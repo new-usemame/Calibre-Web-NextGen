@@ -327,11 +327,81 @@ def test_a_koreader_sync_moves_that_book_to_the_top(library, monkeypatch):
     assert library.ids(user=library.reader) == expected(3)
 
 
-def test_the_read_checkmark_moves_that_book_to_the_top(library, monkeypatch):
-    """Marking a book read is reading activity with no position attached."""
+def test_a_finished_book_takes_its_date_added_place_not_the_top(library, monkeypatch):
+    """#2360: "Recent" is the books you are reading. A book you have finished is
+    not one of them, so it sits among the rest by date added -- whichever way it
+    was finished, and however recently. Before this, every finished book led the
+    list, so a reader with a long history scrolled past all of it to reach
+    anything unread. Book 3 is the OLDEST added, so "at the top" and "in its
+    date-added place" cannot coincide."""
+    _toggle_read_checkmark(library, 3, True, monkeypatch)          # the checkmark
+    _web_reader_save(library, 1, percentage=100.0)                  # read to the end
+    _koreader_sync(library, 1, 100.0, monkeypatch)
+    assert library.ids(user=library.reader) == NEWEST_FIRST
+
+    _web_reader_save(library, 4, percentage=30.0)                   # still reading
+    assert library.ids(user=library.reader) == expected(4)
+    assert library.page(library.reader) == expected(4), \
+        "the paged list views must agree with the plain query"
+
+
+def test_a_finished_book_on_the_kobo_leaves_the_reading_group(library, monkeypatch):
+    """A Kobo reports a finished book as progress plus a Finished status; the
+    stored position is still there, and it must not keep the book on top."""
+    _kobo_progress_put(library, 3, 100.0,
+                       datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc))
+    assert library.ids(user=library.reader)[0] == 3
+
     _toggle_read_checkmark(library, 3, True, monkeypatch)
 
+    assert library.ids(user=library.reader) == NEWEST_FIRST
+
+
+def test_rereading_a_finished_book_brings_it_back(library, monkeypatch):
+    """Starting a finished book over is reading it again: a KOReader sync below
+    the end moves it back to in progress, and it returns to the top."""
+    _toggle_read_checkmark(library, 3, True, monkeypatch)
+    _koreader_sync(library, 3, 20.0, monkeypatch)
+
     assert library.ids(user=library.reader) == expected(3)
+
+
+def test_a_read_status_kept_in_a_calibre_column_is_the_one_that_counts(library, monkeypatch):
+    """When the admin links read status to a Calibre Yes/No column, that column
+    is what the Read filter and the checkmark use, so it is what "finished"
+    means here too -- not a leftover per-user row."""
+    from sqlalchemy import Boolean, Column, ForeignKey, Integer
+    from cps import config as cps_config
+
+    column = type("custom_column_2360", (db.Base,), {
+        "__tablename__": "custom_column_2360",
+        "id": Column(Integer, primary_key=True),
+        "book": Column(Integer, ForeignKey("books.id")),
+        "value": Column(Boolean),
+    })
+    try:
+        column.__table__.create(library.engine)
+        monkeypatch.setitem(db.cc_classes, 2360, column)
+        monkeypatch.setattr(cps_config, "config_read_column", 2360, raising=False)
+
+        _web_reader_save(library, 3, percentage=40.0)
+        assert library.ids(user=library.reader) == expected(3)
+
+        library.session.add(column(book=3, value=True))
+        library.session.commit()
+        assert library.ids(user=library.reader) == NEWEST_FIRST
+    finally:
+        db.Base.metadata.remove(column.__table__)
+
+
+def test_one_readers_finished_book_is_still_anothers_current_read(library, monkeypatch):
+    """Finished is per reader, like the rest of the order."""
+    _web_reader_save(library, 3, percentage=40.0)
+    _web_reader_save(library, 3, percentage=40.0, user=library.stranger)
+    _toggle_read_checkmark(library, 3, True, monkeypatch)            # reader only
+
+    assert library.ids(user=library.reader) == NEWEST_FIRST
+    assert library.ids(user=library.stranger) == expected(3)
 
 
 def test_books_with_activity_order_by_newest_activity_first(library, monkeypatch):

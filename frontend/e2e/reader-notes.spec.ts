@@ -128,6 +128,7 @@ async function openReaderOnEpub(page: Page, offset: number): Promise<number | nu
     // noted highlight on the page" is someone else's — which is exactly how this
     // spec once tapped a stale highlight and read its older note.
     await clearAnnotationsViaApi(page, candidate.id);
+    await clearReadingPositionViaApi(page, candidate.id);
     // Retry the same book once before moving on: the first reader render in a
     // fresh context pays for the epub.js chunk and the book download at once.
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -242,6 +243,34 @@ async function clearAnnotationsViaApi(page: Page, bookId: number) {
       headers: { 'X-CSRFToken': csrf },
     });
   }
+}
+
+/*
+ * Start the book with no reading position on ANY carrier.
+ *
+ * Sibling specs "put the book back" by clearing the web bookmark, but the web
+ * reader also mirrors its progress into the Kobo/KOReader position. With the
+ * web bookmark gone, the next open treats that mirror as a synced device
+ * position and resumes there automatically -- a deferred jump that lands after
+ * the locations index is built. Since #2359 a page turn no longer cancels it,
+ * so it teleported the reader mid-test: measured on CI 2026-09-30 (run
+ * 36748302126), the jump after the reload landed while pageUntilNotedPainted
+ * was paging, and "the noted highlight is repainted after a reload" read 0.
+ *
+ * Marking the book unread is the product's own full reset (#683:
+ * reset_reading_position clears the web bookmark and nulls the device
+ * progress), so no resume is offered and the book opens at its start.
+ */
+async function clearReadingPositionViaApi(page: Page, bookId: number) {
+  const csrf = (await (await page.request.get('/api/v1/auth/csrf')).json()).csrf_token;
+  const res = await page.request.post(`/api/v1/books/${bookId}/read`, {
+    data: { read: false },
+    headers: { 'X-CSRFToken': csrf },
+  });
+  expect(res.ok(), 'reset the test book\'s reading position').toBe(true);
+  const saved = await (await page.request.get(`/api/v1/books/${bookId}/bookmark?format=epub`)).json();
+  expect(saved, 'the test book opens with no saved or synced position')
+    .toMatchObject({ bookmark: null, resume: null });
 }
 
 async function restoreAnnotations(page: Page, bookId: number, keep: string[]) {
@@ -653,9 +682,13 @@ test.describe('reader column count (#325)', () => {
         const doc = frame?.contentDocument;
         if (!doc) return null;
         const el = doc.querySelector('body') || doc.documentElement;
+        const container = document.querySelector('.epub-container');
+        // Changing columns replaces the frame. Its document can exist before
+        // it has a root element; keep polling until a layout can be measured.
+        if (!el || !doc.defaultView || !container) return null;
         return {
-          column: parseFloat(doc.defaultView!.getComputedStyle(el).columnWidth),
-          viewport: document.querySelector('.epub-container')!.clientWidth,
+          column: parseFloat(doc.defaultView.getComputedStyle(el).columnWidth),
+          viewport: container.clientWidth,
         };
       });
 

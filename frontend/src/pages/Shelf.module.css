@@ -230,3 +230,5 @@
 }
 .koboNoticeBtn:disabled { opacity: 0.65; cursor: default; }
 .koboNoticeLink { color: var(--accent); font-size: var(--fs-sm); text-decoration: underline; }
+
+.title:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 4px; }

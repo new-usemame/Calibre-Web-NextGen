@@ -110,6 +110,9 @@ _NATIVE_RULE_FIELDS = (
     {'id': 'timestamp', 'label': 'Date Added', 'type': 'datetime',
      'validation': {'format': 'YYYY-MM-DD'}, 'description': 'When the book was added',
      'operators': _DATE_OPERATORS, '_binding': (db.Books, 'timestamp')},
+    {'id': 'last_modified', 'label': 'Last Modified', 'type': 'datetime',
+     'validation': {'format': 'YYYY-MM-DD'}, 'description': 'When the book was last modified',
+     'operators': _DATE_OPERATORS, '_binding': (db.Books, 'last_modified')},
     {'id': 'has_cover', 'label': 'Has Cover', 'type': 'integer', 'input': 'radio',
      'values': {1: 'Yes', 0: 'No'}, 'description': 'Whether the book has cover art',
      'operators': _SELECT_OPERATORS, '_binding': (db.Books, 'has_cover')},
@@ -523,6 +526,14 @@ def system_magic_shelf_display_name(shelf):
 # field cannot silently leave one UI behind.
 FIELD_MAP = {definition['id']: definition['_binding'] for definition in _NATIVE_RULE_FIELDS}
 
+# Native fields the engine can filter "in the last N days" on: offered by the
+# schema and stored directly on Books. Derived from the same definitions, so a
+# date field added there is filtered rather than silently dropped.
+_RELATIVE_DATE_FIELDS = frozenset(
+    definition['id'] for definition in _NATIVE_RULE_FIELDS
+    if 'in_last_days' in definition['operators'] and definition['_binding'][0] is db.Books
+)
+
 # Mapping from UI operators to SQLAlchemy functions/operators
 OPERATOR_MAP = {
     # 'equals': lambda col, val: col == val,  # Not used by QueryBuilder
@@ -578,7 +589,7 @@ def build_filter_from_rule(rule, user_id=None):
     # Relative date windows requested in #467. Store the duration, not a
     # frozen date, so the shelf keeps moving without an edit or migration.
     if operator_name in ('in_last_days', 'not_in_last_days'):
-        if field_name not in ('pubdate', 'timestamp'):
+        if field_name not in _RELATIVE_DATE_FIELDS:
             return None
         if isinstance(value, bool):
             return None

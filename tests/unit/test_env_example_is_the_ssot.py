@@ -64,6 +64,7 @@ SSOT_EXCEPTIONS = {
     "LISTEN_FDS": "provided by systemd's socket-activation protocol",
     "NODE_ENV": "provided and interpreted by the Node and Vite runtimes",
     "SECRET": "injected transiently by the operator's secret broker into measurement tools",
+
 }
 
 EXAMPLE_ASSIGNMENT = re.compile(r"^\s*#?\s*([A-Z][A-Z0-9_]*)\s*=", re.MULTILINE)
@@ -302,6 +303,18 @@ def _python_env_reads() -> tuple[dict[str, set[str]], list[str]]:
             unresolved.extend(source_unresolved)
             for key, locations in found.items():
                 reads.setdefault(key, set()).update(locations)
+    # The Generic OIDC resolver accepts an injected environment mapping.
+    # Its explicit field registry is the reviewed static seam for that parser;
+    # derive the population so a new field still requires .env documentation.
+    declaration_path = ROOT / "cps" / "oauth_config.py"
+    tree = ast.parse(declaration_path.read_text(encoding="utf-8"))
+    declaration = next(node for node in tree.body if isinstance(node, ast.Assign)
+                       and any(isinstance(target, ast.Name) and target.id == "ENVIRONMENT_FIELDS"
+                               for target in node.targets))
+    fields = ast.literal_eval(declaration.value.args[0])
+    for field in fields:
+        reads.setdefault("GENERIC_OAUTH_" + field, set()).add(
+            f"{_relative(declaration_path)}:{declaration.lineno}:ENVIRONMENT_FIELDS")
     return reads, unresolved
 
 

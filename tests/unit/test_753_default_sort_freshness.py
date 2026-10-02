@@ -24,8 +24,9 @@ def test_default_books_api_requests_newest_first_and_returns_seeded_order():
         book(3, "Newest", datetime(2024, 3, 1, tzinfo=timezone.utc)),
         book(2, "Middle", datetime(2024, 2, 1, tzinfo=timezone.utc)),
     ]
-    def fill(_page, _model, _per_page, _filter, order, *_args):
+    def fill(_page, _model, _per_page, _filter, order, *_args, ids_only=False, **_kwargs):
         assert order == books_mod.SORT_MAP["new"]
+        assert ids_only is False
         rows = sorted(seeded, key=lambda b: b.timestamp, reverse=True)
         wrapped = [SimpleNamespace(Books=b, is_archived=False, read_status=None) for b in rows]
         return wrapped, None, Pagination(1, 60, len(rows))

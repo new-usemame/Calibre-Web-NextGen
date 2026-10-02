@@ -23,9 +23,11 @@ import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { useT } from '../lib/i18n';
+import { useRangeSelection } from '../lib/useRangeSelection';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
+import { advancedSearchHref } from '../lib/advancedSearchUrl';
 import { canUploadBooks } from '../lib/permissions';
 import {
   LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
@@ -316,6 +318,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // Multi-select / bulk mode
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectAllBusy, setSelectAllBusy] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selectAllError, setSelectAllError] = useState('');
+  const selectAllRequest = useRef(0);
+  const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
@@ -643,6 +650,58 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   }, [data, isPlaceholderData, resetKey]);
 
   const total = data?.total ?? 0;
+
+  useLayoutEffect(() => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
+    setSelectAllError('');
+  }, [resetKey]);
+
+  const selectAllBooks = async () => {
+    const requestId = ++selectAllRequest.current;
+    setSelectAllBusy(true);
+    setSelectAllError('');
+    announce(t('Selecting all books in this view…'));
+    try {
+      let ids: number[];
+      // Discover is intentionally a random, one-page pick list. Its current
+      // rendered cards are the entire view, so preserve that exact sample.
+      if (view === 'discover') {
+        ids = allBooks.map((book) => book.id);
+      } else if (filterActive && advParams) {
+        const result = await apiPost<{ ids: number[] }>('/api/v1/search/advanced', {
+          ...advParams, select_all: true,
+        });
+        ids = result.ids;
+      } else {
+        const params = new URLSearchParams({ select_all: '1', sort });
+        if (search && !entityKind && !view) params.set('search', search);
+        if (view) params.set('filter', view);
+        else if (readFilter !== 'all') params.set('filter', readFilter);
+        if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
+        if (entityKind && entityId !== undefined && entityId !== '') {
+          params.set(entityKind, String(entityId));
+        }
+        const result = await apiGet<{ ids: number[] }>(`/api/v1/books?${params.toString()}`);
+        ids = result.ids;
+      }
+      if (requestId !== selectAllRequest.current) return;
+      setSelected(new Set(ids));
+      announce(t('Selected all {count} books in this view.', { count: ids.length }));
+    } catch (error) {
+      if (requestId !== selectAllRequest.current) return;
+      const apiError = error instanceof ApiError ? error : undefined;
+      const limit = apiError?.detail?.code === 'selection_too_large'
+        ? t('Select all is limited to {max} books. Narrow the current view and try again.', {
+          max: typeof apiError.detail.max_items === 'number' ? apiError.detail.max_items : 100000,
+        })
+        : t('Could not select all books. Try again.');
+      setSelectAllError(limit);
+      announce(limit, { assertive: true });
+    } finally {
+      if (requestId === selectAllRequest.current) setSelectAllBusy(false);
+    }
+  };
   const hasMore = allBooks.length < total;
   // A disabled query is not "loading" as far as react-query is concerned, so the
   // pre-measurement render has to be treated as first load explicitly. Without
@@ -797,13 +856,17 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             onClick={() => { setShowingAll(true); setPage(1); }}>
             {t('Show all books')}
           </button>
-          <Link href="/search" className={styles.defaultFilterEdit}>{t('Edit default view')}</Link>
+          {/* Open the form ON the saved criteria: a bare /search showed an
+              empty form, so "editing" the view meant rebuilding it from memory. */}
+          <Link href={advancedSearchHref(defaultFilter)} className={styles.defaultFilterEdit}>
+            {t('Edit default view')}
+          </Link>
         </div>
       )}
 
       <div className={styles.header}>
         {filtered && <span className={styles.kindLabel}>{t(KIND_OPTIONS[entityKind!].label)}</span>}
-        <h1 className={renamingTag ? 'sr-only' : styles.title}>{heading}</h1>
+        <h1 data-testid="catalog-heading" tabIndex={-1} className={renamingTag ? 'sr-only' : styles.title}>{heading}</h1>
         {renamingTag ? (
           <form className={styles.renameForm} onSubmit={submitTagRename}>
             <label className="sr-only" htmlFor="tag-name-input">{t('Tag name')}</label>
@@ -939,9 +1002,13 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <button
           type="button"
           className={selecting ? styles.selectBtnActive : styles.selectBtn}
+          disabled={bulkBusy}
           onClick={() => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
             setSelecting((s) => !s);
             setSelected(new Set());
+            setSelectAllError('');
           }}
           aria-pressed={selecting}
           title={t('Select multiple')}
@@ -949,6 +1016,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           <ListChecks size={15} />
           <span className={styles.selectLabel}>{selecting ? t('Done') : t('Select')}</span>
         </button>
+        {selecting && (
+          <button type="button" className={styles.selectAllBtn}
+            onClick={() => { void selectAllBooks(); }}
+            disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
+            aria-busy={selectAllBusy}>
+            {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
+          </button>
+        )}
 
         {/* Manual library scan (fork #780 / #665) — the SPA equivalent of the
             classic header's "Refresh Library" button. Spins while the background
@@ -1077,6 +1152,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           </div>
         )}
       </div>
+      {selectAllError && <p className={styles.refreshStatusError}>{selectAllError}</p>}
 
       {/* Library-scan status (aria-live so the "please wait" → "complete"
           transition is announced, SC 4.1.3). Hidden when idle + empty. */}
@@ -1144,14 +1220,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   hideShelfTags={shelfBadgesHidden}
                   selectable={selecting}
                   selected={selected.has(book.id)}
-                  onToggleSelect={(b) =>
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(b.id)) next.delete(b.id);
-                      else next.add(b.id);
-                      return next;
-                    })
-                  }
+                  onToggleSelect={toggleSelect}
+                  selectionDisabled={selectAllBusy || bulkBusy}
                   onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
                   removeLabel={t('Remove {title} from my library', { title: book.title })}
                 />
@@ -1234,10 +1304,19 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           ids={[...selected]}
           personalLibrary={personalLibrary}
           onClear={() => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
             setSelected(new Set());
             setSelecting(false);
           }}
-          onRetryable={(failedIds) => setSelected(new Set(failedIds))}
+          onRetryable={(failedIds) => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
+            setSelected(new Set(failedIds));
+          }}
+          onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy}
+          currentTag={entityKind === 'tag' ? entityName : undefined}
           onChanged={() => {
             // A bulk action changed read state / membership / removed books.
             // Reset the accumulated grid so the refetched first page replaces it

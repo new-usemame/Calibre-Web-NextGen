@@ -144,7 +144,9 @@ def test_my_library_bulk_remove_is_mode_gated_primary_and_not_css_hidden():
     assert "t('Remove from my library')" in bulk_bar
     assert "t('Delete from the global library')" in bulk_bar
     assert "reportAccounting(result, message, { failureReasonFor })" in bulk_bar
-    assert "onRetryable={(failedIds) => setSelected(new Set(failedIds))}" in catalog
+    # Actual per-item retry retention after a bulk read mutation fails is
+    # exercised in select-all-2268.spec.ts; pinning this callback's JSX text
+    # would reject the request-invalidation guard without testing behavior.
     assert ".actionPrimary {" in styles
     assert "background: var(--accent)" in styles
     assert ".action, .actionPrimary, .actionDanger { gap: 0; font-size: 0; }" in styles

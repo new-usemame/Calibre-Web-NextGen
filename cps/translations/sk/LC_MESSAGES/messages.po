@@ -224,6 +224,27 @@ msgstr "Nie je možné zapisovať do databázy nastavení"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Support settings were not saved. Use an HTTP or HTTPS URL without "
+"credentials, with a URL up to 2048 characters and a label up to 80 "
+"characters."
+msgstr ""
+
+#: cps/admin.py
+msgid "Invalid default body font option"
+msgstr ""
+
+#: cps/admin.py
+msgid "Invalid default display font option"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -391,6 +412,10 @@ msgid ""
 msgstr ""
 "Vybrané knihy nezodpovedajú tomuto náhľadu. Nahrajte databázu zariadenia "
 "znova."
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -2398,6 +2423,10 @@ msgstr ""
 "Pomôžte zlepšiť preklad Calibre-Web NextGen do jazyka %(language)s — vo "
 "vašom jazyku ešte treba preložiť %(count)s reťazcov."
 
+#: cps/api/auth.py cps/render_template.py cps/spa_strings.py
+msgid "Contact support"
+msgstr ""
+
 #: cps/search.py
 msgid "Published after "
 msgstr "Vydané po "
@@ -3303,13 +3332,15 @@ msgstr "Vymazať hodnotenie"
 msgid "Not rated"
 msgstr "Nehodnotené"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Áno"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Nie"
 
@@ -3513,6 +3544,20 @@ msgid ""
 msgstr ""
 "Platí pre účty vytvorené odteraz. Každý si vyberá vlastnú v časti Účet → "
 "Téma."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI body font for new users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI display font for new users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Applies to accounts created from now on. Each user can change these fonts "
+"under Account settings."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add a format"
@@ -3781,15 +3826,15 @@ msgstr "Predvolené (Optima / Sans-Serif)"
 msgid "Default (Bookish Serif)"
 msgstr "Predvolené (knižné pätkové)"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "System Sans-Serif"
 msgstr "Systémové bezpätkové"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Bookish Serif"
 msgstr "Knižné pätkové"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Monospace"
 msgstr "Neproporcionálne"
 
@@ -4428,6 +4473,10 @@ msgid "Date Added"
 msgstr "Dátum pridania"
 
 #: cps/spa_strings.py
+msgid "Last Modified"
+msgstr "Naposledy upravené"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
 msgstr "Zmazať „{name}“? Odstráni sa z {count} knihy, ktorá zostane zachovaná."
@@ -4832,12 +4881,32 @@ msgid "Unused by this arrangement"
 msgstr "Toto usporiadanie nepoužíva"
 
 #: cps/spa_strings.py
+msgid "Book details"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show original filename"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the imported file name visible on book detail pages."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Shows the name a book had when it was imported."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(žiadny zachytený text)"
 
 #: cps/spa_strings.py
 msgid "(replace cover)"
 msgstr "(nahradiť obálku)"
+
+#: cps/spa_strings.py
+msgid ", search supported"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "1 annotation assigned to this source"
@@ -4861,9 +4930,19 @@ msgid "3:4 (generic)"
 msgstr "3:4 (všeobecné)"
 
 #: cps/spa_strings.py
+msgid "A copy was already in the library; it was kept."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "A device calling itself “{name}” wants to connect to your account."
 msgstr "Zariadenie s názvom „{name}“ sa chce pripojiť k vášmu účtu."
+
+#: cps/spa_strings.py
+msgid ""
+"A download redirect tried to send a credential to another origin and was "
+"blocked."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -4876,6 +4955,11 @@ msgid "A few random picks from your library"
 msgstr "Niekoľko náhodných kníh z vašej knižnice"
 
 #: cps/spa_strings.py
+msgid ""
+"A new catalog is added switched off. Test it first, then make it available."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "A note about the book, not tied to a passage"
 msgstr "Poznámka ku knihe, neviazaná na konkrétnu pasáž"
 
@@ -4886,6 +4970,14 @@ msgid ""
 msgstr ""
 "Je potrebné jednorazové úplné hľadanie duplikátov. Spustite ho pomocou "
 "„Hľadať duplikáty“ vyššie."
+
+#: cps/spa_strings.py
+msgid "API endpoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "API key"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
@@ -4905,8 +4997,21 @@ msgid "Account: {name}"
 msgstr "Účet: {name}"
 
 #: cps/spa_strings.py
+msgid ""
+"Acquisition is not ready right now. Ask an administrator to check its status."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Active"
 msgstr "Aktívne"
+
+#: cps/spa_strings.py
+msgid "Add a connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add group"
@@ -4939,6 +5044,14 @@ msgstr "Pridať medzi obľúbené"
 #: cps/spa_strings.py
 msgid "Add to library"
 msgstr "Pridať do knižnice"
+
+#: cps/spa_strings.py
+msgid "Added to your activity."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Additional local download origins"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Admin group"
@@ -4981,6 +5094,10 @@ msgstr ""
 "čítania Prehliadač."
 
 #: cps/spa_strings.py
+msgid "All catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All shelves"
 msgstr "Všetky police"
 
@@ -4989,12 +5106,37 @@ msgid "Allow remote (magic-link) login"
 msgstr "Povoliť vzdialené prihlásenie (magickým odkazom)"
 
 #: cps/spa_strings.py
+msgid "Allow requests from book sources"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Povolené skupiny (oddelené čiarkou)"
 
 #: cps/spa_strings.py
+msgid "Allowed torrent tracker origins"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Also add the book to My Library"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Also on {names}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "An administrator has not added a book source, or none is switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5133,12 +5275,27 @@ msgid "Auto-create users on first login"
 msgstr "Automaticky vytvárať používateľov pri prvom prihlásení"
 
 #: cps/spa_strings.py
+msgid "Available to users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Naspäť"
+
+#: cps/spa_strings.py
 msgid "Back to formatting"
 msgstr "Späť na formátovanie"
 
 #: cps/spa_strings.py
 msgid "Back to library"
 msgstr "Späť do knižnice"
+
+#: cps/spa_strings.py
+msgid "Back to top"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Background"
@@ -5178,6 +5335,10 @@ msgid "Bold"
 msgstr "Tučné"
 
 #: cps/spa_strings.py
+msgid "Book category ID"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Book default"
 msgstr "Predvolené knihou"
 
@@ -5188,6 +5349,24 @@ msgstr "Hustota kníh"
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Poradie kníh"
+
+#: cps/spa_strings.py
+msgid "Book sources"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book sources are off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book sources are on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Book sources could not be reached just now. This is not a change to your "
+"access."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5232,6 +5411,16 @@ msgstr ""
 "synchronizácii zmiznú z knižnice čítačky. Tu vo vašej knižnici zostanú."
 
 #: cps/spa_strings.py
+msgid ""
+"Browse the catalogs your administrator has added. A book you pick is "
+"imported into the library here — it is not just downloaded to your device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browse this catalog"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Browser"
 msgstr "Prehliadač"
 
@@ -5248,6 +5437,10 @@ msgid "Built-in providers (leave blank to disable):"
 msgstr "Vstavaní poskytovatelia (nechajte prázdne na vypnutie):"
 
 #: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Bulleted list"
 msgstr "Odrážkový zoznam"
 
@@ -5258,6 +5451,25 @@ msgstr "Cesta k certifikátu CA"
 #: cps/spa_strings.py
 msgid "CWA settings"
 msgstr "Nastavenia CWA"
+
+#: cps/spa_strings.py
+msgid ""
+"CWNG cannot read the mapped completed folder. Check its mount and "
+"permissions."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"CWNG copies a completed EPUB or PDF from this mapping. It does not move "
+"files, delete client jobs, or change seeding limits. NZBGet needs "
+"credentials that can read configuration, queue and history. qBittorrent "
+"needs an existing category. Transmission uses the configured folder and "
+"label."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Can browse and request"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Can upload books"
@@ -5277,6 +5489,10 @@ msgid "Cancel"
 msgstr "Zrušiť"
 
 #: cps/spa_strings.py
+msgid "Cancel editing"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Cancel rename"
 msgstr "Zrušiť premenovanie"
 
@@ -5288,6 +5504,30 @@ msgstr "Zrušiť úpravu názvu"
 #, python-brace-format
 msgid "Cancel {task}"
 msgstr "Zrušiť {task}"
+
+#: cps/spa_strings.py
+msgid "Cancelling…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog address"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog trail"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalogs and download clients"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -5310,6 +5550,15 @@ msgid "Check again"
 msgstr "Skontrolovať znova"
 
 #: cps/spa_strings.py
+msgid "Check the address and the sign-in details."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Checked {count} catalogs for “{query}”."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Kontroluje sa…"
 
@@ -5320,6 +5569,10 @@ msgstr "Vyberte obálku"
 #: cps/spa_strings.py
 msgid "Choose a cover image to upload"
 msgstr "Vyberte obrázok obálky na nahratie"
+
+#: cps/spa_strings.py
+msgid "Choose a download client connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose an image…"
@@ -5354,6 +5607,10 @@ msgid "Client ID"
 msgstr "ID klienta"
 
 #: cps/spa_strings.py
+msgid "Client category or label"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Client secret"
 msgstr "Tajný kľúč klienta"
 
@@ -5374,6 +5631,12 @@ msgid "Code on the e-reader"
 msgstr "Kód na čítačke"
 
 #: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Colour scheme"
 msgstr "Farebná schéma"
 
@@ -5390,6 +5653,10 @@ msgid "Compact"
 msgstr "Kompaktná"
 
 #: cps/spa_strings.py
+msgid "Completed folder as the download client sees it"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Configuration"
 msgstr "Konfigurácia"
 
@@ -5401,6 +5668,10 @@ msgstr "Nakonfigurované"
 #, python-brace-format
 msgid "Confirm delete tag {name}"
 msgstr "Potvrďte zmazanie značky {name}"
+
+#: cps/spa_strings.py
+msgid "Confirm deletion"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
@@ -5421,6 +5692,30 @@ msgid ""
 msgstr ""
 "Pripojte tento účet k čítačke a potom raz zosynchronizujte, aby ste overili, "
 "že sa dostala do vašej knižnice."
+
+#: cps/spa_strings.py
+msgid "Connection changed. Reload its settings before saving."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection saved. Test it, then switch it on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection type"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection works."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Contacting the source"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Continue"
@@ -5555,6 +5850,10 @@ msgid "Could not load users."
 msgstr "Používateľov sa nepodarilo načítať."
 
 #: cps/spa_strings.py
+msgid "Could not look up who asked"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not open that highlight."
 msgstr "Toto zvýraznenie sa nepodarilo otvoriť."
 
@@ -5577,6 +5876,10 @@ msgstr "Tento archív komiksu sa nepodarilo prečítať."
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not reload metadata"
 msgstr "Metadáta sa nepodarilo znova načítať"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
@@ -5643,6 +5946,10 @@ msgid "Could not search this book."
 msgstr "V tejto knihe sa nepodarilo vyhľadávať."
 
 #: cps/spa_strings.py
+msgid "Could not select all books. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
 msgstr "Hľadanie duplikátov sa nepodarilo spustiť."
 
@@ -5650,7 +5957,7 @@ msgstr "Hľadanie duplikátov sa nepodarilo spustiť."
 msgid "Could not update pairing details."
 msgstr "Podrobnosti párovania sa nepodarilo aktualizovať."
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Policu sa nepodarilo aktualizovať."
 
@@ -5693,10 +6000,6 @@ msgid "Cover updated from the selected result."
 msgstr "Obálka bola aktualizovaná z vybraného výsledku."
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr "Vytvoriť"
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr "Vytvoriť účet"
 
@@ -5707,6 +6010,10 @@ msgstr "Vytvoriť účet"
 #: cps/spa_strings.py
 msgid "Create failed."
 msgstr "Vytvorenie zlyhalo."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
@@ -5785,7 +6092,7 @@ msgstr "Dátum pridania"
 msgid "Declined. {name} was not connected."
 msgstr "Zamietnuté. {name} nebolo pripojené."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default (System Sans-Serif)"
 msgstr "Predvolené (systémové bezpätkové)"
 
@@ -5856,6 +6163,11 @@ msgid ""
 msgstr ""
 "Zmazať túto URL synchronizácie Kobo? Aktuálna URL prestane fungovať na "
 "všetkých spárovaných zariadeniach Kobo."
+
+#: cps/spa_strings.py
+msgid ""
+"Delete this connection and its saved credentials? Request history is kept."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
@@ -6036,8 +6348,21 @@ msgid "Download"
 msgstr "Stiahnuť"
 
 #: cps/spa_strings.py
+msgid "Download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Download ready-made plugin"
 msgstr "Stiahnuť hotový plugin"
+
+#: cps/spa_strings.py
+msgid "Download release"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Download {format}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6047,6 +6372,14 @@ msgid ""
 msgstr ""
 "Stiahnuté: {file}. Obsahuje heslo k tomuto účtu: keď bude plugin v čítačke, "
 "zip súbor zmažte."
+
+#: cps/spa_strings.py
+msgid "Downloaded, waiting to import"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Downloading"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Drawing the cover…"
@@ -6121,6 +6454,10 @@ msgid "Edit HTML"
 msgstr "Upraviť HTML"
 
 #: cps/spa_strings.py
+msgid "Edit connection"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Edit cover"
 msgstr "Upraviť obálku"
 
@@ -6140,7 +6477,7 @@ msgstr "Upraviť moju súkromnú obálku"
 msgid "Edit note"
 msgstr "Upraviť poznámku"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr "Upravovať verejné police"
 
@@ -6156,6 +6493,11 @@ msgstr "Upraviť inteligentnú policu"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Upraviť názov pre {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Edit {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -6194,6 +6536,10 @@ msgstr "E-mailový server"
 msgid "Email settings saved."
 msgstr "Nastavenia e-mailu boli uložené."
 
+#: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
+msgid "Empty"
+msgstr "Prázdne"
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 msgid "Enable Kobo sync"
 msgstr "Povoliť synchronizáciu Kobo"
@@ -6201,6 +6547,10 @@ msgstr "Povoliť synchronizáciu Kobo"
 #: cps/spa_strings.py
 msgid "Enable e-reader sync"
 msgstr "Zapnúť synchronizáciu s čítačkou"
+
+#: cps/spa_strings.py
+msgid "Enabled"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
@@ -6263,13 +6613,17 @@ msgstr "Exportovať"
 msgid "Expose only selected shelves over OPDS"
 msgstr "Sprístupniť cez OPDS len vybrané police"
 
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr "Police sa nepodarilo načítať."
+#: cps/spa_strings.py cps/tasks_status.py
+msgid "Failed"
+msgstr "Neúspešná"
 
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Nepodarilo sa načítať."
+
+#: cps/spa_strings.py
+msgid "Feature"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6290,6 +6644,10 @@ msgid "Fill style"
 msgstr "Štýl výplne"
 
 #: cps/spa_strings.py
+msgid "Filter"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "Filtrovať podľa zariadenia"
 
@@ -6302,6 +6660,18 @@ msgstr "Filtrovať {items}"
 #, python-brace-format
 msgid "Filter {items}…"
 msgstr "Filtrovať {items}…"
+
+#: cps/spa_strings.py
+msgid "Find books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Find books is unavailable"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Finish or cancel outstanding requests before editing this connection."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6363,6 +6733,10 @@ msgstr "Formátovanie sa zachová tam, kde ho stránka knihy podporuje."
 #: cps/spa_strings.py
 msgid "From address"
 msgstr "Adresa odosielateľa"
+
+#: cps/spa_strings.py cps/templates/search_form.html
+msgid "From:"
+msgstr "Od:"
 
 #: cps/spa_strings.py
 msgid "Full screen"
@@ -6446,6 +6820,10 @@ msgid "Group object filter"
 msgstr "Filter objektov skupiny"
 
 #: cps/spa_strings.py
+msgid "Handing over to the library"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Has pen or drawing notes"
 msgstr "Obsahuje poznámky perom alebo kresby"
 
@@ -6477,6 +6855,10 @@ msgstr "Skryté"
 msgid "Hidden built-ins"
 msgstr "Skryté vstavané"
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Skryť"
@@ -6500,6 +6882,11 @@ msgstr "Skryť polia"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Skryť heslo"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6555,6 +6942,13 @@ msgid "Identifiers"
 msgstr "Identifikátory"
 
 #: cps/spa_strings.py
+msgid ""
+"If Prowlarr redirects to another source on your local network, list its "
+"exact origin here. Separate origins with commas. Credentials stay scoped to "
+"their original origin."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "Obrázok z {source}"
@@ -6570,6 +6964,14 @@ msgstr "Import a export"
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "Importované ako"
+
+#: cps/spa_strings.py
+msgid "Imported into the library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Importing"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "In your book"
@@ -6590,6 +6992,10 @@ msgstr "Neaktívne"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Zahrnuté"
+
+#: cps/spa_strings.py
+msgid "Indexer preset"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
@@ -6630,6 +7036,10 @@ msgstr "Priebeh v KOReader"
 #: cps/spa_strings.py
 msgid "KOReader sync is not enabled on this server."
 msgstr "Synchronizácia KOReader nie je na tomto serveri zapnutá."
+
+#: cps/spa_strings.py
+msgid "Keep connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -6725,8 +7135,37 @@ msgid "Leave a field empty to use its default."
 msgstr "Ak chcete použiť predvolenú hodnotu, nechajte pole prázdne."
 
 #: cps/spa_strings.py
+msgid ""
+"Leave the credential blank to keep it. Saving switches the connection off "
+"and expires old selections; test it before enabling it again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Left"
 msgstr "Vľavo"
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before a catalog can be added."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before a catalog can be made "
+"available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before this can be switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Let people request books from an OPDS catalog or an indexer connected to a "
+"download client. A requested book is imported into this library through the "
+"normal ingest path, credited to the account that asked for it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Lettering"
@@ -6743,6 +7182,17 @@ msgstr "Výška riadku"
 #: cps/spa_strings.py
 msgid "Link address"
 msgstr "Adresa odkazu"
+
+#: cps/spa_strings.py
+msgid ""
+"List the exact HTTP, HTTPS or UDP tracker origins you trust, separated by "
+"commas. Torrents using other trackers are blocked. Source credentials are "
+"never sent to trackers."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Literata"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Load more"
@@ -6813,6 +7263,10 @@ msgstr "Prihlásiť sa cez"
 #: cps/spa_strings.py
 msgid "Logs"
 msgstr "Záznamy"
+
+#: cps/spa_strings.py
+msgid "Looking up who asked…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Looks good"
@@ -6935,6 +7389,10 @@ msgid "Model"
 msgstr "Model"
 
 #: cps/spa_strings.py
+msgid "More"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Ďalšie akcie pre {name}"
@@ -6984,6 +7442,10 @@ msgid "My private cover"
 msgstr "Moja súkromná obálka"
 
 #: cps/spa_strings.py
+msgid "NZBGet download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Name"
 msgstr "Názov"
 
@@ -7020,10 +7482,6 @@ msgid "New shelf name"
 msgstr "Názov novej police"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Názov novej police…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Nová polica…"
 
@@ -7047,6 +7505,10 @@ msgstr "Najnovšie"
 msgid "Newest published"
 msgstr "Najnovšie vydané"
 
+#: cps/spa_strings.py
+msgid "Newznab / Torznab indexer"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
 msgid "Next"
@@ -7055,6 +7517,18 @@ msgstr "Ďalší"
 #: cps/spa_strings.py
 msgid "Next page"
 msgstr "Ďalšia strana"
+
+#: cps/spa_strings.py
+msgid "No EPUB or PDF available from this catalog."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No accepted upload format allows EPUB or PDF."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No approval needed"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -7070,6 +7544,10 @@ msgid "No books match those criteria."
 msgstr "Týmto kritériám nevyhovujú žiadne knihy."
 
 #: cps/spa_strings.py
+msgid "No books on this catalog matched that search."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books were reported in the latest device inventory."
 msgstr "V poslednom inventári zariadenia neboli nahlásené žiadne knihy."
 
@@ -7078,6 +7556,14 @@ msgid "No candidates found yet. Try a different search or refresh."
 msgstr ""
 "Zatiaľ sa nenašli žiadni kandidáti. Skúste iné vyhľadávanie alebo obnovte "
 "stránku."
+
+#: cps/spa_strings.py
+msgid "No catalogs yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No catalogs yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No contents found."
@@ -7145,9 +7631,12 @@ msgid "No shelves yet — create one below."
 msgstr "Zatiaľ žiadne police — vytvorte si jednu nižšie."
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
+msgid "No shelves yet. Create a shelf to start collecting books."
 msgstr ""
-"Zatiaľ žiadne police. Vytvorte si jednu vyššie a začnite zbierať knihy."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -7189,6 +7678,10 @@ msgstr "Nenastavené"
 #: cps/spa_strings.py
 msgid "Not set up yet"
 msgstr "Zatiaľ nenastavené"
+
+#: cps/spa_strings.py
+msgid "Not tested in this session."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
@@ -7234,12 +7727,26 @@ msgstr ""
 "sa tu aj vo vašej čítačke."
 
 #: cps/spa_strings.py
+msgid "Nothing requested yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Zatiaľ nie je čo zobraziť."
 
 #: cps/spa_strings.py
 msgid "Numbered list"
 msgstr "Číslovaný zoznam"
+
+#: cps/spa_strings.py
+msgid "OPDS catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. Nothing is fetched and no permission changes until you turn "
+"this on."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -7318,6 +7825,10 @@ msgstr ""
 msgid "Open administration"
 msgstr "Otvoriť správu"
 
+#: cps/spa_strings.py cps/templates/annotations_view.html
+msgid "Open book"
+msgstr "Otvoriť knihu"
+
 #: cps/spa_strings.py
 msgid "Open classic reader"
 msgstr "Otvoriť klasickú čítačku"
@@ -7341,6 +7852,10 @@ msgstr "Otvoriť klasické rozhranie"
 #: cps/spa_strings.py
 msgid "Open the link below on your signed-in device."
 msgstr "Otvorte odkaz nižšie na svojom prihlásenom zariadení."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
@@ -7564,6 +8079,10 @@ msgstr "Predchádzajúca strana"
 msgid "Progress"
 msgstr "Pokrok"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Public"
 msgstr "Verejné"
@@ -7581,6 +8100,10 @@ msgid "Quarantined books"
 msgstr "Knihy v karanténe"
 
 #: cps/spa_strings.py
+msgid "Queued"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Quote"
 msgstr "Citácia"
 
@@ -7596,6 +8119,11 @@ msgstr "Hodnotenie"
 #: cps/spa_strings.py
 msgid "Rating (stars)"
 msgstr "Hodnotenie (hviezdičky)"
+
+#: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Read from here"
@@ -7638,6 +8166,10 @@ msgid "Reading positions"
 msgstr "Pozície čítania"
 
 #: cps/spa_strings.py
+msgid "Ready to run requests."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Ready-made plugin (USB)"
 msgstr "Hotový plugin (USB)"
 
@@ -7658,8 +8190,16 @@ msgid "Refresh"
 msgstr "Obnoviť"
 
 #: cps/spa_strings.py
+msgid "Refresh catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Registering…"
 msgstr "Registruje sa…"
+
+#: cps/spa_strings.py
+msgid "Reject"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reload"
@@ -7691,6 +8231,10 @@ msgstr "Zapamätať si ma"
 #: cps/spa_strings.py
 msgid "Remove device"
 msgstr "Odstrániť zariadenie"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
@@ -7726,8 +8270,21 @@ msgstr "Odstrániť pravidlo"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "Remove tag \"{tag}\""
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Remove these"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "Remove {name}?"
 msgstr "Odstrániť {name}?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -7776,6 +8333,52 @@ msgid "Report this problem"
 msgstr "Nahlásiť tento problém"
 
 #: cps/spa_strings.py
+msgid "Request approved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request cancelled"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request release"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request {format}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requested by a removed account"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Requested by {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requested. An administrator has to approve it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requests are paused"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requests cannot run yet:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr "Vyžadovať členstvo v skupine"
 
@@ -7811,6 +8414,11 @@ msgid "Restoring…"
 msgstr "Obnovuje sa…"
 
 #: cps/spa_strings.py
+msgid ""
+"Results stay separate by catalog so you can choose the edition and format."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Resume at {percent} from another device"
 msgstr "Pokračovať na {percent} z iného zariadenia"
@@ -7826,6 +8434,10 @@ msgid ""
 msgstr ""
 "Skúsiť znova dokončí zostávajúce účty bez zmeny už dokončených výberov. "
 "Vrátiť späť obnoví nastavenia spred začiatku nastavovania."
+
+#: cps/spa_strings.py
+msgid "Retrying."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -7857,6 +8469,10 @@ msgid "Run time"
 msgstr "Čas spustenia"
 
 #: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "SMTP server"
 msgstr "SMTP server"
 
@@ -7867,6 +8483,10 @@ msgstr "SSL/TLS"
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "STARTTLS"
 msgstr "STARTTLS"
+
+#: cps/spa_strings.py
+msgid "Same completed folder inside CWNG"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/config_db.html
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
@@ -7880,6 +8500,10 @@ msgstr "Uložiť"
 #: cps/spa_strings.py
 msgid "Save as preset"
 msgstr "Uložiť ako predvoľbu"
+
+#: cps/spa_strings.py
+msgid "Save connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save email settings"
@@ -7935,8 +8559,16 @@ msgid "Scopes"
 msgstr "Rozsahy"
 
 #: cps/spa_strings.py
+msgid "Search all catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search inside book"
 msgstr "Hľadať v knihe"
+
+#: cps/spa_strings.py
+msgid "Search remaining catalogs"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Search sources with different words"
@@ -7951,8 +8583,21 @@ msgid "Search this book"
 msgstr "Hľadať v tejto knihe"
 
 #: cps/spa_strings.py
+msgid "Search this catalog"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Hľadať názov, autora…"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Search: {query}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching catalogs…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
@@ -7961,6 +8606,10 @@ msgstr "Prehľadávajú sa všetky zdroje…"
 #: cps/spa_strings.py
 msgid "Searching this book…"
 msgstr "Prehľadáva sa táto kniha…"
+
+#: cps/spa_strings.py
+msgid "Searching this catalog…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -7993,6 +8642,17 @@ msgstr "Vybrať všetko v skupine"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid ""
+"Select all is limited to {max} books. Narrow the current view and try again."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select all {count} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "Select all {n}"
 msgstr "Vybrať všetkých {n}"
 
@@ -8011,8 +8671,21 @@ msgid "Select note: {text}"
 msgstr "Vybrať poznámku: {text}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Selected all {count} books in this view."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Selected books"
 msgstr "Vybrané knihy"
+
+#: cps/spa_strings.py
+msgid "Selecting all books in this view…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Selecting…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
@@ -8109,8 +8782,17 @@ msgid "Settings"
 msgstr "Nastavenia"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Nastavenia boli uložené."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8120,9 +8802,29 @@ msgstr "Zdieľaná obálka"
 msgid "Shelf name"
 msgstr "Názov police"
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Názov police je povinný"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr "Polica sa nenašla."
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Ukázať"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8175,6 +8877,10 @@ msgid "Show hidden books"
 msgstr "Zobraziť skryté knihy"
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr "Zobraziť menej"
 
@@ -8202,6 +8908,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "Show {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid ""
 "Show {name} the global library again? Their selection is kept but no longer "
 "used, and their e-reader syncs the global library at the next update."
@@ -8226,6 +8937,32 @@ msgid "Showing {shown} of {total} books from the latest device inventory."
 msgstr "Zobrazuje sa {shown} z {total} kníh z posledného inventára zariadenia."
 
 #: cps/spa_strings.py
+msgid "Minimum books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter a whole number of at least 1."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Correct the minimum books value to see results."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No matching {items} for the selected filters."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing {shown} of {total} {items}."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shuffle picks"
 msgstr "Zamiešať výber"
 
@@ -8246,6 +8983,10 @@ msgid "Sign out"
 msgstr "Odhlásiť sa"
 
 #: cps/spa_strings.py
+msgid "Sign-in"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Signing in…"
 msgstr "Prihlasuje sa…"
 
@@ -8258,12 +8999,22 @@ msgid "Size (pt)"
 msgstr "Veľkosť (pt)"
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Inteligentná polica sa nenašla."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Inteligentné police"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -8396,12 +9147,30 @@ msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
 msgstr "Synchronizovať do čítačiek (Kobo a KOReader) len vybrané police"
 
 #: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Table view"
 msgstr "Tabuľkové zobrazenie"
 
 #: cps/spa_strings.py
 msgid "Tag"
 msgstr "Značka"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {n} book(s)."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {succeeded}; {failed} failed."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
@@ -8440,6 +9209,10 @@ msgid "Technical details"
 msgstr "Technické podrobnosti"
 
 #: cps/spa_strings.py
+msgid "Test connection"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Text templates"
 msgstr "Textové šablóny"
 
@@ -8448,8 +9221,89 @@ msgid "That URL is not a usable image."
 msgstr "Táto URL nie je použiteľný obrázok."
 
 #: cps/spa_strings.py
+msgid "That account is no longer allowed to request books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"That address cannot be reached on a local network. Loopback, link-local and "
+"cloud metadata addresses are never allowed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That catalog no longer exists."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That choice expired. Refresh the page and pick the file again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That page expired. Go back to the top and try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"That permission could not be changed. Check that book sources are still "
+"switched on, then try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request has already moved on and can no longer be stopped."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request has already moved on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request is no longer in a state that can be retried."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request is no longer waiting."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The Calibre library folder could not be found."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The KOReader plugin is not part of this installation."
 msgstr "Plugin KOReader nie je súčasťou tejto inštalácie."
+
+#: cps/spa_strings.py
+msgid "The acquisition database could not be opened."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The acquisition key is missing."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The acquisition tables are not ready."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The acquisition tables are not ready. Restart the server, then reload this "
+"page."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The approval queue could not be loaded, so requests may be waiting unseen."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The authors, tags, publishers, and languages you enter will be removed from "
+"each selected book. Books without them are left unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The background scheduler is not running."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
@@ -8464,17 +9318,145 @@ msgstr ""
 "Záznam knihy, metadáta, police a stav čítania zostanú dostupné. Ak ide o "
 "posledný formát, náhradu môžete pridať neskôr."
 
+#: cps/spa_strings.py
+msgid "The catalog could not be changed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The catalog could not be read"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The catalogs could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download contains multiple books. A single-book release is "
+"required."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed download contains no usable EPUB or PDF."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download is outside its mapped folder or uses an unsafe file "
+"path."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed-folder mapping does not cover the configured download client "
+"folder."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The connection could not be deleted. Finish or cancel outstanding requests "
+"first."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection did not answer with a response we can read."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection settings could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection test failed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client did not finish this download before the waiting limit. "
+"Check its queue before retrying."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client did not report a completed folder and category that "
+"could be verified."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client for this source is unavailable. Ask an administrator to "
+"check it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client is unavailable or its settings changed. Make a new "
+"selection after an administrator checks it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The download client reported that this download failed."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "The global library"
 msgstr "Globálna knižnica"
+
+#: cps/spa_strings.py
+msgid "The indexer did not return a valid NZB descriptor."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise a supported keyword search."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise this book category."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ingest folder could not be found."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ingest folder is not writable."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ingest service is not running."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The library cover is back for you."
 msgstr "Obálka knižnice sa vám vrátila."
 
 #: cps/spa_strings.py
+msgid "The list of people could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr "Zmena predvoľby zlyhala. Skúste to znova."
+
+#: cps/spa_strings.py
+msgid "The request could not be approved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be made."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be rejected. It may have already moved on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be retried."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be stopped."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
@@ -8487,6 +9469,10 @@ msgid ""
 msgstr ""
 "Celoserverová voľba je tiež vypnutá, takže sa zatiaľ nemôže nič "
 "synchronizovať. Správca ju môže zapnúť v klasických nastaveniach servera."
+
+#: cps/spa_strings.py
+msgid "The setting could not be changed."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
@@ -8508,6 +9494,90 @@ msgstr ""
 "správca."
 
 #: cps/spa_strings.py
+msgid "The source asked us to wait."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The source did not answer with a catalog we can read."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The source or download client rejected its credentials. Ask an administrator "
+"to check the credential."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The source redirected to a network address that this connection does not "
+"allow."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The submission could not be confirmed. Check the download client queue and "
+"history before trying again; CWNG will not blindly send a duplicate."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The torrent descriptor is unsupported or contains unsafe paths or links."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The transfer did not complete."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There are no other accounts on this server yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "These results could not be refreshed and may be out of date."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be loaded, so nothing on this page can be trusted "
+"yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be refreshed, so what is shown may be out of date."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This account cannot use book sources, or the feature is switched off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This account is no longer an administrator."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This book was already imported."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This catalog could not be searched. Results from other catalogs are still "
+"available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This catalog does not offer search."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This catalog page is empty."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This category does not exist in the download client."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "This changes only your view of this book and copies delivered to your e-"
 "readers. The shared book cover and everyone else’s view stay unchanged."
@@ -8527,12 +9597,28 @@ msgid "This code has already been approved or declined."
 msgstr "Tento kód už bol schválený alebo zamietnutý."
 
 #: cps/spa_strings.py
+msgid "This connection is on my home or local network"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This database carries permissions from the old experimental Store. They need "
+"review before book sources can be switched on."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device has not reported its inventory yet."
 msgstr "Toto zariadenie zatiaľ nenahlásilo svoj inventár."
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr "Toto zariadenie sa už nebude synchronizovať."
+
+#: cps/spa_strings.py
+msgid ""
+"This download client API version is not supported. Check the documented "
+"supported versions."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This e-reader is unavailable or belongs to another account."
@@ -8552,6 +9638,12 @@ msgstr "Toto zvýraznenie nemá uloženú pozíciu"
 
 #: cps/spa_strings.py
 msgid ""
+"This is a torrent release. Choose qBittorrent or Transmission for this "
+"indexer. Usenet clients accept NZB releases."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
 "Change and enter the address the e-reader can use, such as "
 "http://192.168.1.20:8083."
@@ -8559,6 +9651,12 @@ msgstr ""
 "Toto je vlastná adresa tohto počítača, na ktorú sa čítačka nedostane. Zvoľte "
 "Zmeniť a zadajte adresu, ktorú môže čítačka použiť, napríklad "
 "http://192.168.1.20:8083."
+
+#: cps/spa_strings.py
+msgid ""
+"This job is no longer in the download client queue or history. It will not "
+"be submitted again automatically."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
@@ -8571,8 +9669,16 @@ msgstr ""
 "Platnosť tohto magického odkazu vypršala. Vygenerujte nový a skúste to znova."
 
 #: cps/spa_strings.py
+msgid "This page could not be refreshed, so what is shown may be out of date."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This page doesn't exist here."
 msgstr "Táto stránka tu neexistuje."
+
+#: cps/spa_strings.py
+msgid "This page is not available to this account."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8583,6 +9689,10 @@ msgstr ""
 "je všetko v poriadku — opätovné načítanie to zvyčajne vyrieši."
 
 #: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "This request came from a different network than the one you are using. If "
 "you did not just ask for a code on your own e-reader, choose Deny."
@@ -8591,8 +9701,23 @@ msgstr ""
 "nežiadali o kód na vlastnej čítačke, zvoľte Zamietnuť."
 
 #: cps/spa_strings.py
+msgid "This request needs an administrator to approve it again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
 msgstr "Táto polica je prázdna. Knihy pridáte zo stránky ktorejkoľvek knihy."
+
+#: cps/spa_strings.py
+msgid ""
+"This torrent already exists outside this request. CWNG will not adopt or "
+"change an unrelated client job."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This torrent uses a tracker outside the origins allowed by the administrator."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8609,6 +9734,22 @@ msgstr "Text názvu"
 #: cps/spa_strings.py
 msgid "Title, author, or ISBN"
 msgstr "Názov, autor alebo ISBN"
+
+#: cps/spa_strings.py cps/templates/search_form.html
+msgid "To:"
+msgstr "Do:"
+
+#: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Token"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Token URL"
@@ -8627,8 +9768,20 @@ msgstr ""
 "Vygenerujte nový odkaz alebo to skúste neskôr."
 
 #: cps/spa_strings.py
+msgid "Too many open selections. Wait a little, then try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Top Rated"
 msgstr "Najlepšie hodnotené"
+
+#: cps/spa_strings.py
+msgid "Top of catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Transmission download client"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
@@ -8641,6 +9794,18 @@ msgstr "Vyskúšať Moju knižnicu"
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 msgid "Try again"
 msgstr "Skúsiť znova"
+
+#: cps/spa_strings.py
+msgid "Turn the feature on to grant access."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Turn this on for a connection running on your own network, such as a "
+"catalog, indexer or download client on a 192.168 or 10.x address. It applies "
+"to this connection only. Loopback, link-local and cloud metadata addresses "
+"are never allowed."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -8721,6 +9886,10 @@ msgstr "Nenaplnené knihy"
 #: cps/spa_strings.py
 msgid "Untitled"
 msgstr "Bez názvu"
+
+#: cps/spa_strings.py
+msgid "Untitled catalog"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Untitled link"
@@ -8810,6 +9979,10 @@ msgid "Username"
 msgstr "Meno používateľa"
 
 #: cps/spa_strings.py
+msgid "Username and password"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Username claim"
 msgstr "Nárok používateľského mena"
 
@@ -8853,6 +10026,10 @@ msgstr "Prehliadač"
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
 msgstr "Čaká sa, kým sa Kobo alebo KOReader zosynchronizuje s týmto účtom."
+
+#: cps/spa_strings.py
+msgid "Waiting for approval"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
@@ -8920,6 +10097,10 @@ msgid "Which books sync?"
 msgstr "Ktoré knihy sa synchronizujú?"
 
 #: cps/spa_strings.py
+msgid "Who can use it"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Width (px)"
 msgstr "Šírka (px)"
 
@@ -8943,6 +10124,10 @@ msgid "Write a note…"
 msgstr "Napíšte poznámku…"
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -8963,6 +10148,22 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "Vaša knižnica"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -8999,6 +10200,14 @@ msgid "Your personal digital library"
 msgstr "Vaša osobná digitálna knižnica"
 
 #: cps/spa_strings.py
+msgid "Your requests"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your requests could not be loaded. They have not been lost."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 "Zobrazuje sa vaša uložená adresa čítačky — zmeňte ju len pre toto odoslanie."
@@ -9010,6 +10219,11 @@ msgstr "všetky pravidlá"
 #: cps/spa_strings.py
 msgid "an unknown address"
 msgstr "neznáma adresa"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "and {count} more"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "any rule"
@@ -9044,6 +10258,10 @@ msgid "just now"
 msgstr "práve teraz"
 
 #: cps/spa_strings.py
+msgid "qBittorrent download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "shared"
 msgstr "zdieľané"
 
@@ -9076,6 +10294,11 @@ msgstr "{count} kniha"
 #, python-brace-format
 msgid "{count} books"
 msgstr "{count} kníh"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} catalogs have not been searched yet."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9233,6 +10456,11 @@ msgid "{seeded} of {total} books seeded"
 msgstr "Naplnené knihy: {seeded} z {total}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{title} — {protocol}{search}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "← Back"
 msgstr "← Späť"
 
@@ -9248,13 +10476,124 @@ msgstr "← Späť na prihlásenie"
 msgid "← Library"
 msgstr "← Knižnica"
 
+#: cps/spa_strings.py
+msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
+"library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Favorite"
+msgstr "Obľúbená"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files stay "
+"in the configuration volume across upgrades."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load reader fonts."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not remove font."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not upload font."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Display name (optional)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font file"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font file is too large."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font is available in both EPUB readers."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font removed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No uploaded fonts yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reader fonts"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Readers using this font return to Book default when they next open a book."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
+msgid "Remove"
+msgstr "Odstrániť"
+
+#: cps/spa_strings.py
+msgid "Remove font"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Upload font"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font choices "
+"stay available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Uploaded reader fonts"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Arial"
+msgstr "Arial"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "KaiTi"
+msgstr "KaiTi"
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "SimSun"
+msgstr "SimSun"
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Čakajúca"
-
-#: cps/tasks_status.py
-msgid "Failed"
-msgstr "Neúspešná"
 
 #: cps/tasks_status.py
 msgid "Started"
@@ -9411,6 +10750,10 @@ msgid "Invalid request"
 msgstr "Neplatná požiadavka"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr ""
+
+#: cps/web.py
 msgid "Name and rules are required"
 msgstr "Vyžaduje sa názov a pravidlá"
 
@@ -9427,12 +10770,12 @@ msgid "Create Magic Shelf"
 msgstr "Vytvoriť magickú policu"
 
 #: cps/web.py
-msgid "Permission denied to change public status"
-msgstr "Zmena verejného stavu bola zamietnutá"
+msgid "Only the shelf owner can change Kobo sync"
+msgstr ""
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Názov police je povinný"
+msgid "Permission denied to change public status"
+msgstr "Zmena verejného stavu bola zamietnutá"
 
 #: cps/web.py
 msgid "Error updating shelf"
@@ -9470,7 +10813,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Chyba pri mazaní police"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -9685,6 +11028,14 @@ msgstr "Neplatné ID knihy."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "Značku sa nepodarilo zmazať"
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
+msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
 msgid "KOReader Sync Plugin"
@@ -10210,6 +11561,10 @@ msgid "Edit Calibre Database Configuration"
 msgstr "Upraviť konfiguráciu databázy Calibre"
 
 #: cps/templates/admin.html
+msgid "Manage reader fonts"
+msgstr ""
+
+#: cps/templates/admin.html
 msgid "Scheduled Tasks&nbsp;&nbsp;⌛"
 msgstr "Naplánované úlohy&nbsp;&nbsp;⌛"
 
@@ -10474,10 +11829,6 @@ msgid "Export JSON"
 msgstr "Exportovať JSON"
 
 #: cps/templates/annotations_view.html
-msgid "Open book"
-msgstr "Otvoriť knihu"
-
-#: cps/templates/annotations_view.html
 #, python-format
 msgid "%(count)d highlights"
 msgstr "Zvýraznenia: %(count)d"
@@ -10569,11 +11920,6 @@ msgstr "Typ identifikátora"
 #: cps/templates/book_edit.html
 msgid "Identifier Value"
 msgstr "Hodnota identifikátora"
-
-#: cps/templates/book_edit.html cps/templates/detail.html
-#: cps/templates/user_table.html
-msgid "Remove"
-msgstr "Odstrániť"
 
 #: cps/templates/book_edit.html
 msgid "Add Identifier"
@@ -10886,13 +12232,6 @@ msgstr "Odoslať oznámenie"
 msgid "Send test to me"
 msgstr "Poslať test mne"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Naspäť"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr "Odoslať toto oznámenie príjemcom (__NUM__)?"
@@ -11181,6 +12520,19 @@ msgstr "Použiť LDAP autentifikáciu"
 #: cps/templates/config_edit.html
 msgid "Use OAuth"
 msgstr "Použiť OAuth"
+
+#: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC is managed by the environment. Its settings and secret cannot "
+"be changed here; secret-file rotation takes effect after restart."
+msgstr ""
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid ""
+"Generic OIDC is inactive because its environment configuration is incomplete "
+"or invalid: %(reason)s"
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Server Configuration"
@@ -11713,6 +13065,16 @@ msgid "Generic OAuth Provider"
 msgstr "Všeobecný poskytovateľ OAuth"
 
 #: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC settings are supplied by the environment and are read-only "
+"here. They are not saved to the application database."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Environment-managed Generic OIDC settings"
+msgstr ""
+
+#: cps/templates/config_edit.html
 msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr "URL adresa metadát OAuth (pre automatické zisťovanie)"
 
@@ -11798,6 +13160,16 @@ msgstr "ID klienta OAuth"
 #: cps/templates/config_edit.html
 msgid "OAuth Client Secret"
 msgstr "Tajný kľúč klienta OAuth"
+
+#: cps/templates/config_edit.html
+msgid "Supplied by environment"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"The secret is never displayed or saved in the application database. Restart "
+"the service after rotating a mounted secret file."
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Field Mapping Configuration"
@@ -11905,7 +13277,6 @@ msgid "Allow Changing Password"
 msgstr "Povoliť zmenu hesla"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Povoliť úpravu verejných políc"
 
@@ -12142,10 +13513,9 @@ msgstr "Zobraziť obmedzenia založené na Calibre stĺpcoch"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"Obmedziť viditeľnosť kníh na základe hodnôt vo vlastnom textovom stĺpci "
-"Calibre."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -12162,6 +13532,37 @@ msgstr ""
 #: cps/templates/config_view_edit.html
 msgid "Site Customization"
 msgstr "Prispôsobenie stránky"
+
+#: cps/templates/config_view_edit.html
+msgid "Show Calibre-Web NextGen support links to readers"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When enabled, readers see the project support links. Administrators always "
+"see them."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support URL"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When project support links are hidden, readers can use this destination "
+"instead. Leave blank to hide those links without a replacement. Use an "
+"absolute HTTP or HTTPS URL without username or password."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support link label"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Up to 80 characters. If left blank while a URL is set, the link says "
+"“Contact support”."
+msgstr ""
 
 #: cps/templates/config_view_edit.html
 msgid "Server announcement banner"
@@ -14374,10 +15775,6 @@ msgstr "Návrat domov"
 msgid "Logout User"
 msgstr "Odhlásiť používateľa"
 
-#: cps/templates/image.html
-msgid "Favorite"
-msgstr "Obľúbená"
-
 #: cps/templates/index.html
 msgid "Subcategories"
 msgstr "Podkategórie"
@@ -14637,16 +16034,8 @@ msgid "Logout"
 msgstr "Odhlásiť sa"
 
 #: cps/templates/layout.html
-msgid "Support Calibre-Web NextGen"
-msgstr "Podporiť Calibre-Web NextGen"
-
-#: cps/templates/layout.html
 msgid "Refresh Library"
 msgstr "Obnoviť knižnicu"
-
-#: cps/templates/layout.html
-msgid "Support"
-msgstr "Podpora"
 
 #: cps/templates/layout.html
 msgid "See Changelog"
@@ -14890,6 +16279,10 @@ msgstr ""
 "používateľa"
 
 #: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
+
+#: cps/templates/modal_dialogs.html
 msgid "Enter Tag"
 msgstr "Zadať štítok"
 
@@ -14978,18 +16371,6 @@ msgstr "Predvolené"
 #: cps/templates/read.html
 msgid "Yahei"
 msgstr "Yahei"
-
-#: cps/templates/read.html
-msgid "SimSun"
-msgstr "SimSun"
-
-#: cps/templates/read.html
-msgid "KaiTi"
-msgstr "KaiTi"
-
-#: cps/templates/read.html
-msgid "Arial"
-msgstr "Arial"
 
 #: cps/templates/read.html
 msgid "Spread"
@@ -15127,10 +16508,6 @@ msgstr "Zapamätať si pozíciu"
 msgid "Scrollbar"
 msgstr "Posúvatko"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Ukázať"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "DJVU čítačka"
@@ -15209,10 +16586,6 @@ msgid "Published Date To"
 msgstr "Dátum vydania do"
 
 #: cps/templates/search_form.html
-msgid "Empty"
-msgstr "Prázdne"
-
-#: cps/templates/search_form.html
 msgid "Exclude Tags"
 msgstr "Vylúčiť značky"
 
@@ -15243,14 +16616,6 @@ msgstr "Hodnotenie lepšie ako"
 #: cps/templates/search_form.html
 msgid "Rating Below"
 msgstr "Hodnotenie horšie ako"
-
-#: cps/templates/search_form.html
-msgid "From:"
-msgstr "Od:"
-
-#: cps/templates/search_form.html
-msgid "To:"
-msgstr "Do:"
 
 #: cps/templates/shelf.html
 msgid "Delete this Shelf"
@@ -15398,6 +16763,14 @@ msgstr "Program"
 #: cps/templates/stats.html
 msgid "Installed Version"
 msgstr "Nainštalovaná verzia"
+
+#: cps/templates/support_links.html
+msgid "Support"
+msgstr "Podpora"
+
+#: cps/templates/support_links.html
+msgid "Support Calibre-Web NextGen"
+msgstr "Podporiť Calibre-Web NextGen"
 
 #: cps/templates/tasks.html
 msgid "Background Tasks Overview"
@@ -15743,6 +17116,12 @@ msgstr "Synchronizovať s Kobo iba knihy vo vybraných policiach"
 
 #: cps/templates/user_edit.html
 msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its Kobo sync mark. Uncheck this to sync your whole library."
+msgstr ""
+
+#: cps/templates/user_edit.html
+msgid ""
 "Defaults off. Stage 0 only captures recovery evidence and does not change "
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
@@ -16055,6 +17434,25 @@ msgstr "Sprístupniť vybrané police cez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zobraziť sekciu Prečítané/Neprečítané"
+
+#~ msgid ""
+#~ "Restrict book visibility based on values in a Calibre text custom column."
+#~ msgstr ""
+#~ "Obmedziť viditeľnosť kníh na základe hodnôt vo vlastnom textovom stĺpci "
+#~ "Calibre."
+
+#~ msgid "Create"
+#~ msgstr "Vytvoriť"
+
+#~ msgid "Failed to load shelves."
+#~ msgstr "Police sa nepodarilo načítať."
+
+#~ msgid "New shelf name…"
+#~ msgstr "Názov novej police…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr ""
+#~ "Zatiaľ žiadne police. Vytvorte si jednu vyššie a začnite zbierať knihy."
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

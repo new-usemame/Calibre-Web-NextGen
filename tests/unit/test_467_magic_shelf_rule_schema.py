@@ -41,11 +41,12 @@ def test_canonical_schema_covers_engine_and_dynamic_columns():
     )
     assert fields["pubdate"]["label"] == "Publication Date"
     assert fields["timestamp"]["label"] == "Date Added"
+    assert fields["last_modified"]["label"] == "Last Modified"
     assert fields["language"]["values"] == {"eng": "English"}
     assert fields["custom_column_71"]["type"] == "integer"
     assert fields["custom_column_72"]["values"] == {"Calm": "Calm", "Tense": "Tense"}
 
-    for field_id in ("pubdate", "timestamp"):
+    for field_id in ("pubdate", "timestamp", "last_modified"):
         assert fields[field_id]["type"] == "datetime", (
             "QueryBuilder only exposes relative-date operators to datetime fields"
         )
@@ -76,22 +77,41 @@ def _books_session():
     return sessionmaker(bind=engine)()
 
 
+def _fields_offering_relative_dates():
+    schema = magic_shelf.build_rule_schema()
+    return [field["id"] for field in schema["fields"] if "in_last_days" in field["operators"]]
+
+
 @pytest.mark.unit
-@pytest.mark.parametrize("field_id", ["timestamp", "pubdate"])
+def test_every_field_offered_a_relative_window_is_one_the_engine_filters():
+    # Both rule builders offer "in the last N days" wherever the schema lists it.
+    # A field the engine then declines is a rule that saves fine and is silently
+    # dropped from the shelf's query, so the offer and the engine must stay one list.
+    offered = _fields_offering_relative_dates()
+    assert set(offered) >= {"timestamp", "pubdate", "last_modified"}
+    for field_id in offered:
+        for operator in ("in_last_days", "not_in_last_days"):
+            assert magic_shelf.build_filter_from_rule(
+                {"id": field_id, "operator": operator, "value": "30"}
+            ) is not None, (field_id, operator)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("field_id", ["timestamp", "pubdate", "last_modified"])
 def test_relative_date_rules_filter_real_rows(field_id):
+    # Each book is recent on exactly one date column, so a rule bound to the
+    # wrong column picks the wrong book. An old book re-fetched yesterday is
+    # the case Last Modified exists for (#2364).
     session = _books_session()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    recent = db.Books(
-        title="Recent", sort="Recent", author_sort="Author", path="recent",
-        timestamp=now - timedelta(days=7), pubdate=now - timedelta(days=14),
-        series_index=1.0, last_modified=now, has_cover=0, authors=[], tags=[],
-    )
-    old = db.Books(
-        title="Old", sort="Old", author_sort="Author", path="old",
-        timestamp=now - timedelta(days=90), pubdate=now - timedelta(days=120),
-        series_index=1.0, last_modified=now, has_cover=0, authors=[], tags=[],
-    )
-    session.add_all([recent, old])
+    recent, old = now - timedelta(days=3), now - timedelta(days=400)
+    for recent_field in ("timestamp", "pubdate", "last_modified"):
+        dates = {name: (recent if name == recent_field else old)
+                 for name in ("timestamp", "pubdate", "last_modified")}
+        session.add(db.Books(
+            title=recent_field, sort=recent_field, author_sort="Author", path=recent_field,
+            series_index=1.0, has_cover=0, authors=[], tags=[], **dates,
+        ))
     session.commit()
 
     in_window = magic_shelf.build_filter_from_rule({
@@ -101,5 +121,6 @@ def test_relative_date_rules_filter_real_rows(field_id):
         "id": field_id, "operator": "not_in_last_days", "value": "30",
     })
 
-    assert [title for (title,) in session.query(db.Books.title).filter(in_window).all()] == ["Recent"]
-    assert [title for (title,) in session.query(db.Books.title).filter(outside_window).all()] == ["Old"]
+    assert [title for (title,) in session.query(db.Books.title).filter(in_window).all()] == [field_id]
+    assert sorted(title for (title,) in session.query(db.Books.title).filter(outside_window).all()) == sorted(
+        {"timestamp", "pubdate", "last_modified"} - {field_id})

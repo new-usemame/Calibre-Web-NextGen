@@ -156,12 +156,21 @@ function TagRow({ id, name, count, href }: { id: number | string; name: string; 
   );
 }
 
-export function BrowseList({ plural, title }: BrowseListProps) {
+export function BrowseList(props: BrowseListProps) {
+  // Wouter renders the same component type for Authors, Series, Tags, etc. Key
+  // the view by its route scope so list-specific filters reset on navigation.
+  return <BrowseListContent key={props.plural} {...props} />;
+}
+
+function BrowseListContent({ plural, title }: BrowseListProps) {
   const { t, locale } = useI18n();
   const { data, isLoading, error } = useEntityList(plural);
   // Tag maintenance is an editor action; everyone else sees the plain list.
   const canEditTags = plural === 'tags' && !!useMe().data?.role?.edit;
   const [q, setQ] = useState('');
+  const minimumScope: 'authors' | 'series' | null = plural === 'authors' || plural === 'series' ? plural : null;
+  const hasBookCountFilter = minimumScope !== null;
+  const [minimumBooks, setMinimumBooks] = useState('');
   const [compact, setCompact] = usePersistentBool('cwng:browse-list-compact', false);
   const translatedItems = useMemo(() => {
     const translated = t(title);
@@ -186,12 +195,18 @@ export function BrowseList({ plural, title }: BrowseListProps) {
   // Typing stays responsive on 10k-entity libraries: the filter re-runs at
   // deferred priority instead of on every keystroke (#1813 item 6).
   const deferredQ = useDeferredValue(q);
+  const deferredMinimumBooks = useDeferredValue(minimumBooks);
+  const parsedMinimum = !hasBookCountFilter || deferredMinimumBooks.trim() === '' ? null : Number(deferredMinimumBooks);
+  const minimumInvalid = hasBookCountFilter && deferredMinimumBooks.trim() !== '' &&
+    (!/^\d+$/.test(deferredMinimumBooks.trim()) || !Number.isSafeInteger(parsedMinimum) || (parsedMinimum ?? 0) < 1);
   const items = useMemo(() => {
     const all = data?.items ?? [];
-    if (!deferredQ.trim()) return all;
     const needle = deferredQ.trim().toLowerCase();
-    return all.filter((e) => e.name.toLowerCase().includes(needle));
-  }, [data, deferredQ]);
+    if (minimumInvalid) return [];
+    return all.filter((e) => (!needle || e.name.toLowerCase().includes(needle)) &&
+      (parsedMinimum === null || e.count >= parsedMinimum));
+  }, [data, deferredQ, minimumInvalid, parsedMinimum]);
+  const totalItems = data?.items.length ?? 0;
 
   return (
     <main className={styles.container}>
@@ -210,27 +225,50 @@ export function BrowseList({ plural, title }: BrowseListProps) {
         </div>
       </div>
 
-      {data && data.items.length > 8 && (
-        <div className={styles.searchWrap}>
-          <Search size={15} className={styles.searchIcon} />
-          <input
-            type="search"
-            className={styles.searchInput}
-            placeholder={t('Filter {items}…', { items: translatedItems })}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label={t('Filter {items}', { items: translatedItems })}
-          />
+      {data && (hasBookCountFilter || data.items.length > 8) && (
+        <div className={styles.filters}>
+          <div className={styles.searchWrap}>
+            <Search size={15} className={styles.searchIcon} aria-hidden="true" />
+            <input
+              type="search"
+              className={styles.searchInput}
+              placeholder={t('Filter {items}…', { items: translatedItems })}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label={t('Filter {items}', { items: translatedItems })}
+            />
+          </div>
+          {hasBookCountFilter && (
+            <div className={styles.minimumWrap}>
+              <label htmlFor="minimum-books">{t('Minimum books')}</label>
+              <input
+                id="minimum-books"
+                type="text"
+                inputMode="numeric"
+                className={styles.minimumInput}
+                value={minimumBooks}
+                onChange={(e) => setMinimumBooks(e.target.value)}
+                aria-invalid={minimumInvalid || undefined}
+                aria-describedby={minimumInvalid ? 'minimum-books-error' : 'minimum-books-help'}
+              />
+              <span id="minimum-books-help" className={styles.filterHelp}>{t('Leave blank to show any number of books. The minimum is inclusive.')}</span>
+              {minimumInvalid && <span id="minimum-books-error" className={styles.filterError} role="alert">{t('Enter a whole number of at least 1.')}</span>}
+            </div>
+          )}
         </div>
       )}
+
+      {hasBookCountFilter && data && <p className={styles.resultStatus} role="status" aria-live="polite">
+        {t('Showing {shown} of {total} {items}.', { shown: minimumInvalid ? 0 : items.length, total: totalItems, items: translatedItems })}
+      </p>}
 
       {isLoading ? (
         <SpinnerCentered size={36} />
       ) : error ? (
         <EmptyState message={error instanceof Error ? error.message : t('Failed to load.')} />
       ) : items.length === 0 ? (
-        <EmptyState message={q
-          ? t('No matching {items} for "{query}".', { items: translatedItems, query: q })
+        <EmptyState message={minimumInvalid ? t('Correct the minimum books value to see results.') : (q || parsedMinimum !== null)
+          ? t('No matching {items} for the selected filters.', { items: translatedItems })
           : t('No {items} yet.', { items: translatedItems })} />
       ) : (
         <ul className={compact ? styles.list : gridClass} role="list">

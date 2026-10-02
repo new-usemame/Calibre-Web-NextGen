@@ -79,8 +79,20 @@ local function blockingRequest()
     input.since = input.since + 1
     if input.since > input.worst then input.worst = input.since end
 end
+-- The progress notice: what was shown, and whether one is still up.
+local notices = { open = 0 }
+stub("ui/widget/notification", { new = function(_, fields)
+    fields.notice = true
+    return fields
+end })
 stub("ui/uimanager", {
-    show = function(_, widget) shown[#shown + 1] = widget.text end,
+    show = function(_, widget)
+        shown[#shown + 1] = widget.text
+        if widget.notice then notices.open = notices.open + 1 end
+    end,
+    close = function(_, widget)
+        if widget.notice then notices.open = notices.open - 1 end
+    end,
     nextTick = function(_, f) ticks[#ticks + 1] = f end,
     scheduleIn = function(_, seconds, f)
         assert(seconds > 0, "a task due at once does not let input through")
@@ -142,13 +154,24 @@ end
 -- `fetch(book)` answers each cover download; a table `{ download = f }`
 -- instead answers the runtime's own download as the client would,
 -- `f(book_id, temp)`.
-local function sync(answer, real_apply, fetch, root, broken)
+-- With `blocking`, the list request answers before it returns, as it does on a
+-- device without Turbo, and counts as a blocking request.
+local function sync(answer, real_apply, fetch, root, broken, blocking)
     local queue, requests = {}, {}
     local outcome = { applied = nil }
     local client = {
-        get_library = function(_, _, _, _, _, cursor, _, callback)
+        get_library = function(_, _, _, _, _, cursor, ...)
+            local count = select("#", ...)
+            local callback = select(count, ...)
+            -- if_revision, then the page size when the runtime asks for one.
+            if count >= 3 then outcome.limit = select(2, ...) end
             requests[#requests + 1] = cursor or "first"
-            queue[#queue + 1] = function() callback(true, answer(cursor)) end
+            if blocking then
+                blockingRequest()
+                callback(true, answer(cursor))
+            else
+                queue[#queue + 1] = function() callback(true, answer(cursor)) end
+            end
         end,
     }
     local runtime = setmetatable({
@@ -245,7 +268,7 @@ end
 
 local function newRuntime()
     local runtime = setmetatable({}, { __index = Runtime })
-    function runtime:getDocumentDigest() return "md5:the book" end
+    function runtime:getDocumentContentDigest() return "md5:the book" end
     function runtime:fetchPlaceholder() error("a placeholder was fetched over the book") end
     function runtime:getLibraryState() return { books = {} } end
     return runtime
@@ -416,6 +439,53 @@ local function testTheReaderCanTapBetweenDownloads()
     assertEqual(input.worst, 1, "no two downloads run without KOReader reading input between them")
 end
 
+local function testTheReaderCanTapWhileTheListArrives()
+    -- #2329: after the covers stopped holding the screen, the list itself
+    -- still did. Every page was requested straight after the one before, and
+    -- the plan ran straight after the last, so an 800-book library kept
+    -- KOReader from reading a tap until all of it had arrived ("Wait / Close").
+    input.since, input.worst = 0, 0
+    local books, per_page = 0, 50
+    local outcome = sync(function(cursor)
+        local page = (cursor or 0) + 1
+        local list = {}
+        for i = 1, per_page do
+            books = books + 1
+            list[i] = { book_id = books, filename = books .. ".epub", title = "Book " .. books, rev = "1" }
+        end
+        return { books = list, next_cursor = page < 8 and page or nil, revision = "r1", total = 8 * per_page }
+    end, true, function() return true, { size = 1, mtime = 1 } end, nil, nil, true)
+    assertEqual(outcome.ok, true, "the sync finishes")
+    assertEqual(#outcome.requests, 8, "every page is fetched")
+    assertEqual(outcome.fetched, 400, "every cover arrives")
+    assertEqual(input.worst, 1, "no two requests, pages or covers, run without KOReader reading input between them")
+    assert(type(outcome.limit) == "number" and outcome.limit <= 50,
+        "the list is asked for in pages small enough for a cold server disk, got " .. tostring(outcome.limit))
+end
+
+local function testAFirstFillShowsHowFarItHasGot()
+    -- #2329: the only sign of a first fill was a 3-second "Adding N books…".
+    local before = #shown
+    notices.open = 0
+    local outcome = sync(function(cursor)
+        local page = (cursor or 0) + 1
+        local list = {}
+        for i = 1, 20 do
+            local id = (page - 1) * 20 + i
+            list[i] = { book_id = id, filename = id .. ".epub", title = "Book " .. id, rev = "1" }
+        end
+        return { books = list, next_cursor = page < 3 and page or nil, revision = "r1", total = 60 }
+    end, true, function() return true, { size = 1, mtime = 1 } end)
+    assertEqual(outcome.ok, true, "the sync finishes")
+    local seen = {}
+    for i = before + 1, #shown do seen[shown[i]] = true end
+    assert(seen["Getting your library list: 20 of 60 books"], "the list's progress is shown")
+    assert(seen["Adding 60 books to your library…"], "the fill is announced")
+    assert(seen["Adding books to your library: 18 of 60"], "the fill's progress is shown")
+    assert(seen["Adding books to your library: 54 of 60"], "and kept up to date")
+    assertEqual(notices.open, 0, "no progress notice is left on screen once the sync ends")
+end
+
 local function written(name)
     for path, file in pairs(settings_files) do
         if path:sub(-#name) == name then return file end
@@ -432,7 +502,8 @@ local function testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
     local root = folder .. "/interrupted"
     assert(os.execute("mkdir -p '" .. root .. "'"))
     local books = manyNewBooks(100)().books
-    local client = { get_library = function(_, _, _, _, _, _, _, callback)
+    local client = { get_library = function(_, _, _, _, _, _, ...)
+        local callback = select(select("#", ...), ...)
         ticks[#ticks + 1] = function() callback(true, { books = books, revision = "r1" }) end
     end }
     local runtime = setmetatable({ device_id = "device",
@@ -501,7 +572,8 @@ local function testALibraryWhoseListWasNotSavedIsNotEmptied()
         { book_id = 2, filename = "Book [2].epub", rev = "b", read_status = "unread", checksum = "md5:book" },
     }
     local asked = {}
-    local client = { get_library = function(_, _, _, _, _, _, if_revision, callback)
+    local client = { get_library = function(_, _, _, _, _, _, if_revision, ...)
+        local callback = select(select("#", ...), ...)
         asked[#asked + 1] = if_revision or "everything"
         ticks[#ticks + 1] = function()
             callback(true, if_revision == "r1" and { unchanged = true, revision = "r1" }
@@ -520,7 +592,7 @@ local function testALibraryWhoseListWasNotSavedIsNotEmptied()
         function runtime:newSyncClient() return client end
         function runtime:refreshLibraryViews() end
         function runtime:applyLibraryCollections() end
-        function runtime:getDocumentDigest(path) return path == book and "md5:book" or nil end
+        function runtime:getDocumentContentDigest(path) return path == book and "md5:book" or nil end
         return runtime
     end
     local function run(runtime, opts)
@@ -642,7 +714,8 @@ local function testAnotherAccountsBooksLeaveTheLibraryFolder()
         ["5"] = { kind = "placeholder", path = cover, size = #"cover" },
     } }
     local queue = {}
-    local client = { get_library = function(_, _, _, _, _, _, _, callback)
+    local client = { get_library = function(_, _, _, _, _, _, ...)
+        local callback = select(select("#", ...), ...)
         queue[#queue + 1] = function() callback(true, { books = {}, revision = "r1" }) end
     end }
     local runtime = setmetatable({ settings = { username = "kid", password = "secret" }, device_id = "device" },
@@ -728,7 +801,8 @@ local function testBooksComeBackWithTheirAccount()
     local kids = file(root .. "/Kid [1].epub", "kid's book")
     local state = { owner = "https://new.example|kid", books = {} }
     local queue = {}
-    local client = { get_library = function(_, _, _, _, _, _, _, callback)
+    local client = { get_library = function(_, _, _, _, _, _, ...)
+        local callback = select(select("#", ...), ...)
         queue[#queue + 1] = function() callback(true, { books = {}, revision = "r1" }) end
     end }
     local runtime = setmetatable({ settings = { username = "ann", password = "secret" }, device_id = "device" },
@@ -798,6 +872,8 @@ testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()
 testTheInventoryKnowsCoversFromBooks()
 testTheReaderCanTapBetweenDownloads()
+testTheReaderCanTapWhileTheListArrives()
+testAFirstFillShowsHowFarItHasGot()
 testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
 testALibraryWhoseListWasNotSavedIsNotEmptied()

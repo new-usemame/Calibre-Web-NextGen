@@ -689,7 +689,8 @@ $(function() {
                                 .removeClass('alert-info alert-success alert-warning alert-danger')
                                 .addClass('alert-danger refresh-cwa');
                             $("#thumbnail_message").text('❌ Thumbnail cache refresh failed');
-                            $("#thumbnail_progress_status").text('Error: ' + (thumbnailTask.error || 'Unknown error'));
+                            // error arrives HTML-escaped from /ajax/emailstat
+                            $("#thumbnail_progress_status").html('Error: ' + (thumbnailTask.error || 'Unknown error'));
                         }
                     } else {
                         // Task not found - might be completed and cleaned up

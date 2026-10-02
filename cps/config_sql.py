@@ -122,10 +122,27 @@ class _Settings(_Base):
     # Sync annotations to Hardcover
     config_hardcover_annotations_sync = Column(Boolean, default=False)
 
+    # Experimental acquisition remains dormant until explicit admin enablement.
+    #
+    # server_default is load-bearing, not decoration. SQLAlchemy's `default=` is
+    # client-side: it only fills the value when this mapper performs the INSERT.
+    # A settings row created any other way -- an older database being migrated, a
+    # fixture, any raw `INSERT INTO settings (...)` that does not name this column
+    # -- got no value at all and died on "NOT NULL constraint failed:
+    # settings.config_acquisition_enabled". services/acquisition/migration.py
+    # already adds the column with `DEFAULT 0`, so omitting it here also made a
+    # freshly created table and an upgraded one disagree about the schema.
+    config_acquisition_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
     config_default_role = Column(SmallInteger, default=0)
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")
     config_default_locale = Column(String(2), default="en")
+    # Seed only newly created accounts; an account's own Account-page choice
+    # remains independent after creation.
+    config_default_ui_font_body = Column(String, default="")
+    config_default_ui_font_display = Column(String, default="")
     # Fork issue #160: locale fallback for anonymous OPDS clients (Readest,
     # KOReader, Aldiko) that don't send Accept-Language. Empty string keeps
     # the existing 'en' fallback; setting a value pins anon OPDS responses
@@ -199,6 +216,15 @@ class _Settings(_Base):
     # Trust-the-admin model (no per-rule sanitization); the only guard is
     # neutralizing </style> breakout at render time (see render_template.py).
     config_custom_css = Column(String, default="")
+
+    # Issue #1402: let hosted instances hide project-specific support links and
+    # point readers to their own support destination. Defaults preserve today's
+    # links for every existing installation.
+    config_show_project_support = Column(
+        Boolean, nullable=False, default=True, server_default=text("1"),
+    )
+    config_support_url = Column(String, default="")
+    config_support_label = Column(String, default="")
 
     config_ldap_provider_url = Column(String, default='example.org')
     config_ldap_port = Column(SmallInteger, default=389)
@@ -796,6 +822,13 @@ class ConfigSQL(object):
             except OperationalError as e:
                 log.error('Database error: %s', e)
                 self._session.rollback()
+        runtime_login_type = self.__dict__.get("_runtime_login_type_override")
+        if runtime_login_type is not None:
+            # Environment-managed OIDC selects OAuth for this process without
+            # changing the stored login type. Preserve that startup decision
+            # across admin saves/reloads; the value is private runtime state,
+            # so bypass ConfigSQL.__setattr__ and never add it to app.db.
+            self.__dict__["config_login_type"] = runtime_login_type
         self.__dict__["dirty"] = list()
 
     def save(self):

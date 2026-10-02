@@ -9,7 +9,7 @@ import { BookCard } from '../components/BookCard';
 import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import { apiPost, type Book, type AdvancedSearchParams, type Me } from '../lib/api';
+import { apiPost, type Book, type AdvancedSearchParams, type Me, type SearchCustomColumn } from '../lib/api';
 import { advancedSearchFromQuery, advancedSearchToQuery } from '../lib/advancedSearchUrl';
 import { SPA_ROUTES } from '../lib/routes';
 import { useT } from '../lib/i18n';
@@ -38,6 +38,7 @@ interface FormState {
   exclude_language: (string | number)[];
   include_extension: string[];
   exclude_extension: string[];
+  custom: Record<string, string>;
 }
 
 const EMPTY: FormState = {
@@ -45,6 +46,7 @@ const EMPTY: FormState = {
   read_status: 'all', publishstart: '', publishend: '', rating_low: '', rating_high: '',
   include_tag: [], exclude_tag: [], include_serie: [], exclude_serie: [],
   include_language: [], exclude_language: [], include_extension: [], exclude_extension: [],
+  custom: {},
 };
 
 const RATINGS = ['', '1', '2', '3', '4', '5'];
@@ -73,7 +75,16 @@ function currentQuery(): string {
 }
 
 function formFrom(params: AdvancedSearchParams | null): FormState {
-  return params ? { ...EMPTY, ...params } as FormState : EMPTY;
+  return params ? { ...EMPTY, ...params, custom: { ...params.custom } } as FormState : EMPTY;
+}
+
+/** The submitted criteria: custom-column fields left blank are dropped, and
+ *  the key is omitted entirely when none is set, so a search that never
+ *  touched a custom column posts (and saves as a default view) as before. */
+function toParams(form: FormState): AdvancedSearchParams {
+  const { custom, ...rest } = form;
+  const set = Object.fromEntries(Object.entries(custom).filter(([, v]) => v.trim() !== ''));
+  return Object.keys(set).length ? { ...rest, custom: set } : rest;
 }
 
 export function AdvancedSearch() {
@@ -142,6 +153,8 @@ export function AdvancedSearch() {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+  const setCustom = (key: string, value: string) =>
+    setForm((f) => ({ ...f, custom: { ...f.custom, [key]: value } }));
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +163,7 @@ export function AdvancedSearch() {
     // an unchanged key react-query would answer from its cached pages (#2211).
     qc.removeQueries({ queryKey: ['adv-search'] });
     clearResults();
-    const next = { ...form };
+    const next = toParams(form);
     setSubmitted(next);
     writeUrl(advancedSearchToQuery(next));
   };
@@ -271,6 +284,12 @@ export function AdvancedSearch() {
             <MultiSelect options={formatOptions} value={form.exclude_extension}
               onChange={(v) => set('exclude_extension', v.map(String))} placeholder={t('None')} />
           </Field>
+
+          {(options?.custom_columns ?? []).map((column) => (
+            <Field key={column.id} label={column.name}>
+              <CustomColumnInput column={column} values={form.custom} onChange={setCustom} />
+            </Field>
+          ))}
         </div>
 
         <div className={styles.actions}>
@@ -333,6 +352,64 @@ export function AdvancedSearch() {
       )}
     </main>
   );
+}
+
+const CC_STARS = ['1', '2', '3', '4', '5'];
+
+/** One custom column's criteria, in the field names the classic advanced
+ *  search posts (#2365): a range for numbers and dates, a Yes/No/Empty choice,
+ *  the column's own values for a fixed list, a star count, else "contains". */
+function CustomColumnInput({ column, values, onChange }: {
+  column: SearchCustomColumn;
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+}) {
+  const t = useT();
+  const key = `custom_column_${column.id}`;
+  const value = (suffix = '') => values[key + suffix] ?? '';
+  const range = (type: 'number' | 'date', low: string, high: string) => (
+    <div className={styles.rangeRow}>
+      <input type={type} className={styles.input} value={value(low)}
+        step={column.datatype === 'float' ? 'any' : undefined}
+        aria-label={`${column.name} ${t('From:')}`}
+        onChange={(e) => onChange(key + low, e.target.value)} />
+      <span className={styles.rangeSep}>→</span>
+      <input type={type} className={styles.input} value={value(high)}
+        step={column.datatype === 'float' ? 'any' : undefined}
+        aria-label={`${column.name} ${t('To:')}`}
+        onChange={(e) => onChange(key + high, e.target.value)} />
+    </div>
+  );
+  const choice = (options: { value: string; text: string }[]) => (
+    <select className={styles.input} value={value()} aria-label={column.name}
+      onChange={(e) => onChange(key, e.target.value)}>
+      <option value="">{t('Any')}</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.text}</option>)}
+    </select>
+  );
+
+  switch (column.datatype) {
+    case 'int':
+    case 'float':
+      return range('number', '_low', '_high');
+    case 'datetime':
+      return range('date', '_start', '_end');
+    case 'bool':
+      return choice([
+        { value: 'True', text: t('Yes') },
+        { value: 'False', text: t('No') },
+        { value: 'Empty', text: t('Empty') },
+      ]);
+    case 'enumeration':
+      return choice((column.enum_values ?? []).map((v) => ({ value: v, text: v })));
+    case 'rating':
+      return choice(CC_STARS.map((r) => ({ value: r, text: '★'.repeat(Number(r)) })));
+    default:
+      return (
+        <input className={styles.input} value={value()} aria-label={column.name}
+          onChange={(e) => onChange(key, e.target.value)} />
+      );
+  }
 }
 
 // A labelled group. role=group + aria-labelledby is valid for one OR several

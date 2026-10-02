@@ -1,3 +1,0 @@
-### Fixed
-
-- **Books with a lone "—" or "©" in their metadata no longer come out of import with garbled text like "Ghostâ€”Spectres".** With the Kindle EPUB fixer on, a book whose metadata file (or stylesheet) had no encoding declaration and contained just one character like an em dash or a copyright sign could be misread, so a title such as "Ghost—Spectres" was saved as "Ghostâ€”Spectres" in your library and in the book's folder name. With the fixer's aggressive mode on, accented titles such as "Café" could be damaged the same way ("Caf√©"). Text like this is now read as the UTF-8 it is. Books already imported this way keep the damaged text until you fix the title or import them again from the original file. Thanks to @sgreadly for the report and the fix.

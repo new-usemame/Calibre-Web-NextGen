@@ -1,0 +1,2 @@
+### Fixed
+- **A long series name no longer hides which book in the series it is.** On the library grid, a series name too long for the card was cut off together with the book's number, so a card read "The Stormlight Archive Chroni…" and you had to open it to see it was book 4. Now only the name is shortened and the number stays beside it ("The Stormlight Arch… #4"), in every language's wording. Hovering the line shows the full name. Reported by @magdalar in #2051.

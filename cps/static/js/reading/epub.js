@@ -13,6 +13,18 @@ var reader;
         bookmarks: calibre.bookmark ? [calibre.bookmark] : []
     });
 
+    if (reader && reader.rendition && reader.rendition.hooks && reader.rendition.hooks.content
+        && typeof reader.rendition.hooks.content.register === 'function' && calibre.customFontFaces) {
+        reader.rendition.hooks.content.register(function(contents) {
+            try {
+                contents.addStylesheetCss(calibre.customFontFaces, 'cwa-custom-font-faces');
+            } catch (e) {
+                // Some content types don't support stylesheet injection; that
+                // one piece of content just keeps its fallback font.
+            }
+        });
+    }
+
     function showReaderError(message, error) {
         try {
             console.error(message, error || "");
@@ -47,6 +59,30 @@ var reader;
 
     Object.keys(themes).forEach(function (theme) {
         reader.rendition.themes.register(theme, themes[theme].css_path);
+    });
+
+    // Custom fonts are served from immutable, same-origin URLs. epub.js renders
+    // each chapter in its own document, so install the validated faces into every
+    // newly rendered content document before applying a saved custom family.
+    function installUploadedFontFaces(contents) {
+        var doc = contents && contents.document;
+        if (!doc || doc.getElementById('cwng-reader-font-faces')) { return; }
+        var rules = (calibre.readerFonts || []).filter(function (font) {
+            return !font.builtin && font.url && /^CWNGUpload_[a-f0-9]{32}$/.test(font.family) &&
+                ['woff', 'woff2', 'truetype', 'opentype'].indexOf(font.format) >= 0;
+        }).map(function (font) {
+            return '@font-face{font-family:' + font.family + ';font-style:normal;font-weight:normal;' +
+                'font-display:swap;src:url(' + JSON.stringify(font.url) + ") format('" + font.format + "');}";
+        }).join('');
+        if (!rules) { return; }
+        var style = doc.createElement('style');
+        style.id = 'cwng-reader-font-faces';
+        style.textContent = rules;
+        (doc.head || doc.documentElement).appendChild(style);
+    }
+    reader.rendition.on('rendered', function () {
+        try { (reader.rendition.getContents() || []).forEach(installUploadedFontFaces); }
+        catch (e) { /* content can be unavailable while epub.js changes sections */ }
     });
 
     if (calibre.useBookmarks) {
@@ -302,6 +338,9 @@ var reader;
      * @param {string|int} location - Location or zero
      */
     function updateBookmark(action, location) {
+        // Lookup mode keeps reader navigation local to this tab. Existing
+        // positions still load, but adding/removing a bookmark cannot persist.
+        if (calibre.lookupMode) return;
         // Remove other bookmarks (there can only be one)
         if (action === "add") {
             this.settings.bookmarks.filter(function (bookmark) {
@@ -369,6 +408,7 @@ var reader;
         // Font
         let fontMap = {
             'default': '',
+            'Literata': '"Literata", serif',
             'Yahei': '"Microsoft YaHei", sans-serif',
             'SimSun': 'SimSun, serif',
             'KaiTi': 'KaiTi, serif',

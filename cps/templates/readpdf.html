@@ -34,6 +34,7 @@ See https://github.com/adobe-type-tools/cmap-resources
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}"> 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/libs/viewer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}">
 	  <!-- This snippet is used in production (included from viewer.html) -->
 	  <link rel="resource" type="application/l10n" href="{{ url_for('static', filename='locale/locale.json') }}">
 	  <script src="{{ url_for('static', filename='js/libs/pdf.mjs') }}" type="module"></script>
@@ -100,6 +101,7 @@ See https://github.com/adobe-type-tools/cmap-resources
   </head>
 
   <body tabindex="1">
+    {% include '_reader_lookup_banner.html' %}
     <div id="outerContainer">
 
       <div id="sidebarContainer">

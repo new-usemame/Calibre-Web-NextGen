@@ -42,7 +42,11 @@ const CATALOG_LAYOUT_SPECS = [CATALOG_LAYOUT_SPEC, CATALOG_WATCHDOG_CLASSIFIER_S
 // which CI invokes as a separate, serialized step (E2E_SERVER_STATE=1).
 // shelf-count-refresh archives a book for the shared seed login, hiding it from
 // every lane's catalog for the length of the spec, so it lives here too.
-const SERVER_STATE_SPECS = [/my-library-admin-intro\.spec\.ts/, /shelf-count-refresh\.spec\.ts/];
+const SERVER_STATE_SPECS = [
+  /my-library-admin-intro\.spec\.ts/,
+  /shelf-count-refresh\.spec\.ts/,
+  /font-defaults-751\.spec\.ts/,
+];
 const VISUAL_REGRESSION_SPEC = /visual-regression\.spec\.ts/;
 const hostileLoadEnabled = process.env.E2E_HOSTILE_LOAD === '1';
 const visualRegressionEnabled = process.env.E2E_VISUAL_REGRESSION === '1';

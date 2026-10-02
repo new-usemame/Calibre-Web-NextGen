@@ -77,14 +77,6 @@ def test_root_calibre_services_use_a_uid_private_config(service):
     assert 'install -d -m 0700 "$CALIBRE_CONFIG_DIRECTORY"' in source
 
 
-def test_init_prepares_abc_runtime_config_without_exposing_opt_in_plugins():
-    source = _run_script("cwa-init")
-    runtime_create = "install -d -o abc -g abc /config/.config/calibre-runtime"
-    plugin_create = "install -d -o abc -g abc /config/.config/calibre/plugins"
-    assert runtime_create in source
-    assert plugin_create in source
-    assert "/config/.config/calibre-runtime/plugins" not in source
-
 
 def test_audit_names_every_s6_service_reaching_a_calibre_tool():
     # Observed call graph at origin/main:

@@ -41,6 +41,7 @@ from .services.ereader_send import (
     send_includes_own_address,
 )
 from .services import app_passwords, ereader_scope, reading_position
+from .services.read_status import stop_reading as stop_reading_status
 from .search import render_search_results, render_adv_search_results
 from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
@@ -57,6 +58,7 @@ from .redirect import get_redirect_location
 from .cw_babel import get_available_locale, get_available_translations, sanitize_locale_for_write
 from .usermanagement import login_required_if_no_ano
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 from .kobo_sync_status import remove_synced_book
 from . import magic_shelf
 from .render_template import render_title_template, get_custom_column_visibility_options
@@ -72,6 +74,8 @@ from .reader_settings import (
     reader_setting_int as _reader_setting_int,
     sanitize_reader_settings,
 )
+from .user_preferences import set_checkbox_preference_from_form
+from .services import reader_fonts
 
 # CWA Imports
 import shutil
@@ -295,6 +299,11 @@ def get_email_status_json():
 @web.route("/ajax/bookmark/<int:book_id>/<book_format>", methods=['POST'])
 @user_login_required
 def set_bookmark(book_id, book_format):
+    # A lookup reader may load an existing position but cannot replace or
+    # clear it. This request-level guard also protects older classic clients
+    # that keep the bookmark URL and send an empty value when unbookmarking.
+    if request.args.get("lookup") == "1":
+        return "", 204
     try:
         from .services.device_registry import (
             WEBREADER_INSTALLATION_ID_HEADER,
@@ -358,6 +367,38 @@ def set_bookmark(book_id, book_format):
     if not ub.session_commit("Bookmark for user {} in book {} created".format(current_user.id, book_id)):
         return "", 500
     return "", 201
+
+
+@web.route("/ajax/stopreading/<int:book_id>", methods=["POST"])
+@user_login_required
+def stop_reading(book_id):
+    """Remove this user's in-progress marker without resetting saved state."""
+    if current_user.is_anonymous:
+        abort(403)
+    result = calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=current_user.role_browse_global(),
+        allow_public_shelf_books=True,
+    )
+    if not result:
+        abort(404)
+    _, custom_read, _ = result
+    if config.config_read_column and custom_read:
+        return jsonify({"error": "finished_books_cannot_be_removed"}), 409
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == int(current_user.id),
+        ub.ReadBook.book_id == int(book_id),
+    ).one_or_none()
+    if row is not None and row.read_status == ub.ReadBook.STATUS_FINISHED:
+        return jsonify({"error": "finished_books_cannot_be_removed"}), 409
+
+    changed = stop_reading_status(ub.session, current_user.id, book_id, ub.ReadBook)
+    if changed and not ub.session_commit("Stopped reading book {} for user {}".format(
+            book_id, current_user.id)):
+        return jsonify({"error": "could_not_update_reading_status"}), 500
+    return jsonify({"ok": True, "changed": changed})
 
 
 @web.route("/ajax/toggleread/<int:book_id>", methods=['POST'])
@@ -1745,9 +1786,10 @@ def create_magic_shelf():
         kobo_sync = data.get('kobo_sync', False)
         is_public = data.get('is_public', False)
         
-        # Only allow public if user has permission
-        if is_public and not current_user.role_edit_shelfs():
-            is_public = False
+        # Publishing your own shelf is a separate capability from editing
+        # somebody else's public shelf.
+        if is_public and not current_user.role_share_shelfs():
+            return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
         
         # Validate inputs
         if not name or not rules:
@@ -1805,6 +1847,7 @@ def create_magic_shelf():
     return render_title_template('magic_shelf_edit.html',
                                  title=_("Create Magic Shelf"),
                                  page="magic_shelf_create",
+                                 is_owner=True,
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
                                  opds_expose_checked=False,
                                  kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves),
@@ -1845,6 +1888,8 @@ def edit_magic_shelf(shelf_id):
         log.warning(f"Magic shelf {shelf_id} not found")
         abort(404)
 
+    is_owner = int(shelf.user_id) == int(current_user.id)
+
     opds_expose_checked = ub.is_opds_magic_shelf_exposed_for_user(current_user.id, shelf.id)
     
     # Check if user can edit this shelf (owner or admin only)
@@ -1859,10 +1904,22 @@ def edit_magic_shelf(shelf_id):
         icon = data.get('icon', shelf.icon)
         kobo_sync = data.get('kobo_sync', shelf.kobo_sync)
         is_public = data.get('is_public', shelf.is_public == 1)
+
+        # Kobo sync membership is account-owned: only the shelf owner can
+        # change it. Non-owner edits preserve the stored value, and a forged
+        # attempt to change it is rejected.
+        if not is_owner and bool(kobo_sync) != bool(shelf.kobo_sync):
+            return jsonify({"success": False, "message": _("Only the shelf owner can change Kobo sync")}), 403
+        if not is_owner:
+            kobo_sync = shelf.kobo_sync
         
         # Only allow changing public status if user has permission
         if is_public != (shelf.is_public == 1):
-            if not current_user.role_edit_shelfs():
+            if shelf.is_system:
+                return jsonify({"success": False, "message": _("Permission denied to change public status")}), 403
+            if is_owner and is_public and not current_user.role_share_shelfs():
+                return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
+            if not is_owner and not current_user.role_edit_shelfs():
                 return jsonify({"success": False, "message": _("Permission denied to change public status")}), 403
         
         # Validate inputs
@@ -1888,7 +1945,7 @@ def edit_magic_shelf(shelf_id):
             shelf.kobo_sync = kobo_sync
             shelf.is_public = 1 if is_public else 0
             flag_modified(shelf, "rules")
-            if current_user.opds_only_shelves_sync:
+            if current_user.opds_only_shelves_sync and 'opds_expose' in data:
                 ub.set_opds_magic_shelf_exposed_for_user(
                     current_user.id,
                     shelf.id,
@@ -1934,6 +1991,7 @@ def edit_magic_shelf(shelf_id):
                                  page="magic_shelf_edit",
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
                                  opds_expose_checked=opds_expose_checked,
+                                 is_owner=is_owner,
                                  kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves),
                                  koreader_sync=ereader_scope.koreader_library_on(),
                                  allowed_icons=ALLOWED_ICONS,
@@ -2878,6 +2936,7 @@ def register_post():
             content.theme = config_theme_code(getattr(config, 'config_theme', None))
         except Exception:
             pass
+        seed_new_user_ui_font_defaults(content, config)
         try:
             ub.session.add(content)
             ub.session.commit()
@@ -3301,6 +3360,13 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
             current_user.kobo_two_way_annotation_sync = int(
                 to_save.get("kobo_two_way_annotation_sync") == "on"
             ) or 0
+        # The hidden sentinel distinguishes an unchecked control from a
+        # partial/older form submission. Guests always use the default-visible
+        # behavior and cannot change the shared Guest preference.
+        set_checkbox_preference_from_form(
+            current_user, to_save, "show_original_filename",
+            "show_original_filename_present",
+        )
         current_user.hardcover_token = to_save.get("hardcover_token","" ).replace("Bearer ","" ) or None
         # Auto-send and metadata fetch settings
         current_user.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
@@ -3729,6 +3795,7 @@ def app_password_revoke(app_password_id):
 @login_required_if_no_ano
 @viewer_required
 def read_book(book_id, book_format):
+    lookup_mode = request.args.get("lookup") == "1"
     # allow_show_hidden=True: a user can read their own hidden book — the
     # detail page's reading icon must not bounce with "unavailable" just
     # because the book is on the user's hide list (#319 pushback @droM4X).
@@ -3797,7 +3864,7 @@ def read_book(book_id, book_format):
         except Exception as e:
             log.debug(f"Failed to load KOReader progress for book {book_id}: {e}")
     # Track read activity
-    if current_user.is_authenticated:
+    if current_user.is_authenticated and not lookup_mode:
         try:
             from cps.cwa_db_loader import load_cwa_db
             CWA_DB = load_cwa_db().CWA_DB
@@ -3842,7 +3909,7 @@ def read_book(book_id, book_format):
     # reader tab or hitting Back/Forward doesn't count as a new
     # reading session. Always touch `last_time_started_reading` so
     # "recently read" sorting reflects every open.
-    if current_user.is_authenticated:
+    if current_user.is_authenticated and not lookup_mode:
         try:
             read_row = ub.session.query(ub.ReadBook).filter(
                 ub.ReadBook.user_id == int(current_user.id),
@@ -3882,20 +3949,42 @@ def read_book(book_id, book_format):
         reader_settings = {}
         if current_user.is_authenticated:
             reader_settings = (getattr(current_user, "view_settings", None) or {}).get("reader", {}) or {}
+        font_choice = reader_settings.get("font") if isinstance(reader_settings, dict) else None
+        try:
+            reader_custom_ids = (reader_fonts.custom_font_ids()
+                                 if isinstance(font_choice, str) and font_choice.startswith("custom:")
+                                 else set())
+        except Exception:
+            log.warning("Could not read uploaded reader-font catalog while opening a book", exc_info=True)
+            reader_custom_ids = set()
+        reader_settings = sanitize_reader_settings(reader_settings, reader_custom_ids)
+        try:
+            reader_font_catalogue = reader_fonts.catalogue(
+                lambda font_uuid: url_for("api_v1.reader_font_file", font_uuid=font_uuid)
+            )
+        except Exception:
+            # Uploaded fonts are an optional enhancement; a broken catalog must
+            # not block the established EPUB reader or built-in font controls.
+            log.warning("Could not load uploaded reader-font options", exc_info=True)
+            reader_font_catalogue = {"items": list(reader_fonts.BUILTIN_FONTS)}
         return render_title_template('read.html', bookid=book_id, title=book.title,
                                      bookmark=bookmark, kosync_progress=kosync_progress,
                                      reader_settings=json.dumps(reader_settings),
+                                     lookup_mode=lookup_mode,
+                                     reader_fonts=reader_font_catalogue["items"],
                                      book_format=book_format.lower())
     elif book_format.lower() == "pdf":
         log.debug("Start pdf reader for %d", book_id)
-        return render_title_template('readpdf.html', pdffile=book_id, title=book.title)
+        return render_title_template('readpdf.html', pdffile=book_id, title=book.title,
+                                     lookup_mode=lookup_mode)
     elif book_format.lower() == "txt":
         log.debug("Start txt reader for %d", book_id)
-        return render_title_template('readtxt.html', txtfile=book_id, title=book.title)
+        return render_title_template('readtxt.html', txtfile=book_id, title=book.title,
+                                     lookup_mode=lookup_mode)
     elif book_format.lower() in ["djvu", "djv"]:
         log.debug("Start djvu reader for %d", book_id)
         return render_title_template('readdjvu.html', djvufile=book_id, title=book.title,
-                                     extension=book_format.lower())
+                                     extension=book_format.lower(), lookup_mode=lookup_mode)
     else:
         for fileExt in constants.EXTENSIONS_AUDIO:
             if book_format.lower() == fileExt:
@@ -3905,7 +3994,7 @@ def read_book(book_id, book_format):
                 entries = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
                 log.debug("Start mp3 listening for %d", book_id)
                 return render_title_template('listenmp3.html', mp3file=book_id, audioformat=book_format.lower(),
-                                             entry=entries, bookmark=bookmark)
+                                             entry=entries, bookmark=bookmark, lookup_mode=lookup_mode)
         for fileExt in ["cbr", "cbt", "cbz"]:
             if book_format.lower() == fileExt:
                 all_name = str(book_id)
@@ -3916,7 +4005,7 @@ def read_book(book_id, book_format):
                         title = title + " #" + '{0:.2f}'.format(book.series_index).rstrip('0').rstrip('.')
                 log.debug("Start comic reader for %d", book_id)
                 return render_title_template('readcbr.html', comicfile=all_name, title=title,
-                                             extension=fileExt, bookmark=bookmark)
+                                             extension=fileExt, bookmark=bookmark, lookup_mode=lookup_mode)
         log.debug("Reader requested for an unsupported format: %s", book_format)
         # 404, not a redirect to the library.
         #
@@ -4056,10 +4145,18 @@ def show_book(book_id):
 
         original_filename_row = ub.session.query(ub.BookOriginalFilename).filter(
             ub.BookOriginalFilename.book_id == book_id).first()
+        show_original_filename = True
+        if not current_user.is_anonymous:
+            stored_filename_preference = current_user.get_view_property(
+                "preferences", "show_original_filename"
+            )
+            if type(stored_filename_preference) is bool:
+                show_original_filename = stored_filename_preference
         return render_title_template('detail.html',
                                      entry=entry,
                                      original_filename=(original_filename_row.filename
                                                         if original_filename_row else None),
+                                     show_original_filename=show_original_filename,
                                      cc=cc,
                                      hierarchical_cc_ids=calibre_db.get_hierarchical_column_ids(),
                                      is_xhr=request.headers.get('X-Requested-With') == 'XMLHttpRequest',

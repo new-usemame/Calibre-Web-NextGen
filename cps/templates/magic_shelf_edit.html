@@ -427,6 +427,7 @@ div.help-panel > .panel-body {
                     </div>
 
                     <!-- Kobo Sync Checkbox -->
+                    {% if is_owner %}
                     <div class="form-group shelf-option-card">
                         <label>
                             <input style="margin-right: 2rem !important;" type="checkbox" id="shelf-kobo-sync" {{ 'checked' if shelf and shelf.kobo_sync else '' }} {{ 'disabled' if not kobo_magic_sync_enabled else '' }}>
@@ -442,6 +443,7 @@ div.help-panel > .panel-body {
                         <small class="form-text text-muted">Only works if Kobo integration is enabled</small>
                         {% endif %}
                     </div>
+                    {% endif %}
 
                     {% if opds_expose_enabled %}
                     <div class="form-group shelf-option-card">
@@ -454,7 +456,8 @@ div.help-panel > .panel-body {
                     {% endif %}
 
                     <!-- Public Shelf Checkbox (only for custom shelves with permission) -->
-                    {% if current_user.role_edit_shelfs() and not (shelf and shelf.is_system) %}
+                    {% if ((is_owner and current_user.role_share_shelfs()) or
+                           (not is_owner and current_user.role_edit_shelfs())) and not (shelf and shelf.is_system) %}
                     <div class="form-group shelf-option-card">
                         <label>
                             <input style="margin-right: 2rem !important;" type="checkbox" id="shelf-is-public" {{ 'checked' if shelf and shelf.is_public == 1 else '' }}>
@@ -582,6 +585,10 @@ $(function() {
     // Query Builder Configuration
     var ruleSchema = JSON.parse(document.getElementById('magic-shelf-rule-schema').textContent);
     var fields = ruleSchema.fields;
+    // Fields whose values are YYYY-MM-DD dates, straight from the schema.
+    var dateFieldIds = fields.filter(function(field) {
+        return field.validation && field.validation.format === 'YYYY-MM-DD';
+    }).map(function(field) { return field.id; });
     var operators = ruleSchema.operators;
     var operatorLabels = {};
     operators.forEach(function(operator) {
@@ -622,7 +629,9 @@ $(function() {
         // Check all filter dropdowns for date fields
         $('#builder .rule-filter-container select').each(function() {
             var filterId = $(this).val();
-            if (filterId === 'pubdate' || filterId === 'timestamp') {
+            var operator = $(this).closest('.rule-container').find('.rule-operator-container select').val();
+            if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
+            if (dateFieldIds.indexOf(filterId) !== -1) {
                 hasDateField = true;
                 return false; // break out of each loop
             }
@@ -654,10 +663,17 @@ $(function() {
             var $rule = $input.closest('.rule-container');
             var filterId = $rule.find('.rule-filter-container select').val();
             
-            if (filterId === 'pubdate' || filterId === 'timestamp') {
+            if (dateFieldIds.indexOf(filterId) !== -1) {
                 var operator = $rule.find('.rule-operator-container select').val();
-                if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
-                $input.off('blur.dateValidation').on('blur.dateValidation', function() {
+                // Relative windows take a day count; drop any date check and its
+                // error left over from an absolute operator on the same input.
+                $input.off('blur.dateValidation');
+                if (operator === 'in_last_days' || operator === 'not_in_last_days') {
+                    $input.css('border-color', '');
+                    $input.next('.date-error').remove();
+                    return;
+                }
+                $input.on('blur.dateValidation', function() {
                     var value = $(this).val();
                     if (value && !isValidDate(value)) {
                         $(this).css('border-color', '#d9534f');
@@ -759,9 +775,14 @@ $(function() {
             name: shelfName,
             icon: $('#shelf-icon').val(),
             rules: rules,
+            {% if is_owner %}
             kobo_sync: $('#shelf-kobo-sync').is(':checked'),
+            {% endif %}
             opds_expose: $('#shelf-opds-expose').is(':checked'),
+            {% if ((is_owner and current_user.role_share_shelfs()) or
+                   (not is_owner and current_user.role_edit_shelfs())) and not (shelf and shelf.is_system) %}
             is_public: $('#shelf-is-public').is(':checked')
+            {% endif %}
         };
 
         console.log('Submitting shelf data:', shelfData);

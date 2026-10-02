@@ -353,7 +353,7 @@
             {% if g.shelves_access %}
                 {% for shelf in g.shelves_access %}
                     {% if current_user.is_anonymous == False %}
-                        {% if shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs()) %}
+                        {% if not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                             <option value="{{ shelf.id }}">{{ shelf.name }}</option>
                         {% endif %}
                     {% elif shelf.is_public and config.config_anon_browse %}

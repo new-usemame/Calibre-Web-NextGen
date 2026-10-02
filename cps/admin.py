@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import shutil  # noqa: F401 -- test/extension monkeypatch compatibility
 import subprocess
 import tempfile
+from types import SimpleNamespace
 
 from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
@@ -55,8 +56,10 @@ from .services.kobo_reconcile import (
     build_reconciliation_preview,
     scan_from_candidates,
 )
+from .services.support_policy import validate_support_settings
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults, validate_default_font_updates
 from .cw_babel import (get_available_locale,
                        get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
@@ -64,6 +67,12 @@ from . import content_server
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
 from .custom_column_sort import load_eligible_columns, persist_configured_columns
+from .services.restriction_columns import (
+    BOOL_CHOICES,
+    RESTRICTION_DATATYPES,
+    bool_tokens_valid,
+    normalize_bool_token,
+)
 
 log = logger.create()
 
@@ -668,10 +677,21 @@ def configuration():
             hardcover_status["expires_label"] = _("Hardcover token expires")
         except Exception:
             log.debug("Unable to inspect Hardcover token status", exc_info=True)
+    providers = [dict(provider) for provider in oauth_bb.get_oauth_blueprints()]
+    environment = current_app.extensions.get("cps_generic_oauth_environment", {})
+    for provider in providers:
+        if provider.get("provider_name") == "generic" and provider.get("environment_managed"):
+            # The runtime descriptor must retain the secret for Flask-Dance,
+            # but an admin page never needs the value.
+            provider["oauth_client_secret"] = ""
+
     return render_title_template("config_edit.html",
                                  config=config,
-                                 provider=oauth_bb.get_oauth_blueprints(),
+                                 provider=providers,
                                  feature_support=feature_support,
+                                 generic_oauth_environment_managed=bool(environment.get("managed")),
+                                 generic_oauth_environment_active=bool(environment.get("active")),
+                                 generic_oauth_environment_error=environment.get("error"),
                                  kobo_two_way_emergency_disabled=(
                                      os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
                                      in {"0", "false", "off", "no"}
@@ -724,12 +744,15 @@ def view_configuration():
     read_column = calibre_db.session.query(db.CustomColumns) \
         .filter(and_(db.CustomColumns.datatype == 'bool', db.CustomColumns.mark_for_delete == 0)).all()
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
-        .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all()
+        .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
+        .filter(db.CustomColumns.mark_for_delete == 0).all()
     sortable_columns = load_eligible_columns() or []
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -751,7 +774,13 @@ def edit_user_table():
         .order_by(db.Tags.name).all()
     if config.config_restricted_column:
         try:
-            custom_values = calibre_db.session.query(db.cc_classes[config.config_restricted_column]).all()
+            if restricted_column_datatype(config.config_restricted_column) == "bool":
+                custom_values = [
+                    SimpleNamespace(id=token, name=_(label))
+                    for token, label in BOOL_CHOICES
+                ]
+            else:
+                custom_values = calibre_db.session.query(db.cc_classes[config.config_restricted_column]).all()
         except (KeyError, AttributeError, IndexError):
             custom_values = []
             log.error("Custom Column No.{} does not exist in calibre database".format(
@@ -768,6 +797,8 @@ def edit_user_table():
                                  users=all_user.all(),
                                  tags=tags,
                                  custom_values=custom_values,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  translations=translations,
                                  languages=languages,
                                  visiblility=visibility,
@@ -913,6 +944,16 @@ def edit_list_user(param):
         vals['value'] = vals['value'][0]
     elif 'value[]' not in vals:
         return _("Malformed request"), 400
+    if (param in ('allowed_column_value', 'denied_column_value')
+            and restricted_column_datatype(config.config_restricted_column) == "bool"):
+        try:
+            if 'value[]' in vals:
+                vals['value[]'] = [_canonical_boolean_restriction(value)
+                                   for value in vals['value[]']]
+            else:
+                vals['value'] = _canonical_boolean_restrictions_csv(vals['value'])
+        except ValueError as ex:
+            return str(ex), 400
     for user in users:
         try:
             if param in ['denied_tags', 'allowed_tags', 'allowed_column_value', 'denied_column_value']:
@@ -1051,6 +1092,44 @@ def update_table_settings():
 def update_view_configuration():
     to_save = request.form.to_dict()
 
+    # Validate a switch to Boolean restrictions before changing any settings:
+    # these persisted fields are comma-separated literals, so silently changing
+    # their meaning would either hide the whole library (fail-closed) or damage
+    # existing restrictions. Keep every saved value intact and require the
+    # administrator to correct or clear incompatible entries first.
+    selected_restriction_column = to_save.get("config_restricted_column", "0")
+    if (restricted_column_datatype(selected_restriction_column) == "bool"
+            and str(selected_restriction_column) != str(config.config_restricted_column)
+            and not boolean_restrictions_compatible()):
+        flash(_("Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."),
+              category="error")
+        return view_configuration()
+
+    # This settings card is optional on legacy/partial POST clients. Validate
+    # its complete submitted value before mutating any other configuration.
+    support_settings_submitted = request.form.get("support_settings_present") == "1"
+    support_url = support_label = None
+    if support_settings_submitted:
+        try:
+            support_url, support_label = validate_support_settings(
+                request.form.get("config_support_url", ""),
+                request.form.get("config_support_label", ""),
+            )
+        except ValueError:
+            flash(_("Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."), category="error")
+            return view_configuration()
+
+    # Validate both presets before any other form fields mutate the config.
+    # This keeps a stale/manual POST from partially applying unrelated settings.
+    try:
+        font_updates = validate_default_font_updates(to_save)
+    except ValueError as ex:
+        message = (_("Invalid default body font option")
+                   if "body" in str(ex)
+                   else _("Invalid default display font option"))
+        flash(message, category="error")
+        return view_configuration()
+
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
     persist_configured_columns(
@@ -1095,6 +1174,8 @@ def update_view_configuration():
     _config_int(to_save, "config_authors_max")
     _config_string(to_save, "config_default_language")
     _config_string(to_save, "config_default_locale")
+    for key, value in font_updates.items():
+        setattr(config, key, value)
     _config_string(to_save, "config_opds_default_locale")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
@@ -1105,12 +1186,20 @@ def update_view_configuration():
     # Fork #323 (@olskar): admin-set custom CSS injected site-wide.
     _config_string(to_save, "config_custom_css")
 
-    config.config_default_role = constants.selected_roles(to_save)
+    # The classic page has no checkbox for the acquisition grants, and a legacy
+    # Store upgrade can have remapped them into this template.
+    config.config_default_role = (constants.selected_roles(to_save)
+                                  | constants.preserved_roles(to_save, config.config_default_role))
     config.config_default_role &= ~constants.ROLE_ANONYMOUS
 
     config.config_default_show = sum(int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_'))
     if "Show_detail_random" in to_save:
         config.config_default_show |= constants.DETAIL_RANDOM
+
+    if support_settings_submitted:
+        config.config_show_project_support = "config_show_project_support" in request.form
+        config.config_support_url = support_url
+        config.config_support_label = support_label
 
     config.save()
     flash(_("Calibre-Web NextGen configuration updated"), category="success")
@@ -1227,6 +1316,12 @@ def list_domain(allow):
 @admin_required
 def edit_restriction(res_type, user_id):
     element = request.form.to_dict()
+    if res_type in (1, 3) and restricted_column_datatype(
+            config.config_restricted_column) == "bool":
+        try:
+            element["Element"] = _canonical_boolean_restriction(element["Element"])
+        except (KeyError, ValueError) as ex:
+            return str(ex), 400
     if element['id'].startswith('a'):
         if res_type == 0:  # Tags as template
             elementlist = config.list_allowed_tags()
@@ -1300,6 +1395,12 @@ def add_user_0_restriction(res_type):
 @admin_required
 def add_restriction(res_type, user_id):
     element = request.form.to_dict()
+    if res_type in (1, 3) and restricted_column_datatype(
+            config.config_restricted_column) == "bool":
+        try:
+            element["add_element"] = _canonical_boolean_restriction(element["add_element"])
+        except (KeyError, ValueError) as ex:
+            return str(ex), 400
     if res_type == 0:  # Tags as template
         if 'submit_allow' in element:
             config.config_allowed_tags = restriction_addition(element, config.list_allowed_tags)
@@ -1351,6 +1452,8 @@ def delete_user_0_restriction(res_type):
 @admin_required
 def delete_restriction(res_type, user_id):
     element = request.form.to_dict()
+    bool_column_restriction = (res_type in (1, 3) and restricted_column_datatype(
+        config.config_restricted_column) == "bool")
     if res_type == 0:  # Tags as template
         if element['id'].startswith('a'):
             config.config_allowed_tags = restriction_deletion(element, config.list_allowed_tags)
@@ -1360,10 +1463,16 @@ def delete_restriction(res_type, user_id):
             config.save()
     elif res_type == 1:  # CustomC as template
         if element['id'].startswith('a'):
-            config.config_allowed_column_value = restriction_deletion(element, config.list_allowed_column_values)
+            config.config_allowed_column_value = (
+                restriction_delete_by_id(element, config.list_allowed_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, config.list_allowed_column_values))
             config.save()
         elif element['id'].startswith('d'):
-            config.config_denied_column_value = restriction_deletion(element, config.list_denied_column_values)
+            config.config_denied_column_value = (
+                restriction_delete_by_id(element, config.list_denied_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, config.list_denied_column_values))
             config.save()
     elif res_type == 2:  # Tags per user
         if isinstance(user_id, int):
@@ -1382,11 +1491,17 @@ def delete_restriction(res_type, user_id):
         else:
             usr = current_user
         if element['id'].startswith('a'):
-            usr.allowed_column_value = restriction_deletion(element, usr.list_allowed_column_values)
+            usr.allowed_column_value = (
+                restriction_delete_by_id(element, usr.list_allowed_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, usr.list_allowed_column_values))
             ub.session_commit("Deleted allowed columns of user {}: {}".format(usr.name, usr.list_allowed_column_values()))
 
         elif element['id'].startswith('d'):
-            usr.denied_column_value = restriction_deletion(element, usr.list_denied_column_values)
+            usr.denied_column_value = (
+                restriction_delete_by_id(element, usr.list_denied_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, usr.list_denied_column_values))
             ub.session_commit("Deleted denied columns of user {}: {}".format(usr.name, usr.list_denied_column_values()))
     return ""
 
@@ -1396,6 +1511,8 @@ def delete_restriction(res_type, user_id):
 @user_login_required
 @admin_required
 def list_restriction(res_type, user_id):
+    is_bool_column = (res_type in (1, 3) and restricted_column_datatype(
+        config.config_restricted_column) == "bool")
     if res_type == 0:  # Tags as template
         restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(config.list_denied_tags()) if x != '']
@@ -1403,9 +1520,9 @@ def list_restriction(res_type, user_id):
                  for i, x in enumerate(config.list_allowed_tags()) if x != '']
         json_dumps = restrict + allow
     elif res_type == 1:  # CustomC as template
-        restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
+        restrict = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(config.list_denied_column_values()) if x != '']
-        allow = [{'Element': x, 'type': _('Allow'), 'id': 'a' + str(i)}
+        allow = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Allow'), 'id': 'a' + str(i)}
                  for i, x in enumerate(config.list_allowed_column_values()) if x != '']
         json_dumps = restrict + allow
     elif res_type == 2:  # Tags per user
@@ -1423,9 +1540,9 @@ def list_restriction(res_type, user_id):
             usr = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
         else:
             usr = current_user
-        restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
+        restrict = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(usr.list_denied_column_values()) if x != '']
-        allow = [{'Element': x, 'type': _('Allow'), 'id': 'a' + str(i)}
+        allow = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Allow'), 'id': 'a' + str(i)}
                  for i, x in enumerate(usr.list_allowed_column_values()) if x != '']
         json_dumps = restrict + allow
     else:
@@ -1705,9 +1822,70 @@ def check_valid_read_column(column):
 def check_valid_restricted_column(column):
     if column != "0":
         if not calibre_db.session.query(db.CustomColumns).filter(db.CustomColumns.id == column) \
-          .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all():
+          .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
+          .filter(db.CustomColumns.mark_for_delete == 0).all():
             return False
     return True
+
+
+def restricted_column_datatype(column):
+    """Return the active custom-column datatype selected for restrictions."""
+    if not column or str(column) == "0":
+        return None
+    custom_column = calibre_db.session.query(db.CustomColumns).filter(
+        db.CustomColumns.id == column,
+        db.CustomColumns.mark_for_delete == 0,
+    ).first()
+    return custom_column.datatype if custom_column else None
+
+
+def _canonical_boolean_restriction(value):
+    token = normalize_bool_token(value)
+    if token is None:
+        raise ValueError(_("Boolean restrictions must be Yes, No, or Undefined."))
+    return token
+
+
+def _canonical_boolean_restrictions_csv(value):
+    if value == "":
+        return ""
+    values = value.split(",")
+    if not bool_tokens_valid(values):
+        raise ValueError(_("Boolean restrictions must be Yes, No, or Undefined."))
+    return ",".join(_canonical_boolean_restriction(item) for item in values)
+
+
+def display_boolean_restriction(value, is_bool_column=None):
+    """Show canonical Boolean tokens while preserving legacy bad values for repair."""
+    if is_bool_column is None:
+        is_bool_column = restricted_column_datatype(
+            config.config_restricted_column) == "bool"
+    if not is_bool_column:
+        return value
+    return normalize_bool_token(value) or value
+
+
+def restriction_delete_by_id(element, list_func):
+    """Delete a Boolean state by its stored list index, including legacy aliases."""
+    values = list_func()
+    if values == [""]:
+        values = []
+    index = int(element["id"][1:])
+    if 0 <= index < len(values):
+        del values[index]
+    return ",".join(values)
+
+
+def boolean_restrictions_compatible():
+    """Whether every saved global and user restriction is a Boolean state."""
+    if not all(bool_tokens_valid(values) for values in (
+            config.list_allowed_column_values(),
+            config.list_denied_column_values())):
+        return False
+    users = ub.session.query(ub.User.allowed_column_value,
+                             ub.User.denied_column_value).all()
+    return all(bool_tokens_valid(allowed) and bool_tokens_valid(denied)
+               for allowed, denied in users)
 
 
 def restriction_addition(element, list_func):
@@ -1733,15 +1911,18 @@ def prepare_tags(user, action, tags_name, id_list):
             raise Exception(_("Tag not found"))
         new_tags_list = [x.name for x in tags]
     else:
-        try:
-            tags = calibre_db.session.query(db.cc_classes[config.config_restricted_column]) \
-                .filter(db.cc_classes[config.config_restricted_column].id.in_(id_list)).all()
-        except (KeyError, AttributeError, IndexError):
-            log.error("Custom Column No.{} does not exist in calibre database".format(
-                config.config_restricted_column))
-            raise Exception(_("Custom Column No.%(column)d does not exist in calibre database",
-                    column=config.config_restricted_column))
-        new_tags_list = [x.value for x in tags]
+        if restricted_column_datatype(config.config_restricted_column) == "bool":
+            new_tags_list = [_canonical_boolean_restriction(value) for value in id_list]
+        else:
+            try:
+                tags = calibre_db.session.query(db.cc_classes[config.config_restricted_column]) \
+                    .filter(db.cc_classes[config.config_restricted_column].id.in_(id_list)).all()
+            except (KeyError, AttributeError, IndexError):
+                log.error("Custom Column No.{} does not exist in calibre database".format(
+                    config.config_restricted_column))
+                raise Exception(_("Custom Column No.%(column)d does not exist in calibre database",
+                        column=config.config_restricted_column))
+            new_tags_list = [x.value for x in tags]
     saved_tags_list = user.__dict__[tags_name].split(",") if len(user.__dict__[tags_name]) else []
     if action == "remove":
         saved_tags_list = [x for x in saved_tags_list if x not in new_tags_list]
@@ -1898,6 +2079,10 @@ def _configuration_oauth_helper(to_save):
     for element in oauth_bb.get_oauth_blueprints():
         update = {}
         if element["provider_name"] == "generic":
+            if element.get("environment_managed"):
+                # Deployment owns every Generic OIDC setting, including the
+                # secret and activation state. Ignore even forged POST values.
+                continue
             if to_save["config_generic_oauth_client_id"] != element["oauth_client_id"]:
                 reboot_required = True
                 update["oauth_client_id"] = to_save["config_generic_oauth_client_id"]
@@ -2129,6 +2314,7 @@ def simulatedbchange():
 @admin_required
 def new_user():
     content = ub.User()
+    content.kobo_only_shelves_sync = 1
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     kobo_support = feature_support['kobo'] and config.config_kobo_sync
@@ -2137,6 +2323,7 @@ def new_user():
         _handle_new_user(to_save, content, languages, translations, kobo_support)
     else:
         content.role = config.config_default_role
+        content.share_shelfs = True
         content.sidebar_view = config.config_default_show
         content.locale = config.config_default_locale
         content.default_language = config.config_default_language
@@ -2144,6 +2331,8 @@ def new_user():
     magic_shelf_context = _build_magic_shelf_order_context(content)
     return render_title_template("user_edit.html", new_user=1, content=content,
                                  config=config, translations=translations,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  languages=languages, title=_("Add New User"), page="newuser",
                                  kobo_support=kobo_support, registered_oauth=oauth_bb.oauth_check,
                                  opds_root_order_string=opds_context["opds_root_order_string"],
@@ -2503,6 +2692,8 @@ def edit_user(user_id):
                                  new_user=0,
                                  content=content,
                                  config=config,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  registered_oauth=oauth_bb.oauth_check,
                                  mail_configured=config.get_mail_server_configured(),
                                  kobo_support=kobo_support,
@@ -2700,6 +2891,7 @@ def ldap_import_create_user(user, user_data):
     # path. Without this the column default (dark) silently wins over whatever
     # the admin configured.
     content.theme = config_theme_code(config.config_theme)
+    seed_new_user_ui_font_defaults(content, config)
     ub.session.add(content)
     try:
         ub.session.commit()
@@ -2950,7 +3142,9 @@ def _configuration_update_helper():
             to_save["config_converterpath"] = get_calibre_binarypath("ebook-convert")
             _config_string(to_save, "config_converterpath")
 
-        reboot_required |= _config_int(to_save, "config_login_type")
+        env_oauth = current_app.extensions.get("cps_generic_oauth_environment", {})
+        if not (env_oauth.get("managed") and env_oauth.get("active")):
+            reboot_required |= _config_int(to_save, "config_login_type")
 
         # LDAP configurator
         if config.config_login_type == constants.LOGIN_LDAP:
@@ -3223,6 +3417,7 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.sidebar_view |= constants.DETAIL_RANDOM
 
     content.role = constants.selected_roles(to_save)
+    content.share_shelfs = to_save.get("share_shelfs") == "on"
     # Seed the account with the instance default theme (Admin -> Theme). The
     # account owns its theme from here on, via Account -> Theme in the New UI.
     try:
@@ -3248,6 +3443,8 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         magic_shelf_context = _build_magic_shelf_order_context(content)
         return render_title_template("user_edit.html", new_user=1, content=content,
                                      config=config,
+                                     restriction_is_bool=(restricted_column_datatype(
+                                         config.config_restricted_column) == "bool"),
                                      translations=translations,
                                      languages=languages, title=_("Add new user"), page="newuser",
                                      kobo_support=kobo_support, registered_oauth=oauth_bb.oauth_check,
@@ -3262,12 +3459,18 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.denied_tags = config.config_denied_tags
         content.allowed_column_value = config.config_allowed_column_value
         content.denied_column_value = config.config_denied_column_value
-        # No default value for kobo sync shelf setting
-        content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync", 0) == "on"
+        # An unchecked, visible checkbox is an explicit whole-library choice.
+        # When Kobo is disabled the form has no control: retain the new-user
+        # default so enabling Kobo later cannot unexpectedly send everything.
+        if kobo_support:
+            content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync") == "on"
+        else:
+            content.kobo_only_shelves_sync = 1
         content.kobo_two_way_annotation_sync = (
             to_save.get("kobo_two_way_annotation_sync", 0) == "on"
         )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
+        seed_new_user_ui_font_defaults(content, config)
         ub.session.add(content)
         ub.session.commit()
         flash(_("User '%(user)s' created", user=content.name), category="success")
@@ -3505,7 +3708,13 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.locale = validated_locale
     try:
         anonymous = content.is_anonymous
-        content.role = constants.selected_roles(to_save)
+        # Book-source access is granted on the admin Book sources page, which
+        # this form knows nothing about. Rebuilding the mask from the posted
+        # checkboxes alone silently revoked it on any edit, even an email change.
+        content.role = (constants.selected_roles(to_save)
+                        | constants.preserved_roles(to_save, content.role))
+        if "share_shelfs_present" in to_save:
+            content.share_shelfs = to_save.get("share_shelfs") == "on"
         if anonymous:
             content.role |= constants.ROLE_ANONYMOUS
         else:
@@ -3544,6 +3753,8 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
                                      new_user=0,
                                      content=content,
                                      config=config,
+                                     restriction_is_bool=(restricted_column_datatype(
+                                         config.config_restricted_column) == "bool"),
                                      registered_oauth=oauth_bb.oauth_check,
                                      opds_root_order_string=opds_context["opds_root_order_string"],
                                      opds_hidden_entries_string=opds_context["opds_hidden_entries_string"],

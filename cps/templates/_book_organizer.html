@@ -106,7 +106,7 @@
       </button>
       <ul class="dropdown-menu" role="menu" aria-labelledby="book-organizer-shelf-toggle">
         {% for shelf_item in shelves %}
-        {% if not shelf_item.is_public or can_edit_public_shelf %}
+        {% if not current_user.is_anonymous and (shelf_item.user_id == current_user.id or (shelf_item.is_public and current_user.role_edit_shelfs())) %}
         <li role="presentation">
           <a href="#"
              role="menuitem"

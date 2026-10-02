@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
@@ -14,8 +14,10 @@ import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { Book } from '../lib/api';
-import { ApiError } from '../lib/api';
+import { apiGet, ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { useRangeSelection } from '../lib/useRangeSelection';
+import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
@@ -51,22 +53,22 @@ export function Shelf({ id }: { id: string }) {
   const [readingTagsHidden] = useReadingTagsHidden();
   const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
+  const announce = useAnnouncer();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectAllBusy, setSelectAllBusy] = useState(false);
+  const [selectAllError, setSelectAllError] = useState('');
+  const selectAllRequest = useRef(0);
   const clearSelection = () => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
     setSelected(new Set());
     setSelecting(false);
   };
-  const toggleSelect = (book: Book) => setSelected((previous) => {
-    const next = new Set(previous);
-    if (next.has(book.id)) next.delete(book.id);
-    else next.add(book.id);
-    return next;
-  });
   const refreshAfterBulk = (changedIds: number[]) => {
     // Successful books leave selection; partial failures remain retryable.
     const changed = new Set(changedIds);
@@ -76,6 +78,7 @@ export function Shelf({ id }: { id: string }) {
     setRevision((value) => value + 1);
   };
   const [books, setBooks] = useState<Book[]>([]);
+  const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
 
@@ -87,6 +90,32 @@ export function Shelf({ id }: { id: string }) {
   const me = useMe().data;
   const updateProfile = useUpdateProfile();
 
+  const selectAllBooks = async () => {
+    const requestId = ++selectAllRequest.current;
+    setSelectAllBusy(true);
+    setSelectAllError('');
+    announce(t('Selecting all books in this view…'));
+    try {
+      const params = new URLSearchParams({ select_all: '1', sort });
+      const result = await apiGet<{ ids: number[] }>(`/api/v1/shelves/${id}?${params.toString()}`);
+      if (requestId !== selectAllRequest.current) return;
+      setSelected(new Set(result.ids));
+      announce(t('Selected all {count} books in this view.', { count: result.ids.length }));
+    } catch (error) {
+      if (requestId !== selectAllRequest.current) return;
+      const apiError = error instanceof ApiError ? error : undefined;
+      const message = apiError?.detail?.code === 'selection_too_large'
+        ? t('Select all is limited to {max} books. Narrow the current view and try again.', {
+          max: typeof apiError.detail.max_items === 'number' ? apiError.detail.max_items : 100000,
+        })
+        : t('Could not select all books. Try again.');
+      setSelectAllError(message);
+      announce(message, { assertive: true });
+    } finally {
+      if (requestId === selectAllRequest.current) setSelectAllBusy(false);
+    }
+  };
+
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -94,7 +123,10 @@ export function Shelf({ id }: { id: string }) {
 
   // Route reuse (/shelf/A -> /shelf/B keeps this component mounted): reset
   // paging and per-shelf UI modes when the shelf changes (#612).
-  useEffect(() => {
+  useLayoutEffect(() => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
+    setSelectAllError('');
     setSelected(new Set());
     setSelecting(false);
     setSort(readShelfSort(id));
@@ -126,6 +158,8 @@ export function Shelf({ id }: { id: string }) {
   }, [data, id, isPlaceholderData, sort, revision]);
 
   const changeSort = (nextSort: string) => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
     const safeSort = SHELF_SORT_VALUES.has(nextSort) ? nextSort : 'stored';
     setReordering(false);
     setBooks([]);
@@ -148,12 +182,12 @@ export function Shelf({ id }: { id: string }) {
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {
     return (
-      <main className={styles.container}>
+      <div className={styles.container}>
         <Link href="/shelves" className={styles.back}>
           <ChevronLeft size={16} /> {t('All shelves')}
         </Link>
         <EmptyState message={error instanceof Error ? error.message : t('Shelf not found.')} />
-      </main>
+      </div>
     );
   }
 
@@ -162,7 +196,7 @@ export function Shelf({ id }: { id: string }) {
   const canEdit = data.can_edit;
   const visibilityAction = getShelfVisibilityAction({
     canEdit,
-    canMakePublic: !!me?.role?.edit_shelfs,
+    canMakePublic: data.is_owner ? !!me?.role?.share_shelfs : !!me?.role?.edit_shelfs,
     isPublic: data.is_public,
   });
 
@@ -252,7 +286,7 @@ export function Shelf({ id }: { id: string }) {
   };
 
   return (
-    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
+    <div className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
       <Link href="/shelves" className={styles.back}>
         <ChevronLeft size={16} /> {t('All shelves')}
       </Link>
@@ -287,7 +321,7 @@ export function Shelf({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              <h1 className={styles.title}>{data.name}</h1>
+              <h1 data-testid="shelf-heading" tabIndex={-1} className={styles.title}>{data.name}</h1>
               <span
                 className={styles.visibility}
                 title={data.is_public ? t('Public shelf') : t('Private shelf')}
@@ -308,12 +342,22 @@ export function Shelf({ id }: { id: string }) {
             className={selecting ? styles.manageBtnActive : styles.manageBtn}
             aria-pressed={selecting} disabled={bulkBusy} title={t('Select multiple')}
             onClick={() => {
+              selectAllRequest.current += 1;
+              setSelectAllBusy(false);
               setSelecting((value) => !value);
               setSelected(new Set());
               setReordering(false);
             }}>
             <ListChecks size={15} aria-hidden="true" /> {selecting ? t('Done') : t('Select')}
           </button>
+          {selecting && (
+            <button type="button" className={styles.manageBtn}
+              onClick={() => { void selectAllBooks(); }}
+              disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
+              aria-busy={selectAllBusy}>
+              {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
+            </button>
+          )}
           <select
             className={styles.sortSelect}
             value={sort}
@@ -326,6 +370,7 @@ export function Shelf({ id }: { id: string }) {
               </option>
             ))}
           </select>
+          {canEdit && <Link href={`/shelf/${id}/edit`} className={styles.manageBtn}>{t('Settings')}</Link>}
           {canEdit && !editing && (
             <div className={styles.manage}>
               <button className={styles.manageBtn} onClick={startRename}>
@@ -339,7 +384,7 @@ export function Shelf({ id }: { id: string }) {
                   {visibilityAction === 'make-private' ? t('Make private') : t('Make public')}
                 </button>
               )}
-              {shelfMarksReachDevices(me?.features) && (
+              {data.is_owner && shelfMarksReachDevices(me?.features) && (
                 <button className={data.kobo_sync ? styles.manageBtnActive : styles.manageBtn}
                   onClick={toggleKoboSync} disabled={updateShelf.isPending}>
                   <Smartphone size={14} /> {ereaderWording
@@ -361,6 +406,7 @@ export function Shelf({ id }: { id: string }) {
           )}
         </div>
         {actionError && <p className={styles.actionError}>{actionError}</p>}
+        {selectAllError && <p className={styles.actionError}>{selectAllError}</p>}
 
         {koboMarkInert && (
           <div className={styles.koboNotice} role="status">
@@ -423,7 +469,7 @@ export function Shelf({ id }: { id: string }) {
               <BookCard
                 key={book.id}
                 book={book}
-                selectable={selecting} selectionDisabled={bulkBusy}
+                selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy}
                 selected={selected.has(book.id)}
                 onToggleSelect={toggleSelect}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }}
@@ -454,8 +500,9 @@ export function Shelf({ id }: { id: string }) {
           personalLibrary={me?.library_mode === 'personal_library'}
           onClear={clearSelection}
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
-          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
+          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy} />
       )}
-    </main>
+    </div>
   );
 }

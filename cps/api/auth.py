@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 
 from flask import jsonify, request, url_for
+from flask_babel import gettext as _
 from sqlalchemy import func
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -17,6 +18,7 @@ from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
 from ..ui_themes import config_theme_code
+from ..ui_font_preferences import seed_new_user_ui_font_defaults
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
@@ -228,7 +230,17 @@ def _me_payload(user):
     from .. import user_library
     user_library.mark_response_user_specific()
     payload = serialize_user(user)
+    payload["opds_only_shelves_sync"] = bool(
+        getattr(user, "opds_only_shelves_sync", False)
+    )
     payload["features"] = _server_features()
+    from ..services.acquisition.admission import instance_enabled, account_allowed
+    payload["acquisition_access"] = bool(
+        getattr(user, "is_authenticated", False)
+        and not getattr(user, "is_anonymous", True)
+        and instance_enabled(ub.app_DB_path)
+        and account_allowed(ub.app_DB_path, user.id)
+    )
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
     catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})
@@ -242,6 +254,18 @@ def _me_payload(user):
         "books_per_page": int(getattr(config, "config_books_per_page", 60) or 60),
         "random_books": int(getattr(config, "config_random_books", 4) or 4),
     }
+    from ..services.support_policy import support_policy
+    role_admin = getattr(user, "role_admin", None)
+    try:
+        contact_support_label = _("Contact support")
+    except (KeyError, RuntimeError):
+        # Minimal Flask apps used by auth bootstrap/tests may not install Babel.
+        contact_support_label = "Contact support"
+    payload["support"] = support_policy(
+        config,
+        is_admin=bool(role_admin()) if callable(role_admin) else False,
+        contact_support_label=contact_support_label,
+    )
     return payload
 
 
@@ -537,6 +561,7 @@ def auth_register():
         content.theme = config_theme_code(getattr(config, "config_theme", None))
     except Exception:
         pass
+    seed_new_user_ui_font_defaults(content, config)
     try:
         ub.session.add(content)
         ub.session.commit()

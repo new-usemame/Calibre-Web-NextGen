@@ -358,8 +358,9 @@
         <div style="margin-top: 20px;
                     background: #202c34a3;
                     padding: 2rem;">
-          <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" {% if content.kobo_only_shelves_sync %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" aria-describedby="kobo-shelf-sync-help" {% if content.kobo_only_shelves_sync %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="kobo_only_shelves_sync">{{_('Sync only books in selected shelves with Kobo')}}</label>
+          <p id="kobo-shelf-sync-help" class="help-block" style="color: inherit;">{{_('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its Kobo sync mark. Uncheck this to sync your whole library.')}}</p>
           <div style="margin-top: 12px;">
             <input type="hidden" name="kobo_two_way_annotation_sync_present" value="1">
             <input type="checkbox" name="kobo_two_way_annotation_sync" id="kobo_two_way_annotation_sync" {% if content.kobo_two_way_annotation_sync %}checked{% endif %} aria-describedby="kobo-two-way-user-help" style="accent-color: var(--color-secondary);">
@@ -437,6 +438,14 @@
           <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if content.show_detail_random() %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
+        {% if profile and not content.role_anonymous() %}
+        <div>
+          <input type="hidden" name="show_original_filename_present" value="1">
+          <input type="checkbox" name="show_original_filename" id="show_original_filename" {% if content.get_view_property('preferences', 'show_original_filename') is not sameas false %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="show_original_filename">{{_('Show original filename')}}</label>
+          <p class="help-block">{{_('Shows the name a book had when it was imported.')}}</p>
+        </div>
+        {% endif %}
       </div>
       
       {% if ( current_user and current_user.role_admin() and not new_user ) and not simple %}
@@ -521,7 +530,12 @@
         
         <div>
           <input type="checkbox" name="edit_shelf_role" id="edit_shelf_role" {% if content.role_edit_shelfs() %}checked{% endif %} style="accent-color: var(--color-secondary);">
-          <label for="edit_shelf_role">{{_('Allow Editing Public Shelves')}}</label>
+          <label for="edit_shelf_role">{{_('Edit public shelves')}}</label>
+        </div>
+        <input type="hidden" name="share_shelfs_present" value="1">
+        <div>
+          <input type="checkbox" name="share_shelfs" id="share_shelfs" {% if content.share_shelfs is not defined or content.share_shelfs %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="share_shelfs">{{_('Allow sharing your own shelves')}}</label>
         </div>
         {% endif %}
       </div>
@@ -966,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% endblock %}
 {% block modal %}
-{{ restrict_modal() }}
+{{ restrict_modal(restriction_is_bool|default(false)) }}
 {{ delete_confirm_modal() }}
 {% endblock %}
 {% block js %}

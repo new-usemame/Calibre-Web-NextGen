@@ -197,8 +197,18 @@ test('viewer and download roles independently govern every book affordance (F-ed
         const card = page.locator(`a[href$="/book/${readableBookId}"]`).first();
         await expect(card).toBeVisible();
         const cardWrap = card.locator('..');
+        // Card actions now live in the cover disclosure. Open it before
+        // checking that viewer permission controls the Read affordance.
+        const cardActions = cardWrap.getByRole('button', {
+          name: `Actions for ${book.title}`,
+          exact: true,
+        });
+        await card.hover();
+        await cardActions.click();
+        const actionDialog = page.getByRole('dialog', { name: `Actions for ${book.title}`, exact: true });
+        await expect(actionDialog).toBeVisible();
         await expect(
-          cardWrap.locator(`a[href$="/read/${readableBookId}"], a[href*="/view/${readableBookId}/"]`),
+          actionDialog.getByRole('link', { name: 'Read now', exact: true }),
           `${user.label}: New UI card Read affordance must match API role.viewer`,
         ).toHaveCount(me.role.viewer ? 1 : 0);
 

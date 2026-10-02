@@ -8,6 +8,8 @@
 import datetime
 import threading
 
+from markupsafe import escape
+
 from . import config, constants, logger
 from .services.background_scheduler import BackgroundScheduler, CronTrigger, IntervalTrigger, use_APScheduler, DateTrigger
 from .tasks.database import TaskReconnectDatabase, TaskCleanArchivedBooks
@@ -102,6 +104,38 @@ def end_scheduled_tasks():
             worker.end_task(task.id)
 
 
+ACQUISITION_JOB_ID = 'cwng-acquisition-drain'
+
+
+def acquisition_scheduler_available():
+    # A status GET must not start a scheduler just by constructing its wrapper.
+    try:
+        instance = BackgroundScheduler._instance
+        if not use_APScheduler or instance is None or getattr(instance.scheduler, 'state', None) != 1:
+            return False
+        return any(job.id == ACQUISITION_JOB_ID and job.next_run_time is not None for job in instance.get_jobs())
+    except Exception:
+        return False
+
+
+def _drain_acquisition_jobs():
+    from .services.acquisition.runtime import drain_acquisition_jobs
+    drain_acquisition_jobs()
+
+
+def register_acquisition_task(scheduler=None):
+    from . import ub
+    from .services.acquisition.admission import instance_enabled
+    scheduler = scheduler or BackgroundScheduler._instance
+    if not use_APScheduler or not scheduler:
+        return
+    scheduler.remove_job(ACQUISITION_JOB_ID)
+    if instance_enabled(ub.app_DB_path):
+        scheduler.schedule(func=_drain_acquisition_jobs, trigger=IntervalTrigger(seconds=5),
+            name='acquisition import queue', job_id=ACQUISITION_JOB_ID,
+            max_instances=1, coalesce=True)
+
+
 def register_scheduled_tasks(reconnect=True):
     # Reconcile even when APScheduler is unavailable, then reuse the result so
     # normal startup performs one CWA DB read/mirror write rather than two.
@@ -129,6 +163,7 @@ def register_scheduled_tasks(reconnect=True):
             scheduler, timezone_info, configuration=hardcover_configuration
         )
         _schedule_archived_book_cleanup(scheduler, timezone_info)
+        register_acquisition_task(scheduler)
 
         # Kick-off tasks, if they should currently be running
         if should_task_be_running(start, duration):
@@ -179,7 +214,7 @@ def register_startup_tasks():
                         except Exception:
                             pass
                         if should_enqueue and bid is not None and uid is not None:
-                            WorkerThread.add(u, TaskAutoSend(f"Auto-sending '{t}' to user's eReader(s)", bid, uid, delay_minutes), hidden=False)
+                            WorkerThread.add(u, TaskAutoSend(f"Auto-sending '{escape(t)}' to user's eReader(s)", bid, uid, delay_minutes), hidden=False)
 
                     job = scheduler.schedule(func=_rehydrate_enqueue, trigger=DateTrigger(run_date=run_at_local), name=f"rehydrated auto-send {schedule_id}")
                     try:

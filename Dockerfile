@@ -371,6 +371,11 @@ RUN \
   # STEP 7.1 - Move contents of /app/calibre-web-automated/root to / and delete the /app/calibre-web-automated/root directory
   cp -R /app/calibre-web-automated/root/* / && \
   rm -R /app/calibre-web-automated/root/ && \
+  # Install the intended ImageMagick policy while building the image. Runtime
+  # cwa-init repeats this for the root/PUID path; arbitrary non-root users
+  # cannot mutate /etc and should already see the same policy.
+  rm -f /etc/ImageMagick-6/policy.xml && \
+  ln -s /defaults/policy.xml /etc/ImageMagick-6/policy.xml && \
   # STEP 7.2 - Run CWA install script to make required dirs, set script permissions and add aliases for CLI commands  ect.
   chmod +x /app/calibre-web-automated/scripts/setup-cwa.sh && \
   /app/calibre-web-automated/scripts/setup-cwa.sh && \

@@ -31,10 +31,10 @@
 # both empty), so Python imports and template reads work regardless of owner.
 # Only the dirs the runtime user *writes* under the app tree need ownership.
 #
-# cps/cache is such a dir; it is created and chowned earlier in the
-# cwa-init unit (before first-run app.db creation needs it), so it is not
-# repeated here. The rest of the tree (dirs.json, the code) is written only by
-# root or never, so orphaned build-time ownership is harmless.
+# Cache now defaults to /config/cache (#995), and thumbnails stay under
+# /config/thumbnails; the config pass covers both. Explicit CACHE_DIR locations
+# remain the deployment's ownership responsibility. No cache directory under
+# the image-owned app tree needs creation or ownership changes.
 #
 # scripts/auto_library.py can rewrite dirs.json in place at runtime when the
 # library environment override is unset, so a crash mid-write can leave it

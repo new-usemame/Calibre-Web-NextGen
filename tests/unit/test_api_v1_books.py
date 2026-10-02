@@ -354,3 +354,104 @@ def test_list_books_handles_discovery_filters():
     src = _inspect.getsource(books_mod.list_books)
     for value in ('favorites', 'rated', 'discover', 'hot'):
         assert 'filter_val == "%s"' % value in src, "discovery filter %r missing" % value
+
+
+@pytest.mark.unit
+def test_select_all_returns_all_matching_ids_without_serializing_book_cards():
+    from cps.api import books as books_mod
+    from cps.pagination import Pagination
+
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?select_all=1&author=3"):
+        with patch.object(books_mod.calibre_db, "fill_indexpage",
+                          return_value=([7, 8, 9], None, Pagination(1, 100001, 3))) as fill, \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True):
+            response = inspect.unwrap(books_mod.list_books)()
+
+    assert response.status_code == 200
+    assert json.loads(response.get_data(as_text=True)) == {"ids": [7, 8, 9], "total": 3}
+    assert fill.call_args.kwargs["ids_only"] is True
+    assert fill.call_args.args[0:2] == (1, 100001)
+
+
+@pytest.mark.unit
+def test_select_all_rejects_more_than_the_explicit_result_limit():
+    from cps.api import books as books_mod
+    from cps.pagination import Pagination
+
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?select_all=1"):
+        with patch.object(books_mod.calibre_db, "fill_indexpage",
+                          return_value=(list(range(100001)), None,
+                                        Pagination(1, 100001, 100001))), \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True):
+            response, status = inspect.unwrap(books_mod.list_books)()
+
+    assert status == 413
+    payload = json.loads(response.get_data(as_text=True))
+    assert payload["error"]["code"] == "selection_too_large"
+    assert payload["error"]["max_items"] == books_mod.MAX_SELECT_ALL_BOOKS
+
+
+@pytest.mark.unit
+def test_select_all_search_uses_the_filtered_search_query_ids():
+    from cps.api import books as books_mod
+
+    class IDQuery:
+        def __init__(self):
+            self.ordered = None
+            self.limit_count = None
+
+        def with_entities(self, *_columns):
+            return self
+
+        def distinct(self):
+            return self
+
+        def count(self):
+            return 2
+
+        def order_by(self, *order):
+            self.ordered = order
+            return self
+
+        def limit(self, count):
+            self.limit_count = count
+            return self
+
+        def all(self):
+            return [(41,), (42,)]
+
+    query = IDQuery()
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?search=dune&select_all=1"):
+        with patch.object(books_mod.calibre_db, "search_query", return_value=query) as search_query, \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True):
+            response = inspect.unwrap(books_mod.list_books)()
+
+    assert search_query.call_args.args[0] == "dune"
+    assert query.limit_count == books_mod.MAX_SELECT_ALL_BOOKS + 1
+    assert json.loads(response.get_data(as_text=True)) == {"ids": [41, 42], "total": 2}
+
+
+@pytest.mark.unit
+def test_select_all_discover_returns_only_the_current_random_page_ids():
+    from cps.api import books as books_mod
+
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?filter=discover&select_all=1"):
+        with patch.object(books_mod.calibre_db, "fill_indexpage",
+                          return_value=([41, 42, 43], None, None)) as fill, \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True), \
+             patch.object(books_mod, "_real_user_id", return_value=7), \
+             patch.object(books_mod, "_hidden_book_ids", return_value=set()):
+            response = inspect.unwrap(books_mod.list_books)()
+
+    assert response.status_code == 200
+    assert json.loads(response.get_data(as_text=True)) == {"ids": [41, 42, 43], "total": 3}
+    assert fill.call_args.args[:2] == (1, 24)
+    assert fill.call_args.kwargs["ids_only"] is True

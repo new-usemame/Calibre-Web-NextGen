@@ -20,6 +20,7 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link href="{{ url_for('static', filename='css/libs/bootstrap.min.css') }}" rel="stylesheet" media="screen">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/libs/bar-ui.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}" />
 
   <script>
     "use strict";
@@ -28,6 +29,7 @@
 </head>
 
 <body>
+  {% include '_reader_lookup_banner.html' %}
 
   <div class="row" style="display: inline-block; width: 100%;">
     <div class="col-sm-3 col-lg-3 col-xs-5">
@@ -192,7 +194,7 @@
           </button>
           <ul id="add-to-shelves" class="dropdown-menu" aria-labelledby="add-to-shelf">
             {% for shelf in g.shelves_access %}
-              {% if not shelf.id in books_shelfs and ( not shelf.is_public or current_user.role_edit_shelfs() ) %}
+              {% if not shelf.id in books_shelfs and not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                 <li>
                   <a data-href="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
                      data-remove-href="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
@@ -213,7 +215,7 @@
                    data-add-href="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
                    class="btn btn-sm btn-default" role="button" data-shelf-action="remove"
                 >
-                  <span {% if not shelf.is_public or current_user.role_edit_shelfs() %}
+                  <span {% if not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                         class="glyphicon glyphicon-remove"
                         {% endif %}></span> {{shelf.name}}{% if shelf.is_public == 1 %} {{_('(Public)')}}{% endif %}
                 </a>
@@ -341,7 +343,8 @@ window.calibre = {
         filePath: "{{ url_for('static', filename='js/libs/') }}",
         cssPath: "{{ url_for('static', filename='css/') }}",
         bookUrl: "{{ url_for('static', filename=mp3file) }}/",
-        bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=mp3file, book_format=audioformat.upper()) }}",
+        bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=mp3file, book_format=audioformat.upper(), lookup=1 if lookup_mode else None) }}",
+        lookupMode: {{ lookup_mode|default(false)|tojson }},
         bookmark: "{{ bookmark.bookmark_key if bookmark != None }}",
         useBookmarks: "{{ current_user.is_authenticated | tojson }}"
 

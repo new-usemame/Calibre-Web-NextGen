@@ -225,6 +225,27 @@ msgstr "Il DB delle impostazioni non è scrivibile"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Support settings were not saved. Use an HTTP or HTTPS URL without "
+"credentials, with a URL up to 2048 characters and a label up to 80 "
+"characters."
+msgstr ""
+
+#: cps/admin.py
+msgid "Invalid default body font option"
+msgstr ""
+
+#: cps/admin.py
+msgid "Invalid default display font option"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -397,6 +418,10 @@ msgid ""
 msgstr ""
 "I libri selezionati non corrispondono a questa anteprima. Ricarica il "
 "database del dispositivo."
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -2423,6 +2448,10 @@ msgstr ""
 "Aiuta a migliorare le traduzioni in %(language)s di Calibre-Web NextGen — "
 "%(count)s stringhe nella tua lingua devono ancora essere tradotte."
 
+#: cps/api/auth.py cps/render_template.py cps/spa_strings.py
+msgid "Contact support"
+msgstr ""
+
 #: cps/search.py
 msgid "Published after "
 msgstr "Pubblicato dopo il "
@@ -3354,13 +3383,15 @@ msgstr "Rimuovi valutazione"
 msgid "Not rated"
 msgstr "Non valutato"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Sì"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "No"
 
@@ -3564,6 +3595,20 @@ msgid ""
 msgstr ""
 "Si applica agli account creati da questo momento in poi. Ognuno potrà "
 "scegliere il proprio nel menu Account → Tema."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI body font for new users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI display font for new users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Applies to accounts created from now on. Each user can change these fonts "
+"under Account settings."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add a format"
@@ -3833,15 +3878,15 @@ msgstr "Predefinito (Optima / Sans-Serif)"
 msgid "Default (Bookish Serif)"
 msgstr "Predefinito (Bookish Serif)"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "System Sans-Serif"
 msgstr "System Sans-Serif"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Bookish Serif"
 msgstr "Bookish Serif"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Monospace"
 msgstr "A larghezza fissa"
 
@@ -4483,6 +4528,10 @@ msgid "Date Added"
 msgstr "Data aggiunta"
 
 #: cps/spa_strings.py
+msgid "Last Modified"
+msgstr "Ultima modifica"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
 msgstr ""
@@ -4890,12 +4939,32 @@ msgid "Unused by this arrangement"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Book details"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show original filename"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the imported file name visible on book detail pages."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Shows the name a book had when it was imported."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(Nessun testo rilevato)"
 
 #: cps/spa_strings.py
 msgid "(replace cover)"
 msgstr "(sostituisci copertina)"
+
+#: cps/spa_strings.py
+msgid ", search supported"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "1 annotation assigned to this source"
@@ -4919,8 +4988,18 @@ msgid "3:4 (generic)"
 msgstr "3:4 (generico)"
 
 #: cps/spa_strings.py
+msgid "A copy was already in the library; it was kept."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "A device calling itself “{name}” wants to connect to your account."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"A download redirect tried to send a credential to another origin and was "
+"blocked."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4935,6 +5014,11 @@ msgid "A few random picks from your library"
 msgstr "Alcune selezioni casuali dalla tua biblioteca"
 
 #: cps/spa_strings.py
+msgid ""
+"A new catalog is added switched off. Test it first, then make it available."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "A note about the book, not tied to a passage"
 msgstr "Nota sul libro, non collegata a un brano"
 
@@ -4945,6 +5029,14 @@ msgid ""
 msgstr ""
 "È necessaria una ricerca completa dei duplicati. Usa \"Cerca duplicati\" in "
 "alto per avviarla."
+
+#: cps/spa_strings.py
+msgid "API endpoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "API key"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
@@ -4964,8 +5056,21 @@ msgid "Account: {name}"
 msgstr "Account: {name}"
 
 #: cps/spa_strings.py
+msgid ""
+"Acquisition is not ready right now. Ask an administrator to check its status."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Active"
 msgstr "Attivo"
+
+#: cps/spa_strings.py
+msgid "Add a connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add group"
@@ -4997,6 +5102,14 @@ msgstr "Aggiungi ai preferiti"
 
 #: cps/spa_strings.py
 msgid "Add to library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Added to your activity."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Additional local download origins"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5038,6 +5151,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "All catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All shelves"
 msgstr "Tutti gli scaffali"
 
@@ -5046,12 +5163,37 @@ msgid "Allow remote (magic-link) login"
 msgstr "Permetti autenticazione remota (magic-link)"
 
 #: cps/spa_strings.py
+msgid "Allow requests from book sources"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Gruppi autorizzati (separati da virgole)"
 
 #: cps/spa_strings.py
+msgid "Allowed torrent tracker origins"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Also add the book to My Library"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Also on {names}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "An administrator has not added a book source, or none is switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5188,12 +5330,27 @@ msgid "Auto-create users on first login"
 msgstr "Creazione automatica utenti al primo accesso"
 
 #: cps/spa_strings.py
+msgid "Available to users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Indietro"
+
+#: cps/spa_strings.py
 msgid "Back to formatting"
 msgstr "Torna alla formattazione"
 
 #: cps/spa_strings.py
 msgid "Back to library"
 msgstr "Torna alla biblioteca"
+
+#: cps/spa_strings.py
+msgid "Back to top"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Background"
@@ -5231,6 +5388,10 @@ msgid "Bold"
 msgstr "Grassetto"
 
 #: cps/spa_strings.py
+msgid "Book category ID"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Book default"
 msgstr "Impostazione predefinita libro"
 
@@ -5241,6 +5402,24 @@ msgstr "Densità di libri"
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Ordinamento libri"
+
+#: cps/spa_strings.py
+msgid "Book sources"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book sources are off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book sources are on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Book sources could not be reached just now. This is not a change to your "
+"access."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5284,6 +5463,16 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Browse the catalogs your administrator has added. A book you pick is "
+"imported into the library here — it is not just downloaded to your device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browse this catalog"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Browser"
 msgstr ""
 
@@ -5300,6 +5489,10 @@ msgid "Built-in providers (leave blank to disable):"
 msgstr "Provider integrati (lasciare vuoto per disabilitare):"
 
 #: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Bulleted list"
 msgstr "Elenco puntato"
 
@@ -5310,6 +5503,25 @@ msgstr "Percorso del certificato CA"
 #: cps/spa_strings.py
 msgid "CWA settings"
 msgstr "Impostazioni CWA"
+
+#: cps/spa_strings.py
+msgid ""
+"CWNG cannot read the mapped completed folder. Check its mount and "
+"permissions."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"CWNG copies a completed EPUB or PDF from this mapping. It does not move "
+"files, delete client jobs, or change seeding limits. NZBGet needs "
+"credentials that can read configuration, queue and history. qBittorrent "
+"needs an existing category. Transmission uses the configured folder and "
+"label."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Can browse and request"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Can upload books"
@@ -5329,6 +5541,10 @@ msgid "Cancel"
 msgstr "Annulla"
 
 #: cps/spa_strings.py
+msgid "Cancel editing"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Cancel rename"
 msgstr "Annulla rinomina"
 
@@ -5340,6 +5556,30 @@ msgstr "Annulla modifica del titolo"
 #, python-brace-format
 msgid "Cancel {task}"
 msgstr "Annulla {task}"
+
+#: cps/spa_strings.py
+msgid "Cancelling…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog address"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalog trail"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalogs and download clients"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -5362,6 +5602,15 @@ msgid "Check again"
 msgstr "Verifica di nuovo"
 
 #: cps/spa_strings.py
+msgid "Check the address and the sign-in details."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Checked {count} catalogs for “{query}”."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Verifica in corso…"
 
@@ -5372,6 +5621,10 @@ msgstr "Scegli una copertina"
 #: cps/spa_strings.py
 msgid "Choose a cover image to upload"
 msgstr "Seleziona un immagine di copertina da caricare"
+
+#: cps/spa_strings.py
+msgid "Choose a download client connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose an image…"
@@ -5406,6 +5659,10 @@ msgid "Client ID"
 msgstr "Client ID"
 
 #: cps/spa_strings.py
+msgid "Client category or label"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Client secret"
 msgstr "Client secert"
 
@@ -5426,6 +5683,12 @@ msgid "Code on the e-reader"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Colour scheme"
 msgstr ""
 
@@ -5442,6 +5705,10 @@ msgid "Compact"
 msgstr "Compatta"
 
 #: cps/spa_strings.py
+msgid "Completed folder as the download client sees it"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Configuration"
 msgstr "Configurazione"
 
@@ -5453,6 +5720,10 @@ msgstr "Configurato"
 #, python-brace-format
 msgid "Confirm delete tag {name}"
 msgstr "Conrerma la cancellazione dell'etichetta {name}"
+
+#: cps/spa_strings.py
+msgid "Confirm deletion"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
@@ -5473,6 +5744,30 @@ msgid ""
 msgstr ""
 "Collega questo account a un eReader, quindi effettua una sincronizzazione "
 "per confermare che sia stato aggiunto alla tua biblioteca."
+
+#: cps/spa_strings.py
+msgid "Connection changed. Reload its settings before saving."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection saved. Test it, then switch it on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection type"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection works."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Contacting the source"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Continue"
@@ -5607,6 +5902,10 @@ msgid "Could not load users."
 msgstr "Impossibile caricare gli utenti."
 
 #: cps/spa_strings.py
+msgid "Could not look up who asked"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not open that highlight."
 msgstr "Impossibile caricare l'evidenziazione."
 
@@ -5629,6 +5928,10 @@ msgstr "Impossibile caricare l'archivio dei fumetti."
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not reload metadata"
 msgstr "Impossibile ricaricare i metadati"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
@@ -5695,6 +5998,10 @@ msgid "Could not search this book."
 msgstr "Impossibile cercare questo libro."
 
 #: cps/spa_strings.py
+msgid "Could not select all books. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
 msgstr "Impossibile avviare la ricerca dei duplicati."
 
@@ -5702,7 +6009,7 @@ msgstr "Impossibile avviare la ricerca dei duplicati."
 msgid "Could not update pairing details."
 msgstr "Impossibile aggiornare i dettagli di associazione."
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Impossibile aggiornare lo scaffale."
 
@@ -5742,10 +6049,6 @@ msgid "Cover updated from the selected result."
 msgstr "Copertina aggiornata dal risultato selezionato."
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr "Crea"
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr "Crea account"
 
@@ -5756,6 +6059,10 @@ msgstr "Crea un account"
 #: cps/spa_strings.py
 msgid "Create failed."
 msgstr "Creazione non riuscita."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
@@ -5836,7 +6143,7 @@ msgstr "Aggiunto"
 msgid "Declined. {name} was not connected."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default (System Sans-Serif)"
 msgstr "Predefinito (System Sans-Serif)"
 
@@ -5908,6 +6215,11 @@ msgid ""
 msgstr ""
 "Eliminare questo URL di sincronizzazione Kobo? L'URL attuale smetterà di "
 "funzionare su ogni Kobo associato."
+
+#: cps/spa_strings.py
+msgid ""
+"Delete this connection and its saved credentials? Request history is kept."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
@@ -6086,7 +6398,20 @@ msgid "Download"
 msgstr "Download"
 
 #: cps/spa_strings.py
+msgid "Download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Download ready-made plugin"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Download release"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Download {format}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6094,6 +6419,14 @@ msgstr ""
 msgid ""
 "Downloaded {file}. It holds a password for this account: delete the zip once "
 "the plugin is on the e-reader."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Downloaded, waiting to import"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Downloading"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6169,6 +6502,10 @@ msgid "Edit HTML"
 msgstr "Modifica HTML"
 
 #: cps/spa_strings.py
+msgid "Edit connection"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Edit cover"
 msgstr ""
 
@@ -6188,7 +6525,7 @@ msgstr ""
 msgid "Edit note"
 msgstr "Modifica la nota"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr "Modifica scaffali pubblici"
 
@@ -6204,6 +6541,11 @@ msgstr "Modifica lo scaffale intelligente"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Modifica il titolo per {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Edit {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -6240,12 +6582,20 @@ msgstr "Server mail"
 msgid "Email settings saved."
 msgstr "Impostazioni mail salvate."
 
+#: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
+msgid "Empty"
+msgstr "Vuoto"
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 msgid "Enable Kobo sync"
 msgstr "Abilita la sincronizzazione Kobo"
 
 #: cps/spa_strings.py
 msgid "Enable e-reader sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enabled"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
@@ -6307,13 +6657,17 @@ msgstr "Esporta"
 msgid "Expose only selected shelves over OPDS"
 msgstr "Esponi solo gli scaffali selezionati su OPDS"
 
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr "Impossibile caricare gli scaffali."
+#: cps/spa_strings.py cps/tasks_status.py
+msgid "Failed"
+msgstr "Non riuscito"
 
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Impossibile caricare."
+
+#: cps/spa_strings.py
+msgid "Feature"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6336,6 +6690,10 @@ msgid "Fill style"
 msgstr "Stile di riempimento"
 
 #: cps/spa_strings.py
+msgid "Filter"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "Filtra per dispositivo"
 
@@ -6348,6 +6706,18 @@ msgstr "Filtra {items}"
 #, python-brace-format
 msgid "Filter {items}…"
 msgstr "Filtra {items}…"
+
+#: cps/spa_strings.py
+msgid "Find books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Find books is unavailable"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Finish or cancel outstanding requests before editing this connection."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6407,6 +6777,10 @@ msgstr "La formattazione viene conservata se supportata dalla pagina."
 #: cps/spa_strings.py
 msgid "From address"
 msgstr "Indirizzo mittente"
+
+#: cps/spa_strings.py cps/templates/search_form.html
+msgid "From:"
+msgstr "Da:"
 
 #: cps/spa_strings.py
 msgid "Full screen"
@@ -6490,6 +6864,10 @@ msgid "Group object filter"
 msgstr "Filtro per gruppi di oggetti"
 
 #: cps/spa_strings.py
+msgid "Handing over to the library"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Has pen or drawing notes"
 msgstr "Include annotazioni a penna o disegni"
 
@@ -6521,6 +6899,10 @@ msgstr "Nascosto"
 msgid "Hidden built-ins"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Nascondi"
@@ -6544,6 +6926,11 @@ msgstr "Nascondi campi"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Nascondi password"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6600,6 +6987,13 @@ msgid "Identifiers"
 msgstr "Identificatori"
 
 #: cps/spa_strings.py
+msgid ""
+"If Prowlarr redirects to another source on your local network, list its "
+"exact origin here. Separate origins with commas. Credentials stay scoped to "
+"their original origin."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "Immagine da {source}"
@@ -6615,6 +7009,14 @@ msgstr "Importa ed esporta"
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "Importato come"
+
+#: cps/spa_strings.py
+msgid "Imported into the library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Importing"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "In your book"
@@ -6635,6 +7037,10 @@ msgstr "Inattivi"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Incluso/i"
+
+#: cps/spa_strings.py
+msgid "Indexer preset"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
@@ -6676,6 +7082,10 @@ msgstr "Progresso KOReader"
 
 #: cps/spa_strings.py
 msgid "KOReader sync is not enabled on this server."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep connection"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6772,7 +7182,36 @@ msgid "Leave a field empty to use its default."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Leave the credential blank to keep it. Saving switches the connection off "
+"and expires old selections; test it before enabling it again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Left"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before a catalog can be added."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before a catalog can be made "
+"available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before this can be switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Let people request books from an OPDS catalog or an indexer connected to a "
+"download client. A requested book is imported into this library through the "
+"normal ingest path, credited to the account that asked for it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6790,6 +7229,17 @@ msgstr "Altezza della linea"
 #: cps/spa_strings.py
 msgid "Link address"
 msgstr "Indirizzo del collegamento"
+
+#: cps/spa_strings.py
+msgid ""
+"List the exact HTTP, HTTPS or UDP tracker origins you trust, separated by "
+"commas. Torrents using other trackers are blocked. Source credentials are "
+"never sent to trackers."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Literata"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Load more"
@@ -6860,6 +7310,10 @@ msgstr "Accedi con"
 #: cps/spa_strings.py
 msgid "Logs"
 msgstr "Log"
+
+#: cps/spa_strings.py
+msgid "Looking up who asked…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Looks good"
@@ -6982,6 +7436,10 @@ msgid "Model"
 msgstr "Modello"
 
 #: cps/spa_strings.py
+msgid "More"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Altre azioni per {name}"
@@ -7029,6 +7487,10 @@ msgid "My private cover"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "NZBGet download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Name"
 msgstr "Nome"
 
@@ -7066,10 +7528,6 @@ msgid "New shelf name"
 msgstr "Nome del nuovo scaffale"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Nome del nuovo scaffale…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Nuovo scaffale…"
 
@@ -7093,6 +7551,10 @@ msgstr "Più recenti"
 msgid "Newest published"
 msgstr "Pubblicazione più recente"
 
+#: cps/spa_strings.py
+msgid "Newznab / Torznab indexer"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
 msgid "Next"
@@ -7101,6 +7563,18 @@ msgstr "Successivo"
 #: cps/spa_strings.py
 msgid "Next page"
 msgstr "Pagina seguente"
+
+#: cps/spa_strings.py
+msgid "No EPUB or PDF available from this catalog."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No accepted upload format allows EPUB or PDF."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No approval needed"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -7117,6 +7591,10 @@ msgid "No books match those criteria."
 msgstr "Nessun libro corrisponde a questi criteri."
 
 #: cps/spa_strings.py
+msgid "No books on this catalog matched that search."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books were reported in the latest device inventory."
 msgstr "Nessun libro trovato nell'ultimo inventario del dispositivo."
 
@@ -7125,6 +7603,14 @@ msgid "No candidates found yet. Try a different search or refresh."
 msgstr ""
 "Nessuna corrispondenza trovata al momento. Prova una ricerca diversa o "
 "aggiorna la pagina."
+
+#: cps/spa_strings.py
+msgid "No catalogs yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No catalogs yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No contents found."
@@ -7192,10 +7678,12 @@ msgid "No shelves yet — create one below."
 msgstr "Nessuno scaffale presente — creane uno qui sotto."
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
+msgid "No shelves yet. Create a shelf to start collecting books."
 msgstr ""
-"Nessuno scaffale presente. Creane uno qui sopra per iniziare a raccogliere i "
-"libri."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -7237,6 +7725,10 @@ msgstr "Non impostato"
 #: cps/spa_strings.py
 msgid "Not set up yet"
 msgstr "Non ancora impostato"
+
+#: cps/spa_strings.py
+msgid "Not tested in this session."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
@@ -7282,12 +7774,26 @@ msgstr ""
 "globale; appariranno qui e sul tuo eReader."
 
 #: cps/spa_strings.py
+msgid "Nothing requested yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Nessun elemento da visualizzare in anteprima."
 
 #: cps/spa_strings.py
 msgid "Numbered list"
 msgstr "Elenco numerato"
+
+#: cps/spa_strings.py
+msgid "OPDS catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. Nothing is fetched and no permission changes until you turn "
+"this on."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -7365,6 +7871,10 @@ msgstr ""
 msgid "Open administration"
 msgstr "Apri l'amministrazione"
 
+#: cps/spa_strings.py cps/templates/annotations_view.html
+msgid "Open book"
+msgstr "Apri libro"
+
 #: cps/spa_strings.py
 msgid "Open classic reader"
 msgstr "Apri il lettore classico"
@@ -7388,6 +7898,10 @@ msgstr "Apri l'interfaccia classica"
 #: cps/spa_strings.py
 msgid "Open the link below on your signed-in device."
 msgstr "Apri il link sottostante sul tuo dispositivo connesso."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
@@ -7610,6 +8124,10 @@ msgstr "Pagina precedente"
 msgid "Progress"
 msgstr "Avanzamento"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Public"
 msgstr "Pubblico"
@@ -7627,6 +8145,10 @@ msgid "Quarantined books"
 msgstr "Libri in quarantena"
 
 #: cps/spa_strings.py
+msgid "Queued"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Quote"
 msgstr "Citazione"
 
@@ -7642,6 +8164,11 @@ msgstr "Valutazione"
 #: cps/spa_strings.py
 msgid "Rating (stars)"
 msgstr "Valutazione (stelle)"
+
+#: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Read from here"
@@ -7682,6 +8209,10 @@ msgid "Reading positions"
 msgstr "Progressi di lettura"
 
 #: cps/spa_strings.py
+msgid "Ready to run requests."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Ready-made plugin (USB)"
 msgstr ""
 
@@ -7702,8 +8233,16 @@ msgid "Refresh"
 msgstr "Aggiorna"
 
 #: cps/spa_strings.py
+msgid "Refresh catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Registering…"
 msgstr "In registrazione…"
+
+#: cps/spa_strings.py
+msgid "Reject"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reload"
@@ -7735,6 +8274,10 @@ msgstr "Ricordami"
 #: cps/spa_strings.py
 msgid "Remove device"
 msgstr "Rimuovi dispositivo"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
@@ -7770,8 +8313,21 @@ msgstr "Rimuovi regola"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "Remove tag \"{tag}\""
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Remove these"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "Remove {name}?"
 msgstr "Rimuovere {name}?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -7820,6 +8376,52 @@ msgid "Report this problem"
 msgstr "Segnala questo problema"
 
 #: cps/spa_strings.py
+msgid "Request approved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request cancelled"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request release"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request {format}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requested by a removed account"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Requested by {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requested. An administrator has to approve it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requests are paused"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requests cannot run yet:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr "Richiede l'appartenenza a un gruppo"
 
@@ -7855,6 +8457,11 @@ msgid "Restoring…"
 msgstr "Ripristino in corso…"
 
 #: cps/spa_strings.py
+msgid ""
+"Results stay separate by catalog so you can choose the edition and format."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Resume at {percent} from another device"
 msgstr ""
@@ -7867,6 +8474,10 @@ msgstr "Riprova"
 msgid ""
 "Retry finishes the remaining accounts without changing completed selections. "
 "Undo restores the settings from before setup began."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Retrying."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7900,6 +8511,10 @@ msgid "Run time"
 msgstr "Tempo di esecuzione"
 
 #: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "SMTP server"
 msgstr "Server SMTP"
 
@@ -7910,6 +8525,10 @@ msgstr "SSL/TLS"
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "STARTTLS"
 msgstr "STARTTLS"
+
+#: cps/spa_strings.py
+msgid "Same completed folder inside CWNG"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/config_db.html
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
@@ -7922,6 +8541,10 @@ msgstr "Salva"
 
 #: cps/spa_strings.py
 msgid "Save as preset"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save connection"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7978,8 +8601,16 @@ msgid "Scopes"
 msgstr "Ambiti"
 
 #: cps/spa_strings.py
+msgid "Search all catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search inside book"
 msgstr "Cerca nel libro"
+
+#: cps/spa_strings.py
+msgid "Search remaining catalogs"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Search sources with different words"
@@ -7994,8 +8625,21 @@ msgid "Search this book"
 msgstr "Cerca in questo libro"
 
 #: cps/spa_strings.py
+msgid "Search this catalog"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Ricerca titolo, autore…"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Search: {query}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching catalogs…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
@@ -8004,6 +8648,10 @@ msgstr "Ricerca in tutte le fonti in corso…"
 #: cps/spa_strings.py
 msgid "Searching this book…"
 msgstr "Ricerca di questo libro in corso…"
+
+#: cps/spa_strings.py
+msgid "Searching this catalog…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -8036,6 +8684,17 @@ msgstr "Seleziona tutto nel gruppo"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid ""
+"Select all is limited to {max} books. Narrow the current view and try again."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select all {count} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "Select all {n}"
 msgstr "Seleziona tutto {n}"
 
@@ -8054,8 +8713,21 @@ msgid "Select note: {text}"
 msgstr "Seleziona nota: {text}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Selected all {count} books in this view."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Selected books"
 msgstr "Libri selezionati"
+
+#: cps/spa_strings.py
+msgid "Selecting all books in this view…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Selecting…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
@@ -8152,8 +8824,17 @@ msgid "Settings"
 msgstr "Impostazioni"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Configurazione salvata."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8163,9 +8844,29 @@ msgstr ""
 msgid "Shelf name"
 msgstr "Nome dello scaffale"
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Il nome dello scaffale è obbligatorio"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr "Scaffale non trovato."
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Mostra"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8218,6 +8919,10 @@ msgid "Show hidden books"
 msgstr "Mostra i libri nascosti"
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr ""
 
@@ -8243,6 +8948,11 @@ msgstr ""
 "esattamente come l'hai lasciata — potrai ripristinarla in qualsiasi momento. "
 "Al prossimo aggiornamento, il tuo eReader sincronizzerà la biblioteca "
 "completa."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Show {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8272,6 +8982,32 @@ msgstr ""
 "dispositivo."
 
 #: cps/spa_strings.py
+msgid "Minimum books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter a whole number of at least 1."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Correct the minimum books value to see results."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No matching {items} for the selected filters."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing {shown} of {total} {items}."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shuffle picks"
 msgstr "Consigli casuali"
 
@@ -8292,6 +9028,10 @@ msgid "Sign out"
 msgstr "Disconnessione"
 
 #: cps/spa_strings.py
+msgid "Sign-in"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Signing in…"
 msgstr "Accesso in corso…"
 
@@ -8304,12 +9044,22 @@ msgid "Size (pt)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Scaffale intelligente non trovato."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Scaffali intelligenti"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -8445,12 +9195,30 @@ msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Table view"
 msgstr "Vista a tabella"
 
 #: cps/spa_strings.py
 msgid "Tag"
 msgstr "Etichetta"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {n} book(s)."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {succeeded}; {failed} failed."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
@@ -8489,6 +9257,10 @@ msgid "Technical details"
 msgstr "Dettagli tecnici"
 
 #: cps/spa_strings.py
+msgid "Test connection"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Text templates"
 msgstr ""
 
@@ -8497,7 +9269,88 @@ msgid "That URL is not a usable image."
 msgstr "Quell'URL non è un'immagine utilizzabile."
 
 #: cps/spa_strings.py
+msgid "That account is no longer allowed to request books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"That address cannot be reached on a local network. Loopback, link-local and "
+"cloud metadata addresses are never allowed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That catalog no longer exists."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That choice expired. Refresh the page and pick the file again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That page expired. Go back to the top and try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"That permission could not be changed. Check that book sources are still "
+"switched on, then try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request has already moved on and can no longer be stopped."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request has already moved on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request is no longer in a state that can be retried."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That request is no longer waiting."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The Calibre library folder could not be found."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The KOReader plugin is not part of this installation."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The acquisition database could not be opened."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The acquisition key is missing."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The acquisition tables are not ready."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The acquisition tables are not ready. Restart the server, then reload this "
+"page."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The approval queue could not be loaded, so requests may be waiting unseen."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The authors, tags, publishers, and languages you enter will be removed from "
+"each selected book. Books without them are left unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The background scheduler is not running."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8514,16 +9367,144 @@ msgstr ""
 "rimarranno disponibili. Se questo è l'unico formato presente, potrai "
 "aggiungerne uno sostitutivo in seguito."
 
+#: cps/spa_strings.py
+msgid "The catalog could not be changed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The catalog could not be read"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The catalogs could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download contains multiple books. A single-book release is "
+"required."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed download contains no usable EPUB or PDF."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download is outside its mapped folder or uses an unsafe file "
+"path."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed-folder mapping does not cover the configured download client "
+"folder."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The connection could not be deleted. Finish or cancel outstanding requests "
+"first."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection did not answer with a response we can read."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection settings could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection test failed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client did not finish this download before the waiting limit. "
+"Check its queue before retrying."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client did not report a completed folder and category that "
+"could be verified."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client for this source is unavailable. Ask an administrator to "
+"check it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client is unavailable or its settings changed. Make a new "
+"selection after an administrator checks it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The download client reported that this download failed."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "The global library"
 msgstr "Biblioteca globale"
+
+#: cps/spa_strings.py
+msgid "The indexer did not return a valid NZB descriptor."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise a supported keyword search."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise this book category."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ingest folder could not be found."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ingest folder is not writable."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ingest service is not running."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The library cover is back for you."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "The list of people could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The preset change failed. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be approved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be made."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be rejected. It may have already moved on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be retried."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be stopped."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8538,6 +9519,10 @@ msgstr ""
 "Anche l'opzione globale del server è disattivata, quindi al momento non è "
 "possibile sincronizzare nulla. Un amministratore può abilitarla nelle "
 "impostazioni del server classico."
+
+#: cps/spa_strings.py
+msgid "The setting could not be changed."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
@@ -8559,6 +9544,90 @@ msgstr ""
 "amministratore gestisce ciò che contiene."
 
 #: cps/spa_strings.py
+msgid "The source asked us to wait."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The source did not answer with a catalog we can read."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The source or download client rejected its credentials. Ask an administrator "
+"to check the credential."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The source redirected to a network address that this connection does not "
+"allow."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The submission could not be confirmed. Check the download client queue and "
+"history before trying again; CWNG will not blindly send a duplicate."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The torrent descriptor is unsupported or contains unsafe paths or links."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The transfer did not complete."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There are no other accounts on this server yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "These results could not be refreshed and may be out of date."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be loaded, so nothing on this page can be trusted "
+"yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be refreshed, so what is shown may be out of date."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This account cannot use book sources, or the feature is switched off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This account is no longer an administrator."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This book was already imported."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This catalog could not be searched. Results from other catalogs are still "
+"available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This catalog does not offer search."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This catalog page is empty."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This category does not exist in the download client."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "This changes only your view of this book and copies delivered to your e-"
 "readers. The shared book cover and everyone else’s view stay unchanged."
@@ -8575,12 +9644,28 @@ msgid "This code has already been approved or declined."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This connection is on my home or local network"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This database carries permissions from the old experimental Store. They need "
+"review before book sources can be switched on."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device has not reported its inventory yet."
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr "Questo dispositivo non verrà più sincronizzato."
+
+#: cps/spa_strings.py
+msgid ""
+"This download client API version is not supported. Check the documented "
+"supported versions."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This e-reader is unavailable or belongs to another account."
@@ -8600,9 +9685,21 @@ msgstr "Questo evidenziatore non ha una posizione salvata"
 
 #: cps/spa_strings.py
 msgid ""
+"This is a torrent release. Choose qBittorrent or Transmission for this "
+"indexer. Usenet clients accept NZB releases."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
 "Change and enter the address the e-reader can use, such as "
 "http://192.168.1.20:8083."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This job is no longer in the download client queue or history. It will not "
+"be submitted again automatically."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8615,8 +9712,16 @@ msgid "This magic link expired. Generate a new one to try again."
 msgstr "Questo magic-link è scaduto. Generane uno nuovo e riprova."
 
 #: cps/spa_strings.py
+msgid "This page could not be refreshed, so what is shown may be out of date."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This page doesn't exist here."
 msgstr "Questa pagina non esiste qui."
+
+#: cps/spa_strings.py
+msgid "This page is not available to this account."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8628,9 +9733,17 @@ msgstr ""
 "ricaricare per risolvere."
 
 #: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "This request came from a different network than the one you are using. If "
 "you did not just ask for a code on your own e-reader, choose Deny."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This request needs an administrator to approve it again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8638,6 +9751,17 @@ msgid "This shelf is empty. Add books from any book's page."
 msgstr ""
 "Lo scaffale è vuoto. Aggiungi libri direttamente dalla scheda di qualsiasi "
 "libro."
+
+#: cps/spa_strings.py
+msgid ""
+"This torrent already exists outside this request. CWNG will not adopt or "
+"change an unrelated client job."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This torrent uses a tracker outside the origins allowed by the administrator."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8654,6 +9778,22 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Title, author, or ISBN"
 msgstr "Titolo, autore, o ISBN"
+
+#: cps/spa_strings.py cps/templates/search_form.html
+msgid "To:"
+msgstr "A:"
+
+#: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Token"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Token URL"
@@ -8672,8 +9812,20 @@ msgstr ""
 "link o riprova in seguito."
 
 #: cps/spa_strings.py
+msgid "Too many open selections. Wait a little, then try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Top Rated"
 msgstr "Valutazioni migliori"
+
+#: cps/spa_strings.py
+msgid "Top of catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Transmission download client"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
@@ -8686,6 +9838,18 @@ msgstr "Prova la Biblioteca Personale"
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 msgid "Try again"
 msgstr "Riprova"
+
+#: cps/spa_strings.py
+msgid "Turn the feature on to grant access."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Turn this on for a connection running on your own network, such as a "
+"catalog, indexer or download client on a 192.168 or 10.x address. It applies "
+"to this connection only. Loopback, link-local and cloud metadata addresses "
+"are never allowed."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -8762,6 +9926,10 @@ msgstr "Libri non in condivisione"
 #: cps/spa_strings.py
 msgid "Untitled"
 msgstr "Senza titolo"
+
+#: cps/spa_strings.py
+msgid "Untitled catalog"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Untitled link"
@@ -8851,6 +10019,10 @@ msgid "Username"
 msgstr "Nome utente"
 
 #: cps/spa_strings.py
+msgid "Username and password"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Username claim"
 msgstr "Attributo nome utente"
 
@@ -8894,6 +10066,10 @@ msgstr "Visualizzatore"
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
 msgstr "In attesa che un Kobo o KOReader si sincronizzi con questo account."
+
+#: cps/spa_strings.py
+msgid "Waiting for approval"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
@@ -8959,6 +10135,10 @@ msgid "Which books sync?"
 msgstr "Quali libri sincronizzare?"
 
 #: cps/spa_strings.py
+msgid "Who can use it"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Width (px)"
 msgstr ""
 
@@ -8982,6 +10162,10 @@ msgid "Write a note…"
 msgstr "Scrivi una nota…"
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -9003,6 +10187,22 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "La tua biblioteca"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -9036,6 +10236,14 @@ msgid "Your personal digital library"
 msgstr "La tua biblioteca personale"
 
 #: cps/spa_strings.py
+msgid "Your requests"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your requests could not be loaded. They have not been lost."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 "Viene visualizzato l'indirizzo salvato del tuo e-reader: modificalo solo per "
@@ -9047,6 +10255,11 @@ msgstr "tutte le regole"
 
 #: cps/spa_strings.py
 msgid "an unknown address"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "and {count} more"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9082,6 +10295,10 @@ msgid "just now"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "qBittorrent download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "shared"
 msgstr "condiviso"
 
@@ -9114,6 +10331,11 @@ msgstr "{count} libro"
 #, python-brace-format
 msgid "{count} books"
 msgstr "{count} libri"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} catalogs have not been searched yet."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9268,6 +10490,11 @@ msgid "{seeded} of {total} books seeded"
 msgstr "{seeded} libri di {total} in condicisione"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{title} — {protocol}{search}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "← Back"
 msgstr "← Indietro"
 
@@ -9283,13 +10510,124 @@ msgstr "← Torna al login"
 msgid "← Library"
 msgstr "← Biblioteca"
 
+#: cps/spa_strings.py
+msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
+"library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "Azioni per {title}"
+
+#: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Favorite"
+msgstr "Preferito"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files stay "
+"in the configuration volume across upgrades."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load reader fonts."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not remove font."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not upload font."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Display name (optional)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font file"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font file is too large."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font is available in both EPUB readers."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Font removed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No uploaded fonts yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reader fonts"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Readers using this font return to Book default when they next open a book."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
+msgid "Remove"
+msgstr "Rimuovi"
+
+#: cps/spa_strings.py
+msgid "Remove font"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Upload font"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font choices "
+"stay available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Uploaded reader fonts"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Arial"
+msgstr "Arial"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "KaiTi"
+msgstr "KaiTi"
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "SimSun"
+msgstr "SimSun"
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Attendi"
-
-#: cps/tasks_status.py
-msgid "Failed"
-msgstr "Non riuscito"
 
 #: cps/tasks_status.py
 msgid "Started"
@@ -9445,6 +10783,10 @@ msgid "Invalid request"
 msgstr "Richiesta non valida"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr ""
+
+#: cps/web.py
 msgid "Name and rules are required"
 msgstr "I campi nome e regole sono obbligatori"
 
@@ -9461,12 +10803,12 @@ msgid "Create Magic Shelf"
 msgstr "Crea Scaffale Magico"
 
 #: cps/web.py
-msgid "Permission denied to change public status"
-msgstr "Autorizzazione negata per modificare lo stato pubblico"
+msgid "Only the shelf owner can change Kobo sync"
+msgstr ""
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Il nome dello scaffale è obbligatorio"
+msgid "Permission denied to change public status"
+msgstr "Autorizzazione negata per modificare lo stato pubblico"
 
 #: cps/web.py
 msgid "Error updating shelf"
@@ -9504,7 +10846,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Errore nella cancellazione dello scaffale"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -9728,6 +11070,14 @@ msgstr "Book ID non valido."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "L'etichetta non può essere rimossa"
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
+msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
 msgid "KOReader Sync Plugin"
@@ -10249,6 +11599,10 @@ msgid "Edit Calibre Database Configuration"
 msgstr "Modifica configurazione database di Calibre"
 
 #: cps/templates/admin.html
+msgid "Manage reader fonts"
+msgstr ""
+
+#: cps/templates/admin.html
 msgid "Scheduled Tasks&nbsp;&nbsp;⌛"
 msgstr "Attività pianificate&nbsp;&nbsp;⌛"
 
@@ -10514,10 +11868,6 @@ msgid "Export JSON"
 msgstr "Esporta JSON"
 
 #: cps/templates/annotations_view.html
-msgid "Open book"
-msgstr "Apri libro"
-
-#: cps/templates/annotations_view.html
 #, python-format
 msgid "%(count)d highlights"
 msgstr "%(count)d evidenziazioni"
@@ -10609,11 +11959,6 @@ msgstr "Tipo di identificatore"
 #: cps/templates/book_edit.html
 msgid "Identifier Value"
 msgstr "Valore dell'identificatore"
-
-#: cps/templates/book_edit.html cps/templates/detail.html
-#: cps/templates/user_table.html
-msgid "Remove"
-msgstr "Rimuovi"
 
 #: cps/templates/book_edit.html
 msgid "Add Identifier"
@@ -10932,13 +12277,6 @@ msgstr "Invia una comunicazione"
 msgid "Send test to me"
 msgstr "Invio di test a me"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Indietro"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr "Inviare questa comunicazione a __NUM__ destinatario/i?"
@@ -11232,6 +12570,19 @@ msgstr "Usa l'autenticazione LDAP"
 #: cps/templates/config_edit.html
 msgid "Use OAuth"
 msgstr "Usa OAuth"
+
+#: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC is managed by the environment. Its settings and secret cannot "
+"be changed here; secret-file rotation takes effect after restart."
+msgstr ""
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid ""
+"Generic OIDC is inactive because its environment configuration is incomplete "
+"or invalid: %(reason)s"
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Server Configuration"
@@ -11770,6 +13121,16 @@ msgid "Generic OAuth Provider"
 msgstr "Provider OAuth generico"
 
 #: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC settings are supplied by the environment and are read-only "
+"here. They are not saved to the application database."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Environment-managed Generic OIDC settings"
+msgstr ""
+
+#: cps/templates/config_edit.html
 msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr "URL dei metadati OAuth (per il rilevamento automatico)"
 
@@ -11856,6 +13217,16 @@ msgstr "ID client di OAuth"
 #: cps/templates/config_edit.html
 msgid "OAuth Client Secret"
 msgstr "OAuth Client Secret"
+
+#: cps/templates/config_edit.html
+msgid "Supplied by environment"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"The secret is never displayed or saved in the application database. Restart "
+"the service after rotating a mounted secret file."
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Field Mapping Configuration"
@@ -11964,7 +13335,6 @@ msgid "Allow Changing Password"
 msgstr "Consenti modifica password"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Consenti modifica scaffali pubblici"
 
@@ -12211,10 +13581,9 @@ msgstr "Visualizza le restrizioni basate sulla colonna di Calibre"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"Limita la visibilità dei libri in base ai valori di una colonna "
-"personalizzata di testo di Calibre."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -12231,6 +13600,37 @@ msgstr ""
 #: cps/templates/config_view_edit.html
 msgid "Site Customization"
 msgstr "Personalizzazione del sito"
+
+#: cps/templates/config_view_edit.html
+msgid "Show Calibre-Web NextGen support links to readers"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When enabled, readers see the project support links. Administrators always "
+"see them."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support URL"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When project support links are hidden, readers can use this destination "
+"instead. Leave blank to hide those links without a replacement. Use an "
+"absolute HTTP or HTTPS URL without username or password."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support link label"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Up to 80 characters. If left blank while a URL is set, the link says "
+"“Contact support”."
+msgstr ""
 
 #: cps/templates/config_view_edit.html
 msgid "Server announcement banner"
@@ -14498,10 +15898,6 @@ msgstr "Ritorna alla pagina principale"
 msgid "Logout User"
 msgstr "Disconnetti utente"
 
-#: cps/templates/image.html
-msgid "Favorite"
-msgstr "Preferito"
-
 #: cps/templates/index.html
 msgid "Subcategories"
 msgstr ""
@@ -14767,16 +16163,8 @@ msgid "Logout"
 msgstr "Disconnetti"
 
 #: cps/templates/layout.html
-msgid "Support Calibre-Web NextGen"
-msgstr "Supporta Calibre-Web NextGen"
-
-#: cps/templates/layout.html
 msgid "Refresh Library"
 msgstr "Aggiorna la biblioteca"
-
-#: cps/templates/layout.html
-msgid "Support"
-msgstr "Supporto"
 
 #: cps/templates/layout.html
 msgid "See Changelog"
@@ -15019,6 +16407,10 @@ msgstr ""
 "Seleziona i valori personali consentiti/negati per le colonne dell'utente"
 
 #: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
+
+#: cps/templates/modal_dialogs.html
 msgid "Enter Tag"
 msgstr "Inserisci etichetta"
 
@@ -15108,18 +16500,6 @@ msgstr "Predefinito"
 #: cps/templates/read.html
 msgid "Yahei"
 msgstr "Yahei"
-
-#: cps/templates/read.html
-msgid "SimSun"
-msgstr "SimSun"
-
-#: cps/templates/read.html
-msgid "KaiTi"
-msgstr "KaiTi"
-
-#: cps/templates/read.html
-msgid "Arial"
-msgstr "Arial"
 
 #: cps/templates/read.html
 msgid "Spread"
@@ -15257,10 +16637,6 @@ msgstr "Ricorda la posizione"
 msgid "Scrollbar"
 msgstr "Barra di scorrimento"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Mostra"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "Lettore DJVU"
@@ -15340,10 +16716,6 @@ msgid "Published Date To"
 msgstr "Data di pubblicazione fino al"
 
 #: cps/templates/search_form.html
-msgid "Empty"
-msgstr "Vuoto"
-
-#: cps/templates/search_form.html
 msgid "Exclude Tags"
 msgstr "Escludi etichette"
 
@@ -15374,14 +16746,6 @@ msgstr "Valutazione superiore a"
 #: cps/templates/search_form.html
 msgid "Rating Below"
 msgstr "Valutazione inferiore a"
-
-#: cps/templates/search_form.html
-msgid "From:"
-msgstr "Da:"
-
-#: cps/templates/search_form.html
-msgid "To:"
-msgstr "A:"
 
 #: cps/templates/shelf.html
 msgid "Delete this Shelf"
@@ -15530,6 +16894,14 @@ msgstr "Programma"
 #: cps/templates/stats.html
 msgid "Installed Version"
 msgstr "Versione installata"
+
+#: cps/templates/support_links.html
+msgid "Support"
+msgstr "Supporto"
+
+#: cps/templates/support_links.html
+msgid "Support Calibre-Web NextGen"
+msgstr "Supporta Calibre-Web NextGen"
 
 #: cps/templates/tasks.html
 msgid "Background Tasks Overview"
@@ -15882,6 +17254,12 @@ msgstr "Sincronizza con Kobo unicamente i libri negli scaffali selezionati"
 
 #: cps/templates/user_edit.html
 msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its Kobo sync mark. Uncheck this to sync your whole library."
+msgstr ""
+
+#: cps/templates/user_edit.html
+msgid ""
 "Defaults off. Stage 0 only captures recovery evidence and does not change "
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
@@ -16196,6 +17574,26 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
 
+#~ msgid ""
+#~ "Restrict book visibility based on values in a Calibre text custom column."
+#~ msgstr ""
+#~ "Limita la visibilità dei libri in base ai valori di una colonna "
+#~ "personalizzata di testo di Calibre."
+
+#~ msgid "Create"
+#~ msgstr "Crea"
+
+#~ msgid "Failed to load shelves."
+#~ msgstr "Impossibile caricare gli scaffali."
+
+#~ msgid "New shelf name…"
+#~ msgstr "Nome del nuovo scaffale…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr ""
+#~ "Nessuno scaffale presente. Creane uno qui sopra per iniziare a "
+#~ "raccogliere i libri."
+
 #, python-brace-format
 #~ msgid ""
 #~ "Book {0} was not in the sync record for user {1}; last_modified bumped so "
@@ -16323,10 +17721,6 @@ msgstr "Mostra sezione Libri letti e Libri da leggere"
 #, python-brace-format
 #~ msgid "More actions for {title}"
 #~ msgstr "Altre azioni per {title}"
-
-#, python-brace-format
-#~ msgid "Actions for {title}"
-#~ msgstr "Azioni per {title}"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

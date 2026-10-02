@@ -12297,7 +12297,7 @@ msgstr ""
 
 #: cps/templates/annotations_view.html
 msgid "Export CSV"
-msgstr ""
+msgstr "CSV exporteren"
 
 #: cps/templates/annotations_view.html
 msgid "Export JSON"

@@ -26,6 +26,11 @@ def _load(name, path):
 _services = Path(__file__).resolve().parent / "services"
 _locks = _load("_cwng_server_file_lock", _services / "file_lock.py")
 _writes = _load("_cwng_server_write_lock", _services / "calibre_db_lock.py")
+EXIT_MAINTENANCE = 75
+
+
+class LibraryBusyError(RuntimeError):
+    """Another cooperating operation owns the library; retain input for retry."""
 
 
 def operation(config_dir=None, timeout=120):
@@ -35,8 +40,7 @@ def operation(config_dir=None, timeout=120):
 
 
 def _open_lock(config_dir, kind):
-    return os.open(os.path.join(config_dir, ".cwa-content-server-{}.lock".format(kind)),
-                   os.O_RDWR | os.O_CREAT, 0o600)
+    return _locks.open_lock(os.path.join(config_dir, ".cwa-content-server-{}.lock".format(kind)))
 
 
 def busy(config_dir, kind):
@@ -58,8 +62,11 @@ def maintenance(config_dir, timeout=120):
     fd = _open_lock(config_dir, "maintenance")
     acquired = False
     try:
-        if not _locks.acquire(fd, blocking=False):
-            raise RuntimeError("Calibre library maintenance is already running")
+        acquire_deadline = time.monotonic() + min(timeout, 1)
+        while not _locks.acquire(fd, blocking=False):
+            if time.monotonic() >= acquire_deadline:
+                raise LibraryBusyError("Calibre library maintenance is already running")
+            time.sleep(0.05)
         acquired = True
         deadline = time.monotonic() + timeout
         while busy(config_dir, "owner"):
@@ -101,11 +108,14 @@ def supervise(config_dir, command):
     child = None
     acquired = False
     try:
-        if not _locks.acquire(fd, blocking=False):
-            raise RuntimeError("A managed Calibre server already owns this configuration")
+        owner_deadline = time.monotonic() + 0.2
+        while not _locks.acquire(fd, blocking=False):
+            if time.monotonic() >= owner_deadline:
+                raise LibraryBusyError("A managed Calibre server already owns this configuration")
+            time.sleep(0.02)
         acquired = True
         if busy(config_dir, "maintenance"):
-            return 0
+            return EXIT_MAINTENANCE
         kwargs = {}
         if os.name != "nt":
             # The child retains ownership if this supervisor is killed. Never
@@ -127,6 +137,7 @@ def supervise(config_dir, command):
         # SIGTERM must execute the reap path, not leave the child orphaned.
         import signal
         previous = signal.signal(signal.SIGTERM, lambda *_args: parent_gone.set())
+        maintenance_drained = False
         try:
             while child.poll() is None:
                 if parent_gone.wait(0.1):
@@ -139,9 +150,17 @@ def supervise(config_dir, command):
                         # or SIGTERM can interrupt a maintenance drain.
                         with operation(config_dir, timeout=0.2):
                             _reap(child)
+                        maintenance_drained = True
                         break
                     except TimeoutError:
                         continue
+            if maintenance_drained:
+                return EXIT_MAINTENANCE
+            # The reserved guardian status must never turn a real child crash
+            # into a maintenance deferral.
+            if child.returncode == EXIT_MAINTENANCE:
+                print("Calibre child exited with reserved status 75", flush=True)
+                return 1
             return child.returncode
         finally:
             signal.signal(signal.SIGTERM, previous)

@@ -510,6 +510,10 @@ def test_lifecycle_start_yields_to_other_web_requests(content_server, monkeypatc
     import time
     import gevent
     ticks = []
+    if operation == 'stop':
+        # Exercise an actual pending stop; stopping an absent server is now
+        # deliberately immediate and does not enter the writer gate.
+        content_server._process = types.SimpleNamespace()
     monkeypatch.setattr(content_server, '_locked_start' if operation == 'start' else '_locked_stop',
                         lambda: time.sleep(0.12))
     def other_request():
@@ -766,3 +770,57 @@ def test_native_windows_saved_enabled_settings_cannot_launch_an_unowned_child(
     content_server.start()
     assert launched == []
     assert any("POSIX" in message for message in content_server.log_records)
+
+
+def test_finished_maintenance_exit_does_not_consume_genuine_crash_budget(content_server, monkeypatch):
+    """The maintenance lease may be free before the watcher sees the drain exit."""
+    callbacks = []
+    monkeypatch.setattr(content_server, '_defer_for_maintenance', lambda: callbacks.append(True))
+    monkeypatch.setattr(content_server.ownership, 'busy', lambda *_args: False)
+    monkeypatch.setattr(content_server, '_locked_start', lambda: None)
+    content_server._quick_exits = 1
+    for _ in range(4):
+        process = types.SimpleNamespace(returncode=75)
+        content_server._process = process
+        content_server._restart_after_exit(process)
+    assert content_server._quick_exits == 1
+    assert len(callbacks) == 4
+    assert not any('leaving it stopped' in r for r in content_server.log_records)
+
+
+@pytest.mark.parametrize('boundary', ['watch', 'reconcile', 'initial-start'])
+def test_lifecycle_gate_timeout_preserves_monitoring_and_start_retry(content_server, monkeypatch, boundary):
+    """Inject one acquisition deadline, then release the gate; actors must survive."""
+    from contextlib import contextmanager
+    attempts = []
+    starts = []
+    callbacks = []
+    monkeypatch.setattr(content_server.threading, 'Thread', lambda target, **kwargs:
+                        types.SimpleNamespace(start=lambda: callbacks.append(target)))
+    monkeypatch.setattr(content_server.time, 'sleep', lambda *_args: None)
+    monkeypatch.setattr(content_server.ownership, 'busy', lambda *_args: False)
+
+    @contextmanager
+    def contended(*args, **kwargs):
+        attempts.append(kwargs.get('timeout'))
+        if len(attempts) == 1:
+            raise TimeoutError('existing writer still owns the gate')
+        yield
+
+    monkeypatch.setattr(content_server.ownership, 'operation', contended)
+    monkeypatch.setattr(content_server, '_locked_start', lambda: starts.append(True))
+    if boundary == 'watch':
+        process = types.SimpleNamespace(poll=lambda: 1)
+        content_server._process = process
+        monkeypatch.setattr(content_server, '_restart_after_exit', lambda _p: starts.append(True))
+        content_server._watch(process, '/unused/metadata.db')
+    elif boundary == 'reconcile':
+        content_server._defer_for_maintenance()
+        callbacks[0]()
+    else:
+        content_server._start_blocking()
+        assert callbacks, 'startup contention must schedule later reconciliation'
+        assert attempts[0] < 1, 'an offline child must not delay web startup for 120s'
+        callbacks[0]()
+    assert starts == [True]
+    assert len(attempts) >= 2

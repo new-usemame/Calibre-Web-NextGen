@@ -311,6 +311,55 @@ def test_folder_label_failure_on_preexisting_marker_retains_source_for_retry(
     assert source.is_file()
 
 
+def test_existing_folder_label_replay_child_inherits_metadata_exclusion(
+    ingest_processor, monkeypatch, tmp_path
+):
+    """A surviving replay child must retain both maintenance and writer locks."""
+    import os
+    import json
+    from types import SimpleNamespace
+    import calibre_library_target
+
+    source = tmp_path / "ingest" / "Owner" / "incoming.epub"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"already imported bytes")
+    processor = _processor(ingest_processor, tmp_path)
+    processor.filepath = str(source)
+    processor.ingest_folder = str(tmp_path / "ingest")
+    processor.cwa_settings.update({
+        "auto_ingest_folder_label_target": "tags",
+        "auto_ingest_folder_label_nested": False,
+    })
+    _disable_post_import_work(ingest_processor, processor, monkeypatch)
+    processor._content_marker_book_ids = lambda _digest: [7]
+    monkeypatch.setattr(calibre_library_target, "config_dir", lambda: str(tmp_path))
+    original_lock = ingest_processor.metadata_db_write_lock
+    writer_inode = []
+
+    @contextmanager
+    def tracked_lock():
+        with original_lock() as fd:
+            writer_inode.append(os.fstat(fd).st_ino)
+            yield fd
+
+    monkeypatch.setattr(ingest_processor, "metadata_db_write_lock", tracked_lock)
+    inherited = []
+
+    def completed(_command, _environment, **kwargs):
+        inherited.extend(os.fstat(fd).st_ino for fd in kwargs.get("pass_fds", ()))
+        return SimpleNamespace(stdout="CWNG_INGEST_RESULT=" + json.dumps({
+            "status": "already_imported", "book_ids": [7],
+        }))
+
+    monkeypatch.setattr(ingest_processor, "_run_calibredb_add_with_retry", completed)
+    processor.add_book_to_library(str(source))
+    assert writer_inode and writer_inode[0] in inherited, (
+        "folder-label child lost the writer gate when its parent exits"
+    )
+    assert len(inherited) == 2, "raw replay must inherit maintenance and writer descriptors"
+    assert processor.last_added_book_id == 7
+
+
 @pytest.mark.parametrize("fail_replay", [False, True])
 def test_concurrent_folder_label_replay_skips_unlocked_format_inspection(
     ingest_processor, monkeypatch, tmp_path, fail_replay

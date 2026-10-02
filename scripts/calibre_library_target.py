@@ -46,6 +46,7 @@ path_is_available = _policy.path_is_available
 _guard = importlib.util.spec_from_file_location("_cwng_server_guard", _policy_path.with_name("calibre_server_guard.py"))
 ownership = importlib.util.module_from_spec(_guard)
 _guard.loader.exec_module(ownership)
+LibraryBusyError = ownership.LibraryBusyError
 
 
 def operation(timeout=120):

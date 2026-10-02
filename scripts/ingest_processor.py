@@ -13,7 +13,7 @@ import subprocess
 import sys
 from calibre_library_target import (library_target, calibredb_command, operation,
                                     offline_library_operation, offline_child_ownership,
-                                    offline_writer_ownership)
+                                    offline_writer_ownership, LibraryBusyError)
 import tempfile
 import time
 import shutil
@@ -2416,7 +2416,7 @@ class NewBookProcessor:
                 # not run overwrite inspection or format recovery for it:
                 # those Calibre opens can fail independently of this safe
                 # additive tag operation, and no format should be replaced.
-                with metadata_db_write_lock():
+                with metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     replay_result = self._run_calibre_transaction(
                         staged_path,
                         staged_identity_path,
@@ -2792,8 +2792,10 @@ class NewBookProcessor:
             stderr_output = e.stderr if e.stderr else "No error details available"
             print(f"[ingest-processor] Failed to add format for book id {book_id}: {os.path.basename(str(staged_path))}\nCALIBREDB EXIT/ERROR CODE: {e.returncode}\nError details: {stderr_output}", flush=True)
             self.backup(str(staged_path), backup_type="failed")
+            raise RetryIngestSourceError("Calibre did not commit the new format") from e
         except Exception as e:
             print(f"[ingest-processor] Unexpected error while adding format for book id {book_id}: {e}", flush=True)
+            raise RetryIngestSourceError(str(e)) from e
         finally:
             clear_ingest_batch_active()
             if staged_path.exists():
@@ -3238,6 +3240,8 @@ def main(filepath=None):
                     return 0
             if nbp.acquisition_required and not getattr(nbp, "acquisition_intent", None):
                 raise PreserveIngestSourceError("Acquisition manifest missing; original retained")
+        except (PreserveIngestSourceError, RetryIngestSourceError, LibraryBusyError, TimeoutError, PermissionError):
+            raise
         except Exception as e:
             if getattr(nbp, "acquisition_required", False):
                 raise PreserveIngestSourceError("Acquisition intent unavailable or invalid; original retained") from None
@@ -3355,7 +3359,12 @@ def main(filepath=None):
         skip_delete = True
         print(f"[ingest-processor] RETRY: {error}", flush=True)
         return 1
+    except (LibraryBusyError, TimeoutError, PermissionError) as error:
+        skip_delete = True
+        print(f"[ingest-processor] BUSY: {error}; original retained", flush=True)
+        return 2
     except Exception as e:
+        skip_delete = True
         print(f"[ingest-processor] Unexpected error during processing: {e}", flush=True)
         raise
     finally:

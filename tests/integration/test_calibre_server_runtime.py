@@ -45,3 +45,22 @@ def test_built_image_calibre_authentication_and_process_ownership(
         assert record["owner_released"]
     assert evidence["results"][0]["authenticated_client"]
     assert evidence["results"][0]["wrong_password_rejected"]
+
+
+def test_built_image_root_helpers_leave_service_owned_locks(cwa_container, container_name):
+    probe = PROBE.with_name("calibre_server_lock_owner_probe.py")
+    remote = "/tmp/cwng_calibre_server_lock_owner_probe.py"
+    subprocess.run(["docker", "cp", str(probe), f"{container_name}:{remote}"], check=True)
+    result = subprocess.run(
+        ["docker", "exec", "--user", "0", container_name, "python3", remote],
+        capture_output=True, text=True, timeout=20,
+    )
+    assert result.returncode == 0, f"root/app lock probe failed:\n{result.stdout}\n{result.stderr}"
+    records = [line.split("=", 1)[1] for line in result.stdout.splitlines()
+               if line.startswith("CWNG_ROOT_LOCK_RUNTIME=")]
+    assert records, result.stdout
+    assert json.loads(records[-1]) == {
+        "root_created_locks": 3,
+        "service_owned_locks": 3,
+        "app_acquired_all_locks": True,
+    }

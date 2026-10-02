@@ -194,14 +194,17 @@ def _watch(process, db_path, last=None):
     changed = None
     while True:
         time.sleep(WATCH_INTERVAL)
-        with ownership.operation(constants.CONFIG_DIR), _lock:
-            if _process is not process:
-                return
-            if process.poll() is not None:
-                if _stopped_on_purpose:
+        try:
+            with ownership.operation(constants.CONFIG_DIR, timeout=0.2), _lock:
+                if _process is not process:
                     return
-                _restart_after_exit(process)
-                return
+                if process.poll() is not None:
+                    if _stopped_on_purpose:
+                        return
+                    _restart_after_exit(process)
+                    return
+        except TimeoutError:
+            continue
         mtime = _db_mtime(db_path)
         if mtime is None:
             continue
@@ -212,16 +215,20 @@ def _watch(process, db_path, last=None):
             changed = time.time()
         elif changed and time.time() - changed >= QUIET_BEFORE_RELOAD:
             log.info("Library database changed, reloading calibre content server")
-            with ownership.operation(constants.CONFIG_DIR), _lock:
-                if _process is process and process.poll() is None:
-                    _locked_start()
+            try:
+                with ownership.operation(constants.CONFIG_DIR, timeout=0.2), _lock:
+                    if _process is process and process.poll() is None:
+                        _locked_start()
+            except TimeoutError:
+                continue
             return
 
 
 def _restart_after_exit(process):
     """Relaunch a server that died, unless it keeps dying on startup."""
     global _quick_exits, _process
-    if ownership.busy(constants.CONFIG_DIR, "maintenance"):
+    if (process.returncode == ownership.EXIT_MAINTENANCE
+            or ownership.busy(constants.CONFIG_DIR, "maintenance")):
         _process = None
         _defer_for_maintenance()
         return
@@ -370,21 +377,28 @@ def start():
 
 def _start_blocking(gate_owned=False):
     global _quick_exits
-    operation = nullcontext() if gate_owned else ownership.operation(constants.CONFIG_DIR)
-    with operation, _lock:
-        _quick_exits = 0
-        _locked_start()
+    if not gate_owned and not setting("config_calibre_server_enabled") and _process is None:
+        return
+    operation = nullcontext() if gate_owned else ownership.operation(constants.CONFIG_DIR, timeout=0.2)
+    try:
+        with operation, _lock:
+            _quick_exits = 0
+            _locked_start()
+    except TimeoutError:
+        with _lock:
+            _quick_exits = 0
+            _defer_for_maintenance()
 
 
 def _locked_start():
     global _process, _stopped_on_purpose, _started_at, _restart_on_release
     if _library_holds:
         _restart_on_release = bool(setting("config_calibre_server_enabled"))
-        return
+        return False
     _locked_stop()
     if ownership.busy(constants.CONFIG_DIR, "maintenance"):
         _defer_for_maintenance()
-        return
+        return False
     if not setting("config_calibre_server_enabled") or not setting("config_calibre_dir"):
         return
     if not platform_supported():
@@ -437,6 +451,14 @@ def _locked_start():
             _locked_stop()
             return
         time.sleep(0.1)
+    if _process.poll() is not None:
+        if _process.returncode == ownership.EXIT_MAINTENANCE:
+            _process = None
+            _defer_for_maintenance()
+            return False
+        log.error("Calibre content server exited before readiness (code %s)", _process.returncode)
+        threading.Thread(target=_watch, args=(_process, db_path, initial_mtime), daemon=True).start()
+        return
     _started_at = time.monotonic()
     log.info("Calibre content server started on port %s", setting("config_calibre_server_port"))
     threading.Thread(target=_watch,
@@ -450,6 +472,8 @@ def stop():
 
 
 def _stop_blocking(gate_owned=False):
+    if not gate_owned and _process is None:
+        return
     operation = nullcontext() if gate_owned else ownership.operation(constants.CONFIG_DIR)
     with operation, _lock:
         _locked_stop()
@@ -579,13 +603,19 @@ def _defer_for_maintenance():
                 if ownership.busy(constants.CONFIG_DIR, "maintenance") or _library_holds:
                     time.sleep(WATCH_INTERVAL)
                     continue
-                with ownership.operation(constants.CONFIG_DIR), _lock:
-                    if not setting("config_calibre_server_enabled"):
-                        return
-                    _locked_start()
-                    if ownership.busy(constants.CONFIG_DIR, "maintenance") or _library_holds:
+                try:
+                    with ownership.operation(constants.CONFIG_DIR, timeout=0.2), _lock:
+                        if not setting("config_calibre_server_enabled"):
+                            return
+                        outcome = _locked_start()
+                        retry = (outcome is False or ownership.busy(constants.CONFIG_DIR, "maintenance")
+                                 or _library_holds)
+                    if retry:
+                        time.sleep(WATCH_INTERVAL)
                         continue
                     return
+                except TimeoutError:
+                    time.sleep(WATCH_INTERVAL)
         finally:
             _maintenance_waiter = False
 

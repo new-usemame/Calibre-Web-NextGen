@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""A transient library owner must leave the published ingest source retryable."""
+
+import json
+from contextlib import contextmanager
+from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
+@pytest.fixture
+def ingest(monkeypatch, tmp_path):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "scripts"))
+    import ingest_processor
+    import calibre_library_target
+
+    monkeypatch.setattr(calibre_library_target, "config_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(ingest_processor, "_acquire_process_lock_or_exit", lambda: None)
+    monkeypatch.setattr(ingest_processor, "initialize_runtime", lambda: True)
+    monkeypatch.setattr(ingest_processor, "is_a_book_format", lambda _format: True)
+    monkeypatch.setattr(ingest_processor, "mark_ingest_batch_active", lambda: None)
+    monkeypatch.setattr(ingest_processor, "clear_ingest_batch_active", lambda: None)
+    monkeypatch.setattr(ingest_processor, "wait_for_duplicate_full_scan_to_finish", lambda: None)
+    return ingest_processor, calibre_library_target
+
+
+def processor(module, source, tmp_path):
+    p = object.__new__(module.NewBookProcessor)
+    p.filepath = str(source)
+    p.filename = source.name
+    p.input_format = "epub"
+    p.is_target_format = True
+    p.ingest_ignored_formats = []
+    p.cwa_settings = {"ingest_timeout_minutes": 15}
+    p.library_dir = str(tmp_path / "library")
+    p.staging_dir = str(tmp_path / "staging")
+    p.tmp_conversion_dir = str(tmp_path / "conversion")
+    Path(p.staging_dir).mkdir()
+    p.calibre_env = {}
+    p.is_file_in_use = lambda: True
+    p.set_library_permissions = lambda: None
+    p.delete_current_file = lambda: source.unlink(missing_ok=True)
+    p._validate_book_exists = lambda _book: True
+    return p
+
+
+def test_default_off_ingest_keeps_source_while_convert_library_owns_maintenance(
+    ingest, monkeypatch, tmp_path
+):
+    module, routing = ingest
+    source = tmp_path / "incoming.epub"
+    source.write_bytes(b"published source")
+    p = processor(module, source, tmp_path)
+    monkeypatch.setattr(module, "NewBookProcessor", lambda _path: p)
+    with routing.ownership.maintenance(str(tmp_path)):
+        try:
+            result = module.main(str(source))
+        except RuntimeError:
+            result = "unexpected exception"
+    assert source.is_file(), "main deleted the source after a busy maintenance owner"
+    assert source.read_bytes() == b"published source"
+    assert result == 2, "busy input must enter the service's existing retry queue"
+
+
+@pytest.mark.parametrize("failure", [RuntimeError("unready owner"), TimeoutError("writer deadline")])
+def test_add_format_coordination_failure_keeps_source_and_manifest(
+    ingest, monkeypatch, tmp_path, failure
+):
+    module, _routing = ingest
+    source = tmp_path / "incoming.epub"
+    source.write_bytes(b"new format source")
+    manifest = source.with_name(source.name + ".cwa.json")
+    manifest.write_text(json.dumps({"action": "add_format", "book_id": 1}))
+    p = processor(module, source, tmp_path)
+    monkeypatch.setattr(module, "NewBookProcessor", lambda _path: p)
+
+    @contextmanager
+    def blocked():
+        raise failure
+        yield
+
+    monkeypatch.setattr(module, "operation", blocked)
+    result = module.main(str(source))
+    assert source.is_file(), "unacknowledged format source was deleted"
+    assert source.read_bytes() == b"new format source"
+    assert manifest.is_file(), "the add_format intent must remain paired with the source"
+    assert result in (1, 2), "uncommitted add_format cannot be acknowledged as success"
+
+
+def test_failed_add_format_command_is_not_acknowledged_or_deleted(ingest, monkeypatch, tmp_path):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    module, _routing = ingest
+    source = tmp_path / 'incoming.epub'
+    source.write_bytes(b'new format source')
+    manifest = source.with_name(source.name + '.cwa.json')
+    manifest.write_text(json.dumps({'action': 'add_format', 'book_id': 1}))
+    p = processor(module, source, tmp_path)
+    p.backup = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(module, 'NewBookProcessor', lambda _path: p)
+    monkeypatch.setattr(module, 'operation', nullcontext)
+    monkeypatch.setattr(module, 'library_target', lambda _library: SimpleNamespace(args=[], stdin=None))
+    def failed(*_args, **_kwargs):
+        raise module.subprocess.CalledProcessError(1, ['calibredb', 'add_format'], stderr='library busy')
+    monkeypatch.setattr(module.subprocess, 'run', failed)
+    result = module.main(str(source))
+    assert source.is_file(), 'failed Calibre command must retain the published source'
+    assert manifest.is_file(), 'failed command cannot acknowledge its sidecar intent'
+    assert result == 1

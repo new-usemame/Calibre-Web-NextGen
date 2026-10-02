@@ -23,6 +23,8 @@ def export_env(monkeypatch, tmp_path):
     monkeypatch.setattr(embed_helper, 'get_temp_dir', lambda: str(tmp_path))
     monkeypatch.setenv('CWA_METADATA_LOCK_DIR', str(tmp_path))
     monkeypatch.setenv('CWA_EMBED_TIMEOUT', '2')
+    monkeypatch.setattr(embed_helper.content_server, 'library_target',
+                        lambda: SimpleNamespace(args=[], stdin=None))
     from cps.services import calibre_user_plugins
     monkeypatch.setattr(calibre_user_plugins, 'apply_to_env', lambda _: None)
     return embed_helper

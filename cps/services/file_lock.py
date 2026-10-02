@@ -15,6 +15,7 @@ The bespoke cooperative calibre_db_lock protocol is intentionally separate.
 import errno
 import logging
 import os
+import stat
 import time
 
 try:
@@ -31,6 +32,31 @@ if fcntl is None:
 
 log = logging.getLogger(__name__)
 _BUSY = (errno.EACCES, errno.EAGAIN)
+
+
+def open_lock(path, mode=0o600):
+    """Open a dedicated lock inode shared by root helpers and its directory owner.
+
+    Root-run container helpers must not strand a lock owned by root in the
+    service user's configuration directory. Never follow a symlink or transfer
+    a hard-linked inode while repairing that ownership.
+    """
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), mode)
+    try:
+        info = os.fstat(fd)
+        linked = os.stat(path, follow_symlinks=False)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or stat.S_ISLNK(linked.st_mode)
+                or (info.st_dev, info.st_ino) != (linked.st_dev, linked.st_ino)):
+            raise OSError(errno.EINVAL, "Lock must be a dedicated regular file", path)
+        if getattr(os, "geteuid", lambda: -1)() == 0 and info.st_uid == 0:
+            directory = os.stat(os.path.dirname(os.path.abspath(path)))
+            if directory.st_uid != 0:
+                os.fchown(fd, directory.st_uid, directory.st_gid)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
 
 
 def _windows_lock(fd, mode):

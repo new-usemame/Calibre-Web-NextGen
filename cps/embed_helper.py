@@ -143,7 +143,7 @@ def _do_calibre_export_blocking(book_id, book_format):
         # Never advertise a path Calibre did not create. Callers use this
         # failure value to deliver the original instead of returning a 404.
         return None, None
-    except OSError as ex:
+    except (OSError, RuntimeError) as ex:
         # ToDo real error handling
         log.error_or_exception(ex)
         return None, None

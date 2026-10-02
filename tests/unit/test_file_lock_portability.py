@@ -184,3 +184,49 @@ handle = _acquire_restore_file_lock({path!r})
 assert handle is not None
 _release_restore_locks([handle])
 ''', tmp_path)
+
+
+@pytest.mark.parametrize('link_kind', ['symlink', 'hardlink'])
+def test_shared_lock_refuses_an_alias_to_unrelated_data(tmp_path, link_kind):
+    """Opening a coordination lock must never turn another file into a PID ledger."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('dedicated_lock', ROOT / 'cps/services/file_lock.py')
+    locks = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(locks)
+    target = tmp_path / 'unrelated.data'
+    target.write_bytes(b'preserved unrelated bytes')
+    path = tmp_path / 'lock'
+    if link_kind == 'symlink':
+        path.symlink_to(target)
+    else:
+        os.link(target, path)
+    with pytest.raises(OSError):
+        locks.open_lock(path)
+    assert target.read_bytes() == b'preserved unrelated bytes'
+
+
+def test_root_helper_lock_is_assigned_to_the_service_directory_owner(monkeypatch, tmp_path):
+    """Model root creation; the actual root/abc boundary is covered in Docker."""
+    import importlib.util
+    from types import SimpleNamespace
+    spec = importlib.util.spec_from_file_location('service_owner_lock', ROOT / 'cps/services/file_lock.py')
+    locks = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(locks)
+    real_stat = locks.os.stat
+    real_fstat = locks.os.fstat
+    monkeypatch.setattr(locks.os, 'geteuid', lambda: 0, raising=False)
+    def directory_stat(path, *args, **kwargs):
+        if Path(path) == tmp_path:
+            return SimpleNamespace(st_uid=501, st_gid=20)
+        return real_stat(path, *args, **kwargs)
+    def root_inode(fd):
+        info = real_fstat(fd)
+        return SimpleNamespace(st_uid=0, st_mode=info.st_mode, st_nlink=info.st_nlink,
+                               st_dev=info.st_dev, st_ino=info.st_ino)
+    monkeypatch.setattr(locks.os, 'stat', directory_stat)
+    monkeypatch.setattr(locks.os, 'fstat', root_inode)
+    assignments = []
+    monkeypatch.setattr(locks.os, 'fchown', lambda fd, uid, gid: assignments.append((uid, gid)), raising=False)
+    fd = locks.open_lock(tmp_path / 'owner.lock')
+    os.close(fd)
+    assert assignments == [(501, 20)]

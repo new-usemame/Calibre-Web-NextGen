@@ -110,16 +110,15 @@ def metadata_db_write_lock(
         Seconds between non-blocking flock attempts. Lower is more
         responsive but burns more CPU. Default 0.1s is a fine balance.
     """
-    windows_locks = None
-    if not HAS_FCNTL:
-        try:
-            from . import file_lock as windows_locks
-        except ImportError:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location(
-                "_cwng_metadata_file_lock", Path(__file__).with_name("file_lock.py"))
-            windows_locks = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(windows_locks)
+    try:
+        from . import file_lock as lock_files
+    except ImportError:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_cwng_metadata_file_lock", Path(__file__).with_name("file_lock.py"))
+        lock_files = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lock_files)
+    windows_locks = None if HAS_FCNTL else lock_files
 
     lock_path = _resolve_lock_path(lock_dir)
 
@@ -127,7 +126,7 @@ def metadata_db_write_lock(
     # directory on demand — that would mask a misconfiguration (e.g.
     # configured directory not mounted). If the directory is missing, the
     # ENOENT-from-open below surfaces clearly.
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    fd = lock_files.open_lock(lock_path, mode=0o644)
     try:
         deadline = time.monotonic() + timeout
         while True:

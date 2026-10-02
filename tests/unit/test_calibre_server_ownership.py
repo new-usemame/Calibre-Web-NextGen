@@ -93,7 +93,7 @@ def test_maintenance_waits_for_inflight_operation_then_retains_child_owned_hold(
             assert not entered.is_set(), "maintenance entered before server reap"
         assert entered.wait(timeout=8)
         supervisor.wait(timeout=10)
-        assert supervisor.returncode >= 0, supervisor.stderr.read().decode()
+        assert supervisor.returncode == 75, "maintenance needs a distinct guardian exit reason"
         assert not alive(child)
         assert ownership.busy(str(tmp_path), "maintenance")
         assert not ownership.busy(str(tmp_path), "owner")

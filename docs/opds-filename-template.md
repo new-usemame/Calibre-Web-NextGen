@@ -91,7 +91,7 @@ If a stored template is invalid, downloads fall back to the original naming beha
 Do not use `/` or `\` to request subfolders.
 Content-Disposition supplies a filename, not a destination path.
 [HTTP guidance](https://www.rfc-editor.org/rfc/rfc6266.html#section-4.3) tells clients to discard directory components.
-CWNG removes control, invisible formatting, and Unicode line-separator characters. It replaces path separators and unsafe filename characters with underscores.
+CWNG removes control, directional and other invisible formatting, and Unicode line-separator characters. It preserves the zero-width joiner and non-joiner used in scripts and emoji. It replaces path separators and unsafe filename characters with underscores.
 The device controls the download folder.
 
 In KOReader, enable Use server filenames in the OPDS catalog configuration.

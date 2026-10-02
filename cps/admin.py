@@ -764,7 +764,7 @@ def _view_configuration_draft(form):
                                    if k.startswith('show_') and k[5:].isdigit())
     if 'Show_detail_random' in form:
         draft.config_default_show |= constants.DETAIL_RANDOM
-    if 'support_settings_present' in form:
+    if form.get('support_settings_present') == '1':
         draft.config_show_project_support = 'config_show_project_support' in form
     if hasattr(config, 'config_sortable_custom_columns'):
         draft.config_sortable_custom_columns = ','.join(form.getlist('config_sortable_custom_columns'))

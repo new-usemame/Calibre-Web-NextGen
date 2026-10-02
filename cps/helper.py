@@ -3475,9 +3475,9 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             log.error(f"Failed to log download stats: {e}")
 
     file_name = book.title
-    first_author = next((author for author in book.authors if author is not None and author.name), None)
+    first_author = next((author for author in book.authors if author is not None), None)
     if first_author is not None:
-        file_name = file_name + ' - ' + first_author.name
+        file_name = file_name + ' - ' + (first_author.name or '')
     if isinstance(filename_template, str):
         filename_template = strip_whitespaces(filename_template)
     if filename_template:
@@ -3488,7 +3488,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 unicode_filename=config.config_unicode_filename,
                 ordered_authors=calibre_db.order_authors([book]),
             )
-        except (ValueError, TypeError, AttributeError, SQLAlchemyError):
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
             # A corrupt or manually changed setting must not prevent downloads.
             log.warning("Invalid OPDS filename template; using the default filename")
     file_name = get_valid_filename(file_name, replace_whitespace=False)

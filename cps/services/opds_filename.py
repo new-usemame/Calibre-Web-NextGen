@@ -213,7 +213,7 @@ class _BookValues(dict):
         value = ''
         try:
             value = self._custom_value(key[1:])
-        except (SQLAlchemyError, ValueError, TypeError, KeyError, InvalidOperation, OverflowError):
+        except (SQLAlchemyError, ValueError, TypeError, KeyError, InvalidOperation, OverflowError, RecursionError):
             if key not in self.warned:
                 self.warned.add(key)
                 log.warning('Could not read custom field %s for an OPDS filename', key)
@@ -231,6 +231,9 @@ class _BookValues(dict):
 
     def _custom_value(self, label):
         if self.columns is None:
+            # Cache an unavailable schema as empty for this one download; do
+            # not retry the same failed query for every distinct custom field.
+            self.columns = {}
             self.columns = {
                 column.label: column for column in self.session.query(db.CustomColumns).all()
                 if not column.mark_for_delete
@@ -253,7 +256,7 @@ class _BookValues(dict):
         if column.datatype == 'composite':
             metadata = ChainMap({
                 'title': self.book.title or '',
-                'series': next((item.name for item in self.book.series if item is not None), ''),
+                'series': next((item.name or '' for item in self.book.series if item is not None), ''),
             }, self)
             return expand_template(display.get('composite_template', ''), metadata)
 
@@ -289,7 +292,8 @@ def render_filename(template, book, session, title_regex='', unicode_filename=Fa
     """Return a safe basename. The download helper adds the actual extension."""
     values = _BookValues(book, session, title_regex, ordered_authors)
     rendered = expand_template(template, values)
-    rendered = ''.join(char for char in rendered if unicodedata.category(char) not in ('Cc', 'Cf', 'Zl', 'Zp'))
+    rendered = ''.join(char for char in rendered if unicodedata.category(char) not in ('Cc', 'Zl', 'Zp')
+                       and (unicodedata.category(char) != 'Cf' or char in ('\u200c', '\u200d')))
     rendered = rendered.strip().strip(' .') or 'book-%s' % book.id
     try:
         rendered = get_valid_filename_shared(

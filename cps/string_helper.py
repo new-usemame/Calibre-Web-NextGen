@@ -23,6 +23,7 @@ def title_sort_name(title, regex):
             if match:
                 article = match.group(1)
                 title = title[len(article):] + ', ' + article
-    except (re.error, IndexError, TypeError):
+    except Exception:
+        # Preserve the library UDF fallback even for regex size/depth errors.
         pass
     return strip_whitespaces(title)

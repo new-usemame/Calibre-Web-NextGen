@@ -382,10 +382,11 @@ def admin_update_config():
             validate_opds_filename_template(data["config_opds_filename_template"] if data["config_opds_filename_template"] is not None else "")
         except ValueError as error:
             return _err("invalid_opds_filename_template", str(error), 400)
+    integer_updates = {}
     for key in _UI_CONFIG_INT:
         if key in data:
             try:
-                setattr(config, key, int(data[key]))
+                integer_updates[key] = int(data[key])
             except (TypeError, ValueError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
     if "config_theme" in data:
@@ -394,7 +395,9 @@ def admin_update_config():
         # instead of being stored and silently falling back to dark on read.
         if data["config_theme"] not in ALLOWED_THEME_SLUGS:
             return _err("invalid_request", "Invalid theme option", 400)
-        config.config_theme = theme_code(data["config_theme"])
+        integer_updates['config_theme'] = theme_code(data["config_theme"])
+    for key, value in integer_updates.items():
+        setattr(config, key, value)
     for key in _UI_CONFIG_STR:
         if key in data:
             value = str(data[key] or "")

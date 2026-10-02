@@ -675,3 +675,48 @@ def test_classic_draft_restriction_controls_follow_selected_draft_column(admin_c
     monkeypatch.setattr(classic, 'render_title_template', render)
     assert inspect.unwrap(classic_view_configuration)(draft_config=draft) == 'draft form'
     assert render.call_args.kwargs['restriction_is_bool'] is True
+
+
+@pytest.mark.parametrize('regex', [r'^(A|The){4294967296}', '(' * 5000 + 'A' + ')' * 5000])
+def test_invalid_admin_regex_cannot_break_library_sort_trigger(book, monkeypatch, regex):
+    from sqlalchemy import event
+    monkeypatch.setattr(db.CalibreDB, 'config', NS(config_title_regex=regex))
+    engine = create_engine('sqlite://')
+    event.listen(engine, 'connect', db._register_sqlite_udfs)
+    with engine.begin() as connection:
+        connection.execute(text('CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, sort TEXT)'))
+        connection.execute(text('CREATE TRIGGER book_sort AFTER INSERT ON books BEGIN UPDATE books SET sort=title_sort(NEW.title) WHERE id=NEW.id; END'))
+        connection.execute(text("INSERT INTO books(title) VALUES ('The Book')"))
+        assert connection.execute(text('SELECT sort FROM books')).scalar() == 'The Book'
+    engine.dispose()
+    book.sort = None
+    assert names.render_filename('{title}', book, None, regex) == 'The Book'
+
+
+def test_deeply_nested_display_json_is_missing_without_breaking_download(book, custom_session):
+    custom_session.get(db.CustomColumns, 7).display = '[' * 5000 + '0' + ']' * 5000
+    custom_session.commit()
+    assert names.render_filename('{#computed}{title}', book, custom_session) == 'Book, The'
+
+
+def test_blank_preference_keeps_empty_first_author_legacy_name(download, book):
+    book.authors[0].name = ''
+    response = download.get_download_link(42, 'epub', '', filename_template='')
+    assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'The Book -.epub'
+
+
+@pytest.mark.parametrize('title', ['می\u200cخواهم', 'क्\u200dष', '👩\u200d💻'])
+def test_filename_preserves_meaningful_script_and_emoji_joiners(book, title):
+    book.title = book.sort = title
+    assert names.render_filename('{title}', book, None) == title
+
+
+@pytest.mark.parametrize('bad', [{'config_theme': 'bogus'}, {'config_random_books': 'bogus'}])
+def test_api_invalid_later_field_cannot_change_any_configuration(admin_config, bad):
+    config, _, api = admin_config
+    with Flask(__name__).test_request_context(method='POST', json={'config_books_per_page': 5, 'config_opds_filename_template': '{id}', **bad}):
+        response, status = inspect.unwrap(api.admin_update_config)()
+    assert status == 400
+    assert config.config_books_per_page == 30
+    assert config.config_opds_filename_template == '{title}'
+    config.save.assert_not_called()

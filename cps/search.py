@@ -374,6 +374,10 @@ def render_adv_search_results(term, offset=None, order=None, limit=None):
     q, search_term = build_adv_search_query(term)
     q = q.order_by(*sort)
     flask_session['query'] = json.dumps(term)
+    # The export action must represent this rendered result set even after a
+    # second browser tab replaces the mutable session query.
+    from .api.books import create_classic_advanced_export_snapshot
+    book_export_snapshot = create_classic_advanced_export_snapshot(term)
 
     # Perform a count query for pagination, which is much faster than fetching all results.
     result_count = q.count()
@@ -399,6 +403,7 @@ def render_adv_search_results(term, offset=None, order=None, limit=None):
                                  pagination=pagination,
                                  entries=entries,
                                  result_count=result_count,
+                                 book_export_snapshot=book_export_snapshot,
                                  title=_("Advanced Search"), page="advsearch",
                                  order=order[1])
 

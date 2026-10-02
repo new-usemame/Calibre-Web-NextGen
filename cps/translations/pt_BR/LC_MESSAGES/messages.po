@@ -5197,6 +5197,10 @@ msgstr ""
 msgid "Book density"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Book list download started."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr ""
@@ -5631,6 +5635,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not delete the Kobo sync URL."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Could not export the book list. Please try again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6428,6 +6436,23 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Export"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+#: cps/templates/annotations_view.html
+msgid "Export CSV"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export TXT"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export this book list"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Exports all matching books, including pages you have not loaded."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7838,6 +7863,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Position repair queued"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Preparing book list…"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9544,6 +9573,10 @@ msgstr "URL do token"
 
 #: cps/spa_strings.py
 msgid "Too many attempts. Wait a minute and try again."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Too many books to export. Narrow the filters and try again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11781,10 +11814,6 @@ msgstr "Erro de conexão"
 
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
-msgstr ""
-
-#: cps/templates/annotations_view.html
-msgid "Export CSV"
 msgstr ""
 
 #: cps/templates/annotations_view.html

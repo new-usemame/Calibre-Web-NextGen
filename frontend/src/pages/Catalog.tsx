@@ -5,6 +5,7 @@ import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, Upload
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { BookCard } from '../components/BookCard';
 import { BookCover } from '../components/BookCover';
+import { BookListExport } from '../components/BookListExport';
 import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -960,6 +961,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
+        {view !== 'discover' && view !== 'hot' && <BookListExport disabled={isLoading || isPlaceholderData || !!error} source={filterActive
+          ? { source: 'advanced', params: { ...advParams } }
+          : { source: 'catalog', params: {
+              sort,
+              ...(search && !entityKind && !view ? { search } : {}),
+              ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
+              ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
+              ...(entityKind && entityId !== undefined && entityId !== '' ? { [entityKind]: String(entityId) } : {}),
+            } }} />}
+
         {/* #1288: Upload is a library-wide ACTION, not one of the view-scoped
             controls hideLibraryControls exists to hide (search box, Advanced,
             read-status filter). Gating it there made it vanish on every entity
@@ -978,9 +989,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           </Link>
         )}
 
-        {/* Read-status segmented control (disabled while a text search is active,
-            which the API resolves on a separate code path). Hidden in a fixed
-            discovery view, which owns the server-side filter. */}
+        {/* Read status composes with text search and entity filters. Fixed
+            discovery views own their server-side filter. */}
         {!isView && (
         <div className={styles.segmented} role="group" aria-label={t('Read status filter')}>
           {READ_FILTERS.map((rf) => (
@@ -989,7 +999,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               type="button"
               className={readFilter === rf.value ? styles.segActive : styles.seg}
               aria-pressed={readFilter === rf.value}
-              disabled={!!search && !filtered}
               onClick={() => setReadFilter(rf.value)}
             >
               {t(rf.label)}

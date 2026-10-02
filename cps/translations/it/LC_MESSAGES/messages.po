@@ -5405,6 +5405,10 @@ msgstr "Impostazione predefinita libro"
 msgid "Book density"
 msgstr "Densità di libri"
 
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Book list download started."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Ordinamento libri"
@@ -5847,6 +5851,10 @@ msgstr "Impossibile cancellare l'etichetta"
 #: cps/spa_strings.py
 msgid "Could not delete the Kobo sync URL."
 msgstr "Impossibile eliminare L'URL di sincronizzazione Kobo."
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Could not export the book list. Please try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -6663,6 +6671,23 @@ msgstr "Esplora le modifiche, potrai sempre annullarle in seguito."
 #: cps/spa_strings.py
 msgid "Export"
 msgstr "Esporta"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+#: cps/templates/annotations_view.html
+msgid "Export CSV"
+msgstr "Esporta CSV"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export TXT"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export this book list"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Exports all matching books, including pages you have not loaded."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Expose only selected shelves over OPDS"
@@ -8118,6 +8143,10 @@ msgstr "Posizione salvata"
 #: cps/spa_strings.py
 msgid "Position repair queued"
 msgstr "Riparazione posizione in coda"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Preparing book list…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Preparing your magic link…"
@@ -9875,6 +9904,10 @@ msgstr "URL token"
 
 #: cps/spa_strings.py
 msgid "Too many attempts. Wait a minute and try again."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Too many books to export. Narrow the filters and try again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12132,10 +12165,6 @@ msgstr "Errore di rete."
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
 msgstr "Esporta Markdown"
-
-#: cps/templates/annotations_view.html
-msgid "Export CSV"
-msgstr "Esporta CSV"
 
 #: cps/templates/annotations_view.html
 msgid "Export JSON"

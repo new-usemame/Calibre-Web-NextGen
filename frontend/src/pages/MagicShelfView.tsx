@@ -1,3 +1,4 @@
+import { BookListExport } from '../components/BookListExport';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
@@ -242,6 +243,8 @@ export function MagicShelfView({ id }: { id: string }) {
           <h1 className={styles.title}>{data.icon} {data.name}</h1>
         </div>
         <div className={styles.subRow}>
+          <BookListExport disabled={bulkBusy || isFetching || isPlaceholderData || !!error} source={{ source: 'smart_shelf', id: Number(id), params: { sort } }} />
+
           <span className={styles.count}>{total} {t('books')}</span>
           <button type="button"
             className={selecting ? styles.manageBtnActive : styles.manageBtn}

@@ -9,8 +9,10 @@
       {% if current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and current_user.role_browse_global() %}
         <p><a href="{{ url_for('web.global_library', search=adv_searchterm) }}">{{ _('Search the global library for "%(query)s" instead', query=adv_searchterm) }}</a></p>
       {% endif %}
+      {% include '_book_list_export.html' %}
     {% else %}
       <h2>{{result_count}} {{_('Results for:')}} {{adv_searchterm}}</h2>
+      {% include '_book_list_export.html' %}
       {% if current_user.is_authenticated %}
         {% if current_user.shelf.all() or g.shelves_access %}
           <div id="shelf-actions" class="btn-toolbar" role="toolbar">

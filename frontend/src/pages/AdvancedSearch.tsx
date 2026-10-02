@@ -1,3 +1,4 @@
+import { BookListExport } from '../components/BookListExport';
 import { useState, useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useSearch } from 'wouter';
@@ -318,6 +319,8 @@ export function AdvancedSearch() {
       {/* Results */}
       {submitted !== null && (
         <section className={styles.results} aria-label={t('Search results')}>
+          <BookListExport disabled={isFetching || isPlaceholderData || !!error} source={{ source: 'advanced', params: { ...submitted } }} />
+
           {error ? (
             <EmptyState message={error instanceof Error ? error.message : t('Search failed.')} />
           ) : isFetching && results.length === 0 ? (

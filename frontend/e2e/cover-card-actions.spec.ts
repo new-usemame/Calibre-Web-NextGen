@@ -42,6 +42,10 @@ test('cover actions persist favorite/read choices without opening the book', asy
   await open();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
+  // Audit the page at its origin: card focus can naturally scroll an unfocused
+  // toolbar control partly behind the sticky header. Focus reachability has
+  // its own natural-scroll regression below. Keep every Axe rule enabled.
+  await page.evaluate(() => window.scrollTo(0, 0));
   const violations = (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations.filter(v => ['critical', 'serious'].includes(v.impact || ''));
   expect(violations).toEqual([]);
 });
@@ -323,4 +327,27 @@ test('worst dense cover badge stack does not collide with the action disclosure'
     && Math.min(geometry!.trigger.bottom, badge.bottom) - Math.max(geometry!.trigger.y, badge.y) > 0.5);
   expect(collisions, `cover action overlaps status badges: ${JSON.stringify(geometry)}`).toEqual([]);
   await page.unrouteAll({ behavior: 'wait' });
+});
+
+
+test('catalog focus keeps toolbar controls below the sticky header after card actions', async ({ secondaryUser }) => {
+  const { page } = secondaryUser;
+  const phone = test.info().project.use.hasTouch === true;
+  await page.setViewportSize(phone ? { width: 375, height: 812 } : { width: 1280, height: 800 });
+  await page.goto('/app');
+  const card = page.getByTestId('catalog-grid').locator(cards).first().locator('..');
+  const trigger = card.getByRole('button', { name: /^Actions for / });
+  if (phone) await trigger.tap(); else { await trigger.focus(); await trigger.press('Enter'); }
+  await expect(page.getByRole('dialog', { name: /^Actions for / })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  const sort = page.getByRole('combobox', { name: 'Sort order' });
+  await sort.focus();
+  await expect(sort).toBeFocused();
+  const geometry = await sort.evaluate(control => ({
+    control: control.getBoundingClientRect().toJSON(),
+    header: document.querySelector('header')!.getBoundingClientRect().toJSON(),
+  }));
+  expect(geometry.control.top).toBeGreaterThanOrEqual(geometry.header.bottom);
+  expect(geometry.control.bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
 });

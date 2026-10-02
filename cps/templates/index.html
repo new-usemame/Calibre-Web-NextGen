@@ -163,6 +163,7 @@
   </div>
   {% endif %}
 
+  {% include '_book_list_export.html' %}
   {% set show_shelf_actions = page != 'discover' %}
   {% if show_shelf_actions %}<div class="shelf-actions">{% endif %}
     {% if page == 'global_library' %}

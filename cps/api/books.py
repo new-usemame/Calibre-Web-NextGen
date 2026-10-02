@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Catalog endpoints for /api/v1."""
-from datetime import timezone
+import csv
+import io
+import json
+import math
+import tempfile
+from datetime import datetime, timezone
 
-from flask import jsonify, request
+from flask import Response, current_app, jsonify, request
 from flask_babel import get_locale
-from sqlalchemy import and_, func, or_
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from sqlalchemy import String, and_, bindparam, cast, false, func, literal, or_, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.functions import coalesce
 
 from . import api_v1
@@ -36,6 +43,26 @@ def _selection_response(ids, total):
             "max_items": MAX_SELECT_ALL_BOOKS,
         }}), 413
     return jsonify({"ids": ids, "total": total})
+
+MAX_BOOK_EXPORT_ROWS = 100_000
+BOOK_EXPORT_BATCH_SIZE = 250
+CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_AGE = 24 * 60 * 60
+CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_BYTES = 32 * 1024
+CLASSIC_ADV_EXPORT_TOKEN_MAX_CHARS = 48 * 1024
+CLASSIC_ADV_EXPORT_TOKEN_SALT = "classic-advanced-book-export"
+BOOK_EXPORT_COLUMNS = (
+    "Title", "Authors", "Series", "Tags", "Rating", "Read", "Formats", "Date added",
+)
+
+
+class BookExportRequestError(Exception):
+    """A safe client-facing validation or access failure for book export."""
+
+    def __init__(self, code, message, status):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status = status
 
 def _detail_custom_columns():
     """Classic-parity display definitions, degrading safely if DB metadata is unavailable.
@@ -310,6 +337,706 @@ def _build_read_filter(filter_val):
     return True
 
 
+def _export_ids_filter(values):
+    """Build an ID predicate using one SQLite JSON bind, even for large lists."""
+    values = sorted({int(value) for value in values if value is not None})
+    if not values:
+        return false()
+    if not db._sqlite_json_available(ub.session, calibre_db.session):
+        # Keep the bounded legacy case usable on old SQLite builds. For large
+        # lists, failing explicitly is safer than emitting SQL that exceeds
+        # SQLite's connection variable limit.
+        if len(values) <= 900:
+            return db.Books.id.in_(values)
+        raise BookExportRequestError(
+            "large_filter_unsupported",
+            "This SQLite build cannot safely export a large saved list",
+            503,
+        )
+    value_table = func.json_each(bindparam("export_book_ids", json.dumps(values), unique=True)).table_valued(
+        "value"
+    ).alias("export_book_ids")
+    return db.Books.id.in_(select(value_table.c.value))
+
+
+def _catalog_visibility(show_hidden=False, *, allow_archived=False, viewing_tag_id=None):
+    """Return the same common visibility predicate used by catalog listings."""
+    if not show_hidden or current_user.is_anonymous:
+        return calibre_db.common_filters(
+            allow_show_archived=allow_archived, viewing_tag_id=viewing_tag_id
+        )
+    hidden_ids = _hidden_book_ids()
+    archived_ids = _archived_book_ids()
+    return calibre_db.common_filters(
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        viewing_tag_id=viewing_tag_id,
+        extra_filter=or_(~_export_ids_filter(archived_ids), _export_ids_filter(hidden_ids)),
+    )
+
+
+def _catalog_book_query(*, search=None, author_id=None, series_id=None, tag_id=None,
+                        publisher_id=None, language_code=None, rating_id=None,
+                        book_format=None, filter_val=None, show_hidden=False,
+                        book_ids=None, classic_tag_view=False):
+    """Build one unpaged query for catalog search results and file export.
+
+    This is shared by ``/books`` and ``/books/export`` so combined search,
+    entity and read criteria cannot drift between the visible list and its
+    downloaded copy. Discovery views with randomized/truncated semantics are
+    handled explicitly rather than broadening to the full library.
+    """
+    if filter_val == "hot":
+        raise BookExportRequestError(
+            "unsupported_source", "The Hot list cannot be exported right now", 400
+        )
+
+    series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
+    if search:
+        # Keep the search predicate itself in CalibreDB so API, classic, and
+        # export search semantics share the one implementation.
+        query = calibre_db.search_query(
+            search, config, *series_join, allow_show_hidden=show_hidden,
+            eager_data=False,
+            viewing_tag_id=tag_id if classic_tag_view else None,
+        )
+    else:
+        query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+        query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
+        query = query.outerjoin(db.Series)
+        query = query.filter(_catalog_visibility(
+            show_hidden, allow_archived=(filter_val == "archived"),
+            viewing_tag_id=tag_id if classic_tag_view else None,
+        ))
+
+    if filter_val == "discover":
+        if book_ids is None:
+            raise BookExportRequestError(
+                "unsupported_source", "Discover export requires the visible sample IDs", 400
+            )
+        query = query.filter(_export_ids_filter(book_ids))
+        query = query.filter(_build_read_filter("unread"))
+    elif filter_val == "archived":
+        archived = (ub.session.query(ub.ArchivedBook.book_id)
+                    .filter(ub.ArchivedBook.user_id == int(current_user.id),
+                            ub.ArchivedBook.is_archived.is_(True)).all())
+        query = query.filter(_export_ids_filter([row[0] for row in archived]))
+    elif filter_val == "favorites":
+        favorites = (ub.session.query(ub.FavoriteBook.book_id)
+                     .filter(ub.FavoriteBook.user_id == int(current_user.id)).all())
+        query = query.filter(_export_ids_filter([row[0] for row in favorites]))
+    elif filter_val == "rated":
+        query = query.filter(db.Books.ratings.any(db.Ratings.rating > 9))
+    elif filter_val not in (None, "", "all", "read", "unread", "discover"):
+        raise BookExportRequestError("invalid_filter", "Unsupported book-list filter", 400)
+
+    entity_filter = _build_entity_filter(
+        author_id, series_id, tag_id, publisher_id, language_code,
+        rating=rating_id, book_format=book_format,
+    )
+    if entity_filter is not True:
+        query = query.filter(entity_filter)
+    if filter_val in ("read", "unread"):
+        query = query.filter(_build_read_filter(filter_val))
+    eager_options = [
+        selectinload(db.Books.authors),
+        selectinload(db.Books.series),
+        selectinload(db.Books.tags),
+        selectinload(db.Books.ratings),
+    ]
+    eager_options.append(selectinload(db.Books.data))
+    return query.options(*eager_options).distinct()
+
+
+def _strict_int(value, label, *, optional=False):
+    if optional and value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        raise BookExportRequestError("invalid_request", f"{label} must be an integer", 400)
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and len(value.strip()) <= 19 and value.strip().isascii() \
+            and value.strip().isdecimal():
+        parsed = int(value.strip())
+    else:
+        raise BookExportRequestError("invalid_request", f"{label} must be an integer", 400) from None
+    if parsed < 0:
+        raise BookExportRequestError("invalid_request", f"{label} must be non-negative", 400)
+    if parsed > (2**63 - 1):
+        raise BookExportRequestError("invalid_request", f"{label} is too large", 400)
+    return parsed
+
+
+def _export_params_object(value, allowed_keys, label):
+    if not isinstance(value, dict):
+        raise BookExportRequestError("invalid_request", f"{label} parameters must be an object", 400)
+    unknown = set(value) - set(allowed_keys)
+    if unknown:
+        raise BookExportRequestError(
+            "invalid_request", f"Unsupported {label} parameter: {sorted(unknown)[0]}", 400
+        )
+    return value
+
+
+def _classic_adv_export_serializer():
+    return URLSafeTimedSerializer(
+        current_app.secret_key, salt=CLASSIC_ADV_EXPORT_TOKEN_SALT
+    )
+
+
+def create_classic_advanced_export_snapshot(term):
+    """Sign an immutable Classic advanced-search term for its rendered page."""
+    user_id = _real_user_id()
+    if user_id is None or not isinstance(term, dict):
+        return None
+    try:
+        serialized = json.dumps(term, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if len(serialized.encode("utf-8")) > CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_BYTES:
+        return None
+    return _classic_adv_export_serializer().dumps({
+        "version": 1,
+        "user_id": int(user_id),
+        "term": term,
+    })
+
+
+def _classic_advanced_export_query(params):
+    params = _export_params_object(params, {"snapshot", "sort"}, "Classic advanced search")
+    token = params.get("snapshot")
+    if not isinstance(token, str) or len(token) > CLASSIC_ADV_EXPORT_TOKEN_MAX_CHARS:
+        raise BookExportRequestError(
+            "invalid_snapshot", "This advanced-search result is no longer available. Run the search again.", 400
+        )
+    try:
+        payload = _classic_adv_export_serializer().loads(
+            token, max_age=CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_AGE
+        )
+    except SignatureExpired:
+        raise BookExportRequestError(
+            "expired_snapshot", "This advanced-search result expired. Run the search again.", 409
+        ) from None
+    except BadSignature:
+        raise BookExportRequestError(
+            "invalid_snapshot", "This advanced-search result is invalid. Run the search again.", 400
+        ) from None
+    if (not isinstance(payload, dict) or payload.get("version") != 1
+            or isinstance(payload.get("user_id"), bool)
+            or payload.get("user_id") != _real_user_id()
+            or not isinstance(payload.get("term"), dict)):
+        raise BookExportRequestError(
+            "invalid_snapshot", "This advanced-search result is unavailable to this account.", 403
+        )
+    term = payload["term"]
+    try:
+        term_size = len(json.dumps(term, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError, OverflowError):
+        term_size = CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_BYTES + 1
+    if term_size > CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_BYTES:
+        raise BookExportRequestError("invalid_snapshot", "The saved search is too large", 400)
+    sort_key = _export_sort(params.get("sort"))
+    from ..search import build_adv_search_query
+    query, _criteria = build_adv_search_query(term)
+    return query.options(
+        selectinload(db.Books.authors), selectinload(db.Books.series),
+        selectinload(db.Books.tags), selectinload(db.Books.ratings),
+        selectinload(db.Books.data),
+    ).distinct().order_by(*_query_order(sort_key))
+
+
+def _export_sort(value, *, default="new"):
+    if value is None:
+        return default
+    if not isinstance(value, str) or len(value) > 32:
+        raise BookExportRequestError("invalid_request", "Sort must be a short text value", 400)
+    if value not in SORT_MAP and value != "recent":
+        raise BookExportRequestError("invalid_request", "Unsupported sort order", 400)
+    return value
+
+
+def _safe_csv_cell(value):
+    if value is None:
+        return ""
+    text = str(value)
+    probe = text.lstrip(" \t\r\n\v\f\x00\u00a0\u200b\ufeff")
+    if probe.startswith(("=", "+", "-", "@")):
+        # Quoting CSV fields does not prevent spreadsheet formula evaluation.
+        return "'" + text
+    return text
+
+
+def _one_line(value):
+    return " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+
+
+def _book_export_values(entry):
+    book = getattr(entry, "Books", entry)
+    authors = [author.name.replace("|", ",") for author in (book.authors or []) if author]
+    series = [item for item in (book.series or []) if item]
+    series_text = "; ".join(
+        f"{item.name} ({book.series_index})" for item in series
+    )
+    tags = ", ".join(tag.name for tag in (book.tags or []) if tag)
+    ratings = [rating.rating for rating in (book.ratings or []) if rating and rating.rating is not None]
+    rating_text = "" if not ratings else f"{ratings[0] / 2:g}"
+    if config.config_read_column:
+        read_value = bool(getattr(entry, "value", None))
+    else:
+        read_value = getattr(entry, "read_status", None) == ub.ReadBook.STATUS_FINISHED
+    formats = ", ".join(sorted({str(data.format).lower() for data in (book.data or []) if data.format}))
+    timestamp = getattr(book, "timestamp", None)
+    return [
+        book.title or "",
+        ", ".join(authors),
+        series_text,
+        tags,
+        rating_text,
+        "Yes" if read_value else "No",
+        formats,
+        timestamp.isoformat() if hasattr(timestamp, "isoformat") else timestamp or "",
+    ]
+
+
+def _count_export_rows(query):
+    # LIMIT keeps the preflight bounded while still making the 100,000-row
+    # refusal exact. Clear ORDER BY so SQLite doesn't sort before counting.
+    return (query.with_entities(db.Books.id).order_by(None).distinct()
+            .limit(MAX_BOOK_EXPORT_ROWS + 1).count())
+
+
+def _write_export(spool, query, format_name):
+    """Prepare an export before sending headers and return the number of rows written."""
+    written = 0
+
+    def write_record(value):
+        nonlocal written
+        if written >= MAX_BOOK_EXPORT_ROWS:
+            raise BookExportRequestError(
+                "result_changed",
+                "The book list grew beyond the export limit while it was being prepared. Retry the download.",
+                409,
+            )
+        spool.write(value.encode("utf-8"))
+        written += 1
+
+    if format_name == "txt":
+        batch = []
+        for entry in query.yield_per(BOOK_EXPORT_BATCH_SIZE):
+            batch.append(entry)
+            if len(batch) >= BOOK_EXPORT_BATCH_SIZE:
+                calibre_db.order_authors(batch, list_return=True, combined=True)
+                for row in batch:
+                    values = _book_export_values(row)
+                    write_record(_one_line(values[0] + " — " + values[1]) + "\n")
+                batch.clear()
+        if batch:
+            calibre_db.order_authors(batch, list_return=True, combined=True)
+            for row in batch:
+                values = _book_export_values(row)
+                write_record(_one_line(values[0] + " — " + values[1]) + "\n")
+        return written
+
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(BOOK_EXPORT_COLUMNS)
+    spool.write(buffer.getvalue().encode("utf-8"))
+    buffer.seek(0)
+    buffer.truncate(0)
+
+    batch = []
+    for entry in query.yield_per(BOOK_EXPORT_BATCH_SIZE):
+        batch.append(entry)
+        if len(batch) >= BOOK_EXPORT_BATCH_SIZE:
+            calibre_db.order_authors(batch, list_return=True, combined=True)
+            for row in batch:
+                writer.writerow([_safe_csv_cell(value) for value in _book_export_values(row)])
+                write_record(buffer.getvalue())
+                buffer.seek(0)
+                buffer.truncate(0)
+            batch.clear()
+    if batch:
+        calibre_db.order_authors(batch, list_return=True, combined=True)
+        for row in batch:
+            writer.writerow([_safe_csv_cell(value) for value in _book_export_values(row)])
+            write_record(buffer.getvalue())
+            buffer.seek(0)
+            buffer.truncate(0)
+    return written
+
+
+def _query_order(sort_key):
+    return _requested_order(sort_key)
+
+
+def _catalog_export_query(params, *, classic_tag_view=False):
+    params = _export_params_object(params, {
+        "search", "filter", "book_ids", "author", "series", "tag", "publisher",
+        "language", "rating", "format", "sort", "show_hidden",
+    }, "Catalog")
+    search = params.get("search")
+    if search is not None and not isinstance(search, str):
+        raise BookExportRequestError("invalid_request", "Search must be text", 400)
+    search = (search or "").strip()
+    if len(search) > 512:
+        raise BookExportRequestError("invalid_request", "Search is too long", 400)
+    filter_val = params.get("filter")
+    if filter_val is not None and not isinstance(filter_val, str):
+        raise BookExportRequestError("invalid_request", "Filter must be text", 400)
+    if filter_val not in (None, "", "all", "read", "unread", "favorites", "rated", "archived", "discover"):
+        raise BookExportRequestError("invalid_filter", "Unsupported book-list filter", 400)
+    for key, limit in (("language", 128), ("format", 32)):
+        value = params.get(key)
+        if value is not None and (not isinstance(value, str) or len(value) > limit):
+            raise BookExportRequestError("invalid_request", f"{key.title()} must be short text", 400)
+    show_hidden = params.get("show_hidden", False)
+    if not isinstance(show_hidden, (bool, int, str)) or (
+        isinstance(show_hidden, str) and show_hidden.lower() not in ("0", "1", "true", "false", "yes", "no", "on", "off")
+    ):
+        raise BookExportRequestError("invalid_request", "show_hidden must be a boolean", 400)
+    ids = params.get("book_ids")
+    sort_key = _export_sort(params.get("sort"))
+    if ids is not None:
+        if not isinstance(ids, list) or len(ids) > MAX_BOOK_EXPORT_ROWS:
+            raise BookExportRequestError("invalid_request", "Book IDs must be a bounded list", 400)
+        ids = [_strict_int(value, "Book ID") for value in ids]
+        if len(set(ids)) != len(ids):
+            raise BookExportRequestError("invalid_request", "Book IDs must be unique", 400)
+    elif filter_val == "discover":
+        raise BookExportRequestError(
+            "unsupported_source", "Discover export requires the visible sample IDs", 400
+        )
+    if ids is not None and filter_val != "discover":
+        raise BookExportRequestError(
+            "invalid_request", "Book IDs are supported only for the Discover sample", 400
+        )
+
+    read_filter = filter_val if filter_val in ("read", "unread") else None
+    query = _catalog_book_query(
+        search=search or None,
+        author_id=_strict_int(params.get("author"), "Author ID", optional=True),
+        series_id=_strict_int(params.get("series"), "Series ID", optional=True),
+        tag_id=_strict_int(params.get("tag"), "Tag ID", optional=True),
+        publisher_id=_strict_int(params.get("publisher"), "Publisher ID", optional=True),
+        language_code=params.get("language"),
+        rating_id=_strict_int(params.get("rating"), "Rating ID", optional=True),
+        book_format=params.get("format"),
+        filter_val=filter_val if filter_val not in (None, "", "all") else read_filter,
+        show_hidden=(filter_val != "discover" and show_hidden
+                     in (True, 1, "1", "true", "yes", "on")),
+        book_ids=ids,
+        classic_tag_view=classic_tag_view,
+    )
+    if ids is not None:
+        # The random sample is explicit in the request, but every member is
+        # revalidated against the caller's visible, unread catalog. A stale or
+        # forged ID refuses the entire export instead of silently widening it.
+        expected = len(ids)
+        if _count_export_rows(query) != expected:
+            raise BookExportRequestError(
+                "invalid_book_ids", "The Discover sample changed; reload it and retry", 409
+            )
+        if ids:
+            # `CASE id WHEN ...` expands two bind parameters per sample ID.
+            # Keep the whole sample in a single JSON bind and use delimited
+            # lookup positions to preserve the visible Discover order.
+            sample_csv = "," + ",".join(str(book_id) for book_id in ids) + ","
+            id_token = literal(",") + cast(db.Books.id, String) + literal(",")
+            query = query.order_by(func.instr(
+                bindparam("discover_sample_order", sample_csv, unique=True), id_token
+            ))
+    else:
+        query = query.order_by(*_query_order(sort_key))
+    return query
+
+
+def _advanced_export_query(params):
+    from ..search import build_adv_search_query
+    from .search import _CC_KEY, _CC_RANGE, _CC_SINGLE, _custom_value, _json_to_term
+
+    params = _export_params_object(params, {
+        "title", "authors", "publisher", "comments", "publishstart", "publishend",
+        "rating_high", "rating_low", "read_status", "include_tag", "exclude_tag",
+        "include_serie", "exclude_serie", "include_language", "exclude_language",
+        "include_extension", "exclude_extension", "include_shelf", "exclude_shelf",
+        "custom", "sort",
+    }, "Advanced search")
+    for key in ("title", "authors", "publisher", "comments", "publishstart", "publishend",
+                "read_status"):
+        value = params.get(key)
+        if value is not None and not isinstance(value, str):
+            raise BookExportRequestError("invalid_request", f"{key} must be text", 400)
+        if isinstance(value, str) and len(value) > 2048:
+            raise BookExportRequestError("invalid_request", f"{key} is too long", 400)
+    for key in ("rating_high", "rating_low"):
+        value = params.get(key)
+        if value in (None, ""):
+            continue
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            raise BookExportRequestError("invalid_request", f"{key} must be a rating", 400)
+        try:
+            rating = int(value)
+        except (TypeError, ValueError, OverflowError):
+            raise BookExportRequestError("invalid_request", f"{key} must be a rating", 400) from None
+        if isinstance(value, float) and not value.is_integer():
+            raise BookExportRequestError("invalid_request", f"{key} must be a whole-star rating", 400)
+        if not 0 <= rating <= 5:
+            raise BookExportRequestError("invalid_request", f"{key} must be between 0 and 5", 400)
+    if params.get("read_status", "all") not in ("all", "read", "unread"):
+        raise BookExportRequestError("invalid_request", "Unsupported read-status filter", 400)
+    for key in ("publishstart", "publishend"):
+        value = params.get(key)
+        if value:
+            try:
+                datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                raise BookExportRequestError("invalid_request", f"{key} must be an ISO date", 400) from None
+    for key in ("include_tag", "exclude_tag", "include_serie", "exclude_serie",
+                "include_language", "exclude_language", "include_extension", "exclude_extension",
+                "include_shelf", "exclude_shelf"):
+        value = params.get(key)
+        if value is not None and (
+            not isinstance(value, list) or len(value) > 500
+            or any(not isinstance(item, (str, int)) or isinstance(item, bool)
+                   or len(str(item)) > 256 for item in value)
+        ):
+            raise BookExportRequestError("invalid_request", f"{key} must be a bounded list", 400)
+    custom = params.get("custom")
+    if custom is not None and (
+        not isinstance(custom, dict) or len(custom) > 100
+        or any(not isinstance(key, str) or len(key) > 64
+               or not isinstance(value, (str, int, float, bool))
+               for key, value in custom.items())
+        or any(len(str(value)) > 2048 for value in custom.values())
+        or any(isinstance(value, float) and not math.isfinite(value)
+               for value in custom.values())
+    ):
+        raise BookExportRequestError("invalid_request", "custom must be a bounded object", 400)
+    columns = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+    custom_types = {int(column.id): column.datatype for column in columns}
+    for key, raw in (custom or {}).items():
+        match = _CC_KEY.fullmatch(key)
+        if match is None:
+            raise BookExportRequestError("invalid_request", "Unsupported custom-column filter", 400)
+        column_id = int(match.group(1))
+        datatype = custom_types.get(column_id)
+        suffix = match.group(2) or ""
+        if datatype not in _CC_SINGLE and datatype not in _CC_RANGE:
+            raise BookExportRequestError("invalid_request", "Unsupported custom-column filter", 400)
+        if ((datatype in _CC_RANGE and suffix not in _CC_RANGE[datatype])
+                or (datatype in _CC_SINGLE and suffix)):
+            raise BookExportRequestError("invalid_request", "Unsupported custom-column filter", 400)
+        if raw not in (None, "") and _custom_value(datatype, suffix, raw) is None:
+            raise BookExportRequestError("invalid_request", "Invalid custom-column filter value", 400)
+    term = _json_to_term(params, columns)
+    query, _criteria = build_adv_search_query(term)
+    sort_key = _export_sort(params.get("sort"))
+    return query.options(
+        selectinload(db.Books.authors), selectinload(db.Books.series),
+        selectinload(db.Books.tags), selectinload(db.Books.ratings),
+        selectinload(db.Books.data),
+    ).distinct().order_by(*_query_order(sort_key))
+
+
+def _manual_shelf_export_query(shelf_id, params):
+    from ..shelf import check_shelf_view_permissions
+
+    shelf = ub.session.query(ub.Shelf).filter(ub.Shelf.id == shelf_id).first()
+    if shelf is None:
+        raise BookExportRequestError("not_found", "Shelf not found", 404)
+    if not check_shelf_view_permissions(shelf):
+        raise BookExportRequestError("forbidden", "You are not allowed to view this shelf", 403)
+
+    query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+    query = query.join(ub.BookShelf, ub.BookShelf.book_id == db.Books.id)
+    query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
+    query = query.outerjoin(db.Series).filter(ub.BookShelf.shelf == shelf_id)
+    query = query.filter(calibre_db.common_filters(allow_public_shelf_books=bool(shelf.is_public)))
+    params = _export_params_object(params, {"sort"}, "Shelf")
+    sort_key = params.get("sort", "stored")
+    if not isinstance(sort_key, str) or len(sort_key) > 32:
+        raise BookExportRequestError("invalid_request", "Sort must be a short text value", 400)
+    if sort_key not in ("stored", "recent", "hotasc", "hotdesc", *SORT_MAP):
+        raise BookExportRequestError("invalid_request", "Unsupported shelf sort order", 400)
+    if sort_key == "stored" or sort_key in ("hotasc", "hotdesc"):
+        order = (ub.BookShelf.order.asc(), db.Books.id.asc())
+    else:
+        order = tuple(_query_order(sort_key))
+    return query.options(
+        selectinload(db.Books.authors), selectinload(db.Books.series),
+        selectinload(db.Books.tags), selectinload(db.Books.ratings),
+        selectinload(db.Books.data),
+    ).distinct().order_by(*order)
+
+
+def _smart_shelf_export_query(shelf_id, params, *, classic_owner_rules=False):
+    from .. import magic_shelf
+    from ..custom_column_sort import load_configured_columns, resolve_magic_shelf_sort
+
+    shelf = ub.session.query(ub.MagicShelf).filter(ub.MagicShelf.id == shelf_id).first()
+    if shelf is None:
+        raise BookExportRequestError("not_found", "Smart shelf not found", 404)
+    uid = _real_user_id()
+    if shelf.user_id != uid and not shelf.is_public:
+        raise BookExportRequestError("forbidden", "You are not allowed to view this shelf", 403)
+    rule_user_id = shelf.user_id if classic_owner_rules else uid
+    try:
+        query_filter = magic_shelf.build_query_from_rules(shelf.rules, user_id=rule_user_id)
+    except Exception:
+        log.warning("Could not build smart-shelf export query for %s", shelf_id, exc_info=True)
+        query_filter = None
+    query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+    if query_filter is None:
+        query = query.filter(false())
+    else:
+        query = query.filter(query_filter)
+        bypass_language = (
+            magic_shelf.rules_reference_read_status(shelf.rules)
+            if classic_owner_rules else False
+        )
+        query = query.filter(calibre_db.common_filters(return_all_languages=bypass_language))
+
+    params = _export_params_object(params, {"sort"}, "Smart shelf")
+    sort_key = params.get("sort", "new")
+    if not isinstance(sort_key, str) or len(sort_key) > 40:
+        raise BookExportRequestError("invalid_request", "Sort must be a short text value", 400)
+    columns = load_configured_columns(config)
+    resolved = resolve_magic_shelf_sort(sort_key, config, columns)
+    query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
+    query = query.outerjoin(db.Series)
+    if resolved.join:
+        query = query.outerjoin(*resolved.join)
+    return query.options(
+        selectinload(db.Books.authors), selectinload(db.Books.series),
+        selectinload(db.Books.tags), selectinload(db.Books.ratings),
+        selectinload(db.Books.data),
+    ).distinct().order_by(*resolved.order_by)
+
+
+def _global_export_query(params):
+    if (not current_user.is_authenticated or current_user.is_anonymous
+            or not current_user.role_browse_global()):
+        raise BookExportRequestError("forbidden", "Global library access required", 403)
+    params = _export_params_object(params, {"search", "filter", "sort"}, "Global library")
+    filter_name = params.get("filter", "all")
+    if filter_name not in ("all", "not_in_my_library"):
+        raise BookExportRequestError("invalid_filter", "Unsupported global-library filter", 400)
+    term = params.get("search", "")
+    if not isinstance(term, str) or len(term) > 512:
+        raise BookExportRequestError("invalid_request", "Search must be at most 512 characters", 400)
+    filters = []
+    if filter_name == "not_in_my_library":
+        filters.append(user_library.global_missing_filter(current_user, cdb=calibre_db))
+    if term.strip():
+        like = "%" + term.strip() + "%"
+        filters.append(or_(
+            func.lower(db.Books.title).ilike(func.lower(like)),
+            db.Books.authors.any(func.lower(db.Authors.name).ilike(func.lower(like))),
+            db.Books.series.any(func.lower(db.Series.name).ilike(func.lower(like))),
+        ))
+    query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+    query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
+    query = query.outerjoin(db.Series).filter(and_(*filters) if filters else True)
+    query = query.filter(calibre_db.common_filters(allow_show_global=True))
+    return query.options(
+        selectinload(db.Books.authors), selectinload(db.Books.series),
+        selectinload(db.Books.tags), selectinload(db.Books.ratings),
+        selectinload(db.Books.data),
+    ).distinct().order_by(*_query_order(_export_sort(params.get("sort"))))
+
+
+def _book_export_query(payload):
+    if not isinstance(payload, dict):
+        raise BookExportRequestError("invalid_request", "Export request must be an object", 400)
+    if set(payload) - {"format", "source", "id", "params"}:
+        raise BookExportRequestError("invalid_request", "Unsupported export request field", 400)
+    format_name = payload.get("format", "csv")
+    if format_name not in ("csv", "txt"):
+        raise BookExportRequestError("invalid_format", "Format must be csv or txt", 400)
+    source = payload.get("source")
+    params = payload.get("params", {})
+    if not isinstance(params, dict):
+        raise BookExportRequestError("invalid_request", "Export parameters must be an object", 400)
+    shelf_id = _strict_int(payload.get("id"), "Shelf ID", optional=True)
+    if source == "catalog":
+        query = _catalog_export_query(params)
+    elif source == "classic_catalog":
+        if _strict_int(params.get("tag"), "Tag ID", optional=True) is None:
+            raise BookExportRequestError(
+                "unsupported_source", "This Classic list is not an exportable tag view", 400
+            )
+        query = _catalog_export_query(params, classic_tag_view=True)
+    elif source == "advanced":
+        query = _advanced_export_query(params)
+    elif source == "classic_advanced":
+        query = _classic_advanced_export_query(params)
+    elif source == "shelf":
+        if shelf_id is None:
+            raise BookExportRequestError("invalid_request", "Shelf ID is required", 400)
+        query = _manual_shelf_export_query(shelf_id, params)
+    elif source == "smart_shelf":
+        if shelf_id is None:
+            raise BookExportRequestError("invalid_request", "Smart shelf ID is required", 400)
+        query = _smart_shelf_export_query(shelf_id, params)
+    elif source == "classic_smart_shelf":
+        if shelf_id is None:
+            raise BookExportRequestError("invalid_request", "Smart shelf ID is required", 400)
+        query = _smart_shelf_export_query(shelf_id, params, classic_owner_rules=True)
+    elif source == "global":
+        query = _global_export_query(params)
+    else:
+        raise BookExportRequestError("unsupported_source", "This book list cannot be exported", 400)
+    return format_name, query
+
+
+@api_v1.route("/books/export", methods=["POST"])
+@login_required_if_no_ano
+def export_book_list():
+    """Stream the current visible result set as CSV or one-book-per-line TXT."""
+    if _real_user_id() is None:
+        return jsonify({"error": {"code": "authentication_required",
+                                  "message": "Sign in to export a book list"}}), 401
+    user_library.mark_response_user_specific()
+    payload = request.get_json(silent=True)
+    try:
+        format_name, query = _book_export_query(payload)
+        count = _count_export_rows(query)
+        if count > MAX_BOOK_EXPORT_ROWS:
+            return jsonify({"error": {
+                "code": "export_too_large",
+                "message": f"This result has more than {MAX_BOOK_EXPORT_ROWS:,} books. Add a filter and retry.",
+                "limit": MAX_BOOK_EXPORT_ROWS,
+            }}), 413
+        spool = tempfile.SpooledTemporaryFile(max_size=1_048_576, mode="w+b")
+        try:
+            written = _write_export(spool, query, format_name)
+        except Exception:
+            spool.close()
+            raise
+        if written != count:
+            spool.close()
+            return jsonify({"error": {
+                "code": "result_changed",
+                "message": "The book list changed while it was being exported. Retry the download.",
+            }}), 409
+        spool.seek(0)
+        response = Response(
+            iter(lambda: spool.read(64 * 1024), b""),
+            mimetype="text/csv" if format_name == "csv" else "text/plain",
+            headers={
+                "Content-Disposition": f'attachment; filename="calibre-web-books.{format_name}"',
+                "Cache-Control": "private, no-store",
+                "X-Export-Count": str(count),
+            },
+        )
+        response.vary.add("Cookie")
+        response.vary.add("Authorization")
+        response.call_on_close(spool.close)
+        return response
+    except BookExportRequestError as exc:
+        return jsonify({"error": {"code": exc.code, "message": exc.message}}), exc.status
+
+
 @api_v1.route("/books")
 @login_required_if_no_ano
 def list_books():
@@ -332,27 +1059,40 @@ def list_books():
     hidden_ids = _hidden_book_ids() if show_hidden else set()
     to_items = lambda entries: _rows_to_items(entries, hidden_ids)
 
+    author_id = request.args.get("author", type=int)
+    series_id = request.args.get("series", type=int)
+    tag_id = request.args.get("tag", type=int)
+    publisher_id = request.args.get("publisher", type=int)
+    language_code = request.args.get("language")
+    rating_id = request.args.get("rating", type=int)
+    book_format = request.args.get("format")
+    filter_val = request.args.get("filter")
+    has_entity_filter = any(value not in (None, "") for value in (
+        author_id, series_id, tag_id, publisher_id, language_code, rating_id, book_format,
+    ))
+
     if search:
-        if select_all:
-            query = calibre_db.search_query(
-                search, config, db.books_series_link,
-                db.Books.id == db.books_series_link.c.book, db.Series,
-                allow_show_hidden=show_hidden,
-            )
-            id_query = query.with_entities(db.Books.id).distinct()
-            total = id_query.count()
-            ids = [row[0] for row in id_query.order_by(*order).limit(per_page).all()]
-            return _selection_response(ids, total)
         offset = (page - 1) * per_page
-        join = (
-            db.books_series_link,
-            db.Books.id == db.books_series_link.c.book,
-            db.Series,
+        query = _catalog_book_query(
+            search=search,
+            author_id=author_id,
+            series_id=series_id,
+            tag_id=tag_id,
+            publisher_id=publisher_id,
+            language_code=language_code,
+            rating_id=rating_id,
+            book_format=book_format,
+            filter_val=(filter_val if filter_val in
+                        ("read", "unread", "favorites", "rated", "archived") else None),
+            show_hidden=show_hidden,
         )
-        entries, total, _pagination = calibre_db.get_search_results(
-            search, config, offset, [order], per_page, *join,
-            allow_show_hidden=show_hidden,
-        )
+        total = query.with_entities(db.Books.id).order_by(None).distinct().count()
+        if select_all:
+            ids = [row[0] for row in query.with_entities(db.Books.id)
+                   .order_by(*order).limit(per_page).all()]
+            return _selection_response(ids, total)
+        entries = query.order_by(*order).offset(offset).limit(per_page).all()
+        entries = calibre_db.order_authors(entries, list_return=True, combined=True)
         return jsonify({
             "items": to_items(entries),
             "page": page,
@@ -360,63 +1100,9 @@ def list_books():
             "total": total,
         })
 
-    # Entity filters
-    author_id = request.args.get("author", type=int)
-    series_id = request.args.get("series", type=int)
-    tag_id = request.args.get("tag", type=int)
-    publisher_id = request.args.get("publisher", type=int)
-    language_code = request.args.get("language")
-    filter_val = request.args.get("filter")  # read | unread | archived
-
-    # --- archived path (two-step: collect ids, then fill_indexpage_with_archived_books) ---
-    if filter_val == "archived":
-        archived_books = (ub.session.query(ub.ArchivedBook)
-                         .filter(ub.ArchivedBook.user_id == int(current_user.id))
-                         .filter(ub.ArchivedBook.is_archived == True)  # noqa: E712
-                         .all())
-        archived_ids = [ab.book_id for ab in archived_books]
-        archived_filter = db.Books.id.in_(archived_ids)
-        series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
-        entries, _random, pagination = calibre_db.fill_indexpage_with_archived_books(
-            page, db.Books, per_page, archived_filter, order,
-            True, True, config.config_read_column, *series_join, ids_only=select_all,
-        )
-        if select_all:
-            return _selection_response(entries, pagination.total_count)
-        return jsonify({
-            "items": to_items(entries),
-            "page": pagination.page,
-            "per_page": pagination.per_page,
-            "total": pagination.total_count,
-        })
-
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
 
     # --- discovery views (mirror web.py books_list categories) ---
-    if filter_val == "favorites":
-        fav_ids = [f.book_id for f in (ub.session.query(ub.FavoriteBook)
-                   .filter(ub.FavoriteBook.user_id == int(current_user.id)).all())]
-        entries, _random, pagination = calibre_db.fill_indexpage(
-            page, per_page, db.Books, db.Books.id.in_(fav_ids), order,
-            True, config.config_read_column, *series_join, ids_only=select_all)
-        if select_all:
-            return _selection_response(entries, pagination.total_count)
-        return jsonify({"items": to_items(entries),
-                        "page": pagination.page, "per_page": pagination.per_page,
-                        "total": pagination.total_count})
-
-    if filter_val == "rated":
-        # Top-rated: Calibre stores rating 0–10 (half-stars); >9 == 5 stars.
-        rated_filter = db.Books.ratings.any(db.Ratings.rating > 9)
-        entries, _random, pagination = calibre_db.fill_indexpage(
-            page, per_page, db.Books, rated_filter, order,
-            True, config.config_read_column, *series_join, ids_only=select_all)
-        if select_all:
-            return _selection_response(entries, pagination.total_count)
-        return jsonify({"items": to_items(entries),
-                        "page": pagination.page, "per_page": pagination.per_page,
-                        "total": pagination.total_count})
-
     if filter_val == "discover":
         # Random unread books (single page, like the legacy Discover view).
         source_filter, _source_available = discover_source.filter_for(current_user)
@@ -449,9 +1135,77 @@ def list_books():
         return jsonify({"items": to_items(entries),
                         "page": page, "per_page": per_page, "total": total})
 
+    # --- archived path (two-step: collect ids, then fill_indexpage_with_archived_books) ---
+    if filter_val == "archived" and not has_entity_filter:
+        archived_books = (ub.session.query(ub.ArchivedBook)
+                         .filter(ub.ArchivedBook.user_id == int(current_user.id))
+                         .filter(ub.ArchivedBook.is_archived == True)  # noqa: E712
+                         .all())
+        archived_ids = [ab.book_id for ab in archived_books]
+        archived_filter = db.Books.id.in_(archived_ids)
+        series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
+        entries, _random, pagination = calibre_db.fill_indexpage_with_archived_books(
+            page, db.Books, per_page, archived_filter, order,
+            True, True, config.config_read_column, *series_join, ids_only=select_all,
+        )
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
+        return jsonify({
+            "items": to_items(entries),
+            "page": pagination.page,
+            "per_page": pagination.per_page,
+            "total": pagination.total_count,
+        })
+
+    # --- discovery views (mirror web.py books_list categories) ---
+    if filter_val == "favorites" and not has_entity_filter:
+        fav_ids = [f.book_id for f in (ub.session.query(ub.FavoriteBook)
+                   .filter(ub.FavoriteBook.user_id == int(current_user.id)).all())]
+        entries, _random, pagination = calibre_db.fill_indexpage(
+            page, per_page, db.Books, db.Books.id.in_(fav_ids), order,
+            True, config.config_read_column, *series_join, ids_only=select_all)
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
+        return jsonify({"items": to_items(entries),
+                        "page": pagination.page, "per_page": pagination.per_page,
+                        "total": pagination.total_count})
+
+    if filter_val == "rated" and not has_entity_filter:
+        # Top-rated: Calibre stores rating 0–10 (half-stars); >9 == 5 stars.
+        rated_filter = db.Books.ratings.any(db.Ratings.rating > 9)
+        entries, _random, pagination = calibre_db.fill_indexpage(
+            page, per_page, db.Books, rated_filter, order,
+            True, config.config_read_column, *series_join, ids_only=select_all)
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
+        return jsonify({"items": to_items(entries),
+                        "page": pagination.page, "per_page": pagination.per_page,
+                        "total": pagination.total_count})
+
+    if filter_val in ("archived", "favorites", "rated") and has_entity_filter:
+        offset = (page - 1) * per_page
+        query = _catalog_book_query(
+            author_id=author_id,
+            series_id=series_id,
+            tag_id=tag_id,
+            publisher_id=publisher_id,
+            language_code=language_code,
+            rating_id=rating_id,
+            book_format=book_format,
+            filter_val=filter_val,
+            show_hidden=show_hidden,
+        )
+        total = query.with_entities(db.Books.id).order_by(None).distinct().count()
+        if select_all:
+            ids = [row[0] for row in query.with_entities(db.Books.id)
+                   .order_by(*order).limit(per_page).all()]
+            return _selection_response(ids, total)
+        entries = query.order_by(*order).offset(offset).limit(per_page).all()
+        entries = calibre_db.order_authors(entries, list_return=True, combined=True)
+        return jsonify({"items": to_items(entries), "page": page,
+                        "per_page": per_page, "total": total})
+
     # --- entity + read/unread path ---
-    rating_id = request.args.get("rating", type=int)
-    book_format = request.args.get("format")
     entity_filter = _build_entity_filter(author_id, series_id, tag_id, publisher_id, language_code,
                                          rating=rating_id, book_format=book_format)
     read_filter = _build_read_filter(filter_val) if filter_val in ("read", "unread") else True
@@ -466,7 +1220,6 @@ def list_books():
         db_filter = and_(entity_filter, read_filter)
 
     # series_join is needed when order references db.Series.name (authaz/authza)
-    series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
     listing_options = {}
     if show_hidden:
         # SPA-only recovery rule: include this user's hidden+archived books so

@@ -5473,6 +5473,10 @@ msgstr "Valeur par défaut du livre"
 msgid "Book density"
 msgstr "Densité des livres"
 
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Book list download started."
+msgstr "Téléchargement de la liste de livres lancé."
+
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Ordre du livre"
@@ -5936,6 +5940,10 @@ msgstr "Impossible de supprimer l’étiquette"
 #: cps/spa_strings.py
 msgid "Could not delete the Kobo sync URL."
 msgstr "Impossible de supprimer l’URL de synchronisation Kobo."
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Could not export the book list. Please try again."
+msgstr "Impossible d’exporter la liste de livres. Réessayez."
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -6773,6 +6781,24 @@ msgstr "Explorez les changements : vous pouvez toujours annuler plus tard."
 #: cps/spa_strings.py
 msgid "Export"
 msgstr "Exporter"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+#: cps/templates/annotations_view.html
+msgid "Export CSV"
+msgstr "Exporter en CSV"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export TXT"
+msgstr "Exporter en TXT"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export this book list"
+msgstr "Exporter cette liste de livres"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Exports all matching books, including pages you have not loaded."
+msgstr ""
+"Exporte tous les livres correspondants, y compris les pages non chargées."
 
 #: cps/spa_strings.py
 msgid "Expose only selected shelves over OPDS"
@@ -8267,6 +8293,10 @@ msgstr "Position enregistrée"
 #: cps/spa_strings.py
 msgid "Position repair queued"
 msgstr "Restauration de la position en attente"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Preparing book list…"
+msgstr "Préparation de la liste de livres…"
 
 #: cps/spa_strings.py
 msgid "Preparing your magic link…"
@@ -10126,6 +10156,10 @@ msgstr "URL du jeton"
 #: cps/spa_strings.py
 msgid "Too many attempts. Wait a minute and try again."
 msgstr "Trop de tentatives. Patientez une minute, puis réessayez."
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Too many books to export. Narrow the filters and try again."
+msgstr "Trop de livres à exporter. Affinez les filtres et réessayez."
 
 #: cps/spa_strings.py
 msgid ""
@@ -12463,10 +12497,6 @@ msgstr "Erreur de connexion"
 
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
-msgstr ""
-
-#: cps/templates/annotations_view.html
-msgid "Export CSV"
 msgstr ""
 
 #: cps/templates/annotations_view.html

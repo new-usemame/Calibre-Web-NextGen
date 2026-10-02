@@ -5386,6 +5386,10 @@ msgstr "По умолчанию для книги"
 msgid "Book density"
 msgstr "Плотность отображения книг"
 
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Book list download started."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Порядок книг"
@@ -5831,6 +5835,10 @@ msgstr "Не удалось удалить тег"
 #: cps/spa_strings.py
 msgid "Could not delete the Kobo sync URL."
 msgstr "Не удалось удалить URL для синхронизации Kobo."
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Could not export the book list. Please try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -6663,6 +6671,23 @@ msgstr "Изучите изменения, вы всегда сможете от
 #: cps/spa_strings.py
 msgid "Export"
 msgstr "Экспорт"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+#: cps/templates/annotations_view.html
+msgid "Export CSV"
+msgstr "Экспорт в CSV"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export TXT"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Export this book list"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Exports all matching books, including pages you have not loaded."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Expose only selected shelves over OPDS"
@@ -8128,6 +8153,10 @@ msgstr "Позиция зафиксирована"
 #: cps/spa_strings.py
 msgid "Position repair queued"
 msgstr "Исправление позиции поставлено в очередь"
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Preparing book list…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Preparing your magic link…"
@@ -9909,6 +9938,10 @@ msgstr "URL токена"
 #: cps/spa_strings.py
 msgid "Too many attempts. Wait a minute and try again."
 msgstr "Слишком много попыток. Подождите минуту и попробуйте снова."
+
+#: cps/spa_strings.py cps/templates/_book_list_export.html
+msgid "Too many books to export. Narrow the filters and try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -12180,10 +12213,6 @@ msgstr "Ошибка соединения."
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
 msgstr "Экспорт в Markdown"
-
-#: cps/templates/annotations_view.html
-msgid "Export CSV"
-msgstr "Экспорт в CSV"
 
 #: cps/templates/annotations_view.html
 msgid "Export JSON"

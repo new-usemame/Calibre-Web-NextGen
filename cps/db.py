@@ -29,7 +29,7 @@ try:
 except ImportError:
     from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.sql.expression import and_, true, false, text, func, literal, or_, select, union_all
+from sqlalchemy.sql.expression import and_, true, false, text, func, literal, or_, select, union_all, bindparam
 try:
     # Scope key for the session registry, see _make_session_factory. greenlet is
     # a pinned dependency (pyproject.toml) and a hard dependency of gevent;
@@ -148,6 +148,28 @@ def public_shelf_book_filter(app_session, metadata_session):
     else:
         book_ids = [int(row.book_id) for row in public_books.all()]
     return Books.id.in_(book_ids)
+
+
+def _cross_database_book_id_filter(metadata_session, app_session, values, *, include):
+    """Filter metadata IDs from another DB without expanding large ID lists.
+
+    Keep the legacy literal predicate on SQLite builds without JSON1. When
+    JSON1 is available, consume each nonempty cross-database set through one
+    bind. The statement may contain both archived and hidden exclusions, so a
+    per-list threshold would not bound their combined bind count.
+    """
+    values = sorted({int(value) for value in values if value is not None})
+    if not values:
+        return false() if include else true()
+    if _sqlite_json_available(app_session, metadata_session):
+        json_values = json.dumps(values, separators=(",", ":"))
+        value_table = func.json_each(
+            bindparam("cross_database_book_ids", json_values, unique=True)
+        ).table_valued("value").alias("cross_database_book_ids")
+        ids = select(value_table.c.value)
+    else:
+        ids = values
+    return Books.id.in_(ids) if include else Books.id.notin_(ids)
 
 
 def _register_sqlite_udfs(dbapi_connection, _connection_record):
@@ -1923,7 +1945,9 @@ class CalibreDB:
                               .filter(ub.ArchivedBook.is_archived.is_(True))
                               .all())
             archived_book_ids = [archived_book.book_id for archived_book in archived_books]
-            archived_filter = Books.id.notin_(archived_book_ids)
+            archived_filter = _cross_database_book_id_filter(
+                self.session, ub.session, archived_book_ids, include=False
+            )
         else:
             archived_filter = true()
 
@@ -1934,7 +1958,9 @@ class CalibreDB:
                             .filter(ub.UserHiddenBook.user_id == int(filter_user.id))
                             .all())
             hidden_book_ids = [h.book_id for h in hidden_books]
-            hidden_filter = Books.id.notin_(hidden_book_ids)
+            hidden_filter = _cross_database_book_id_filter(
+                self.session, ub.session, hidden_book_ids, include=False
+            )
         else:
             hidden_filter = true()
 
@@ -2338,7 +2364,8 @@ class CalibreDB:
         return self.session.query(Books) \
             .filter(and_(Books.authors.any(and_(*q)), func.lower(Books.title).ilike("%" + title + "%"))).first()
 
-    def search_query(self, term, config, *join, allow_show_hidden=False, user=None):
+    def search_query(self, term, config, *join, allow_show_hidden=False, user=None,
+                     eager_data=True, viewing_tag_id=None):
         self.ensure_session()
         strip_whitespaces(term).lower()
         q = list()
@@ -2367,9 +2394,15 @@ class CalibreDB:
                     getattr(Books,
                             'custom_column_' + str(c.id)).any(
                         func.lower(cc_classes[c.id].value).ilike("%" + term + "%")))
-        # Eagerly load the data relationship to prevent session errors
-        query = query.options(joinedload(Books.data))
-        return query.filter(self.common_filters(True, allow_show_hidden=allow_show_hidden, user=user)) \
+        # Eagerly load the data relationship to prevent session errors.
+        # Bounded export iterators use selectinload instead: joinedload on a
+        # collection requires result uniquing and is incompatible with yield_per.
+        if eager_data:
+            query = query.options(joinedload(Books.data))
+        return query.filter(self.common_filters(
+            True, allow_show_hidden=allow_show_hidden, user=user,
+            viewing_tag_id=viewing_tag_id,
+        )) \
             .filter(or_(*filter_expression))
 
     def get_cc_columns(self, config, filter_config_custom_read=False):

@@ -15,6 +15,12 @@
   padding: var(--sp-6) var(--sp-5);
 }
 
+/* Focus scrolling must keep catalog controls clear of the sticky TopBar.
+   This also applies to card controls nested below the wrapping toolbar. */
+.container :is(a, button, input, select, textarea) {
+  scroll-margin-top: calc(var(--topbar-h) + var(--sp-2));
+}
+
 /* #1756 — while a multi-selection is active the bulk bar floats fixed over the
    bottom of the viewport. Without extra bottom room the last cover row can
    never scroll out from under it (and neither can the sentinel behind it).

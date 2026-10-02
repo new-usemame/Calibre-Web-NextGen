@@ -21,3 +21,12 @@ On that current image, a newly created private editor account had every metadata
 The frozen-base full suite reported 10,291 passed, 103 skipped, and 3 failures. Two are the known macOS SQLite baseline failures in `test_2291_replaced_metadata_db_reconnects.py`. The third was `rootUnitLane.test.ts` timing out at 30 seconds during the resource-heavy parallel suite; the isolated rerun of `tests/unit/test_frontend_unit_suites_run.py` passed 19/19, including that lane. No product failure remains from that timeout.
 
 This changes new candidate selection; it does not forcibly replace stored covers or reprocess URLs already classified as high resolution. Preserving the existing ISBN-first order avoids silently changing a print edition to its Kindle edition. MAIN-first keeps original artwork when available while the prior URL retains compatibility for CDN records without it. Live phone-width picker application was not rerun for this backend URL change; the shared picker layout is unchanged, and the measured New/Classic cases were desktop. No release or deployment is included.
+
+
+## Serial current-main integration — 2026-10-02
+
+Rebased cleanly onto main `357fca016155e22d73e775fb3edbe7bd580ed62a`, the translation follow-up after book-list export. Runtime head `423523e275ef9befe825e5738970319170bebda5` retains the original reviewed cover resolver bytes. The feature remains seven additive files; main SPA anchors/changelog rows are retained and the current import classifier still measures224/283. The central changelog row links PR2428 and issue304.
+
+Current focused cover booster/picker/provenance/ISBN wiring plus classifier packet:141passed30.81s. The shell wrapper then failed assigning zsh's reserved `status` variable; the complete pytest log records the successful terminal result, and subsequent wrappers use a task-specific variable. No extra test rerun or product change is represented by that wrapper correction. No frontend change or repeated full suite is claimed.
+
+Original real CDN, New/Classic desktop picker/apply and full mixed-platform evidence above remain historical. A new complete current-source image and bounded actual cover integration, independent source disposition, resulting-head CI and final current-main/head/persona gates remain required before merging. No release, deployment, issue closure or comment.

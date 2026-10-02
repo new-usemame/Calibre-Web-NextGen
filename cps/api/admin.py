@@ -23,6 +23,7 @@ from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slu
 from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
                                    validate_default_font_updates)
 from ..admin import _delete_user
+from ..string_helper import strip_whitespaces
 from ..services.opds_filename import validate_template as validate_opds_filename_template
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
@@ -378,7 +379,7 @@ def admin_update_config():
         return _err("invalid_request", str(ex), 400)
     if "config_opds_filename_template" in data:
         try:
-            validate_opds_filename_template(data["config_opds_filename_template"])
+            validate_opds_filename_template(data["config_opds_filename_template"] if data["config_opds_filename_template"] is not None else "")
         except ValueError as error:
             return _err("invalid_opds_filename_template", str(error), 400)
     for key in _UI_CONFIG_INT:
@@ -397,7 +398,7 @@ def admin_update_config():
     for key in _UI_CONFIG_STR:
         if key in data:
             value = str(data[key] or "")
-            setattr(config, key, value.strip() if key == "config_opds_filename_template" else value)
+            setattr(config, key, strip_whitespaces(value) if key == "config_opds_filename_template" else value)
     for key, value in font_updates.items():
         setattr(config, key, value)
     try:

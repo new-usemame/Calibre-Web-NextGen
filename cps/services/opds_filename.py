@@ -18,12 +18,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db, logger
+from ..string_helper import title_sort_name
 from ..utils.filename_sanitizer import get_valid_filename_shared
 
 
 log = logger.create()
 MAX_TEMPLATE_LENGTH = 1024
 MAX_FILENAME_LENGTH = 128
+MAX_CUSTOM_LOOKUPS = 256
 _FIELDS = frozenset((
     'author_sort', 'authors', 'id', 'isbn', 'languages', 'last_modified',
     'pubdate', 'publisher', 'rating', 'series', 'series_index', 'tags',
@@ -32,7 +34,7 @@ _FIELDS = frozenset((
 _FIELD = re.compile(r'([a-z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
 _FORMAT = re.compile(r'(?:(.[<^>]|[<^>]))?([0-9]{1,3})?(?:\.([0-9]{1,3}))?s?\Z')
 _UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
-_RESERVED = re.compile(r'(CON|CONIN\$|CONOUT\$|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)', re.I)
+_RESERVED = re.compile(r'(CON|CONIN\$|CONOUT\$|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³]) *(?:\.|$)', re.I)
 
 
 def _format_parts(spec):
@@ -118,7 +120,10 @@ def _value(value):
             return ''
         if isinstance(value, datetime):
             if value.tzinfo is not None:
-                value = value.astimezone(timezone.utc)
+                try:
+                    value = value.astimezone(timezone.utc)
+                except OverflowError:
+                    return ''
             value = value.date()
         return value.isoformat()
     return str(value)
@@ -129,14 +134,7 @@ def _sorted_name(name, stored_sort, title_regex):
         return ''
     if stored_sort:
         return stored_sort
-    try:
-        match = re.match(title_regex, name, re.IGNORECASE) if title_regex else None
-        if match and match.lastindex:
-            article = match.group(1)
-            return name[len(article):].strip() + ', ' + article
-    except re.error:
-        pass
-    return name
+    return title_sort_name(name, title_regex)
 
 
 class _BookValues(dict):
@@ -146,8 +144,29 @@ class _BookValues(dict):
         self.columns = None
         self.depth = 0
         self.active = set()
-        series = book.series[0] if book.series else None
+        self.composites = {}
+        self.displays = {}
+        self.warned = set()
+        self.lookups_remaining = MAX_CUSTOM_LOOKUPS
+        series = next((item for item in book.series if item is not None), None)
         authors = book.authors if ordered_authors is None else ordered_authors
+        # The shared orderer cannot distinguish authors with identical sort
+        # strings. Resolve those occurrences in their original link order.
+        by_sort = {}
+        for author in book.authors:
+            if author is not None:
+                by_sort.setdefault(getattr(author, 'sort', None), []).append(author)
+        collision_offsets = {}
+        corrected = []
+        for author in authors:
+            group = by_sort.get(getattr(author, 'sort', None), [])
+            if author is not None and len(group) > 1:
+                offset = collision_offsets.get(author.sort, 0)
+                if offset < len(group):
+                    author = group[offset]
+                    collision_offsets[author.sort] = offset + 1
+            corrected.append(author)
+        authors = corrected
         author_names = []
         seen_authors = set()
         for author in authors:
@@ -158,19 +177,20 @@ class _BookValues(dict):
             if author_key not in seen_authors:
                 seen_authors.add(author_key)
                 author_names.append(author.name.replace('|', ','))
+        rating = next((item.rating for item in book.ratings if item is not None and item.rating), None)
         super().__init__(
             title=_sorted_name(book.title, book.sort, title_regex),
             author_sort=book.author_sort or '',
             authors=' & '.join(author_names),
             id=_value(book.id), isbn=book.isbn or '',
-            languages=', '.join(language.lang_code for language in book.languages),
+            languages=', '.join(language.lang_code for language in book.languages if language is not None),
             last_modified=_value(book.last_modified), pubdate=_value(book.pubdate),
             timestamp=_value(book.timestamp),
-            publisher=', '.join(publisher.name for publisher in book.publishers),
-            rating=_number(book.ratings[0].rating / 2) if book.ratings and book.ratings[0].rating else '',
+            publisher=', '.join(publisher.name for publisher in book.publishers if publisher is not None),
+            rating=_number(rating / 2) if rating else '',
             series=_sorted_name(series.name, series.sort, title_regex) if series else '',
             series_index=_number(book.series_index) if series else '',
-            tags=', '.join(tag.name for tag in book.tags),
+            tags=', '.join(tag.name for tag in book.tags if tag is not None),
         )
 
     def __getitem__(self, key):
@@ -182,20 +202,30 @@ class _BookValues(dict):
     def __missing__(self, key):
         if not key.startswith('#'):
             return ''
+        context = (key, self.depth, frozenset(self.active))
+        if context in self.composites:
+            return self.composites[context]
+        if self.lookups_remaining <= 0:
+            return ''
+        self.lookups_remaining -= 1
         self.active.add(key)
         self.depth += 1
         value = ''
         try:
             value = self._custom_value(key[1:])
-        except (SQLAlchemyError, ValueError, TypeError, KeyError, InvalidOperation):
-            log.warning('Could not read custom field %s for an OPDS filename', key)
+        except (SQLAlchemyError, ValueError, TypeError, KeyError, InvalidOperation, OverflowError):
+            if key not in self.warned:
+                self.warned.add(key)
+                log.warning('Could not read custom field %s for an OPDS filename', key)
         finally:
             self.depth -= 1
             self.active.remove(key)
         column = (self.columns or {}).get(key[1:])
-        # A composite can be truncated by its calling depth or a cycle. Cache
-        # stored leaf values only, so a later shallow composite is independent.
-        if column is None or column.datatype != 'composite':
+        # Include depth and active ancestors in composite cache keys: a value
+        # cut short by a cycle/depth bound must not poison a shallow reference.
+        if column is not None and column.datatype == 'composite':
+            self.composites[context] = value
+        else:
             self[key] = value
         return value
 
@@ -214,13 +244,16 @@ class _BookValues(dict):
                 return ''
         if column is None:
             return ''
-        if column.datatype == 'composite':
-            display = json.loads(column.display or '{}')
+        if column.id not in self.displays:
+            display = json.loads(column.display or '{}') if column.datatype == 'composite' or column.is_multiple else {}
             if not isinstance(display, dict):
                 raise ValueError('Invalid custom column display metadata')
+            self.displays[column.id] = display
+        display = self.displays[column.id]
+        if column.datatype == 'composite':
             metadata = ChainMap({
                 'title': self.book.title or '',
-                'series': self.book.series[0].name if self.book.series else '',
+                'series': next((item.name for item in self.book.series if item is not None), ''),
             }, self)
             return expand_template(display.get('composite_template', ''), metadata)
 
@@ -235,7 +268,7 @@ class _BookValues(dict):
             value = 'link.extra' if index else 'value.value'
             sql = ('SELECT %s FROM %s AS value JOIN %s AS link '
                    'ON value.id = link.value WHERE link.book = :book_id '
-                   'ORDER BY value.id') % (value, table, link)
+                   'ORDER BY link.rowid') % (value, table, link)
         else:
             sql = 'SELECT value FROM %s WHERE book = :book_id ORDER BY id' % table
         values = self.session.execute(text(sql), {'book_id': self.book.id}).scalars().all()
@@ -248,7 +281,8 @@ class _BookValues(dict):
             values = [_number(Decimal(str(v)) / 2) if v else '' for v in values]
         elif index or column.datatype in ('int', 'float'):
             values = [_number(v) for v in values]
-        return ', '.join(_value(v) for v in values if v is not None)
+        separator = ' & ' if column.is_multiple and display.get('is_names') else ', '
+        return separator.join(_value(v) for v in values if v is not None)
 
 
 def render_filename(template, book, session, title_regex='', unicode_filename=False, ordered_authors=None):
@@ -257,10 +291,13 @@ def render_filename(template, book, session, title_regex='', unicode_filename=Fa
     rendered = expand_template(template, values)
     rendered = ''.join(char for char in rendered if unicodedata.category(char) not in ('Cc', 'Cf', 'Zl', 'Zp'))
     rendered = rendered.strip().strip(' .') or 'book-%s' % book.id
-    rendered = get_valid_filename_shared(
-        rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH,
-        unicode_filename=unicode_filename,
-    )
+    try:
+        rendered = get_valid_filename_shared(
+            rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH,
+            unicode_filename=unicode_filename,
+        )
+    except ValueError:
+        rendered = 'book-%s' % book.id
     # Content-Disposition cannot create directories. Sanitize after optional
     # transliteration, which can itself introduce path separators or CON etc.
     rendered = _UNSAFE.sub('_', rendered).strip(' .') or 'book-%s' % book.id

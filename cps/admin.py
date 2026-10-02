@@ -788,7 +788,7 @@ def view_configuration(opds_filename_template=None, opds_filename_error=None, dr
                                  opds_filename_error=opds_filename_error, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
                                  restriction_is_bool=(restricted_column_datatype(
-                                     config.config_restricted_column) == "bool"),
+                                     (draft_config or config).config_restricted_column) == "bool"),
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -1146,7 +1146,7 @@ def update_view_configuration():
             and not boolean_restrictions_compatible()):
         flash(_("Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."),
               category="error")
-        return view_configuration()
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     # This settings card is optional on legacy/partial POST clients. Validate
     # its complete submitted value before mutating any other configuration.
@@ -1160,7 +1160,7 @@ def update_view_configuration():
             )
         except ValueError:
             flash(_("Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."), category="error")
-            return view_configuration()
+            return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     # Validate both presets before any other form fields mutate the config.
     # This keeps a stale/manual POST from partially applying unrelated settings.
@@ -1171,7 +1171,17 @@ def update_view_configuration():
                    if "body" in str(ex)
                    else _("Invalid default display font option"))
         flash(message, category="error")
-        return view_configuration()
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    if not check_valid_read_column(to_save.get("config_read_column", "0")):
+        flash(_("Invalid Read Column"), category="error")
+        log.debug("Invalid Read column")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    if not check_valid_restricted_column(to_save.get("config_restricted_column", "0")):
+        flash(_("Invalid Restricted Column"), category="error")
+        log.debug("Invalid Restricted Column")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
@@ -1199,16 +1209,7 @@ def update_view_configuration():
                     "library failed — books may keep their previous order until "
                     "you retry or edit them."), category="error")
 
-    if not check_valid_read_column(to_save.get("config_read_column", "0")):
-        flash(_("Invalid Read Column"), category="error")
-        log.debug("Invalid Read column")
-        return view_configuration()
     _config_int(to_save, "config_read_column")
-
-    if not check_valid_restricted_column(to_save.get("config_restricted_column", "0")):
-        flash(_("Invalid Restricted Column"), category="error")
-        log.debug("Invalid Restricted Column")
-        return view_configuration()
     _config_int(to_save, "config_restricted_column")
 
     _config_int(to_save, "config_theme")

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from werkzeug.http import parse_options_header
 
 from cps import config_sql, db
+from cps.admin import view_configuration as classic_view_configuration
 from cps.services import opds_filename as names
 
 
@@ -545,3 +546,132 @@ def test_classic_draft_does_not_share_the_live_config_dirty_queue(monkeypatch):
     assert config.config_books_per_page == 30
     assert config.dirty == []
     assert draft.dirty is not config.dirty
+
+
+@pytest.mark.parametrize('value', ['\u200b', '\ufeff', None])
+def test_api_blank_template_matches_classic_and_legacy_download(admin_config, download, value):
+    config, _, api = admin_config
+    with Flask(__name__).test_request_context(method='POST', json={'config_opds_filename_template': value}):
+        response = inspect.unwrap(api.admin_update_config)()
+    assert response.json['config_opds_filename_template'] == ''
+    response = download.get_download_link(42, 'epub', '', filename_template=value or '')
+    assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'The Book - Ann Writer.epub'
+
+
+def test_composite_fanout_has_bounded_work_without_losing_shallow_values(book, custom_session, monkeypatch):
+    import json
+    for number in range(8):
+        target = f'#fan_{number + 1}' if number < 7 else '#shelf'
+        custom_session.add(db.CustomColumns(id=40 + number, label=f'fan_{number}', datatype='composite',
+            display=json.dumps({'composite_template': ('{' + target + '}') * 4})))
+    custom_session.commit()
+    calls = 0
+    original = names._BookValues._custom_value
+    def bounded(self, label):
+        nonlocal calls
+        calls += 1
+        # Fail early on the unbounded renderer rather than timing its hang.
+        assert calls <= 256
+        return original(self, label)
+    monkeypatch.setattr(names._BookValues, '_custom_value', bounded)
+    result = names.render_filename('{#fan_0}', book, custom_session)
+    assert result.startswith('Favorites')
+    assert calls < 30
+
+
+def test_bad_composite_is_logged_once_per_download(book, custom_session, caplog):
+    custom_session.get(db.CustomColumns, 7).display = 'not JSON'
+    custom_session.commit()
+    assert names.render_filename('{#computed}{#computed}{#computed}', book, custom_session) == 'book-42'
+    assert caplog.text.count('Could not read custom field #computed') == 1
+
+
+def test_multivalue_custom_names_keep_book_link_order(book, custom_session):
+    column = custom_session.get(db.CustomColumns, 1)
+    column.is_multiple = True
+    column.display = '{"is_names": true}'
+    custom_session.execute(text("INSERT INTO custom_column_1 VALUES (2, 'Amy A')"))
+    custom_session.execute(text('DELETE FROM books_custom_column_1_link'))
+    custom_session.execute(text('INSERT INTO books_custom_column_1_link VALUES (42, 2, NULL), (42, 1, NULL)'))
+    custom_session.commit()
+    assert names.render_filename('{#shelf}', book, custom_session) == 'Amy A & Favorites'
+
+
+def test_overflowed_custom_date_is_missing_without_breaking_other_fields(book, custom_session):
+    custom_session.execute(text("UPDATE custom_column_4 SET value = '9999-12-31T23:00:00-05:00'"))
+    assert names.render_filename('{#date}{title}', book, custom_session) == 'Book, The'
+
+
+def test_transliteration_empty_name_uses_book_id(book):
+    book.title = book.sort = '🎉🎉'
+    assert names.render_filename('{title}', book, None, unicode_filename=True) == 'book-42'
+
+
+def test_author_collision_preserves_original_relationship_order(download, book):
+    book.authors = [NS(id=1, name='Writer A', sort='Smith, J'), NS(id=2, name='Writer B', sort='Smith, J')]
+    book.author_sort = 'Smith, J & Smith, J'
+    response = download.get_download_link(42, 'epub', '', filename_template='{authors}')
+    assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'Writer A & Writer B.epub'
+
+
+@pytest.mark.parametrize('relationship', ['tags', 'languages', 'publishers', 'series', 'ratings'])
+def test_torn_optional_relationship_keeps_available_template_fields(book, relationship):
+    getattr(book, relationship).insert(0, None)
+    assert names.render_filename('{id}-{tags}', book, None) == '42-Fiction, Space'
+
+
+@pytest.mark.parametrize('title', ['COM0', 'LPT0', 'NUL .x'])
+def test_reserved_device_names_with_zero_or_space_before_extension(book, title):
+    assert names.render_filename(title, book, None).startswith('_')
+
+
+def test_other_classic_validation_errors_preserve_template_and_title(admin_config, monkeypatch):
+    config, classic, _ = admin_config
+    render = Mock(return_value='invalid form')
+    monkeypatch.setattr(classic, 'view_configuration', render)
+    with Flask(__name__).test_request_context(method='POST', data={
+        'config_opds_filename_template': '{id}', 'config_calibre_web_title': 'Draft site',
+        'support_settings_present': '1', 'config_support_url': 'javascript:bad',
+    }):
+        inspect.unwrap(classic.update_view_configuration)()
+    draft = render.call_args.kwargs['draft_config']
+    assert draft.config_opds_filename_template == '{id}'
+    assert draft.config_calibre_web_title == 'Draft site'
+    assert config.config_calibre_web_title == 'Library'
+    config.save.assert_not_called()
+
+
+def test_sort_fallback_matches_actual_library_udf(book, monkeypatch):
+    config = NS(config_title_regex=r'(The|A)\s+')
+    monkeypatch.setattr(db.CalibreDB, 'config', config)
+    engine = create_engine('sqlite://')
+    # The registered library UDF is the oracle for configured regex behavior.
+    from sqlalchemy import event
+    event.listen(engine, 'connect', db._register_sqlite_udfs)
+    book.sort = None
+    book.title = 'My The Book'
+    with engine.connect() as connection:
+        expected = connection.execute(text('SELECT title_sort(:title)'), {'title': book.title}).scalar()
+    assert names.render_filename('{title}', book, None, config.config_title_regex) == expected
+    engine.dispose()
+
+
+def test_global_custom_budget_stops_distinct_lookups_but_keeps_builtin_metadata(book, custom_session, monkeypatch):
+    monkeypatch.setattr(names, 'MAX_CUSTOM_LOOKUPS', 1, raising=False)
+    assert names.render_filename('{#shelf}{#count}{title}', book, custom_session) == 'FavoritesBook, The'
+
+
+def test_classic_draft_restriction_controls_follow_selected_draft_column(admin_config, monkeypatch):
+    config, classic, _ = admin_config
+    config.config_restricted_column = 1
+    draft = NS(config_restricted_column=3)
+    query = Mock()
+    query.filter.return_value = query
+    query.all.return_value = []
+    monkeypatch.setattr(classic, 'calibre_db', NS(session=NS(query=lambda *args: query), speaking_language=lambda: []))
+    monkeypatch.setattr(classic, 'get_available_locale', lambda: [])
+    monkeypatch.setattr(classic, 'restricted_column_datatype', lambda value: 'bool' if value == 3 else 'text')
+    render = Mock(return_value='draft form')
+    monkeypatch.setattr(classic, 'render_title_template', render)
+    assert inspect.unwrap(classic_view_configuration)(draft_config=draft) == 'draft form'
+    assert render.call_args.kwargs['restriction_is_bool'] is True

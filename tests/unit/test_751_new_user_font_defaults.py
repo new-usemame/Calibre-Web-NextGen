@@ -105,6 +105,7 @@ def test_classic_admin_rejects_unknown_font_before_mutating_other_settings():
         "config_calibre_web_title": "must-not-stick",
     }):
         with patch.object(mod, "_", side_effect=lambda value: value), \
+             patch.object(mod, "config", SimpleNamespace(config_default_role=0, config_default_show=0)), \
              patch.object(mod, "flash") as flash, \
              patch.object(mod, "view_configuration", return_value="rendered") as render, \
              patch.object(mod, "_config_string") as mutate_string, \

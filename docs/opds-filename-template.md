@@ -64,7 +64,7 @@ String formatting supports alignment, padding, and a character limit:
 - `{title:.20s}` keeps the first 20 characters of the title.
 
 Custom fields support text, numbers, dates, yes/no values, ratings, and custom series.
-Multiple values use commas. Zero remains `0`, and false remains `No`.
+Multiple values keep their stored link order and use commas; custom name fields use ` & `. Zero remains `0`, and false remains `No`.
 For a custom series named `#saga`, `{#saga_index}` supplies its number.
 Missing, deleted, or unavailable custom fields produce empty text.
 
@@ -76,7 +76,7 @@ Both separators are required; affixes cannot contain nested fields. Use explicit
 This is a limited [Calibre-style template language](https://manual.calibre-ebook.com/template_lang.html), not the complete Calibre template engine.
 It does not support template functions, numeric format codes, or Calibre program mode.
 A computed custom field works when its source template uses the supported syntax; title and series inside that computed value use their original metadata names.
-Composite expansion is limited to ten nested lookups. Cycles and deeper references become empty text, without changing the result of a later shallow reference.
+Composite expansion is limited to ten nested lookups and 256 custom-field evaluations per download. Repeated composites reuse results only within the same depth and cycle context. Cycles and deeper references become empty text, without changing the result of a later shallow reference.
 Otherwise, that field produces empty text and the server logs a warning.
 Templates cannot access Python attributes or execute code.
 

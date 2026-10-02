@@ -51,3 +51,9 @@ the served bundle was `index-DirqgK9H.js` (`db65c4f714d91aac9934c8604bef62c6995c
 “book is still listed” case passed for desktop and mobile with no retries: **3 passed
 including setup**. The broad suite has not been rerun locally; the pushed correction
 restarts CI for that gate.
+
+## Serial current-main integration — 2026-10-02
+
+Rebased onto main `e2b4233be` after uploaded-font PR2418. API registration retains reader_fonts and adds book_reviews; all preceding changelog rows and SPA strings remain. Current account Kobo/default UI-font settings and the complete book-detail surface remain intact. Product feature files remain unchanged from the independently reviewed original tree; current focused checks, independent bounded integration and exact-head CI are required before merge. Derived Python import closure is219 of277 modules. Original actual image/browser/security/concurrency/restart and full-failure evidence above remains historical; this rebase does not claim a repeated full local suite or current whole-image run.
+
+Current focused schema/private-review/SSOT cleanup/detail/locale/anchor/classifier/immutable-image resolver packet: **177 passed, one existing skip**. Frontend units **201 passed**, both TypeScript checks and production build passed. Original feature service/widgets/storage/tests are byte-identical; the shared catalog fixture retains main’s new cover disclosure/native tap interaction from PR2416 alongside this feature’s explicit empty-review response for its synthetic book. Original actual browser/concurrency/restart evidence remains applicable to unchanged feature behavior and is not presented as a new current-image run. Fresh exact-head broad CI and independent additive integration are pending.

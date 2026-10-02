@@ -1331,38 +1331,39 @@ class NewBookProcessor:
             if not settings.auto_enabled:
                 return False
 
-            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                row = connection.execute(
-                    "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
-                    (int(book_id),),
-                ).fetchone()
-                if not row:
-                    return False
-                book_path, title, has_cover, series_index = row
-                if has_cover:
-                    return False
-                authors = [name for (name,) in connection.execute(
-                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
-                    "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
-                series_row = connection.execute(
-                    "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
-                    "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
+            with offline_library_access(), metadata_db_write_lock():
+                with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+                    row = connection.execute(
+                        "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
+                        (int(book_id),),
+                    ).fetchone()
+                    if not row:
+                        return False
+                    book_path, title, has_cover, series_index = row
+                    if has_cover:
+                        return False
+                    authors = [name for (name,) in connection.execute(
+                        "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
+                        "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
+                    series_row = connection.execute(
+                        "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
+                        "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
 
-            destination = os.path.join(self.library_dir, book_path, "cover.jpg")
-            written = cover_generator.generate_cover_file(
-                destination,
-                cover_generator.BookCoverMeta(
-                    title=title or "",
-                    authors=authors,
-                    series=series_row[0] if series_row else None,
-                    series_index=series_index,
-                ),
-                preset=settings.default_preset,
-            )
-            if not written:
-                return False
-            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+                destination = os.path.join(self.library_dir, book_path, "cover.jpg")
+                written = cover_generator.generate_cover_file(
+                    destination,
+                    cover_generator.BookCoverMeta(
+                        title=title or "",
+                        authors=authors,
+                        series=series_row[0] if series_row else None,
+                        series_index=series_index,
+                    ),
+                    preset=settings.default_preset,
+                )
+                if not written:
+                    return False
+                with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+                    connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
             print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
                   f"({settings.default_preset}) — it was imported without one.", flush=True)
             return True

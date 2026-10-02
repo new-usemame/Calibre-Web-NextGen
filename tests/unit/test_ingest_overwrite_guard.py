@@ -593,3 +593,63 @@ def test_committed_import_finishes_followups_when_conversion_takes_maintenance(
         maintenance.__exit__(None, None, None)
     assert followups == ["cover", "send"], "a busy optional path fix skipped the committed book's followups"
     assert p.last_added_book_id == 7
+
+
+@pytest.mark.parametrize("busy", [False, True])
+def test_generated_cover_coordinates_raw_metadata_and_skips_busy_optional_work(
+    ingest_processor, monkeypatch, tmp_path, busy
+):
+    import sqlite3
+    from types import SimpleNamespace
+    from cps.services import cover_generator
+
+    processor = _processor(ingest_processor, tmp_path)
+    book_dir = Path(processor.library_dir) / "Author/Book (1)"
+    book_dir.mkdir(parents=True)
+    with sqlite3.connect(processor.metadata_db) as connection:
+        connection.executescript(
+            "CREATE TABLE books(id INTEGER, path TEXT, title TEXT, has_cover INTEGER, series_index REAL);"
+            "INSERT INTO books VALUES(1, 'Author/Book (1)', 'Book', 0, 1);"
+            "CREATE TABLE authors(id INTEGER, name TEXT);"
+            "CREATE TABLE books_authors_link(id INTEGER, book INTEGER, author INTEGER);"
+            "CREATE TABLE series(id INTEGER, name TEXT);"
+            "CREATE TABLE books_series_link(book INTEGER, series INTEGER);"
+        )
+    active = []
+
+    @contextmanager
+    def offline():
+        if busy:
+            raise TimeoutError("library maintenance busy")
+        active.append("maintenance")
+        try:
+            yield
+        finally:
+            active.pop()
+
+    @contextmanager
+    def metadata():
+        assert active == ["maintenance"], "raw cover access acquired no maintenance ownership"
+        active.append("metadata")
+        try:
+            yield
+        finally:
+            active.pop()
+
+    ownership_at_write = []
+
+    def generate(destination, *_args, **_kwargs):
+        ownership_at_write.append(list(active))
+        Path(destination).write_bytes(b"generated cover")
+        return True
+
+    monkeypatch.setattr(ingest_processor, "offline_library_access", offline)
+    monkeypatch.setattr(ingest_processor, "metadata_db_write_lock", metadata)
+    monkeypatch.setattr(cover_generator, "settings_from_app_db", lambda _path: SimpleNamespace(auto_enabled=True, default_preset="classic"))
+    monkeypatch.setattr(cover_generator, "generate_cover_file", generate)
+    assert processor.generate_missing_cover_if_enabled(1) is (not busy)
+    with sqlite3.connect(processor.metadata_db) as connection:
+        assert connection.execute("SELECT has_cover FROM books WHERE id=1").fetchone()[0] == (0 if busy else 1)
+    assert (book_dir / "cover.jpg").exists() is (not busy)
+    assert ownership_at_write == ([] if busy else [["maintenance", "metadata"]])
+    assert active == []

@@ -4,6 +4,7 @@ import { useBulkActions, useShelves, useMe, useMergeBooks } from '../lib/queries
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { Spinner } from './Spinner';
+import { useShelfDrag } from './ShelfDrag';
 import { ApiError, type MetadataListMode, type MetadataUpdate } from '../lib/api';
 import { bulkRemovalFailureReason } from '../lib/bulkRemoval';
 import {
@@ -110,7 +111,8 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
 
   const canDelete = canDeleteBooks(me);
   const editableShelves = (shelvesData?.items ?? []).filter((s) => canEditShelf(me, s));
-  const busy = markRead.isPending || addToShelf.isPending || deleteBooks.isPending
+  const shelfDrag = useShelfDrag();
+  const busy = !!shelfDrag?.busy || markRead.isPending || addToShelf.isPending || deleteBooks.isPending
     || removeFromMyLibrary.isPending
     || setMetadata.isPending || mergeBooks.isPending;
   const actionsBusy = busy || actionsDisabled;

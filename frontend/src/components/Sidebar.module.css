@@ -614,3 +614,7 @@
   .sectionControl { display: none; }
   :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .sectionControl { display: inline-flex; }
 }
+
+/* Targets expand only during a book drag, leaving saved sidebar choices alone. */
+.dropTarget { min-height: 44px; border: 1px dashed var(--accent); }
+.dropOver { background: var(--accent-soft); color: var(--accent-text); outline: 2px solid var(--accent); outline-offset: -2px; }

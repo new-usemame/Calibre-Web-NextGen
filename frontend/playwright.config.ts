@@ -219,6 +219,19 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
       dependencies: ['setup'],
     },
+    // Shelf dragging uses native desktop drag and a keyboard/tap alternative.
+    {
+      name: 'shelf-drag-webkit', testMatch: /grid-shelf-drag\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'shelf-picker-webkit-phone', testMatch: /grid-shelf-drag\.spec\.ts/,
+      // Trusted touch dragging is exercised through Chromium's input protocol;
+      // this lane covers the actual Safari engine's picker, retry and focus.
+      grepInvert: /twenty selected/,
+      use: { ...devices['iPhone 13'], storageState: STORAGE }, dependencies: ['setup'],
+    },
 
     // 4. iPad-class touch viewport — card actions remain persistent and the
     //    sidebar remains an off-canvas drawer because hover is unavailable.

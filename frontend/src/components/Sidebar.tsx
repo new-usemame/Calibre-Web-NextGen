@@ -15,6 +15,8 @@ import {
   resolveSidebarOrder, ORDERABLE_ENTRIES, DEFAULT_SIDEBAR_ORDER, type SidebarEntryDef,
 } from '../lib/sidebarEntries';
 import { SidebarEditList } from './SidebarEditList';
+import { useShelfDrag } from './ShelfDrag';
+import { canEditShelf } from '../lib/permissions';
 import styles from './Sidebar.module.css';
 
 // Lower-frequency info pages (pinned; not customizable).
@@ -41,6 +43,8 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const [location] = useLocation();
+  const shelfDrag = useShelfDrag();
+  const dragging = !!shelfDrag?.drag;
   const t = useT();
   const isDrawerMode = useIsDrawerMode();
   const announce = useAnnouncer();
@@ -99,7 +103,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     return () => window.removeEventListener('pointermove', trackPointerJourney, true);
   }, [hoverSuppressed]);
 
-  useFocusTrap(navRef, { onClose, active: isDrawerMode && open });
+  useFocusTrap(navRef, { onClose, active: isDrawerMode && open && !dragging });
   const { data: shelvesData } = useShelves();
   const shelves = shelvesData?.items ?? [];
   const [shelvesExpanded, setShelvesExpanded] = usePersistentBool('cwng:shelves-expanded', true);
@@ -190,7 +194,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           <Plus size={16} aria-hidden="true" focusable={false} />
         </Link>}
       </div>
-      <div id="sidebar-shelves" hidden={!shelvesExpanded}>
+      <div id="sidebar-shelves" hidden={!shelvesExpanded && !dragging}>
       {shelves.length > 0 && (
         <ul className={styles.shelfList} role="list">
           {shelves.map((s) => {
@@ -200,7 +204,10 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
               <li key={s.id}>
                 <Link
                   href={href}
-                  className={active ? styles.shelfItemActive : styles.shelfItem}
+                  className={`${active ? styles.shelfItemActive : styles.shelfItem}${dragging && canEditShelf(me, s) ? ` ${styles.dropTarget}` : ''}${shelfDrag?.drag?.shelfId === s.id ? ` ${styles.dropOver}` : ''}`}
+                  data-shelf-drop={canEditShelf(me, s) ? s.id : undefined}
+                  onDragOver={event => shelfDrag?.nativeOver(s.id, event)}
+                  onDrop={event => shelfDrag?.nativeDrop(s.id, event)}
                   aria-current={active ? 'page' : undefined}
                   onClick={onNavigate}
                   title={s.name}
@@ -302,7 +309,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
       <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}`}>
         <nav
           ref={navRef}
-          className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}${pinActive ? ` ${styles.pinned}` : ''}`}
+          data-shelf-drag-nav
+          className={`${open ? styles.navOpen : styles.nav}${(hoverSuppressed && !dragging) ? ` ${styles.hoverSuppressed}` : ''}${pinActive || dragging ? ` ${styles.pinned}` : ''}`}
           aria-label={t('Browse')}
           tabIndex={-1}
           onClickCapture={(event) => {
@@ -336,7 +344,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           </div>
         )}
 
-        {editMode ? (
+        {editMode && !dragging ? (
           <>
             <p className={styles.editHint}>
               {t('Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle.')}

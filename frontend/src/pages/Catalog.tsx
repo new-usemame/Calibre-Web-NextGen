@@ -1,3 +1,4 @@
+import { useShelfDragSelection } from '../components/ShelfDrag';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch, useLocation } from 'wouter';
@@ -330,6 +331,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
   const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
+  useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
+    setSelected(new Set(ids)); setSelecting(true);
+  } });
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
@@ -692,7 +696,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     ? { ...defaultFilter, sort, ...(readFilter !== 'all' ? { read_status: readFilter } : {}) }
     : null;
   const advQuery = useAdvancedSearch(advParams, requestPage, perPage);
-  const { data, isLoading, isFetching, isPlaceholderData, error } =
+  const { data, dataUpdatedAt, isLoading, isFetching, isPlaceholderData, error } =
     filterActive ? advQuery : booksQuery;
 
   // Accumulate pages; replace the accumulator whenever the filter set changes.
@@ -708,7 +712,10 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     } else {
       setAllBooks((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, isPlaceholderData, resetKey]);
+  // A successful idempotent bulk action can refetch byte-identical data.
+  // React Query keeps that object identity, but the cleared accumulator still
+  // needs to consume the newly confirmed result.
+  }, [data, dataUpdatedAt, isPlaceholderData, resetKey]);
 
   const total = data?.total ?? 0;
 
@@ -1240,6 +1247,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       {/* Discover: random picks, library landing only (not while searching). */}
       {!hideLibraryControls && !search && !discoverHidden && (
         <DiscoverSection
+          actionsDisabled={bulkBusy}
           onClose={() => setDiscoverHidden(true)}
           closeDisabled={discoverPreferenceSaving}
           hideActions={cardActionsHidden}
@@ -1290,6 +1298,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   hideReadingTags={readingTagsHidden}
                   hideShelfTags={shelfBadgesHidden}
                   selectable={selecting}
+                  selectionDisabled={bulkBusy}
                   selected={selected.has(book.id)}
                   onToggleSelect={toggleSelect}
                   selectionDisabled={selectAllBusy || bulkBusy}
@@ -1374,6 +1383,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <BulkBar
           ids={[...selected]}
           personalLibrary={personalLibrary}
+          onBusyChange={setBulkBusy}
           onClear={() => {
             selectAllRequest.current += 1;
             setSelectAllBusy(false);

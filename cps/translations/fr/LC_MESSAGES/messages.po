@@ -19255,3 +19255,20 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+# Grid-to-shelf drag (#946).
+
+msgid "Add {title} to a shelf"
+msgstr "Ajouter {title} à une étagère"
+
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "Glisser vers une étagère ou choisir une étagère"
+
+msgid "{n} book(s) added to {shelf}."
+msgstr "{n} livre(s) ajouté(s) à {shelf}."
+
+msgid "{succeeded} added to {shelf}; {failed} failed. Failed books remain selected for retry."
+msgstr "{succeeded} ajouté(s) à {shelf} ; {failed} échec(s). Les livres en échec restent sélectionnés pour réessayer."
+
+msgid "Could not add books to the shelf. Please try again."
+msgstr "Impossible d’ajouter les livres à l’étagère. Veuillez réessayer."

@@ -18708,3 +18708,20 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+# Grid-to-shelf drag (#946).
+
+msgid "Add {title} to a shelf"
+msgstr "{title} aan een plank toevoegen"
+
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "Sleep naar een plank of kies een plank"
+
+msgid "{n} book(s) added to {shelf}."
+msgstr "{n} boek(en) toegevoegd aan {shelf}."
+
+msgid "{succeeded} added to {shelf}; {failed} failed. Failed books remain selected for retry."
+msgstr "{succeeded} toegevoegd aan {shelf}; {failed} mislukt. Mislukte boeken blijven geselecteerd om opnieuw te proberen."
+
+msgid "Could not add books to the shelf. Please try again."
+msgstr "Boeken konden niet aan de plank worden toegevoegd. Probeer het opnieuw."

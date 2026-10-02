@@ -2047,3 +2047,10 @@ _("Read status could not be set")
 _("Books you chose not to finish")
 
 _("Books you have paused for later")
+
+# Grid-to-shelf drag and keyboard picker (#946).
+_("Add {title} to a shelf")
+_("Drag to a shelf, or choose a shelf")
+_("{n} book(s) added to {shelf}.")
+_("{succeeded} added to {shelf}; {failed} failed. Failed books remain selected for retry.")
+_("Could not add books to the shelf. Please try again.")

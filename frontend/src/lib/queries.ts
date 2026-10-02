@@ -11,6 +11,7 @@ import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
+import { addShelfBooks } from './shelfAdd';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
@@ -1077,11 +1078,7 @@ export function useBulkActions() {
   });
   const addToShelf = useMutation({
     mutationFn: (v: { ids: number[]; shelfId: number }) =>
-      // tolerate 409 (already on shelf) per book
-      settleById(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch((err) => {
-        if (err instanceof ApiError && err.status === 409) return null;
-        throw err;
-      })),
+      addShelfBooks(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`)),
     onSuccess: refresh,
   });
   const deleteBooks = useMutation({

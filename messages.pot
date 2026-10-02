@@ -16768,3 +16768,20 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+# Grid-to-shelf drag (#946).
+
+msgid "Add {title} to a shelf"
+msgstr ""
+
+msgid "Drag to a shelf, or choose a shelf"
+msgstr ""
+
+msgid "{n} book(s) added to {shelf}."
+msgstr ""
+
+msgid "{succeeded} added to {shelf}; {failed} failed. Failed books remain selected for retry."
+msgstr ""
+
+msgid "Could not add books to the shelf. Please try again."
+msgstr ""

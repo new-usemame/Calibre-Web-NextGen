@@ -5044,6 +5044,10 @@ msgstr "Povoliť vzdialené prihlásenie (magickým odkazom)"
 msgid "Allow requests from book sources"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Povolené skupiny (oddelené čiarkou)"
@@ -5063,6 +5067,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "An administrator has not added a book source, or none is switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5203,6 +5212,13 @@ msgstr "Automaticky vytvárať používateľov pri prvom prihlásení"
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Naspäť"
 
 #: cps/spa_strings.py
 msgid "Back to formatting"
@@ -5350,6 +5366,10 @@ msgstr "Vstavané"
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Vstavaní poskytovatelia (nechajte prázdne na vypnutie):"
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Bulleted list"
@@ -5535,6 +5555,12 @@ msgstr "Kód"
 #: cps/spa_strings.py
 msgid "Code on the e-reader"
 msgstr "Kód na čítačke"
+
+#: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Colour scheme"
@@ -5849,7 +5875,7 @@ msgstr "Hľadanie duplikátov sa nepodarilo spustiť."
 msgid "Could not update pairing details."
 msgstr "Podrobnosti párovania sa nepodarilo aktualizovať."
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Policu sa nepodarilo aktualizovať."
 
@@ -5892,10 +5918,6 @@ msgid "Cover updated from the selected result."
 msgstr "Obálka bola aktualizovaná z vybraného výsledku."
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr "Vytvoriť"
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr "Vytvoriť účet"
 
@@ -5906,6 +5928,10 @@ msgstr "Vytvoriť účet"
 #: cps/spa_strings.py
 msgid "Create failed."
 msgstr "Vytvorenie zlyhalo."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
@@ -6369,7 +6395,7 @@ msgstr "Upraviť moju súkromnú obálku"
 msgid "Edit note"
 msgstr "Upraviť poznámku"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr "Upravovať verejné police"
 
@@ -6508,10 +6534,6 @@ msgstr "Sprístupniť cez OPDS len vybrané police"
 #: cps/spa_strings.py cps/tasks_status.py
 msgid "Failed"
 msgstr "Neúspešná"
-
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr "Police sa nepodarilo načítať."
 
 #: cps/spa_strings.py
 msgid "Failed to load."
@@ -6751,6 +6773,10 @@ msgstr "Skryté"
 msgid "Hidden built-ins"
 msgstr "Skryté vstavané"
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Skryť"
@@ -6774,6 +6800,11 @@ msgstr "Skryť polia"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Skryť heslo"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7365,10 +7396,6 @@ msgid "New shelf name"
 msgstr "Názov novej police"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Názov novej police…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Nová polica…"
 
@@ -7518,9 +7545,12 @@ msgid "No shelves yet — create one below."
 msgstr "Zatiaľ žiadne police — vytvorte si jednu nižšie."
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
+msgid "No shelves yet. Create a shelf to start collecting books."
 msgstr ""
-"Zatiaľ žiadne police. Vytvorte si jednu vyššie a začnite zbierať knihy."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -7958,10 +7988,6 @@ msgstr "Predchádzajúca strana"
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
 msgstr "Pokrok"
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Verejné"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8601,8 +8627,17 @@ msgid "Settings"
 msgstr "Nastavenia"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Nastavenia boli uložené."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8612,9 +8647,29 @@ msgstr "Zdieľaná obálka"
 msgid "Shelf name"
 msgstr "Názov police"
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Názov police je povinný"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr "Polica sa nenašla."
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Ukázať"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8667,6 +8722,10 @@ msgid "Show hidden books"
 msgstr "Zobraziť skryté knihy"
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr "Zobraziť menej"
 
@@ -8691,6 +8750,11 @@ msgstr ""
 "Znova zobraziť globálnu knižnicu? Váš výber zostane presne taký, ako ste ho "
 "nechali — kedykoľvek sa môžete prepnúť späť a bude tam. Pri ďalšej "
 "aktualizácii vaša čítačka zosynchronizuje globálnu knižnicu."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Show {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8754,12 +8818,22 @@ msgid "Size (pt)"
 msgstr "Veľkosť (pt)"
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Inteligentná polica sa nenašla."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Inteligentné police"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -8890,6 +8964,14 @@ msgstr "Synchronizovať do Kobo len vybrané police"
 #: cps/spa_strings.py
 msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
 msgstr "Synchronizovať do čítačiek (Kobo a KOReader) len vybrané police"
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Table view"
@@ -9471,6 +9553,14 @@ msgid "To:"
 msgstr "Do:"
 
 #: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Token"
 msgstr ""
 
@@ -9847,6 +9937,10 @@ msgid "Write a note…"
 msgstr "Napíšte poznámku…"
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -9867,6 +9961,22 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "Vaša knižnica"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -10328,6 +10438,10 @@ msgid "Invalid request"
 msgstr "Neplatná požiadavka"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr ""
+
+#: cps/web.py
 msgid "Name and rules are required"
 msgstr "Vyžaduje sa názov a pravidlá"
 
@@ -10344,12 +10458,12 @@ msgid "Create Magic Shelf"
 msgstr "Vytvoriť magickú policu"
 
 #: cps/web.py
-msgid "Permission denied to change public status"
-msgstr "Zmena verejného stavu bola zamietnutá"
+msgid "Only the shelf owner can change Kobo sync"
+msgstr ""
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Názov police je povinný"
+msgid "Permission denied to change public status"
+msgstr "Zmena verejného stavu bola zamietnutá"
 
 #: cps/web.py
 msgid "Error updating shelf"
@@ -10387,7 +10501,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Chyba pri mazaní police"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -10602,6 +10716,14 @@ msgstr "Neplatné ID knihy."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "Značku sa nepodarilo zmazať"
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
+msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
 msgid "KOReader Sync Plugin"
@@ -11799,13 +11921,6 @@ msgstr "Odoslať oznámenie"
 msgid "Send test to me"
 msgstr "Poslať test mne"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Naspäť"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr "Odoslať toto oznámenie príjemcom (__NUM__)?"
@@ -12818,7 +12933,6 @@ msgid "Allow Changing Password"
 msgstr "Povoliť zmenu hesla"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Povoliť úpravu verejných políc"
 
@@ -16040,10 +16154,6 @@ msgstr "Zapamätať si pozíciu"
 msgid "Scrollbar"
 msgstr "Posúvatko"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Ukázať"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "DJVU čítačka"
@@ -16956,6 +17066,22 @@ msgstr "Sprístupniť vybrané police cez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zobraziť sekciu Prečítané/Neprečítané"
+
+#~ msgid "Create"
+#~ msgstr "Vytvoriť"
+
+#~ msgid "Failed to load shelves."
+#~ msgstr "Police sa nepodarilo načítať."
+
+#~ msgid "New shelf name…"
+#~ msgstr "Názov novej police…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr ""
+#~ "Zatiaľ žiadne police. Vytvorte si jednu vyššie a začnite zbierať knihy."
+
+#~ msgid "Public"
+#~ msgstr "Verejné"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

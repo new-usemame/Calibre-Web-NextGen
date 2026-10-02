@@ -109,6 +109,7 @@ export interface Me {
    *  because the mark does nothing until it is on. Absent on older servers →
    *  stay quiet rather than warn wrongly. */
   kobo_only_shelves_sync?: boolean;
+  opds_only_shelves_sync?: boolean;
   features?: ServerFeatures;
   instance_name?: string;
   display?: {
@@ -317,6 +318,8 @@ export interface Shelf {
   is_owner: boolean;
   kobo_sync: boolean;
   count: number;
+  can_edit?: boolean;
+  opds_expose?: boolean;
 }
 
 export interface ShelfDetail extends Shelf {

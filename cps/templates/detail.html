@@ -782,7 +782,7 @@
                                     {% if current_user.is_authenticated and (current_user.shelf.all() or g.shelves_access) %}
                                         {% set shelf_state = namespace(has_available=false) %}
                                         {% for shelf in g.shelves_access %}
-                                            {% if not shelf.id in books_shelfs and ( not shelf.is_public or current_user.role_edit_shelfs() ) %}
+                                            {% if not shelf.id in books_shelfs and not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                                                 {% set shelf_state.has_available = true %}
                                             {% endif %}
                                         {% endfor %}
@@ -795,7 +795,7 @@
                                             </button>
                                             <ul id="add-to-shelves" class="dropdown-menu" aria-labelledby="addShelfMenu">
                                                 {% for shelf in g.shelves_access %}
-                                                    {% if not shelf.id in books_shelfs and ( not shelf.is_public or current_user.role_edit_shelfs() ) %}
+                                                    {% if not shelf.id in books_shelfs and not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                                                         <li>
                                                             <a data-href="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
                                                                data-remove-href="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
@@ -815,7 +815,7 @@
                                            shelf with the book, other readers' private ones too. #}
                                         {% set removable = namespace(shelves=[]) %}
                                         {% for shelf in g.shelves_access %}
-                                            {% if shelf.id in books_shelfs and ((not shelf.is_public and shelf.user_id == current_user.id) or (shelf.is_public and current_user.role_edit_shelfs())) %}
+                                            {% if shelf.id in books_shelfs and not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                                                 {% set removable.shelves = removable.shelves + [shelf] %}
                                             {% endif %}
                                         {% endfor %}
@@ -1010,7 +1010,7 @@
                             {% if current_user.is_authenticated and (current_user.shelf.all() or g.shelves_access) %}
                                 {% set shelf_state = namespace(has_available=false) %}
                                 {% for shelf in g.shelves_access %}
-                                    {% if not shelf.id in books_shelfs and ( not shelf.is_public or current_user.role_edit_shelfs() ) %}
+                                    {% if not shelf.id in books_shelfs and not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                                         {% set shelf_state.has_available = true %}
                                     {% endif %}
                                 {% endfor %}
@@ -1026,7 +1026,7 @@
                                                data-add-href="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
                                                data-remove-href="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=shelf.id) }}">
                                                 <span class="shelf-label">{{ shelf.name }}{% if shelf.is_public == 1 %} {{ _('(Public)') }}{% endif %}</span>
-                                                {% if (not shelf.is_public and shelf.user_id == current_user.id) or (shelf.is_public and current_user.role_edit_shelfs()) %}
+                                                {% if not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                                                     <button type="button" class="shelf-remove" aria-label="{{ _('Remove from shelf') }}">&times;</button>
                                                 {% endif %}
                                             </a>
@@ -1666,7 +1666,7 @@
         var $shelvesContainer = $("#detail-shelves");
         var availableShelves = [
             {% for shelf in g.shelves_access %}
-                {% if not shelf.id in books_shelfs and ( not shelf.is_public or current_user.role_edit_shelfs() ) %}
+                {% if not shelf.id in books_shelfs and not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                 {
                     id: {{ shelf.id }},
                     name: {{ shelf.name|tojson }},

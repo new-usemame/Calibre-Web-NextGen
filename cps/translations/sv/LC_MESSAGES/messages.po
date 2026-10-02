@@ -5041,6 +5041,10 @@ msgstr "Tillåt fjärrinloggning (magisk länk)"
 msgid "Allow requests from book sources"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Tillåtna grupper (kommaseparerade)"
@@ -5060,6 +5064,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "An administrator has not added a book source, or none is switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5198,6 +5207,13 @@ msgstr "Skapa användare automatiskt vid första inloggningen"
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Tillbaka"
 
 #: cps/spa_strings.py
 msgid "Back to formatting"
@@ -5343,6 +5359,10 @@ msgstr "Inbyggd"
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Inbyggda leverantörer (lämna tomt för att inaktivera):"
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Bulleted list"
@@ -5527,6 +5547,12 @@ msgstr "Kod"
 
 #: cps/spa_strings.py
 msgid "Code on the e-reader"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5842,7 +5868,7 @@ msgstr "Kunde inte starta dubblettgenomsökningen."
 msgid "Could not update pairing details."
 msgstr "Kunde inte uppdatera parkopplingsdetaljer."
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Kunde inte uppdatera hyllan."
 
@@ -5885,10 +5911,6 @@ msgid "Cover updated from the selected result."
 msgstr "Omslaget har uppdaterats från det valda resultatet."
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr "Skapa"
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr "Skapa konto"
 
@@ -5899,6 +5921,10 @@ msgstr "Skapa ett konto"
 #: cps/spa_strings.py
 msgid "Create failed."
 msgstr "Det gick inte att skapa."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
@@ -6356,7 +6382,7 @@ msgstr "Redigera mitt privata omslag"
 msgid "Edit note"
 msgstr "Redigera anteckning"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr "Redigera offentliga hyllor"
 
@@ -6491,10 +6517,6 @@ msgstr "Exponera endast valda hyllor via OPDS"
 #: cps/spa_strings.py cps/tasks_status.py
 msgid "Failed"
 msgstr "Misslyckades"
-
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr "Det gick inte att läsa in hyllor."
 
 #: cps/spa_strings.py
 msgid "Failed to load."
@@ -6733,6 +6755,10 @@ msgstr "Dold"
 msgid "Hidden built-ins"
 msgstr "Dolda inbyggda"
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Dölj"
@@ -6756,6 +6782,11 @@ msgstr "Dölj fält"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Dölj lösenord"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7347,10 +7378,6 @@ msgid "New shelf name"
 msgstr "Nytt hyllnamn"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Nytt hyllnamn…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Ny hylla…"
 
@@ -7495,8 +7522,12 @@ msgid "No shelves yet — create one below."
 msgstr "Inga hyllor ännu — skapa en nedan."
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
-msgstr "Inga hyllor ännu. Skapa en ovan för att börja samla böcker."
+msgid "No shelves yet. Create a shelf to start collecting books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -7930,10 +7961,6 @@ msgstr "Föregående sida"
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
 msgstr "Förlopp"
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Offentlig"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8571,8 +8598,17 @@ msgid "Settings"
 msgstr "Inställningar"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Inställningarna har sparats."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8582,9 +8618,29 @@ msgstr "Delat omslag"
 msgid "Shelf name"
 msgstr "Hyllnamn"
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Ett hyllnamn krävs"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr "Hyllan hittades inte."
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Visa"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8637,6 +8693,10 @@ msgid "Show hidden books"
 msgstr "Visa dolda böcker"
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr "Visa mindre"
 
@@ -8661,6 +8721,11 @@ msgstr ""
 "Visa det globala biblioteket igen? Ditt urval behålls exakt som du lämnade "
 "det — byt tillbaka när som helst, så finns det kvar. Vid nästa uppdatering "
 "synkroniserar din e-boksläsare det globala biblioteket."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Show {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8724,12 +8789,22 @@ msgid "Size (pt)"
 msgstr "Storlek (pt)"
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Den smarta hyllan hittades inte."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Smarta hyllor"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -8857,6 +8932,14 @@ msgstr "Synkronisera endast valda hyllor till Kobo"
 
 #: cps/spa_strings.py
 msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9435,6 +9518,14 @@ msgid "To:"
 msgstr "Till:"
 
 #: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Token"
 msgstr ""
 
@@ -9803,6 +9894,10 @@ msgid "Write a note…"
 msgstr "Skriv en anteckning…"
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -9823,6 +9918,22 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "Ditt bibliotek"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -10278,6 +10389,10 @@ msgid "Invalid request"
 msgstr "Ogiltig begäran"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr ""
+
+#: cps/web.py
 msgid "Name and rules are required"
 msgstr "Namn och regler krävs"
 
@@ -10294,12 +10409,12 @@ msgid "Create Magic Shelf"
 msgstr "Skapa smart hylla"
 
 #: cps/web.py
-msgid "Permission denied to change public status"
-msgstr "Behörighet saknas för att ändra offentlig status"
+msgid "Only the shelf owner can change Kobo sync"
+msgstr ""
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Ett hyllnamn krävs"
+msgid "Permission denied to change public status"
+msgstr "Behörighet saknas för att ändra offentlig status"
 
 #: cps/web.py
 msgid "Error updating shelf"
@@ -10337,7 +10452,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Fel när hyllan togs bort"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -10554,6 +10669,14 @@ msgstr "Ogiltigt bok-id."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "Taggen kunde inte tas bort"
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
+msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
 msgid "KOReader Sync Plugin"
@@ -11744,13 +11867,6 @@ msgstr "Skicka meddelande"
 msgid "Send test to me"
 msgstr "Skicka test till mig"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Tillbaka"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr "Skicka detta meddelande till __NUM__ mottagare?"
@@ -12754,7 +12870,6 @@ msgid "Allow Changing Password"
 msgstr "Tillåt Ändra lösenord"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Tillåt Redigering av offentliga hyllor"
 
@@ -15964,10 +16079,6 @@ msgstr "Kom ihåg position"
 msgid "Scrollbar"
 msgstr "Rullningslist"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Visa"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "DjVu-läsare"
@@ -16875,6 +16986,21 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#~ msgid "Create"
+#~ msgstr "Skapa"
+
+#~ msgid "Failed to load shelves."
+#~ msgstr "Det gick inte att läsa in hyllor."
+
+#~ msgid "New shelf name…"
+#~ msgstr "Nytt hyllnamn…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr "Inga hyllor ännu. Skapa en ovan för att börja samla böcker."
+
+#~ msgid "Public"
+#~ msgstr "Offentlig"
 
 #, python-brace-format
 #~ msgid ""

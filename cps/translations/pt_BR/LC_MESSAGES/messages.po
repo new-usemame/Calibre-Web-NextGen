@@ -4893,6 +4893,10 @@ msgstr "Permitir login remoto (link mágico)"
 msgid "Allow requests from book sources"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Grupos permitidos (separado por vírgulas)"
@@ -4912,6 +4916,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "An administrator has not added a book source, or none is switched on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5050,6 +5059,13 @@ msgstr "Criar usuários automaticamente no primeiro login"
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Voltar"
 
 #: cps/spa_strings.py
 msgid "Back to formatting"
@@ -5190,6 +5206,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5375,6 +5395,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Code on the e-reader"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5686,7 +5712,7 @@ msgstr ""
 msgid "Could not update pairing details."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr ""
 
@@ -5726,10 +5752,6 @@ msgid "Cover updated from the selected result."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr ""
 
@@ -5739,6 +5761,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create failed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Create shelf"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6185,7 +6211,7 @@ msgstr ""
 msgid "Edit note"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr ""
 
@@ -6318,10 +6344,6 @@ msgstr ""
 #: cps/spa_strings.py cps/tasks_status.py
 msgid "Failed"
 msgstr "Falha"
-
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Failed to load."
@@ -6555,6 +6577,10 @@ msgstr "Livro ocultado"
 msgid "Hidden built-ins"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Esconder"
@@ -6578,6 +6604,11 @@ msgstr "Ocultar campos"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Ocultar senha"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7161,10 +7192,6 @@ msgid "New shelf name"
 msgstr "Novo nome da estante"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Novo nome da estante…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Nova estante…"
 
@@ -7310,8 +7337,12 @@ msgid "No shelves yet — create one below."
 msgstr "Ainda não há estantes - crie uma abaixo"
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
-msgstr "Ainda não há estantes. Crie uma acima para começar a guardar livros."
+msgid "No shelves yet. Create a shelf to start collecting books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -7723,10 +7754,6 @@ msgstr "Página anterior"
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
 msgstr "Progresso"
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Público"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8353,8 +8380,17 @@ msgid "Settings"
 msgstr "Configurações"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Configurações salvas."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8364,9 +8400,29 @@ msgstr ""
 msgid "Shelf name"
 msgstr ""
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Nome da estante é obrigatório"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Mostrar"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8419,6 +8475,10 @@ msgid "Show hidden books"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr ""
 
@@ -8439,6 +8499,11 @@ msgid ""
 "Show the global library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"
 "reader syncs the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Show {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8500,12 +8565,22 @@ msgid "Size (pt)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Estantes inteligentes"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -8624,6 +8699,14 @@ msgstr "Sincronizar apenas as estantes selecionadas com o Kobo"
 
 #: cps/spa_strings.py
 msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9183,6 +9266,14 @@ msgid "To:"
 msgstr "Para:"
 
 #: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Token"
 msgstr ""
 
@@ -9535,6 +9626,10 @@ msgid "Write a note…"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -9550,6 +9645,22 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "Sua Biblioteca"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -10000,6 +10111,10 @@ msgid "Invalid request"
 msgstr "Requisição inválida"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr ""
+
+#: cps/web.py
 msgid "Name and rules are required"
 msgstr "Nome e regras são obrigatórios"
 
@@ -10016,12 +10131,12 @@ msgid "Create Magic Shelf"
 msgstr ""
 
 #: cps/web.py
-msgid "Permission denied to change public status"
+msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Nome da estante é obrigatório"
+msgid "Permission denied to change public status"
+msgstr ""
 
 #: cps/web.py
 #, fuzzy
@@ -10058,7 +10173,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Erro ao apagar estante"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -10285,6 +10400,14 @@ msgstr "ID de livro inválido."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
 msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
@@ -11485,13 +11608,6 @@ msgstr ""
 msgid "Send test to me"
 msgstr "Enviar para E-Reader"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Voltar"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr ""
@@ -12413,7 +12529,6 @@ msgid "Allow Changing Password"
 msgstr "Permitir Alterar Senha"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Permitir a Edição de Estantes Públicas"
 
@@ -15461,10 +15576,6 @@ msgstr "Lembrar Posição"
 msgid "Scrollbar"
 msgstr "Barra de Rolagem"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Mostrar"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "leitor de DJVU"
@@ -16348,6 +16459,16 @@ msgstr "Sincronizar Estantes Selecionadas com Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar seção de lidos/não lidos"
+
+#~ msgid "New shelf name…"
+#~ msgstr "Novo nome da estante…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr ""
+#~ "Ainda não há estantes. Crie uma acima para começar a guardar livros."
+
+#~ msgid "Public"
+#~ msgstr "Público"
 
 #~ msgid "Favorited"
 #~ msgstr "Favoritado"

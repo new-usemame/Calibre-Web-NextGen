@@ -145,10 +145,10 @@ export function MagicShelfView({ id }: { id: string }) {
 
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {
-    return <main className={styles.container}>
-      <Link href="/" className={styles.back}><ChevronLeft size={16} /> {t('Library')}</Link>
+    return <div className={styles.container}>
+      <Link href="/magic" className={styles.back}><ChevronLeft size={16} /> {t('Smart shelves')}</Link>
       <EmptyState message={error instanceof Error ? error.message : t('Smart shelf not found.')} />
-    </main>;
+    </div>;
   }
 
   const total = data.total;
@@ -199,8 +199,8 @@ export function MagicShelfView({ id }: { id: string }) {
   };
 
   return (
-    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
-      <Link href="/" className={styles.back}><ChevronLeft size={16} /> {t('Library')}</Link>
+    <div className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
+      <Link href="/magic" className={styles.back}><ChevronLeft size={16} /> {t('Smart shelves')}</Link>
       <div className={styles.header}>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>{data.icon} {data.name}</h1>
@@ -324,6 +324,6 @@ export function MagicShelfView({ id }: { id: string }) {
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
           onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
       )}
-    </main>
+    </div>
   );
 }

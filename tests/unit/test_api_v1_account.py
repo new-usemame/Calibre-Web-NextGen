@@ -31,7 +31,8 @@ def _user(**kw):
         role_admin=lambda: False, role_passwd=lambda: True,
         role_upload=lambda: False, role_edit=lambda: False,
         role_download=lambda: True, role_delete_books=lambda: False,
-        role_edit_shelfs=lambda: True, role_viewer=lambda: True,
+        role_edit_shelfs=lambda: True, role_share_shelfs=lambda: True,
+        role_viewer=lambda: True,
     )
     defaults.update(kw)
     return SimpleNamespace(**defaults)

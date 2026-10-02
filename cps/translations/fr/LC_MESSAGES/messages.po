@@ -5148,6 +5148,10 @@ msgstr "Autoriser la connexion à distance (lien magique)"
 msgid "Allow requests from book sources"
 msgstr "Autoriser les demandes depuis les sources de livres"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr "Autoriser le partage de ses propres étagères"
+
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Groupes autorisés (séparés par des virgules)"
@@ -5169,6 +5173,13 @@ msgstr "Aussi sur {names}"
 msgid "An administrator has not added a book source, or none is switched on."
 msgstr ""
 "Aucun administrateur n'a ajouté de source de livres, ou aucune n'est activée."
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
+msgstr ""
+"Un administrateur doit activer la synchronisation des étagères pour rendre "
+"cette option disponible."
 
 #: cps/spa_strings.py
 msgid "Annotation pages"
@@ -5310,6 +5321,13 @@ msgstr "Créer les utilisateurs automatiquement à la première connexion"
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr "Disponible pour les utilisateurs"
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Retour"
 
 #: cps/spa_strings.py
 msgid "Back to formatting"
@@ -5464,6 +5482,10 @@ msgstr "Intégré"
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Sources intégrées (laisser vide pour désactiver) :"
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr "Étagère intelligente intégrée"
 
 #: cps/spa_strings.py
 msgid "Bulleted list"
@@ -5656,6 +5678,14 @@ msgstr "Code"
 #: cps/spa_strings.py
 msgid "Code on the e-reader"
 msgstr "Code affiché sur la liseuse"
+
+#: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
+msgstr ""
+"Regroupez les livres dans des étagères. Les paramètres permettent de les "
+"renommer, de les partager et de choisir leur visibilité sur les appareils."
 
 #: cps/spa_strings.py
 msgid "Colour scheme"
@@ -5974,7 +6004,7 @@ msgstr "Impossible de lancer la recherche de doublons."
 msgid "Could not update pairing details."
 msgstr "Impossible de mettre à jour les informations d’association."
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Impossible de mettre à jour l’étagère."
 
@@ -6018,10 +6048,6 @@ msgid "Cover updated from the selected result."
 msgstr "Couverture mise à jour à partir du résultat sélectionné."
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr "Créer"
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr "Créer un compte"
 
@@ -6032,6 +6058,10 @@ msgstr "Créer un compte"
 #: cps/spa_strings.py
 msgid "Create failed."
 msgstr "Échec de la création."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr "Créer une étagère"
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
@@ -6504,7 +6534,7 @@ msgstr "Modifier ma couverture privée"
 msgid "Edit note"
 msgstr "Modifier la note"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr "Modifier les étagères publiques"
 
@@ -6646,10 +6676,6 @@ msgstr "N’exposer que les étagères sélectionnées via OPDS"
 #: cps/spa_strings.py cps/tasks_status.py
 msgid "Failed"
 msgstr "Echoué"
-
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr "Impossible de charger les étagères."
 
 #: cps/spa_strings.py
 msgid "Failed to load."
@@ -6895,6 +6921,10 @@ msgstr "Masqué"
 msgid "Hidden built-ins"
 msgstr "Éléments intégrés masqués"
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr "Masquée dans la navigation"
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Cacher"
@@ -6918,6 +6948,11 @@ msgstr "Masquer les champs"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Masquer le mot de passe"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr "Masquer {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7533,10 +7568,6 @@ msgid "New shelf name"
 msgstr "Nom de la nouvelle étagère"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Nom de la nouvelle étagère…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Nouvelle étagère…"
 
@@ -7689,10 +7720,16 @@ msgid "No shelves yet — create one below."
 msgstr "Aucune étagère pour l’instant — créez-en une ci-dessous."
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
+msgid "No shelves yet. Create a shelf to start collecting books."
 msgstr ""
-"Aucune étagère pour le moment. Créez-en une ci-dessus pour commencer à "
-"regrouper des livres."
+"Aucune étagère pour le moment. Créez-en une pour commencer à regrouper vos "
+"livres."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr ""
+"Aucune étagère intelligente pour le moment. Créez-en une pour regrouper les "
+"livres automatiquement."
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -8133,10 +8170,6 @@ msgstr "Page précédente"
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
 msgstr "Avancement"
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Publique"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8789,8 +8822,17 @@ msgid "Settings"
 msgstr "Paramètres"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr "Paramètres de {name}"
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Paramètres enregistrés."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr "Partager avec tout le monde"
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8800,9 +8842,29 @@ msgstr "Couverture partagée"
 msgid "Shelf name"
 msgstr "Nom de l’étagère"
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Le nom de l'étagère est obligatoire"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr "Étagère introuvable."
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr "Options de l’étagère"
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr "Paramètres de l’étagère"
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr "Visibilité de l’étagère enregistrée."
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Montrer"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8855,6 +8917,10 @@ msgid "Show hidden books"
 msgstr "Afficher les livres masqués"
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr "Afficher dans mon flux OPDS"
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr "Afficher moins"
 
@@ -8880,6 +8946,11 @@ msgstr ""
 "exactement comme vous l'avez laissée — revenez quand vous voulez, elle est "
 "toujours là. À la prochaine mise à jour, votre liseuse synchronise la "
 "bibliothèque globale."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Show {name}"
+msgstr "Afficher {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8945,12 +9016,25 @@ msgid "Size (pt)"
 msgstr "Taille (pt)"
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr "Étagère intelligente"
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Étagère intelligente introuvable."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Étagères intelligentes"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
+"Les étagères intelligentes regroupent automatiquement les livres selon des "
+"règles. Les étagères masquées restent ici pour que vous puissiez les "
+"réafficher."
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -9082,6 +9166,14 @@ msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
 msgstr ""
 "Ne synchroniser que les étagères sélectionnées vers les liseuses (Kobo et "
 "KOReader)"
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr "Synchroniser avec Kobo"
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr "Synchroniser avec les liseuses"
 
 #: cps/spa_strings.py
 msgid "Table view"
@@ -9732,6 +9824,14 @@ msgid "To:"
 msgstr "Vers :"
 
 #: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr "Déplier ou replier la liste des étagères"
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr "Déplier ou replier la liste des étagères intelligentes"
+
+#: cps/spa_strings.py
 msgid "Token"
 msgstr "Jeton"
 
@@ -10120,6 +10220,10 @@ msgid "Write a note…"
 msgstr "Écrire une note…"
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr "Vous n’avez pas l’autorisation de modifier cette étagère"
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -10141,6 +10245,28 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "Votre bibliothèque"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+"Votre flux OPDS inclut toutes les étagères visibles. Activez l’option "
+"limitant le flux aux étagères sélectionnées dans les paramètres de votre "
+"compte pour les choisir individuellement."
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+"Votre compte synchronise actuellement toute la bibliothèque. Choisissez la "
+"synchronisation des seules étagères sélectionnées dans les paramètres de "
+"votre compte pour utiliser ces marques."
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr "Votre administrateur a désactivé le partage de vos propres étagères."
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -10606,6 +10732,10 @@ msgid "Invalid request"
 msgstr "Requête invalide"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr "Vous n’avez pas l’autorisation de partager des étagères"
+
+#: cps/web.py
 msgid "Name and rules are required"
 msgstr "Le nom et les règles sont obligatoires"
 
@@ -10622,12 +10752,13 @@ msgid "Create Magic Shelf"
 msgstr "Créer une étagère magique"
 
 #: cps/web.py
-msgid "Permission denied to change public status"
-msgstr "Autorisation refusée pour modifier le statut public"
+msgid "Only the shelf owner can change Kobo sync"
+msgstr ""
+"Seul le propriétaire de l’étagère peut modifier sa synchronisation Kobo"
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Le nom de l'étagère est obligatoire"
+msgid "Permission denied to change public status"
+msgstr "Autorisation refusée pour modifier le statut public"
 
 #: cps/web.py
 msgid "Error updating shelf"
@@ -10665,7 +10796,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Erreur lors de la suppression de l'étagère"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -10895,6 +11026,14 @@ msgstr "Identifiant du livre invalide."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
 msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
@@ -12101,13 +12240,6 @@ msgstr ""
 msgid "Send test to me"
 msgstr "Envoyer à l'eReader"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Retour"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr ""
@@ -13048,7 +13180,6 @@ msgid "Allow Changing Password"
 msgstr "Permettre le changement de mot de passe"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Autoriser la modification d’étagères publiques"
 
@@ -16193,10 +16324,6 @@ msgstr "Se souvenir de la position"
 msgid "Scrollbar"
 msgstr "Barre de défilement"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Montrer"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "Lecteur DJVU"
@@ -17107,6 +17234,23 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Create"
+#~ msgstr "Créer"
+
+#~ msgid "Failed to load shelves."
+#~ msgstr "Impossible de charger les étagères."
+
+#~ msgid "New shelf name…"
+#~ msgstr "Nom de la nouvelle étagère…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr ""
+#~ "Aucune étagère pour le moment. Créez-en une ci-dessus pour commencer à "
+#~ "regrouper des livres."
+
+#~ msgid "Public"
+#~ msgstr "Publique"
 
 #~ msgid "Choose a SABnzbd connection"
 #~ msgstr "Choisir une connexion SABnzbd"

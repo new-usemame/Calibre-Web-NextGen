@@ -65,7 +65,8 @@ def test_create_public_without_role_403():
     from cps.api import shelves as mod
     with _ctx("/api/v1/shelves", body={"name": "Shared", "is_public": True}):
         with patch.object(mod, "current_user",
-                          SimpleNamespace(role_edit_shelfs=lambda: False, id=7)):
+                          SimpleNamespace(role_edit_shelfs=lambda: False,
+                                           role_share_shelfs=lambda: False, id=7)):
             resp = inspect.unwrap(mod.create_shelf_api)()
     assert resp[1] == 403
     assert json.loads(resp[0].get_data())["error"]["code"] == "forbidden"

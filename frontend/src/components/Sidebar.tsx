@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   Library, Globe, BookCopy, BookPlus,
-  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
+  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff, ChevronDown, Plus,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
 import { useT } from '../lib/i18n';
@@ -102,11 +102,13 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   useFocusTrap(navRef, { onClose, active: isDrawerMode && open });
   const { data: shelvesData } = useShelves();
   const shelves = shelvesData?.items ?? [];
+  const [shelvesExpanded, setShelvesExpanded] = usePersistentBool('cwng:shelves-expanded', true);
+  const [smartExpanded, setSmartExpanded] = usePersistentBool('cwng:smart-shelves-expanded', true);
   const magicShelves = useMagicShelves().data?.items ?? [];
   const me = useMe().data;
   const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
-  const isAuthed = !!me?.id;
+  const isAuthed = !!me?.id && !me.role.anonymous;
   const personalLibrary = me?.library_mode === 'personal_library';
   const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
   // Server-derived: the feature is on AND this account is granted. A fresh or
@@ -171,7 +173,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   // ── normal-mode ordered region (browse/discovery + Shelves block, in order) ─
   const renderShelvesBlock = () => (
     <Fragment key="shelves-block">
-      <div>
+      <div className={styles.sectionHeader}>
         <Link
           href="/shelves"
           className={isActive(location, '/shelves', true) ? styles.itemActive : styles.item}
@@ -180,7 +182,15 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
           <span>{t('Shelves')}</span>
         </Link>
+        <button className={styles.sectionControl} aria-label={t('Toggle shelf list')}
+          aria-expanded={shelvesExpanded} aria-controls="sidebar-shelves" onClick={() => setShelvesExpanded(!shelvesExpanded)}>
+          <ChevronDown size={16} aria-hidden="true" focusable={false} style={{ transform: shelvesExpanded ? undefined : 'rotate(-90deg)' }} />
+        </button>
+        {isAuthed && <Link href="/shelves/new" className={styles.sectionControl} aria-label={t('Create shelf')} onClick={onNavigate}>
+          <Plus size={16} aria-hidden="true" focusable={false} />
+        </Link>}
       </div>
+      <div id="sidebar-shelves" hidden={!shelvesExpanded}>
       {shelves.length > 0 && (
         <ul className={styles.shelfList} role="list">
           {shelves.map((s) => {
@@ -203,6 +213,46 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           })}
         </ul>
       )}
+      </div>
+      <div className={styles.sectionHeader}>
+                <Link
+                  href="/magic"
+                  className={isActive(location, '/magic', true) ? styles.itemActive : styles.item}
+                  aria-current={isActive(location, '/magic', true) ? 'page' : undefined}
+                  onClick={onNavigate}
+                >
+                  <Wand2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                  <span>{t('Smart shelves')}</span>
+                </Link>
+                <button className={styles.sectionControl} aria-label={t('Toggle smart shelf list')}
+                  aria-expanded={smartExpanded} aria-controls="sidebar-smart-shelves" onClick={() => setSmartExpanded(!smartExpanded)}>
+                  <ChevronDown size={16} aria-hidden="true" focusable={false} style={{ transform: smartExpanded ? undefined : 'rotate(-90deg)' }} />
+                </button>
+                {isAuthed && <Link href="/magic/new" className={styles.sectionControl} aria-label={t('Create smart shelf')} onClick={onNavigate}>
+                  <Plus size={16} aria-hidden="true" focusable={false} />
+                </Link>}
+      </div>
+      <div id="sidebar-smart-shelves" hidden={!smartExpanded}><ul className={styles.shelfList} role="list">
+              {magicShelves.map((ms) => {
+                const href = `/magic/${ms.id}`;
+                const active = location === href;
+                return (
+                  <li key={`ms-${ms.id}`}>
+                    <Link
+                      href={href}
+                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={ms.name}
+                      onClick={onNavigate}
+                      title={ms.name}
+                    >
+                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
+                      <span className={styles.magicShelfName}>{ms.name}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+      </ul></div>
     </Fragment>
   );
 
@@ -343,36 +393,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">
-              <li>
-                <Link
-                  href="/magic"
-                  className={isActive(location, '/magic', true) ? styles.itemActive : styles.item}
-                  aria-current={isActive(location, '/magic', true) ? 'page' : undefined}
-                  onClick={onNavigate}
-                >
-                  <Wand2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                  <span>{t('Smart shelves')}</span>
-                </Link>
-              </li>
-              {magicShelves.map((ms) => {
-                const href = `/magic/${ms.id}`;
-                const active = location === href;
-                return (
-                  <li key={`ms-${ms.id}`}>
-                    <Link
-                      href={href}
-                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
-                      aria-current={active ? 'page' : undefined}
-                      aria-label={ms.name}
-                      onClick={onNavigate}
-                      title={ms.name}
-                    >
-                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
-                      <span className={styles.magicShelfName}>{ms.name}</span>
-                    </Link>
-                  </li>
-                );
-              })}
               {showList && (
                 <li>
                   <Link

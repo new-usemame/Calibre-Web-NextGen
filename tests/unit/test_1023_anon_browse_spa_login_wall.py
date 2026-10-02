@@ -76,6 +76,7 @@ class _FakeGuest:
     def role_download(self): return False
     def role_delete_books(self): return False
     def role_edit_shelfs(self): return False
+    def role_share_shelfs(self): return False
     def role_viewer(self): return True
     def role_passwd(self): return False
     def role_anonymous(self): return True

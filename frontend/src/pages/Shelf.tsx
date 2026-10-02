@@ -144,12 +144,12 @@ export function Shelf({ id }: { id: string }) {
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {
     return (
-      <main className={styles.container}>
+      <div className={styles.container}>
         <Link href="/shelves" className={styles.back}>
           <ChevronLeft size={16} /> {t('All shelves')}
         </Link>
         <EmptyState message={error instanceof Error ? error.message : t('Shelf not found.')} />
-      </main>
+      </div>
     );
   }
 
@@ -158,7 +158,7 @@ export function Shelf({ id }: { id: string }) {
   const canEdit = data.can_edit;
   const visibilityAction = getShelfVisibilityAction({
     canEdit,
-    canMakePublic: !!me?.role?.edit_shelfs,
+    canMakePublic: data.is_owner ? !!me?.role?.share_shelfs : !!me?.role?.edit_shelfs,
     isPublic: data.is_public,
   });
 
@@ -248,7 +248,7 @@ export function Shelf({ id }: { id: string }) {
   };
 
   return (
-    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
+    <div className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
       <Link href="/shelves" className={styles.back}>
         <ChevronLeft size={16} /> {t('All shelves')}
       </Link>
@@ -322,6 +322,7 @@ export function Shelf({ id }: { id: string }) {
               </option>
             ))}
           </select>
+          {canEdit && <Link href={`/shelf/${id}/edit`} className={styles.manageBtn}>{t('Settings')}</Link>}
           {canEdit && !editing && (
             <div className={styles.manage}>
               <button className={styles.manageBtn} onClick={startRename}>
@@ -335,7 +336,7 @@ export function Shelf({ id }: { id: string }) {
                   {visibilityAction === 'make-private' ? t('Make private') : t('Make public')}
                 </button>
               )}
-              {shelfMarksReachDevices(me?.features) && (
+              {data.is_owner && shelfMarksReachDevices(me?.features) && (
                 <button className={data.kobo_sync ? styles.manageBtnActive : styles.manageBtn}
                   onClick={toggleKoboSync} disabled={updateShelf.isPending}>
                   <Smartphone size={14} /> {ereaderWording
@@ -452,6 +453,6 @@ export function Shelf({ id }: { id: string }) {
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
           onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
       )}
-    </main>
+    </div>
   );
 }

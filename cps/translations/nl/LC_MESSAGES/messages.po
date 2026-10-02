@@ -5023,6 +5023,10 @@ msgstr "Inloggen op afstand (magic link) toestaan"
 msgid "Allow requests from book sources"
 msgstr "Aanvragen vanuit boekbronnen toestaan"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Allow sharing your own shelves"
+msgstr "Delen van eigen planken toestaan"
+
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
 msgstr "Toegestane groepen (door komma's gescheiden)"
@@ -5044,6 +5048,13 @@ msgstr "Ook op {names}"
 msgid "An administrator has not added a book source, or none is switched on."
 msgstr ""
 "Een beheerder heeft geen boekbron toegevoegd, of geen enkele staat aan."
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must enable shelf sync before this option is available."
+msgstr ""
+"Een beheerder moet planksynchronisatie inschakelen voordat deze optie "
+"beschikbaar is."
 
 #: cps/spa_strings.py
 msgid "Annotation pages"
@@ -5185,6 +5196,13 @@ msgstr "Gebruikers automatisch aanmaken bij eerste aanmelding"
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr "Beschikbaar voor gebruikers"
+
+#: cps/spa_strings.py cps/templates/broadcast_email.html
+#: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
+#: cps/templates/layout.html cps/templates/shelf_order.html
+#: cps/templates/shelf_reorder.html cps/templates/user_table.html
+msgid "Back"
+msgstr "Annuleren"
 
 #: cps/spa_strings.py
 msgid "Back to formatting"
@@ -5339,6 +5357,10 @@ msgstr "Ingebouwd"
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Ingebouwde providers (laat leeg om uit te schakelen):"
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr "Ingebouwde slimme plank"
 
 #: cps/spa_strings.py
 msgid "Bulleted list"
@@ -5531,6 +5553,14 @@ msgstr "Code"
 #: cps/spa_strings.py
 msgid "Code on the e-reader"
 msgstr "Code op de e-reader"
+
+#: cps/spa_strings.py
+msgid ""
+"Collect books in shelves. Use settings to rename, share or choose device "
+"visibility."
+msgstr ""
+"Verzamel boeken op planken. Gebruik de instellingen om de naam, het delen of "
+"de zichtbaarheid op apparaten te wijzigen."
 
 #: cps/spa_strings.py
 msgid "Colour scheme"
@@ -5848,7 +5878,7 @@ msgstr "Kan de duplicatenscan niet starten."
 msgid "Could not update pairing details."
 msgstr "De koppelingsgegevens konden niet worden bijgewerkt."
 
-#: cps/spa_strings.py
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Kan boekenplank niet bijwerken."
 
@@ -5892,10 +5922,6 @@ msgid "Cover updated from the selected result."
 msgstr "Omslag bijgewerkt vanuit het geselecteerde resultaat."
 
 #: cps/spa_strings.py
-msgid "Create"
-msgstr "Aanmaken"
-
-#: cps/spa_strings.py
 msgid "Create account"
 msgstr "Account aanmaken"
 
@@ -5906,6 +5932,10 @@ msgstr "Een account aanmaken"
 #: cps/spa_strings.py
 msgid "Create failed."
 msgstr "Aanmaken mislukt."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr "Plank maken"
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
@@ -6372,7 +6402,7 @@ msgstr "Mijn privéomslag bewerken"
 msgid "Edit note"
 msgstr "Notitie bewerken"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Edit public shelves"
 msgstr "Openbare boekenplanken bewerken"
 
@@ -6511,10 +6541,6 @@ msgstr "Alleen geselecteerde boekenplanken via OPDS tonen"
 #: cps/spa_strings.py cps/tasks_status.py
 msgid "Failed"
 msgstr "Mislukt"
-
-#: cps/spa_strings.py
-msgid "Failed to load shelves."
-msgstr "Boekenplanken laden mislukt."
 
 #: cps/spa_strings.py
 msgid "Failed to load."
@@ -6760,6 +6786,10 @@ msgstr "Verborgen"
 msgid "Hidden built-ins"
 msgstr "Verborgen ingebouwde"
 
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr "Verborgen in de navigatie"
+
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
 msgstr "Verberg"
@@ -6783,6 +6813,11 @@ msgstr "Velden verbergen"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Wachtwoord verbergen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}"
+msgstr "{name} verbergen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7395,10 +7430,6 @@ msgid "New shelf name"
 msgstr "Nieuwe boekenplanknaam"
 
 #: cps/spa_strings.py
-msgid "New shelf name…"
-msgstr "Nieuwe boekenplanknaam…"
-
-#: cps/spa_strings.py
 msgid "New shelf…"
 msgstr "Nieuwe boekenplank…"
 
@@ -7547,9 +7578,13 @@ msgid "No shelves yet — create one below."
 msgstr "Nog geen boekenplanken — maak er hieronder een aan."
 
 #: cps/spa_strings.py
-msgid "No shelves yet. Create one above to start collecting books."
+msgid "No shelves yet. Create a shelf to start collecting books."
+msgstr "Nog geen planken. Maak een plank om boeken te verzamelen."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
 msgstr ""
-"Nog geen boekenplanken. Maak er hierboven een aan om boeken te verzamelen."
+"Nog geen slimme planken. Maak er een om boeken automatisch te verzamelen."
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
@@ -7989,10 +8024,6 @@ msgstr "Vorige pagina"
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
 msgstr "Voortgang"
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Openbaar"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8639,8 +8670,17 @@ msgid "Settings"
 msgstr "Instellingen"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Settings for {name}"
+msgstr "Instellingen voor {name}"
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr "Delen met iedereen"
 
 #: cps/spa_strings.py
 msgid "Shared cover"
@@ -8650,9 +8690,29 @@ msgstr "Gedeelde omslag"
 msgid "Shelf name"
 msgstr "Boekenplanknaam"
 
+#: cps/spa_strings.py cps/web.py
+msgid "Shelf name is required"
+msgstr "Boekenplank-naam is verplicht"
+
 #: cps/spa_strings.py
 msgid "Shelf not found."
 msgstr "Boekenplank niet gevonden."
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr "Plankopties"
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr "Plankinstellingen"
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr "Zichtbaarheid van de plank opgeslagen."
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Show"
+msgstr "Toon"
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
@@ -8705,6 +8765,10 @@ msgid "Show hidden books"
 msgstr "Verborgen boeken tonen"
 
 #: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr "Tonen in mijn OPDS-feed"
+
+#: cps/spa_strings.py
 msgid "Show less"
 msgstr "Minder tonen"
 
@@ -8729,6 +8793,11 @@ msgstr ""
 "De globale bibliotheek weer tonen? Je selectie blijft precies zoals je hem "
 "achterliet — schakel gerust terug, hij blijft bewaard. Bij de volgende "
 "update synchroniseert je e-reader de globale bibliotheek."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Show {name}"
+msgstr "{name} tonen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8794,12 +8863,24 @@ msgid "Size (pt)"
 msgstr "Grootte (pt)"
 
 #: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr "Slimme plank"
+
+#: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Slimme boekenplank niet gevonden."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
 msgstr "Slimme boekenplanken"
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves collect books automatically using rules. Hidden shelves stay "
+"here so you can show them again."
+msgstr ""
+"Slimme planken verzamelen boeken automatisch met regels. Verborgen planken "
+"blijven hier staan zodat je ze weer kunt tonen."
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -8933,6 +9014,14 @@ msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
 msgstr ""
 "Alleen geselecteerde boekenplanken synchroniseren met e-readers (Kobo en "
 "KOReader)"
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr "Synchroniseren met Kobo"
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr "Synchroniseren met e-readers"
 
 #: cps/spa_strings.py
 msgid "Table view"
@@ -9577,6 +9666,14 @@ msgid "To:"
 msgstr "Tot:"
 
 #: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr "Plankenlijst in- of uitklappen"
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr "Slimme-plankenlijst in- of uitklappen"
+
+#: cps/spa_strings.py
 msgid "Token"
 msgstr "Token"
 
@@ -9960,6 +10057,10 @@ msgid "Write a note…"
 msgstr "Schrijf een notitie…"
 
 #: cps/spa_strings.py
+msgid "You are not allowed to edit this shelf"
+msgstr "Je mag deze plank niet bewerken"
+
+#: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
@@ -9981,6 +10082,27 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Your Library"
 msgstr "Jouw bibliotheek"
+
+#: cps/spa_strings.py
+msgid ""
+"Your OPDS feed includes all visible shelves. Enable selected shelves only in "
+"your account settings to choose individual shelves."
+msgstr ""
+"Je OPDS-feed bevat alle zichtbare planken. Schakel in je accountinstellingen "
+"alleen geselecteerde planken in om afzonderlijke planken te kiezen."
+
+#: cps/spa_strings.py
+msgid ""
+"Your account currently syncs the whole library. Select shelf-only sync in "
+"your account settings to use shelf marks."
+msgstr ""
+"Je account synchroniseert nu de hele bibliotheek. Kies in je "
+"accountinstellingen synchronisatie van alleen geselecteerde planken om "
+"plankmarkeringen te gebruiken."
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr "Je beheerder heeft het delen van eigen planken uitgeschakeld."
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -10447,6 +10569,10 @@ msgid "Invalid request"
 msgstr "Ongeldige rol"
 
 #: cps/web.py
+msgid "Permission denied to share shelves"
+msgstr "Geen toestemming om planken te delen"
+
+#: cps/web.py
 #, fuzzy
 msgid "Name and rules are required"
 msgstr "Zowel gebruikersnaam als regels zijn vereist"
@@ -10464,12 +10590,12 @@ msgid "Create Magic Shelf"
 msgstr "Magische boekenplank maken"
 
 #: cps/web.py
-msgid "Permission denied to change public status"
-msgstr ""
+msgid "Only the shelf owner can change Kobo sync"
+msgstr "Alleen de eigenaar kan Kobo-synchronisatie wijzigen"
 
 #: cps/web.py
-msgid "Shelf name is required"
-msgstr "Boekenplank-naam is verplicht"
+msgid "Permission denied to change public status"
+msgstr ""
 
 #: cps/web.py
 msgid "Error updating shelf"
@@ -10507,7 +10633,7 @@ msgstr ""
 msgid "Error deleting shelf"
 msgstr "Fout bij verwijderen boekenplank"
 
-#: cps/web.py
+#: cps/api/magicshelves.py cps/web.py
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
@@ -10732,6 +10858,14 @@ msgstr "Ongeldige boek ID."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "You are not allowed to view this shelf"
+msgstr ""
+
+#: cps/api/magicshelves.py
+msgid "visible must be a boolean"
 msgstr ""
 
 #: cps/progress_syncing/protocols/kosync.py
@@ -11932,13 +12066,6 @@ msgstr ""
 msgid "Send test to me"
 msgstr "Versturen naar eReader"
 
-#: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
-#: cps/templates/email_edit.html cps/templates/layout.html
-#: cps/templates/shelf_order.html cps/templates/shelf_reorder.html
-#: cps/templates/user_table.html
-msgid "Back"
-msgstr "Annuleren"
-
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr ""
@@ -12850,7 +12977,6 @@ msgid "Allow Changing Password"
 msgstr "Wachtwoord wijzigen toestaan"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/user_edit.html
 msgid "Allow Editing Public Shelves"
 msgstr "Bewerken van openbare boekenplanken toestaan"
 
@@ -15862,10 +15988,6 @@ msgstr "Onthoud positie"
 msgid "Scrollbar"
 msgstr "Schuifbalk"
 
-#: cps/templates/readcbr.html
-msgid "Show"
-msgstr "Toon"
-
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"
 msgstr "DJVU lezer"
@@ -16750,6 +16872,22 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Create"
+#~ msgstr "Aanmaken"
+
+#~ msgid "Failed to load shelves."
+#~ msgstr "Boekenplanken laden mislukt."
+
+#~ msgid "New shelf name…"
+#~ msgstr "Nieuwe boekenplanknaam…"
+
+#~ msgid "No shelves yet. Create one above to start collecting books."
+#~ msgstr ""
+#~ "Nog geen boekenplanken. Maak er hierboven een aan om boeken te verzamelen."
+
+#~ msgid "Public"
+#~ msgstr "Openbaar"
 
 #~ msgid "Choose a SABnzbd connection"
 #~ msgstr "Kies een SABnzbd-verbinding"

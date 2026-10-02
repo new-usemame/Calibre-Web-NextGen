@@ -1095,7 +1095,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         {selecting && (
           <button type="button" className={styles.selectAllBtn}
             onClick={() => { void selectAllBooks(); }}
-            disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
+            // The complete-ID query does not depend on the next card page.
+            // Keep new-view loading guarded, but let a settled view select
+            // all while its background pagination is slow.
+            disabled={selectAllBusy || bulkBusy || total === 0
+              || (isFetching && (requestPage === 1 || resetKey !== accKeyRef.current))}
             aria-busy={selectAllBusy}>
             {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
           </button>

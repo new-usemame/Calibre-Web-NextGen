@@ -15,6 +15,19 @@ const test = base.extend<{ dragPage: Page }>({
   },
 });
 
+// Wait for actual entrance/drawer animations before reading hit coordinates.
+// A screenshot can span frames while a sidebar target is still moving.
+async function settleAnimations(locator: import('@playwright/test').Locator) {
+  await locator.evaluate(async element => {
+    const animations: Animation[] = [];
+    for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+      animations.push(...ancestor.getAnimations().filter(animation =>
+        animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime)));
+    }
+    await Promise.all(animations.map(animation => animation.finished));
+  });
+}
+
 test('a card offers an accessible shelf picker and persists membership', async ({ dragPage: page, secondaryUser }, info) => {
   const csrf = await page.request.get('/api/v1/auth/csrf');
   const headers = { 'X-CSRFToken': (await csrf.json()).csrf_token as string };
@@ -74,8 +87,11 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
     await page.getByRole('button', { name: 'Select', exact: true }).click();
     for (const book of books) {
       const card = page.getByRole('button', { name: `Select ${book.title}`, exact: true }).first();
-      await card.scrollIntoViewIfNeeded();
-      await card.focus(); await page.keyboard.press('Space');
+      // Focus scrolls the real card into view without waiting on WebKit's
+      // offscreen content-visibility geometry before it has been painted.
+      await card.focus();
+      await settleAnimations(card);
+      await page.keyboard.press('Space');
     }
     await expect(page.getByRole('region', { name: '20 selected', exact: true })).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -96,10 +112,16 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
       await touch('touchStart'); await touch('touchMove', x - 14, y);
       await expect(target).toBeVisible();
       await target.scrollIntoViewIfNeeded();
+      await settleAnimations(target);
       const dest = (await target.boundingBox())!;
       await touch('touchMove', dest.x + dest.width / 2, dest.y + dest.height / 2);
       await expect(target).toHaveClass(/dropOver/);
       await info.attach('shelf-drop-target', { body: await page.screenshot({ path: info.outputPath('shelf-drop-target.jpeg'), type: 'jpeg', quality: 72 }), contentType: 'image/jpeg' });
+      // Keep the release over the target after the evidence capture; native
+      // edge scrolling and drawer transitions can move it during a screenshot.
+      const release = (await target.boundingBox())!;
+      await touch('touchMove', release.x + release.width / 2, release.y + release.height / 2);
+      await expect(target).toHaveClass(/dropOver/);
       await touch('touchEnd'); await cdp.detach();
     } else {
       const box = (await selected.boundingBox())!;

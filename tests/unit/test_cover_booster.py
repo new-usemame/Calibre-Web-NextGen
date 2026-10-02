@@ -121,7 +121,34 @@ class TestAmazonCdnProbe:
     def test_real_jpeg_cover_returns_url(self):
         with self._mock_head(200, "image/jpeg", 250000):
             url = cover_booster._amazon_cdn_cover_for_key("1853260010")
-        assert url == "https://m.media-amazon.com/images/P/1853260010.01._SCRM_SL2000_.jpg"
+        assert url == "https://m.media-amazon.com/images/P/1853260010.01.MAIN._SCRM_.jpg"
+
+    def test_main_image_is_preferred_over_the_legacy_bounded_variant(self):
+        response = types.SimpleNamespace(
+            status_code=200,
+            headers={"content-type": "image/jpeg", "content-length": "288326"},
+        )
+        with patch.object(cover_booster.requests, "head", return_value=response) as head:
+            url = cover_booster._amazon_cdn_cover_for_key("B0DHV4TZ4L")
+
+        assert url == "https://m.media-amazon.com/images/P/B0DHV4TZ4L.01.MAIN._SCRM_.jpg"
+        assert head.call_count == 1
+        assert head.call_args.args[0] == url
+
+    def test_legacy_bounded_variant_remains_the_fallback(self):
+        missing_main = types.SimpleNamespace(status_code=404, headers={})
+        legacy_jpeg = types.SimpleNamespace(
+            status_code=200,
+            headers={"content-type": "image/jpeg", "content-length": "217786"},
+        )
+        with patch.object(cover_booster.requests, "head", side_effect=[missing_main, legacy_jpeg]) as head:
+            url = cover_booster._amazon_cdn_cover_for_key("B0DHV4TZ4L")
+
+        assert url == "https://m.media-amazon.com/images/P/B0DHV4TZ4L.01._SCRM_SL2000_.jpg"
+        assert [call.args[0] for call in head.call_args_list] == [
+            "https://m.media-amazon.com/images/P/B0DHV4TZ4L.01.MAIN._SCRM_.jpg",
+            url,
+        ]
 
     def test_placeholder_gif_returns_none(self):
         with self._mock_head(200, "image/gif", 43):
@@ -200,7 +227,7 @@ class TestBoostedCoverPathOrder:
             "cover": "https://covers.openlibrary.org/b/isbn/1853260010-L.jpg",
             "publishedDate": "1992",
         }
-        amazon_url = "https://m.media-amazon.com/images/P/1853260010.01._SCRM_SL2000_.jpg"
+        amazon_url = "https://m.media-amazon.com/images/P/1853260010.01.MAIN._SCRM_.jpg"
         with patch.object(
             cover_booster, "_amazon_cdn_cover_for_key", return_value=amazon_url
         ) as cdn_mock, patch.object(
@@ -211,6 +238,26 @@ class TestBoostedCoverPathOrder:
             result = cover_booster._boosted_cover_for(record)
         assert result == amazon_url
         cdn_mock.assert_called_once_with("1853260010")
+        itunes_lookup.assert_not_called()
+        itunes_search.assert_not_called()
+
+    def test_main_variant_is_treated_as_already_high_resolution(self):
+        cover = "https://m.media-amazon.com/images/P/B0DHV4TZ4L.01.MAIN._SCRM_.jpg"
+        record = {
+            "title": "Seven Year Itch",
+            "authors": ["Amy Daws"],
+            "identifiers": {"isbn": "9780369764621", "amazon": "B0DHV4TZ4L"},
+            "cover": cover,
+            "source": {"id": "hardcover", "description": "Hardcover"},
+        }
+        with patch.object(cover_booster, "_amazon_cdn_cover_for_key") as cdn, \
+             patch.object(cover_booster, "_itunes_lookup_isbn") as itunes_lookup, \
+             patch.object(cover_booster, "_itunes_search") as itunes_search:
+            result = cover_booster.boost_covers([record])
+
+        assert result[0]["cover"] == cover
+        assert result[0]["cover_origin"] == "amazon"
+        cdn.assert_not_called()
         itunes_lookup.assert_not_called()
         itunes_search.assert_not_called()
 
@@ -486,7 +533,7 @@ class TestAmazonAsinKey:
         with self._inert_itunes(), self._mock_head(200, "image/jpeg", 279516):
             boosted = cover_booster.boost_covers([record])
         assert boosted[0]["cover"] == (
-            "https://m.media-amazon.com/images/P/B0DJ1TV47C.01._SCRM_SL2000_.jpg"
+            "https://m.media-amazon.com/images/P/B0DJ1TV47C.01.MAIN._SCRM_.jpg"
         )
 
     def test_asin_placeholder_leaves_cover_untouched(self):
@@ -515,7 +562,7 @@ class TestAmazonAsinKey:
         with self._inert_itunes(), self._mock_head(200, "image/jpeg", 250000):
             boosted = cover_booster.boost_covers([record])
         assert boosted[0]["cover"] == (
-            "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+            "https://m.media-amazon.com/images/P/0441172717.01.MAIN._SCRM_.jpg"
         )
 
     def test_asin_probed_only_after_isbn_fails(self):
@@ -531,7 +578,7 @@ class TestAmazonAsinKey:
 
         def _fake_probe(key):
             probed.append(key)
-            return None if len(probed) == 1 else f"https://m.media-amazon.com/images/P/{key}.01._SCRM_SL2000_.jpg"
+            return None if len(probed) == 1 else f"https://m.media-amazon.com/images/P/{key}.01.MAIN._SCRM_.jpg"
 
         with self._inert_itunes(), patch.object(
             cover_booster, "_amazon_cdn_cover_for_key", side_effect=_fake_probe
@@ -539,4 +586,4 @@ class TestAmazonAsinKey:
             boosted = cover_booster.boost_covers([record])
 
         assert probed == ["0369764625", "B0DHV4TZ4L"]
-        assert boosted[0]["cover"].endswith("B0DHV4TZ4L.01._SCRM_SL2000_.jpg")
+        assert boosted[0]["cover"].endswith("B0DHV4TZ4L.01.MAIN._SCRM_.jpg")

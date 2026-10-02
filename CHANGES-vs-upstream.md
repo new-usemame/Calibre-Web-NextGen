@@ -59,6 +59,8 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ## Original fork patches (no upstream PR existed)
 
+- **Kindle cover lookup prefers Amazon’s original-size artwork (#304).** The existing ISBN/ASIN picker and metadata cover boost use the same-host MAIN image first, retaining the prior 2,000px variant as a bounded fallback. Edition-key priority, independent provider settings and the shared CDN kill switch remain intact. Fork-original. | SHA `TBD` | release `pending`.
+
 ### Features
 
 | Fork PR | Upstream | Description | SHA | Release |

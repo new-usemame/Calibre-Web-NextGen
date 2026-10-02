@@ -74,7 +74,7 @@ if SCRIPTS_DIR not in sys.path:
 import ingest_processor  # noqa: E402
 
 INGEST_SERVICE_RUN = (
-    REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run"
+    REPO_ROOT / "scripts/services/cwa-ingest-service.sh"
 )
 INGEST_PROCESSOR_PATH = REPO_ROOT / "scripts/ingest_processor.py"
 
@@ -933,7 +933,7 @@ class TestIngestServiceTimeoutMessaging:
         idx = text.find("SAFETY TIMEOUT:")
         assert idx != -1
         window = text[idx : idx + 1600]
-        assert "/config/processed_books/failed" in window, (
+        assert "processed_books/failed" in window, (
             "the safety-timeout branch must tell the user where the file went"
         )
 

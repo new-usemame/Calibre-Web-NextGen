@@ -64,7 +64,7 @@ LCP_LICENSE = b'''{
 }'''
 
 INGEST_SERVICE_RUN = (
-    REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run"
+    REPO_ROOT / "scripts/services/cwa-ingest-service.sh"
 )
 
 

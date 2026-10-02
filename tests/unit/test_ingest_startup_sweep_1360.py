@@ -47,7 +47,7 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_SCRIPT = (
-    REPO_ROOT / "root" / "etc" / "s6-overlay" / "s6-rc.d" / "cwa-ingest-service" / "run"
+    REPO_ROOT / "scripts" / "services" / "cwa-ingest-service.sh"
 )
 
 

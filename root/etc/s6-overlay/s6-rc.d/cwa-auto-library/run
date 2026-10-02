@@ -3,27 +3,5 @@
 
 echo "[cwa-auto-library] Starting auto-library service..."
 
-# auto_library conditionally invokes calibre-customize. Its root-run default
-# must not share config files with abc, while the plugin helper remains free to
-# override this path when the operator explicitly enables user plugins.
-if [ -z "${CALIBRE_CONFIG_DIRECTORY:-}" ]; then
-    export CALIBRE_CONFIG_DIRECTORY="/tmp/cwa-calibre-config-$(id -u)"
-    install -d -m 0700 "$CALIBRE_CONFIG_DIRECTORY"
-fi
-
-# Optionally skip auto-library based on DISABLE_LIBRARY_AUTOMOUNT env var
-if [[ "${DISABLE_LIBRARY_AUTOMOUNT,,}" == "true" || "${DISABLE_LIBRARY_AUTOMOUNT,,}" == "yes" || "${DISABLE_LIBRARY_AUTOMOUNT}" == "1" ]]; then
-    echo "[cwa-auto-library] DISABLE_LIBRARY_AUTOMOUNT=${DISABLE_LIBRARY_AUTOMOUNT:-unset}. Skipping auto-library service as requested."
-    exit 0
-fi
-
-python3 /app/calibre-web-automated/scripts/auto_library.py
-exit_code=$?
-
-if [[ ${exit_code} -eq 0 ]]; then
-    echo "[cwa-auto-library] Service completed successfully! Ending service..."
-else
-    echo "[cwa-auto-library] Service did not complete successfully (exit code: ${exit_code}). Ending service..."
-fi
-
-exit "${exit_code}"
+# The service body lives in scripts/services so it can run outside s6 (#2094).
+exec /app/calibre-web-automated/scripts/services/cwa-auto-library.sh

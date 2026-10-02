@@ -16,7 +16,7 @@ from .. import (
 )
 from ..annotations import count_user_annotations
 from ..cw_login import current_user
-from ..services import user_cover
+from ..services import user_cover, discover_source
 from ..shelf import sort_shelves_for_user
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
     get_convert_options, get_kosync_progress_display, hot_books_page
@@ -419,6 +419,7 @@ def list_books():
 
     if filter_val == "discover":
         # Random unread books (single page, like the legacy Discover view).
+        source_filter, _source_available = discover_source.filter_for(current_user)
         if not config.config_read_column:
             disc_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
         else:
@@ -429,7 +430,7 @@ def list_books():
         discover_per_page = config.config_books_per_page if select_all else per_page
         entries, _random, _pg = calibre_db.fill_indexpage(
             1, discover_per_page, db.Books, disc_filter, [func.randomblob(2)],
-            True, config.config_read_column, ids_only=select_all)
+            True, config.config_read_column, ids_only=select_all, extra_filter=source_filter)
         if select_all:
             # Discover is deliberately a random, one-page sample. Its current
             # cards are the complete view; never expand this request to the

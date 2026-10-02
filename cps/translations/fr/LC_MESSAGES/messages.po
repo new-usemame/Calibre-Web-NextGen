@@ -19002,3 +19002,58 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Discover source"
+msgstr "Source de découverte"
+
+#: cps/spa_strings.py
+msgid "Current library"
+msgstr "Bibliothèque actuelle"
+
+#: cps/spa_strings.py
+msgid "Shelf: {name}"
+msgstr "Étagère : {name}"
+
+#: cps/spa_strings.py
+msgid "Smart shelf: {name}"
+msgstr "Étagère intelligente : {name}"
+
+#: cps/spa_strings.py
+msgid "Unavailable source"
+msgstr "Source indisponible"
+
+#: cps/spa_strings.py
+msgid "Save Discover source"
+msgstr "Enregistrer la source de découverte"
+
+#: cps/spa_strings.py
+msgid "Discover source saved."
+msgstr "Source de découverte enregistrée."
+
+#: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr "Impossible de charger les sources de découverte."
+
+#: cps/spa_strings.py
+msgid "Could not save Discover source. Please try again."
+msgstr "Impossible d’enregistrer la source de découverte. Veuillez réessayer."
+
+#: cps/spa_strings.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr ""
+"Cette source de découverte est indisponible. Choisissez une autre source."
+
+#: cps/spa_strings.py
+msgid "No unread books in this Discover source."
+msgstr "Aucun livre non lu dans cette source de découverte."
+
+#: cps/spa_strings.py
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+"Seules les suggestions de découverte changent ; les livres restent dans "
+"votre bibliothèque."
+
+#: cps/spa_strings.py
+msgid "A few random picks from your Discover source"
+msgstr "Quelques suggestions aléatoires de votre source de découverte"

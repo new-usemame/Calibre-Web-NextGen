@@ -1,6 +1,6 @@
 import type { ReaderBookmark } from "./readerResume";
 import type { ReaderFontCatalog } from './readerFonts';
-import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import {
   apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, apiPostDownload, ApiError,
@@ -193,14 +193,66 @@ export function useMagicLinkPoll() {
 /** A short strip of random books for the library "Discover" section. `nonce`
  *  lets the caller reshuffle (bump it to refetch a fresh random set). Reuses the
  *  same server-side discover filter as the full /discover view. */
-export function useDiscover(count: number, nonce: number) {
-  return useQuery<BooksPage>({
-    queryKey: ['discover-strip', count, nonce],
-    queryFn: () => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`),
+export interface DiscoverSourceSettings {
+  source: string;
+  available: boolean;
+  sources: { value: string; name: string; kind: 'library' | 'shelf' | 'smart' }[];
+}
+
+export function useDiscoverSource(enabled = true) {
+  const me = useMe().data;
+  return useQuery<DiscoverSourceSettings>({
+    queryKey: ['account', 'discover-source', me?.id],
+    queryFn: ({ signal }) => apiGet<DiscoverSourceSettings>('/api/v1/account/discover-source', { signal }),
+    enabled: enabled && !!me && !me.role.anonymous,
     staleTime: 0,
     refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
   });
+}
+
+export function useSaveDiscoverSource() {
+  const qc = useQueryClient();
+  const me = useMe().data;
+  return useMutation({
+    mutationKey: ['discover-source-save'],
+    mutationFn: (source: string) => apiPut<DiscoverSourceSettings>('/api/v1/account/discover-source', { source }),
+    onMutate: async () => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ['discover-strip'] }),
+        qc.cancelQueries({ queryKey: ['books'] }),
+        qc.cancelQueries({ queryKey: ['account', 'discover-source', me?.id] }),
+      ]);
+    },
+    onSuccess: (settings) => {
+      qc.setQueryData(['account', 'discover-source', me?.id], settings);
+    },
+    onSettled: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['discover-strip'] }),
+        qc.invalidateQueries({ queryKey: ['books'] }),
+      ]);
+    },
+  });
+}
+
+export function useDiscover(count: number, nonce: number) {
+  const me = useMe().data;
+  const source = useDiscoverSource();
+  const saving = useIsMutating({ mutationKey: ['discover-source-save'] }) > 0;
+  const query = useQuery<BooksPage>({
+    queryKey: ['discover-strip', me?.id, source.data?.source, source.data?.available, count, nonce],
+    queryFn: ({ signal }) => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`, { signal }),
+    enabled: !!me && (me.role.anonymous || !!source.data) && !saving,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && previousQuery.queryKey[1] === me?.id && previousQuery.queryKey[2] === source.data?.source
+        && previousQuery.queryKey[3] === source.data?.available ? previous : undefined,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  return { ...query,
+    isLoading: query.isLoading || !me || (!me.role.anonymous && source.isPending),
+    error: query.error ?? source.error,
+  };
 }
 
 export function useAuthConfig() {
@@ -234,6 +286,8 @@ export function useLogout() {
 export function useBooks(q: BooksQuery) {
   const revision = useLibraryRevision();
   const me = useMe().data;
+  const discoverSource = useDiscoverSource(q.view === 'discover');
+  const savingSource = useIsMutating({ mutationKey: ['discover-source-save'] }) > 0;
   const {
     page, perPage = 24, search = '', sort = 'new', readFilter = 'all',
     entityKind, entityId, view, showHidden = false, enabled = true,
@@ -265,13 +319,19 @@ export function useBooks(q: BooksQuery) {
   if (entityKind && entityId !== undefined && entityId !== '') {
     params.set(entityKind, String(entityId));
   }
-  return useQuery<BooksPage>({
+  const query = useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
-      entityKind ?? '', entityId ?? '', view ?? '', showHidden, me?.id, me?.library_mode, revision],
-    queryFn: () => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`),
-    placeholderData: (prev) => prev,
-    enabled,
+      entityKind ?? '', entityId ?? '', view ?? '', showHidden, me?.id, me?.library_mode, revision,
+      view === 'discover' ? discoverSource.data?.source : '',
+      view === 'discover' ? discoverSource.data?.available : true],
+    queryFn: ({ signal }) => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`, { signal }),
+    placeholderData: view === 'discover' ? undefined : (prev) => prev,
+    enabled: enabled && (view !== 'discover' || (!!me && (me.role.anonymous || !!discoverSource.data) && !savingSource)),
   });
+  return { ...query,
+    isLoading: query.isLoading || (view === 'discover' && (!me || (!me.role.anonymous && discoverSource.isPending))),
+    error: query.error ?? (view === 'discover' ? discoverSource.error : null),
+  };
 }
 
 export interface GlobalLibraryQuery {

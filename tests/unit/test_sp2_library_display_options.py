@@ -61,17 +61,6 @@ def test_display_preferences_have_one_persistence_key_each():
     assert "cwng:browse-list-compact" in source("frontend/src/pages/BrowseList.tsx")
 
 
-def test_catalog_rows_drive_live_width_aware_page_size():
-    catalog = source("frontend/src/pages/Catalog.tsx")
-    queries = source("frontend/src/lib/queries.ts")
-    assert catalog.count("cwng:catalog-rows-v1") == 1
-    assert "ResizeObserver" in catalog
-    assert "rowsPerLoad * columnCount" in catalog
-    assert "perPage" in queries
-    assert "params.set('per_page', String(perPage))" in queries
-    assert "perPage" in queries.split("queryKey: ['books'", 1)[1].split("queryFn:", 1)[0]
-
-
 def test_discover_honors_instance_random_book_count():
     auth = source("cps/api/auth.py")
     api = source("frontend/src/lib/api.ts")

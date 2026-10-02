@@ -2104,6 +2104,17 @@ class CalibreDB:
         pagesize = pagesize or self.config.config_books_per_page
         if current_user.show_detail_random() and not ids_only:
             random_query = self.generate_linked_query(config_read_column, database)
+            random_extra_filter = extra_filter
+            if database == Books:
+                # Every Classic random strip is a Discover feed. Keep it on
+                # the same per-user source as /discover without changing the
+                # listing filter or granting extra visibility.
+                from .services import discover_source
+                discover_filter, _source_available = discover_source.filter_for(current_user)
+                random_extra_filter = and_(
+                    discover_filter,
+                    extra_filter if extra_filter is not None else true(),
+                )
             # Eagerly load template relationships to prevent detached lazy-load
             # failures if another request tears down the shared scoped session.
             if database == Books:
@@ -2119,7 +2130,7 @@ class CalibreDB:
                                                              allow_show_hidden=allow_show_hidden,
                                                              allow_show_global=allow_show_global,
                                                              allow_public_shelf_books=allow_public_shelf_books,
-                                                             extra_filter=extra_filter))
+                                                             extra_filter=random_extra_filter))
                      .order_by(func.random())
                      .limit(self.config.config_random_books).all())
         else:

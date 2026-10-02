@@ -16529,3 +16529,55 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "Discover source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Current library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shelf: {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Smart shelf: {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unavailable source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save Discover source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Discover source saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save Discover source. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No unread books in this Discover source."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A few random picks from your Discover source"
+msgstr ""

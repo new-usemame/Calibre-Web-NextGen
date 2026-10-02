@@ -18457,3 +18457,57 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Discover source"
+msgstr "Bron voor ontdekken"
+
+#: cps/spa_strings.py
+msgid "Current library"
+msgstr "Huidige bibliotheek"
+
+#: cps/spa_strings.py
+msgid "Shelf: {name}"
+msgstr "Boekenplank: {name}"
+
+#: cps/spa_strings.py
+msgid "Smart shelf: {name}"
+msgstr "Slimme boekenplank: {name}"
+
+#: cps/spa_strings.py
+msgid "Unavailable source"
+msgstr "Bron niet beschikbaar"
+
+#: cps/spa_strings.py
+msgid "Save Discover source"
+msgstr "Bron voor ontdekken opslaan"
+
+#: cps/spa_strings.py
+msgid "Discover source saved."
+msgstr "Bron voor ontdekken opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr "Kan bronnen voor ontdekken niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not save Discover source. Please try again."
+msgstr "Kan de bron voor ontdekken niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr "Deze bron voor ontdekken is niet beschikbaar. Kies een andere bron."
+
+#: cps/spa_strings.py
+msgid "No unread books in this Discover source."
+msgstr "Geen ongelezen boeken in deze bron voor ontdekken."
+
+#: cps/spa_strings.py
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+"Alleen de suggesties voor ontdekken veranderen; boeken blijven in je "
+"bibliotheek."
+
+#: cps/spa_strings.py
+msgid "A few random picks from your Discover source"
+msgstr "Een paar willekeurige suggesties uit je bron voor ontdekken"

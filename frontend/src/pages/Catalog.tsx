@@ -8,9 +8,10 @@ import { BookCover } from '../components/BookCover';
 import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { DiscoverSource } from '../components/DiscoverSource';
 import { DiscoverSection } from '../components/DiscoverSection';
 import { VirtualizedGridRows } from '../components/VirtualizedGridRows';
-import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
+import { useDiscoverSource, useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
@@ -229,6 +230,8 @@ function useLibraryRefresh() {
 
 export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogProps) {
   const me = useMe().data;
+  const discoverSource = useDiscoverSource(view === 'discover');
+  const discoverIdentity = view === 'discover' ? `${discoverSource.data?.source ?? ''}:${discoverSource.data?.available ?? ''}` : '';
   const revision = useLibraryRevision();
   const libraryScope = `${me?.id ?? 'guest'}:${me?.library_mode ?? 'monolibrary'}:${revision}`;
   const t = useT();
@@ -522,13 +525,20 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // saving a different one) changes which books belong here, so the accumulator
   // must reset rather than append the new set onto the old (#928).
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', perPage, showHidden,
-    filterActive ? JSON.stringify(defaultFilter) : '', libraryScope].join('|');
+    filterActive ? JSON.stringify(defaultFilter) : '', libraryScope, discoverIdentity].join('|');
 
   const previousLibraryScope = useRef(libraryScope);
   const changedLibrary = previousLibraryScope.current !== libraryScope;
+  const previousDiscoverIdentity = useRef(discoverIdentity);
+  const changedDiscover = previousDiscoverIdentity.current !== discoverIdentity;
+  useLayoutEffect(() => {
+    if (!changedDiscover) return;
+    previousDiscoverIdentity.current = discoverIdentity;
+    setPage(1); setAllBooks([]); accKeyRef.current = '';
+  }, [changedDiscover, discoverIdentity]);
   // Use page 1 in this render, before the effect updates pagination. Otherwise
   // changing selection on a loaded page can issue the new query at the old offset.
-  const requestPage = changedLibrary ? 1 : page;
+  const requestPage = changedLibrary || changedDiscover ? 1 : page;
   useEffect(() => {
     if (!changedLibrary) return;
     previousLibraryScope.current = libraryScope;
@@ -1154,6 +1164,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       </div>
       {selectAllError && <p className={styles.refreshStatusError}>{selectAllError}</p>}
 
+      {view === 'discover' && <DiscoverSource />}
+
       {/* Library-scan status (aria-live so the "please wait" → "complete"
           transition is announced, SC 4.1.3). Hidden when idle + empty. */}
       {(libraryRefresh.isRefreshing || libraryRefresh.message) && (
@@ -1247,7 +1259,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
                 ? t('No {filter} books here.', { filter: readFilter })
-                : t('No books here.')
+                : view === 'discover' ? t('No unread books in this Discover source.') : t('No books here.')
           }>
           {search && !filtered && personalLibrary && me?.role?.browse_global && (
             <Link href={`/global?q=${encodeURIComponent(search)}`} className={styles.uploadLink}>

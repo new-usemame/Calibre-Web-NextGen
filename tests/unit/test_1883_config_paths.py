@@ -170,6 +170,50 @@ def test_cps_call_sites_follow_resolved_config_root(monkeypatch, tmp_path):
     )
 
 
+def test_processed_books_override_moves_both_resolvers(
+    script_config_root, monkeypatch, tmp_path, capsys
+):
+    from cps import constants, duplicates
+
+    app_paths, _config_root = script_config_root
+    elsewhere = tmp_path / "big-disk" / "processed"
+    monkeypatch.setenv("CWA_PROCESSED_BOOKS_DIR", f"{elsewhere}/")
+
+    assert app_paths.processed_books_dir() == elsewhere
+    assert constants.processed_books_dir() == str(elsewhere)
+    assert duplicates.duplicate_resolution_root() == str(
+        elsewhere / "duplicate_resolutions"
+    )
+    assert app_paths._main(["processed_books_dir"]) == 0
+    assert capsys.readouterr().out == f"{elsewhere}\n"
+
+
+@pytest.mark.parametrize("value", ("relative/processed", "/", "/srv/../etc"))
+def test_processed_books_override_rejects_unsafe_paths(
+    script_config_root, monkeypatch, value
+):
+    from cps import constants
+
+    app_paths, _config_root = script_config_root
+    monkeypatch.setenv("CWA_PROCESSED_BOOKS_DIR", value)
+
+    with pytest.raises(app_paths.RuntimePathError):
+        app_paths.processed_books_dir()
+    with pytest.raises(constants.RuntimePathError):
+        constants.processed_books_dir()
+    assert app_paths._main(["processed_books_dir"]) == 1
+
+
+def test_processed_books_shell_command_stays_out_of_all(
+    script_config_root, monkeypatch, tmp_path, capsys
+):
+    app_paths, _config_root = script_config_root
+    monkeypatch.setenv("CWA_PROCESSED_BOOKS_DIR", str(tmp_path / "processed"))
+
+    assert app_paths._main(["all"]) == 0
+    assert len(capsys.readouterr().out.splitlines()) == 3
+
+
 def test_metadata_lock_default_follows_config_resolver(monkeypatch, tmp_path):
     from cps.services import calibre_db_lock
 
@@ -197,6 +241,8 @@ def test_metadata_lock_default_follows_config_resolver(monkeypatch, tmp_path):
         "cps/duplicates.py",
         "cps/templates/duplicates.html",
         "cps/templates/cwa_settings.html",
+        "root/etc/s6-overlay/s6-rc.d/cwa-init/run",
+        "root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run",
     ),
 )
 def test_processed_books_sites_do_not_restore_container_literal(relative_path):

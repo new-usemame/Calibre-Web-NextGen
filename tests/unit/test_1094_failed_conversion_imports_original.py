@@ -933,7 +933,7 @@ class TestIngestServiceTimeoutMessaging:
         idx = text.find("SAFETY TIMEOUT:")
         assert idx != -1
         window = text[idx : idx + 1600]
-        assert "/config/processed_books/failed" in window, (
+        assert "$FAILED_BOOKS_DIR" in window, (
             "the safety-timeout branch must tell the user where the file went"
         )
 

@@ -108,8 +108,20 @@ fi
 STATUS_FILE="${CWA_INGEST_STATUS_FILE:-/config/cwa_ingest_status}"
 echo "idle" > "$STATUS_FILE"
 
-# Ensure failed backup directory exists
-mkdir -p "/config/processed_books/failed" 2>/dev/null || true
+# Ensure failed backup directory exists. cwa-init has already refused an unsafe
+# CWA_PROCESSED_BOOKS_DIR, so a failure here only means failed files are not kept.
+FAILED_BOOKS_DIR=""
+if PROCESSED_BOOKS_DIR="$(python3 "${CWA_APP_PATHS}" processed_books_dir 2>/dev/null)"; then
+        case "$PROCESSED_BOOKS_DIR" in
+                ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..|[!/]*) ;;
+                *) FAILED_BOOKS_DIR="$PROCESSED_BOOKS_DIR/failed" ;;
+        esac
+fi
+if [ -n "$FAILED_BOOKS_DIR" ]; then
+        mkdir -p "$FAILED_BOOKS_DIR" 2>/dev/null || true
+else
+        echo "[cwa-ingest-service] WARN: could not resolve the processed books folder; failed files will not be kept"
+fi
 
 # Treat cwa.db as untrusted at the shell boundary. SQLite affinity does not
 # guarantee that an existing INTEGER column contains digits, and Bash
@@ -675,10 +687,10 @@ process_retry_queue() {
                                 elif [ $retry_exit -eq 124 ]; then
                                         # Timeout, remove problematic file
                                         echo "[cwa-ingest-service] TIMEOUT on retry: $queued_file, removing"
-                                        if [ -d "/config/processed_books/failed" ]; then
+                                        if [ -d "$FAILED_BOOKS_DIR" ]; then
                                                 local timestamp=$(date '+%Y%m%d_%H%M%S')
                                                 local failed_filename="${timestamp}_retry_timeout_$(basename "$queued_file")"
-                                                cp "$queued_file" "/config/processed_books/failed/$failed_filename" 2>/dev/null || true
+                                                cp "$queued_file" "$FAILED_BOOKS_DIR/$failed_filename" 2>/dev/null || true
                                         fi
                                         rm -f "$queued_file" 2>/dev/null || true
                                         mark_recent_path "$queued_file"
@@ -877,11 +889,11 @@ handle_event() {
                 echo "[cwa-ingest-service] Raise 'Ingest Timeout' in CWA Settings to increase it (safety timeout is 3x that value)."
                 echo "safety_timeout:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
                 # Move problematic file to failed backup with timestamp
-                if [ -d "/config/processed_books/failed" ]; then
+                if [ -d "$FAILED_BOOKS_DIR" ]; then
                         local timestamp=$(date '+%Y%m%d_%H%M%S')
                         local failed_filename="${timestamp}_safety_timeout_${filename}"
-                        echo "[cwa-ingest-service] Moving $filename to /config/processed_books/failed/$failed_filename"
-                        cp "$filepath" "/config/processed_books/failed/$failed_filename" 2>/dev/null || true
+                        echo "[cwa-ingest-service] Moving $filename to $FAILED_BOOKS_DIR/$failed_filename"
+                        cp "$filepath" "$FAILED_BOOKS_DIR/$failed_filename" 2>/dev/null || true
                 fi
                 record_acquisition_failure "$filepath" "$exit_code"
                 rm -f "$filepath" 2>/dev/null || true

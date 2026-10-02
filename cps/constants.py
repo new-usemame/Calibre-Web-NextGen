@@ -180,7 +180,13 @@ def config_path(*parts, _join=os.path.join):
 
 
 def processed_books_dir():
-    """Root for retained originals, failed conversions and backup archives."""
+    """Root for retained originals, failed conversions and backup archives.
+
+    ``CWA_PROCESSED_BOOKS_DIR`` places it apart from the config dir (#1883).
+    """
+    override = _dirs_environ.get('CWA_PROCESSED_BOOKS_DIR')
+    if override is not None and override.strip():
+        return _validated_runtime_dir(override, 'CWA_PROCESSED_BOOKS_DIR')
     return config_path("processed_books")
 
 # Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the

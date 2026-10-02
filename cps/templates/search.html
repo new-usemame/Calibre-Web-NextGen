@@ -3,6 +3,7 @@
 {% extends "layout.html" %}
 {% block body %}
 <div class="discover">
+    {% include '_book_list_export.html' %}
     {% if entries|length < 1 %}
       <h2>{{_('No Results Found')}}</h2>
       <p>{{_('Search Term:')}} {{adv_searchterm}}</p>

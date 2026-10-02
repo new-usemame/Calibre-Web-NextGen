@@ -4,6 +4,7 @@
 {% block body %}
 <div class="discover">
   <h2>{{title}}</h2>
+  {% include '_book_list_export.html' %}
       <!--form  method="post"--->
   {% if current_user.role_download() %}
   <a id="shelf_down" href="{{ url_for('shelf.show_simpleshelf', shelf_id=shelf.id) }}" class="btn btn-primary">{{ _('Download') }} </a>

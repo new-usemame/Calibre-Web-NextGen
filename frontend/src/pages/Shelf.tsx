@@ -1,3 +1,4 @@
+import { BookListExport } from '../components/BookListExport';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
@@ -333,6 +334,8 @@ export function Shelf({ id }: { id: string }) {
         </div>
 
         <div className={styles.subRow}>
+          <BookListExport disabled={bulkBusy || isFetching || isPlaceholderData || !!error} source={{ source: 'shelf', id: Number(id), params: { sort } }} />
+
           <span className={styles.count}>
             {total === 1
               ? t('{count} book', { count: total })

@@ -3,7 +3,7 @@ import inspect
 import pytest
 import flask
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 @pytest.mark.unit
@@ -129,55 +129,43 @@ def test_list_books_sort_unknown_defaults_to_new():
 
 @pytest.mark.unit
 def test_list_books_search():
-    """GET /api/v1/books?search=dune routes through get_search_results and total==1.
-
-    Regression (real-library 500): get_search_results → order_authors(combined=True)
-    returns SQLAlchemy Row objects whose book is under .Books, NOT at the top level.
-    _row_to_item must unwrap .Books and surface read/archived from the Row.
-    This test returns a Row-shaped object (SimpleNamespace with .Books, .read_status,
-    .is_archived) so it fails against code that passes entries straight to
-    serialize_book_list_item.
-    """
+    """Search results retain row serialization after query delegation."""
     from cps.api import books as books_mod
-    from cps import ub as ub_mod
+    from cps import ub
 
-    inner_book = SimpleNamespace(id=42, title="Dune", series_index="1.0", has_cover=1,
-                                 authors=[SimpleNamespace(name="Frank Herbert")],
-                                 series=[], data=[SimpleNamespace(format="EPUB")])
-    # Simulate the Row object with read_status=STATUS_FINISHED to verify read=True surfacing
-    row_entry = SimpleNamespace(
-        Books=inner_book,
-        is_archived=None,
-        read_status=ub_mod.ReadBook.STATUS_FINISHED,
+    book = SimpleNamespace(
+        id=42, title="Dune", series_index=None, has_cover=0,
+        authors=[], series=[], data=[], tags=[], timestamp=None, last_modified=None,
     )
+    row = SimpleNamespace(Books=book, is_archived=False,
+                          read_status=ub.ReadBook.STATUS_FINISHED)
+    query = MagicMock()
+    query.with_entities.return_value.order_by.return_value.distinct.return_value.count.return_value = 1
+    query.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [row]
 
     app = flask.Flask(__name__)
-    with app.test_request_context("/api/v1/books?search=dune"):
-        with patch.object(books_mod.calibre_db, "get_search_results",
-                          return_value=([row_entry], 1, None)) as mock_search, \
+    with app.test_request_context("/api/v1/books?search=dune&author=3&filter=unread"):
+        with patch.object(books_mod, "_catalog_book_query", return_value=query) as mock_query, \
              patch.object(books_mod.config, "config_books_per_page", 60, create=True), \
-             patch.object(books_mod.config, "config_read_column", 0, create=True):
+             patch.object(books_mod.config, "config_read_column", 0, create=True), \
+             patch.object(books_mod, "book_in_progress_ids", return_value=set()), \
+             patch.object(books_mod.user_cover, "overrides_for_user", return_value={}), \
+             patch.object(books_mod, "_visible_shelves_by_book", return_value={}), \
+             patch.object(books_mod, "_real_user_id", return_value=7):
             view = inspect.unwrap(books_mod.list_books)
             resp = view()
 
-    mock_search.assert_called_once()
-    call_args = mock_search.call_args
-    # first positional arg is the search term
-    assert call_args.args[0] == "dune", (
-        f"get_search_results first arg should be 'dune', got {call_args.args[0]!r}"
+    mock_query.assert_called_once_with(
+        search="dune", author_id=3, series_id=None, tag_id=None, publisher_id=None,
+        language_code=None, rating_id=None, book_format=None, filter_val="unread",
+        show_hidden=False,
     )
 
     data = json.loads(resp.get_data(as_text=True))
     assert data["total"] == 1
-    assert len(data["items"]) == 1
-    assert data["items"][0]["id"] == 42, (
-        "id must come from .Books.id — if this fails, the Row normalization is missing"
-    )
+    assert data["items"][0]["id"] == 42
     assert data["items"][0]["title"] == "Dune"
-    assert data["items"][0]["read"] is True, (
-        "read must be True when read_status == STATUS_FINISHED"
-    )
-    assert "read" in data["items"][0], "read key must be present in search results"
+    assert data["items"][0]["read"] is True
 
 
 @pytest.mark.unit

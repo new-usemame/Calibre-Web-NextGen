@@ -18601,3 +18601,34 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Export this book list"
+msgstr "Deze boekenlijst exporteren"
+
+#: cps/spa_strings.py
+msgid "Export TXT"
+msgstr "TXT exporteren"
+
+#: cps/spa_strings.py
+msgid "Exports all matching books, including pages you have not loaded."
+msgstr ""
+"Exporteert alle overeenkomende boeken, inclusief pagina’s die u nog niet "
+"hebt geladen."
+
+#: cps/spa_strings.py
+msgid "Preparing book list…"
+msgstr "Boekenlijst voorbereiden…"
+
+#: cps/spa_strings.py
+msgid "Book list download started."
+msgstr "Download van de boekenlijst gestart."
+
+#: cps/spa_strings.py
+msgid "Could not export the book list. Please try again."
+msgstr "De boekenlijst kon niet worden geëxporteerd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Too many books to export. Narrow the filters and try again."
+msgstr ""
+"Te veel boeken om te exporteren. Beperk de filters en probeer het opnieuw."

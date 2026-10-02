@@ -16665,3 +16665,31 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "Export this book list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Export TXT"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Exports all matching books, including pages you have not loaded."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Preparing book list…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book list download started."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not export the book list. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Too many books to export. Narrow the filters and try again."
+msgstr ""

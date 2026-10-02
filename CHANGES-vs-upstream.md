@@ -59,6 +59,8 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ## Original fork patches (no upstream PR existed)
 
+- **Filtered book lists can be downloaded as CSV or TXT (#1059).** Both interfaces export every matching page for supported search, catalog, manual/smart shelf and Global Library scopes with current account permissions. CSV includes reusable metadata and neutralizes spreadsheet formulas; TXT is a reading list. Classic Advanced Search binds each rendered page to signed account-specific criteria, so another tab cannot change its export. Bounded spooling refuses over 100,000 rows or detected result changes. Fork-original. | SHA `TBD` | release `pending`.
+
 ### Features
 
 | Fork PR | Upstream | Description | SHA | Release |

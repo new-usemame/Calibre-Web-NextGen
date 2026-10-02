@@ -1,3 +1,4 @@
+import { BookListExport } from '../components/BookListExport';
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
@@ -84,6 +85,8 @@ export function GlobalLibrary() {
       <p className={styles.intro}>{t('The whole archive. Add books to your library from here.')}</p>
 
       <div className={catalogStyles.toolbar}>
+        <BookListExport disabled={listing.isLoading || listing.isPlaceholderData || !!listing.error} source={{ source: 'global', params: { search, sort, filter } }} />
+
         <div className={styles.scope} role="group" aria-label={t('Library scope')}>
           <button type="button" aria-pressed={!onlyMissing} onClick={() => setOnlyMissing(false)}>{t('All')}</button>
           <button type="button" aria-pressed={onlyMissing} onClick={() => setOnlyMissing(true)}>{t('Not in your library')}</button>

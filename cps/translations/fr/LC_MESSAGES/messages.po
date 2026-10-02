@@ -19147,3 +19147,32 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Export this book list"
+msgstr "Exporter cette liste de livres"
+
+#: cps/spa_strings.py
+msgid "Export TXT"
+msgstr "Exporter en TXT"
+
+#: cps/spa_strings.py
+msgid "Exports all matching books, including pages you have not loaded."
+msgstr ""
+"Exporte tous les livres correspondants, y compris les pages non chargées."
+
+#: cps/spa_strings.py
+msgid "Preparing book list…"
+msgstr "Préparation de la liste de livres…"
+
+#: cps/spa_strings.py
+msgid "Book list download started."
+msgstr "Téléchargement de la liste de livres lancé."
+
+#: cps/spa_strings.py
+msgid "Could not export the book list. Please try again."
+msgstr "Impossible d’exporter la liste de livres. Réessayez."
+
+#: cps/spa_strings.py
+msgid "Too many books to export. Narrow the filters and try again."
+msgstr "Trop de livres à exporter. Affinez les filtres et réessayez."

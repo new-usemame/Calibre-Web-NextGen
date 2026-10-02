@@ -39,7 +39,7 @@
     <button type="button" disabled class="btn btn-default" data-export-format="csv" style="min-height:44px">{{ _('Export CSV') }}</button>
     <button type="button" disabled class="btn btn-default" data-export-format="txt" style="min-height:44px">{{ _('Export TXT') }}</button>
   </div>
-  <p class="help-block">{{ _('Exports all matching books, including pages you have not loaded.') }}</p>
+  <p class="help-block" style="color:inherit">{{ _('Exports all matching books, including pages you have not loaded.') }}</p>
   <p role="status"></p>
 </section>
 <script src="{{ url_for('static', filename='js/book-list-export.js') }}" defer></script>

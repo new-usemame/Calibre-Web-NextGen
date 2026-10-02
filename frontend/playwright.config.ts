@@ -201,6 +201,8 @@ export default defineConfig({
       // with anything — including a second project running it. It creates a
       // reader of its own per test instead, and therefore runs here too.
       testIgnore: [
+        // Desktop wrapping is covered by desktop and native Safari lanes.
+        /catalog-settings-wrap\.spec\.ts/,
         /subpath\.spec\.ts/,
         /default-library-view\.spec\.ts/,
         /series-sort-order\.spec\.ts/,
@@ -210,6 +212,12 @@ export default defineConfig({
         ...CATALOG_LAYOUT_SPECS,
         ...SERVER_STATE_SPECS,
       ],
+    },
+
+    {
+      name: 'catalog-settings-webkit', testMatch: /catalog-settings-wrap\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
     },
 
     // 4. iPad-class touch viewport — card actions remain persistent and the

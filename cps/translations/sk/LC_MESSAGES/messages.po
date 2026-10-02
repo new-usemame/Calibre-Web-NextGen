@@ -1478,6 +1478,14 @@ msgid "Source or destination format for conversion missing"
 msgstr "Chýba zdrojový alebo cieľový formát pre prevod"
 
 #: cps/editbooks.py
+msgid "Book is unavailable for conversion"
+msgstr ""
+
+#: cps/editbooks.py
+msgid "The selected conversion formats are not supported for this book"
+msgstr ""
+
+#: cps/editbooks.py
 #, python-format
 msgid "Book successfully queued for converting to %(book_format)s"
 msgstr "Kniha bola úspešne zaradená na prevod do %(book_format)s"

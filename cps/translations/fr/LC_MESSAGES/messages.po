@@ -1541,6 +1541,16 @@ msgid "Source or destination format for conversion missing"
 msgstr "Le format de conversion de la source ou de la destination est manquant"
 
 #: cps/editbooks.py
+msgid "Book is unavailable for conversion"
+msgstr "Le livre n'est pas disponible pour la conversion"
+
+#: cps/editbooks.py
+msgid "The selected conversion formats are not supported for this book"
+msgstr ""
+"Les formats de conversion sélectionnés ne sont pas pris en charge pour ce "
+"livre"
+
+#: cps/editbooks.py
 #, python-format
 msgid "Book successfully queued for converting to %(book_format)s"
 msgstr ""

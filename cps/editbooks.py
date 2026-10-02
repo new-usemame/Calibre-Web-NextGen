@@ -221,9 +221,24 @@ def convert_bookformat(book_id):
         flash(_("Source or destination format for conversion missing"), category="error")
         return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
 
+    # A form's select options are not an authorization or capability check.
+    # Validate again against the same installed-Calibre registry used to
+    # render the classic editor and the SPA conversion API, so an unsupported
+    # format cannot be queued by a crafted POST.
+    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    if not book:
+        flash(_("Book is unavailable for conversion"), category="error")
+        return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+    allowed_sources, allowed_targets = helper.get_convert_options(book)
+    source = book_format_from.strip().lower().lstrip('.')
+    target = book_format_to.strip().lower().lstrip('.')
+    if source not in allowed_sources or target not in allowed_targets or source == target:
+        flash(_("The selected conversion formats are not supported for this book"), category="error")
+        return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+
     log.info('converting: book id: %s from: %s to: %s', book_id, book_format_from, book_format_to)
-    rtn = helper.convert_book_format(book_id, config.get_book_path(), book_format_from.upper(),
-                                     book_format_to.upper(), current_user.name)
+    rtn = helper.convert_book_format(book_id, config.get_book_path(), source.upper(),
+                                     target.upper(), current_user.name)
 
     if rtn is None:
         flash(_("Book successfully queued for converting to %(book_format)s",

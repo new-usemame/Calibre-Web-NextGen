@@ -1397,6 +1397,14 @@ msgid "Source or destination format for conversion missing"
 msgstr "轉換的來源或目的格式不存在"
 
 #: cps/editbooks.py
+msgid "Book is unavailable for conversion"
+msgstr ""
+
+#: cps/editbooks.py
+msgid "The selected conversion formats are not supported for this book"
+msgstr ""
+
+#: cps/editbooks.py
 #, python-format
 msgid "Book successfully queued for converting to %(book_format)s"
 msgstr "書籍已經成功加入到 %(book_format)s 格式轉換佇列"

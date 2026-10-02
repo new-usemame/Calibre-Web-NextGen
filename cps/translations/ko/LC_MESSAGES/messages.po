@@ -1413,6 +1413,14 @@ msgid "Source or destination format for conversion missing"
 msgstr "변환할 원본 또는 대상 형식이 지정되지 않았습니다."
 
 #: cps/editbooks.py
+msgid "Book is unavailable for conversion"
+msgstr ""
+
+#: cps/editbooks.py
+msgid "The selected conversion formats are not supported for this book"
+msgstr ""
+
+#: cps/editbooks.py
 #, python-format
 msgid "Book successfully queued for converting to %(book_format)s"
 msgstr "%(book_format)s 형식으로 변환하기 위해 작업에 추가되었습니다."

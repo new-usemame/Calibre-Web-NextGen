@@ -485,6 +485,8 @@ calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you i
 
 Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input wants an Adobe login) keep their settings in files next to the zips. Easiest path: configure the plugin in Calibre desktop on your computer first, then copy its settings files (e.g. `plugins/dedrm.json`, the `plugins/DeACSM/` folder) from your desktop Calibre configuration folder into the same container `plugins/` folder and restart.
 
+The book editor's conversion choices come from the configured Calibre install's active input and output plugins. For example, a KFX input plugin makes KFX books eligible as sources; a KFX output choice appears only when Calibre reports an installed output plugin that can write KFX. Plugins are not bundled, and a separate comic/KPF workflow does not by itself add an `ebook-convert` output format. The capability check uses the same `CWA_CALIBRE_USER_PLUGINS` setting as conversion jobs, refreshes at least once a minute, and hides Calibre conversion choices if the local capability probe is unavailable or invalid. Directory-only OEB output is excluded because book conversion stores one file. The separate EPUB-to-KEPUB option remains available when `kepubify` is configured.
+
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
 ```
@@ -805,34 +807,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `██████████████████░░` 90% | 3381/3763 | 0 |
-| Slovak (`sk`) | `██████████████████░░` 90% | 3377/3763 | 0 |
-| Swedish (`sv`) | `█████████████████░░░` 87% | 3289/3763 | 0 |
-| French (`fr`) | `█████████████████░░░` 86% | 3224/3763 | 125 |
-| Italian (`it`) | `████████████████░░░░` 82% | 3100/3763 | 0 |
-| Spanish (`es`) | `████████████████░░░░` 82% | 3084/3763 | 0 |
-| Dutch (`nl`) | `███████████████░░░░░` 74% | 2772/3763 | 288 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████████░░░░░░` 70% | 2653/3763 | 179 |
-| Polish (`pl`) | `██████████████░░░░░░` 68% | 2566/3763 | 0 |
-| German (`de`) | `█████████████░░░░░░░` 63% | 2365/3763 | 12 |
-| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 46% | 1720/3763 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 37% | 1397/3763 | 303 |
-| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 35% | 1310/3763 | 243 |
-| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 32% | 1204/3763 | 311 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 31% | 1170/3763 | 339 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 25% | 939/3763 | 265 |
-| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 21% | 784/3763 | 280 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 19% | 699/3763 | 351 |
-| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 18% | 676/3763 | 353 |
-| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 18% | 675/3763 | 352 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 14% | 507/3763 | 389 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 13% | 478/3763 | 399 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 447/3763 | 365 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 12% | 432/3763 | 426 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 425/3763 | 348 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 358/3763 | 379 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 292/3763 | 377 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 209/3763 | 337 |
+| Russian (`ru`) | `██████████████████░░` 90% | 3381/3765 | 0 |
+| Slovak (`sk`) | `██████████████████░░` 90% | 3377/3765 | 0 |
+| Swedish (`sv`) | `█████████████████░░░` 87% | 3289/3765 | 0 |
+| French (`fr`) | `█████████████████░░░` 86% | 3226/3765 | 125 |
+| Italian (`it`) | `████████████████░░░░` 82% | 3100/3765 | 0 |
+| Spanish (`es`) | `████████████████░░░░` 82% | 3084/3765 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 74% | 2774/3765 | 288 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████████░░░░░░` 70% | 2653/3765 | 179 |
+| Polish (`pl`) | `██████████████░░░░░░` 68% | 2566/3765 | 0 |
+| German (`de`) | `█████████████░░░░░░░` 63% | 2365/3765 | 12 |
+| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 46% | 1720/3765 | 119 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 37% | 1397/3765 | 303 |
+| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 35% | 1310/3765 | 243 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 32% | 1204/3765 | 311 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 31% | 1170/3765 | 339 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 25% | 939/3765 | 265 |
+| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 21% | 784/3765 | 280 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 19% | 699/3765 | 351 |
+| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 18% | 676/3765 | 353 |
+| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 18% | 675/3765 | 352 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 14% | 507/3765 | 389 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 13% | 478/3765 | 399 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 447/3765 | 365 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 12% | 432/3765 | 426 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 425/3765 | 348 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 358/3765 | 379 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 292/3765 | 377 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 209/3765 | 337 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

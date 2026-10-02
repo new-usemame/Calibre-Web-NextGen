@@ -1247,7 +1247,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       {/* Discover: random picks, library landing only (not while searching). */}
       {!hideLibraryControls && !search && !discoverHidden && (
         <DiscoverSection
-          actionsDisabled={bulkBusy}
+          actionsDisabled={bulkBusy || selectAllBusy}
           onClose={() => setDiscoverHidden(true)}
           closeDisabled={discoverPreferenceSaving}
           hideActions={cardActionsHidden}
@@ -1298,7 +1298,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   hideReadingTags={readingTagsHidden}
                   hideShelfTags={shelfBadgesHidden}
                   selectable={selecting}
-                  selectionDisabled={bulkBusy}
                   selected={selected.has(book.id)}
                   onToggleSelect={toggleSelect}
                   selectionDisabled={selectAllBusy || bulkBusy}
@@ -1383,7 +1382,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <BulkBar
           ids={[...selected]}
           personalLibrary={personalLibrary}
-          onBusyChange={setBulkBusy}
           onClear={() => {
             selectAllRequest.current += 1;
             setSelectAllBusy(false);

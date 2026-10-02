@@ -129,7 +129,13 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
       // Keep the release over the target after the evidence capture; native
       // edge scrolling and drawer transitions can move it during a screenshot.
       const release = (await target.boundingBox())!;
-      await touch('touchMove', release.x + release.width / 2, release.y + release.height / 2);
+      const nav = (await page.locator('[data-shelf-drag-nav]').boundingBox())!;
+      // Follow the moving row out of the 48px edge-scroll band. The point
+      // stays inside the lower shelf row and the floating toolbar's overlap.
+      const releaseY = Math.min(release.y + release.height / 2, nav.y + nav.height - 56);
+      expect(releaseY).toBeGreaterThan(release.y);
+      expect(releaseY).toBeLessThan(release.y + release.height);
+      await touch('touchMove', release.x + release.width / 2, releaseY);
       await expect(target).toHaveClass(/dropOver/);
       // This lower target can lie in the drawer's edge-scroll zone. Keep the
       // overlap hit above, then place the actual drop in the stable centre.

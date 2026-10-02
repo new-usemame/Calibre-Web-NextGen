@@ -50,11 +50,12 @@ def load_browsable_columns():
 def is_cc_visible(user, col_id, fail_on_error=False):
     """An explicit reader choice wins; otherwise resolve Calibre's mode."""
     try:
-        stored = user.get_view_property(CC_PAGE, "show_cc_%d" % col_id)
-        # Anonymous keeps browser choices in session, but compatibility choices
-        # belong to the configured Guest row and also serve anonymous OPDS.
-        if stored is None and user.is_anonymous:
-            stored = ub.UserBase.get_view_property(user, CC_PAGE, "show_cc_%d" % col_id)
+        key = "show_cc_%d" % col_id
+        # Explicit Guest choices are shared across anonymous clients. Session
+        # preferences may customize only columns without a saved Guest choice.
+        stored = ub.UserBase.get_view_property(user, CC_PAGE, key) if user.is_anonymous else None
+        if not isinstance(stored, bool):
+            stored = user.get_view_property(CC_PAGE, key)
         if isinstance(stored, bool):
             return stored
         return col_id in calibre_db.get_hierarchical_column_ids(fail_on_error=True) if fail_on_error else col_id in calibre_db.get_hierarchical_column_ids()

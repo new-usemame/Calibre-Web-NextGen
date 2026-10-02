@@ -394,11 +394,15 @@ def test_fresh_settings_skip_legacy_upgrade_and_existing_settings_keep_it(existi
         engine.dispose()
 
 
-@pytest.mark.parametrize("session_choice,expected", [(None, True), (False, False), (True, True)])
-def test_guest_uses_preserved_visibility_unless_browser_session_overrides(monkeypatch, session_choice, expected):
+@pytest.mark.parametrize("guest_choice,session_choice,expected", [
+    (False, True, False), (False, "crafted", False), (True, False, True),
+    (True, None, True), (False, None, False),
+    (None, True, True), (None, False, False), (None, None, False),
+])
+def test_explicit_guest_choice_wins_over_browser_session(monkeypatch, guest_choice, session_choice, expected):
     from cps import ub
     guest = ub.Anonymous.__new__(ub.Anonymous)
-    guest.view_settings = {"cc_sidebar": {"show_cc_2": True}}
+    guest.view_settings = {"cc_sidebar": {"show_cc_2": guest_choice}}
     monkeypatch.setattr(ccv.calibre_db, "get_hierarchical_column_ids", lambda: set())
     with _app().test_request_context():
         if session_choice is not None:

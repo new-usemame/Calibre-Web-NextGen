@@ -17741,72 +17741,72 @@ msgstr "Zobraziť sekciu Prečítané/Neprečítané"
 #~ "Kniha musí byť najskôr archivovaná a zariadenie synchronizované pred tým "
 #~ "než môže byť kniha bezpečne zmazaná."
 
-#: cps/admin.py:2993
+#: cps/admin.py
 msgid "Disable the Calibre content server before enabling split library mode."
 msgstr ""
 
-#: cps/admin.py:3071
+#: cps/admin.py
 msgid ""
 "Please enter a content server username and password, or allow anonymous "
 "writes"
 msgstr ""
 
-#: cps/admin.py:3077
+#: cps/admin.py
 msgid "Content server port must be a number from 1 to 65535"
 msgstr ""
 
-#: cps/admin.py:3078
+#: cps/admin.py
 msgid "Content server port must differ from the port this server listens on"
 msgstr ""
 
-#: cps/admin.py:3079
+#: cps/admin.py
 msgid ""
 "Content server username may only use the letters A-Z, numbers, spaces, "
 "underscores and hyphens"
 msgstr ""
 
-#: cps/admin.py:3081
+#: cps/admin.py
 msgid "Content server password must use only ASCII (English) characters"
 msgstr ""
 
-#: cps/admin.py:3088
+#: cps/admin.py
 #, python-format
 msgid "Invalid content server listen address: %(address)s"
 msgstr ""
 
-#: cps/admin.py:3098
+#: cps/admin.py
 #, python-format
 msgid "Invalid content server trusted IP/CIDR entry: %(entry)s"
 msgstr ""
 
-#: cps/admin.py:3110
+#: cps/admin.py
 msgid "Disable split library mode before enabling the Calibre content server."
 msgstr ""
 
-#: cps/templates/config_edit.html:306
+#: cps/templates/config_edit.html
 msgid "Enable Calibre Content Server"
 msgstr ""
 
-#: cps/templates/config_edit.html:310
+#: cps/templates/config_edit.html
 msgid "Content Server Port"
 msgstr ""
 
-#: cps/templates/config_edit.html:314
+#: cps/templates/config_edit.html
 msgid "Content Server Listen Address"
 msgstr ""
 
-#: cps/templates/config_edit.html:316
+#: cps/templates/config_edit.html
 msgid ""
 "127.0.0.1 keeps the content server reachable only from this machine. Enter "
 "0.0.0.0 to expose it on the network, which is required to reach it from "
 "another container or host."
 msgstr ""
 
-#: cps/templates/config_edit.html:320
+#: cps/templates/config_edit.html
 msgid "Allow Anonymous Writes (no username or password required)"
 msgstr ""
 
-#: cps/templates/config_edit.html:321
+#: cps/templates/config_edit.html
 msgid ""
 "Without a username and password, anyone who can reach the listen address can"
 " read the whole library. Behind Docker port mapping or a reverse proxy on "
@@ -17814,30 +17814,34 @@ msgid ""
 "allowing that address lets everyone write."
 msgstr ""
 
-#: cps/templates/config_edit.html:325
+#: cps/templates/config_edit.html
 msgid ""
 "Addresses Allowed to Write Without a Password (Comma Separated IPs/CIDRs)"
 msgstr ""
 
-#: cps/templates/config_edit.html:327
+#: cps/templates/config_edit.html
 msgid ""
 "Leave empty to allow unauthenticated writes only from this machine. Every "
 "address listed here can add, edit and delete books in the library without "
 "any credentials, so keep it as narrow as possible."
 msgstr ""
 
-#: cps/templates/config_edit.html:332
+#: cps/templates/config_edit.html
 msgid "Content Server Username"
 msgstr ""
 
-#: cps/templates/config_edit.html:336
+#: cps/templates/config_edit.html
 msgid "Content Server Password"
 msgstr ""
 
-#: cps/templates/config_edit.html:340
+#: cps/templates/config_edit.html
 msgid "Reset Password"
 msgstr ""
 
-#: cps/templates/config_edit.html:341
+#: cps/templates/config_edit.html
 msgid "The content server stays stopped until a new password is saved."
+msgstr ""
+
+#: cps/admin.py
+msgid "The managed Calibre content server requires a POSIX platform. Use the Linux container on Windows."
 msgstr ""

@@ -11,7 +11,9 @@ import json
 import os
 import subprocess
 import sys
-from calibre_library_target import library_target
+from calibre_library_target import (library_target, calibredb_command, operation,
+                                    offline_library_operation, offline_child_ownership,
+                                    offline_writer_ownership)
 import tempfile
 import time
 import shutil
@@ -48,15 +50,14 @@ from contextlib import contextmanager as _contextmanager
 
 
 @_contextmanager
-def _noop_metadata_db_write_lock(*args, **kwargs):
-    # No-op fallback used when running outside the container OR before
-    # _load_optional_cps_modules() has been called. The fcntl-based
-    # lock is advisory; in test paths that don't reach the cps import,
-    # this fallback preserves callsite semantics.
-    yield
+def _standalone_metadata_db_write_lock(*args, **kwargs):
+    # The shared primitive is dependency-free: a failed optional Flask import
+    # must not disable coordination with the app or a managed Calibre server.
+    with operation(timeout=kwargs.get("timeout", 120)) as fd:
+        yield fd
 
 
-metadata_db_write_lock = _noop_metadata_db_write_lock
+metadata_db_write_lock = _standalone_metadata_db_write_lock
 
 
 def _load_fork_cps_imports() -> None:
@@ -82,7 +83,7 @@ def _load_fork_cps_imports() -> None:
         from cps.services.calibre_db_lock import metadata_db_write_lock as _module_lock
         metadata_db_write_lock = _module_lock
     except ImportError:
-        metadata_db_write_lock = _noop_metadata_db_write_lock
+        metadata_db_write_lock = _standalone_metadata_db_write_lock
 
     try:
         from cps.services.kepub_package_normalizer import (
@@ -109,7 +110,7 @@ def _is_lock_error_stderr(stderr_text):
     return any(p in low for p in _LOCK_PATTERNS)
 
 
-def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0):
+def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0, **process_options):
     """Run calibredb add with retry+backoff on transient lock errors.
 
     Returns the successful CompletedProcess. Raises the last
@@ -121,6 +122,7 @@ def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0):
         try:
             return subprocess.run(
                 cmd, env=env, check=True, capture_output=True, text=True,
+                **process_options,
             )
         except subprocess.CalledProcessError as e:
             stderr = e.stderr or ""
@@ -1995,6 +1997,7 @@ class NewBookProcessor:
                 action,
             ),
             self.calibre_env,
+            **offline_child_ownership(),
         )
         return self._parse_calibre_transaction_result(completed)
 
@@ -2231,6 +2234,7 @@ class NewBookProcessor:
         return True
 
 
+    @offline_library_operation
     def add_book_to_library(
         self,
         book_path: str,
@@ -2433,7 +2437,7 @@ class NewBookProcessor:
                 # Reinspect under the cooperating-writer lock. If a matching
                 # format appeared after the unlocked inspection, release the
                 # lock and validate before trying again.
-                with metadata_db_write_lock():
+                with metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     try:
                         candidates = self._current_overwrite_candidates(
                             staged_path,
@@ -2685,10 +2689,11 @@ class NewBookProcessor:
         try:
             mark_ingest_batch_active()
             wait_for_duplicate_full_scan_to_finish()
-            target = library_target(self.library_dir)
-            result = subprocess.run([
-                "calibredb", "add_format", str(book_id), str(staged_path), *target.args
-            ], env=self.calibre_env, check=True, capture_output=True, text=True, input=target.stdin)
+            with operation():
+                target = library_target(self.library_dir)
+                result = subprocess.run(calibredb_command([
+                    "calibredb", "add_format", str(book_id), str(staged_path), *target.args
+                ], target), env=self.calibre_env, check=True, capture_output=True, text=True, input=target.stdin)
             print(f"[ingest-processor] Added new format for book id {book_id}: {os.path.basename(str(staged_path))}", flush=True)
             mark_ingest_batch_dirty()
             run_duplicate_scan_for_books([book_id])

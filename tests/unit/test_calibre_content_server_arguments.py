@@ -68,7 +68,7 @@ def content_server(monkeypatch, tmp_path):
     package.__path__ = [str(REPO_ROOT / "cps")]
     package.config = _Config()
     package.constants = types.SimpleNamespace(
-        CONFIG_DIR=str(tmp_path), SCRIPTS_DIR="/app/calibre-web-automated/scripts")
+        CONFIG_DIR=str(tmp_path), SCRIPTS_DIR="/app/calibre-web-automated/scripts", DEFAULT_PORT=8083)
     package.logger = types.SimpleNamespace(create=lambda: _Log())
     monkeypatch.setitem(sys.modules, "cps", package)
 
@@ -83,7 +83,12 @@ def content_server(monkeypatch, tmp_path):
 
 
 def _answering(module, monkeypatch, answering=True):
-    monkeypatch.setattr(module, "is_answering", lambda *a, **k: answering)
+    monkeypatch.setattr(module, "is_ready", lambda: answering)
+    monkeypatch.setattr(module.ownership, "busy", lambda *_args: bool(
+        answering and module.config.config_calibre_server_enabled
+        and module.config.config_calibre_dir
+        and (module.config.config_calibre_server_anonymous_writes
+             or (module.config.config_calibre_server_username and module.config.config_calibre_server_password_e))))
 
 
 # --------------------------------------------------------------------------
@@ -316,6 +321,7 @@ def _spawns(module, monkeypatch, tmp_path):
             return 0
 
     monkeypatch.setattr(module.subprocess, "Popen", _Popen)
+    monkeypatch.setattr(module, "is_ready", lambda: True)
     return launched
 
 
@@ -480,7 +486,13 @@ def test_calibredb_reaches_the_server_where_it_listens(content_server, monkeypat
 
     assert content_server.is_answering() is True
     assert probed == [(host, 7777)]
-    assert content_server.library_url().startswith("http://{}:7777/#".format(url_host))
+    http_probes = []
+    monkeypatch.setattr(content_server, "server_ready",
+                        lambda target_host, port, library: http_probes.append(
+                            (target_host, port, library)) or True)
+    monkeypatch.setattr(content_server.ownership, "busy", lambda *_args: True)
+    assert content_server.library_target().args[1].startswith("http://{}:7777/#".format(url_host))
+    assert http_probes == [(host, 7777, "/calibre-library")]
     assert scripts_copy.connect_host(listen) == host
 
 
@@ -613,3 +625,144 @@ def test_forced_stop_must_reap_before_handing_library_to_another_owner(content_s
         assert calls == ['terminate', ('wait', 10), 'kill', ('wait', 10)]
         assert content_server._process is None
         hold.release()
+
+
+def test_startup_refuses_the_actual_web_port_even_for_previously_saved_settings(content_server, monkeypatch, tmp_path):
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.config.config_calibre_server_port = 8083
+    content_server.start()
+    assert launched == []
+    assert any("port-in-use" in message for message in content_server.log_records)
+
+
+def test_server_child_gets_writable_font_cache_without_changing_plugin_selection(content_server, monkeypatch, tmp_path):
+    _spawns(content_server, monkeypatch, tmp_path)
+    observed = {}
+    monkeypatch.delenv('XDG_CACHE_HOME', raising=False)
+    monkeypatch.setenv('CALIBRE_CONFIG_DIRECTORY', '/plugin-free-config')
+    existing_home = os.environ.get('HOME')
+    class Process:
+        stdout = None
+        def poll(self):
+            return None
+    def launch(_args, **kwargs):
+        observed.update(kwargs.get('env') or {})
+        return Process()
+    monkeypatch.setattr(content_server.subprocess, 'Popen', launch)
+    content_server.start()
+    assert observed.get('XDG_CACHE_HOME') == str(tmp_path / '.cache')
+    assert observed.get('CALIBRE_CONFIG_DIRECTORY') == '/plugin-free-config'
+    assert observed.get('HOME') == existing_home
+
+
+def test_packaged_app_routing_does_not_depend_on_an_unrelated_scripts_package(content_server, monkeypatch):
+    """An installed cps package must start even if another package owns scripts."""
+    unrelated = types.ModuleType("scripts")
+    unrelated.__path__ = []
+    monkeypatch.setitem(sys.modules, "scripts", unrelated)
+    monkeypatch.delitem(sys.modules, "scripts.calibre_library_target", raising=False)
+    spec = importlib.util.spec_from_file_location("cps.content_server_installed", MODULE_PATH)
+    installed = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installed)
+    _answering(installed, monkeypatch)
+    target = installed.library_target()
+    assert target.args[:2] == ["--with-library", "http://127.0.0.1:7777/#calibre-library"]
+    assert target.stdin == PASSWORD + "\n"
+
+
+def test_anonymous_specific_lan_bind_trusts_only_its_own_local_source_address(content_server):
+    """Calibre local-write recognizes loopback; a specific LAN bind needs its local IP."""
+    content_server.config.config_calibre_server_anonymous_writes = True
+    content_server.config.config_calibre_server_listen = "192.168.1.20"
+    content_server.config.config_calibre_server_trusted_ips = "10.0.0.5/32"
+    arguments = content_server.server_arguments()
+    assert arguments[arguments.index("--trusted-ips") + 1] == "10.0.0.5/32,192.168.1.20"
+    assert "0.0.0.0/0" not in arguments
+
+
+def test_deferred_reconciler_survives_a_second_maintenance_start(content_server, monkeypatch):
+    """A conversion starting at the handoff cannot strand the enabled server down."""
+    callbacks = []
+    monkeypatch.setattr(content_server.threading, "Thread",
+                        lambda target, **kwargs: types.SimpleNamespace(start=lambda: callbacks.append(target)))
+    active = [False]
+    starts = []
+    monkeypatch.setattr(content_server.ownership, "busy", lambda *_args: active[0])
+    monkeypatch.setattr(content_server.time, "sleep", lambda *_args: active.__setitem__(0, False))
+    def start():
+        starts.append(True)
+        active[0] = len(starts) == 1
+        if active[0]:
+            content_server._defer_for_maintenance()
+    monkeypatch.setattr(content_server, "_locked_start", start)
+    content_server._defer_for_maintenance()
+    assert len(callbacks) == 1
+    callbacks[0]()
+    assert len(starts) == 2
+    assert content_server._maintenance_waiter is False
+
+
+def test_reconciler_thread_failure_leaves_later_saves_able_to_retry(content_server, monkeypatch):
+    class FailingThread:
+        def __init__(self, **kwargs):
+            pass
+        def start(self):
+            raise RuntimeError("thread capacity")
+    monkeypatch.setattr(content_server.threading, "Thread", FailingThread)
+    with pytest.raises(RuntimeError, match="thread capacity"):
+        content_server._defer_for_maintenance()
+    assert content_server._maintenance_waiter is False
+
+
+def test_restore_hold_releases_its_write_gate_even_if_server_restart_fails(
+        content_server, monkeypatch, tmp_path):
+    _spawns(content_server, monkeypatch, tmp_path)
+    content_server.start()
+    hold = content_server.hold_library(exclusive=True)
+    monkeypatch.setattr(content_server, "_locked_start",
+                        lambda: (_ for _ in ()).throw(RuntimeError("restart failed")))
+    try:
+        with pytest.raises(RuntimeError, match="restart failed"):
+            hold.release()
+        assert content_server._library_holds == 0
+        with content_server.ownership.operation(str(tmp_path), timeout=0.05):
+            pass
+        assert hold.child_ownership() == {}
+        hold.release()  # a failed restart must not decrement the hold twice
+    finally:
+        if hold.exclusive_context is not None:
+            hold.exclusive_context.__exit__(None, None, None)
+
+
+def test_configuration_reconcile_retains_one_gate_across_native_lifecycle(
+        content_server, monkeypatch, tmp_path):
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    observed = []
+
+    @content_server.configuration_update
+    def save():
+        with pytest.raises(TimeoutError):
+            with content_server.ownership.operation(str(tmp_path), timeout=0.05):
+                pytest.fail("settings generation became visible before reconciliation")
+        content_server.start()
+        observed.append(content_server._process is not None)
+        content_server.stop()
+        observed.append(content_server._process is None)
+        raise RuntimeError("later configuration failure")
+
+    with pytest.raises(RuntimeError, match="later configuration failure"):
+        save()
+    assert observed == [True, True]
+    assert len(launched) == 1
+    with content_server.ownership.operation(str(tmp_path), timeout=0.05):
+        pass
+    assert content_server._configuration_gate_owned.get() is False
+
+
+def test_native_windows_saved_enabled_settings_cannot_launch_an_unowned_child(
+        content_server, monkeypatch, tmp_path):
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    monkeypatch.setattr(content_server, "platform_supported", lambda: False)
+    content_server.start()
+    assert launched == []
+    assert any("POSIX" in message for message in content_server.log_records)

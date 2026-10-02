@@ -42,7 +42,9 @@ require an application restart.
 NextGen's supported `calibredb` operations use the running content server,
 including its authenticated stdin credentials. Standalone ingest/enforcement
 scripts read the same routing policy and encrypted settings from `app.db`.
-When the service is disabled or unavailable, operations use the library path.
+When the service is stopped and no managed owner remains, operations use the
+library path. An unready server that still owns the library causes a retryable
+failure instead of opening that path concurrently.
 Saving a different library or binaries location reconciles the managed service.
 
 Convert Library and Restore Calibre Database hold the service stopped while
@@ -72,3 +74,32 @@ setting a database override alone does not provide complete split-library
 support.
 
 This integration began with [@benjitobz's contribution](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2210).
+
+
+## Process ownership and platform support
+
+The managed server supports POSIX platforms, including the Linux container.
+Native Windows cannot enable it; use the Linux container there. The ownership
+protocol relies on a descriptor inherited by the Calibre child. Without that
+ownership, a killed supervisor could leave a running server invisible to the
+next app process. This restriction applies to the optional server; the normal
+server-disabled app and command-line tools keep their path-based operation.
+
+The supervisor stops and reaps Calibre when the app lifeline closes. On Linux,
+Calibre also receives a parent-death signal if its supervisor is killed. On
+other POSIX platforms, a child that survives a forced supervisor kill retains
+the owner lock: subsequent operations refuse path access until it exits.
+Raw ingest imports also pause the managed cache for their whole operation; their
+Calibre transaction child inherits both maintenance and metadata-writer locks.
+A standalone Convert Library run owns its maintenance lock for the whole run,
+including across an app restart. Restore holds the shared writer gate through
+its subprocesses, and settings changes retain that gate until the server uses
+the saved generation. These locks coordinate NextGen's supported operations;
+external programs must still stop the managed server before changing its library.
+
+Calibre readiness is checked with a credential-free HTTP probe. A port accepting
+TCP connections alone cannot receive the configured credentials. Authenticated
+calibredb calls use a private stdin pipe, preserving passwords with trailing
+spaces and avoiding a controlling-terminal prompt or a password-bearing command
+argument. Anonymous writes on a specific local LAN bind trust that local address
+in addition to the administrator's explicit trusted addresses.

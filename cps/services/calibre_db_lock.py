@@ -110,12 +110,16 @@ def metadata_db_write_lock(
         Seconds between non-blocking flock attempts. Lower is more
         responsive but burns more CPU. Default 0.1s is a fine balance.
     """
+    windows_locks = None
     if not HAS_FCNTL:
-        # Windows / no-fcntl platforms — no-op fallback. The lock is
-        # advisory anyway; on platforms without fcntl, the deployment
-        # is not a Docker container where the contention matters.
-        yield
-        return
+        try:
+            from . import file_lock as windows_locks
+        except ImportError:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "_cwng_metadata_file_lock", Path(__file__).with_name("file_lock.py"))
+            windows_locks = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(windows_locks)
 
     lock_path = _resolve_lock_path(lock_dir)
 
@@ -128,7 +132,10 @@ def metadata_db_write_lock(
         deadline = time.monotonic() + timeout
         while True:
             try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if windows_locks is None:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                elif not windows_locks.acquire(fd, blocking=False):
+                    raise BlockingIOError(errno.EAGAIN, "metadata writer owns the lock")
                 break
             except OSError as e:
                 if e.errno not in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES):
@@ -155,10 +162,13 @@ def metadata_db_write_lock(
                 os.write(fd, f"{os.getpid()}\n".encode("utf-8"))
             except OSError:
                 pass
-            yield
+            yield fd
         finally:
             try:
-                fcntl.flock(fd, fcntl.LOCK_UN)
+                if windows_locks is None:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                else:
+                    windows_locks.release(fd)
             except OSError:
                 pass
     finally:

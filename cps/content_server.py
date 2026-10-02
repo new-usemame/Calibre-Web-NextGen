@@ -25,14 +25,19 @@ import sys
 import threading
 import time
 from collections import deque
+from contextlib import nullcontext
+from contextvars import ContextVar
+from functools import wraps
 
 from . import config, constants, logger
-from scripts.calibre_library_target import LibraryTarget, connect_host, library_id, server_target
+from .calibre_library_target import LibraryTarget, connect_host, library_id, server_target, server_ready
+from . import calibre_server_guard as ownership
 
 log = logger.create()
 
 _process = None
 _lock = threading.RLock()
+_configuration_gate_owned = ContextVar("calibre_configuration_gate_owned", default=False)
 _stopped_on_purpose = False
 _library_holds = 0
 _restart_on_release = False
@@ -116,21 +121,15 @@ def configuration_identity():
     return tuple(setting(name) for name in SETTING_DEFAULTS)
 
 
-def _url_host(host):
-    return "[{}]".format(host) if ":" in host else host
-
-
-def library_url():
-    return "http://{}:{}/#{}".format(
-        _url_host(connect_host(setting("config_calibre_server_listen"))),
-        setting("config_calibre_server_port"),
-        library_id(setting("config_calibre_dir")))
-
-
 def _auth_enabled():
     return bool(not setting("config_calibre_server_anonymous_writes")
                 and setting("config_calibre_server_username")
                 and setting("config_calibre_server_password_e"))
+
+
+def platform_supported():
+    """Child-held process ownership requires POSIX descriptor inheritance."""
+    return os.name != "nt"
 
 
 def is_answering(timeout=PROBE_TIMEOUT):
@@ -141,6 +140,11 @@ def is_answering(timeout=PROBE_TIMEOUT):
             return True
     except (OSError, ValueError):
         return False
+
+
+def is_ready():
+    return server_ready(connect_host(setting("config_calibre_server_listen")),
+                        setting("config_calibre_server_port"), setting("config_calibre_dir"))
 
 
 def library_target():
@@ -157,15 +161,11 @@ def library_target():
         setting("config_calibre_server_port"), setting("config_calibre_server_listen"),
         setting("config_calibre_server_anonymous_writes"),
         setting("config_calibre_server_username"), setting("config_calibre_server_password_e"),
-        lambda _host, _port: is_answering(),
+        lambda _host, _port: is_ready(),
         lambda reason: log.warning("Calibre content server is enabled but %s, "
                                    "addressing the library by path instead", reason),
+        lambda: ownership.busy(constants.CONFIG_DIR, "owner"),
     )
-
-
-def library_arguments():
-    """Back-compat shim for callers that cannot feed stdin."""
-    return library_target().args
 
 
 def _db_mtime(db_path):
@@ -194,7 +194,7 @@ def _watch(process, db_path, last=None):
     changed = None
     while True:
         time.sleep(WATCH_INTERVAL)
-        with _lock:
+        with ownership.operation(constants.CONFIG_DIR), _lock:
             if _process is not process:
                 return
             if process.poll() is not None:
@@ -212,7 +212,7 @@ def _watch(process, db_path, last=None):
             changed = time.time()
         elif changed and time.time() - changed >= QUIET_BEFORE_RELOAD:
             log.info("Library database changed, reloading calibre content server")
-            with _lock:
+            with ownership.operation(constants.CONFIG_DIR), _lock:
                 if _process is process and process.poll() is None:
                     _locked_start()
             return
@@ -221,6 +221,10 @@ def _watch(process, db_path, last=None):
 def _restart_after_exit(process):
     """Relaunch a server that died, unless it keeps dying on startup."""
     global _quick_exits, _process
+    if ownership.busy(constants.CONFIG_DIR, "maintenance"):
+        _process = None
+        _defer_for_maintenance()
+        return
     ran_for = time.monotonic() - (_started_at or 0)
     _quick_exits = _quick_exits + 1 if ran_for < QUICK_EXIT_SECONDS else 1
     if _quick_exits >= MAX_QUICK_EXITS:
@@ -265,6 +269,15 @@ def userdb_path():
     return os.path.join(constants.CONFIG_DIR, "content_server_users.sqlite")
 
 
+def _calibre_environment():
+    # The abc service user cannot write /root's default fontconfig cache.
+    # Give the child a writable cache without changing Calibre's plugin/config
+    # selection or the caller's environment.
+    environment = os.environ.copy()
+    environment.setdefault("XDG_CACHE_HOME", os.path.join(constants.CONFIG_DIR, ".cache"))
+    return environment
+
+
 def write_userdb(username, password, userdb=None, binary=None):
     """Create the single-user database calibre-server authenticates against.
 
@@ -282,7 +295,7 @@ def write_userdb(username, password, userdb=None, binary=None):
         pass
     helper = os.path.join(constants.SCRIPTS_DIR, "calibre_server_user.py")
     result = subprocess.run([binary, "-e", helper, "--", userdb, username],
-                            input=password + "\n", capture_output=True, text=True)
+                            input=password + "\n", capture_output=True, text=True, env=_calibre_environment())
     if result.returncode != 0:
         log.error("Failed to create calibre content server user: %s", result.stderr)
         return False
@@ -310,8 +323,15 @@ def server_arguments():
             "--disable-fallback-to-detected-interface"]
     if setting("config_calibre_server_anonymous_writes"):
         args.append("--enable-local-write")
-        if setting("config_calibre_server_trusted_ips"):
-            args += ["--trusted-ips", setting("config_calibre_server_trusted_ips")]
+        trusted = [entry.strip() for entry in setting("config_calibre_server_trusted_ips").split(",")
+                   if entry.strip()]
+        local_source = connect_host(setting("config_calibre_server_listen"))
+        if not ipaddress.ip_address(local_source).is_loopback and local_source not in trusted:
+            # A connection to our specific LAN bind originates from that same
+            # host address. Calibre's local-write rule recognizes loopback only.
+            trusted.append(local_source)
+        if trusted:
+            args += ["--trusted-ips", ",".join(trusted)]
     elif _auth_enabled():
         # calibre's default auth mode: Digest over plain HTTP, so the password
         # never crosses the wire in the clear; calibredb authenticates with it
@@ -344,12 +364,14 @@ def start():
 
     A deliberate start clears the give-up count, so saving corrected settings
     is always another attempt."""
-    return _run_lifecycle(_start_blocking)
+    gate_owned = _configuration_gate_owned.get()
+    return _run_lifecycle(lambda: _start_blocking(gate_owned))
 
 
-def _start_blocking():
+def _start_blocking(gate_owned=False):
     global _quick_exits
-    with _lock:
+    operation = nullcontext() if gate_owned else ownership.operation(constants.CONFIG_DIR)
+    with operation, _lock:
         _quick_exits = 0
         _locked_start()
 
@@ -360,11 +382,23 @@ def _locked_start():
         _restart_on_release = bool(setting("config_calibre_server_enabled"))
         return
     _locked_stop()
+    if ownership.busy(constants.CONFIG_DIR, "maintenance"):
+        _defer_for_maintenance()
+        return
     if not setting("config_calibre_server_enabled") or not setting("config_calibre_dir"):
+        return
+    if not platform_supported():
+        log.error("Calibre content server not started: managed child ownership requires a POSIX platform")
         return
     if setting("config_calibre_split"):
         log.error("Calibre content server not started: split library mode is unsupported. "
                   "Disable split library mode before enabling the content server.")
+        return
+    problem = settings_problem(setting("config_calibre_server_port"),
+                               setting("config_calibre_server_username"),
+                               setting("config_calibre_server_password_e"), constants.DEFAULT_PORT)
+    if problem:
+        log.error("Calibre content server not started: invalid settings (%s)", problem)
         return
     if not os.path.isfile(server_binary()):
         log.error("calibre-server binary not found: %s", server_binary())
@@ -388,14 +422,22 @@ def _locked_start():
     db_path = os.path.join(setting("config_calibre_dir"), "metadata.db")
     initial_mtime = _db_mtime(db_path)
     try:
-        _process = subprocess.Popen(server_arguments(), stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True)
+        command = [sys.executable, ownership.__file__, constants.CONFIG_DIR, *server_arguments()]
+        _process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True, env=_calibre_environment())
     except OSError as ex:
         log.error("Failed to start calibre content server: %s", ex)
         _process = None
         return
-    _started_at = time.monotonic()
     threading.Thread(target=_drain_output, args=(_process.stdout,), daemon=True).start()
+    deadline = time.monotonic() + 30
+    while _process.poll() is None and not is_ready():
+        if time.monotonic() >= deadline:
+            log.error("Calibre content server did not become ready within 30 seconds")
+            _locked_stop()
+            return
+        time.sleep(0.1)
+    _started_at = time.monotonic()
     log.info("Calibre content server started on port %s", setting("config_calibre_server_port"))
     threading.Thread(target=_watch,
                      args=(_process, db_path, initial_mtime),
@@ -403,35 +445,70 @@ def _locked_start():
 
 
 def stop():
-    return _run_lifecycle(_stop_blocking)
+    gate_owned = _configuration_gate_owned.get()
+    return _run_lifecycle(lambda: _stop_blocking(gate_owned))
 
 
-def _stop_blocking():
-    with _lock:
+def _stop_blocking(gate_owned=False):
+    operation = nullcontext() if gate_owned else ownership.operation(constants.CONFIG_DIR)
+    with operation, _lock:
         _locked_stop()
+
+
+def configuration_update(callback):
+    """Keep settings persistence and process reconciliation one generation.
+
+    Flask/session work stays on its caller. Capture gate ownership before
+    offloading lifecycle work: native gevent workers do not inherit ContextVars.
+    """
+    @wraps(callback)
+    def update(*args, **kwargs):
+        if _configuration_gate_owned.get():
+            return callback(*args, **kwargs)
+        operation = ownership.operation(constants.CONFIG_DIR)
+        _run_lifecycle(operation.__enter__)
+        token = _configuration_gate_owned.set(True)
+        try:
+            return callback(*args, **kwargs)
+        finally:
+            _configuration_gate_owned.reset(token)
+            _run_lifecycle(lambda: operation.__exit__(None, None, None))
+    return update
 
 
 
 class _LibraryHold:
     """One owned hold on the library; releasing twice cannot resume it early."""
-    def __init__(self):
+    def __init__(self, exclusive_context=None, fd=None):
         self.released = False
+        self.exclusive_context = exclusive_context
+        self.fd = fd
+
+    def child_ownership(self):
+        return {"pass_fds": (self.fd,)} if self.fd is not None and os.name != "nt" else {}
 
     def release(self):
         return _run_lifecycle(self._release_blocking)
 
     def _release_blocking(self):
         global _library_holds, _restart_on_release
-        with _lock:
-            if self.released:
-                return
-            self.released = True
-            _library_holds -= 1
-            if not _library_holds:
-                restart = _restart_on_release
-                _restart_on_release = False
-                if restart and setting("config_calibre_server_enabled"):
-                    _locked_start()
+        operation = nullcontext() if self.exclusive_context is not None else ownership.operation(constants.CONFIG_DIR)
+        try:
+            with operation, _lock:
+                if self.released:
+                    return
+                self.released = True
+                _library_holds -= 1
+                if not _library_holds:
+                    restart = _restart_on_release
+                    _restart_on_release = False
+                    if restart and setting("config_calibre_server_enabled"):
+                        _locked_start()
+        finally:
+            if self.exclusive_context is not None:
+                self.exclusive_context.__exit__(None, None, None)
+                self.exclusive_context = None
+                self.fd = None
 
     def __enter__(self):
         return self
@@ -440,24 +517,33 @@ class _LibraryHold:
         self.release()
 
 
-def hold_library():
+def hold_library(exclusive=False):
     """Stop the server until every conversion/restore owner releases its hold.
 
     A hold also protects a currently disabled or stopped server. Enabling or
     saving settings during that operation defers startup until the last hold
     is released, rather than taking the database lock back mid-conversion.
     """
-    return _run_lifecycle(_hold_library_blocking)
+    return _run_lifecycle(lambda: _hold_library_blocking(exclusive))
 
 
-def _hold_library_blocking():
+def _hold_library_blocking(exclusive=False):
     global _library_holds, _restart_on_release
-    with _lock:
-        if not _library_holds:
-            _restart_on_release = _process is not None and _process.poll() is None
-            _locked_stop()
-        _library_holds += 1
-        return _LibraryHold()
+    operation = ownership.operation(constants.CONFIG_DIR)
+    fd = operation.__enter__()
+    try:
+        with _lock:
+            if not _library_holds:
+                _restart_on_release = _process is not None and _process.poll() is None
+                _locked_stop()
+            _library_holds += 1
+            hold = _LibraryHold(operation if exclusive else None, fd if exclusive else None)
+        if not exclusive:
+            operation.__exit__(None, None, None)
+        return hold
+    except BaseException:
+        operation.__exit__(*sys.exc_info())
+        raise
 
 
 def _locked_stop():
@@ -475,3 +561,36 @@ def _locked_stop():
             _process.wait(10)
         log.info("Calibre content server stopped")
     _process = None
+
+
+_maintenance_waiter = False
+
+
+def _defer_for_maintenance():
+    global _maintenance_waiter
+    if _maintenance_waiter or not setting("config_calibre_server_enabled"):
+        return
+    _maintenance_waiter = True
+
+    def reconcile():
+        global _maintenance_waiter
+        try:
+            while setting("config_calibre_server_enabled"):
+                if ownership.busy(constants.CONFIG_DIR, "maintenance") or _library_holds:
+                    time.sleep(WATCH_INTERVAL)
+                    continue
+                with ownership.operation(constants.CONFIG_DIR), _lock:
+                    if not setting("config_calibre_server_enabled"):
+                        return
+                    _locked_start()
+                    if ownership.busy(constants.CONFIG_DIR, "maintenance") or _library_holds:
+                        continue
+                    return
+        finally:
+            _maintenance_waiter = False
+
+    try:
+        threading.Thread(target=reconcile, daemon=True).start()
+    except RuntimeError:
+        _maintenance_waiter = False
+        raise

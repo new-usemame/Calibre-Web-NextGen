@@ -54,7 +54,18 @@ def target_module(monkeypatch, tmp_path):
 
     monkeypatch.setattr(module, "app_db_path", lambda: str(app_db))
     monkeypatch.setattr(module, "config_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(module, "_is_answering", lambda host, port: True)
+    monkeypatch.setattr(module, "_is_answering", lambda host, port, library_dir=None: True)
+    def managed_owner(*_args):
+        try:
+            row = module._read_settings()
+        except sqlite3.Error:
+            return False
+        if not row or not row[0]:
+            return False
+        _, port, anonymous, username, password_e, listen = row
+        port, username, password = module._apply_env(port, username, module._decrypt(password_e))
+        return bool((anonymous or (username and password)) and module._is_answering(listen, port, LIBRARY))
+    monkeypatch.setattr(module.ownership, "busy", managed_owner)
     module.real_decrypt = module._decrypt
     monkeypatch.setattr(module, "_decrypt", lambda token: PASSWORD if token else "")
     module.app_db = app_db
@@ -114,7 +125,7 @@ def test_environment_port_overrides_the_database(target_module, monkeypatch):
 def test_a_server_that_is_not_running_falls_back_to_the_library_path(target_module, monkeypatch):
     """Convert Library stops the server for its run, and a server can die."""
     _make_app_db(target_module.app_db, password_e=b"encrypted")
-    monkeypatch.setattr(target_module, "_is_answering", lambda host, port: False)
+    monkeypatch.setattr(target_module, "_is_answering", lambda host, port, library_dir=None: False)
     assert target_module.library_target(LIBRARY).args == ["--library-path=/calibre-library"]
 
 
@@ -142,18 +153,29 @@ def test_ingest_transaction_helper_is_addressed_by_path_only():
     Handing it --with-library made every import exit 2 on an argparse error for
     as long as the content server was switched on.
     """
-    source = (REPO_ROOT / "scripts" / "ingest_processor.py").read_text(encoding="utf-8")
-    start = source.index('"calibre-debug", "-e", str(helper)')
-    invocation = source[start:start + 400]
-    assert '"--library-path", self.library_dir' in invocation
-    assert "library_target" not in invocation
-    assert "library_arguments" not in invocation
+    import importlib
+    scripts_dir = str(REPO_ROOT / "scripts")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.syspath_prepend(scripts_dir)
+        processor_module = importlib.import_module("ingest_processor")
+        processor = object.__new__(processor_module.NewBookProcessor)
+        processor.library_dir = "/books/Library With Spaces"
+        processor.cwa_settings = {"auto_ingest_automerge": "overwrite"}
+        processor.calibre_env = {}
+        command = processor._calibre_transaction_command(
+            Path("/ingest/staged.epub"), Path("/ingest/original.acsm"),
+            "import-digest", "ticket-digest", {}, "add")
+    assert command[:2] == ["calibre-debug", "-e"]
+    assert Path(command[2]).name == "calibre_ingest_transaction.py"
+    assert command[command.index("--library-path") + 1] == processor.library_dir
+    assert "--with-library" not in command
+    assert command[command.index("--identity-path") + 1] == "/ingest/original.acsm"
 
 
 def test_the_fallback_says_why_it_fell_back(target_module, monkeypatch, capsys):
     """An operator reading the ingest log can tell the two paths apart."""
     _make_app_db(target_module.app_db, password_e=b"encrypted")
-    monkeypatch.setattr(target_module, "_is_answering", lambda host, port: False)
+    monkeypatch.setattr(target_module, "_is_answering", lambda host, port, library_dir=None: False)
     target_module.library_target(LIBRARY)
     message = capsys.readouterr().err
     assert "not answering on 127.0.0.1 port 7777" in message
@@ -162,7 +184,7 @@ def test_the_fallback_says_why_it_fell_back(target_module, monkeypatch, capsys):
 
 def test_the_fallback_message_never_carries_the_password(target_module, monkeypatch, capsys):
     _make_app_db(target_module.app_db, password_e=b"encrypted")
-    monkeypatch.setattr(target_module, "_is_answering", lambda host, port: False)
+    monkeypatch.setattr(target_module, "_is_answering", lambda host, port, library_dir=None: False)
     target_module.library_target(LIBRARY)
     assert PASSWORD not in capsys.readouterr().err
 
@@ -192,3 +214,14 @@ def test_custom_app_database_uses_the_key_beside_that_database(target_module, mo
     target = target_module.library_target(LIBRARY)
     assert target.args[1] == 'http://127.0.0.1:7777/#calibre-library'
     assert target.stdin == PASSWORD + '\n'
+
+
+@pytest.mark.parametrize("case", ["disabled", "missing-credentials", "unreadable-settings"])
+def test_scripts_never_fall_back_to_path_while_managed_owner_is_alive(target_module, monkeypatch, case):
+    if case == "disabled":
+        _make_app_db(target_module.app_db, enabled=0)
+    elif case == "missing-credentials":
+        _make_app_db(target_module.app_db, username="", password_e=None)
+    monkeypatch.setattr(target_module.ownership, "busy", lambda *_args: True)
+    with pytest.raises(RuntimeError, match="owns the library"):
+        target_module.library_target(LIBRARY)

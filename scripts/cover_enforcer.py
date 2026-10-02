@@ -12,7 +12,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
-from calibre_library_target import library_target
+from calibre_library_target import library_target, calibredb_command, operation
 import sys
 import tempfile
 import time
@@ -337,13 +337,14 @@ class Book:
                 # Creating it here costs nothing and keeps the export from failing on a
                 # fresh volume.
                 os.makedirs(metadata_temp_dir, exist_ok=True)
-                target = library_target(self.calibre_library)
-                result = subprocess.run(
-                    ["calibredb", "export", "--to-dir", metadata_temp_dir, self.book_id] + target.args,
-                    env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60,
-                    input=target.stdin
-                )
-                
+                with operation(timeout=60):
+                    target = library_target(self.calibre_library)
+                    result = subprocess.run(
+                        calibredb_command(["calibredb", "export", "--to-dir", metadata_temp_dir, self.book_id] + target.args, target),
+                        env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60,
+                        input=target.stdin
+                    )
+
                 if result.returncode == 0:
                     temp_files = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(metadata_temp_dir) for f in filenames]
                     opf_files = [f for f in temp_files if f.endswith('.opf')]
@@ -1208,9 +1209,11 @@ class Enforcer:
 
     def print_library_list(self) -> None:
         """Uses the calibredb command line utility to list the books in the library"""
-        target = library_target(self.calibre_library)
-        subprocess.run(["calibredb", "list"] + target.args, env=self.calibre_env, check=True,
-                       input=target.stdin, text=target.stdin is not None)
+        with operation():
+            target = library_target(self.calibre_library)
+            subprocess.run(calibredb_command(["calibredb", "list"] + target.args, target), env=self.calibre_env, check=True,
+                           input=target.stdin, text=target.stdin is not None)
+
 
 
     def delete_log(self, auto=True, log_path="None"):

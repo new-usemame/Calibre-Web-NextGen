@@ -9,12 +9,15 @@ The app and standalone scripts share ``server_target``. The scripts load the
 same settings from app.db without importing Flask.
 """
 
-import ipaddress
 import os
 import socket
 import sqlite3
 import sys
-from collections import namedtuple
+import importlib.util
+from contextvars import ContextVar
+from functools import wraps
+from contextlib import contextmanager
+from pathlib import Path
 
 try:
     from app_paths import app_db_path, config_dir
@@ -27,18 +30,65 @@ except ImportError:  # pragma: no cover - direct execution outside the app tree
 
 PROBE_TIMEOUT = 0.5
 
-# ``args`` extend a calibredb command line; ``stdin`` is the payload that
-# command must be fed, or None.
-LibraryTarget = namedtuple("LibraryTarget", "args stdin")
+# Load the packaged, dependency-free policy without importing cps/__init__.
+# Its path belongs to this checkout; an unrelated top-level scripts package
+# cannot shadow the application's runtime policy.
+_policy_path = Path(__file__).resolve().parents[1] / "cps" / "calibre_library_target.py"
+_policy_spec = importlib.util.spec_from_file_location("_cwng_calibre_target_policy", _policy_path)
+_policy = importlib.util.module_from_spec(_policy_spec)
+_policy_spec.loader.exec_module(_policy)
+LibraryTarget = _policy.LibraryTarget
+library_id = _policy.library_id
+connect_host = _policy.connect_host
+server_target = _policy.server_target
+calibredb_command = _policy.calibredb_command
+path_is_available = _policy.path_is_available
+_guard = importlib.util.spec_from_file_location("_cwng_server_guard", _policy_path.with_name("calibre_server_guard.py"))
+ownership = importlib.util.module_from_spec(_guard)
+_guard.loader.exec_module(ownership)
 
 
-def library_id(library_dir):
-    """calibre-server's id for a library: folder name, spaces as ``_``.
+def operation(timeout=120):
+    return ownership.operation(config_dir(), timeout=timeout)
 
-    Mirrors Calibre's ``library_id_from_path``; both app and scripts use
-    this implementation.
+
+_offline_owner_fd = ContextVar("calibre_offline_owner_fd", default=None)
+_offline_writer_fd = ContextVar("calibre_offline_writer_fd", default=None)
+
+
+def offline_child_ownership():
+    fds = tuple(fd for fd in (_offline_owner_fd.get(), _offline_writer_fd.get()) if fd is not None)
+    return {"pass_fds": fds} if fds and os.name != "nt" else {}
+
+
+@contextmanager
+def offline_writer_ownership(fd):
+    """Let a raw transaction child retain its parent's metadata exclusion."""
+    token = _offline_writer_fd.set(fd)
+    try:
+        yield
+    finally:
+        _offline_writer_fd.reset(token)
+
+
+def offline_library_operation(callback):
+    """Keep raw Calibre imports outside the managed server's live cache.
+
+    Acquire maintenance before the caller's existing metadata gate. The raw
+    helper inherits ownership so an ingest-parent crash cannot resume the
+    managed server while that helper is still importing.
     """
-    return os.path.basename(str(library_dir).rstrip("/")).replace(" ", "_")
+    @wraps(callback)
+    def run(*args, **kwargs):
+        if _offline_owner_fd.get() is not None:
+            return callback(*args, **kwargs)
+        with ownership.maintenance(config_dir()) as fd:
+            token = _offline_owner_fd.set(fd)
+            try:
+                return callback(*args, **kwargs)
+            finally:
+                _offline_owner_fd.reset(token)
+    return run
 
 
 def _path_target(library_dir):
@@ -98,51 +148,10 @@ def _decrypt(token):
         return ""
 
 
-def connect_host(listen):
-    """Where this host reaches the server; shared by app and scripts."""
-    listen = (listen or "").strip()
-    if listen in ("", "0.0.0.0"):
-        return "127.0.0.1"
-    if listen == "::":
-        return "::1"
-    try:
-        return str(ipaddress.ip_address(listen))
-    except ValueError:
-        return "127.0.0.1"
 
+def _is_answering(host, port, library_dir=None):
+    return _policy.server_ready(host, port, library_dir or "")
 
-def _is_answering(host, port):
-    try:
-        with socket.create_connection((host, int(port)), PROBE_TIMEOUT):
-            return True
-    except (OSError, ValueError):
-        return False
-
-
-
-def server_target(library_dir, enabled, port, listen, anonymous_writes, username, password,
-                  is_answering, announce_fallback):
-    """Shared app/script routing policy; an empty target means use the local path.
-
-    Only the explicit anonymous choice can omit credentials. This policy is
-    separate from loading Flask config or encrypted app.db values so both
-    consumers use the same decision and argument boundaries.
-    """
-    if not enabled or not library_dir:
-        return LibraryTarget([], None)
-    if not anonymous_writes and not (username and password):
-        announce_fallback("no content server credentials are configured")
-        return LibraryTarget([], None)
-    host = connect_host(listen)
-    if not is_answering(host, port):
-        announce_fallback("it is not answering on {} port {}".format(host, port))
-        return LibraryTarget([], None)
-    url_host = "[{}]".format(host) if ":" in host else host
-    args = ["--with-library", "http://{}:{}/#{}".format(url_host, port, library_id(library_dir))]
-    if anonymous_writes:
-        return LibraryTarget(args, None)
-    args += ["--username", username, "--password", "<stdin>"]
-    return LibraryTarget(args, password + "\n")
 
 
 def library_target(library_dir):
@@ -158,16 +167,14 @@ def library_target(library_dir):
     try:
         row = _read_settings()
     except sqlite3.Error:
+        path_is_available(lambda: ownership.busy(config_dir(), "owner"))
         return _path_target(library_dir)
     if not row or not row[0]:
+        path_is_available(lambda: ownership.busy(config_dir(), "owner"))
         return _path_target(library_dir)
     _enabled, port, anonymous_writes, username, password_e, listen = row
     port, username, password = _apply_env(port, username, _decrypt(password_e))
     target = server_target(library_dir, _enabled, port, listen, anonymous_writes, username, password,
-                           _is_answering, _announce_fallback)
+                           lambda host, port: _is_answering(host, port, library_dir), _announce_fallback,
+                           lambda: ownership.busy(config_dir(), "owner"))
     return target if target.args else _path_target(library_dir)
-
-
-def library_arguments(library_dir):
-    """Back-compat shim for callers that cannot feed stdin."""
-    return library_target(library_dir).args

@@ -21,6 +21,7 @@ import sqlite3
 
 import app_paths
 import service_user
+from calibre_library_target import ownership, operation
 from cwa_db import CWA_DB
 from kindle_epub_fixer import EPUBFixer
 
@@ -209,15 +210,17 @@ class LibraryConverter:
             if self.verbose:
                 print_and_log(f"[convert-library]: Running command: {' '.join(args)}")
                 
-            cmd = subprocess.run(
-                args,
-                env=self.calibre_env,
-                capture_output=True,
-                check=True,
-                text=True,
-                encoding='utf-8',
-                timeout=300  # 5 minute timeout for large libraries
-            )
+            with operation(timeout=300):
+                cmd = subprocess.run(
+                    args,
+                    env=self.calibre_env,
+                    capture_output=True,
+                    check=True,
+                    text=True,
+                    encoding='utf-8',
+                    timeout=300,  # 5 minute timeout for large libraries
+                    **_child_ownership()
+                )
 
             # Validate output before parsing
             raw_output = cmd.stdout.strip()
@@ -487,9 +490,10 @@ class LibraryConverter:
                     print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while processing {os.path.basename(target_filepath)} with the kindle-epub-fixer. See the following error:\n{e}")
 
             try: # Import converted book to library. As of V3.0.0, "add_format" is used instead of "add"
-                self._run_streaming(
-                    ["calibredb", "add_format", book_id, target_filepath, f"--library-path={self.library_dir}"],
-                    env=self.calibre_env)
+                with operation(timeout=300):
+                    self._run_streaming(
+                        ["calibredb", "add_format", book_id, target_filepath, f"--library-path={self.library_dir}"],
+                        env=self.calibre_env)
 
                 if self.cwa_settings['auto_backup_imports']:
                     self.backup(target_filepath, backup_type="imported")
@@ -609,7 +613,8 @@ class LibraryConverter:
                 env=env,
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                **_child_ownership()
             ) as process:
                 for line in process.stdout:  # Read from the combined stdout (which includes stderr)
                     output_tail.append(line)
@@ -655,7 +660,7 @@ class LibraryConverter:
             print_and_log(f"{label} Successfully set ownership of new files in {self.library_dir}.")
 
 
-def main():
+def _main():
     _acquire_lock_or_exit()
 
     parser = argparse.ArgumentParser(
@@ -682,6 +687,23 @@ def main():
         print_and_log(f"\n[convert-library]: Library conversion complete! {converted} books converted! Exiting now...")
     logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
     sys.exit(0)
+
+
+_maintenance_fd = None
+
+
+def _child_ownership():
+    return {"pass_fds": (_maintenance_fd,)} if _maintenance_fd is not None and os.name != "nt" else {}
+
+
+def main():
+    global _maintenance_fd
+    with ownership.maintenance(str(app_paths.config_dir())) as fd:
+        _maintenance_fd = fd
+        try:
+            return _main()
+        finally:
+            _maintenance_fd = None
 
 
 if __name__ == "__main__":

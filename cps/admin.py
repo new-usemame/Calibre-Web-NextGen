@@ -2984,6 +2984,7 @@ def _db_simulate_change():
     return db_change, db_valid
 
 
+@content_server.configuration_update
 def _db_configuration_update_helper():
     db_change = False
     to_save = request.form.to_dict()
@@ -3063,6 +3064,8 @@ def _db_configuration_update_helper():
 
 def _content_server_settings_error(to_save):
     """Validate the submitted server draft before any shared settings change."""
+    if to_save.get("config_calibre_server_enabled") == "on" and not content_server.platform_supported():
+        return _('The managed Calibre content server requires a POSIX platform. Use the Linux container on Windows.')
     server_username = to_save.get("config_calibre_server_username", content_server.setting("config_calibre_server_username"))
     server_password = to_save.get("config_calibre_server_password_e") or content_server.setting("config_calibre_server_password_e")
     if (to_save.get("config_calibre_server_enabled") == "on"
@@ -3071,7 +3074,9 @@ def _content_server_settings_error(to_save):
         return (_('Please enter a content server username and password, or allow anonymous writes'))
     problem = content_server.settings_problem(
         to_save.get("config_calibre_server_port", content_server.setting("config_calibre_server_port")),
-        server_username, to_save.get("config_calibre_server_password_e"), getattr(config, "config_port", None))
+        server_username, to_save.get("config_calibre_server_password_e"),
+        (web_server.listen_port or constants.DEFAULT_PORT)
+        if to_save.get("config_calibre_server_enabled") == "on" else None)
     if problem:
         return ({
             "port": _('Content server port must be a number from 1 to 65535'),
@@ -3101,6 +3106,7 @@ def _content_server_settings_error(to_save):
     return None
 
 
+@content_server.configuration_update
 def _configuration_update_helper():
     reboot_required = False
     content_server_changed = False
@@ -3359,6 +3365,7 @@ def _configuration_update_helper():
 @admi.route("/admin/config/clear_calibre_server_password", methods=['POST'])
 @user_login_required
 @admin_required
+@content_server.configuration_update
 def clear_calibre_server_password():
     config.config_calibre_server_password_e = ""
     config.save()
@@ -4025,7 +4032,7 @@ def restore_calibre_db():
 
         # calibredb's check_library/restore_database need the library path
         # itself, which a running content server holds open (#2210 review).
-        content_server_hold = content_server.hold_library()
+        content_server_hold = content_server.hold_library(exclusive=True)
 
         # 1. Backup both DBs
         backup_dir = constants.config_path(
@@ -4051,7 +4058,8 @@ def restore_calibre_db():
             calibredb_binary, "check_library",
             "--with-library", config.config_calibre_dir
         ]
-        check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300)
+        check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300,
+                                      **content_server_hold.child_ownership())
         log.info("calibredb check_library (pre) output: %s\n%s", check_result.stdout, check_result.stderr)
         if check_result.returncode != 0:
             log.warning("calibredb check_library (pre) returned code %s", check_result.returncode)
@@ -4066,7 +4074,8 @@ def restore_calibre_db():
             "--with-library", config.config_calibre_dir,
             "--really-do-it"
         ]
-        result = subprocess.run(restore_cmd, capture_output=True, text=True, timeout=1200)
+        result = subprocess.run(restore_cmd, capture_output=True, text=True, timeout=1200,
+                                **content_server_hold.child_ownership())
         log.info("calibredb restore_database output: %s\n%s", result.stdout, result.stderr)
         with open(log_path, "a", encoding="utf-8") as log_file:
             log_file.write("\n[restore_database]\n")
@@ -4097,7 +4106,8 @@ def restore_calibre_db():
             return redirect(url_for("admin.db_configuration"))
 
         # 5. Run calibredb check_library (post)
-        check_result_post = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300)
+        check_result_post = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300,
+                                      **content_server_hold.child_ownership())
         log.info("calibredb check_library (post) output: %s\n%s", check_result_post.stdout, check_result_post.stderr)
         if check_result_post.returncode != 0:
             log.warning("calibredb check_library (post) returned code %s", check_result_post.returncode)

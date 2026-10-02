@@ -11,7 +11,8 @@ import pytest
 
 
 @pytest.mark.unit
-def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch):
+@pytest.mark.parametrize("selection_filter", ["search", "favorites", "rated", "archived"])
+def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch, selection_filter):
     """The visible query returns only rows satisfying all three SQL predicates."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -92,6 +93,33 @@ def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch):
         text_written = books_api._write_export(text_output, query, "txt")
         assert text_written == 1
         assert text_output.getvalue().decode("utf-8").count("\n") == 1
+
+        # Select all must consume the same combined predicates as the visible
+        # rows and exported copy, rather than widening back to search alone.
+        if selection_filter == "favorites":
+            app_session.add_all([
+                ub.FavoriteBook(user_id=viewer.id, book_id=rows[i][0].id)
+                for i in (0, 2)
+            ])
+        elif selection_filter == "archived":
+            app_session.add_all([
+                ub.ArchivedBook(user_id=viewer.id, book_id=rows[i][0].id, is_archived=True)
+                for i in (0, 2)
+            ])
+        elif selection_filter == "rated":
+            rating = db.Ratings(10)
+            for i in (0, 2):
+                rows[i][0].ratings.append(rating)
+            metadata_session.commit()
+        app_session.commit()
+        selection_args = ("search=dune&filter=unread" if selection_filter == "search"
+                          else f"filter={selection_filter}")
+        app = flask.Flask(__name__)
+        with app.test_request_context(
+            f"/api/v1/books?{selection_args}&author={target_id}&select_all=1"
+        ):
+            selected = inspect.unwrap(books_api.list_books)().get_json()
+        assert selected == {"ids": [rows[0][0].id], "total": 1}
 
         # The shared search query must retain the existing hidden-book toggle.
         monkeypatch.setattr(config, "config_user_hide_enabled", True, raising=False)

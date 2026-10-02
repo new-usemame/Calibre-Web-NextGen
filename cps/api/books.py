@@ -402,7 +402,8 @@ def _catalog_book_query(*, search=None, author_id=None, series_id=None, tag_id=N
         )
     else:
         query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-        query = query.outerjoin(*series_join)
+        query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
+        query = query.outerjoin(db.Series)
         query = query.filter(_catalog_visibility(
             show_hidden, allow_archived=(filter_val == "archived"),
             viewing_tag_id=tag_id if classic_tag_view else None,
@@ -901,8 +902,8 @@ def _smart_shelf_export_query(shelf_id, params, *, classic_owner_rules=False):
         raise BookExportRequestError("invalid_request", "Sort must be a short text value", 400)
     columns = load_configured_columns(config)
     resolved = resolve_magic_shelf_sort(sort_key, config, columns)
-    series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
-    query = query.outerjoin(*series_join)
+    query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
+    query = query.outerjoin(db.Series)
     if resolved.join:
         query = query.outerjoin(*resolved.join)
     return query.options(
@@ -1071,16 +1072,6 @@ def list_books():
     ))
 
     if search:
-        if select_all:
-            query = calibre_db.search_query(
-                search, config, db.books_series_link,
-                db.Books.id == db.books_series_link.c.book, db.Series,
-                allow_show_hidden=show_hidden,
-            )
-            id_query = query.with_entities(db.Books.id).distinct()
-            total = id_query.count()
-            ids = [row[0] for row in id_query.order_by(*order).limit(per_page).all()]
-            return _selection_response(ids, total)
         offset = (page - 1) * per_page
         query = _catalog_book_query(
             search=search,
@@ -1096,6 +1087,10 @@ def list_books():
             show_hidden=show_hidden,
         )
         total = query.with_entities(db.Books.id).order_by(None).distinct().count()
+        if select_all:
+            ids = [row[0] for row in query.with_entities(db.Books.id)
+                   .order_by(*order).limit(per_page).all()]
+            return _selection_response(ids, total)
         entries = query.order_by(*order).offset(offset).limit(per_page).all()
         entries = calibre_db.order_authors(entries, list_return=True, combined=True)
         return jsonify({
@@ -1151,8 +1146,10 @@ def list_books():
         series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
         entries, _random, pagination = calibre_db.fill_indexpage_with_archived_books(
             page, db.Books, per_page, archived_filter, order,
-            True, True, config.config_read_column, *series_join,
+            True, True, config.config_read_column, *series_join, ids_only=select_all,
         )
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
         return jsonify({
             "items": to_items(entries),
             "page": pagination.page,
@@ -1166,7 +1163,9 @@ def list_books():
                    .filter(ub.FavoriteBook.user_id == int(current_user.id)).all())]
         entries, _random, pagination = calibre_db.fill_indexpage(
             page, per_page, db.Books, db.Books.id.in_(fav_ids), order,
-            True, config.config_read_column, *series_join)
+            True, config.config_read_column, *series_join, ids_only=select_all)
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
         return jsonify({"items": to_items(entries),
                         "page": pagination.page, "per_page": pagination.per_page,
                         "total": pagination.total_count})
@@ -1176,7 +1175,9 @@ def list_books():
         rated_filter = db.Books.ratings.any(db.Ratings.rating > 9)
         entries, _random, pagination = calibre_db.fill_indexpage(
             page, per_page, db.Books, rated_filter, order,
-            True, config.config_read_column, *series_join)
+            True, config.config_read_column, *series_join, ids_only=select_all)
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
         return jsonify({"items": to_items(entries),
                         "page": pagination.page, "per_page": pagination.per_page,
                         "total": pagination.total_count})
@@ -1195,6 +1196,10 @@ def list_books():
             show_hidden=show_hidden,
         )
         total = query.with_entities(db.Books.id).order_by(None).distinct().count()
+        if select_all:
+            ids = [row[0] for row in query.with_entities(db.Books.id)
+                   .order_by(*order).limit(per_page).all()]
+            return _selection_response(ids, total)
         entries = query.order_by(*order).offset(offset).limit(per_page).all()
         entries = calibre_db.order_authors(entries, list_return=True, combined=True)
         return jsonify({"items": to_items(entries), "page": page,

@@ -142,6 +142,8 @@ def test_list_books_search():
     query = MagicMock()
     query.with_entities.return_value.order_by.return_value.distinct.return_value.count.return_value = 1
     query.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [row]
+    app_session = MagicMock()
+    app_session.query.return_value.filter.return_value.all.return_value = [(42,)]
 
     app = flask.Flask(__name__)
     with app.test_request_context("/api/v1/books?search=dune&author=3&filter=unread"):
@@ -150,6 +152,7 @@ def test_list_books_search():
              patch.object(books_mod.config, "config_read_column", 0, create=True), \
              patch.object(books_mod, "book_in_progress_ids", return_value=set()), \
              patch.object(books_mod.user_cover, "overrides_for_user", return_value={}), \
+             patch.object(books_mod.ub, "session", app_session), \
              patch.object(books_mod, "_visible_shelves_by_book", return_value={}), \
              patch.object(books_mod, "_real_user_id", return_value=7):
             view = inspect.unwrap(books_mod.list_books)
@@ -166,6 +169,7 @@ def test_list_books_search():
     assert data["items"][0]["id"] == 42
     assert data["items"][0]["title"] == "Dune"
     assert data["items"][0]["read"] is True
+    assert data["items"][0]["favorited"] is True
 
 
 @pytest.mark.unit
@@ -415,12 +419,12 @@ def test_select_all_search_uses_the_filtered_search_query_ids():
     query = IDQuery()
     app = flask.Flask(__name__)
     with app.test_request_context("/api/v1/books?search=dune&select_all=1"):
-        with patch.object(books_mod.calibre_db, "search_query", return_value=query) as search_query, \
+        with patch.object(books_mod, "_catalog_book_query", return_value=query) as search_query, \
              patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
              patch.object(books_mod.config, "config_read_column", 0, create=True):
             response = inspect.unwrap(books_mod.list_books)()
 
-    assert search_query.call_args.args[0] == "dune"
+    assert search_query.call_args.kwargs["search"] == "dune"
     assert query.limit_count == books_mod.MAX_SELECT_ALL_BOOKS + 1
     assert json.loads(response.get_data(as_text=True)) == {"ids": [41, 42], "total": 2}
 

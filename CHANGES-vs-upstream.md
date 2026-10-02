@@ -59,12 +59,11 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ## Original fork patches (no upstream PR existed)
 
-- **Filtered book lists can be downloaded as CSV or TXT (#1059).** Both interfaces export every matching page for supported search, catalog, manual/smart shelf and Global Library scopes with current account permissions. CSV includes reusable metadata and neutralizes spreadsheet formulas; TXT is a reading list. Classic Advanced Search binds each rendered page to signed account-specific criteria, so another tab cannot change its export. Bounded spooling refuses over 100,000 rows or detected result changes. Fork-original. | SHA `TBD` | release `pending`.
-
 ### Features
 
 | Fork PR | Upstream | Description | SHA | Release |
 |---|---|---|---|---|
+| [#2427](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2427) | Fork issue [#1059](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1059) | **Download complete filtered book lists as CSV or TXT.** Matching pages share current visibility/search/entity/read rules; signed Classic advanced criteria, permission checks, formula-safe CSV and bounded spooling refuse oversized or changed results. Select all retains the same combined scope and explicit limits. | TBD | Unreleased |
 | [#2395](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2395) | — | **Find books searches shared catalogs together.** Four-source batches, distinct editions/source groups, isolated retry and browse-only states, source-bound requests and pagination, query/withdrawal cancellation. Existing permissions and receipts apply. | TBD | Unreleased |
 | Pending (#1734) | — | Matching ordinary/smart shelf overview, create and settings flows; separate default-on own-sharing permission; owner-only device marks; per-user OPDS and hidden-shelf restoration. | TBD | Unreleased |
 | pending (#2242) | — | **Book detail pages can hide the original imported filename per account.** The setting defaults on, is stored in `User.view_settings`, and affects classic and New UI detail presentation only; the data remains available to metadata-edit screens. | pending | Unreleased |

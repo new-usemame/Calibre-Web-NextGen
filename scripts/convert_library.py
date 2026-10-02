@@ -23,6 +23,7 @@ import sqlite3
 import app_paths
 import service_user
 from cwa_db import CWA_DB
+import script_lock
 from kindle_epub_fixer import EPUBFixer
 
 ### Global Variables
@@ -65,70 +66,19 @@ LOCK_PATH = os.path.join(tempfile.gettempdir(), 'convert_library.lock')
 
 # Defining function to delete the lock on script exit
 def removeLock(path=None):
-    """Remove the lock, but only while it is still ours.
-
-    The web UI's Cancel deletes the lock itself right after sending SIGTERM, and
-    this run can take a few seconds to stop its child. If a new run has taken the
-    lock in the meantime, it now holds that run's PID and must be left alone.
-    """
-    path = path or LOCK_PATH
-    try:
-        with open(path) as f:
-            if f.read().strip() != str(os.getpid()):
-                return
-        os.remove(path)
-    except FileNotFoundError:
-        ...
+    """Remove the lock, but only while it is still ours (see script_lock.release)."""
+    script_lock.release(path or LOCK_PATH)
 
 
 def _lock_owner_alive(path):
-    """True if the lock names a convert_library process that is still running.
-
-    The lock holds the owner's PID. A run killed with SIGKILL (or by the OOM
-    killer) never reaches atexit, so its lock stays behind, and every later run
-    refused to start until the container restarted. An empty or unreadable
-    lock, or one naming a dead process or a reused PID, counts as stale.
-    """
-    try:
-        with open(path) as f:
-            pid = int(f.read().strip())
-    except (OSError, ValueError):
-        return False
-    try:
-        with open(f"/proc/{pid}/cmdline", "rb") as f:
-            return b"convert_library" in f.read()
-    except FileNotFoundError:
-        return False
-    except OSError:
-        # No /proc (not Linux): fall back to "does that PID exist".
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        return True
+    """True if the lock names a running convert_library (see script_lock.owner_alive)."""
+    return script_lock.owner_alive(path, ("convert_library",))
 
 
 def acquire_lock(path=None):
     """Take the lock, clearing one left by a run that was killed. False if another run holds it."""
-    path = path or LOCK_PATH
-    for _ in range(2):
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            if _lock_owner_alive(path):
-                return False
-            print_and_log("[convert-library]: Removing a stale lock left by a run that was killed")
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                pass
-            continue
-        with os.fdopen(fd, "w") as f:
-            f.write(str(os.getpid()))
-        return True
-    return False
+    return script_lock.acquire(path or LOCK_PATH, ("convert_library",),
+                               on_stale=lambda message: print_and_log(f"[convert-library]: {message}"))
 
 
 def _acquire_lock_or_exit():

@@ -2,7 +2,7 @@
 
 Drag a book card onto a shelf in the sidebar. The sidebar opens while you drag, including on phones. Writable shelves show a drop border, and the shelf under the pointer is highlighted. Drop to add the book; its existing shelf memberships stay in place.
 
-To add several books, use **Select**, choose the books, and drag one of the selected cards. The drag carries the whole current selection. Dragging an unselected card adds that book alone. The selected books stay selected after a successful add, so you can add them to another shelf.
+To add several books, use **Select**, choose the books, and drag one of the selected cards. The drag carries the whole current selection. Dragging an unselected card adds that book alone. The selected books stay selected after a successful add, so you can add them to another shelf. Wait until **Select all** finishes loading before dropping; a drop while selection is still loading is cancelled.
 
 On a touchscreen, drag the small grip below the card. This handle leaves ordinary card and page scrolling available. Tap the handle, or focus it and press Enter or Space, to choose a shelf in a dialog instead. The existing **Add to shelf** bulk action and book-detail controls also remain available.
 

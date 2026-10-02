@@ -29,6 +29,15 @@ test('a card offers an accessible shelf picker and persists membership', async (
     await page.goto(`/app?q=${encodeURIComponent(book.title)}`);
     const handle = page.getByRole('button', { name: `Add ${book.title} to a shelf`, exact: true }).first();
     await expect(handle).toBeVisible();
+    // A card's entrance animation translates its ancestor. Wait for its
+    // natural finish before measuring the rendered 44px target.
+    await handle.evaluate(async element => {
+      const animations: Animation[] = [];
+      for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+        animations.push(...ancestor.getAnimations().filter(animation => animation.playState === 'running'));
+      }
+      await Promise.all(animations.map(animation => animation.finished));
+    });
     expect((await handle.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await handle.focus();
     await page.keyboard.press('Enter');

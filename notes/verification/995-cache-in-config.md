@@ -10,4 +10,11 @@ Actual complete private image 399f02785c185fec59aae7fc27d676bc3f64d8c3feb637d031
 
 Logs contain known invalid private-seed EPUB/backfill errors (not ZIP files), with no cache-permission failure. These are not claimed fixed. Evidence is retained in the local X8 cwng-promised-995 directory: seen-red/focused/full logs, container default/explicit cache IO, HTTP thumbnail response/hash and matching files, container log and subject identity. No product UI changed, so screenshots add no relevant evidence.
 
-Shell syntax and diff checks pass. cwa-init may need rebasing after the separate #947 startup change; neither request depends on bundling the other. Operator owns merging/releases.
+Shell syntax and diff checks pass. cwa-init may need rebasing after the separate #947 startup change; neither request depends on bundling the other. Current-head verification governs merging; releases remain separately owned.
+
+
+## Serial merge integration (2026-10-02)
+
+Rebased onto current main d98944a6e after non-root initialization #2408. The cwa-init conflict removes the entire obsolete root-only app-cache creation wrapper; cache now belongs under writable config or explicit CACHE_DIR. Root/non-root config ownership behavior and all #2408 ImageMagick policy, kepubify guard, runtime-directory fail-fast helper, AutoLibrary no-op/override and Qt marker logic survive. The ownership comment now describes config instead of the removed app-tree cache. Constants, ownership script and cache behavioral test bytes are unchanged from the independently reviewed original; all preceding CHANGES rows and SPA anchors survive. Other-owner #2403 remains untouched.
+
+Current actual FileSystem/cache/metadata/ownership/non-root/runtime/preview/classifier packet104 passed,one existing skip. Shell syntax and diff checks pass. Measured classifier closure214 of272 matches the README. Original actual runtime-user default/explicit cache I/O and authenticated thumbnail byte-preservation proof remain applicable; fresh exact-head CI and an independent bounded startup/cache integration read govern landing.

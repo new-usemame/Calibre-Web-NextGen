@@ -181,7 +181,7 @@ def _parse_probe(stdout: str) -> tuple[frozenset[str], frozenset[str]] | None:
         if not isinstance(values, (list, tuple)) or any(not isinstance(value, str) for value in values):
             return None
         formats = {value.strip().lower().lstrip(".") for value in values}
-        if any(not value or not value.isascii() or not value.replace("-", "").isalnum() for value in formats):
+        if any(not value or not value.isascii() or not value.replace("-", "").replace("_", "").isalnum() for value in formats):
             return None
         parsed.append(frozenset(formats))
     return parsed[0], parsed[1]

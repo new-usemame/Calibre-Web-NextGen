@@ -258,3 +258,22 @@ def test_classic_convert_post_revalidates_the_same_dynamic_targets(monkeypatch, 
         assert queued[0][2:4] == ("EPUB", "KFX")
     else:
         assert response.status_code == 302
+
+
+def test_native_calibre_internal_input_name_does_not_hide_valid_output_formats():
+    # The packaged Calibre registry includes downloaded_recipe, even for an
+    # ordinary EPUB book. One legitimate internal name must not fail the entire
+    # inventory and remove every valid conversion from both editors.
+    result = capabilities._parse_probe(
+        'CWNG_CONVERSION_CAPABILITIES={"inputs":["epub","downloaded_recipe"],"outputs":["txt","epub"]}\n'
+    )
+    assert result == (frozenset({"epub", "downloaded_recipe"}), frozenset({"txt", "epub"}))
+
+
+def test_directory_only_oeb_output_is_not_offered_as_a_stored_book_file(monkeypatch):
+    monkeypatch.setattr(helper.config, "config_converterpath", "/calibre/ebook-convert", raising=False)
+    monkeypatch.setattr(helper.config, "config_binariesdir", "/calibre", raising=False)
+    monkeypatch.setattr(helper.config, "config_kepubifypath", "", raising=False)
+    monkeypatch.setattr(helper, "get_conversion_capabilities", lambda *_:
+        (frozenset({"epub"}), frozenset({"epub", "txt", "oeb"})))
+    assert helper.get_convert_options(_book("epub")) == (["epub"], ["txt"])

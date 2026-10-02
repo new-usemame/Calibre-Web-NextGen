@@ -402,6 +402,9 @@ def get_convert_options(book):
             converter_path,
             getattr(config, "config_binariesdir", "") or "",
         )
+        # OEB writes a directory tree, while conversion tasks store one file.
+        # It is a real Calibre output plugin but not a supported library format.
+        output_formats = output_formats.difference({"oeb"})
         for file in book.data:
             file_format = (file.format or "").lower().lstrip(".")
             if file_format in input_formats and file_format not in {"zip", "rar"}:

@@ -416,7 +416,10 @@ function AdminConfigForm() {
       onError: (err) => {
         if (err instanceof ApiError && err.detail?.code === 'invalid_opds_filename_template') {
           setFilenameError(err.message);
-          requestAnimationFrame(() => filenameInput.current?.focus());
+          requestAnimationFrame(() => {
+            filenameInput.current?.focus({ preventScroll: true });
+            filenameInput.current?.scrollIntoView({ block: 'center' });
+          });
         } else {
           setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') });
         }

@@ -14,6 +14,7 @@ from .cw_login import current_user
 from sqlalchemy.sql.expression import or_
 
 from . import config, constants, logger, ub
+from .custom_column_visibility import is_cc_visible
 from .ub import User
 from .duplicate_notice import duplicate_setup_notice_dismissed
 from .translation_notice import last_notified, record_notified
@@ -267,12 +268,15 @@ def get_custom_column_sidebar_entries():
         from . import calibre_db, db
         if not db.cc_classes:
             return entries
-        hierarchical = calibre_db.get_hierarchical_column_ids()
+        # Every tag-like column gets an entry. Whether it renders as a tree or
+        # a flat list is the browse route's decision (web.render_cc_category),
+        # NOT a filter here: gating enumeration on the hierarchy detector is
+        # what made Dewey/LCC columns disappear from the sidebar, from /me and
+        # from OPDS with no way for a user to switch them back on.
         for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration') or col.id not in hierarchical:
+            if col.datatype not in ('text', 'enumeration'):
                 continue
-            prop = 'show_cc_%d' % col.id
-            if current_user.get_view_property('cc_sidebar', prop) is False:
+            if not is_cc_visible(current_user, col.id):
                 continue
             entries.append({
                 "glyph": "glyphicon-tags",
@@ -302,15 +306,17 @@ def get_custom_column_visibility_options():
         from . import calibre_db, db
         if not db.cc_classes:
             return options
-        hierarchical = calibre_db.get_hierarchical_column_ids()
+        # Mirrors get_custom_column_sidebar_entries: every tag-like column
+        # gets a checkbox. The option list and the sidebar are gated by the
+        # SAME predicate on purpose -- if only one were filtered, a user could
+        # tick a column with no sidebar entry and vice versa.
         for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration') or col.id not in hierarchical:
+            if col.datatype not in ('text', 'enumeration'):
                 continue
             options.append({
                 'id': col.id,
                 'name': col.name,
-                'visible': current_user.get_view_property(
-                    'cc_sidebar', 'show_cc_%d' % col.id) is not False,
+                'visible': is_cc_visible(current_user, col.id),
             })
     except Exception:
         log.debug("Could not build custom column visibility options", exc_info=True)

@@ -25,6 +25,7 @@ from sqlalchemy.sql.expression import func
 
 from . import constants, logger, isoLanguages, gdriveutils, uploader, helper, kobo_sync_status
 from . import user_book_data
+from . import hierarchy
 from .clean_html import clean_string
 from . import config, ub, db, calibre_db
 from .config_sql import uploads_enabled
@@ -88,6 +89,19 @@ def delete_book_from_details(book_id):
 @user_login_required
 def delete_book_ajax(book_id, book_format):
     return delete_book_from_table(book_id, book_format, False, request.form.to_dict().get('location', ""))
+
+
+@editbook.route("/ajax/get_cc_tree/<int:c_id>")
+@user_login_required
+def get_cc_tree(c_id):
+    """Choices for the custom-column picker on the book-edit page.
+
+    Serves BOTH modes: a hierarchical column gets an indented tree, a flat
+    one a plain list. The response carries the mode explicitly so the client
+    never has to re-detect it.
+    """
+    hierarchical, entries = cc_picker_values(c_id)
+    return jsonify({'hierarchical': hierarchical, 'entries': entries})
 
 
 @editbook.route("/admin/book/<int:book_id>", methods=['GET'])
@@ -232,6 +246,69 @@ def convert_bookformat(book_id):
     else:
         flash(_("There was an error converting this book: %(res)s", res=rtn), category="error")
     return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+
+
+def cc_picker_values(c_id):
+    """Every distinct stored value of a text custom column, for the edit-page picker.
+
+    Returns ``(hierarchical, entries)`` where ``entries`` is a list of
+    ``{"value", "depth"}`` ready for the client to render as either an
+    indented tree (hierarchical) or a plain list (flat).
+
+    Both modes are built from the same canonicalisation the browse surfaces
+    use -- ``hierarchy.parse_tag_hierarchy`` -- because this list and
+    ``/custom_column/<id>`` (web.cc_category_list) must agree. Otherwise a
+    stored ``'Computers.'`` or ``'Computers. DB'`` would appear here as a
+    bogus sibling of ``Computers`` that the browse tree does not have.
+
+    For a flat column no splitting happens at all: Dewey ``778.3`` is ONE
+    entry, never a ``778`` parent with a ``3`` child
+    (``calibre_db.get_cc_flat_list`` documents that contract).
+
+    The mode comes from the same detector the browse surfaces use, so a
+    column never renders as a tree in one place and a list in another.
+    """
+    cc = (calibre_db.session.query(db.CustomColumns)
+          .filter(db.CustomColumns.id == c_id)
+          .filter(db.CustomColumns.datatype.notin_(db.cc_exceptions)).one_or_none())
+    if cc is None:
+        return False, []
+    cc_class = db.cc_classes.get(c_id)
+    if cc_class is None:
+        return False, []
+
+    try:
+        rows = calibre_db.session.query(cc_class.value).distinct().all()
+    except OperationalError:
+        log.error("Failed to read custom column %s values for the edit picker", c_id)
+        return False, []
+
+    # A multi-value column stores each value as its own row, but a single row
+    # can still hold a comma-joined string on installs edited by hand or by
+    # tools that predate --is-multiple. Split so those become individual
+    # choices rather than one un-tickable blob.
+    values = set()
+    for (val,) in rows:
+        if val is None:
+            continue
+        for item in str(val).split(','):
+            item = item.strip()
+            if item:
+                values.add(item)
+
+    if calibre_db.is_flat_cc_column(c_id):
+        # Sorted case-insensitively so Dewey/LCC read in numeric order.
+        return False, [{'value': v, 'depth': 0} for v in sorted(values, key=lambda s: s.lower())]
+
+    entries = []
+
+    def _flatten(nodes, depth):
+        for node in nodes:
+            entries.append({'value': node['path'], 'depth': depth})
+            _flatten(node['children'], depth + 1)
+
+    _flatten(hierarchy.parse_tag_hierarchy(values), 0)
+    return True, entries
 
 
 @editbook.route("/ajax/getcustomenum/<int:c_id>")
@@ -1948,6 +2025,23 @@ def render_edit_book(book_id):
         lang.language_name = isoLanguages.get_language_name(get_locale(), lang.lang_code)
 
     book.authors = calibre_db.order_authors([book])
+
+    # Every text custom column gets the picker button, in one of two modes.
+    # The detector is the single source of truth the browse surfaces already
+    # use (get_hierarchical_column_ids), so a column never offers a tree here
+    # while the browse page shows a flat list. Fail CLOSED on an error: an
+    # unknown mode must not silently offer a wrong-shaped list.
+    cc_picker_modes = {}
+    try:
+        hier_ids = calibre_db.get_hierarchical_column_ids()
+        for c in cc:
+            if c.datatype == 'text':
+                cc_picker_modes[c.id] = 'hierarchical' if c.id in hier_ids else 'flat'
+    except Exception as ex:  # noqa: BLE001 - a picker must never break the page
+        log.error("Could not classify custom columns for the edit picker: %s", ex)
+        cc_picker_modes = {}
+    for c in cc:
+        c.cc_picker_mode = cc_picker_modes.get(c.id)
 
     author_names = []
     for authr in book.authors:

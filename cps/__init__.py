@@ -488,6 +488,16 @@ def create_app(config=None, services=None):
             ub.session.bind,
             lambda book_id: getattr(calibre_db.get_book(book_id), "uuid", None),
         )
+        # The custom-column visibility seed needs both databases too: the
+        # browsable column set and each column's hierarchy come from
+        # metadata.db, the per-user values live in app.db. Runs once, gated on
+        # a settings flag, and writes missing keys only -- a user who already
+        # saved a choice keeps it.
+        try:
+            from .custom_column_visibility import backfill_existing_users
+            backfill_existing_users()
+        except Exception as ex:
+            log.error("Custom column visibility seed failed: %s", ex)
 
         updater_thread.init_updater(runtime_config, web_server)
     # Perform dry run of updater and exit afterward

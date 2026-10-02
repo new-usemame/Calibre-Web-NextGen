@@ -2425,6 +2425,30 @@ class CalibreDB:
         cc = cc_classes[col_id]
         return cc.value.in_(hierarchy.subtree_values(node))
 
+    def flat_cc_filter(self, col_id, value):
+        """SQLAlchemy filter matching one exact stored value of a flat column.
+
+        The counterpart to ``hierarchical_cc_filter``: a flat column's stored
+        value is an opaque atomic string. Dewey ``778.3`` is ONE
+        classification, not a ``778`` node with a ``3`` child, so there is
+        deliberately no prefix expansion and no LIKE here. A node that happens
+        to be a valid hierarchical path (``778.3`` where ``778`` also exists)
+        must not pull in its "descendants".
+        """
+        return cc_classes[col_id].value == value
+
+    def is_flat_cc_column(self, col_id):
+        """True when ``col_id`` is a browsable column that is NOT a hierarchy.
+
+        The single source of truth for the two-mode browse model. A column is
+        hierarchical exactly when ``get_hierarchical_column_ids`` detected a
+        real prefix relationship; everything else tag-like is flat. Callers
+        must not re-derive this, or the sidebar, the browse route, OPDS and
+        the SPA can disagree about what a column is.
+        """
+        return (col_id in cc_classes
+                and col_id not in self.get_hierarchical_column_ids())
+
     def get_hierarchical_column_ids(self, ttl=300):
         """Return the set of custom column ids that behave as hierarchies.
 
@@ -2483,6 +2507,46 @@ class CalibreDB:
             log.error("Failed to read custom column %s for hierarchy tree", col_id)
             return []
         return hierarchy.parse_tag_hierarchy([(r[0], r[1]) for r in rows])
+
+    def get_cc_flat_list(self, col_id, apply_common_filters=True, book_filter=None):
+        """Return the distinct ``(value, book_count)`` rows of a flat column.
+
+        The flat counterpart to ``get_hierarchical_tree``, shaped so the same
+        node contract serves both modes: each entry carries ``path == name ==
+        value`` and ``children == []``, so the existing hierarchy macros render
+        it as a plain list without ever splitting anything. Dewey ``778.3`` is
+        one entry -- never a ``778`` parent with a ``3`` child.
+
+        Sorted case-insensitively so Dewey and LCC read in numeric order
+        (``770``, ``775``, ``778.3``) rather than lexicographically.
+
+        ``book_filter`` replaces the default ``common_filters()`` (OPDS's
+        shelf restriction). Omitting it would leak books from a restricted
+        shelf into a value list, so every caller must pass the same filter
+        its book queries use.
+        """
+        cc = cc_classes.get(col_id)
+        if cc is None:
+            return []
+        rel = getattr(Books, 'custom_column_' + str(col_id))
+        q = (self.session.query(cc.value, func.count(func.distinct(Books.id)))
+            .select_from(Books)
+            .join(rel)
+            .group_by(cc.value))
+        if book_filter is not None:
+            q = q.filter(book_filter)
+        elif apply_common_filters:
+            q = q.filter(self.common_filters())
+        try:
+            rows = q.all()
+        except OperationalError:
+            log.error("Failed to read custom column %s for flat list", col_id)
+            return []
+        entries = [{'name': r[0], 'path': r[0], 'count': r[1],
+                    'total_count': r[1], 'children': []}
+                   for r in rows if r[0] is not None and str(r[0]).strip()]
+        entries.sort(key=lambda e: e['name'].lower())
+        return entries
 
     # read search results from calibre-database and return it (function is used for feed and simple search
     def get_search_results(self, term, config, offset=None, order=None, limit=None, *join,

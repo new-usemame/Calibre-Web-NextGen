@@ -1,0 +1,62 @@
+{# Custom-column value picker for the classic book-edit page.
+
+   Opened by the .btn-edit-hierarchy buttons in book_edit.html, which
+   cps/editbooks.py::render_edit_book renders for EVERY text custom column
+   (c.cc_picker_mode is 'hierarchical' or 'flat').
+
+   Serves both modes from one markup:
+     hierarchical -> indented tree (indent comes from the entry's depth)
+     flat         -> plain one-level list
+
+   The markup MUST be included in book_edit.html: get_cc_tree.js binds the
+   buttons and calls $('#ccValueModal').modal('show'), so without this
+   include the selector matches nothing and the button appears dead.
+
+   There is no save endpoint. Applying writes the comma-joined selection
+   back into the column's ordinary text input, which the ordinary edit
+   pipeline (editbooks.py::edit_cc_data) persists unchanged. #}
+<div class="modal fade" id="ccValueModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="ccValueModalTitle">{{ _('Select values') }}</h4>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="ccValueSearch" class="form-control"
+               placeholder="{{ _('Search or filter values...') }}"
+               aria-label="{{ _('Search or filter values') }}">
+
+        <hr>
+
+        {# Populated by get_cc_tree.js. max-height keeps a large column
+           (thousands of values) from pushing the footer off-screen. #}
+        <div id="ccValueList" style="max-height: 320px; overflow-y: auto;">
+          <div class="text-center" style="padding: 2em 0;">
+            <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+          </div>
+        </div>
+
+        <div id="ccValueEmpty" class="text-muted" style="padding: 1em 0;" hidden>
+          {{ _('No values stored for this column yet. Add one below.') }}
+        </div>
+
+        <hr>
+
+        <h5>{{ _('Add a new value') }}</h5>
+        <div class="input-group">
+          <input type="text" id="ccValueNew" class="form-control"
+                 placeholder="{{ _('e.g. Category.SubCategory.Item') }}"
+                 aria-label="{{ _('New value') }}">
+          <span class="input-group-btn">
+            <button class="btn btn-primary" id="ccValueAddBtn" type="button">{{ _('Add') }}</button>
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('Cancel') }}</button>
+        <button type="button" class="btn btn-success" id="ccValueApplyBtn">{{ _('Apply selection') }}</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -648,6 +648,14 @@ def _reap_stale_pytest_tempdirs(base, max_age_seconds=6 * 3600):
             os.kill(pid, 0)
         except ProcessLookupError:
             pass          # owner is gone: reapable
+        except SystemError:
+            # CPython on Windows can raise SystemError from os.kill rather than
+            # ProcessLookupError for a pid that no longer exists. Not an
+            # OSError, so the branch below cannot catch it, and an exception
+            # escaping here fails the whole run -- which is the one thing this
+            # function promises never to do. Treat it as "not reapable" and
+            # leave the directory; leaking a temp dir beats failing a suite.
+            continue
         except OSError:
             continue      # e.g. EPERM -- another user's live process; leave it
         else:

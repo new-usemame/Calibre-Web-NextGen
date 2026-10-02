@@ -148,6 +148,18 @@ class _Settings(_Base):
     # Comma-separated Calibre custom-column IDs selected by an administrator.
     # Request-time use is revalidated against the live Calibre schema.
     config_sortable_custom_columns = Column(String, default="")
+    # Seed template for per-user custom-column browse visibility, read ONCE per
+    # user when they are seeded (signup, or the one-time upgrade backfill) and
+    # then frozen in User.view_settings. NULL = never configured, so the
+    # default is derived from the column's own hierarchy (hierarchical columns
+    # visible, flat ones hidden). "" = the administrator saved nothing ticked,
+    # which seeds every column hidden. Never consulted on a request path for a
+    # user who already has a value.
+    config_default_cc_columns = Column(String, default=None)
+    # Set once the upgrade backfill has run, so it cannot re-run. Only recorded
+    # after a successful pass; an unreadable library leaves it unset so the next
+    # start retries.
+    config_cc_visibility_seeded = Column(Boolean, default=False)
 
     config_denied_tags = Column(String, default="")
     config_allowed_tags = Column(String, default="")

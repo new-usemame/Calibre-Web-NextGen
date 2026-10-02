@@ -222,6 +222,18 @@
   padding: var(--sp-4); border-bottom: 1px solid var(--border);
 }
 .detailsTitle { font-family: var(--font-display); font-size: var(--fs-md); color: var(--text); font-weight: 600; }
+/* Text custom columns: the value input plus its picker button. The input keeps
+ * its own styling inside the flex row so the button lines up with it. */
+.inputWithButton { display: flex; align-items: center; gap: var(--sp-2); }
+.inputWithButton .input { flex: 1; min-width: 0; }
+.pickerBtn {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  color: var(--text-muted);
+}
+.pickerBtn:hover { color: var(--text); background: var(--surface-3); }
+
 .detailsClose {
   flex-shrink: 0; background: none; border: 0; color: var(--text-muted); cursor: pointer;
   display: inline-flex; padding: 4px; border-radius: var(--r-sm);

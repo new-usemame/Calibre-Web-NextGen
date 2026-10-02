@@ -16,6 +16,7 @@ from werkzeug.datastructures import Authorization
 from werkzeug.security import check_password_hash
 
 from . import lm, ub, config, logger, limiter, constants, services, rate_limits
+from .custom_column_visibility import load_browsable_columns, seed_cc_visibility
 from .services import app_passwords
 from .ui_themes import config_theme_code
 
@@ -132,6 +133,14 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         user.sidebar_view = config.config_default_show
         user.locale = config.config_default_locale
         user.default_language = config.config_default_language
+        # Frozen per-column browse visibility, same as the other signup paths.
+        try:
+            columns = load_browsable_columns()
+            if columns:
+                seed_cc_visibility(user, columns, commit=False)
+        except Exception:
+            log.error("Could not seed custom column visibility for the new user",
+                      exc_info=True)
         
         # Apply default restrictions and permissions
         user.allowed_tags = getattr(config, 'config_allowed_tags', '')

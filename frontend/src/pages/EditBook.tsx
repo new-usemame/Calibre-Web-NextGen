@@ -9,6 +9,7 @@ import {
 } from '../lib/queries';
 import { Button } from '../components/Button';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
+import { CcValuePicker } from '../components/CcValuePicker';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
@@ -742,6 +743,7 @@ function CoverManager({ id }: { id: string }) {
 function CustomColumnField({ column, value, error, onChange }:
   { column: EditableCustomColumn; value: string; error?: string; onChange: (v: string) => void }) {
   const t = useT();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const label = column.name || column.label;
 
   if (column.datatype === 'bool' && !column.is_multiple) {
@@ -814,10 +816,36 @@ function CustomColumnField({ column, value, error, onChange }:
 
   // text (and anything new calibre grows) — comma separated when the column
   // holds several values, which is how the server splits it back apart.
+  //
+  // Text columns also get the value picker: `hierarchical` (sent by the server
+  // from the same detector CcBrowse uses) chooses an indented tree or a plain
+  // list, so both kinds of column can be filled by choosing rather than by
+  // remembering exact spellings. Typing stays available — the picker only ever
+  // writes a comma-joined string back into this same field.
   return (
-    <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error}>
-      <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
-    </Field>
+    <>
+      <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error}>
+        <div className={styles.inputWithButton}>
+          <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
+          <button type="button" className={styles.pickerBtn}
+            onClick={() => setPickerOpen(true)}
+            aria-label={t('Choose from stored values')}
+            title={column.hierarchical ? t('Choose from the existing hierarchy') : t('Choose from the existing values')}>
+            <Search size={16} aria-hidden="true" focusable={false} />
+          </button>
+        </div>
+      </Field>
+      {pickerOpen && (
+        <CcValuePicker
+          columnId={column.id}
+          columnLabel={label}
+          hierarchical={!!column.hierarchical}
+          value={value}
+          onApply={onChange}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </>
   );
 }
 

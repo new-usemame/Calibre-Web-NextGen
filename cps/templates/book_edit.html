@@ -228,9 +228,28 @@
             {% endif %}
 
             {% if c.datatype == 'text' %}
+              {# c.cc_picker_mode is 'hierarchical' or 'flat' for EVERY text
+                 column (render_edit_book), so the picker button is not limited
+                 to hierarchies — a flat Dewey/LCC-style column gets a plain
+                 list instead of a tree. Absent only when classification failed,
+                 which render_edit_book fails closed. #}
+              {% if c.cc_picker_mode %}
+              <div class="input-group">
+                <input type="text" class="form-control" name="{{ 'custom_column_' ~ c.id }}" id="{{ 'custom_column_' ~ c.id }}"
+                {% if book['custom_column_' ~ c.id]|length > 0 %}
+                value="{% for column in book['custom_column_' ~ c.id] %}{{ column.value.strip() }}{% if not loop.last %}, {% endif %}{% endfor %}"{% endif %}>
+                <span class="input-group-btn">
+                  <button type="button" class="btn btn-default btn-cc-picker" data-column-id="{{ c.id }}" data-column-name="{{ c.name }}"
+                          title="{% if c.cc_picker_mode == 'hierarchical' %}{{ _('Choose from the existing hierarchy') }}{% else %}{{ _('Choose from the existing values') }}{% endif %}">
+                    <span class="glyphicon glyphicon-list"></span>
+                  </button>
+                </span>
+              </div>
+              {% else %}
               <input type="text" class="form-control" name="{{ 'custom_column_' ~ c.id }}" id="{{ 'custom_column_' ~ c.id }}"
               {% if book['custom_column_' ~ c.id]|length > 0 %}
               value="{% for column in book['custom_column_' ~ c.id] %}{{ column.value.strip() }}{% if not loop.last %}, {% endif %}{% endfor %}"{% endif %}>
+              {% endif %}
             {% endif %}
 
             {% if c.datatype == 'series' %}
@@ -531,6 +550,10 @@
 </script>
 <script src="{{ url_for('static', filename='js/libs/typeahead.bundle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/libs/bootstrap-rating-input.min.js') }}"></script>
+{# Custom-column value picker modal. The markup must be in THIS page:
+   get_cc_tree.js calls $('#ccValueModal').modal('show'), so without the
+   include the button has nothing to open and appears dead. #}
+{% include 'custom_column_modal.html' %}
 <script src="{{ url_for('static', filename='js/get_meta.js') }}"></script>
 <script src="{{ url_for('static', filename='js/libs/tinymce/tinymce.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/libs/bootstrap-datepicker/bootstrap-datepicker.min.js') }}"></script>
@@ -539,6 +562,7 @@
 {% endif %}
 <script src="{{ url_for('static', filename='js/edit_books.js') }}"></script>
 <script src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
+<script src="{{ url_for('static', filename='js/get_cc_tree.js') }}"></script>
 {% endblock %}
 {% block header %}
 <meta name="referrer" content="never">

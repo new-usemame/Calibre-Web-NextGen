@@ -58,6 +58,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from .usermanagement import user_login_required
 
 from . import app, config, constants, logger, oauth_auto_redirect, ub
+from .custom_column_visibility import load_browsable_columns, seed_cc_visibility
 from .ui_themes import config_theme_code
 
 try:
@@ -479,6 +480,14 @@ def register_user_from_generic_oauth(token=None):
         user.sidebar_view = getattr(config, 'config_default_show', 1)
         user.locale = getattr(config, 'config_default_locale', 'en')
         user.default_language = getattr(config, 'config_default_language', 'all')
+        # Frozen per-column browse visibility, same as the other signup paths.
+        try:
+            _cc_columns = load_browsable_columns()
+            if _cc_columns:
+                seed_cc_visibility(user, _cc_columns, commit=False)
+        except Exception:
+            log.error("Could not seed custom column visibility for the new OAuth user",
+                      exc_info=True)
         
         # Apply default restrictions and permissions (same as _handle_new_user)
         user.allowed_tags = getattr(config, 'config_allowed_tags', '')

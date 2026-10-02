@@ -265,6 +265,12 @@ def _custom_column_payload(book):
             "is_multiple": bool(column.is_multiple),
             "value": _custom_column_value(book, column),
         }
+        if column.datatype == "text":
+            # Whether this column's stored values form a dotted hierarchy or
+            # are flat atomic values. Same detector the browse surfaces use
+            # (is_flat_cc_column / get_hierarchical_column_ids), so the SPA's
+            # picker offers a tree exactly when CcBrowse renders one.
+            entry["hierarchical"] = not calibre_db.is_flat_cc_column(column.id)
         if column.datatype == "enumeration":
             # Allowed values live in the column's JSON `display` blob and were
             # only reachable through the classic /ajax/getcustomenum route, so

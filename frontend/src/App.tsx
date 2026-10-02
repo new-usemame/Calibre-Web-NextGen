@@ -30,6 +30,7 @@ import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
 import { Duplicates } from './pages/Duplicates';
+import { CcBrowse } from './pages/CcBrowse';
 import { Annotations } from './pages/Annotations';
 import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
@@ -249,6 +250,12 @@ export function App() {
           <Route path={SPA_ROUTES.format}>
             {(p) => <Catalog entityKind="format" entityId={decodeURIComponent(p.id)} />}
           </Route>
+
+          {/* Custom columns (tag-like text/enumeration; a hierarchical one
+              renders as a tree, a flat one as a plain list of atomic values) —
+              SPA parity with the classic /custom_column views. */}
+          <Route path={SPA_ROUTES.ccList}>{() => <CcBrowse />}</Route>
+          <Route path={SPA_ROUTES.cc}>{(p) => <CcBrowse id={p.id} />}</Route>
 
           {/* Shelves */}
           <Route path={SPA_ROUTES.shelfNew}>{() => <ShelfEditor />}</Route>

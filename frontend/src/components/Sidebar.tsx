@@ -306,11 +306,11 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   return (
     <>
       {open && <div className={styles.scrim} onClick={onClose} aria-hidden="true" />}
-      <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}`}>
+      <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}${dragging ? ` ${styles.bookDragging}` : ''}`}>
         <nav
           ref={navRef}
           data-shelf-drag-nav
-          className={`${open ? styles.navOpen : styles.nav}${(hoverSuppressed && !dragging) ? ` ${styles.hoverSuppressed}` : ''}${pinActive || dragging ? ` ${styles.pinned}` : ''}`}
+          className={`${open ? styles.navOpen : styles.nav}${(hoverSuppressed && !dragging) ? ` ${styles.hoverSuppressed}` : ''}${pinActive || dragging ? ` ${styles.pinned}` : ''}${dragging ? ` ${styles.bookDragging}` : ''}`}
           aria-label={t('Browse')}
           tabIndex={-1}
           onClickCapture={(event) => {

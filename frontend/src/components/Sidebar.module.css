@@ -618,3 +618,10 @@
 /* Targets expand only during a book drag, leaving saved sidebar choices alone. */
 .dropTarget { min-height: 44px; border: 1px dashed var(--accent); }
 .dropOver { background: var(--accent-soft); color: var(--accent-text); outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The selection toolbar shares the normal overlay level and paints later in
+   the catalog. During a book drag, lower shelf targets must receive hits above
+   that toolbar. Raise the desktop rail's stacking context and mobile drawer. */
+.rail.bookDragging, :is(.nav, .navOpen).bookDragging {
+  z-index: calc(var(--z-overlay) + 1);
+}

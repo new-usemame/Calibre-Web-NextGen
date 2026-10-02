@@ -1,6 +1,7 @@
 import { test as base, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { DEFAULT_SIDEBAR_ORDER, ORDERABLE_ENTRIES } from '../src/lib/sidebarEntries';
 
 const test = base.extend<{ dragPage: Page }>({
   dragPage: async ({ browser, secondaryUser, baseURL }, use, info) => {
@@ -82,6 +83,14 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
   expect(created.ok(), await created.text()).toBeTruthy();
   const shelf = await created.json();
   try {
+    // Mirror a fresh install's full default navigation on this owned account.
+    // A local instance can seed fewer entries and miss the lower shelf target
+    // where the floating selection toolbar crosses the mobile drawer.
+    const sidebar = await page.request.post('/api/v1/account/sidebar', { headers, data: {
+      order: DEFAULT_SIDEBAR_ORDER,
+      visibility: Object.fromEntries(ORDERABLE_ENTRIES.filter(e => !e.isShelvesBlock).map(e => [e.key, true])),
+    } });
+    expect(sidebar.ok(), `save owned sidebar preferences (${sidebar.status()})`).toBeTruthy();
     await page.addInitScript(() => localStorage.setItem('cwng:sidebar-pinned', 'false'));
     await page.goto('/app');
     await page.getByRole('button', { name: 'Select', exact: true }).click();
@@ -121,6 +130,12 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
       // edge scrolling and drawer transitions can move it during a screenshot.
       const release = (await target.boundingBox())!;
       await touch('touchMove', release.x + release.width / 2, release.y + release.height / 2);
+      await expect(target).toHaveClass(/dropOver/);
+      // This lower target can lie in the drawer's edge-scroll zone. Keep the
+      // overlap hit above, then place the actual drop in the stable centre.
+      await target.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+      const drop = (await target.boundingBox())!;
+      await touch('touchMove', drop.x + drop.width / 2, drop.y + drop.height / 2);
       await expect(target).toHaveClass(/dropOver/);
       await touch('touchEnd'); await cdp.detach();
     } else {

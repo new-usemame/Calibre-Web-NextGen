@@ -358,8 +358,12 @@ test.describe('Recent library sort', () => {
       });
       await more.click();
       await nextPage;
+      // The last response can remove Load more before the book's paint.
+      // Inspect the current elements without auto-waiting for a button that
+      // has gone, so the next poll can observe the now-rendered book.
       await expect.poll(async () => (await renderedIds(page)).includes(readBookId)
-        || await more.isEnabled()).toBe(true);
+        || await more.evaluateAll(elements => elements.some(element => !(element as HTMLButtonElement).disabled)))
+        .toBe(true);
     }
     expect((await renderedIds(page)).includes(readBookId)).toBe(true);
     expect(sorts.filter(sort => sort !== 'new')).toEqual([]);

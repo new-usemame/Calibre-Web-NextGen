@@ -12,7 +12,7 @@ Explicit status intent has a separate nullable timestamp, so newer device activi
 
 ## Verification
 
-Independent refutations drove repairs for reverse-clock duplicate arbitration, Classic JSON escaping, actual WebKit selector height, lookup preservation, and integration with Stop reading. The final frozen feature passed 10,357 smoke/unit cases with 102 skipped and only the two Mac SQLite replacement/I/O failures previously reproduced on clean main. The separate serial integration lane passed one case. Current-main integration passed 67 targeted checks; Linux CI remains the merge gate.
+Independent refutations drove repairs for reverse-clock duplicate arbitration, Classic JSON escaping, actual WebKit selector height, lookup preservation, and integration with Stop reading. The final frozen feature passed 10,357 smoke/unit cases with 102 skipped and only the two Mac SQLite replacement/I/O failures previously reproduced on clean main. The separate serial integration lane passed one case. The first current-main integration passed 67 targeted checks; the subsequent catalog-search/translation rebase passed 125 focused status, locale and classifier checks with one existing skip; Linux CI remains the merge gate.
 
 A complete Linux image (`sha256:f1a292ecb25b627e9c23d1d4025153fe3057700973167944131dd93e91898c99`) from source `8b8fa250cb4abb596d59dd09b8097d0e6dd1ab2d` passed 13 committed browser cases across Chromium desktop/phone and native Safari/iPhone, without retries or skips. Two independent native cases exercised the real gear-menu Stop action, lookup, ordinary resume, position/history preservation, live Unread invalidation and idempotence. Native selectors measured 44 CSS pixels and retained dropdown arrows.
 

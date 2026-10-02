@@ -56,3 +56,60 @@ test('changing list scope cancels an export and suppresses a stale download', as
     expect(downloads).toEqual([]);
   } finally { release?.(); }
 });
+
+
+// Classic actions are progressive enhancement: an unbound button must not
+// promise an action. Hold the real script to exercise the loading window.
+test('Classic export remains disabled until its action script binds', async ({ secondaryUser }, info) => {
+  const { page } = secondaryUser;
+  await page.setViewportSize(info.project.use.viewport || { width: 1280, height: 800 });
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/static/js/book-list-export.js*', async route => {
+    await held;
+    await route.continue();
+  });
+  try {
+    await page.goto('/search?query=the', { waitUntil: 'commit' });
+    const box = page.locator('.book-list-export');
+    await expect(box).toBeVisible();
+    await expect(box.getByRole('button', { name: 'Export CSV', exact: true })).toBeDisabled();
+    await expect(box.getByRole('button', { name: 'Export TXT', exact: true })).toBeDisabled();
+    release();
+    await page.waitForLoadState('load');
+    await expect(box.getByRole('button', { name: 'Export CSV', exact: true })).toBeEnabled();
+    const downloaded = page.waitForEvent('download');
+    await box.getByRole('button', { name: 'Export CSV', exact: true }).click();
+    expect((await downloaded).suggestedFilename()).toBe('calibre-web-books.csv');
+  } finally { release(); }
+});
+
+test('Classic advanced exports retain the first tab criteria after another search', async ({ secondaryUser }, info) => {
+  const { page } = secondaryUser;
+  await page.setViewportSize(info.project.use.viewport || { width: 1280, height: 800 });
+  async function search(tab: typeof page, title: string) {
+    await tab.goto('/advsearch');
+    await tab.locator('#title').fill(title);
+    await tab.locator('form').filter({ has: tab.locator('#title') })
+      .getByRole('button', { name: /Search/ }).click();
+    await tab.waitForLoadState('load');
+    await expect(tab.locator('.book-list-export')).toBeVisible();
+  }
+  async function csv() {
+    const downloaded = page.waitForEvent('download');
+    await page.locator('.book-list-export').getByRole('button', { name: 'Export CSV', exact: true }).click();
+    const stream = await (await downloaded).createReadStream();
+    expect(stream).not.toBeNull();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks).toString('utf8');
+  }
+  await search(page, 'the');
+  const original = await csv();
+  expect(original).toContain('Title,Authors,Series,Tags,Rating,Read,Formats,Date added');
+  const other = await page.context().newPage();
+  try {
+    await search(other, 'no matching second tab export phrase');
+    expect(await csv()).toBe(original);
+  } finally { await other.close(); }
+});

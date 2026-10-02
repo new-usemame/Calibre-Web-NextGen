@@ -38,3 +38,16 @@ export function getReaderContentUrl(
 ): string {
   return contentUrl || `/show/${id}/${format.toLowerCase()}`;
 }
+
+/** Keep lookup mode on server-reader fallbacks, preserving source and fragments. */
+export function withLookupMode(target: string, lookup: boolean): string {
+  if (!lookup) return target;
+  const hashIndex = target.indexOf('#');
+  const pathAndQuery = hashIndex < 0 ? target : target.slice(0, hashIndex);
+  const hash = hashIndex < 0 ? '' : target.slice(hashIndex);
+  const queryIndex = pathAndQuery.indexOf('?');
+  const path = queryIndex < 0 ? pathAndQuery : pathAndQuery.slice(0, queryIndex);
+  const params = new URLSearchParams(queryIndex < 0 ? '' : pathAndQuery.slice(queryIndex + 1));
+  params.set('lookup', '1');
+  return `${path}?${params.toString()}${hash}`;
+}

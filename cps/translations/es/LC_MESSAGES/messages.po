@@ -5880,6 +5880,10 @@ msgstr "No se pudo leer este archivo de cómic."
 msgid "Could not reload metadata"
 msgstr "No se pudieron recargar los metadatos"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr ""
@@ -7822,6 +7826,10 @@ msgstr "Abrir la interfaz clásica"
 msgid "Open the link below on your signed-in device."
 msgstr "Abre el enlace de abajo en tu dispositivo con sesión iniciada."
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "Servidor OpenLDAP"
@@ -8042,6 +8050,14 @@ msgstr "Página anterior"
 msgid "Progress"
 msgstr "Progreso"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "Pública"
+
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Publicado después de"
@@ -8182,6 +8198,10 @@ msgid "Remove device"
 msgstr "Quitar dispositivo"
 
 #: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Quitar de favoritos"
 
@@ -8226,6 +8246,10 @@ msgstr ""
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "¿Quitar {name}?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -17212,9 +17236,6 @@ msgstr "Mostrar Selección Leidos/No Leidos"
 #~ msgid "No shelves yet. Create one above to start collecting books."
 #~ msgstr ""
 #~ "Aún no hay estanterías. Crea una arriba para empezar a coleccionar libros."
-
-#~ msgid "Public"
-#~ msgstr "Pública"
 
 #, python-brace-format
 #~ msgid ""

@@ -5867,6 +5867,10 @@ msgstr "Не удалось прочитать этот архив комикс�
 msgid "Could not reload metadata"
 msgstr "Не удалось перезагрузить метаданные"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr "Не удалось удалить этот источник. Попробуйте снова."
@@ -7851,6 +7855,10 @@ msgstr "Открыть классический интерфейс"
 msgid "Open the link below on your signed-in device."
 msgstr "Откройте ссылку ниже на авторизованном устройстве."
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "Сервер OpenLDAP"
@@ -8074,6 +8082,14 @@ msgstr "Предыдущая страница"
 msgid "Progress"
 msgstr "Прогресс"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "Общедоступный"
+
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Опубликовано после"
@@ -8216,6 +8232,10 @@ msgid "Remove device"
 msgstr "Удалить устройство"
 
 #: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Удалить из избранного"
 
@@ -8260,6 +8280,10 @@ msgstr ""
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "Удалить {name}?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -17260,9 +17284,6 @@ msgstr "Показать раздел прочитанного/непрочит�
 
 #~ msgid "No shelves yet. Create one above to start collecting books."
 #~ msgstr "Полок пока нет. Создайте полку выше, чтобы начать собирать книги."
-
-#~ msgid "Public"
-#~ msgstr "Общедоступный"
 
 #, python-brace-format
 #~ msgid ""

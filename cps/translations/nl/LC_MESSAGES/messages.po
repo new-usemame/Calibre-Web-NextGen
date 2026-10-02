@@ -5836,6 +5836,10 @@ msgstr "Kan dit comic-archief niet lezen."
 msgid "Could not reload metadata"
 msgstr "Kan metagegevens niet opnieuw laden"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr "Dit boek kon niet uit Momenteel aan het lezen worden verwijderd."
+
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr "Kan deze bron niet verwijderen. Probeer het opnieuw."
@@ -7833,6 +7837,10 @@ msgstr "Klassieke interface openen"
 msgid "Open the link below on your signed-in device."
 msgstr "Open de onderstaande link op je aangemelde apparaat."
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr "Openen zonder voortgang op te slaan"
+
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "OpenLDAP server"
@@ -8055,6 +8063,14 @@ msgstr "Vorige pagina"
 msgid "Progress"
 msgstr "Voortgang"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr "Voortgang wordt niet opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "Openbaar"
+
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Gepubliceerd na"
@@ -8199,6 +8215,10 @@ msgid "Remove device"
 msgstr "Apparaat verwijderen"
 
 #: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr "Verwijderen uit Momenteel aan het lezen"
+
+#: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Verwijderen uit favorieten"
 
@@ -8243,6 +8263,10 @@ msgstr "Deze verwijderen"
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "{name} verwijderen?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr "Verwijderd uit Momenteel aan het lezen."
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -16923,9 +16947,6 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgid "No shelves yet. Create one above to start collecting books."
 #~ msgstr ""
 #~ "Nog geen boekenplanken. Maak er hierboven een aan om boeken te verzamelen."
-
-#~ msgid "Public"
-#~ msgstr "Openbaar"
 
 #~ msgid "Choose a SABnzbd connection"
 #~ msgstr "Kies een SABnzbd-verbinding"

@@ -518,6 +518,19 @@ export function useToggleRead(id: string | number) {
   });
 }
 
+/** Remove the local Reading marker while retaining every saved position. */
+export function useStopReading(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
 /** Star/unstar a book for the current user. Server is presence-based; we just
  *  refetch the detail so the star reflects the new state. */
 export function useToggleFavorite(id: string | number) {

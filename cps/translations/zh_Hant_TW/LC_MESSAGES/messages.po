@@ -5576,6 +5576,10 @@ msgstr "無法讀取此漫畫封存檔。"
 msgid "Could not reload metadata"
 msgstr "無法重新載入中繼資料"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr ""
@@ -7477,6 +7481,10 @@ msgstr "開啟經典介面"
 msgid "Open the link below on your signed-in device."
 msgstr "在您的已登入裝置上開啟以下連結。"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "OpenLDAP 伺服器"
@@ -7690,6 +7698,14 @@ msgstr "上一頁"
 msgid "Progress"
 msgstr "任務進度"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "公開"
+
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "出版於之後"
@@ -7827,6 +7843,10 @@ msgid "Remove device"
 msgstr "移除裝置"
 
 #: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "從最愛中移除"
 
@@ -7871,6 +7891,10 @@ msgstr ""
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "移除 {name}？"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -16242,9 +16266,6 @@ msgstr "顯示已讀/未讀選擇"
 
 #~ msgid "No shelves yet. Create one above to start collecting books."
 #~ msgstr "尚無書架。請在上方建立一個以開始收集書籍。"
-
-#~ msgid "Public"
-#~ msgstr "公開"
 
 #, python-brace-format
 #~ msgid ""

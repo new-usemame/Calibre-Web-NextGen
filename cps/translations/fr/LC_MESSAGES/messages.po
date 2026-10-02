@@ -5962,6 +5962,10 @@ msgstr "Impossible de lire cette archive de bande dessinée."
 msgid "Could not reload metadata"
 msgstr "Impossible de recharger les métadonnées"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr "Impossible de retirer ce livre de « Lecture en cours »."
+
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr "Impossible de supprimer cette source. Réessayez."
@@ -7980,6 +7984,10 @@ msgstr "Ouvrir l’interface classique"
 msgid "Open the link below on your signed-in device."
 msgstr "Ouvrez le lien ci-dessous sur votre appareil connecté."
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr "Ouvrir sans enregistrer la progression"
+
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "Serveur OpenLDAP"
@@ -8201,6 +8209,14 @@ msgstr "Page précédente"
 msgid "Progress"
 msgstr "Avancement"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr "La progression n’est pas enregistrée."
+
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "Publique"
+
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Publié après le"
@@ -8346,6 +8362,10 @@ msgid "Remove device"
 msgstr "Supprimer l'appareil"
 
 #: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr "Retirer de « Lecture en cours »"
+
+#: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Retirer des favoris"
 
@@ -8390,6 +8410,10 @@ msgstr "Retirer ceux-ci"
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "Supprimer {name} ?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr "Retiré de « Lecture en cours »."
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -17290,9 +17314,6 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Aucune étagère pour le moment. Créez-en une ci-dessus pour commencer à "
 #~ "regrouper des livres."
-
-#~ msgid "Public"
-#~ msgstr "Publique"
 
 #~ msgid "Choose a SABnzbd connection"
 #~ msgstr "Choisir une connexion SABnzbd"

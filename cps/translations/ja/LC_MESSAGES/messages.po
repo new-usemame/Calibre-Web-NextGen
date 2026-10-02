@@ -5676,6 +5676,10 @@ msgstr ""
 msgid "Could not reload metadata"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr ""
@@ -7577,6 +7581,10 @@ msgstr ""
 msgid "Open the link below on your signed-in device."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr ""
@@ -7790,6 +7798,14 @@ msgstr ""
 msgid "Progress"
 msgstr "進捗"
 
+#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Public"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr ""
@@ -7927,6 +7943,10 @@ msgid "Remove device"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr ""
 
@@ -7970,6 +7990,10 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {name}?"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removed from Currently Reading."
 msgstr ""
 
 #: cps/spa_strings.py

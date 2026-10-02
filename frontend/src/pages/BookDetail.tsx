@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } f
 import { Link, useParams, useLocation } from 'wouter';
 import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
-  useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
+  useBook, useToggleRead, useStopReading, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
@@ -22,7 +22,7 @@ import { EmptyState } from '../components/EmptyState';
 import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
-import { getPrimaryReadTarget } from '../lib/readerTarget';
+import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
 import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
 import {
   canDeleteBooks, canDownloadBooks, canEditBookCover, canReadBooks, canUploadBooks,
@@ -421,6 +421,7 @@ export function BookDetail() {
   // server keeps for this book; a public shelf alone grants neither.
   const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
+  const stopReading = useStopReading(id);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
   const toggleHidden = useToggleHidden(id);
@@ -549,6 +550,23 @@ export function BookDetail() {
      Labels name the ACTION performed (state-aware), per the cleanup brief:
      today's "In your library" state chip becomes "Remove from library". */
   const menuItems: MenuSectionDef['items'] = [];
+  if (canAccessBook && primaryReadTarget) {
+    menuItems.push({
+      id: 'lookup', label: t('Open without saving progress'),
+      icon: <BookOpen size={15} />,
+      to: withLookupMode(primaryReadTarget, true), testId: 'menu-open-lookup',
+    });
+  }
+  if (canAccessBook && book.in_progress && !me?.role?.anonymous) {
+    menuItems.push({
+      id: 'stop-reading', label: t('Remove from Currently Reading'),
+      icon: <BookX size={15} />, disabled: stopReading.isPending,
+      onSelect: () => stopReading.mutate(undefined, {
+        onSuccess: () => announce(t('Removed from Currently Reading.')),
+        onError: () => announce(t('Could not remove this book from Currently Reading.'), { assertive: true }),
+      }), testId: 'menu-stop-reading',
+    });
+  }
   if (inLibrary) {
     menuItems.push({
       id: 'read-toggle',

@@ -12,12 +12,14 @@
 
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}">
 
     <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/libs/Djvu_html5.css') }}">
     <script src="{{ url_for('static', filename='js/libs/djvu_html5/djvu_html5/djvu_html5.nocache.js') }}"></script>
     <script src="{{ url_for('static', filename='js/reading/djvu_reader.js') }}"></script>
   </head>
   <body>
+    {% include '_reader_lookup_banner.html' %}
 	<div id="djvuContainer" file="{{ url_for('web.serve_book', book_id=djvufile, book_format=extension) }}"></div>
   </body>
 </html>

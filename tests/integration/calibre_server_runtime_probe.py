@@ -6,7 +6,17 @@ Product modules are loaded from the image, never copied from the host.
 Explicit checks also work under optimized Python.
 """
 
-import ctypes, importlib.util, json, os, pathlib, signal, socket, subprocess, sys, tempfile, time
+import ctypes
+import importlib.util
+import json
+import os
+import pathlib
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
 
 APP_ROOT = pathlib.Path("/app/calibre-web-automated")
 if ctypes.CDLL(None).prctl(36, 1, 0, 0, 0) != 0:
@@ -45,6 +55,9 @@ def live(pid):
 
 results = []
 with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
+    runtime_config = pathlib.Path(base) / "calibre-config"
+    runtime_config.mkdir()
+    runtime_env = dict(os.environ, CALIBRE_CONFIG_DIRECTORY=str(runtime_config))
     library = pathlib.Path(base) / "library"
     library.mkdir()
     initialize = subprocess.run(
@@ -56,6 +69,7 @@ with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
         ],
         capture_output=True,
         text=True,
+        env=runtime_env,
     )
     if initialize.returncode:
         raise RuntimeError(initialize.stderr)
@@ -92,6 +106,7 @@ with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
                 input="Fixture-2026  \n",
                 capture_output=True,
                 text=True,
+                env=runtime_env,
             )
             if created.returncode:
                 raise RuntimeError("user database creation failed: " + created.stderr)
@@ -111,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=dict(os.environ, XDG_CACHE_HOME=str(config / "cache")),
+            env=dict(runtime_env, XDG_CACHE_HOME=str(config / "cache")),
         )
         child = None
         try:
@@ -138,6 +153,7 @@ with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    env=runtime_env,
                 )
                 if accepted.returncode or json.loads(accepted.stdout) != []:
                     raise RuntimeError(
@@ -149,6 +165,7 @@ with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    env=runtime_env,
                 )
                 if rejected.returncode == 0:
                     raise RuntimeError("wrong password was accepted")

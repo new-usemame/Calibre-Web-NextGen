@@ -90,7 +90,7 @@ function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, shel
             <Check size={18} aria-hidden="true" focusable={false} />
             {book.read ? t('Mark as unread') : t('Mark as read')}
           </button>
-          <p className={styles.status}>{book.in_progress ? t('Reading') : book.read ? t('Read') : t('Unread')}</p>
+          <p className={styles.status}>{book.read_status === 'did_not_finish' ? t('Did not finish') : book.read_status === 'on_hold' ? t('On hold') : book.in_progress ? t('Reading') : book.read ? t('Read') : t('Unread')}</p>
         </>}
         {shelfNames.length > 0 && <section className={styles.shelves} aria-label={t('Shelves')}>
           <h3>{t('Shelves')}</h3>

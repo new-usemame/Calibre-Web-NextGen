@@ -103,3 +103,25 @@ test('a failed status save keeps the saved choice, associates the error and perm
   await expect(status).toHaveValue('on_hold');
   await expect(status).not.toHaveAttribute('aria-invalid', 'true');
 });
+
+
+test('cover actions report paused choices and keep explicit finished and unread actions', async ({ statusPage: page }) => {
+  const book = await firstBook(page);
+  for (const [choice, label] of [['on_hold', 'On hold'], ['did_not_finish', 'Did not finish']]) {
+    expect((await post(page, `/api/v1/books/${book.id}/read-status`, { status: choice })).status()).toBe(200);
+    await page.goto('/app');
+    const card = page.getByTestId('catalog-grid').locator(`[data-book-id="${book.id}"]`);
+    await card.getByRole('button', { name: `Actions for ${book.title}`, exact: true }).press('Enter');
+    const dialog = page.getByRole('dialog', { name: `Actions for ${book.title}`, exact: true });
+    await expect(dialog.getByText(label, { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Unread', { exact: true })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Mark as read', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(async () => (await (await page.request.get(`/api/v1/books/${book.id}`)).json()).read_status).toBe('finished');
+    await card.getByRole('button', { name: `Actions for ${book.title}`, exact: true }).press('Enter');
+    await expect(dialog.getByText('Read', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Mark as unread', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(async () => (await (await page.request.get(`/api/v1/books/${book.id}`)).json()).read_status).toBe('unread');
+  }
+});

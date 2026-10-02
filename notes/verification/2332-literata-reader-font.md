@@ -1,6 +1,6 @@
 # Literata in both EPUB readers — verification
 
-The original contribution by @sgreadly is preserved with its author and cherry-pick source. Literata is an additional optional reader choice; existing saved choices and Book default remain unchanged. Four same-origin WOFF2 assets provide regular, italic, bold and bold italic. Their full OFL 1.1 text accompanies them. No external font request or runtime dependency is introduced. The separate distribution decision is recorded in `notes/dep-review-2332.md` for the operator before merging or releasing.
+The original contribution by @sgreadly is preserved with its author and cherry-pick source. Literata is an additional optional reader choice; existing saved choices and Book default remain unchanged. Four same-origin WOFF2 assets provide regular, italic, bold and bold italic. Their full OFL 1.1 text accompanies them. No external font request or runtime dependency is introduced. The operator cleared distribution of these assets on 2026-10-01; `notes/dep-review-2332.md` records the clearance and preservation requirements.
 
 ## Observed behavior
 
@@ -14,4 +14,4 @@ Independent review fetched all four fonts over HTTP: 200, WOFF2 signatures and b
 
 One full local smoke/unit run: **10,271 passed, 103 skipped, 134 deselected, four failed**. Two failures are the previously observed SQLite baseline cases; two missing French/Dutch Literata catalog entries were corrected, with affected locale checks rerun. The brand name remains Literata in both languages.
 
-This is EPUB support. PDF, physical phones and Safari/WebKit were not exercised. A Literata-specific request through a live subpath proxy was not exercised; existing prefix tests passed, and both reader paths use their existing prefix-aware static URL builders. Independent review found no code or behavior blocker. The OFL distribution decision remains separate from that review.
+This is EPUB support. PDF, physical phones and Safari/WebKit were not exercised. A Literata-specific request through a live subpath proxy was not exercised; existing prefix tests passed, and both reader paths use their existing prefix-aware static URL builders. Independent review found no code or behavior blocker. The separate OFL distribution decision was cleared on 2026-10-01; that clearance does not replace the integration and current-head CI gates.

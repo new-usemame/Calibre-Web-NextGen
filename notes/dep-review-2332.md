@@ -1,8 +1,8 @@
 # PR #2332 dependency and license review
 
-## Decision needed
+## Distribution cleared — 2026-10-01
 
-This adoption retains four bundled Literata WOFF2 font files from the contributor's PR and adds their SIL Open Font License 1.1 text at `cps/static/fonts/literata/OFL.txt`. The source tree has no new runtime dependency or external font service URL. The font files are shipping assets under a newly introduced license, so this triggers the operator-only licensing gate in `agent-context/AGENTS-DETAILS.md` rule 6. The review branch is prepared for that decision; merging or releasing bundled builds requires the operator to choose whether Calibre-Web-NextGen may distribute these font assets under OFL 1.1. This note records the gate; it is not distribution approval.
+The operator cleared distribution of these Literata assets under SIL Open Font License 1.1 on 2026-10-01. This resolves the separate asset-distribution gate in `agent-context/AGENTS-DETAILS.md` rule 6. The adoption retains the contributor's four unchanged WOFF2 faces and the full copyright and license text at `cps/static/fonts/literata/OFL.txt`. No runtime dependency or external font service URL is introduced. Future distributions must preserve the accompanying license and contributor credit. Code, integration and current-head CI remain separate merge gates.
 
 ## Evidence and terms
 
@@ -14,4 +14,4 @@ This adoption retains four bundled Literata WOFF2 font files from the contributo
 
 ## Scope
 
-No package or runtime dependency was added, and font requests are served from this application's same-origin static assets. If the operator declines the license gate, remove the four WOFF2 files, the license file, and the Literata reader option before merging or releasing. If accepted, preserve the license file with the fonts in future distributions.
+The clearance covers the four bundled Literata regular, italic, bold and bold italic WOFF2 faces in this adoption, together with the complete OFL text and existing contributor credit. Preserve all of these in future distributions. Font requests are served from this application's same-origin static assets; no package or runtime dependency was added.

@@ -324,3 +324,26 @@ test('worst dense cover badge stack does not collide with the action disclosure'
   expect(collisions, `cover action overlaps status badges: ${JSON.stringify(geometry)}`).toEqual([]);
   await page.unrouteAll({ behavior: 'wait' });
 });
+
+
+test('catalog focus keeps toolbar controls below the sticky header after card actions', async ({ secondaryUser }) => {
+  const { page } = secondaryUser;
+  const phone = test.info().project.use.hasTouch === true;
+  await page.setViewportSize(phone ? { width: 375, height: 812 } : { width: 1280, height: 800 });
+  await page.goto('/app');
+  const card = page.getByTestId('catalog-grid').locator(cards).first().locator('..');
+  const trigger = card.getByRole('button', { name: /^Actions for / });
+  if (phone) await trigger.tap(); else { await trigger.focus(); await trigger.press('Enter'); }
+  await expect(page.getByRole('dialog', { name: /^Actions for / })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  const sort = page.getByRole('combobox', { name: 'Sort order' });
+  await sort.focus();
+  await expect(sort).toBeFocused();
+  const geometry = await sort.evaluate(control => ({
+    control: control.getBoundingClientRect().toJSON(),
+    header: document.querySelector('header')!.getBoundingClientRect().toJSON(),
+  }));
+  expect(geometry.control.top).toBeGreaterThanOrEqual(geometry.header.bottom);
+  expect(geometry.control.bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
+});

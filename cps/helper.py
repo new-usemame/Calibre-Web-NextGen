@@ -31,7 +31,7 @@ from flask_babel import get_locale
 from .cw_login import current_user
 from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from werkzeug.datastructures import Headers
 from werkzeug.http import parse_options_header
 from werkzeug.security import generate_password_hash
@@ -3478,6 +3478,8 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
     first_author = next((author for author in book.authors if author is not None and author.name), None)
     if first_author is not None:
         file_name = file_name + ' - ' + first_author.name
+    if isinstance(filename_template, str):
+        filename_template = filename_template.strip()
     if filename_template:
         try:
             file_name = render_opds_filename(
@@ -3486,7 +3488,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 unicode_filename=config.config_unicode_filename,
                 ordered_authors=calibre_db.order_authors([book]),
             )
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError):
             # A corrupt or manually changed setting must not prevent downloads.
             log.warning("Invalid OPDS filename template; using the default filename")
     file_name = get_valid_filename(file_name, replace_whitespace=False)

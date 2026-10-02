@@ -495,19 +495,19 @@ function AdminConfigForm() {
           </p>
         </label>
       </div>
-      <label className={styles.field}>
-        <span>{t('OPDS download filename template')}</span>
-        <input value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
+      <div className={styles.field}>
+        <label htmlFor="opds-filename-template">{t('OPDS download filename template')}</label>
+        <input id="opds-filename-template" value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
           placeholder="{author_sort} - {title} ({id})"
           aria-invalid={filenameError ? true : undefined}
           aria-describedby={`opds-filename-help${filenameError ? ' opds-filename-error' : ''}`}
           onChange={(e) => { set('config_opds_filename_template', e.target.value); setFilenameError(null); }} />
-        {filenameError && <p id="opds-filename-error" role="alert">{filenameError}</p>}
+        {filenameError && <p id="opds-filename-error" className={styles.fieldError} role="alert">{filenameError}</p>}
         <p id="opds-filename-help" className={styles.fieldHint}>
           {t('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}
           {' '}{t('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}
         </p>
-      </label>
+      </div>
       <details>
         <summary>{t('Filename template fields and examples')}</summary>
         <p><code>{'{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {#custom_field}'}</code></p>

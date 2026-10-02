@@ -396,7 +396,8 @@ def admin_update_config():
         config.config_theme = theme_code(data["config_theme"])
     for key in _UI_CONFIG_STR:
         if key in data:
-            setattr(config, key, str(data[key] or ""))
+            value = str(data[key] or "")
+            setattr(config, key, value.strip() if key == "config_opds_filename_template" else value)
     for key, value in font_updates.items():
         setattr(config, key, value)
     try:

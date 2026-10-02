@@ -136,7 +136,7 @@ def custom_session():
 def test_custom_lookup_names_and_types(book, custom_session):
     template = '{#shelf} {#count} {#read} {#date} {#saga} {#saga_index} {#stars} {#missing:0>3s}'
     assert names.render_filename(template, book, custom_session) == 'Favorites 0 No 2020-05-06 Custom Saga 1.5 3.5'
-    assert names.render_filename('{#computed}', book, custom_session) == 'Favorites Book, The'
+    assert names.render_filename('{#computed}', book, custom_session) == 'Favorites The Book'
     assert names.render_filename('{#cycle}', book, custom_session) == 'book-42'
     book.id = 43
     assert names.render_filename('{#shelf}{#count}{#read}', book, custom_session) == 'book-43'
@@ -288,7 +288,7 @@ def test_invalid_template_does_not_partially_change_configuration(admin_config):
         inspect.unwrap(classic.update_view_configuration)()
     assert config.config_opds_filename_template == '{title}'
     assert config.config_calibre_web_title == 'Library'
-    classic.flash.assert_called_once()
+    classic.flash.assert_not_called()
     with app.test_request_context('/api/v1/admin/config', method='POST', json=data):
         response, status = inspect.unwrap(api.admin_update_config)()
         assert status == 400 and response.json['error']['code'] == 'invalid_opds_filename_template'
@@ -449,3 +449,99 @@ def test_invalid_classic_template_remains_available_for_correction(admin_config,
     assert render.call_args.kwargs['opds_filename_error']
     assert config.config_opds_filename_template == '{title}'
     config.save.assert_not_called()
+
+
+def test_middle_composites_are_not_cached_after_a_depth_cutoff(book, custom_session):
+    import json
+    for number in range(10):
+        target = f'#level_{number + 1}' if number < 9 else '#shelf'
+        custom_session.add(db.CustomColumns(id=20 + number, label=f'level_{number}', datatype='composite',
+            display=json.dumps({'composite_template': '{' + target + '}'})))
+    custom_session.commit()
+    assert names.render_filename('{#level_0}|{#level_5}', book, custom_session) == '_Favorites'
+    assert names.render_filename('{#level_5}|{#level_0}', book, custom_session) == 'Favorites_'
+
+
+@pytest.mark.parametrize('value', [' ', '  \t  '])
+def test_both_admin_editors_treat_whitespace_as_blank(admin_config, value):
+    config, classic, api = admin_config
+    app = Flask(__name__)
+    with app.test_request_context(method='POST', data={'config_opds_filename_template': value}):
+        inspect.unwrap(classic.update_view_configuration)()
+    assert config.config_opds_filename_template == ''
+    with app.test_request_context(method='POST', json={'config_opds_filename_template': value}):
+        inspect.unwrap(api.admin_update_config)()
+    assert config.config_opds_filename_template == ''
+
+
+def test_custom_composite_uses_metadata_names_instead_of_top_level_sort_names(book, custom_session):
+    custom_session.get(db.CustomColumns, 7).display = '{"composite_template": "{title} - {series}"}'
+    custom_session.commit()
+    assert names.render_filename('{#computed}', book, custom_session) == 'The Book - The Saga'
+
+
+def test_affixes_are_omitted_when_formatting_removes_the_value(book):
+    assert names.render_filename('{series:.0|| - }{title}', book, None) == 'Book, The'
+
+
+@pytest.mark.parametrize('name', ['COM¹', 'COM²', 'COM³', 'LPT¹', 'LPT²', 'LPT³', 'CONIN$', 'CONOUT$'])
+def test_reserved_device_names_remain_safe_with_unicode_preserved(book, name):
+    assert names.render_filename(name, book, None).startswith('_')
+
+
+def test_author_sort_collisions_do_not_duplicate_authors(download, book):
+    book.authors = [NS(id=1, name='Writer A', sort='Smith, J'), NS(id=2, name='Writer B', sort='Smith, J')]
+    book.author_sort = 'Smith, J & Smith, J'
+    response = download.get_download_link(42, 'epub', '', filename_template='{authors}')
+    filename = parse_options_header(response.headers['Content-Disposition'])[1]['filename']
+    assert filename.count('Writer A') == filename.count('Writer B') == 1
+
+
+def test_optional_template_metadata_read_failure_keeps_the_download_available(download):
+    from sqlalchemy.exc import OperationalError
+    def unavailable(*args):
+        raise OperationalError('SELECT', {}, Exception('owned transient read failure'))
+    download.calibre_db.order_authors = unavailable
+    response = download.get_download_link(42, 'epub', '', filename_template='{authors}')
+    assert response.status_code == 200
+    assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'The Book - Ann Writer.epub'
+
+
+def test_invalid_template_keeps_other_classic_drafts_without_persisting(admin_config, monkeypatch):
+    config, classic, _ = admin_config
+    render = Mock(return_value='invalid form')
+    monkeypatch.setattr(classic, 'view_configuration', render)
+    with Flask(__name__).test_request_context(method='POST', data={
+        'config_opds_filename_template': '{title:03}', 'config_calibre_web_title': 'Draft site',
+        'config_books_per_page': '45', 'config_default_locale': 'fr', 'download_role': 'on',
+    }):
+        inspect.unwrap(classic.update_view_configuration)()
+    draft = render.call_args.kwargs['draft_config']
+    assert draft.config_calibre_web_title == 'Draft site'
+    assert draft.config_books_per_page == 45
+    assert draft.config_default_locale == 'fr'
+    assert draft.config_default_role != config.config_default_role
+    assert config.config_calibre_web_title == 'Library'
+    assert config.config_books_per_page == 30
+    config.save.assert_not_called()
+
+
+def test_classic_draft_does_not_share_the_live_config_dirty_queue(monkeypatch):
+    from cps import admin
+    config = config_sql.ConfigSQL()
+    object.__setattr__(config, 'config_default_role', 0)
+    object.__setattr__(config, 'config_calibre_web_title', 'Saved title')
+    object.__setattr__(config, 'config_books_per_page', 30)
+    config.dirty.clear()
+    monkeypatch.setattr(admin, 'config', config)
+    with Flask(__name__).test_request_context(method='POST', data={
+        'config_calibre_web_title': 'Draft title', 'config_books_per_page': '45',
+    }):
+        from flask import request
+        draft = admin._view_configuration_draft(request.form)
+    assert draft.config_calibre_web_title == 'Draft title'
+    assert draft.config_books_per_page == 45
+    assert config.config_calibre_web_title == 'Saved title'
+    assert config.config_books_per_page == 30
+    assert config.dirty == []
+    assert draft.dirty is not config.dirty

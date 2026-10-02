@@ -274,7 +274,7 @@
         <input type="text" class="form-control" name="config_opds_filename_template" id="config_opds_filename_template"
                value="{{ opds_filename_template if opds_filename_template is not none and opds_filename_template is defined else conf.config_opds_filename_template or '' }}" maxlength="1024" placeholder="{author_sort} - {title} ({id})"
                aria-describedby="opds-filename-help{% if opds_filename_error %} opds-filename-error{% endif %}"{% if opds_filename_error %} aria-invalid="true"{% endif %}>
-        {% if opds_filename_error %}<p id="opds-filename-error" role="alert">{{ opds_filename_error }}</p>{% endif %}
+        {% if opds_filename_error %}<p id="opds-filename-error" class="text-danger help-block" role="alert">{{ opds_filename_error }}</p>{% endif %}
         <p id="opds-filename-help" class="settings-explanation">{{_('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}}</p>
         <p class="settings-explanation">{{_('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}}</p>
         <details>

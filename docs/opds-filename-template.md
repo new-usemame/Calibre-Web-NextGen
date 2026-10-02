@@ -21,7 +21,7 @@ Do not include the extension in the template.
 The server adds the extension for the format it sends, such as `.epub` or `.pdf`.
 
 If you want the original naming behavior, clear the preference and save.
-A blank preference keeps `Title - First Author.ext`, with the original title and only the first author.
+A blank or whitespace-only preference keeps `Title - First Author.ext`, with the original title and only the first author.
 Existing installations start with a blank preference.
 
 ## Fields and formatting
@@ -75,7 +75,8 @@ Both separators are required; affixes cannot contain nested fields. Use explicit
 
 This is a limited [Calibre-style template language](https://manual.calibre-ebook.com/template_lang.html), not the complete Calibre template engine.
 It does not support template functions, numeric format codes, or Calibre program mode.
-A computed custom field works when its source template uses the supported syntax.
+A computed custom field works when its source template uses the supported syntax; title and series inside that computed value use their original metadata names.
+Composite expansion is limited to ten nested lookups. Cycles and deeper references become empty text, without changing the result of a later shallow reference.
 Otherwise, that field produces empty text and the server logs a warning.
 Templates cannot access Python attributes or execute code.
 

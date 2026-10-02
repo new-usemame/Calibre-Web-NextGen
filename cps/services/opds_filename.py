@@ -8,6 +8,7 @@ padding. It does not execute Calibre template functions or program mode.
 import json
 import re
 import unicodedata
+from collections import ChainMap
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from string import Formatter
@@ -31,7 +32,7 @@ _FIELDS = frozenset((
 _FIELD = re.compile(r'([a-z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
 _FORMAT = re.compile(r'(?:(.[<^>]|[<^>]))?([0-9]{1,3})?(?:\.([0-9]{1,3}))?s?\Z')
 _UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
-_RESERVED = re.compile(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', re.I)
+_RESERVED = re.compile(r'(CON|CONIN\$|CONOUT\$|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)', re.I)
 
 
 def _format_parts(spec):
@@ -86,7 +87,8 @@ def expand_template(template, values):
             index = int(index)
             value = value[index:index + 1]
         format_spec, prefix, suffix = _format_parts(spec)
-        result.append(prefix + format(value[:MAX_FILENAME_LENGTH], format_spec) + suffix if value else '')
+        formatted = format(value[:MAX_FILENAME_LENGTH], format_spec) if value else ''
+        result.append(prefix + formatted + suffix if formatted else '')
     return ''.join(result)
 
 
@@ -143,12 +145,23 @@ class _BookValues(dict):
         self.session = session
         self.columns = None
         self.depth = 0
+        self.active = set()
         series = book.series[0] if book.series else None
         authors = book.authors if ordered_authors is None else ordered_authors
+        author_names = []
+        seen_authors = set()
+        for author in authors:
+            if author is None or not author.name:
+                continue
+            author_id = getattr(author, 'id', None)
+            author_key = author_id if author_id is not None else id(author)
+            if author_key not in seen_authors:
+                seen_authors.add(author_key)
+                author_names.append(author.name.replace('|', ','))
         super().__init__(
             title=_sorted_name(book.title, book.sort, title_regex),
             author_sort=book.author_sort or '',
-            authors=' & '.join(author.name.replace('|', ',') for author in authors if author is not None and author.name),
+            authors=' & '.join(author_names),
             id=_value(book.id), isbn=book.isbn or '',
             languages=', '.join(language.lang_code for language in book.languages),
             last_modified=_value(book.last_modified), pubdate=_value(book.pubdate),
@@ -160,20 +173,31 @@ class _BookValues(dict):
             tags=', '.join(tag.name for tag in book.tags),
         )
 
-    def __missing__(self, key):
-        if not key.startswith('#') or self.depth >= 10:
+    def __getitem__(self, key):
+        # Enforce the depth bound even for a leaf resolved earlier in this name.
+        if key.startswith('#') and (self.depth >= 10 or key in self.active):
             return ''
-        # A depth cutoff is not a missing value: a later shallow reference may
-        # resolve it. Install a placeholder only for lookups actually started.
-        self[key] = ''
+        return super().__getitem__(key)
+
+    def __missing__(self, key):
+        if not key.startswith('#'):
+            return ''
+        self.active.add(key)
         self.depth += 1
+        value = ''
         try:
-            self[key] = self._custom_value(key[1:])
+            value = self._custom_value(key[1:])
         except (SQLAlchemyError, ValueError, TypeError, KeyError, InvalidOperation):
             log.warning('Could not read custom field %s for an OPDS filename', key)
         finally:
             self.depth -= 1
-        return self[key]
+            self.active.remove(key)
+        column = (self.columns or {}).get(key[1:])
+        # A composite can be truncated by its calling depth or a cycle. Cache
+        # stored leaf values only, so a later shallow composite is independent.
+        if column is None or column.datatype != 'composite':
+            self[key] = value
+        return value
 
     def _custom_value(self, label):
         if self.columns is None:
@@ -194,7 +218,11 @@ class _BookValues(dict):
             display = json.loads(column.display or '{}')
             if not isinstance(display, dict):
                 raise ValueError('Invalid custom column display metadata')
-            return expand_template(display.get('composite_template', ''), self)
+            metadata = ChainMap({
+                'title': self.book.title or '',
+                'series': self.book.series[0].name if self.book.series else '',
+            }, self)
+            return expand_template(display.get('composite_template', ''), metadata)
 
         # IDs come from the schema, not template text. Values stay bound.
         # Read the actual Calibre tables because CWNG does not map custom

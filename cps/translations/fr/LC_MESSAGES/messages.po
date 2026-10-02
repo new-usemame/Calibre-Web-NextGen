@@ -17311,8 +17311,9 @@ msgstr "Afficher la section Lu / Non lu"
 #~ "Aucune étagère pour le moment. Créez-en une ci-dessus pour commencer à "
 #~ "regrouper des livres."
 
-#~ msgid "Public"
-#~ msgstr "Publique"
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "Publique"
 
 #~ msgid "Choose a SABnzbd connection"
 #~ msgstr "Choisir une connexion SABnzbd"

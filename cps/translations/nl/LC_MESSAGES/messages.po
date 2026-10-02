@@ -16944,8 +16944,9 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Nog geen boekenplanken. Maak er hierboven een aan om boeken te verzamelen."
 
-#~ msgid "Public"
-#~ msgstr "Openbaar"
+#: cps/spa_strings.py
+msgid "Public"
+msgstr "Openbaar"
 
 #~ msgid "Choose a SABnzbd connection"
 #~ msgstr "Kies een SABnzbd-verbinding"

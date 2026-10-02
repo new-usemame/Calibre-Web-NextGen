@@ -6000,6 +6000,10 @@ msgstr "Impossibile salvare il titolo."
 msgid "Could not save your reading position."
 msgstr "Impossibile salvare la posizione di lettura."
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Could not scan book files. Please try again."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Could not search this book."
 msgstr "Impossibile cercare questo libro."
@@ -6691,6 +6695,11 @@ msgstr ""
 "I file vengono accodati per l'inserimento nella biblioteca e compariranno al "
 "termine dell'importazione."
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Files that could not be parsed: {formats}"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Fill style"
@@ -6713,6 +6722,10 @@ msgstr "Filtra {items}"
 #, python-brace-format
 msgid "Filter {items}…"
 msgstr "Filtra {items}…"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Find ISBN in book files"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Find books"
@@ -6768,6 +6781,11 @@ msgstr "Formato inserito in coda — apparirà una volta elaborato."
 #: cps/spa_strings.py
 msgid "Formats"
 msgstr "Formati"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Formats not scanned: {formats}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Formats — exclude"
@@ -6976,6 +6994,27 @@ msgstr "Come applicare i campi con valori multipli?"
 msgid "How switching between the global library and My Library works"
 msgstr ""
 "Come funziona il passaggio tra biblioteca globale e biblioteca personale"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN added to the form. Save changes to keep it."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN extraction is unavailable for Google Drive books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN extraction is unavailable on this server platform."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "ISBN suggestions found: {n}."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN suggestions from book files"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Icon"
@@ -7697,9 +7736,17 @@ msgstr ""
 msgid "No sources need a key."
 msgstr "Nessuna sorgente richiede una chiave."
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "No supported book file could be scanned."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "No tasks running."
 msgstr "Nessuna attività in esecuzione."
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "No valid ISBN found in the scanned text."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8596,9 +8643,24 @@ msgstr ""
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr "Salvato. Riavvia il server per applicare le modifiche alla login."
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid ""
+"Scan EPUB, PDF or text files for ISBNs. Check the edition before using a "
+"suggestion."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Scan for duplicates"
 msgstr "Cerca duplicati"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Scanned formats: {formats}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Scanning book files…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Scheduled tasks"
@@ -9515,6 +9577,10 @@ msgstr ""
 msgid "The request could not be stopped."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "The scan reached its limit. More ISBNs may be present in the file."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
 msgstr ""
@@ -9887,6 +9953,11 @@ msgstr ""
 msgid "Unarchive"
 msgstr "Rimuovi dall'archivio"
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Unavailable files: {formats}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Undo"
 msgstr "Annulla"
@@ -9971,6 +10042,11 @@ msgstr ""
 "Funzione di caricamento non disponibile per l'account in uso su questo "
 "server."
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Use ISBN {isbn}"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Use original device: {name}"
@@ -10037,6 +10113,12 @@ msgstr "Attributo nome utente"
 #: cps/spa_strings.py
 msgid "Users"
 msgstr "Utenti"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid ""
+"Using a suggestion replaces only ISBN identifiers in this form. Save changes "
+"to keep it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"

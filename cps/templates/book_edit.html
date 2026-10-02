@@ -186,6 +186,30 @@
       </table>
       <a id="add-identifier-line" class="btn btn-default">{{_('Add Identifier')}}</a>
     </div>
+    {% if current_user.role_edit() %}
+    <section id="file-isbn-suggestions" class="form-group" aria-label="{{ _('ISBN suggestions from book files') }}"
+      data-url="{{ url_for('api_v1.extract_isbn_candidates', book_id=book.id) }}"
+      data-loading="{{ _('Scanning book files…') }}"
+      data-found="{{ _('ISBN suggestions found: {n}.') }}"
+      data-empty="{{ _('No valid ISBN found in the scanned text.') }}"
+      data-unavailable="{{ _('No supported book file could be scanned.') }}"
+      data-error="{{ _('Could not scan book files. Please try again.') }}"
+      data-storage="{{ _('ISBN extraction is unavailable for Google Drive books.') }}"
+      data-platform="{{ _('ISBN extraction is unavailable on this server platform.') }}"
+      data-use="{{ _('Use ISBN {isbn}') }}"
+      data-added="{{ _('ISBN added to the form. Save changes to keep it.') }}"
+      data-scanned="{{ _('Scanned formats: {formats}') }}"
+      data-unsupported="{{ _('Formats not scanned: {formats}') }}"
+      data-missing="{{ _('Unavailable files: {formats}') }}"
+      data-failed="{{ _('Files that could not be parsed: {formats}') }}"
+      data-truncated="{{ _('The scan reached its limit. More ISBNs may be present in the file.') }}">
+      <button type="button" class="btn btn-default file-isbn-scan">{{ _('Find ISBN in book files') }}</button>
+      <p class="help-block">{{ _('Scan EPUB, PDF or text files for ISBNs. Check the edition before using a suggestion.') }}</p>
+      <p class="help-block">{{ _('Using a suggestion replaces only ISBN identifiers in this form. Save changes to keep it.') }}</p>
+      <p class="file-isbn-status" role="status"></p>
+      <div class="file-isbn-results"></div>
+    </section>
+    {% endif %}
     {# Decouple cover changes from global uploads: allow users with edit rights to change covers #}
     {% if current_user.role_edit() %}
     <div class="form-group">
@@ -538,9 +562,16 @@
 <script src="{{ url_for('static', filename='js/libs/bootstrap-datepicker/locales/bootstrap-datepicker.' + current_user.locale + '.min.js') }}" charset="UTF-8"></script>
 {% endif %}
 <script src="{{ url_for('static', filename='js/edit_books.js') }}"></script>
+<script src="{{ url_for('static', filename='js/file-isbn-suggestions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
 {% endblock %}
 {% block header %}
+<style>
+#file-isbn-suggestions { padding: 12px; border: 1px solid #aaa; border-radius: 4px; }
+#file-isbn-suggestions button { min-height: 44px; white-space: normal; }
+#file-isbn-suggestions .file-isbn-candidate { padding: 12px 0; border-top: 1px solid #aaa; overflow-wrap: anywhere; }
+#file-isbn-suggestions .file-isbn-status { min-height: 20px; }
+</style>
 <meta name="referrer" content="never">
 <link href="{{ url_for('static', filename='css/libs/typeahead.css') }}" rel="stylesheet" media="screen">
 <link href="{{ url_for('static', filename='css/libs/bootstrap-datepicker3.min.css') }}" rel="stylesheet" media="screen">

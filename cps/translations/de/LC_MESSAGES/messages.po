@@ -5887,6 +5887,10 @@ msgstr "Titel konnte nicht gespeichert werden."
 msgid "Could not save your reading position."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Could not scan book files. Please try again."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Could not search this book."
 msgstr ""
@@ -6561,6 +6565,11 @@ msgid ""
 "Files are queued for the library's ingest process and appear once imported."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Files that could not be parsed: {formats}"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Fill style"
@@ -6583,6 +6592,10 @@ msgstr "Filtern: {items}"
 #, python-brace-format
 msgid "Filter {items}…"
 msgstr "Filtern: {items}…"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Find ISBN in book files"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Find books"
@@ -6640,6 +6653,11 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Formats"
 msgstr "Formate"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Formats not scanned: {formats}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Formats — exclude"
@@ -6842,6 +6860,27 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "How switching between the global library and My Library works"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN added to the form. Save changes to keep it."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN extraction is unavailable for Google Drive books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN extraction is unavailable on this server platform."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "ISBN suggestions found: {n}."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "ISBN suggestions from book files"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7562,9 +7601,17 @@ msgstr ""
 msgid "No sources need a key."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "No supported book file could be scanned."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "No tasks running."
 msgstr "Keine laufenden Aufgaben."
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "No valid ISBN found in the scanned text."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8433,9 +8480,24 @@ msgstr ""
 "Gespeichert. Starten Sie den Server neu, damit die Anmeldeänderungen wirksam "
 "werden."
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid ""
+"Scan EPUB, PDF or text files for ISBNs. Check the edition before using a "
+"suggestion."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Scan for duplicates"
 msgstr "Nach Duplikaten suchen"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Scanned formats: {formats}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Scanning book files…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Scheduled tasks"
@@ -9348,6 +9410,10 @@ msgstr ""
 msgid "The request could not be stopped."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "The scan reached its limit. More ISBNs may be present in the file."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
 msgstr ""
@@ -9732,6 +9798,11 @@ msgstr ""
 msgid "Unarchive"
 msgstr "Entarchivieren"
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Unavailable files: {formats}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Undo"
 msgstr ""
@@ -9814,6 +9885,11 @@ msgstr "Bücher hochladen"
 msgid "Uploading is not available for your account on this server."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/book_edit.html
+#, python-brace-format
+msgid "Use ISBN {isbn}"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Use original device: {name}"
@@ -9878,6 +9954,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Users"
 msgstr "Benutzer"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid ""
+"Using a suggestion replaces only ISBN identifiers in this form. Save changes "
+"to keep it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"

@@ -274,7 +274,7 @@ export default defineConfig({
     //    Keep this project narrow: the broad suite remains Chromium-backed.
     {
       name: 'webkit-reader',
-      testMatch: [WEBKIT_READER_SPEC, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
+      testMatch: [/paused-reading-states\.spec\.ts/, WEBKIT_READER_SPEC, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
       use: {
         ...devices['Desktop Safari'],
         viewport: { width: 1280, height: 800 },
@@ -285,7 +285,7 @@ export default defineConfig({
 
     {
       name: 'webkit-reader-mobile',
-      testMatch: [/reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
+      testMatch: [/paused-reading-states\.spec\.ts/, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
       use: { ...devices['iPhone 13'], storageState: STORAGE },
       dependencies: ['setup'],
     },

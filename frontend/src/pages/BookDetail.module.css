@@ -915,6 +915,6 @@
 .fileMsgErr { color: var(--danger); font-size: var(--fs-sm); }
 
 .readingStatusControl { display:flex; flex-direction:column; gap:6px; margin-block:12px; max-width:26rem; }
-.readingStatusControl select { min-height:44px; max-width:100%; padding:8px; color:var(--text); background:var(--surface-1); border:1px solid var(--border); border-radius:6px; font:inherit; }
+.readingStatusControl select { height:44px; min-height:44px; max-width:100%; padding:8px; color:var(--text); background:var(--surface-1); border:1px solid var(--border); border-radius:6px; font:inherit; }
 .readingStatusControl select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .readingStatusControl p { margin:0; font-size:var(--fs-sm); }

@@ -1,6 +1,28 @@
-import { test, expect } from './fixtures';
+import { test as base, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+
+// secondaryUser owns identity and cleanup; copy its cookies into the actual
+// project's device context so WebKit phone checks also exercise native touch.
+const test = base.extend<{ statusPage: Page }>({
+  statusPage: async ({ browser, secondaryUser, baseURL }, use, info) => {
+    const profile = info.project.use;
+    const context = await browser.newContext({
+      baseURL,
+      viewport: profile.viewport,
+      isMobile: profile.isMobile,
+      hasTouch: profile.hasTouch,
+      deviceScaleFactor: profile.deviceScaleFactor,
+      userAgent: profile.userAgent,
+      storageState: await secondaryUser.page.context().storageState(),
+    });
+    try {
+      await use(await context.newPage());
+    } finally {
+      await context.close();
+    }
+  },
+});
 
 async function post(page: Page, path: string, data: unknown) {
   const csrf = await page.request.get('/api/v1/auth/csrf');
@@ -14,9 +36,7 @@ async function firstBook(page: Page) {
   return books[0];
 }
 
-test('a personal pause survives automatic progress and both filtered search paths', async ({ secondaryUser }, info) => {
-  const page = secondaryUser.page;
-  await page.setViewportSize(info.project.use.viewport ?? { width: 1280, height: 800 });
+test('a personal pause survives automatic progress and both filtered search paths', async ({ statusPage: page }) => {
   const book = await firstBook(page);
   await page.goto(`/app/book/${book.id}`);
   const status = page.getByRole('combobox', { name: 'Reading status', exact: true });
@@ -48,9 +68,7 @@ test('a personal pause survives automatic progress and both filtered search path
   await expect(page.getByRole('group', { name: 'Read status', exact: true }).getByRole('button', { name: 'On hold', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('Classic pause and explicit resume are reflected in the New UI', async ({ secondaryUser }, info) => {
-  const page = secondaryUser.page;
-  await page.setViewportSize(info.project.use.viewport ?? { width: 1280, height: 800 });
+test('Classic pause and explicit resume are reflected in the New UI', async ({ statusPage: page }) => {
   const book = await firstBook(page);
   await page.goto(`/book/${book.id}`);
   await page.locator('#read-status-select').selectOption('did_not_finish');
@@ -66,9 +84,7 @@ test('Classic pause and explicit resume are reflected in the New UI', async ({ s
   await expect(page.locator('#read-status-select')).toHaveValue('in_progress');
 });
 
-test('a failed status save keeps the saved choice, associates the error and permits retry', async ({ secondaryUser }, info) => {
-  const page = secondaryUser.page;
-  await page.setViewportSize(info.project.use.viewport ?? { width: 1280, height: 800 });
+test('a failed status save keeps the saved choice, associates the error and permits retry', async ({ statusPage: page }) => {
   const book = await firstBook(page);
   await page.goto(`/app/book/${book.id}`);
   const status = page.getByRole('combobox', { name: 'Reading status', exact: true });

@@ -21,6 +21,7 @@ def test_serialize_book_list_item_full():
         "date_added": None,
         "last_modified": None,
         "read": False,
+        "read_status": "unread",
         "in_progress": False,
         "archived": False,
         "hidden": False,

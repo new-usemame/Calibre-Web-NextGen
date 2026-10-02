@@ -103,8 +103,12 @@ other POSIX platforms, a child that survives a forced supervisor kill retains
 the owner lock: subsequent operations refuse path access until it exits.
 Raw ingest imports pause the managed cache only around raw Calibre inspection and
 transactions; their Calibre child inherits both maintenance and metadata-writer
-locks. Network metadata fetch, cover generation and delivery run after the raw
-transaction releases that pause. Raw imports and Convert Library serialize even
+locks. Network metadata fetch and delivery run after the raw transaction releases
+that pause. Optional generated-cover updates take a second maintenance scope for
+the cover file and its metadata flag. Its isolated renderer and font probe each
+have a 25-second limit, so an enabled managed server can be paused for tens of
+seconds per generated cover. Automatic cover generation is off by default;
+leave it off when uninterrupted external reads matter more than generated covers. Raw imports and Convert Library serialize even
 when the optional server is disabled, because both use Calibre directly on the
 same library. Convert Library waits up to two minutes for an existing raw import;
 an uncommitted busy ingest retains its source and retries through the service

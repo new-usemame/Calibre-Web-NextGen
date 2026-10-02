@@ -720,3 +720,14 @@ def test_api_invalid_later_field_cannot_change_any_configuration(admin_config, b
     assert config.config_books_per_page == 30
     assert config.config_opds_filename_template == '{title}'
     config.save.assert_not_called()
+
+
+@pytest.mark.parametrize('value', [float('inf'), 2 ** 100, -(2 ** 100)])
+def test_api_numeric_overflow_cannot_leak_changes_into_live_config(admin_config, value):
+    config, _, api = admin_config
+    with Flask(__name__).test_request_context(method='POST', json={'config_books_per_page': value, 'config_opds_filename_template': '{id}'}):
+        response, status = inspect.unwrap(api.admin_update_config)()
+    assert status == 400
+    assert config.config_books_per_page == 30
+    assert config.config_opds_filename_template == '{title}'
+    config.save.assert_not_called()

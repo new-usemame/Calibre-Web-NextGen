@@ -386,8 +386,11 @@ def admin_update_config():
     for key in _UI_CONFIG_INT:
         if key in data:
             try:
-                integer_updates[key] = int(data[key])
-            except (TypeError, ValueError):
+                value = int(data[key])
+                if not -(2 ** 63) <= value < 2 ** 63:
+                    raise ValueError('Number exceeds the settings database range')
+                integer_updates[key] = value
+            except (TypeError, ValueError, OverflowError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
     if "config_theme" in data:
         # Validated against the SSOT slug set, exactly like the per-account

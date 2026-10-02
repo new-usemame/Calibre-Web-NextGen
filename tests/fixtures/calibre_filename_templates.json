@@ -1,0 +1,716 @@
+{
+  "generator": "scripts/generate_calibre_filename_fixtures.py",
+  "calibre_version": "9.2.1",
+  "locale": "en",
+  "timezone": "UTC",
+  "defaults": {
+    "timefmt": "%b, %Y",
+    "title_series_sorting": "library_order"
+  },
+  "book": {
+    "id": 42,
+    "title": "The Book",
+    "title_sort": "Book, The",
+    "author_sort": "Writer, Ann & Reader, Ben",
+    "authors": [
+      "Ann Writer",
+      "Ben Reader"
+    ],
+    "identifiers": {
+      "isbn": "9781234567890",
+      "doi": "10/example"
+    },
+    "languages": [
+      "eng",
+      "fra"
+    ],
+    "pubdate": "2020-05-06T12:00:00+00:00",
+    "timestamp": "2024-01-02T03:04:05+00:00",
+    "last_modified": "2024-02-03T04:05:06+00:00",
+    "publisher": "Press",
+    "rating": 8,
+    "series": "The Saga",
+    "series_sort": "DO NOT USE THE STORED SERIES SORT",
+    "series_index": 2.345,
+    "tags": [
+      "Space",
+      "Fiction"
+    ]
+  },
+  "custom": {
+    "shelf": {
+      "datatype": "text",
+      "value": [
+        "Favorites",
+        "Other"
+      ],
+      "multiple": true
+    },
+    "count": {
+      "datatype": "int",
+      "value": 0
+    },
+    "fraction": {
+      "datatype": "float",
+      "value": 2.0
+    },
+    "read": {
+      "datatype": "bool",
+      "value": false
+    },
+    "date": {
+      "datatype": "datetime",
+      "value": "2020-05-06T12:00:00+00:00"
+    },
+    "saga": {
+      "datatype": "series",
+      "value": "The Cycle",
+      "extra": 2.345
+    },
+    "stars": {
+      "datatype": "rating",
+      "value": 8
+    },
+    "textzero": {
+      "datatype": "text",
+      "value": "0"
+    },
+    "computed": {
+      "datatype": "composite",
+      "template": "{#shelf} {title}"
+    }
+  },
+  "cases": [
+    {
+      "name": "title",
+      "template": "{title}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Book, The"
+    },
+    {
+      "name": "title_sort",
+      "template": "{title_sort}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Book, The"
+    },
+    {
+      "name": "author",
+      "template": "{author}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Ann Writer & Ben Reader"
+    },
+    {
+      "name": "authors",
+      "template": "{authors}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Ann Writer & Ben Reader"
+    },
+    {
+      "name": "author_sort",
+      "template": "{author_sort}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Writer, Ann & Reader, Ben"
+    },
+    {
+      "name": "id",
+      "template": "{id}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "42"
+    },
+    {
+      "name": "isbn",
+      "template": "{isbn}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "9781234567890"
+    },
+    {
+      "name": "identifiers",
+      "template": "{identifiers}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "doi:10_example, isbn:9781234567890"
+    },
+    {
+      "name": "languages",
+      "template": "{languages}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "eng,fra"
+    },
+    {
+      "name": "pubdate",
+      "template": "{pubdate}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "May, 2020"
+    },
+    {
+      "name": "timestamp",
+      "template": "{timestamp}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Jan, 2024"
+    },
+    {
+      "name": "last_modified",
+      "template": "{last_modified}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Feb, 2024"
+    },
+    {
+      "name": "publisher",
+      "template": "{publisher}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Press"
+    },
+    {
+      "name": "rating",
+      "template": "{rating}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "4.0"
+    },
+    {
+      "name": "series",
+      "template": "{series}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Saga, The"
+    },
+    {
+      "name": "series_index",
+      "template": "{series_index}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "2.35"
+    },
+    {
+      "name": "tags",
+      "template": "{tags}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Fiction, Space"
+    },
+    {
+      "name": "#shelf",
+      "template": "{#shelf}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Favorites,Other"
+    },
+    {
+      "name": "#count",
+      "template": "{#count}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": ""
+    },
+    {
+      "name": "#fraction",
+      "template": "{#fraction}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "2.0"
+    },
+    {
+      "name": "#read",
+      "template": "{#read}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "no"
+    },
+    {
+      "name": "#date",
+      "template": "{#date}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "May, 2020"
+    },
+    {
+      "name": "#saga",
+      "template": "{#saga}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Cycle, The"
+    },
+    {
+      "name": "#saga_index",
+      "template": "{#saga_index}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "2.35"
+    },
+    {
+      "name": "#stars",
+      "template": "{#stars}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "4.0"
+    },
+    {
+      "name": "#textzero",
+      "template": "{#textzero}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "0"
+    },
+    {
+      "name": "#computed",
+      "template": "{#computed}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Favorites,Other Book, The"
+    },
+    {
+      "name": "#missing",
+      "template": "{#missing}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": ""
+    },
+    {
+      "name": "case_insensitive",
+      "template": "{TITLE} {#SAGA}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Book, The Cycle, The"
+    },
+    {
+      "name": "first_character",
+      "template": "{author_sort[0]}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "W"
+    },
+    {
+      "name": "literal_braces",
+      "template": "{{title}} {title}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "{title} Book, The"
+    },
+    {
+      "name": "space_padding",
+      "template": "x{series_index:>5s}x",
+      "book": {
+        "series_index": 2
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "x 2x"
+    },
+    {
+      "name": "zero_padding",
+      "template": "{series_index:0>3s}",
+      "book": {
+        "series_index": 2
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "002"
+    },
+    {
+      "name": "zero_custom_padding",
+      "template": "x{#count:0>3s}x",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "zero_series",
+      "template": "{series_index:0>3s}",
+      "book": {
+        "series_index": 0
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "000"
+    },
+    {
+      "name": "rounding_up",
+      "template": "{series_index}",
+      "book": {
+        "series_index": 1.999
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "2."
+    },
+    {
+      "name": "small_fraction",
+      "template": "x{series_index}x",
+      "book": {
+        "series_index": 2.001
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "x2.x"
+    },
+    {
+      "name": "negative_fraction",
+      "template": "{series_index}",
+      "book": {
+        "series_index": -2.345
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "-2.35"
+    },
+    {
+      "name": "rating_zero",
+      "template": "{rating}",
+      "book": {
+        "rating": 0
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "0.0"
+    },
+    {
+      "name": "rating_missing",
+      "template": "x{rating:0>3s}x",
+      "book": {
+        "rating": null
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "fractional_rating",
+      "template": "{rating}",
+      "book": {
+        "rating": 9
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "4.5"
+    },
+    {
+      "name": "no_series",
+      "template": "x{series}{series_index:0>3s}x",
+      "book": {
+        "series": null,
+        "series_index": null
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "missing_values",
+      "template": "x{pubdate}{timestamp}{last_modified}{authors}{tags}{languages}x",
+      "book": {
+        "pubdate": null,
+        "timestamp": null,
+        "last_modified": null,
+        "authors": [],
+        "tags": [],
+        "languages": []
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "undefined_pubdate",
+      "template": "x{pubdate}x",
+      "book": {
+        "pubdate": "0101-01-01T00:00:00+00:00"
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "title_fallback",
+      "template": "{title}",
+      "book": {
+        "title_sort": null
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "Book, The"
+    },
+    {
+      "name": "quoted_title",
+      "template": "{title}",
+      "book": {
+        "title": "“The Book”",
+        "title_sort": null
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "Book, The"
+    },
+    {
+      "name": "quoted_series",
+      "template": "{series}",
+      "book": {
+        "series": "“The Saga”"
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "Saga, The"
+    },
+    {
+      "name": "article_before_quote",
+      "template": "{title}",
+      "book": {
+        "title": "The \"Book\"",
+        "title_sort": null
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "Book\", The"
+    },
+    {
+      "name": "custom_article_before_quote",
+      "template": "{#saga}",
+      "book": {},
+      "custom": {
+        "saga": {
+          "value": "The \"Cycle\""
+        }
+      },
+      "profile": {},
+      "expected": "Cycle\", The"
+    },
+    {
+      "name": "custom_title_sort",
+      "template": "{title}",
+      "book": {
+        "title_sort": "My chosen sort"
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "My chosen sort"
+    },
+    {
+      "name": "alphabetic",
+      "template": "{title} {series} {#saga}",
+      "book": {},
+      "custom": {},
+      "profile": {
+        "title_series_sorting": "strictly_alphabetic"
+      },
+      "expected": "The Book The Saga The Cycle"
+    },
+    {
+      "name": "helper_date_format",
+      "template": "{pubdate} {#date}",
+      "book": {},
+      "custom": {},
+      "profile": {
+        "timefmt": "%b %Y"
+      },
+      "expected": "May 2020 May 2020"
+    },
+    {
+      "name": "explicit_date_format",
+      "template": "{pubdate} {#date}",
+      "book": {},
+      "custom": {},
+      "profile": {
+        "timefmt": "%Y-%m-%d"
+      },
+      "expected": "2020-05-06 2020-05-06"
+    },
+    {
+      "name": "date_timezone",
+      "template": "{pubdate} {#date}",
+      "book": {
+        "pubdate": "2020-05-06T00:30:00+02:00"
+      },
+      "custom": {
+        "date": {
+          "value": "2020-05-06T00:30:00+02:00"
+        }
+      },
+      "profile": {
+        "timefmt": "%Y-%m-%d"
+      },
+      "expected": "2020-05-06 2020-05-05"
+    },
+    {
+      "name": "naive_custom_date",
+      "template": "{#date}",
+      "book": {},
+      "custom": {
+        "date": {
+          "value": "2020-05-06T12:00:00"
+        }
+      },
+      "profile": {},
+      "expected": "May, 2020"
+    },
+    {
+      "name": "true_boolean",
+      "template": "{#read}",
+      "book": {},
+      "custom": {
+        "read": {
+          "value": true
+        }
+      },
+      "profile": {},
+      "expected": "yes"
+    },
+    {
+      "name": "missing_boolean",
+      "template": "x{#read}x",
+      "book": {},
+      "custom": {
+        "read": {
+          "value": null
+        }
+      },
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "float_zero",
+      "template": "x{#fraction:0>3s}x",
+      "book": {},
+      "custom": {
+        "fraction": {
+          "value": 0.0
+        }
+      },
+      "profile": {},
+      "expected": "xx"
+    },
+    {
+      "name": "custom_rating_zero",
+      "template": "{#stars}",
+      "book": {},
+      "custom": {
+        "stars": {
+          "value": 0
+        }
+      },
+      "profile": {},
+      "expected": "0.0"
+    },
+    {
+      "name": "custom_series_quotes",
+      "template": "{#saga}",
+      "book": {},
+      "custom": {
+        "saga": {
+          "value": "“The Cycle”"
+        }
+      },
+      "profile": {},
+      "expected": "Cycle, The"
+    },
+    {
+      "name": "author_escaping",
+      "template": "{authors}",
+      "book": {
+        "authors": [
+          "A & B",
+          "Last, First"
+        ]
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "A && B & Last, First"
+    },
+    {
+      "name": "tag_order",
+      "template": "{tags}",
+      "book": {
+        "tags": [
+          "zebra",
+          "Alpha",
+          "beta"
+        ]
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "Alpha, beta, zebra"
+    },
+    {
+      "name": "tag_leading_slash",
+      "template": "{tags}",
+      "book": {
+        "tags": [
+          "/Fiction"
+        ]
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "Fiction"
+    },
+    {
+      "name": "metadata_slashes",
+      "template": "{title} {title[1]}",
+      "book": {
+        "title_sort": "A/B\\C"
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "A_B_C _"
+    },
+    {
+      "name": "whitespace",
+      "template": "  x  {title} \t y  ",
+      "book": {
+        "title_sort": "Book\n  Title"
+      },
+      "custom": {},
+      "profile": {},
+      "expected": "x Book Title y"
+    },
+    {
+      "name": "string_precision",
+      "template": "{title:.4s}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Book"
+    }
+  ]
+}

@@ -236,7 +236,7 @@
         <p class="settings-explanation">{{_('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}}</p>
         <details>
           <summary>{{_('Filename template fields and examples')}}</summary>
-          <p><code>{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {{ '{#custom_field}' }}</code></p>
+          <p><code>{author}, {author_sort}, {authors}, {id}, {identifiers}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {title_sort}, {{ '{#custom_field}' }}</code></p>
           <p>{{_('First character:')}} <code>{author_sort[0]}</code>. {{_('Padded series number:')}} <code>{series_index:0&gt;3s}</code>.</p>
           <p>{{_('Example:')}} <code>{series} - {series_index:0&gt;3s} - {title}</code></p>
           <p>{{_('In KOReader, enable Use server filenames for the OPDS catalog.')}}</p>

@@ -472,7 +472,7 @@ function AdminConfigForm() {
       </label>
       <details>
         <summary>{t('Filename template fields and examples')}</summary>
-        <p><code>{'{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {#custom_field}'}</code></p>
+        <p><code>{'{author}, {author_sort}, {authors}, {id}, {identifiers}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {title_sort}, {#custom_field}'}</code></p>
         <p>{t('First character:')} <code>{'{author_sort[0]}'}</code>.{' '}
           {t('Padded series number:')} <code>{'{series_index:0>3s}'}</code>.</p>
         <p>{t('Example:')} <code>{'{series} - {series_index:0>3s} - {title}'}</code></p>

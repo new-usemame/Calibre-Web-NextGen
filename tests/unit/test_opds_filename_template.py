@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """OPDS filename templates: metadata, safety, configuration and download scope."""
+import copy
 import inspect
+import json
+import locale
+import time
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -20,6 +24,26 @@ from cps.services import opds_filename as names
 
 pytestmark = pytest.mark.unit
 
+_CALIBRE_FIXTURE = json.loads((Path(__file__).resolve().parents[1] /
+                              'fixtures/calibre_filename_templates.json').read_text())
+
+
+@pytest.fixture(autouse=True)
+def filename_profile_environment(monkeypatch):
+    """Match the independently generated Calibre fixture, not host settings."""
+    previous_locale = locale.setlocale(locale.LC_TIME)
+    with monkeypatch.context() as patch:
+        patch.setenv('TZ', 'UTC')
+        if hasattr(time, 'tzset'):
+            time.tzset()
+        locale.setlocale(locale.LC_TIME, 'C')
+        try:
+            yield
+        finally:
+            locale.setlocale(locale.LC_TIME, previous_locale)
+    if hasattr(time, 'tzset'):
+        time.tzset()
+
 
 @pytest.fixture
 def book():
@@ -35,12 +59,13 @@ def book():
 
 
 def test_all_standard_metadata_fields(book):
-    values = names._BookValues(book, None, '')
+    values = names._BookValues(book, None)
     assert dict(values) == {
-        'id': '42', 'title': 'Book, The', 'author_sort': 'Writer, Ann',
-        'authors': 'Ann Writer & Ben Reader', 'isbn': '9781234567890',
-        'languages': 'eng, fra', 'pubdate': '2020-05-06', 'timestamp': '2024-01-02',
-        'last_modified': '2024-02-03', 'publisher': 'Press', 'rating': '4.5',
+        'id': '42', 'title': 'Book, The', 'title_sort': 'Book, The',
+        'author_sort': 'Writer, Ann', 'author': 'Ann Writer & Ben Reader',
+        'authors': 'Ann Writer & Ben Reader', 'isbn': '9781234567890', 'identifiers': '',
+        'languages': 'eng,fra', 'pubdate': 'May, 2020', 'timestamp': 'Jan, 2024',
+        'last_modified': 'Feb, 2024', 'publisher': 'Press', 'rating': '4.5',
         'series': 'Saga, The', 'series_index': '2', 'tags': 'Fiction, Space',
     }
 
@@ -52,7 +77,7 @@ def test_sorted_names_fall_back_to_configured_article_rule(book):
 
 @pytest.mark.parametrize('template,expected', [
     ('{author_sort[0]} - {series_index:0>3s} - {title}', 'W - 002 - Book, The'),
-    ('x{series_index:>3s}x', 'x  2x'),
+    ('x{series_index:>3s}x', 'x 2x'),
     ('{series_index}', '2'),
     ('{{title}} {title}', '{title} Book, The'),
     ('{author_sort[999]}', 'book-42'),
@@ -135,7 +160,7 @@ def custom_session():
 
 def test_custom_lookup_names_and_types(book, custom_session):
     template = '{#shelf} {#count} {#read} {#date} {#saga} {#saga_index} {#stars} {#missing:0>3s}'
-    assert names.render_filename(template, book, custom_session) == 'Favorites 0 No 2020-05-06 Custom Saga 1.5 3.5'
+    assert names.render_filename(template, book, custom_session) == 'Favorites no May, 2020 Custom Saga 1.5 3.5'
     assert names.render_filename('{#computed}', book, custom_session) == 'Favorites Book, The'
     assert names.render_filename('{#cycle}', book, custom_session) == 'book-42'
     book.id = 43
@@ -155,7 +180,94 @@ def test_unavailable_computed_field_is_empty_and_logged(book, custom_session, ca
 def test_multivalue_custom_field(book, custom_session):
     custom_session.execute(text("INSERT INTO custom_column_1 VALUES (2, 'Other')"))
     custom_session.execute(text('INSERT INTO books_custom_column_1_link VALUES (42, 2, NULL)'))
-    assert names.render_filename('{#shelf}', book, custom_session) == 'Favorites, Other'
+    assert names.render_filename('{#shelf}', book, custom_session) == 'Favorites,Other'
+
+
+@pytest.mark.parametrize('case', _CALIBRE_FIXTURE['cases'], ids=lambda case: case['name'])
+def test_expansion_matches_calibre_generated_results(case):
+    """Expected strings come from Calibre 9.2.1, not this implementation."""
+    source = dict(_CALIBRE_FIXTURE['book'], **case['book'])
+    custom = copy.deepcopy(_CALIBRE_FIXTURE['custom'])
+    for label, changes in case['custom'].items():
+        custom[label].update(changes)
+    profile = dict(_CALIBRE_FIXTURE['defaults'], **case['profile'])
+
+    def date_value(value):
+        return datetime.fromisoformat(value) if value else None
+
+    book = NS(
+        id=source['id'], title=source['title'], sort=source['title_sort'],
+        author_sort=source['author_sort'],
+        authors=[NS(name=name.replace(',', '|')) for name in source['authors']],
+        isbn=source['identifiers'].get('isbn', ''),
+        identifiers=[NS(type=key, val=value) for key, value in source['identifiers'].items()],
+        languages=[NS(lang_code=code) for code in source['languages']],
+        pubdate=date_value(source['pubdate']), timestamp=date_value(source['timestamp']),
+        last_modified=date_value(source['last_modified']),
+        publishers=[NS(name=source['publisher'])] if source['publisher'] else [],
+        ratings=[NS(rating=source['rating'])] if source['rating'] is not None else [],
+        series=[NS(name=source['series'], sort=source['series_sort'])] if source['series'] else [],
+        series_index=source['series_index'], tags=[NS(name=name) for name in source['tags']],
+    )
+    engine = create_engine('sqlite://')
+    db.CustomColumns.__table__.create(engine)
+    try:
+        with Session(engine) as session:
+            for cid, (label, column) in enumerate(custom.items(), 1):
+                normalized = column['datatype'] in ('text', 'series', 'rating')
+                session.add(db.CustomColumns(
+                    id=cid, label=label, datatype=column['datatype'], normalized=normalized,
+                    display=json.dumps({'composite_template': column.get('template', '')}),
+                ))
+                if column['datatype'] == 'composite':
+                    continue
+                table = 'custom_column_%d' % cid
+                book_column = '' if normalized else ', book INTEGER'
+                session.execute(text(f'CREATE TABLE {table} (id INTEGER PRIMARY KEY, value{book_column})'))
+                if normalized:
+                    session.execute(text(f'CREATE TABLE books_{table}_link (book INTEGER, value INTEGER, extra REAL)'))
+                value = column['value']
+                if value is None:
+                    continue
+                rows = value if isinstance(value, list) else [value]
+                for row_id, value in enumerate(rows, 1):
+                    if normalized:
+                        session.execute(text(f'INSERT INTO {table} VALUES (:id, :value)'),
+                                        {'id': row_id, 'value': value})
+                        session.execute(text(f'INSERT INTO books_{table}_link VALUES (42, :id, :extra)'),
+                                        {'id': row_id, 'extra': column.get('extra')})
+                    else:
+                        session.execute(text(f'INSERT INTO {table} VALUES (:id, :value, 42)'),
+                                        {'id': row_id, 'value': value})
+            session.commit()
+            values = names._BookValues(book, session, **profile)
+            assert names.expand_template(case['template'], values) == case['expected']
+    finally:
+        engine.dispose()
+
+
+def test_stored_series_sort_is_not_used(book):
+    book.series[0].sort = 'Wrong'
+    assert names.render_filename('{series}', book, None) == 'Saga, The'
+
+
+def test_custom_series_uses_the_configured_article_rule(book, custom_session):
+    custom_session.execute(text("UPDATE custom_column_5 SET value = 'Le Cycle'"))
+    assert names.render_filename('{#saga}', book, custom_session, r'^(Le|La)\s+') == 'Cycle, Le'
+
+
+def test_renderer_accepts_explicit_calibre_profile(book, custom_session):
+    assert names.render_filename('{title} {series} {pubdate}', book, custom_session,
+                                 title_series_sorting='strictly_alphabetic', timefmt='%Y-%m-%d') == (
+                                     'The Book The Saga 2020-05-06')
+    with pytest.raises(ValueError):
+        names.render_filename('{title}', book, custom_session, title_series_sorting='unknown')
+
+
+@pytest.mark.parametrize('value', ['NaN', 'Infinity', '-Infinity', '1e999999999', 'x' * 1000])
+def test_invalid_custom_number_remains_bounded(book, custom_session, value):
+    custom_session.execute(text('UPDATE custom_column_2 SET value = :value'), {'value': value})
+    assert names.render_filename('{#count}', book, custom_session) == 'book-42'
 
 
 def test_settings_column_is_added_on_upgrade_and_persists(tmp_path):

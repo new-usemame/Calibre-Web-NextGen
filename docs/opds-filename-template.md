@@ -28,30 +28,37 @@ Existing installations start with a blank preference.
 
 A field is a metadata name inside braces, such as `{title}`.
 Missing metadata becomes empty text, even when the field has padding or character indexing.
-Literal text remains unchanged, so a missing series in `{series} - {title}` leaves the leading separator.
-Use `{{` and `}}` for literal braces.
+A missing series in `{series} - {title}` leaves the leading separator.
+Repeated whitespace becomes one space, and the server removes outer spaces after expansion.
+Field names are case-insensitive. Use `{{` and `}}` for literal braces.
 
 | Field | Value |
 | --- | --- |
+| `{author}` | An alias for `{authors}`. |
 | `{author_sort}` | The author sort string, such as `Writer, Ann`. |
-| `{authors}` | All authors, separated by ` & `. |
+| `{authors}` | All authors, separated by ` & `. An ampersand within a name becomes `&&`, as in Calibre. |
 | `{id}` | The internal Calibre book ID. |
+| `{identifiers}` | Identifier pairs, such as `doi:example, isbn:123`. |
 | `{isbn}` | The ISBN. |
-| `{languages}` | Language codes, separated by commas, such as `eng, fra`. |
+| `{languages}` | Language codes, separated by commas without spaces, such as `eng,fra`. |
 | `{last_modified}` | The date when the book metadata last changed. |
 | `{pubdate}` | The publication date. |
 | `{publisher}` | The publisher. |
-| `{rating}` | The rating from 0 to 5 stars. An unset rating is empty. |
-| `{series}` | The series sort name. |
-| `{series_index}` | The series number, without unnecessary decimal zeros. No series means no number. |
-| `{tags}` | Tags, separated by commas. |
+| `{rating}` | The rating from 0 to 5 stars, such as `4.0` or `4.5`. An absent rating is empty. A stored zero becomes `0.0`. |
+| `{series}` | The series name after article sorting. |
+| `{series_index}` | The series number. Integers have no decimal suffix. Fractions use Calibre's two-decimal conversion. No series means no number. |
+| `{tags}` | Sorted tags, separated by a comma and a space. |
 | `{timestamp}` | The date when the book entered the library. |
-| `{title}` | The title sort name. |
+| `{title}` | The title sort name, with a calculated fallback. |
+| `{title_sort}` | The stored title sort value, without a calculated fallback. |
 | `{#lookup_name}` | A custom field, identified by its Calibre lookup name. |
 
-Dates use `YYYY-MM-DD`. An unset Calibre date is empty.
-Title and series use their stored sort names, with leading articles at the end.
-If a stored sort name is absent, the server applies the configured title-sort rule.
+Dates use Calibre's default save/send format, `%b, %Y`, such as `May, 2020`.
+Month names follow the server's time locale. An unset standard Calibre date is empty.
+Custom dates use the server's local timezone. A custom date without a timezone is treated as UTC first.
+
+Title uses its stored sort name. If that value is absent, the server applies the configured title-sort rule.
+Standard and custom series always use that rule, not their stored sort names.
 For example, “The Book” becomes “Book, The.”
 The original blank-preference behavior does not apply this sorting to filenames.
 
@@ -60,11 +67,13 @@ An index outside the text produces empty text.
 String formatting supports alignment, padding, and a character limit:
 
 - `{series_index:0>3s}` produces `002` for series number 2.
-- `{series_index:>3s}` produces two spaces followed by `2`.
+- `x{series_index:>3s}x` produces `x 2x`. Calibre's whitespace rule compresses the padding.
 - `{title:.20s}` keeps the first 20 characters of the title.
 
 Custom fields support text, numbers, dates, yes/no values, ratings, and custom series.
-Multiple values use commas. Zero remains `0`, and false remains `No`.
+Multiple values use commas without spaces. Numeric zero becomes empty text, even with padding.
+A text field containing `0` remains `0`. False becomes `no`, and true becomes `yes`.
+Custom ratings use the same conversion as standard ratings.
 For a custom series named `#saga`, `{#saga_index}` supplies its number.
 Missing, deleted, or unavailable custom fields produce empty text.
 
@@ -73,6 +82,21 @@ It does not support template functions, conditional prefixes and suffixes, numer
 A computed custom field works when its source template uses the supported syntax.
 Otherwise, that field produces empty text and the server logs a warning.
 Templates cannot access Python attributes or execute code.
+
+## Compatibility profile
+
+OPDS uses Calibre's default `library_order` sorting and `%b, %Y` date format.
+It does not import preferences from a desktop Calibre installation.
+The internal renderer accepts explicit `title_series_sorting` and `timefmt` arguments, but the admin editors do not expose those options.
+
+Article sorting uses the server's configured title-sort regular expression.
+Tags use the application's Unicode sort key, not Calibre's locale-specific ICU sorting library.
+Boolean text stays in English, independent of the requesting user's language.
+Different language rules, tag collation, or date preferences can therefore produce different filenames.
+
+The parser still rejects unknown standard fields and unsupported syntax.
+Out-of-range character indexes produce empty text, and recursive composites stop at the safety limit.
+These are intentional limits, not full Calibre engine behavior.
 
 ## Filename limits and device behavior
 
@@ -100,3 +124,26 @@ The preference is `config_opds_filename_template` in the `settings` table of `ap
 Both admin editors use the same syntax validation.
 The admin API reads and writes this preference through `/api/v1/admin/config`.
 Saving takes effect on the next OPDS download without a restart.
+
+## Comparison tests
+
+`tests/fixtures/calibre_filename_templates.json` contains expected expansions generated by Calibre 9.2.1.
+The unit tests read this file and use real SQLite tables for custom fields.
+They do not require Calibre to be installed.
+
+To compare the fixture with an installed Calibre, run this command from the repository root:
+
+```sh
+CALIBRE_CONFIG_DIRECTORY="$(mktemp -d)" CALIBRE_OVERRIDE_LANG=en LC_ALL=C TZ=UTC \
+calibre-debug -e scripts/generate_calibre_filename_fixtures.py -- --check
+```
+
+To regenerate the fixture, omit `-- --check`.
+Review the generated changes before accepting results from a different Calibre version.
+The generator does not import the application renderer.
+
+To run the application tests in an environment with the project dependencies and pytest, use:
+
+```sh
+python -m pytest tests/unit/test_opds_filename_template.py -q
+```

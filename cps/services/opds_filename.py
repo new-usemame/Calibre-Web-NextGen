@@ -15,18 +15,29 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db, logger
+from ..unicode_collation import unicode_sort_key
 from ..utils.filename_sanitizer import get_valid_filename_shared
 
 
 log = logger.create()
 MAX_TEMPLATE_LENGTH = 1024
 MAX_FILENAME_LENGTH = 128
+# Calibre's send/save configuration default (not the helper's '%b %Y').
+DEFAULT_TIMEFMT = '%b, %Y'
+DEFAULT_TITLE_REGEX = r'^(A|The|An)\s+'
 _FIELDS = frozenset((
-    'author_sort', 'authors', 'id', 'isbn', 'languages', 'last_modified',
-    'pubdate', 'publisher', 'rating', 'series', 'series_index', 'tags',
-    'timestamp', 'title',
+    'author', 'author_sort', 'authors', 'id', 'identifiers', 'isbn', 'languages',
+    'last_modified', 'pubdate', 'publisher', 'rating', 'series', 'series_index',
+    'tags', 'timestamp', 'title', 'title_sort',
 ))
-_FIELD = re.compile(r'([a-z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
+_FIELD = re.compile(r'([a-zA-Z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
+# Quote handling follows calibre.ebooks.metadata.title_sort (GPL-3.0).
+_QUOTE_PAIRS = {
+    '"': ('"',), "'": ("'",), '“': ('”', '“'), '”': ('”',),
+    '„': ('”', '“'), '‚': ('’', '‘'), '’': ('’', '‘'), '‘': ('’', '‘'),
+    '‹': ('›',), '›': ('‹',), '《': ('》',), '〈': ('〉',),
+    '»': ('«', '»'), '«': ('«', '»'), '「': ('」',), '『': ('』',),
+}
 _FORMAT = re.compile(r'(?:(.[<^>]|[<^>]))?([0-9]{1,3})?(?:\.([0-9]{1,3}))?s?\Z')
 _UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
 _RESERVED = re.compile(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', re.I)
@@ -43,7 +54,7 @@ def _parts(template):
         if field is None:
             continue
         match = _FIELD.fullmatch(field)
-        if not match or (match[1] not in _FIELDS and not match[1].startswith('#')):
+        if not match or (match[1].lower() not in _FIELDS and not match[1].startswith('#')):
             raise ValueError('Unknown or unsupported OPDS filename field: %s' % field)
         if conversion:
             raise ValueError('Conversions such as !r are not supported in OPDS filenames.')
@@ -66,82 +77,133 @@ def expand_template(template, values):
         if field is None:
             continue
         name, index = _FIELD.fullmatch(field).groups()
-        value = values[name]
+        # Calibre's filename Formatter normalizes field names and replaces
+        # separators in field values before indexing or applying a format.
+        value = values[name.lower()].replace('/', '_').replace('\\', '_')
         if index is not None:
             index = int(index)
             value = value[index:index + 1]
         result.append(format(value[:MAX_FILENAME_LENGTH], spec) if value else '')
-    return ''.join(result)
+    return re.sub(r'\s+', ' ', ''.join(result)).strip(' ')
 
 
-def _number(value):
+def _finite_number(value):
+    """Keep the existing resource bounds without changing valid number text."""
+    if value is None or value == '' or len(str(value)) > MAX_FILENAME_LENGTH:
+        return None
+    try:
+        number = Decimal(str(value))
+        if number.is_finite() and abs(number.adjusted()) <= MAX_FILENAME_LENGTH:
+            return number
+    except InvalidOperation:
+        pass
+    return None
+
+
+def _series_index(value):
+    """Mirror calibre.ebooks.metadata.fmt_sidx, including float rounding."""
+    number = _finite_number(value)
+    if number is None:
+        return ''
+    number = float(number)
+    if int(number) == number:
+        return str(int(number))
+    return ('%.2f' % number).rstrip('0')
+
+
+def _rating(value):
+    number = _finite_number(value)
+    return str(float(number) / 2.0) if number is not None else ''
+
+
+def _custom_number(value):
+    number = _finite_number(value)
+    # Calibre suppresses numeric zero, but not a text column containing '0'.
+    return str(value) if number is not None and number != 0 else ''
+
+
+def _date(value, timefmt, *, local=False):
     if value is None or value == '':
         return ''
-    try:
-        if len(str(value)) > MAX_FILENAME_LENGTH:
-            return ''
-        number = Decimal(str(value))
-        if not number.is_finite() or abs(number.adjusted()) > MAX_FILENAME_LENGTH:
-            return ''
-        fixed = format(number, 'f')
-        return fixed.rstrip('0').rstrip('.') if '.' in fixed else fixed
-    except InvalidOperation:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if not isinstance(value, (date, datetime)):
         return ''
-
-
-def _value(value):
-    if value is None:
+    if not local and (value.year < 101 or (value.year, value.month, value.day) == (101, 1, 1)):
         return ''
-    if isinstance(value, bool):
-        return 'Yes' if value else 'No'
-    if isinstance(value, (datetime, date)):
-        # Calibre uses year 101 for an unset date.
-        if value.year <= 101:
-            return ''
-        if isinstance(value, datetime):
-            if value.tzinfo is not None:
-                value = value.astimezone(timezone.utc)
-            value = value.date()
-        return value.isoformat()
-    return str(value)
+    if local and isinstance(value, datetime):
+        # Calibre's as_local_time assumes UTC for naive custom dates. Standard
+        # dates instead use their existing calendar components unchanged.
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        value = value.astimezone()
+    return value.strftime(timefmt)
 
 
-def _sorted_name(name, stored_sort, title_regex):
-    if not name:
-        return ''
-    if stored_sort:
-        return stored_sort
-    try:
-        match = re.match(title_regex, name, re.IGNORECASE) if title_regex else None
-        if match and match.lastindex:
-            article = match.group(1)
-            return name[len(article):].strip() + ', ' + article
-    except re.error:
-        pass
+def _unquote(name):
+    if name and name[0] in _QUOTE_PAIRS:
+        closing = _QUOTE_PAIRS[name[0]]
+        name = name[1:]
+        if name and name[-1] in closing:
+            name = name[:-1]
     return name
 
 
+def _sorted_name(name, title_regex):
+    name = _unquote((name or '').strip())
+    try:
+        match = re.search(title_regex, name, re.IGNORECASE) if title_regex else None
+        if match and match.lastindex and match.group(1):
+            article = match.group(1)
+            # Calibre's article group includes the following whitespace. The
+            # server's configurable group usually does not, so remove that
+            # whitespace before the second quote-handling pass in either case.
+            name = _unquote(name[len(article):].lstrip() + ', ' + article)
+    except re.error:
+        pass
+    return name.strip()
+
+
 class _BookValues(dict):
-    def __init__(self, book, session, title_regex):
+    def __init__(self, book, session, title_regex=DEFAULT_TITLE_REGEX, *,
+                 timefmt=DEFAULT_TIMEFMT, title_series_sorting='library_order'):
+        if title_series_sorting not in ('library_order', 'strictly_alphabetic'):
+            raise ValueError('Unsupported filename title/series sorting rule.')
         self.book = book
         self.session = session
+        self.title_regex = title_regex
+        self.timefmt = timefmt
+        self.title_series_sorting = title_series_sorting
         self.columns = None
         self.depth = 0
         series = book.series[0] if book.series else None
+        title = book.title or ''
+        if title and title_series_sorting == 'library_order':
+            title = book.sort or self._series_name(title)
+        authors = ' & '.join(author.name.replace('|', ',').replace('&', '&&')
+                             for author in book.authors if author.name)
+        identifiers = {item.type: item.val for item in getattr(book, 'identifiers', ())}
         super().__init__(
-            title=_sorted_name(book.title, book.sort, title_regex),
-            author_sort=book.author_sort or '',
-            authors=' & '.join(author.name.replace('|', ',') for author in book.authors),
-            id=_value(book.id), isbn=book.isbn or '',
-            languages=', '.join(language.lang_code for language in book.languages),
-            last_modified=_value(book.last_modified), pubdate=_value(book.pubdate),
-            timestamp=_value(book.timestamp),
+            title=title, title_sort=book.sort or '',
+            author_sort=book.author_sort or '', author=authors, authors=authors,
+            id=str(book.id), isbn=book.isbn or '',
+            identifiers=', '.join('%s:%s' % (key, identifiers[key]) for key in sorted(identifiers)),
+            languages=','.join(language.lang_code for language in book.languages),
+            last_modified=_date(book.last_modified, timefmt),
+            pubdate=_date(book.pubdate, timefmt), timestamp=_date(book.timestamp, timefmt),
             publisher=', '.join(publisher.name for publisher in book.publishers),
-            rating=_number(book.ratings[0].rating / 2) if book.ratings and book.ratings[0].rating else '',
-            series=_sorted_name(series.name, series.sort, title_regex) if series else '',
-            series_index=_number(book.series_index) if series else '',
-            tags=', '.join(tag.name for tag in book.tags),
+            rating=_rating(book.ratings[0].rating) if book.ratings else '',
+            series=self._series_name(series.name) if series else '',
+            series_index=_series_index(book.series_index) if series else '',
+            # Reuse the application's bounded Unicode collation. This is not
+            # Calibre's locale-tailored ICU collator (see the OPDS docs).
+            tags=', '.join(sorted((tag.name for tag in book.tags), key=unicode_sort_key)).removeprefix('/'),
         )
+
+    def _series_name(self, name):
+        if self.title_series_sorting == 'strictly_alphabetic':
+            return (name or '').strip()
+        return _sorted_name(name, self.title_regex)
 
     def __missing__(self, key):
         # Install the empty value first to break cycles in composite columns.
@@ -160,7 +222,7 @@ class _BookValues(dict):
     def _custom_value(self, label):
         if self.columns is None:
             self.columns = {
-                column.label: column for column in self.session.query(db.CustomColumns).all()
+                column.label.lower(): column for column in self.session.query(db.CustomColumns).all()
                 if not column.mark_for_delete
             }
         column = self.columns.get(label)
@@ -193,21 +255,27 @@ class _BookValues(dict):
         else:
             sql = 'SELECT value FROM %s WHERE book = :book_id ORDER BY id' % table
         values = self.session.execute(text(sql), {'book_id': self.book.id}).scalars().all()
-        if column.datatype == 'datetime':
-            values = [datetime.fromisoformat(v.replace('Z', '+00:00'))
-                      if isinstance(v, str) and v else v for v in values]
+        if index:
+            values = [_series_index(v) for v in values]
+        elif column.datatype == 'series':
+            values = [self._series_name(v) for v in values]
+        elif column.datatype == 'datetime':
+            values = [_date(v, self.timefmt, local=True) for v in values]
         elif column.datatype == 'bool':
-            values = [bool(v) if v is not None else None for v in values]
+            # Stable English filename profile, independent of request locale.
+            values = [('yes' if v else 'no') if v is not None else '' for v in values]
         elif column.datatype == 'rating':
-            values = [_number(Decimal(str(v)) / 2) if v else '' for v in values]
-        elif index or column.datatype in ('int', 'float'):
-            values = [_number(v) for v in values]
-        return ', '.join(_value(v) for v in values if v is not None)
+            values = [_rating(v) for v in values]
+        elif column.datatype in ('int', 'float'):
+            values = [_custom_number(v) for v in values]
+        return ','.join(str(v) for v in values if v is not None)
 
 
-def render_filename(template, book, session, title_regex='', unicode_filename=False):
+def render_filename(template, book, session, title_regex=DEFAULT_TITLE_REGEX, unicode_filename=False,
+                    *, timefmt=DEFAULT_TIMEFMT, title_series_sorting='library_order'):
     """Return a safe basename. The download helper adds the actual extension."""
-    values = _BookValues(book, session, title_regex)
+    values = _BookValues(book, session, title_regex, timefmt=timefmt,
+                         title_series_sorting=title_series_sorting)
     rendered = expand_template(template, values).strip(' .') or 'book-%s' % book.id
     rendered = get_valid_filename_shared(
         rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH,

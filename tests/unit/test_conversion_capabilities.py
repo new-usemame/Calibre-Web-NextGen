@@ -331,6 +331,9 @@ def test_failed_probe_reaps_descendant_and_output_reader(tmp_path, monkeypatch, 
 
 def test_same_key_probes_coalesce_and_keep_the_gevent_hub_responsive(monkeypatch):
     gevent = pytest.importorskip("gevent")
+    # Native subprocess tests may leave gevent's cached loop clock stale.
+    # Refresh it cooperatively before installing the responsiveness deadline.
+    gevent.sleep(0)
     calls = []
     result = (frozenset({"epub"}), frozenset({"epub", "kfx"}))
 

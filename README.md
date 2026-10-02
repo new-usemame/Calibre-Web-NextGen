@@ -487,6 +487,8 @@ Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input w
 
 The book editor's conversion choices come from the configured Calibre install's active input and output plugins. For example, a KFX input plugin makes KFX books eligible as sources; a KFX output choice appears only when Calibre reports an installed output plugin that can write KFX. Plugins are not bundled, and a separate comic/KPF workflow does not by itself add an `ebook-convert` output format. The capability check uses the same `CWA_CALIBRE_USER_PLUGINS` setting as conversion jobs, refreshes at least once a minute, and hides Calibre conversion choices if the local capability probe is unavailable or invalid. Directory-only OEB output is excluded because book conversion stores one file. The separate EPUB-to-KEPUB option remains available when `kepubify` is configured.
 
+ACSM tickets use Calibre’s import hooks before ordinary book processing. Auto-Convert off imports the fulfilled EPUB/PDF as returned; when enabled, conversion applies to that resulting book. A failed optional conversion keeps the fulfilled book. A missing or unsuccessful ACSM plugin preserves the original ticket in the failed-books folder, and no raw ACSM format is added to the library. Successful source receipts prevent duplicate imports and repeated fulfillment after completion. Configure the plugin’s account authorization first; installing its zip alone cannot authorize Adobe fulfillment.
+
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
 ```

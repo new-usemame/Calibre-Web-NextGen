@@ -622,6 +622,14 @@ class MagicShelf(Base):
         return '<MagicShelf %d:%r>' % (self.id, self.name)
 
 
+class MagicShelfRelativeDateMigration(Base):
+    """Per-database marker committed atomically with the frozen-rule upgrade."""
+    __tablename__ = 'magic_shelf_relative_date_migration'
+
+    id = Column(Integer, primary_key=True)
+    migrated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class MagicShelfCache(Base):
     __tablename__ = 'magic_shelf_cache'
 
@@ -2476,6 +2484,7 @@ def add_missing_tables(engine, _session):
         ("kosync_progress", KOSyncProgress.__table__),
         ("magic_shelf", MagicShelf.__table__),
         ("magic_shelf_cache", MagicShelfCache.__table__),
+        ("magic_shelf_relative_date_migration", MagicShelfRelativeDateMigration.__table__),
         ("opds_shelf_exposure", OpdsShelfExposure.__table__),
         ("book_original_filename", BookOriginalFilename.__table__),
         ("opds_magic_shelf_exposure", OpdsMagicShelfExposure.__table__),
@@ -3136,6 +3145,58 @@ def migrate_magic_shelf_table(engine, _session):
     except exc.OperationalError:
         _safe_session_rollback(_session, "magic_shelf.kobo_sync")
         _run_ddl_with_retry(engine, "ALTER TABLE magic_shelf ADD column 'kobo_sync' Boolean DEFAULT 0")
+
+
+def migrate_magic_shelf_relative_dates(_session):
+    """Upgrade only recognizable, unchanged frozen system rules, once per DB."""
+    try:
+        if _session.get(MagicShelfRelativeDateMigration, 1) is not None:
+            _session.commit()  # Release the read transaction before later DDL.
+            return
+
+        legacy_templates = {
+            'Recently Added': ('timestamp', 30),
+            'Recent Publications': ('pubdate', 730),
+        }
+        shelves = _session.query(MagicShelf).filter(
+            MagicShelf.is_system.is_(True),
+            MagicShelf.name.in_(legacy_templates),
+        ).all()
+        updated = 0
+        for shelf in shelves:
+            if shelf.created is None:
+                continue
+            field, days = legacy_templates[shelf.name]
+            created = shelf.created
+            if created.tzinfo is not None:
+                created = created.astimezone(timezone.utc)
+            try:
+                cutoff = (created - timedelta(days=days)).date().isoformat()
+            except OverflowError:
+                continue
+            # Old defaults were frozen at module import, not shelf creation.
+            # A cutoff from an earlier startup is indistinguishable from an
+            # edited date. Conservatively skip it rather than overwrite it.
+            expected = {'condition': 'AND', 'rules': [{
+                'id': field, 'field': field, 'type': 'date', 'input': 'text',
+                'operator': 'greater', 'value': cutoff,
+            }]}
+            if shelf.rules != expected:
+                continue
+            expected['rules'][0].update(
+                type='datetime', operator='in_last_days', value=str(days),
+            )
+            shelf.rules = expected
+            updated += 1
+            # Keep the cache's Kobo membership generation. The live query
+            # re-evaluates rules and refreshes it only if membership changes.
+
+        _session.add(MagicShelfRelativeDateMigration(id=1))
+        _session.commit()
+        log.info("Updated %d frozen system magic shelves to rolling dates", updated)
+    except (exc.SQLAlchemyError, ValueError, TypeError):
+        _session.rollback()
+        log.exception("Rolling system magic shelf migration failed; will retry next startup")
 
 
 def migrate_kobo_synced_book_uuid(engine, _session):
@@ -5212,6 +5273,7 @@ def migrate_Database(_session):
     migrate_oauth_provider_table(engine, _session)
     migrate_config_table(engine, _session)
     migrate_magic_shelf_table(engine, _session)
+    migrate_magic_shelf_relative_dates(_session)
     migrate_kobo_synced_book_uuid(engine, _session)
     migrate_kobo_unique_constraints(engine, _session)
     migrate_kobo_deleted_book(engine, _session)

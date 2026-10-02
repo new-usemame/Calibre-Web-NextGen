@@ -10,6 +10,7 @@ export interface ReaderFont {
 /** Existing built-ins remain usable if the optional catalog request fails. */
 export const BUILTIN_READER_FONTS: ReaderFont[] = [
   { id: 'default', label: 'Book default', family: 'initial', builtin: true },
+  { id: 'Literata', label: 'Literata', family: "'Literata', serif", builtin: true },
   { id: 'Arial', label: 'Arial', family: 'Arial, Helvetica, sans-serif', builtin: true },
   { id: 'Yahei', label: 'Microsoft YaHei', family: '"Microsoft YaHei", sans-serif', builtin: true },
   { id: 'SimSun', label: 'SimSun', family: 'SimSun, serif', builtin: true },

@@ -1317,3 +1317,614 @@ export interface ReaderSettings {
   theme: 'lightTheme' | 'sepiaTheme' | 'darkTheme' | 'blackTheme';
   /** Built-in IDs and server-validated custom:<uuid> catalog entries. */
   font: string;
+  fontSize: number;
+  margin: number;
+  lineHeight: number;
+  spread: 'spread' | 'nonespread';
+  reflow: boolean;
+}
+
+/** A 401 is a definitive answer, not a flaky one. A guest has no bookmark and no
+ *  saved reader settings — both endpoints say so by design — and the reader waits
+ *  for these two queries to settle before it starts epub.js, so retrying a
+ *  settled "no" just spends the guest's whole boot on re-asking (#1074). */
+const retryUnlessUnauthorized = (failureCount: number, error: unknown) =>
+  !(error instanceof ApiError && error.status === 401) && failureCount < 3;
+
+/** Is re-sending this request capable of changing the answer? (#1318)
+ *
+ *  A 5xx from a write route means the server tried and the transaction did not
+ *  land — typically SQLite contention — so the same request a moment later
+ *  usually succeeds. A 4xx is a verdict on the request itself (unauthenticated,
+ *  CSRF, malformed) and re-sending it unchanged just repeats the answer. A
+ *  network-level failure carries no status at all and is worth another try. */
+export const isWorthResending = (error: unknown) =>
+  !(error instanceof ApiError) || error.status >= 500;
+
+export function useReaderSettings() {
+  return useQuery<{ reader: ReaderSettings }>({
+    queryKey: ['reader-settings'],
+    queryFn: () => apiGet<{ reader: ReaderSettings }>('/api/v1/reader/settings'),
+    staleTime: 60_000,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
+export function useReaderFonts() {
+  return useQuery<ReaderFontCatalog>({
+    queryKey: ['reader-fonts'],
+    queryFn: () => apiGet<ReaderFontCatalog>('/api/v1/reader/fonts'),
+    staleTime: 0,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
+export function useSaveReaderSettings() {
+  return useMutation({
+    mutationFn: (patch: Partial<ReaderSettings>) =>
+      apiPost<{ reader: ReaderSettings }>('/api/v1/reader/settings', patch),
+  });
+}
+
+export function useBookmark(bookId: string | number, format = 'epub') {
+  return useQuery<ReaderBookmark>({
+    queryKey: ['bookmark', String(bookId), format],
+    queryFn: () => apiGet<ReaderBookmark>(
+      `/api/v1/books/${bookId}/bookmark?format=${encodeURIComponent(format)}`),
+    staleTime: 0,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
+export interface ReadingSource {
+  id: string;
+  label: string;
+  kind: string;
+  observation: 'last_reported' | 'resolved';
+  provenance?: 'unknown';
+  progress_percent: number | null;
+  chapter_progress_percent?: number | null;
+  observed_at: string | null;
+  received_at?: string | null;
+  locator_type?: string | null;
+  resume: {
+    percentage: number | null;
+    cfi?: string;
+    href?: string;
+    chapter_href?: string;
+    chapter_progression?: number;
+    epub_sha256?: string;
+    exact: boolean;
+  };
+  writeback: 'read_only';
+  rehydrate_needed?: boolean;
+  edition?: { match: 'sha256' | 'different' };
+}
+
+export interface ReadingSourcesPayload {
+  book_id: number;
+  sources: ReadingSource[];
+  integrations: {
+    storyteller: { configured: boolean; reachable: boolean | null };
+  };
+}
+
+export function useReadingSources(bookId: string | number, enabled = true) {
+  return useQuery<ReadingSourcesPayload>({
+    queryKey: ['reading-sources', String(bookId)],
+    queryFn: () => apiGet<ReadingSourcesPayload>(`/api/v1/books/${bookId}/reading-sources`),
+    staleTime: 30_000,
+    enabled,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
+export function useSaveBookmark(bookId: string | number) {
+  return useMutation({
+    // `percentage` (#324) is the portable half of the position: the server hands
+    // it to the shared Kobo/KOReader carrier so browser reading reaches the
+    // user's devices. Omitted until epub.js has generated locations.
+    mutationFn: (vars: {
+      format: string;
+      bookmark: string;
+      percentage?: number;
+      share_with_devices?: boolean;
+    }) =>
+      apiPost(`/api/v1/books/${bookId}/bookmark`, vars),
+    // #1318: deliberately NO react-query `retry` here. The route now answers
+    // 5xx when the write did not land, which is worth re-sending — but a
+    // built-in retry re-sends the SAME variables, and the reader fires a save
+    // every 800ms while paging. A retry of the position from three pages ago
+    // can therefore land after the current one and move the user backwards.
+    // The caller retries instead, re-reading the latest position each time
+    // (see Reader.tsx), so what goes out is never stale.
+  });
+}
+
+// ── Account ──────────────────────────────────────────────────────────────────
+
+export function useAccount(options?: { enabled?: boolean }) {
+  return useQuery<Account>({
+    queryKey: ['account'],
+    queryFn: () => apiGet<Account>('/api/v1/account'),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: ProfileUpdate) => apiPost<Account>('/api/v1/account/profile', vars),
+    onSuccess: (data) => {
+      qc.setQueryData(['account'], data);
+      // name/locale also surface in the top bar via useMe
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      // Built-in magic-shelf names are translated by the authenticated API.
+      // Refetch them after a locale change so request-local display text does
+      // not remain cached in the previous language (#886).
+      void qc.invalidateQueries({ queryKey: ['magicshelves'] });
+      void qc.invalidateQueries({ queryKey: ['magicshelf'] });
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (vars: { current_password: string; new_password: string }) =>
+      apiPost('/api/v1/account/password', vars),
+  });
+}
+
+/** Create an app password (for OPDS/KOSync). Returns the cleartext token once. */
+export function useCreateAppPassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (label: string) =>
+      apiPost<{ id: number; label: string; token: string }>('/api/v1/account/app-passwords', { label }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['account'] }),
+  });
+}
+
+export function useRevokeAppPassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiPost(`/api/v1/account/app-passwords/${id}/delete`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['account'] }),
+  });
+}
+
+// ── Kobo / KOReader pairing ─────────────────────────────────────────────────
+
+const KOBO_SYNC_TOKEN_KEY = ['kobo-sync-token'] as const;
+
+export function useKoboSyncToken(enabled = true) {
+  return useQuery<KoboSyncToken>({
+    queryKey: KOBO_SYNC_TOKEN_KEY,
+    queryFn: () => apiGet<KoboSyncToken>('/api/v1/account/kobo-sync-token'),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useCreateKoboSyncToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<KoboSyncToken>('/api/v1/account/kobo-sync-token'),
+    onSuccess: (data) => qc.setQueryData(KOBO_SYNC_TOKEN_KEY, data),
+  });
+}
+
+export function useDeleteKoboSyncToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete('/api/v1/account/kobo-sync-token'),
+    onSuccess: () => qc.setQueryData<KoboSyncToken>(KOBO_SYNC_TOKEN_KEY, (old) => (
+      old ? { ...old, configured: false, sync_url: null } : old
+    )),
+  });
+}
+
+/** Forget what this account's Kobos were sent, so the next sync delivers the
+ *  whole library again as New (#2334; the classic profile's "Force full kobo
+ *  sync"). Nothing cached on this page describes that ledger. */
+export function useForceKoboFullSync() {
+  return useMutation({
+    mutationFn: () => apiPost<{ user_id: number; sync_entries_deleted: number }>(
+      '/api/v1/account/kobo-full-sync',
+    ),
+  });
+}
+
+// ── KOReader: pairing by code and the ready-made plugin ──
+
+const koreaderPairPath = (code: string) =>
+  `/api/v1/devices/koreader/pair/${encodeURIComponent(code)}`;
+
+/** Who is behind a typed pairing code. A lookup, run when the reader submits. */
+export function useLookupKoreaderPair() {
+  return useMutation({
+    mutationFn: (code: string) => apiGet<KoreaderPairRequest>(koreaderPairPath(code)),
+  });
+}
+
+/** Approve or decline a waiting KOReader device. An approved device collects
+ *  its own app password on its next poll, then shows up as an e-reader, so
+ *  both lists are refreshed. */
+export function useAnswerKoreaderPair() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, approve }: { code: string; approve: boolean }) =>
+      apiPost<KoreaderPairRequest>(`${koreaderPairPath(code)}/${approve ? 'approve' : 'deny'}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['account'] });
+      void qc.invalidateQueries({ queryKey: ['annotation-devices'] });
+    },
+  });
+}
+
+/** The ready-made plugin: the plugin with this account's sign-in inside. */
+export function useKoreaderSetupBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (server: string) => apiPostDownload(
+      '/api/v1/devices/koreader/setup-bundle', { server },
+    ),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['account'] }); },
+  });
+}
+
+// ── Kobo two-way annotation sync (Stage 0 — preferences over a dead switch) ──
+
+const KOBO_TWO_WAY_KEY = ['kobo-two-way-annotations'] as const;
+
+export function useKoboTwoWayAnnotations(options?: { enabled?: boolean }) {
+  return useQuery<KoboTwoWaySettings>({
+    queryKey: KOBO_TWO_WAY_KEY,
+    queryFn: () => apiGet<KoboTwoWaySettings>('/api/v1/account/kobo-two-way-annotations'),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/** Find one book's state inside the settings payload (book pages' chip). */
+export function selectKoboTwoWayBook(
+  data: KoboTwoWaySettings | undefined,
+  bookId: number,
+): KoboTwoWayBookState | undefined {
+  return data?.books.find((b) => b.book_id === bookId);
+}
+
+export function useUpdateKoboTwoWayAnnotations() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: KoboTwoWayUpdate) =>
+      apiPost<KoboTwoWaySettings>('/api/v1/account/kobo-two-way-annotations', vars),
+    onSuccess: (data) => qc.setQueryData(KOBO_TWO_WAY_KEY, data),
+  });
+}
+
+export function useSetKoboTwoWayBook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { book_id: number; enabled: boolean }) =>
+      apiPost<{ book: KoboTwoWayBookState }>('/api/v1/account/kobo-two-way-annotations/books', vars),
+    onSuccess: (data) => {
+      qc.setQueryData<KoboTwoWaySettings>(KOBO_TWO_WAY_KEY, (old) =>
+        old
+          ? { ...old, books: old.books.map((b) => (b.book_id === data.book.book_id ? data.book : b)) }
+          : old,
+      );
+    },
+  });
+}
+
+// ── Advanced search ──────────────────────────────────────────────────────────
+
+export function useSearchOptions() {
+  return useQuery<SearchOptions>({
+    queryKey: ['search-options'],
+    queryFn: () => apiGet<SearchOptions>('/api/v1/search/options'),
+    staleTime: 60000,
+  });
+}
+
+/** Run advanced search. `params` is null until the user submits, which keeps the
+ *  query disabled (and the results pane empty) on first load. */
+/** Advanced search. `perPage` defaults to the search page's own page size; the
+ *  library passes its measured grid size when a saved default view drives it
+ *  (#928), so filtered rows fill the grid exactly like unfiltered ones. */
+export function useAdvancedSearch(params: AdvancedSearchParams | null, page: number, perPage = 24) {
+  const revision = useLibraryRevision();
+  const me = useMe().data;
+  return useQuery<AdvSearchResult>({
+    queryKey: ['adv-search', params, page, perPage, me?.id, me?.library_mode, revision],
+    queryFn: () => apiPost<AdvSearchResult>('/api/v1/search/advanced', { ...params, page, per_page: perPage }),
+    enabled: params !== null,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** Add or remove a book from a shelf; invalidates the affected caches. */
+export function useShelfMembership() {
+  const qc = useQueryClient();
+  const invalidate = (shelfId: number, bookId: number) => {
+    void qc.invalidateQueries({ queryKey: ['shelf', String(shelfId)] });
+    void qc.invalidateQueries({ queryKey: ['shelves'] });
+    void qc.invalidateQueries({ queryKey: ['book-shelves', String(bookId)] });
+  };
+  const add = useMutation({
+    mutationFn: (v: { shelfId: number; bookId: number }) =>
+      apiPost(`/api/v1/shelves/${v.shelfId}/books/${v.bookId}`),
+    onSuccess: (_d, v) => invalidate(v.shelfId, v.bookId),
+  });
+  const remove = useMutation({
+    mutationFn: (v: { shelfId: number; bookId: number }) =>
+      apiPost(`/api/v1/shelves/${v.shelfId}/books/${v.bookId}/delete`),
+    onSuccess: (_d, v) => invalidate(v.shelfId, v.bookId),
+  });
+  return { add, remove };
+}
+
+// ── Magic shelves (smart collections) ────────────────────────────────────────
+
+export interface MagicRule { id: string; operator: string; value: string | string[] }
+export interface MagicRuleSet { condition: 'AND' | 'OR'; rules: MagicRuleNode[] }
+/** A rule set may nest groups: the classic builder's "Add group" writes them. */
+export type MagicRuleNode = MagicRule | MagicRuleSet;
+export interface MagicRuleField {
+  id: string;
+  label: string;
+  type: 'string' | 'integer' | 'double' | 'date' | 'datetime';
+  input?: 'select' | 'radio';
+  values?: Record<string, string | number>;
+  operators: string[];
+}
+export interface MagicRuleOperator {
+  type: string;
+  label: string;
+  nb_inputs?: number;
+}
+export interface MagicRuleSchema {
+  fields: MagicRuleField[];
+  operators: MagicRuleOperator[];
+}
+
+export function useMagicShelfRuleSchema() {
+  return useQuery<MagicRuleSchema>({
+    queryKey: ['magicshelf-rule-schema'],
+    queryFn: () => apiGet<MagicRuleSchema>('/api/v1/magicshelves/rule-schema'),
+    staleTime: 300000,
+  });
+}
+
+export function useMagicShelfPreview() {
+  return useMutation({
+    mutationFn: (rules: MagicRuleSet) =>
+      apiPost<{ success: boolean; count: number; sample_books: string[]; message?: string }>(
+        '/magicshelf/preview', { rules }),
+  });
+}
+
+export function useCreateMagicShelf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
+      apiPost<{ success: boolean; shelf_id?: number; message?: string }>('/magicshelf', v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
+  });
+}
+
+export function useEditMagicShelf(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
+      apiPost<{ success: boolean; message?: string }>(`/magicshelf/${id}/edit`, v),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['magicshelves'] });
+      void qc.invalidateQueries({ queryKey: ['magicshelf', String(id)] });
+    },
+  });
+}
+
+/** #870 — flip only the Kobo-sync mark on a smart shelf. The classic
+ *  /magicshelf/<id>/edit route is a whole-shelf save (name + icon + rules), so
+ *  a toggle that reused it would have to round-trip the rule set and could
+ *  clobber a concurrent edit. This hits the narrow /api/v1 write instead. */
+export function useToggleMagicShelfKoboSync(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kobo_sync: boolean) =>
+      apiPost<{ id: number; kobo_sync: boolean; warning?: string }>(
+        `/api/v1/magicshelf/${id}/kobo-sync`, { kobo_sync }),
+    // Awaited, not fire-and-forget: the button's disabled state tracks
+    // isPending, and its label reads the *query* cache. Returning the promise
+    // keeps the mutation pending until the refetch lands, so a second click
+    // can't compute `!data.kobo_sync` from the pre-toggle value and re-send
+    // the write it just made.
+    onSuccess: () => Promise.all([
+      qc.invalidateQueries({ queryKey: ['magicshelves'] }),
+      qc.invalidateQueries({ queryKey: ['magicshelf', String(id)] }),
+    ]),
+  });
+}
+
+export interface MagicShelfItem {
+  rules?: MagicRuleSet;
+  id: number;
+  name: string;
+  icon: string;
+  is_public: boolean;
+  is_owner: boolean;
+  is_system: boolean;
+  kobo_sync?: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_duplicate: boolean;
+  can_kobo_sync: boolean;
+  opds_expose?: boolean;
+  can_hide?: boolean;
+  is_hidden?: boolean;
+}
+
+export function useMagicShelves(manage = false) {
+  return useQuery<{ items: MagicShelfItem[] }>({
+    queryKey: ['magicshelves', { manage }],
+    queryFn: () => apiGet<{ items: MagicShelfItem[] }>(`/api/v1/magicshelves${manage ? '?manage=1' : ''}`),
+    staleTime: 30000,
+  });
+}
+
+export interface MagicShelfSortOption {
+  value: string;
+  label: string;
+}
+
+export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new', revision = 0) {
+  return useQuery<MagicShelfItem & BooksPage & {
+    sort: string;
+    sort_persistable?: boolean;
+    custom_sort_options?: MagicShelfSortOption[];
+  }>({
+    queryKey: ['magicshelf', String(id), page, sort, revision],
+    queryFn: () => apiGet(
+      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`,
+    ),
+    enabled: String(id).length > 0,
+    // Same-shelf, same-order paging only — see useShelf (#612).
+    placeholderData: (prev, prevQuery) =>
+      prevQuery
+        && String(prevQuery.queryKey[1]) === String(id)
+        && prevQuery.queryKey[3] === sort
+        ? prev : undefined,
+  });
+}
+
+export function useDeleteMagicShelf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiPost(`/magicshelf/${id}/delete`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['magicshelves'] }),
+  });
+}
+
+export function useDuplicateMagicShelf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiPost(`/magicshelf/${id}/duplicate`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['magicshelves'] }),
+  });
+}
+
+// ── Duplicates ───────────────────────────────────────────────────────────────
+
+export interface DuplicateBook {
+  id: number;
+  title: string;
+  authors: string;
+  formats: string[];
+  cover_url: string | null;
+}
+export interface DuplicateGroup {
+  group_hash: string;
+  title: string;
+  author: string;
+  count: number;
+  books: DuplicateBook[];
+}
+
+export function useDuplicates() {
+  return useQuery<{ items: DuplicateGroup[]; needs_scan: boolean }>({
+    queryKey: ['duplicates'],
+    queryFn: () => apiGet<{ items: DuplicateGroup[]; needs_scan: boolean }>('/api/v1/duplicates'),
+  });
+}
+
+/** Dismiss a duplicate group — reuses the legacy JSON route. */
+export function useDismissDuplicate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (groupHash: string) =>
+      apiPost(`/duplicates/dismiss/${encodeURIComponent(groupHash)}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
+// ── Generic user notices ───────────────────────────────────────────────────
+
+export function useNotices(bookId?: string | number) {
+  const suffix = bookId == null ? '' : `?book_id=${encodeURIComponent(String(bookId))}`;
+  return useQuery<NoticeInbox>({
+    queryKey: ['notices', bookId == null ? 'all' : String(bookId)],
+    queryFn: () => apiGet<NoticeInbox>(`/api/v1/notices${suffix}`),
+  });
+}
+
+export function useDismissNotice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeId: number) =>
+      apiPost<{ dismissed: number; remaining: number }>(`/api/v1/notices/${noticeId}/dismiss`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['notices'] }),
+  });
+}
+
+export function useDismissNotices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeIds: number[]) =>
+      dismissNoticeIdsInBatches(noticeIds, (batch) =>
+        apiPost<{ dismissed: number; remaining: number }>('/api/v1/notices/dismiss', {
+          notice_ids: batch,
+        })),
+    // A later batch can fail after an earlier one committed. Refresh on either
+    // outcome so the banner reflects the server's actual remaining notices.
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['notices'] }),
+  });
+}
+
+/** Queue a manual full duplicate scan (#1048). Runs as a background task, so the
+ *  response only confirms it was queued — the list refreshes when it finishes. */
+export function useTriggerDuplicateScan() {
+  const qc = useQueryClient();
+  return useMutation<{ success?: boolean; message?: string; task_id?: string;
+    queued?: boolean; already_running?: boolean }>({
+    mutationFn: () => apiPost('/api/v1/duplicates/scan'),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
+// ── Info: About / Tasks ──────────────────────────────────────────────────────
+
+export function useAbout() {
+  return useQuery<AboutInfo>({
+    queryKey: ['about'],
+    queryFn: () => apiGet<AboutInfo>('/api/v1/about'),
+    staleTime: 60000,
+  });
+}
+
+export function useTasks() {
+  return useQuery<{ items: TaskItem[] }>({
+    queryKey: ['tasks'],
+    queryFn: () => apiGet<{ items: TaskItem[] }>('/api/v1/tasks'),
+    refetchInterval: 4000, // live queue
+  });
+}
+
+export function useCancelTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: number | string) =>
+      apiPost(`/api/v1/tasks/${encodeURIComponent(String(taskId))}/cancel`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+}
+
+
+export function useMagicShelfVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; visible: boolean }) =>
+      apiPost(`/api/v1/magicshelves/${v.id}/visibility`, { visible: v.visible }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
+  });
+}

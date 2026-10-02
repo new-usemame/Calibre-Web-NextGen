@@ -76,3 +76,4103 @@ from .reader_settings import (
 )
 from .user_preferences import set_checkbox_preference_from_form
 from .services import reader_fonts
+
+# CWA Imports
+import shutil
+import sqlite3
+import subprocess
+import threading
+import time
+
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
+
+feature_support = {
+    'ldap': bool(services.ldap),
+    'goodreads': bool(services.goodreads_support),
+    'kobo': bool(services.kobo),
+    'hardcover' : bool(services.hardcover)
+}
+
+try:
+    from . import oauth_bb
+    # Import functions directly since they don't change
+    register_user_with_oauth = oauth_bb.register_user_with_oauth
+    logout_oauth_user = oauth_bb.logout_oauth_user
+    get_oauth_status = oauth_bb.get_oauth_status
+
+    feature_support['oauth'] = True
+except ImportError:
+    feature_support['oauth'] = False
+    # Create a mock oauth_bb module for when OAuth is not available
+    class MockOAuth:
+        oauth_check = {}
+        oauthblueprints = []
+        @staticmethod
+        def register_user_with_oauth(*args, **kwargs):
+            return None
+        @staticmethod  
+        def logout_oauth_user(*args, **kwargs):
+            return None
+        @staticmethod
+        def get_oauth_status(*args, **kwargs):
+            return None
+    oauth_bb = MockOAuth()
+    register_user_with_oauth = oauth_bb.register_user_with_oauth
+    logout_oauth_user = oauth_bb.logout_oauth_user
+    get_oauth_status = oauth_bb.get_oauth_status
+
+from functools import wraps
+
+try:
+    from natsort import natsorted as sort
+except ImportError:
+    sort = sorted  # Just use regular sort then, may cause issues with badly named pages in cbz/cbr files
+
+
+sql_version = importlib.metadata.version("sqlalchemy")
+sqlalchemy_version2 = ([int(x) for x in sql_version.split('.')] >= [2, 0, 0])
+
+_start_time = time.time()
+
+def add_security_headers(resp):
+    # The SPA reader (spa.spa_shell serves /app/*) renders EPUBs with epub.js,
+    # which loads in-book images and CSS as blob: URLs inside an iframe — the
+    # same need the legacy web.read_book reader has. Since the SPA serves one
+    # shell for every /app route (client-side nav keeps the initial CSP), the
+    # blob: allowance must cover the whole spa endpoint, not a single path.
+    # blob: URLs are same-origin and JS-created, so this is not a new XSS vector.
+    reader_like = request.endpoint in ("web.read_book", "spa.spa_shell")
+    default_src = ([host.strip() for host in config.config_trustedhosts.split(',') if host] +
+                   ["'self'", "'unsafe-inline'", "'unsafe-eval'"])
+    csp = "default-src " + ' '.join(default_src)
+    if request.endpoint == "web.read_book" and config.config_use_google_drive:
+        csp +=" blob: "
+    csp += "; font-src 'self' data:"
+    if reader_like:
+        csp += " blob: "
+    csp += "; img-src 'self'"
+    if request.path.startswith("/author/") and config.config_use_goodreads:
+        csp += " images.gr-assets.com i.gr-assets.com s.gr-assets.com"
+    if request.endpoint == "admin.hardcover_review_matches":
+        csp += " https:"
+    csp += " data:"
+    if (request.endpoint in ("edit-book.show_edit_book", "cover_picker.cover_picker_page",
+                             "spa.spa_shell")
+            or config.config_use_google_drive):
+        # The metadata-search modal (edit-book) and the focused cover-picker
+        # page both render thumbnails directly from external provider CDNs
+        # (Hardcover, Apple Books, Amazon image CDN, OpenLibrary, Kobo,
+        # Douban, etc.). Allow those img-src origins for these endpoints.
+        # The SPA (spa.spa_shell) serves ONE shell for every /app route incl.
+        # its edit page, so the allowance can't be path-scoped within it; we
+        # accept img-src '*' SPA-wide (images are non-executable — this only
+        # widens where covers can load from, not the script/XSS surface).
+        csp += " *"
+    if reader_like:
+        csp += " blob: ; style-src-elem 'self' blob: 'unsafe-inline'"
+    # #60: the switched-back-to-Classic feedback popup (layout.html) POSTs to our
+    # first-party feedback endpoint (a Cloudflare Worker on a different origin).
+    # Without an explicit connect-src, fetch()/XHR fall back to default-src 'self'
+    # and the browser blocks the cross-origin POST, so feedback never leaves the
+    # page. Mirror default-src's host list ('self' + configured trusted hosts) so
+    # existing same-origin / reverse-proxy XHR is unchanged, then add just that one
+    # endpoint. connect-src governs fetch/XHR/WebSocket/EventSource only — it does
+    # not widen the script or object surface.
+    connect_src = ([host.strip() for host in config.config_trustedhosts.split(',') if host] +
+                   ["'self'", "https://app.calibrewebnextgen.com"])
+    csp += "; connect-src " + ' '.join(connect_src)
+    csp += "; object-src 'none';"
+    resp.headers['Content-Security-Policy'] = csp
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    resp.headers['X-XSS-Protection'] = '1; mode=block'
+    resp.headers['Strict-Transport-Security'] = 'max-age=31536000';
+    return resp
+
+
+# The SPA bundle is content-addressed: Vite emits every file under
+# /static/app/assets/ as <name>-<8-char content hash>.<ext> and wipes the
+# directory on each build (emptyOutDir), so a byte change is always a NAME
+# change and nothing that is not build output survives in there. Those files are
+# therefore immutable at their URL and can be cached for a year. The name shape
+# is the test, not proof of provenance, so a hand-placed file matching it would
+# be wrongly pinned. emptyOutDir removes such a file from the SERVER at the next
+# build; it cannot revoke a copy a browser was already told to keep for a year.
+# Gating on the Vite manifest instead of the filename shape would close that,
+# at the cost of coupling this to the build output.
+#
+# They were not cached at all. Flask's SEND_FILE_MAX_AGE_DEFAULT is None, which
+# makes send_file emit `Cache-Control: no-cache`, so a ~640 KB bundle was
+# revalidated on every single page load. The app's cache-buster adds content
+# query hashes to url_for('static') links in every environment. The SPA's asset
+# URLs are baked into the built index.html and never go through url_for.
+# The rule below remains deliberately narrow: ONLY paths carrying a content
+# hash in the filename get immutable caching. Other /static paths can still be
+# requested without a query hash, so they keep revalidating after upgrades.
+_HASHED_ASSET_PREFIX = '/static/app/assets/'
+_HASHED_ASSET_RE = re.compile(r'-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$')
+IMMUTABLE_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+# Only a response that actually carries (or validates) the asset may be pinned.
+# A 404 under a hashed-looking name is the dangerous case: caches store negative
+# responses too, so giving one a year would preserve a white page long after a
+# partial deploy, a missing mount or a rollback had been fixed.
+_CACHEABLE_ASSET_STATUSES = frozenset((200, 206, 304))
+
+
+def is_immutable_static_asset(path):
+    """Whether ``path`` names a content-addressed SPA bundle file.
+
+    ``request.path`` is always mount-relative — a reverse-proxy prefix lives in
+    ``script_root``, not here — so the prefix is anchored rather than searched
+    for anywhere in the string.
+    """
+    if not path or not path.startswith(_HASHED_ASSET_PREFIX):
+        return False
+    name = path[len(_HASHED_ASSET_PREFIX):]
+    # One path segment only — never something reached through a nested path.
+    return '/' not in name and bool(_HASHED_ASSET_RE.search(name))
+
+
+def add_static_asset_cache_headers(resp):
+    if (request.endpoint == 'static'
+            and resp.status_code in _CACHEABLE_ASSET_STATUSES
+            and is_immutable_static_asset(request.path)):
+        resp.headers['Cache-Control'] = IMMUTABLE_ASSET_CACHE_CONTROL
+    return resp
+
+
+_APP_HOOKS_MARKER = "cps_web_after_request_registered"
+
+
+def register_app_hooks(application):
+    """Attach web's app-wide response hooks once to ``application``."""
+    if application.extensions.get(_APP_HOOKS_MARKER):
+        return
+    application.after_request(add_security_headers)
+    application.after_request(add_static_asset_cache_headers)
+    application.extensions[_APP_HOOKS_MARKER] = True
+
+
+# Preserve the historical import-time binding for the compatibility singleton.
+register_app_hooks(app)
+
+
+web = Blueprint('web', __name__)
+
+log = logger.create()
+
+
+# ################################### Login logic and rights management ###############################################
+
+
+def download_required(f):
+    @wraps(f)
+    def inner(*args, **kwargs):
+        if current_user.role_download():
+            return f(*args, **kwargs)
+        abort(403)
+
+    return inner
+
+
+def viewer_required(f):
+    @wraps(f)
+    def inner(*args, **kwargs):
+        if current_user.role_viewer():
+            return f(*args, **kwargs)
+        abort(403)
+
+    return inner
+
+
+# ################################### data provider functions #########################################################
+
+
+@web.route("/ajax/emailstat")
+@user_login_required
+def get_email_status_json():
+    tasks = WorkerThread.get_instance().tasks
+    return jsonify(render_task_status(tasks))
+
+
+@web.route("/ajax/bookmark/<int:book_id>/<book_format>", methods=['POST'])
+@user_login_required
+def set_bookmark(book_id, book_format):
+    # A lookup reader may load an existing position but cannot replace or
+    # clear it. This request-level guard also protects older classic clients
+    # that keep the bookmark URL and send an empty value when unbookmarking.
+    if request.args.get("lookup") == "1":
+        return "", 204
+    try:
+        from .services.device_registry import (
+            WEBREADER_INSTALLATION_ID_HEADER,
+            ensure_webreader_device_best_effort,
+        )
+        g.annotation_origin_device_id = ensure_webreader_device_best_effort(
+            user_id=current_user.id,
+            installation_id=request.headers.get(WEBREADER_INSTALLATION_ID_HEADER),
+        )
+    except Exception:
+        log.warning("Best-effort web-reader device observation failed", exc_info=True)
+        g.annotation_origin_device_id = None
+    book_format = (book_format or "").lower()
+    bookmark_key = request.form["bookmark"]
+    ub.session.query(ub.Bookmark).filter(and_(ub.Bookmark.user_id == int(current_user.id),
+                                              ub.Bookmark.book_id == book_id,
+                                              ub.Bookmark.format == book_format)).delete()
+    if not bookmark_key:
+        if not ub.session_commit():
+            return "", 500
+        return "", 204
+
+    l_bookmark = ub.Bookmark(user_id=current_user.id,
+                             book_id=book_id,
+                             format=book_format,
+                             bookmark_key=bookmark_key)
+    l_bookmark = ub.session.merge(l_bookmark)
+
+    # #1318: settle the user's own write here, before the optional one below.
+    # This flush IS the bookmark; performed inside the progress helper it landed
+    # under the `except Exception` guard a few lines down and a genuine bookmark
+    # failure got logged as an optional progress-sharing failure — and answered
+    # 201 anyway. Settling first also keeps the bookmark out of the savepoint the
+    # helper opens, so a rollback there cannot take it.
+    if not ub.session_flush():
+        return "", 500
+
+    # #324: the CFI above is opaque and read by nothing but the readers, so a
+    # browser reading session was invisible to the user's other devices. The
+    # percentage the reader already computes IS portable — hand it to the shared
+    # carrier so the Kobo (and the book-detail progress row) pick it up. Absent
+    # for the comic/audio readers, which reuse this route.
+    percentage = reading_position.coerce_percentage(request.form.get("percentage"))
+    if percentage is not None:
+        try:
+            reading_position.record_web_reader_progress(
+                current_user,
+                book_id,
+                percentage,
+                origin_device_id=g.annotation_origin_device_id,
+                cfi=bookmark_key,
+            )
+        except Exception as e:
+            # Position sharing must never cost the user their bookmark.
+            log.warning("Could not share web reader progress for book %s: %s", book_id, e)
+
+    l_bookmark.updated_at = datetime.now(timezone.utc)
+
+    # The classic reader posts on every page turn, so a client told 201 after a
+    # rolled-back write simply loses the position with no reason to retry.
+    if not ub.session_commit("Bookmark for user {} in book {} created".format(current_user.id, book_id)):
+        return "", 500
+    return "", 201
+
+
+@web.route("/ajax/stopreading/<int:book_id>", methods=["POST"])
+@user_login_required
+def stop_reading(book_id):
+    """Remove this user's in-progress marker without resetting saved state."""
+    if current_user.is_anonymous:
+        abort(403)
+    result = calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=current_user.role_browse_global(),
+        allow_public_shelf_books=True,
+    )
+    if not result:
+        abort(404)
+    _, custom_read, _ = result
+    if config.config_read_column and custom_read:
+        return jsonify({"error": "finished_books_cannot_be_removed"}), 409
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == int(current_user.id),
+        ub.ReadBook.book_id == int(book_id),
+    ).one_or_none()
+    if row is not None and row.read_status == ub.ReadBook.STATUS_FINISHED:
+        return jsonify({"error": "finished_books_cannot_be_removed"}), 409
+
+    changed = stop_reading_status(ub.session, current_user.id, book_id, ub.ReadBook)
+    if changed and not ub.session_commit("Stopped reading book {} for user {}".format(
+            book_id, current_user.id)):
+        return jsonify({"error": "could_not_update_reading_status"}), 500
+    return jsonify({"ok": True, "changed": changed})
+
+
+@web.route("/ajax/toggleread/<int:book_id>", methods=['POST'])
+@user_login_required
+def toggle_read(book_id):
+    message = edit_book_read_status(book_id)
+    if message:
+        return message, 400
+    else:
+        return message
+
+
+@web.route("/ajax/togglearchived/<int:book_id>", methods=['POST'])
+@user_login_required
+def toggle_archived(book_id):
+    change_archived_books(book_id, message="Book {} archive bit toggled".format(book_id))
+    # Remove book from syncd books list to force resync (?)
+    remove_synced_book(book_id)
+    return ""
+
+
+# Per-user favorite / starred books — fork #27. Presence-based toggle: a row in
+# favorite_book exists iff the calling user has starred the book. Returns the
+# resulting state as JSON so the UI can flip the star in place without a reload.
+@web.route("/ajax/togglefavorite/<int:book_id>", methods=['POST'])
+@user_login_required
+def toggle_favorite(book_id):
+    favorite = ub.session.query(ub.FavoriteBook).filter(
+        and_(ub.FavoriteBook.user_id == int(current_user.id),
+             ub.FavoriteBook.book_id == book_id)).first()
+    if favorite:
+        ub.session.delete(favorite)
+        favorited = False
+    else:
+        ub.session.add(ub.FavoriteBook(user_id=int(current_user.id), book_id=book_id))
+        favorited = True
+    ub.session_commit("Book {} favorite bit toggled".format(book_id))
+    return json.dumps({"favorited": favorited})
+
+
+@web.route("/ajax/mylibrary/<int:book_id>/add", methods=['POST'])
+@user_login_required
+def add_to_my_library(book_id):
+    from . import user_library
+    try:
+        user_library.add_book(current_user, book_id)
+    except user_library.UserLibraryError as ex:
+        return json.dumps({"error": str(ex)}), 403
+    return json.dumps({"in_my_library": True})
+
+
+@web.route("/ajax/mylibrary/<int:book_id>/remove", methods=['POST'])
+@user_login_required
+def remove_from_my_library(book_id):
+    from . import user_library
+    try:
+        shelves = user_library.remove_book(current_user, book_id)
+    except user_library.UserLibraryError as ex:
+        return json.dumps({"error": str(ex)}), 409
+    return json.dumps({
+        "in_my_library": False,
+        "affected_shelves": shelves,
+        "kobo_removal_on_next_sync": True,
+        "reading_data_preserved": True,
+    })
+
+
+@web.route("/ajax/mylibrary/<int:book_id>/removal-impact", methods=['GET'])
+@user_login_required
+def my_library_removal_impact(book_id):
+    """Describe removal effects before the classic UI confirms the action."""
+    from . import user_library
+    try:
+        return json.dumps(user_library.removal_impact(current_user, book_id))
+    except user_library.UserLibraryError as ex:
+        return json.dumps({"error": str(ex)}), 409
+
+
+# --- Web-reader per-user display settings -----------------------------------
+# The epub reader's theme / font / font-size / column-spread / reflow / text
+# margin used to live only in the one browser's localStorage, so they never
+# followed a user to their phone or another browser. We persist them under
+# view_settings['reader'] (same JSON column + flag_modified pattern as the
+# books-list view settings) so they sync per-user across devices. Persistence
+# is owned by the dedicated /api/v1/reader/settings route.
+# Per-user hidden books — fork issue #64. Hide removes the book from index
+# pages, search, OPDS feeds, and shelf listings for the calling user only;
+# /hidden lists hidden books with an unhide button. Distinct from archive
+# (which is sync-pause semantics). See common_filters() in cps/db.py.
+@web.route("/ajax/togglehidden/<int:book_id>", methods=['POST'])
+@user_login_required
+def toggle_hidden(book_id):
+    if current_user.is_anonymous:
+        abort(403)
+    existing = ub.session.query(ub.UserHiddenBook).filter(
+        ub.UserHiddenBook.user_id == int(current_user.id),
+        ub.UserHiddenBook.book_id == int(book_id),
+    ).first()
+    if existing:
+        # Unhide path — always allowed regardless of admin feature flag,
+        # so an admin disabling the feature mid-flight cannot strand
+        # users' already-hidden books (#319 recovery defense-in-depth).
+        ub.session.delete(existing)
+        ub.session.commit()
+        log.debug("Book %d unhidden for user %s", book_id, current_user.name)
+    else:
+        # Hide path — gated on the admin feature flag (#319 SethMilliken).
+        # If the UI button is suppressed by the flag, a direct POST
+        # (curl, bookmarklet, browser extension) must not be able to
+        # bypass it. Mirrors the template gate in detail.html.
+        if not bool(getattr(config, 'config_user_hide_enabled', False)):
+            log.info(
+                "toggle_hidden refused for user %s book %d: hide feature disabled",
+                current_user.name, book_id,
+            )
+            abort(403)
+        row = ub.UserHiddenBook(user_id=int(current_user.id), book_id=int(book_id))
+        ub.session.add(row)
+        try:
+            ub.session.commit()
+        except Exception as ex:
+            ub.session.rollback()
+            log.debug("toggle_hidden insert failed (likely race / dup): %s", ex)
+        log.debug("Book %d hidden for user %s", book_id, current_user.name)
+    return ""
+
+
+@web.route("/ajax/view", methods=["POST"])
+@login_required_if_no_ano
+def update_view():
+    to_save = request.get_json()
+    try:
+        for element in to_save:
+            for param in to_save[element]:
+                current_user.set_view_property(element, param, to_save[element][param])
+    except Exception as ex:
+        log.error("Could not save view_settings: %r %r: %e", request, to_save, ex)
+        return "Invalid request", 400
+    return "1", 200
+
+
+'''
+@web.route("/ajax/getcomic/<int:book_id>/<book_format>/<int:page>")
+@user_login_required
+def get_comic_book(book_id, book_format, page):
+    book = calibre_db.get_book(book_id)
+    if not book:
+        return "", 204
+    else:
+        for bookformat in book.data:
+            if bookformat.format.lower() == book_format.lower():
+                cbr_file = os.path.join(config.config_calibre_dir, book.path, bookformat.name) + "." + book_format
+                if book_format in ("cbr", "rar"):
+                    if feature_support['rar'] == True:
+                        rarfile.UNRAR_TOOL = config.config_rarfile_location
+                        try:
+                            rf = rarfile.RarFile(cbr_file)
+                            names = sort(rf.namelist())
+                            extract = lambda page: rf.read(names[page])
+                        except:
+                            # rarfile not valid
+                            log.error('Unrar binary not found, or unable to decompress file %s', cbr_file)
+                            return "", 204
+                    else:
+                        log.info('Unrar is not supported please install python rarfile extension')
+                        # no support means return nothing
+                        return "", 204
+                elif book_format in ("cbz", "zip"):
+                    zf = zipfile.ZipFile(cbr_file)
+                    names=sort(zf.namelist())
+                    extract = lambda page: zf.read(names[page])
+                elif book_format in ("cbt", "tar"):
+                    tf = tarfile.TarFile(cbr_file)
+                    names=sort(tf.getnames())
+                    extract = lambda page: tf.extractfile(names[page]).read()
+                else:
+                    log.error('unsupported comic format')
+                    return "", 204
+
+                b64 = codecs.encode(extract(page), 'base64').decode()
+                ext = names[page].rpartition('.')[-1]
+                if ext not in ('png', 'gif', 'jpg', 'jpeg', 'webp'):
+                    ext = 'png'
+                extractedfile="data:image/" + ext + ";base64," + b64
+                fileData={"name": names[page], "page":page, "last":len(names)-1, "content": extractedfile}
+                return make_response(json.dumps(fileData))
+        return "", 204
+'''
+
+
+# ################################### Typeahead ##################################################################
+
+
+@web.route("/get_authors_json", methods=['GET'])
+@login_required_if_no_ano
+def get_authors_json():
+    return calibre_db.get_typeahead(db.Authors, request.args.get('q'), ('|', ','))
+
+
+@web.route("/get_publishers_json", methods=['GET'])
+@login_required_if_no_ano
+def get_publishers_json():
+    return calibre_db.get_typeahead(db.Publishers, request.args.get('q'), ('|', ','))
+
+
+@web.route("/get_tags_json", methods=['GET'])
+@login_required_if_no_ano
+def get_tags_json():
+    return calibre_db.get_typeahead(db.Tags, request.args.get('q'), tag_filter=tags_filters())
+
+
+@web.route("/get_series_json", methods=['GET'])
+@login_required_if_no_ano
+def get_series_json():
+    return calibre_db.get_typeahead(db.Series, request.args.get('q'))
+
+
+@web.route("/get_languages_json", methods=['GET'])
+@login_required_if_no_ano
+def get_languages_json():
+    query = (request.args.get('q') or '').lower()
+    language_names = isoLanguages.get_language_names(get_locale())
+    entries_start = [s for key, s in language_names.items() if s.lower().startswith(query.lower())]
+    if len(entries_start) < 5:
+        entries = [s for key, s in language_names.items() if query in s.lower()]
+        entries_start.extend(entries[0:(5 - len(entries_start))])
+        entries_start = list(set(entries_start))
+    json_dumps = json.dumps([dict(name=r) for r in entries_start[0:5]])
+    return json_dumps
+
+
+@web.route("/get_matching_tags", methods=['GET'])
+@login_required_if_no_ano
+def get_matching_tags():
+    tag_dict = {'tags': []}
+    q = calibre_db.session.query(db.Books).filter(calibre_db.common_filters(True))
+    author_input = request.args.get('authors') or ''
+    title_input = request.args.get('title') or ''
+    include_tag_inputs = request.args.getlist('include_tag') or ''
+    exclude_tag_inputs = request.args.getlist('exclude_tag') or ''
+    q = q.filter(db.Books.authors.any(func.lower(db.Authors.name).ilike("%" + author_input + "%")),
+                 func.lower(db.Books.title).ilike("%" + title_input + "%"))
+    if len(include_tag_inputs) > 0:
+        for tag in include_tag_inputs:
+            q = q.filter(db.Books.tags.any(db.Tags.id == tag))
+    if len(exclude_tag_inputs) > 0:
+        for tag in exclude_tag_inputs:
+            q = q.filter(not_(db.Books.tags.any(db.Tags.id == tag)))
+    for book in q:
+        for tag in book.tags:
+            if tag.id not in tag_dict['tags']:
+                tag_dict['tags'].append(tag.id)
+    json_dumps = json.dumps(tag_dict)
+    return json_dumps
+
+
+def generate_char_list(entries): # data_colum, db_link):
+    char_list = list()
+    for entry in entries:
+        upper_char = db.unicode_initial(entry[0].name)
+        if not upper_char:
+            continue
+        if upper_char not in char_list:
+            char_list.append(upper_char)
+    return char_list
+
+
+def query_char_list(data_colum, db_link):
+    results = (calibre_db.session.query(func.ng_initial(data_colum).label('char'))
+            .join(db_link).join(db.Books).filter(calibre_db.common_filters())
+            .filter(func.ng_initial(data_colum).isnot(None))
+            .filter(func.ng_initial(data_colum) != '')
+            .group_by(func.ng_initial(data_colum))
+            .order_by(func.ng_sort_key(data_colum)).all())
+    return results
+
+
+def get_sort_function(sort_param, data):
+    if sort_param == 'stored':
+        sort_param = current_user.get_view_property(data, 'stored')
+    else:
+        current_user.set_view_property(data, 'stored', sort_param)
+    if sort_param is None:
+        if data == "series":
+            # A series page reads in series order by default — matching the
+            # OPDS series feed — not newest-first. An explicitly chosen sort
+            # is stored above and honored on the next visit. (fork #334 audit)
+            return BOOK_SORT_ORDERS["seriesasc"], "seriesasc"
+        sort_param = "new"
+    # The ORDER BY itself is shared with the new UI's /api/v1 lists so the two
+    # cannot disagree, and so every sort keeps its unique tiebreaker (#1331) —
+    # including the per-user "recent", so a stored choice made in the new UI
+    # does not silently mean something else on a classic page.
+    return book_sort_order(sort_param, user_id=viewer_id(current_user)), sort_param
+
+
+def cwa_get_library_location() -> str:
+    return constants.calibre_library_dir()
+
+def cwa_get_num_books_in_library() -> int:
+    try:
+        # Path to user's Calibre library's metadata.db
+        db_path = os.path.join(cwa_get_library_location(), "metadata.db")
+        # Connect to the SQLite database with simple retry for transient locks
+        retries, count = 3, 0
+        while retries:
+            try:
+                conn = sqlite3.connect(db_path, timeout=30)
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM books")
+                count = cursor.fetchone()[0]
+                conn.close()
+                break
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e).lower() and retries > 1:
+                    time.sleep(0.1)
+                    retries -= 1
+                    continue
+                raise
+        # Return the result
+        return count
+    except Exception:
+        return 0
+
+
+def _favorites_first_order():
+    """ORDER-BY term that floats the calling user's starred books to the top,
+    or None when there's nothing to float (anonymous, or no favorites). Used
+    only by the main library list below — the Favorites sidebar view shows
+    starred books alone; this surfaces them within the *full* list. It is NOT
+    applied to the author / series / category / search / shelf views, which keep
+    their own ordering. Favorites live in app.db and books in metadata.db (they
+    can't be JOINed), so we fetch the favorite ids first and feed them to a CASE
+    on the metadata.db query."""
+    if not current_user.is_authenticated:
+        return None
+    rows = ub.session.query(ub.FavoriteBook.book_id).filter(
+        ub.FavoriteBook.user_id == int(current_user.id)).all()
+    fav_ids = [row[0] for row in rows]
+    if not fav_ids:
+        return None
+    # 0 sorts before 1 -> favorites first; the user's chosen sort then orders
+    # within each group.
+    return case((db.Books.id.in_(fav_ids), 0), else_=1)
+
+
+def render_books_list(data, sort_param, book_id, page):
+    order = get_sort_function(sort_param, data)
+    if data == "rated":
+        return render_rated_books(page, book_id, order=order)
+    elif data == "discover":
+        return render_discover_books(book_id)
+    elif data == "unread":
+        return render_read_books(page, False, order=order)
+    elif data == "read":
+        return render_read_books(page, True, order=order)
+    elif data == "hot":
+        return render_hot_books(page, order)
+    elif data == "download":
+        return render_downloaded_books(page, order, book_id)
+    elif data == "author":
+        return render_author_books(page, book_id, order)
+    elif data == "publisher":
+        return render_publisher_books(page, book_id, order)
+    elif data == "series":
+        return render_series_books(page, book_id, order)
+    elif data == "ratings":
+        return render_ratings_books(page, book_id, order)
+    elif data == "formats":
+        return render_formats_books(page, book_id, order)
+    elif data == "category":
+        return render_category_books(page, book_id, order)
+    elif data.startswith("cc_"):
+        # Hierarchical custom column browse view (data == "cc_<column_id>")
+        try:
+            col_id = int(data[3:])
+        except ValueError:
+            abort(404)
+        # books_list defaults book_id to the integer 1 when no node is named
+        path = book_id if isinstance(book_id, str) else ''
+        return render_cc_category(page, col_id, path, order)
+    elif data == "language":
+        return render_language_books(page, book_id, order)
+    elif data == "archived":
+        return render_archived_books(page, order)
+    elif data == "favorites":
+        return render_favorite_books(page, order)
+    elif data in ("hidden", "hidden_books"):
+        # The 'hidden_books' alias exists because render_hidden_books sets
+        # the body CSS class to 'hidden_books' (not 'hidden' — Bootstrap's
+        # .hidden{display:none!important} would blank the body). The
+        # _book_organizer.html sort dropdown builds URLs via url_for(...,
+        # data=page, ...), so sort links become /hidden_books/<sort>.
+        # Without the alias, that URL falls into the catch-all and
+        # silently renders the unfiltered library (fork #319 droM4X
+        # follow-up).
+        return render_hidden_books(page, order)
+    elif data == "search":
+        term = request.args.get('query', None)
+        offset = int(int(config.config_books_per_page) * (page - 1))
+        return render_search_results(term, offset, order, config.config_books_per_page)
+    elif data == "advsearch":
+        term = json.loads(flask_session.get('query', '{}'))
+        offset = int(int(config.config_books_per_page) * (page - 1))
+        return render_adv_search_results(term, offset, order, config.config_books_per_page)
+    elif data == "magicshelf":
+        return render_magic_shelf(book_id, sort_param, page)
+    else:
+        website = data or "newest"
+        # #34: float the user's starred books to the top of the main library
+        # list. Scoped to this branch only — the other views above keep their
+        # own ordering untouched.
+        book_order = list(order[0])
+        favorites_first = _favorites_first_order()
+        if favorites_first is not None:
+            book_order = [favorites_first] + book_order
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0, db.Books, True, book_order,
+                                                                True, config.config_read_column,
+                                                                db.books_series_link,
+                                                                db.Books.id == db.books_series_link.c.book,
+                                                                db.Series)
+
+        try:
+            title = _(f'Books ({pagination.total_count})')
+        except:
+            title = _(f'Books ({cwa_get_num_books_in_library()})')
+
+        return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                     title=title, page=website, order=order[1])
+
+
+def render_rated_books(page, book_id, order):
+    if current_user.check_visibility(constants.SIDEBAR_BEST_RATED):
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Books.ratings.any(db.Ratings.rating > 9),
+                                                                order[0],
+                                                                True, config.config_read_column,
+                                                                db.books_series_link,
+                                                                db.Books.id == db.books_series_link.c.book,
+                                                                db.Series)
+
+        return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                     id=book_id, title=_("Top Rated Books"), page="rated", order=order[1])
+    else:
+        abort(404)
+
+
+def render_discover_books(book_id):
+    if current_user.check_visibility(constants.SIDEBAR_RANDOM):
+        if not config.config_read_column:
+            db_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
+        else:
+            try:
+                db_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True
+            except (KeyError, AttributeError, IndexError):
+                log.error("Custom Column No.{} does not exist in calibre database".format(config.config_read_column))
+                flash(_(
+                        "Custom Column No.%(column)d does not exist in calibre database",
+                        column=config.config_read_column
+                    ),
+                    category="error"
+                )
+                db_filter = True
+
+        entries, __, ___ = calibre_db.fill_indexpage(1, 0, db.Books, db_filter, [func.randomblob(2)],
+                                                            join_archive_read=True,
+                                                            config_read_column=config.config_read_column)
+        pagination = Pagination(1, config.config_books_per_page, config.config_books_per_page)
+        return render_title_template('index.html', random=false(), entries=entries, pagination=pagination, id=book_id,
+                                     title=_("Discover (Random Books)"), page="discover")
+    else:
+        abort(404)
+
+
+def render_hot_books(page, order):
+    if current_user.check_visibility(constants.SIDEBAR_HOT):
+        if order[1] not in ['hotasc', 'hotdesc']:
+            # Through the shared map, not rebuilt here: an order spelled out at
+            # a second call site is a second place to forget the tiebreaker,
+            # and this one is reached by anyone opening /hot with some other
+            # sort stored (#1331).
+            order = BOOK_SORT_ORDERS['hotdesc'], 'hotdesc'
+
+        random = false()
+        if current_user.show_detail_random():
+            random_query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+            random = (random_query.filter(calibre_db.common_filters())
+                     .order_by(func.random())
+                     .limit(config.config_random_books).all())
+
+        per_page = int(config.config_books_per_page)
+        entries, total_hot_books = helper.hot_books_page(
+            calibre_db.common_filters(), order[0], per_page * (page - 1), per_page)
+        pagination = Pagination(page, per_page, total_hot_books)
+        return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                     title=_("Hot Books (Most Downloaded)"), page="hot", order=order[1])
+    else:
+        abort(404)
+
+
+def render_downloaded_books(page, order, user_id):
+    if current_user.role_admin():
+        user_id = int(user_id)
+    else:
+        user_id = current_user.id
+    user = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
+    if current_user.check_visibility(constants.SIDEBAR_DOWNLOAD) and user:
+        entries, random, pagination = calibre_db.fill_indexpage(page,
+                                                            0,
+                                                            db.Books,
+                                                            ub.Downloads.user_id == user_id,
+                                                            order[0],
+                                                            True, config.config_read_column,
+                                                            db.books_series_link,
+                                                            db.Books.id == db.books_series_link.c.book,
+                                                            db.Series,
+                                                            ub.Downloads, db.Books.id == ub.Downloads.book_id)
+        return render_title_template('index.html',
+                                     random=random,
+                                     entries=entries,
+                                     pagination=pagination,
+                                     id=user_id,
+                                     title=_("Downloaded books by %(user)s", user=user.name),
+                                     page="download",
+                                     order=order[1])
+    else:
+        abort(404)
+
+
+def render_author_books(page, author_id, order):
+    entries, __, pagination = calibre_db.fill_indexpage(page, 0,
+                                                        db.Books,
+                                                        db.Books.authors.any(db.Authors.id == author_id),
+                                                        [order[0][0], db.Series.name, db.Books.series_index],
+                                                        True, config.config_read_column,
+                                                        db.books_series_link,
+                                                        db.books_series_link.c.book == db.Books.id,
+                                                        db.Series)
+    if entries is None or not len(entries):
+        flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
+              category="error")
+        return redirect(url_for("web.index"))
+    if sqlalchemy_version2:
+        author = calibre_db.session.get(db.Authors, author_id)
+    else:
+        author = calibre_db.session.query(db.Authors).get(author_id)
+    author_name = author.name.replace('|', ',')
+
+    author_info = None
+    other_books = []
+    if services.goodreads_support and config.config_use_goodreads:
+        author_info = services.goodreads_support.get_author_info(author_name)
+        book_entries = [entry.Books for entry in entries]
+        other_books = services.goodreads_support.get_other_books(author_info, book_entries)
+    return render_title_template('author.html', entries=entries, pagination=pagination, id=author_id,
+                                 title=_("Author: %(name)s", name=author_name), author=author_info,
+                                 other_books=other_books, page="author", order=order[1])
+
+
+def render_publisher_books(page, book_id, order):
+    if book_id == '-1':
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Publishers.name == None,
+                                                                [db.Series.name, order[0][0], db.Books.series_index],
+                                                                True, config.config_read_column,
+                                                                db.books_publishers_link,
+                                                                db.Books.id == db.books_publishers_link.c.book,
+                                                                db.Publishers,
+                                                                db.books_series_link,
+                                                                db.Books.id == db.books_series_link.c.book,
+                                                                db.Series)
+        publisher = _("None")
+    else:
+        publisher = calibre_db.session.query(db.Publishers).filter(db.Publishers.id == book_id).first()
+        if publisher:
+            entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                    db.Books,
+                                                                    db.Books.publishers.any(
+                                                                        db.Publishers.id == book_id),
+                                                                    [db.Series.name, order[0][0],
+                                                                     db.Books.series_index],
+                                                                    True, config.config_read_column,
+                                                                    db.books_series_link,
+                                                                    db.Books.id == db.books_series_link.c.book,
+                                                                    db.Series)
+            publisher = publisher.name
+        else:
+            abort(404)
+
+    return render_title_template('index.html', random=random, entries=entries, pagination=pagination, id=book_id,
+                                 title=_("Publisher: %(name)s", name=publisher),
+                                 page="publisher",
+                                 order=order[1])
+
+
+def render_series_books(page, book_id, order):
+    if book_id == '-1':
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Series.name == None,
+                                                                [order[0][0]],
+                                                                True, config.config_read_column,
+                                                                db.books_series_link,
+                                                                db.Books.id == db.books_series_link.c.book,
+                                                                db.Series)
+        series_name = _("None")
+    else:
+        series_name = calibre_db.session.query(db.Series).filter(db.Series.id == book_id).first()
+        if series_name:
+            entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                    db.Books,
+                                                                    db.Books.series.any(db.Series.id == book_id),
+                                                                    [order[0][0]],
+                                                                    True, config.config_read_column)
+            series_name = series_name.name
+        else:
+            abort(404)
+    return render_title_template('index.html', random=random, pagination=pagination, entries=entries, id=book_id,
+                                 title=_("Series: %(serie)s", serie=series_name), page="series", order=order[1])
+
+
+def render_ratings_books(page, book_id, order):
+    if book_id == '-1':
+        db_filter = coalesce(db.Ratings.rating, 0) < 1
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db_filter,
+                                                                [order[0][0]],
+                                                                True, config.config_read_column,
+                                                                db.books_ratings_link,
+                                                                db.Books.id == db.books_ratings_link.c.book,
+                                                                db.Ratings)
+        title = _("Rating: None")
+    else:
+        name = calibre_db.session.query(db.Ratings).filter(db.Ratings.id == book_id).first()
+        if name:
+            entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                    db.Books,
+                                                                    db.Books.ratings.any(db.Ratings.id == book_id),
+                                                                    [order[0][0]],
+                                                                    True, config.config_read_column)
+            title = _("Rating: %(rating)s stars", rating=int(name.rating / 2))
+        else:
+            abort(404)
+    return render_title_template('index.html', random=random, pagination=pagination, entries=entries, id=book_id,
+                                 title=title, page="ratings", order=order[1])
+
+
+def render_formats_books(page, book_id, order):
+    if book_id == '-1':
+        name = _("None")
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Data.format == None,
+                                                                [order[0][0]],
+                                                                True, config.config_read_column,
+                                                                db.Data)
+
+    else:
+        name = calibre_db.session.query(db.Data).filter(db.Data.format == book_id.upper()).first()
+        if name:
+            name = name.format
+            entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                    db.Books,
+                                                                    db.Books.data.any(
+                                                                        db.Data.format == book_id.upper()),
+                                                                    [order[0][0]],
+                                                                    True, config.config_read_column)
+        else:
+            abort(404)
+
+    return render_title_template('index.html', random=random, pagination=pagination, entries=entries, id=book_id,
+                                 title=_("File format: %(format)s", format=name),
+                                 page="formats",
+                                 order=order[1])
+
+
+def render_category_books(page, book_id, order):
+    if book_id == '-1':
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Tags.name == None,
+                                                                [order[0][0], db.Series.name, db.Books.series_index],
+                                                                True, config.config_read_column,
+                                                                db.books_tags_link,
+                                                                db.Books.id == db.books_tags_link.c.book,
+                                                                db.Tags,
+                                                                db.books_series_link,
+                                                                db.Books.id == db.books_series_link.c.book,
+                                                                db.Series)
+        tagsname = _("None")
+    else:
+        tagsname = calibre_db.session.query(db.Tags).filter(db.Tags.id == book_id).first()
+        if tagsname:
+            # Issue #906: Pass viewing_tag_id to allow this tag even if not in allowed tags
+            entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                    db.Books,
+                                                                    db.Books.tags.any(db.Tags.id == book_id),
+                                                                    [order[0][0], db.Series.name,
+                                                                     db.Books.series_index],
+                                                                    True, config.config_read_column,
+                                                                    db.books_series_link,
+                                                                    db.Books.id == db.books_series_link.c.book,
+                                                                    db.Series,
+                                                                    viewing_tag_id=book_id)
+            tagsname = tagsname.name
+        else:
+            abort(404)
+    return render_title_template('index.html', random=random, entries=entries, pagination=pagination, id=book_id,
+                                 title=_("Category: %(name)s", name=tagsname), page="category", order=order[1])
+
+
+def render_language_books(page, name, order):
+    try:
+        if name.lower() != "none":
+            lang_name = isoLanguages.get_language_name(get_locale(), name)
+            if lang_name == "Unknown":
+                abort(404)
+        else:
+            lang_name = _("None")
+    except KeyError:
+        abort(404)
+    if name == "none":
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Languages.lang_code == None,
+                                                                [order[0][0]],
+                                                                True, config.config_read_column,
+                                                                db.books_languages_link,
+                                                                db.Books.id == db.books_languages_link.c.book,
+                                                                db.Languages)
+    else:
+        entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                                db.Books,
+                                                                db.Books.languages.any(db.Languages.lang_code == name),
+                                                                [order[0][0]],
+                                                                True, config.config_read_column)
+    return render_title_template('index.html', random=random, entries=entries, pagination=pagination, id=name,
+                                 title=_("Language: %(name)s", name=lang_name), page="language", order=order[1])
+
+
+def render_read_books(page, are_read, as_xml=False, order=None, extra_filter=None):
+    sort_param = order[0] if order else []
+    if not config.config_read_column:
+        if are_read:
+            db_filter = and_(ub.ReadBook.user_id == int(current_user.id),
+                             ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED)
+        else:
+            db_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
+    else:
+        try:
+            if are_read:
+                db_filter = db.cc_classes[config.config_read_column].value == True
+            else:
+                db_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True
+        except (KeyError, AttributeError, IndexError):
+            log.error("Custom Column No.{} does not exist in calibre database".format(config.config_read_column))
+            if not as_xml:
+                flash(_("Custom Column No.%(column)d does not exist in calibre database",
+                        column=config.config_read_column),
+                      category="error")
+                return redirect(url_for("web.index"))
+            return []  # ToDo: Handle error Case for opds
+
+    entries, random, pagination = calibre_db.fill_indexpage(page, 0,
+                                                            db.Books,
+                                                            db_filter,
+                                                            sort_param,
+                                                            True, config.config_read_column,
+                                                            db.books_series_link,
+                                                            db.Books.id == db.books_series_link.c.book,
+                                                            db.Series,
+                                                            extra_filter=extra_filter)
+
+    if as_xml:
+        return entries, pagination
+    else:
+        if are_read:
+            name = _('Read Books') + ' (' + str(pagination.total_count) + ')'
+            page_name = "read"
+        else:
+            name = _('Unread Books') + ' (' + str(pagination.total_count) + ')'
+            page_name = "unread"
+        return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                     title=name, page=page_name, order=order[1])
+
+
+def render_archived_books(page, sort_param):
+    order = sort_param[0] or []
+    archived_books = (ub.session.query(ub.ArchivedBook)
+                      .filter(ub.ArchivedBook.user_id == int(current_user.id))
+                      .filter(ub.ArchivedBook.is_archived == True)
+                      .all())
+    archived_book_ids = [archived_book.book_id for archived_book in archived_books]
+
+    archived_filter = db.Books.id.in_(archived_book_ids)
+
+    entries, random, pagination = calibre_db.fill_indexpage_with_archived_books(page, db.Books,
+                                                                                0,
+                                                                                archived_filter,
+                                                                                order,
+                                                                                True,
+                                                                                True, config.config_read_column)
+
+    name = _('Archived Books') + ' (' + str(len(archived_book_ids)) + ')'
+    page_name = "archived"
+    return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                 title=name, page=page_name, order=sort_param[1])
+
+
+def render_favorite_books(page, sort_param):
+    """List the current user's favorited / starred books — fork #27. Mirrors
+    render_archived_books: pull the starred book_ids from app.db (ub), then
+    filter the metadata.db listing to those ids."""
+    order = sort_param[0] or []
+    favorite_books = (ub.session.query(ub.FavoriteBook)
+                      .filter(ub.FavoriteBook.user_id == int(current_user.id))
+                      .all())
+    favorite_book_ids = [fav.book_id for fav in favorite_books]
+
+    favorite_filter = db.Books.id.in_(favorite_book_ids)
+
+    entries, random, pagination = calibre_db.fill_indexpage_with_archived_books(page, db.Books,
+                                                                                0,
+                                                                                favorite_filter,
+                                                                                order,
+                                                                                True,
+                                                                                True, config.config_read_column)
+
+    name = _('Favorite Books') + ' (' + str(len(favorite_book_ids)) + ')'
+    page_name = "favorites"
+    return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                 title=name, page=page_name, order=sort_param[1])
+
+
+def render_hidden_books(page, sort_param):
+    """List the current user's hidden books — fork issue #64. Mirrors
+    render_archived_books: the listing has to bypass the
+    common_filters() hidden-book exclusion (otherwise users couldn't see
+    what they hid in order to unhide it), so we pass
+    `allow_show_hidden=True` through the helper."""
+    order = sort_param[0] or []
+    hidden_books = (ub.session.query(ub.UserHiddenBook)
+                    .filter(ub.UserHiddenBook.user_id == int(current_user.id))
+                    .all())
+    hidden_book_ids = [h.book_id for h in hidden_books]
+
+    hidden_filter = db.Books.id.in_(hidden_book_ids)
+
+    entries, random, pagination = calibre_db.fill_indexpage_with_archived_books(
+        page, db.Books, 0, hidden_filter, order, False, True,
+        config.config_read_column, allow_show_hidden=True)
+
+    name = _('Hidden Books') + ' (' + str(len(hidden_book_ids)) + ')'
+    # NB: must not be "hidden" — layout.html renders <body class="{{ page }}">,
+    # and Bootstrap ships .hidden{display:none!important}, so page="hidden"
+    # blanks the whole page (issue #319). Keep a non-colliding identifier.
+    page_name = "hidden_books"
+    return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
+                                 title=name, page=page_name, order=sort_param[1])
+
+
+@web.route("/magicshelf/<int:shelf_id>", defaults={"sort_param": "stored", 'page': 1})
+@web.route("/magicshelf/<int:shelf_id>/<sort_param>", defaults={'page': 1})
+@web.route("/magicshelf/<int:shelf_id>/<sort_param>/<int:page>")
+@login_required_if_no_ano
+def render_magic_shelf(shelf_id, sort_param, page):
+    """Render a magic shelf with proper pagination and sorting."""
+    shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
+    if not shelf:
+        log.warning(f"Magic shelf {shelf_id} not found")
+        abort(404)
+    
+    # Check access - users can view their own shelves OR public shelves
+    if shelf.user_id != current_user.id and shelf.is_public != 1:
+        log.warning(f"User {current_user.id} attempted to access private magic shelf {shelf_id} owned by {shelf.user_id}")
+        abort(403)
+    
+    custom_sort_columns = load_configured_columns(config)
+    requested_sort = (
+        current_user.get_view_property("magicshelf", "stored")
+        if sort_param == "stored"
+        else sort_param
+    )
+    resolved_sort = resolve_magic_shelf_sort(
+        requested_sort, config, custom_sort_columns
+    )
+    if sort_param != "stored" and resolved_sort.persistable:
+        current_user.set_view_property("magicshelf", "stored", resolved_sort.key)
+    order = (list(resolved_sort.order_by), resolved_sort.key)
+    
+    # Get pagination settings\
+    per_page = config.config_books_per_page or 20
+    
+    # Build sort order - order[0] is a list, we need to unpack it
+    sort_order = order[0] if order and len(order) > 0 else []
+    
+    # Check for cache bypass
+    bypass_cache = request.args.get('refresh') == '1'
+
+    # Get books with pagination
+    try:
+        books, total_count = magic_shelf.get_books_for_magic_shelf(
+            shelf_id, 
+            page=page, 
+            page_size=per_page,
+            sort_order=sort_order,
+            sort_param=resolved_sort.key,
+            sort_join=resolved_sort.join,
+            bypass_cache=bypass_cache
+        )
+        log.debug(f"Magic shelf {shelf_id} returned {len(books)} books out of {total_count} total")
+
+        # Log activity
+        try:
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
+            cwa_db = CWA_DB()
+            cwa_db.log_activity(
+                user_id=current_user.id,
+                user_name=current_user.name,
+                event_type='MAGIC_SHELF_VIEW',
+                item_id=shelf_id,
+                item_title=shelf.name,
+                extra_data=json.dumps({'shelf_name': shelf.name, 'shelf_type': 'magic'})
+            )
+        except Exception as e:
+            log.error(f"Failed to log magic shelf activity: {e}")
+
+    except Exception as e:
+        log.error(f"Error retrieving books for magic shelf {shelf_id}: {e}")
+        flash(_("Error loading magic shelf"), category="error")
+        return redirect(url_for('web.index'))
+    
+    # Create proper pagination object
+    from .pagination import Pagination
+    pagination = Pagination(page, per_page, total_count)
+    
+    # Wrap books in entry objects with .Books attribute for template compatibility
+    class Entry:
+        def __init__(self, book):
+            self.Books = book
+    
+    entries = [Entry(book) for book in books]
+    
+    # Check if this shelf is hidden by current user (for public shelves)
+    is_hidden = False
+    if shelf.user_id != current_user.id:
+        is_hidden = ub.session.query(ub.HiddenMagicShelfTemplate).filter(
+            ub.HiddenMagicShelfTemplate.user_id == current_user.id,
+            ub.HiddenMagicShelfTemplate.shelf_id == shelf_id
+        ).first() is not None
+    
+    return render_title_template('index.html', 
+                                 entries=entries, 
+                                 pagination=pagination,
+                                 title=_("Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s", icon=shelf.icon, name=shelf.name), 
+                                 page="magicshelf",
+                                 shelf=shelf,
+                                 is_hidden_shelf=is_hidden,
+                                 id=shelf_id, 
+                                 order=order[1],
+                                 custom_sort_columns=custom_sort_columns)
+
+
+# ################################### Health Check ##################################################################
+
+# The longruns whose liveness directly determines whether the container is
+# functionally useful. ``cwa-ingest-service`` watches /cwa-book-ingest and
+# moves new files into the library; ``metadata-change-detector`` propagates
+# metadata edits back to the underlying book files. If either has died and
+# isn't being restarted, the container can still serve /health and read
+# metadata.db but the user-visible features dependent on those services are
+# broken — exactly the failure mode reported in fork #193 (droM4X) and the
+# ~200k-book production trace from @FRaccie.
+_CRITICAL_LONGRUNS = ("cwa-ingest-service", "metadata-change-detector")
+
+# A metadata writer is normal during ingest, checksum backfill, or a direct
+# calibredb operation.  Waiting on SQLite's busy timeout here is unsafe:
+# gevent is deliberately unpatched, so a blocking request greenlet freezes
+# the whole application (#1799).  Prefer a recent successful observation for
+# this one distinguishable transient state, but bound it so a permanently
+# locked library cannot be reported healthy forever. This is deliberately a
+# grace period, not proof of current readability: corruption hidden behind a
+# qualifying lock is discovered only when that lock clears; after the grace
+# expires the still-locked DB degrades even though its contents remain unknown.
+_METADATA_DB_LOCK_STALE_GRACE_SECONDS = 5 * 60
+_metadata_db_last_good = (None, 0.0)
+_HEALTH_DB_PROBE_GATE = threading.Lock()
+_HEALTH_S6_PROBE_GATE = threading.Lock()
+# Emit one contention warning per flight, then re-arm when its owner releases.
+_HEALTH_PROBE_WARNING_LOCK = threading.Lock()
+_HEALTH_PROBE_WARNED_GATES = set()
+
+
+def _metadata_db_identity(db_path):
+    """Return an identity for the database object, following symlinks."""
+    stat_result = os.stat(db_path, follow_symlinks=True)
+    return stat_result.st_dev, stat_result.st_ino
+
+
+def _probe_metadata_db():
+    """Return whether metadata.db is readable without waiting on a writer.
+
+    A lock may reuse a recent known-good result for the same database object
+    for a bounded interval. A lock-free corrupt or missing DB is unhealthy
+    immediately. Corruption whose first observable error is a qualifying lock
+    can only be detected once that lock clears. If it outlasts the grace, the
+    lock itself is unhealthy without making any claim about the DB contents.
+    """
+    global _metadata_db_last_good
+
+    conn = None
+    db_identity = None
+    resolved_db_path = None
+    try:
+        db_path = _Path(cwa_get_library_location()) / "metadata.db"
+        # Resolve before identifying and opening the database. A lexical path
+        # is not an identity: a symlinked library root can be retargeted from
+        # one library to another while retaining exactly the same spelling.
+        resolved_db_path = db_path.resolve(strict=True)
+        db_identity = _metadata_db_identity(resolved_db_path)
+        db_uri = resolved_db_path.as_uri() + "?mode=ro"
+        # mode=ro prevents a missing metadata.db from being created by the
+        # liveness probe. timeout=0 makes writer contention observable rather
+        # than parking a native worker for SQLite's historical 30s timeout.
+        conn = sqlite3.connect(db_uri, uri=True, timeout=0)
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+        # Do not attach the successful observation to an object replaced while
+        # it was open. The next probe will assess the replacement on its own.
+        if _metadata_db_identity(resolved_db_path) != db_identity:
+            return False
+        _metadata_db_last_good = (db_identity, time.monotonic())
+        return True
+    except sqlite3.OperationalError as exc:
+        if "locked" in str(exc).lower():
+            cached_identity, cached_at = _metadata_db_last_good
+            try:
+                current_identity = _metadata_db_identity(resolved_db_path)
+            except (OSError, TypeError):
+                return False
+            age = time.monotonic() - cached_at
+            if (
+                cached_identity == db_identity == current_identity
+                and age <= _METADATA_DB_LOCK_STALE_GRACE_SECONDS
+            ):
+                log.warning(
+                    "Health metadata probe is answering from a %.1fs-old stale known-good "
+                    "result because metadata.db is locked; corruption cannot be ruled out "
+                    "until the lock clears (bounded grace %.0fs)",
+                    age,
+                    _METADATA_DB_LOCK_STALE_GRACE_SECONDS,
+                )
+                return True
+        return False
+    except Exception:
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _check_s6_service_status():
+    """Probe live state of each :data:`_CRITICAL_LONGRUNS` longrun via
+    ``s6-rc -a list``.
+
+    ``s6-rc -a list`` enumerates the services currently active under
+    s6-rc and returns their names on stdout. Stopping a service via
+    ``s6-rc -d change <name>`` removes it from this output, so membership
+    is a reliable "is the service currently up" signal. We use this
+    primitive rather than ``s6-svstat`` because the latter requires read
+    access to ``/run/service/<svc>/supervise/`` (root-only in the lsio
+    base image) while the Flask app runs as ``abc``. ``s6-rc -a list``
+    reads world-readable state under ``/run/s6/db`` and works fine for
+    unprivileged callers — that's the same primitive the existing
+    ``scripts/check-cwa-services.sh`` (consumed by the admin UI's "Check
+    NextGen Status" action) already relies on.
+
+    Returns a dict ``{service_name: "up" | "down" | "unknown"}``. The
+    ``unknown`` value covers any environment where ``s6-rc`` isn't on
+    PATH (the unit-test harness, dev compose without s6, k8s sidecars) —
+    not a known-bad state, so the caller treats ``unknown`` as a no-op
+    for the 503 decision.
+    """
+    s6_rc = shutil.which("s6-rc")
+    if not s6_rc:
+        return {service: "unknown" for service in _CRITICAL_LONGRUNS}
+
+    try:
+        completed = subprocess.run(
+            [s6_rc, "-a", "list"],
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return {service: "unknown" for service in _CRITICAL_LONGRUNS}
+
+    if completed.returncode != 0:
+        return {service: "unknown" for service in _CRITICAL_LONGRUNS}
+
+    active = {line.strip() for line in completed.stdout.splitlines() if line.strip()}
+    return {service: ("up" if service in active else "down") for service in _CRITICAL_LONGRUNS}
+
+
+def _run_single_flight_health_probe(gate, probe, already_running_result, label):
+    """Offload one probe without retaining another worker while it is wedged.
+
+    SQLite's busy timeout and ``subprocess.run``'s timeout are not wall-clock
+    deadlines for every filesystem or kernel operation. Holding the gate until
+    the native worker actually returns means repeated container healthchecks
+    can consume at most one shared-pool worker per probe type. A duplicate DB
+    probe fails closed; a duplicate s6 probe reports the existing intentional
+    ``unknown`` state rather than fabricating either ``up`` or ``down``.
+    """
+    if not gate.acquire(blocking=False):
+        with _HEALTH_PROBE_WARNING_LOCK:
+            warn = gate not in _HEALTH_PROBE_WARNED_GATES
+            if warn:
+                _HEALTH_PROBE_WARNED_GATES.add(gate)
+        if warn:
+            log.warning(
+                "Previous %s health probe is still in flight; not retaining another worker",
+                label,
+            )
+        return already_running_result
+
+    # Submission can fail before the callable starts, or a waiting request can
+    # be cancelled after submission. Coordinate ownership so exactly one side
+    # releases the gate and an abandoned queued callable never runs the probe.
+    state_lock = threading.Lock()
+    state = "pending"
+
+    def release_gate():
+        with _HEALTH_PROBE_WARNING_LOCK:
+            _HEALTH_PROBE_WARNED_GATES.discard(gate)
+        gate.release()
+
+    def run_and_release_gate():
+        nonlocal state
+        with state_lock:
+            if state == "abandoned":
+                return already_running_result
+            state = "running"
+        try:
+            return probe()
+        finally:
+            with state_lock:
+                state = "finished"
+            release_gate()
+
+    try:
+        return _run_blocking(run_and_release_gate)
+    except BaseException:
+        with state_lock:
+            release_without_worker = state == "pending"
+            if release_without_worker:
+                state = "abandoned"
+        if release_without_worker:
+            release_gate()
+        raise
+
+
+@web.route("/health")
+def health_check():
+    uptime = time.time() - _start_time
+
+    # When the DB-configuration wizard has not yet completed, every other
+    # route 302-redirects to it. The Dockerfile HEALTHCHECK probes /health
+    # with `curl -fsS`, which treats 3xx as success and would silently
+    # report the container HEALTHY while the app is unusable — Docker /
+    # k8s / Compose then never page on-call, never roll back, never failover.
+    # Report 503 with a distinct status so orchestration sees the broken
+    # state. The companion allowlist entry in cps.admin.before_request lets
+    # this route reach its own body when db_configured=False.
+    if not config.db_configured:
+        return jsonify({
+            "status": "unconfigured",
+            "uptime": uptime,
+            "version": f"Calibre-Web-NextGen/{constants.INSTALLED_VERSION}",
+        }), 503
+
+    # Both helpers perform unpatched blocking I/O. Waiting for them on the
+    # request greenlet freezes gevent's single hub thread and every other
+    # request. The shared offloader runs the syscalls on real OS threads and
+    # waits cooperatively; the per-kind gates ensure a wedged mount or fork can
+    # retain at most two workers across repeated healthchecks (#1799).
+    db_up = _run_single_flight_health_probe(
+        _HEALTH_DB_PROBE_GATE,
+        _probe_metadata_db,
+        False,
+        "metadata DB",
+    )
+    services_status = _run_single_flight_health_probe(
+        _HEALTH_S6_PROBE_GATE,
+        _check_s6_service_status,
+        {service: "unknown" for service in _CRITICAL_LONGRUNS},
+        "s6",
+    )
+    any_service_down = any(state == "down" for state in services_status.values())
+    healthy = db_up and not any_service_down
+
+    return jsonify({
+        "status": "ok" if healthy else "degraded",
+        "uptime": uptime,
+        "version": f"Calibre-Web-NextGen/{constants.INSTALLED_VERSION}",
+        "services": services_status,
+    }), 200 if healthy else 503
+
+# ################################### View Books list ##################################################################
+
+@web.route("/", defaults={'page': 1})
+@web.route('/page/<int:page>')
+@login_required_if_no_ano
+def index(page):
+    sort_param = (request.args.get('sort') or 'stored').lower()
+
+    # Decide the response surface before creating Classic-only flashes. The SPA
+    # does not consume Flask's flash queue (#1959), so flashing before this
+    # redirect would hide the warning and accumulate duplicates in the session.
+    # The helper returns False for cwng_feedback, preserving that Classic path.
+    if spa.classic_index_redirects_to_spa():
+        return redirect(spa.spa_shell_url())
+
+    if current_user.is_authenticated and current_user.role_admin():
+        arch_warning = helper.check_architecture()
+        if arch_warning:
+            flash(arch_warning, category="cwa_arch_warning")
+
+    # The SPA shell's no-JS/nomodule fallback lands here with a one-shot feedback
+    # marker. Enable Classic only for this browser session and clear the legacy
+    # SPA cookie for downgrade compatibility. Only the web index does this;
+    # books_list, authors, OPDS, Kobo and the API never mutate UI selection.
+    if request.args.get('cwng_feedback'):
+        response = make_response(render_books_list("root", sort_param, 1, page))
+        spa.prefer_classic_for_session()
+        spa.clear_prefer_spa_cookie(response)
+        return response
+
+    return render_books_list("root", sort_param, 1, page)
+
+
+@web.route('/global-library', defaults={'sort_param': 'stored', 'page': 1})
+@web.route('/global-library/<sort_param>', defaults={'page': 1})
+@web.route('/global-library/<sort_param>/<int:page>')
+@user_login_required
+def global_library(sort_param, page):
+    if current_user.is_anonymous or not current_user.role_browse_global():
+        abort(403, description=_("You don't have permission to browse the global library."))
+    recent_missing = sort_param == "recent-missing"
+    search_term = (request.args.get("search") or "").strip()
+    order = get_sort_function(
+        "new" if recent_missing else sort_param, "global_library"
+    )
+    filters = []
+    if recent_missing:
+        filters.append(user_library.global_missing_filter(current_user, cdb=calibre_db))
+    if search_term:
+        like = "%" + search_term + "%"
+        filters.append(or_(
+            func.lower(db.Books.title).ilike(func.lower(like)),
+            db.Books.authors.any(func.lower(db.Authors.name).ilike(func.lower(like))),
+            db.Books.series.any(func.lower(db.Series.name).ilike(func.lower(like))),
+        ))
+    global_filter = and_(*filters) if filters else True
+    entries, random, pagination = calibre_db.fill_indexpage(
+        page, 0, db.Books, global_filter, order[0],
+        True, config.config_read_column,
+        db.books_series_link,
+        db.Books.id == db.books_series_link.c.book,
+        db.Series,
+        allow_show_global=True,
+    )
+    page_ids = [int(getattr(entry, "Books", entry).id) for entry in entries]
+    global_member_ids = {int(row[0]) for row in (
+        ub.session.query(ub.UserLibraryBook.book_id)
+        .filter(ub.UserLibraryBook.user_id == int(current_user.id),
+                ub.UserLibraryBook.book_id.in_(page_ids)).all()
+    )}
+    return render_title_template(
+        'index.html', random=random, entries=entries, pagination=pagination,
+        title=_("Global Library (%(count)s)", count=pagination.total_count),
+        page="global_library", order=order[1], global_library=True,
+        recent_missing=recent_missing, global_member_ids=global_member_ids,
+        global_search=search_term,
+    )
+
+
+@web.route('/<data>/<sort_param>', defaults={'page': 1, 'book_id': 1})
+@web.route('/<data>/<sort_param>/', defaults={'page': 1, 'book_id': 1})
+@web.route('/<data>/<sort_param>/<book_id>', defaults={'page': 1})
+@web.route('/<data>/<sort_param>/<book_id>/<int:page>')
+@login_required_if_no_ano
+def books_list(data, sort_param, book_id, page):
+    return render_books_list(data, sort_param, book_id, page)
+
+
+@web.route("/hidden")
+@login_required_if_no_ano
+def hidden_books_redirect():
+    # Bare /hidden was referenced in issue #64's comments but only
+    # /<data>/<sort_param> is routed by books_list, so /hidden 404'd
+    # (issue #319). Redirect to the canonical sorted listing.
+    return redirect(url_for("web.books_list", data="hidden", sort_param="stored"))
+
+
+@web.route("/magicshelf/preview", methods=["POST"])
+@user_login_required
+def preview_magic_shelf():
+    """Preview what books match the given rules without saving the shelf."""
+    try:
+        data = request.get_json()
+        rules = data.get('rules')
+        
+        if not rules or not rules.get('rules'):
+            return jsonify({"success": False, "message": _("No rules provided")}), 400
+        
+        # Temporarily create a query to count matching books
+        try:
+            query_filter = magic_shelf.build_query_from_rules(rules, user_id=current_user.id)
+            if query_filter is None:
+                return jsonify({"success": False, "message": _("Invalid rules format")}), 400
+            
+            cdb = db.CalibreDB(init=True)
+            query = cdb.session.query(db.Books)
+            query = query.filter(query_filter)
+            query = query.filter(cdb.common_filters())
+            
+            # Get total count
+            total_count = query.count()
+            
+            # Get sample books (first 5)
+            sample_books = query.limit(5).all()
+            sample_titles = [book.title for book in sample_books]
+            
+            return jsonify({
+                "success": True,
+                "count": total_count,
+                "sample_books": sample_titles
+            })
+            
+        except Exception as e:
+            log.error(f"Error previewing magic shelf rules: {str(e)}", exc_info=True)
+            return jsonify({"success": False, "message": _("Error processing rules")}), 500
+            
+    except Exception as e:
+        log.error(f"Error in preview_magic_shelf: {e}")
+        return jsonify({"success": False, "message": _("Invalid request")}), 400
+
+
+@web.route("/magicshelf", methods=["GET", "POST"])
+@user_login_required
+def create_magic_shelf():
+    # Curated emoji list for magic shelf icons - organized by category
+    ALLOWED_ICONS = [
+        # Books & Reading
+        '📚', '📖', '📕', '📗', '📘', '📙', '📔', '📓', '📒', '📰',
+        # Stars & Favorites
+        '⭐', '🌟', '✨', '💫', '🌠', '⚡', '🔥', '💥', '🎯', '🏆',
+        # Hearts
+        '❤️', '💙', '💚', '💛', '🧡', '💜', '🖤', '🤍', '💖', '💝',
+        # Entertainment
+        '🎭', '🎬', '🎪', '🎨', '🎮', '🎲', '🎰', '🎳', '🎱', '🎸',
+        # Travel & Space
+        '🚀', '🛸', '🌌', '🌍', '🌎', '🌏', '🗺️', '🧭', '⛰️', '🏔️',
+        # Fantasy & Magic
+        '🔮', '🎃', '👻', '🦄', '🐉', '🐲', '🧙', '🧚', '🧛', '🧜',
+        # Awards & Achievement
+        '🥇', '🥈', '🥉', '🏅', '🎖️', '👑', '💎', '💍', '🔱', '🎗️',
+        # Time & Organization
+        '⏰', '⏱️', '⌛', '⏳', '🕰️', '🔔', '📅', '📆', '📌', '📍',
+        # Learning & Science
+        '🎓', '🏫', '📝', '✏️', '📐', '📏', '🔬', '🔭', '🖌️', '🖍️',
+        # Nature & Weather
+        '🌈', '☀️', '🌙', '🌸', '🌺', '🌻', '🌹', '🌷', '🍀', '🌱'
+    ]
+    
+    if request.method == "POST":
+        data = request.get_json()
+        name = strip_whitespaces(data.get('name', ''))
+        rules = data.get('rules')
+        icon = data.get('icon', '🪄')
+        kobo_sync = data.get('kobo_sync', False)
+        is_public = data.get('is_public', False)
+        
+        # Publishing your own shelf is a separate capability from editing
+        # somebody else's public shelf.
+        if is_public and not current_user.role_share_shelfs():
+            return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
+        
+        # Validate inputs
+        if not name or not rules:
+            return jsonify({"success": False, "message": _("Name and rules are required")}), 400
+        
+        if len(name) > 100:
+            return jsonify({"success": False, "message": _("Shelf name too long (max 100 characters)")}), 400
+        
+        # Use default icon if none provided, otherwise accept any emoji/symbol
+        if not icon:
+            icon = '🪄'
+        
+        try:
+            new_shelf = ub.MagicShelf(
+                name=name,
+                user_id=current_user.id,
+                rules=rules,
+                icon=icon,
+                kobo_sync=kobo_sync,
+                is_public=1 if is_public else 0
+            )
+            ub.session.add(new_shelf)
+            ub.session.flush()
+            if current_user.opds_only_shelves_sync:
+                ub.set_opds_magic_shelf_exposed_for_user(
+                    current_user.id,
+                    new_shelf.id,
+                    bool(data.get('opds_expose')),
+                )
+            ub.session_commit()
+            log.info(f"User {current_user.id} created magic shelf '{name}' (ID: {new_shelf.id})")
+            # Per-shelf Kobo intent is persisted even while the global
+            # 'Sync Magic Shelves to Kobo' setting is off (so enabling the
+            # setting later honors it) — but it is inert until then, so be
+            # honest with API callers who never saw the gated checkbox
+            # (#359 follow-up; the UI disables the checkbox in this state).
+            if kobo_sync and not config.config_kobo_sync_magic_shelves:
+                log.info(
+                    "Magic shelf %s saved with kobo_sync=1 while the global "
+                    "'Sync Magic Shelves to Kobo' setting is off — intent "
+                    "stored but inert until the setting is enabled (#359)",
+                    new_shelf.id,
+                )
+                return jsonify({
+                    "success": True,
+                    "shelf_id": new_shelf.id,
+                    "warning": ereader_scope.magic_shelves_off_warning(),
+                })
+            return jsonify({"success": True, "shelf_id": new_shelf.id})
+        except Exception as e:
+            log.error(f"Error creating magic shelf: {e}")
+            ub.session.rollback()
+            return jsonify({"success": False, "message": _("Error creating shelf")}), 500
+    
+    return render_title_template('magic_shelf_edit.html',
+                                 title=_("Create Magic Shelf"),
+                                 page="magic_shelf_create",
+                                 is_owner=True,
+                                 opds_expose_enabled=current_user.opds_only_shelves_sync,
+                                 opds_expose_checked=False,
+                                 kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves),
+                                 koreader_sync=ereader_scope.koreader_library_on(),
+                                 allowed_icons=ALLOWED_ICONS,
+                                 rule_schema=magic_shelf.build_rule_schema_for_locale(get_locale()))
+
+
+@web.route("/magicshelf/<int:shelf_id>/edit", methods=["GET", "POST"])
+@user_login_required
+def edit_magic_shelf(shelf_id):
+    # Curated emoji list for magic shelf icons - organized by category
+    ALLOWED_ICONS = [
+        # Books & Reading
+        '📚', '📖', '📕', '📗', '📘', '📙', '📔', '📓', '📒', '📰',
+        # Stars & Favorites
+        '⭐', '🌟', '✨', '💫', '🌠', '⚡', '🔥', '💥', '🎯', '🏆',
+        # Hearts
+        '❤️', '💙', '💚', '💛', '🧡', '💜', '🖤', '🤍', '💖', '💝',
+        # Entertainment
+        '🎭', '🎬', '🎪', '🎨', '🎮', '🎲', '🎰', '🎳', '🎱', '🎸',
+        # Travel & Space
+        '🚀', '🛸', '🌌', '🌍', '🌎', '🌏', '🗺️', '🧭', '⛰️', '🏔️',
+        # Fantasy & Magic
+        '🔮', '🎃', '👻', '🦄', '🐉', '🐲', '🧙', '🧚', '🧛', '🧜',
+        # Awards & Achievement
+        '🥇', '🥈', '🥉', '🏅', '🎖️', '👑', '💎', '💍', '🔱', '🎗️',
+        # Time & Organization
+        '⏰', '⏱️', '⌛', '⏳', '🕰️', '🔔', '📅', '📆', '📌', '📍',
+        # Learning & Science
+        '🎓', '🏫', '📝', '✏️', '📐', '📏', '🔬', '🔭', '🖌️', '🖍️',
+        # Nature & Weather
+        '🌈', '☀️', '🌙', '🌸', '🌺', '🌻', '🌹', '🌷', '🍀', '🌱'
+    ]
+    
+    shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
+    if not shelf:
+        log.warning(f"Magic shelf {shelf_id} not found")
+        abort(404)
+
+    is_owner = int(shelf.user_id) == int(current_user.id)
+
+    opds_expose_checked = ub.is_opds_magic_shelf_exposed_for_user(current_user.id, shelf.id)
+    
+    # Check if user can edit this shelf (owner or admin only)
+    if not magic_shelf.can_edit_magic_shelf(shelf, current_user):
+        log.warning(f"User {current_user.id} attempted to edit magic shelf {shelf_id} without permission")
+        abort(403)
+
+    if request.method == "POST":
+        data = request.get_json()
+        name = strip_whitespaces(data.get('name', shelf.name))
+        rules = data.get('rules', shelf.rules)
+        icon = data.get('icon', shelf.icon)
+        kobo_sync = data.get('kobo_sync', shelf.kobo_sync)
+        is_public = data.get('is_public', shelf.is_public == 1)
+
+        # Kobo sync membership is account-owned: only the shelf owner can
+        # change it. Non-owner edits preserve the stored value, and a forged
+        # attempt to change it is rejected.
+        if not is_owner and bool(kobo_sync) != bool(shelf.kobo_sync):
+            return jsonify({"success": False, "message": _("Only the shelf owner can change Kobo sync")}), 403
+        if not is_owner:
+            kobo_sync = shelf.kobo_sync
+        
+        # Only allow changing public status if user has permission
+        if is_public != (shelf.is_public == 1):
+            if shelf.is_system:
+                return jsonify({"success": False, "message": _("Permission denied to change public status")}), 403
+            if is_owner and is_public and not current_user.role_share_shelfs():
+                return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
+            if not is_owner and not current_user.role_edit_shelfs():
+                return jsonify({"success": False, "message": _("Permission denied to change public status")}), 403
+        
+        # Validate inputs
+        if not name:
+            return jsonify({"success": False, "message": _("Shelf name is required")}), 400
+        
+        if len(name) > 100:
+            return jsonify({"success": False, "message": _("Shelf name too long (max 100 characters)")}), 400
+        
+        # Use default icon if none provided, otherwise accept any emoji/symbol
+        if not icon:
+            icon = '🪄'
+        
+        try:
+            # System-shelf names are canonical template identity. The SPA API
+            # returns request-local display text, so persisting its submitted
+            # name would rename the template into the active locale and break
+            # matching, hiding, and future translation (#886).
+            if not getattr(shelf, "is_system", False):
+                shelf.name = name
+            shelf.rules = rules
+            shelf.icon = icon
+            shelf.kobo_sync = kobo_sync
+            shelf.is_public = 1 if is_public else 0
+            flag_modified(shelf, "rules")
+            if current_user.opds_only_shelves_sync and 'opds_expose' in data:
+                ub.set_opds_magic_shelf_exposed_for_user(
+                    current_user.id,
+                    shelf.id,
+                    bool(data.get('opds_expose')),
+                )
+            
+            # Invalidate Complex Query Cache
+            ub.session.query(ub.MagicShelfCache).filter_by(shelf_id=shelf.id).delete()
+            
+            ub.session_commit()
+            
+            # Invalidate cache
+            if 'magic_shelf_counts' in flask_session:
+                counts = flask_session['magic_shelf_counts']
+                if str(shelf_id) in counts:
+                    del counts[str(shelf_id)]
+                    flask_session.modified = True
+            
+            log.info(f"User {current_user.id} updated magic shelf {shelf_id} ('{name}') with icon '{icon}'")
+            # Mirror of the create path: persisted-but-inert kobo intent gets
+            # an explicit warning instead of a silent no-op (#359 follow-up).
+            if kobo_sync and not config.config_kobo_sync_magic_shelves:
+                log.info(
+                    "Magic shelf %s saved with kobo_sync=1 while the global "
+                    "'Sync Magic Shelves to Kobo' setting is off — intent "
+                    "stored but inert until the setting is enabled (#359)",
+                    shelf_id,
+                )
+                return jsonify({
+                    "success": True,
+                    "warning": ereader_scope.magic_shelves_off_warning(),
+                })
+            return jsonify({"success": True})
+        except Exception as e:
+            log.error(f"Error updating magic shelf {shelf_id}: {e}")
+            ub.session.rollback()
+            return jsonify({"success": False, "message": _("Error updating shelf")}), 500
+
+    # For GET request, render the edit form
+    return render_title_template('magic_shelf_edit.html',
+                                 shelf=shelf,
+                                 title=_("Edit Magic Shelf"),
+                                 page="magic_shelf_edit",
+                                 opds_expose_enabled=current_user.opds_only_shelves_sync,
+                                 opds_expose_checked=opds_expose_checked,
+                                 is_owner=is_owner,
+                                 kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves),
+                                 koreader_sync=ereader_scope.koreader_library_on(),
+                                 allowed_icons=ALLOWED_ICONS,
+                                 rule_schema=magic_shelf.build_rule_schema_for_locale(get_locale()))
+
+
+@web.route("/magicshelf/<int:shelf_id>/duplicate", methods=["POST"])
+@user_login_required
+def duplicate_magic_shelf(shelf_id):
+    """Duplicate an existing magic shelf (especially useful for system templates)."""
+    shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
+    if not shelf:
+        log.warning(f"Magic shelf {shelf_id} not found for duplication")
+        return jsonify({"success": False, "message": _("Shelf not found")}), 404
+    
+    # Users can duplicate their own shelves or any public shelf
+    if not magic_shelf.can_duplicate_magic_shelf(shelf, current_user):
+        log.warning(f"User {current_user.id} attempted to duplicate private shelf {shelf_id} owned by {shelf.user_id}")
+        return jsonify({"success": False, "message": _("Permission denied")}), 403
+    
+    try:
+        # Create duplicate with " (Copy)" suffix
+        new_name = f"{shelf.name} (Copy)"
+        
+        # If name already exists, add number
+        counter = 1
+        while ub.session.query(ub.MagicShelf).filter(
+            ub.MagicShelf.user_id == current_user.id,
+            ub.MagicShelf.name == new_name
+        ).first():
+            counter += 1
+            new_name = f"{shelf.name} (Copy {counter})"
+        
+        duplicate_shelf = ub.MagicShelf(
+            user_id=current_user.id,
+            name=new_name,
+            icon=shelf.icon,
+            rules=shelf.rules.copy() if shelf.rules else {},
+            is_system=False,  # Duplicates are never system shelves
+            is_public=0  # Duplicates start as private
+        )
+        
+        ub.session.add(duplicate_shelf)
+        ub.session_commit()
+        
+        log.info(f"User {current_user.id} duplicated magic shelf {shelf_id} as '{new_name}' (ID: {duplicate_shelf.id})")
+        return jsonify({
+            "success": True, 
+            "shelf_id": duplicate_shelf.id,
+            "message": _("Shelf duplicated successfully")
+        })
+        
+    except Exception as e:
+        log.error(f"Error duplicating magic shelf {shelf_id}: {e}")
+        ub.session.rollback()
+        return jsonify({"success": False, "message": _("Error duplicating shelf")}), 500
+
+
+@web.route("/magicshelf/<int:shelf_id>/delete", methods=["POST"])
+@user_login_required
+def delete_magic_shelf(shelf_id):
+    shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
+    if not shelf:
+        log.warning(f"Magic shelf {shelf_id} not found for deletion")
+        abort(404)
+    
+    if not magic_shelf.has_magic_shelf_delete_authority(shelf, current_user):
+        log.warning(f"User {current_user.id} attempted to delete magic shelf {shelf_id} without permission")
+        abort(403)
+
+    if not magic_shelf.can_delete_magic_shelf(shelf, current_user):
+        log.warning(f"User {current_user.id} attempted to delete system shelf {shelf_id}")
+        return jsonify({
+            "success": False,
+            "message": _("System shelves cannot be deleted. You can hide them in your user profile settings.")
+        }), 400
+    
+    try:
+        shelf_name = shelf.name
+        # Delete cache entries first
+        ub.session.query(ub.MagicShelfCache).filter_by(shelf_id=shelf_id).delete()
+        ub.session.query(ub.OpdsMagicShelfExposure).filter_by(shelf_id=shelf_id).delete()
+        # Delete any hide records for this shelf
+        ub.session.query(ub.HiddenMagicShelfTemplate).filter_by(shelf_id=shelf_id).delete()
+        # Delete the shelf
+        ub.session.delete(shelf)
+        ub.session_commit()
+        log.info(f"User {current_user.id} deleted magic shelf {shelf_id} ('{shelf_name}')")
+        return jsonify({"success": True})
+    except Exception as e:
+        log.error(f"Error deleting magic shelf {shelf_id}: {e}")
+        ub.session.rollback()
+        return jsonify({"success": False, "message": _("Error deleting shelf")}), 500
+
+
+@web.route("/magicshelf/<int:shelf_id>/hide", methods=["POST"])
+@user_login_required
+def hide_magic_shelf(shelf_id):
+    """Hide a public magic shelf (user doesn't want to see it in their sidebar)."""
+    shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
+    if not shelf:
+        log.warning(f"Magic shelf {shelf_id} not found")
+        abort(404)
+    
+    # Can only hide shelves you don't own (public or system)
+    if shelf.user_id == current_user.id:
+        return jsonify({
+            "success": False, 
+            "message": _("You cannot hide your own shelves. Delete them instead if you don't want them.")
+        }), 400
+    
+    # Check if already hidden
+    existing = ub.session.query(ub.HiddenMagicShelfTemplate).filter(
+        ub.HiddenMagicShelfTemplate.user_id == current_user.id,
+        ub.HiddenMagicShelfTemplate.shelf_id == shelf_id
+    ).first()
+    
+    if existing:
+        return jsonify({"success": True, "message": _("Shelf already hidden")})
+    
+    try:
+        hidden = ub.HiddenMagicShelfTemplate(
+            user_id=current_user.id,
+            shelf_id=shelf_id
+        )
+        ub.session.add(hidden)
+        ub.session_commit()
+        log.info(f"User {current_user.id} hid magic shelf {shelf_id} ('{shelf.name}')")
+        return jsonify({"success": True})
+    except Exception as e:
+        log.error(f"Error hiding magic shelf {shelf_id}: {e}")
+        ub.session.rollback()
+        return jsonify({"success": False, "message": _("Error hiding shelf")}), 500
+
+
+@web.route("/magicshelf/<int:shelf_id>/unhide", methods=["POST"])
+@user_login_required
+def unhide_magic_shelf(shelf_id):
+    """Unhide a previously hidden magic shelf."""
+    try:
+        hidden = ub.session.query(ub.HiddenMagicShelfTemplate).filter(
+            ub.HiddenMagicShelfTemplate.user_id == current_user.id,
+            ub.HiddenMagicShelfTemplate.shelf_id == shelf_id
+        ).first()
+        
+        if not hidden:
+            return jsonify({"success": True, "message": _("Shelf was not hidden")})
+        
+        ub.session.delete(hidden)
+        ub.session_commit()
+        log.info(f"User {current_user.id} unhid magic shelf {shelf_id}")
+        return jsonify({"success": True})
+    except Exception as e:
+        log.error(f"Error unhiding magic shelf {shelf_id}: {e}")
+        ub.session.rollback()
+        return jsonify({"success": False, "message": _("Error unhiding shelf")}), 500
+
+
+@web.route("/table")
+@user_login_required
+def books_table():
+    visibility = current_user.view_settings.get('table', {})
+    cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+    return render_title_template('book_table.html', title=_("Books List"), cc=cc, page="book_table",
+                                 visiblility=visibility)
+
+
+@web.route("/ajax/listbooks")
+@user_login_required
+def list_books():
+    off = int(request.args.get("offset") or 0)
+    limit = int(request.args.get("limit") or config.config_books_per_page)
+    search_param = request.args.get("search")
+    sort_param = request.args.get("sort", "id")
+    order = request.args.get("order", "").lower()
+    state = None
+    join = tuple()
+
+    if sort_param == "state":
+        state = json.loads(request.args.get("state", "[]"))
+    elif sort_param == "tags":
+        order = [db.Tags.name.asc()] if order == "asc" else [db.Tags.name.desc()]
+        join = db.books_tags_link, db.Books.id == db.books_tags_link.c.book, db.Tags
+    elif sort_param == "series":
+        order = [db.Series.name.asc()] if order == "asc" else [db.Series.name.desc()]
+        join = db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series
+    elif sort_param == "publishers":
+        order = [db.Publishers.name.asc()] if order == "asc" else [db.Publishers.name.desc()]
+        join = db.books_publishers_link, db.Books.id == db.books_publishers_link.c.book, db.Publishers
+    elif sort_param == "authors":
+        order = [db.Authors.name.asc(), db.Series.name, db.Books.series_index] if order == "asc" \
+            else [db.Authors.name.desc(), db.Series.name.desc(), db.Books.series_index.desc()]
+        join = db.books_authors_link, db.Books.id == db.books_authors_link.c.book, db.Authors, db.books_series_link, \
+            db.Books.id == db.books_series_link.c.book, db.Series
+    elif sort_param == "author_sort":
+        order = [db.Books.author_sort.asc()] if order == "asc" else [db.Books.author_sort.desc()]
+    elif sort_param == "languages":
+        order = [db.Languages.lang_code.asc()] if order == "asc" else [db.Languages.lang_code.desc()]
+        join = db.books_languages_link, db.Books.id == db.books_languages_link.c.book, db.Languages
+    elif order and sort_param in ["sort", "title", "authors_sort", "series_index"]:
+        # Map to an ORM column object instead of a raw SQL ORDER BY fragment.
+        # The default render path eager-loads the one-to-many
+        # Books.data relationship under a LIMIT, so SQLAlchemy wraps the book
+        # query in a subquery alias (anon_1) where the column is exposed as
+        # books_<name>. A bare "ORDER BY title" cannot resolve against that
+        # alias -> sqlite3.OperationalError: no such column (CWA#1411). ORM
+        # column objects get rewritten to anon_1.books_<name> at the outer
+        # level, exactly like the author/author_sort branches that never broke.
+        # "authors_sort" is a stale alias for the real column author_sort.
+        col_name = "author_sort" if sort_param == "authors_sort" else sort_param
+        column = getattr(db.Books, col_name, None)
+        if column is not None:
+            order = [column.asc() if order == "asc" else column.desc()]
+        else:
+            order = [db.Books.sort.asc()]
+    elif not state:
+        order = BOOK_SORT_ORDERS["new"]
+
+    total_count = filtered_count = calibre_db.session.query(db.Books).filter(
+        calibre_db.common_filters(allow_show_archived=True)).count()
+    if state is not None:
+        if search_param:
+            books = calibre_db.search_query(search_param, config).all()
+            filtered_count = len(books)
+        else:
+            query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+            books = query.filter(calibre_db.common_filters(allow_show_archived=True)).all()
+        entries = calibre_db.get_checkbox_sorted(books, state, off, limit, order, True)
+    elif search_param:
+        entries, filtered_count, __ = calibre_db.get_search_results(search_param,
+                                                                    config,
+                                                                    off,
+                                                                    [order, ''],
+                                                                    limit,
+                                                                    *join)
+    else:
+        entries, __, __ = calibre_db.fill_indexpage_with_archived_books((int(off) / (int(limit)) + 1),
+                                                                        db.Books,
+                                                                        limit,
+                                                                        True,
+                                                                        order,
+                                                                        True,
+                                                                        True,
+                                                                        config.config_read_column,
+                                                                        *join)
+
+    result = list()
+    for entry in entries:
+        val = entry[0]
+        val.is_archived = entry[1] is True
+        val.read_status = entry[2] == ub.ReadBook.STATUS_FINISHED
+        for lang_index in range(0, len(val.languages)):
+            val.languages[lang_index].language_name = isoLanguages.get_language_name(get_locale(), val.languages[
+                lang_index].lang_code)
+        result.append(val)
+
+    table_entries = {'totalNotFiltered': total_count, 'total': filtered_count, "rows": result}
+    js_list = json.dumps(table_entries, cls=db.AlchemyEncoder)
+
+    response = make_response(js_list)
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
+
+
+@web.route("/ajax/table_settings", methods=['POST'])
+@user_login_required
+def update_table_settings():
+    current_user.view_settings['table'] = json.loads(request.data)
+    try:
+        try:
+            flag_modified(current_user, "view_settings")
+        except AttributeError:
+            pass
+        ub.session.commit()
+    except (InvalidRequestError, OperationalError):
+        log.error("Invalid request received: %r ", request, )
+        return "Invalid request", 400
+    return ""
+
+
+@web.route("/author")
+@login_required_if_no_ano
+def author_list():
+    if current_user.check_visibility(constants.SIDEBAR_AUTHOR):
+        if current_user.get_view_property('author', 'dir') == 'desc':
+            order = db.Authors.sort.desc()
+            order_no = 0
+        else:
+            order = db.Authors.sort.asc()
+            order_no = 1
+        entries = calibre_db.session.query(db.Authors, func.count('books_authors_link.book').label('count')) \
+            .join(db.books_authors_link).join(db.Books).filter(calibre_db.common_filters()) \
+            .group_by(text('books_authors_link.author')).order_by(order).all()
+        char_list = query_char_list(db.Authors.sort, db.books_authors_link)
+        return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
+                                     title="Authors", page="authorlist", data='author', order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/downloadlist")
+@login_required_if_no_ano
+def download_list():
+    if current_user.get_view_property('download', 'dir') == 'desc':
+        order = ub.User.name.desc()
+        order_no = 0
+    else:
+        order = ub.User.name.asc()
+        order_no = 1
+    if current_user.check_visibility(constants.SIDEBAR_DOWNLOAD) and current_user.role_admin():
+        entries = ub.session.query(ub.User, func.count(ub.Downloads.book_id).label('count')) \
+            .join(ub.Downloads).group_by(ub.Downloads.user_id).order_by(order).all()
+        char_list = ub.session.query(func.upper(func.substr(ub.User.name, 1, 1)).label('char')) \
+            .filter(ub.User.role.op('&')(constants.ROLE_ANONYMOUS) != constants.ROLE_ANONYMOUS) \
+            .group_by(func.upper(func.substr(ub.User.name, 1, 1))).all()
+        return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
+                                     title=_("Downloads"), page="downloadlist", data="download", order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/publisher")
+@login_required_if_no_ano
+def publisher_list():
+    if current_user.check_visibility(constants.SIDEBAR_PUBLISHER):
+        order_dir = current_user.get_view_property('publisher', 'dir')
+        order_no = 1 if order_dir != 'desc' else 0
+        order = db.Publishers.name.desc() if order_dir == 'desc' else db.Publishers.name.asc()
+
+        entries_query = (calibre_db.session.query(db.Publishers, func.count(db.books_publishers_link.c.book).label('count'))
+                         .join(db.books_publishers_link, db.Publishers.id == db.books_publishers_link.c.publisher)
+                         .join(db.Books, db.books_publishers_link.c.book == db.Books.id)
+                         .filter(calibre_db.common_filters())
+                         .group_by(db.Publishers.id)
+                         .order_by(order))
+
+        entries = entries_query.all()
+
+        no_publisher_count = (calibre_db.session.query(func.count(db.Books.id))
+                              .outerjoin(db.books_publishers_link)
+                              .filter(db.books_publishers_link.c.book == None)
+                              .filter(calibre_db.common_filters())
+                              .scalar())
+
+        if no_publisher_count:
+            # Manually create a "None" category entry
+            none_publisher_entry = (db.Category(_("None"), "-1"), no_publisher_count)
+            # Decide where to insert it based on sort order
+            if order_no == 1: # ascending
+                entries.insert(0, none_publisher_entry)
+            else: # descending
+                entries.append(none_publisher_entry)
+
+        char_list = [entry[0].name[0].upper() for entry in entries if entry[0].name]
+        char_list = sorted(list(set(char_list)))
+
+        return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
+                                     title=_("Publishers"), page="publisherlist", data="publisher", order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/series")
+@login_required_if_no_ano
+def series_list():
+    if current_user.check_visibility(constants.SIDEBAR_SERIES):
+        if current_user.get_view_property('series', 'dir') == 'desc':
+            order = db.Series.sort.desc()
+            order_no = 0
+        else:
+            order = db.Series.sort.asc()
+            order_no = 1
+        char_list = query_char_list(db.Series.sort, db.books_series_link)
+        if current_user.get_view_property('series', 'series_view') == 'list':
+            entries = calibre_db.session.query(db.Series, func.count('books_series_link.book').label('count')) \
+                .join(db.books_series_link).join(db.Books).filter(calibre_db.common_filters()) \
+                .group_by(text('books_series_link.series')).order_by(order).all()
+            no_series_count = (calibre_db.session.query(db.Books)
+                            .outerjoin(db.books_series_link).outerjoin(db.Series)
+                            .filter(db.Series.name == None)
+                            .filter(calibre_db.common_filters())
+                            .count())
+            if no_series_count:
+                entries.append([db.Category(_("None"), "-1"), no_series_count])
+            entries = sorted(entries, key=lambda x: x[0].name.lower(), reverse=not order_no)
+            return render_title_template('list.html',
+                                         entries=entries,
+                                         folder='web.books_list',
+                                         charlist=char_list,
+                                         title=_("Series"),
+                                         page="serieslist",
+                                         data="series", order=order_no)
+        else:
+            entries = (calibre_db.session.query(db.Books, func.count('books_series_link').label('count'),
+                                                func.max(db.Books.series_index), db.Books.id)
+                       .join(db.books_series_link).join(db.Series).filter(calibre_db.common_filters())
+                       .group_by(text('books_series_link.series'))
+                       .having(or_(func.max(db.Books.series_index), db.Books.series_index==""))
+                       .order_by(order)
+                       .all())
+            return render_title_template('grid.html', entries=entries, folder='web.books_list', charlist=char_list,
+                                         title=_("Series"), page="serieslist", data="series", bodyClass="grid-view",
+                                         order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/ratings")
+@login_required_if_no_ano
+def ratings_list():
+    if current_user.check_visibility(constants.SIDEBAR_RATING):
+        order_dir = current_user.get_view_property('ratings', 'dir')
+        order_no = 1 if order_dir != 'desc' else 0
+        order = db.Ratings.rating.desc() if order_dir == 'desc' else db.Ratings.rating.asc()
+
+        entries_query = (calibre_db.session.query(db.Ratings, func.count(db.books_ratings_link.c.book).label('count'),
+                                           (db.Ratings.rating / 2).label('name'))
+                   .join(db.books_ratings_link, db.Ratings.id == db.books_ratings_link.c.rating)
+                   .join(db.Books, db.books_ratings_link.c.book == db.Books.id)
+                   .filter(calibre_db.common_filters())
+                   .filter(db.Ratings.rating > 0)
+                   .group_by(db.Ratings.id)
+                   .order_by(order))
+
+        entries = entries_query.all()
+
+        no_rating_count = (calibre_db.session.query(func.count(db.Books.id))
+                           .outerjoin(db.books_ratings_link, db.Books.id == db.books_ratings_link.c.book)
+                           .outerjoin(db.Ratings, db.books_ratings_link.c.rating == db.Ratings.id)
+                           .filter(calibre_db.common_filters())
+                           .filter(or_(db.books_ratings_link.c.rating == None, db.Ratings.rating == 0))
+                           .scalar())
+
+        if no_rating_count:
+            none_rating_entry = (db.Category(_("None"), "-1"), no_rating_count, 0)
+            if order_no == 1: # ascending
+                entries.insert(0, none_rating_entry)
+            else: # descending
+                entries.append(none_rating_entry)
+
+        return render_title_template('list.html', entries=entries, folder='web.books_list',
+                                     title=_("Ratings"), page="ratingslist", data="ratings", order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/formats")
+@login_required_if_no_ano
+def formats_list():
+    if current_user.check_visibility(constants.SIDEBAR_FORMAT):
+        if current_user.get_view_property('formats', 'dir') == 'desc':
+            order = db.Data.format.desc()
+            order_no = 0
+        else:
+            order = db.Data.format.asc()
+            order_no = 1
+        entries = calibre_db.session.query(db.Data,
+                                           func.count('data.book').label('count'),
+                                           db.Data.format.label('format')) \
+            .join(db.Books).filter(calibre_db.common_filters()) \
+            .group_by(db.Data.format).order_by(order).all()
+        no_format_count = (calibre_db.session.query(db.Books).outerjoin(db.Data)
+                           .filter(db.Data.format == None)
+                           .filter(calibre_db.common_filters())
+                           .count())
+        if no_format_count:
+            entries.append([db.Category(_("None"), "-1"), no_format_count])
+        return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=list(),
+                                     title=_("File formats list"), page="formatslist", data="formats", order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/language")
+@login_required_if_no_ano
+def language_overview():
+    if current_user.check_visibility(constants.SIDEBAR_LANGUAGE) and current_user.filter_language() == "all":
+        order_no = 0 if current_user.get_view_property('language', 'dir') == 'desc' else 1
+        languages = calibre_db.speaking_language(reverse_order=not order_no, with_count=True)
+        char_list = generate_char_list(languages)
+        return render_title_template('list.html', entries=languages, folder='web.books_list', charlist=char_list,
+                                     title=_("Languages"), page="langlist", data="language", order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/category")
+@login_required_if_no_ano
+def category_list():
+    if current_user.check_visibility(constants.SIDEBAR_CATEGORY):
+        if current_user.get_view_property('category', 'dir') == 'desc':
+            order = db.Tags.name.desc()
+            order_no = 0
+        else:
+            order = db.Tags.name.asc()
+            order_no = 1
+        entries = calibre_db.session.query(db.Tags, func.count('books_tags_link.book').label('count')) \
+            .join(db.books_tags_link).join(db.Books).order_by(order).filter(calibre_db.common_filters()) \
+            .group_by(db.Tags.id).all()
+        no_tag_count = (calibre_db.session.query(db.Books)
+                         .outerjoin(db.books_tags_link).outerjoin(db.Tags)
+                        .filter(db.Tags.name == None)
+                         .filter(calibre_db.common_filters())
+                         .count())
+        if no_tag_count:
+            entries.append([db.Category(_("None"), "-1"), no_tag_count])
+        entries = sorted(entries, key=lambda x: x[0].name.lower(), reverse=not order_no)
+        char_list = generate_char_list(entries)
+        return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
+                                     title=_("Categories"), page="catlist", data="category", order=order_no)
+    else:
+        abort(404)
+
+
+@web.route("/custom_column/<int:column_id>", defaults={'category_path': ''},
+           strict_slashes=False)
+@web.route("/custom_column/<int:column_id>/<path:category_path>",
+           strict_slashes=False)
+@login_required_if_no_ano
+def cc_category_list(column_id, category_path):
+    """Tree/list view for one hierarchical custom column.
+
+    /custom_column/5                     -> top-level nodes of column #5
+    /custom_column/5/Computers           -> books under 'Computers' (+ descendants)
+    /custom_column/5/Computers/DB        -> books under 'Computers.DB'
+    """
+    order = get_sort_function(request.args.get('sort_param', 'stored'), 'cc_%d' % column_id)
+    return render_cc_category(request.args.get('page', 1), column_id,
+                              category_path, order)
+
+
+def browsable_cc_column(col_id):
+    """The tag-like custom column ``col_id`` if this library lets it be
+    browsed: it exists, is text/enumeration, and is not hidden by the admin."""
+    for col in calibre_db.get_cc_columns(config):
+        if col.id == col_id and col.datatype in ('text', 'enumeration'):
+            return col
+    return None
+
+
+def render_cc_category(page, col_id, path, order):
+    """Render either the tree overview (no path) or the filtered book list
+    for one node of a hierarchical custom column."""
+    # Custom columns are part of the Categories section, and a column the
+    # admin hid (config_columns_to_ignore) is not browsable by URL either.
+    if not current_user.check_visibility(constants.SIDEBAR_CATEGORY):
+        abort(404)
+    col = browsable_cc_column(col_id)
+    if col is None:
+        abort(404)
+
+    # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
+    path = hierarchy.join_path([path or ''])
+
+    try:
+        page = int(page)
+    except (TypeError, ValueError):
+        page = 1
+
+    if path:
+        node = hierarchy.get_node_by_path(
+            calibre_db.get_hierarchical_tree(col_id), path)
+        if node is None:
+            abort(404)
+        cc_rel = getattr(db.Books, 'custom_column_' + str(col_id))
+        entries, random, pagination = calibre_db.fill_indexpage(
+            page, 0,
+            db.Books,
+            cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, node)),
+            # The FULL shared ORDER BY, tiebreaker included (#1331). Slicing
+            # order[0][0] out of it dropped Books.id and made paging inside a
+            # node plan-dependent; series context is already inside the
+            # collated authaz/authza orders, so no call-site splice is needed.
+            order[0],
+            True, config.config_read_column,
+            db.books_series_link,
+            db.Books.id == db.books_series_link.c.book,
+            db.Series)
+        # Prepend the column root as first crumb so every level can step back
+        # up to /custom_column/<id>
+        return render_title_template(
+            'index.html', random=random, entries=entries, pagination=pagination,
+            id=path,
+            # layout.html and index.html print title with |safe; a stored value
+            # is text an edit-role user chose, so it is escaped here
+            title=_("%(column)s: %(name)s", column=escape(col.name), name=escape(path)),
+            # Sort and paging links route back through books_list's cc_ branch
+            page="cc_%d" % col_id, order=order[1],
+            breadcrumbs=[[ (col.name, '') ] + hierarchy.breadcrumb_trail(path)],
+            subcategories=node['children'], col_id=col_id)
+
+    # Root behaviour: the whole tree, each level with its distinct-book count
+    return render_title_template(
+        'cc_list.html', entries=calibre_db.get_hierarchical_tree(col_id),
+        title=col.name, page="cclist", col_id=col_id)
+
+
+# ################################### Download/Send ##################################################################
+
+
+@web.route("/cover/<int:book_id>")
+@web.route("/cover/<int:book_id>/<string:resolution>")
+@login_required_if_no_ano
+def get_cover(book_id, resolution=None):
+    resolutions = {
+        'og': constants.COVER_THUMBNAIL_ORIGINAL,
+        'sm': constants.COVER_THUMBNAIL_SMALL,
+        'md': constants.COVER_THUMBNAIL_MEDIUM,
+        'lg': constants.COVER_THUMBNAIL_LARGE,
+    }
+    cover_resolution = resolutions.get(resolution, None)
+    return get_book_cover(book_id, cover_resolution)
+
+
+@web.route("/series_cover/<int:series_id>")
+@web.route("/series_cover/<int:series_id>/<string:resolution>")
+@login_required_if_no_ano
+def get_series_cover(series_id, resolution=None):
+    resolutions = {
+        'og': constants.COVER_THUMBNAIL_ORIGINAL,
+        'sm': constants.COVER_THUMBNAIL_SMALL,
+        'md': constants.COVER_THUMBNAIL_MEDIUM,
+        'lg': constants.COVER_THUMBNAIL_LARGE,
+    }
+    cover_resolution = resolutions.get(resolution, None)
+    return get_series_cover_thumbnail(series_id, cover_resolution)
+
+
+
+@web.route("/robots.txt")
+def get_robots():
+    """Serve the crawl policy, preferring an admin-supplied one.
+
+    This route is inherited from janeczku/calibre-web, where the file it
+    points at has never existed — not there and not here — so it has been a
+    guaranteed 404 in every deployment of both (#1104). A crawler that gets no
+    answer applies its own default and crawls whatever it can reach, which on
+    a server with anonymous browsing enabled is the catalogue, and by extension
+    what the people using the server read.
+
+    The shipped default disallows everything, because a personal library is not
+    a public website. Publishing one is a deliberate choice, so it gets a
+    documented escape hatch rather than a code change: a robots.txt in the
+    config directory (next to app.db) wins over the shipped one and survives
+    upgrades.
+    """
+    override = os.path.join(constants.CONFIG_DIR, "robots.txt")
+    try:
+        if os.path.isfile(override):
+            return send_from_directory(constants.CONFIG_DIR, "robots.txt")
+        return send_from_directory(constants.STATIC_DIR, "robots.txt")
+    except PermissionError:
+        log.error("No permission to access robots.txt file.")
+        abort(403)
+
+
+def _is_valid_container_xml(container_bytes):
+    try:
+        ET.fromstring(container_bytes)
+        return True
+    except Exception:
+        return False
+
+
+def _sanitize_container_xml(container_bytes):
+    try:
+        text = container_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        return container_bytes
+
+    decl_pattern = re.compile(r"<\?xml[^>]*\?>")
+    decls = list(decl_pattern.finditer(text))
+    if len(decls) <= 1:
+        return container_bytes
+
+    first = decls[0]
+    cleaned = text[:first.end()] + decl_pattern.sub("", text[first.end():])
+    return cleaned.encode("utf-8")
+
+
+def _get_fixed_epub_path(book_id, original_path):
+    fix_dir = os.path.join(constants.CONFIG_DIR, "epub_fixes")
+    try:
+        os.makedirs(fix_dir, exist_ok=True)
+    except Exception:
+        return None
+
+    try:
+        mtime = int(os.path.getmtime(original_path))
+    except Exception:
+        mtime = 0
+    return os.path.join(fix_dir, f"{book_id}_{mtime}.epub")
+
+
+def _repair_epub_container_if_needed(book_id, original_path):
+    try:
+        with zipfile.ZipFile(original_path, "r") as zin:
+            container_bytes = zin.read("META-INF/container.xml")
+            if _is_valid_container_xml(container_bytes):
+                return None
+
+        fixed_path = _get_fixed_epub_path(book_id, original_path)
+        if not fixed_path:
+            return None
+        if os.path.exists(fixed_path):
+            return fixed_path
+
+        temp_path = fixed_path + ".tmp"
+        with zipfile.ZipFile(original_path, "r") as zin, zipfile.ZipFile(temp_path, "w") as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename == "META-INF/container.xml":
+                    data = _sanitize_container_xml(data)
+
+                zi = zipfile.ZipInfo(item.filename)
+                zi.date_time = item.date_time
+                zi.compress_type = item.compress_type
+                zi.external_attr = item.external_attr
+                zi.internal_attr = item.internal_attr
+                zi.extra = item.extra
+                zi.comment = item.comment
+                zout.writestr(zi, data, compress_type=item.compress_type)
+
+        os.replace(temp_path, fixed_path)
+        return fixed_path
+    except KeyError:
+        return None
+    except Exception as ex:
+        log.error("Failed to repair EPUB container.xml for book %s: %s", book_id, ex)
+        return None
+
+
+@web.route("/show/<int:book_id>/<book_format>", defaults={'anyname': 'None'})
+@web.route("/show/<int:book_id>/<book_format>/<anyname>")
+@login_required_if_no_ano
+@viewer_required
+def serve_book(book_id, book_format, anyname):
+    book_format = book_format.split(".")[0]
+    # allow_show_hidden=True: the user can download their own hidden books
+    # from the detail page; the serve flow must mirror that (#319 pushback).
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_hidden=True, allow_public_shelf_books=True)
+    if not book:
+        return "File not in Database"
+    data = calibre_db.get_book_format(book_id, book_format.upper())
+    if not data:
+        return "File not in Database"
+    range_header = request.headers.get('Range', None)
+
+    if config.config_use_google_drive:
+        try:
+            headers = Headers()
+            headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")
+            if not range_header:
+                log.info('Serving book: %s', data.name)
+                headers['Accept-Ranges'] = 'bytes'
+            df = getFileFromEbooksFolder(book.path, data.name + "." + book_format)
+            return do_gdrive_download(df, headers, (book_format.upper() == 'TXT'))
+        except AttributeError as ex:
+            log.error_or_exception(ex)
+            return "File Not Found"
+    else:
+        if book_format.upper() in ('EPUB', 'KEPUB'):
+            original_path = os.path.join(config.get_book_path(), book.path, data.name + "." + book_format)
+            fixed_path = _repair_epub_container_if_needed(book_id, original_path)
+            if fixed_path:
+                response = make_response(send_file(fixed_path, mimetype="application/epub+zip"))
+                if not range_header:
+                    log.info('Serving repaired book: %s', data.name)
+                    response.headers['Accept-Ranges'] = 'bytes'
+                return response
+        if book_format.upper() == 'TXT':
+            log.info('Serving book: %s', data.name)
+            try:
+                rawdata = open(os.path.join(config.get_book_path(), book.path, data.name + "." + book_format),
+                               "rb").read()
+                result = chardet.detect(rawdata)
+                try:
+                    text_data = rawdata.decode(result['encoding']).encode('utf-8')
+                except UnicodeDecodeError as e:
+                    log.error("Encoding error in text file {}: {}".format(book.id, e))
+                    if "surrogate" in e.reason:
+                        text_data = rawdata.decode(result['encoding'], 'surrogatepass').encode('utf-8', 'surrogatepass')
+                    else:
+                        text_data = rawdata.decode(result['encoding'], 'ignore').encode('utf-8', 'ignore')
+                return make_response(text_data)
+            except FileNotFoundError:
+                log.error("File Not Found")
+                return "File Not Found"
+        # enable byte range read of pdf
+        response = make_response(
+            send_from_directory(os.path.join(config.get_book_path(), book.path), data.name + "." + book_format))
+        response.headers['Content-Disposition'] = 'inline'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Content-Security-Policy'] = "script-src 'none'; object-src 'none'"
+        if not range_header:
+            log.info('Serving book: %s', data.name)
+            response.headers['Accept-Ranges'] = 'bytes'
+        return response
+
+
+@web.route("/download/<int:book_id>/<book_format>", defaults={'anyname': 'None'})
+@web.route("/download/<int:book_id>/<book_format>/<anyname>")
+@login_required_if_no_ano
+@download_required
+def download_link(book_id, book_format, anyname):
+    client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
+    return get_download_link(
+        book_id, book_format, client, allow_public_shelf_books=True)
+
+
+@web.route('/send/<int:book_id>/<book_format>/<int:convert>', methods=["POST"])
+@login_required_if_no_ano
+@download_required
+def send_to_ereader(book_id, book_format, convert):
+    if not config.get_mail_server_configured():
+        response = [{'type': "danger", 'message': _("Please configure the SMTP mail settings first...")}]
+        return Response(json.dumps(response), mimetype='application/json')
+
+    if not current_user.kindle_mail:
+        response = [{'type': "danger", 'message': _("Oops! Please update your profile with a valid eReader Email.")}]
+        return Response(json.dumps(response), mimetype='application/json')
+
+    result = send_mail(book_id, book_format, convert, current_user.kindle_mail, config.get_book_path(),
+                       current_user.name, current_user.kindle_mail_subject)
+    if result is None:
+        ub.update_download(book_id, int(current_user.id))
+        record_email_activity(current_user, book_id, book_format)
+        response = [{'type': "success", 'message': _("Success! Book queued for sending to %(eReadermail)s",
+                                                   eReadermail=current_user.kindle_mail)}]
+    else:
+        response = [{'type': "danger", 'message': _("Oops! There was an error sending book: %(res)s", res=result)}]
+    return Response(json.dumps(response), mimetype='application/json')
+
+
+@web.route('/send_selected/<int:book_id>', methods=["POST"])
+@login_required_if_no_ano
+@download_required
+def send_to_selected_ereaders(book_id):
+    if not config.get_mail_server_configured():
+        response = [{'type': "danger", 'message': _("Please configure the SMTP mail settings first...")}]
+        return Response(json.dumps(response), mimetype='application/json')
+
+    selected_emails_raw = request.form.get('selected_emails', '')
+    book_format = request.form.get('book_format', '')
+    convert = request.form.get('convert', '0')
+
+    if not selected_emails_raw:
+        response = [{'type': "danger", 'message': _("No email addresses selected")}]
+        return Response(json.dumps(response), mimetype='application/json')
+
+    try:
+        selected_emails = valid_email(selected_emails_raw)
+    except Exception as ex:
+        response = [{'type': "danger", 'message': str(ex)}]
+        return Response(json.dumps(response), mimetype='application/json')
+
+    if not selected_emails:
+        response = [{'type': "danger", 'message': _("No email addresses selected")}]
+        return Response(json.dumps(response), mimetype='application/json')
+
+    if not getattr(current_user, 'allow_additional_ereader_emails', True):
+        # Fork #276 (@magdalar): admins managing family eReaders can send to
+        # OTHER users' kindle_mail addresses even when the
+        # allow_additional_ereader_emails flag is off. Build the allow-set
+        # from self.kindle_mail + (admin-only) other users' kindle_mail.
+        allowed = [email.strip().lower() for email in (current_user.kindle_mail or "").split(',') if email.strip()]
+        if current_user.role_admin():
+            for other in other_users_with_ereader(current_user.id):
+                allowed.extend(email.lower() for email in ereader_addresses(other.kindle_mail))
+        selected_list = [email.strip().lower() for email in selected_emails.split(',') if email.strip()]
+        if any(email not in allowed for email in selected_list):
+            response = [{'type': "danger", 'message': _("Additional email addresses are disabled for your account.")}]
+            return Response(json.dumps(response), mimetype='application/json')
+
+    result = send_mail(book_id, book_format, int(convert), selected_emails, config.get_book_path(), current_user.name, current_user.kindle_mail_subject)
+
+    if result is None:
+        # Fork #276 (@magdalar): only record a self-download when the send
+        # actually targeted one of the sender's own eReader addresses. An admin
+        # relaying a book solely to other users' eReaders did not download it
+        # themselves, so it must not pollute their download history.
+        if send_includes_own_address(current_user.kindle_mail, selected_emails):
+            ub.update_download(book_id, int(current_user.id))
+        record_email_activity(current_user, book_id, book_format)
+        response = [{'type': "success", 'message': _("Success! Book queued for sending to the selected address(es)!")}]
+    else:
+        response = [{'type': "danger", 'message': _("Oops! There was an error sending book: %(res)s", res=result)}]
+
+    return Response(json.dumps(response), mimetype='application/json')
+
+
+# ################################### Login Logout ##################################################################
+
+@web.route('/register', methods=['POST'])
+@limiter.limit("40/day", key_func=get_remote_address)
+@limiter.limit("3/minute", key_func=get_remote_address)
+def register_post():
+    if not config.config_public_reg:
+        abort(404)
+    to_save = request.form.to_dict()
+    try:
+        limiter.check()
+    except RateLimitExceeded:
+        flash(_(u"Please wait one minute to register next user"), category="error")
+        return render_title_template('register.html', config=config, title=_("Register"), page="register")
+    except (ConnectionError, Exception) as e:
+        log.error("Connection error to limiter backend: %s", e)
+        flash(_("Connection error to limiter backend, please contact your administrator"), category="error")
+        return render_title_template('register.html', config=config, title=_("Register"), page="register")
+    if current_user is not None and current_user.is_authenticated:
+        return redirect(url_for('web.index'))
+    if not config.get_mail_server_configured():
+        flash(_("Oops! Email server is not configured, please contact your administrator."), category="error")
+        return render_title_template('register.html', title=_("Register"), page="register")
+    nickname = strip_whitespaces(to_save.get("email", "")) if config.config_register_email else to_save.get('name')
+    if not nickname or not to_save.get("email"):
+        flash(_("Oops! Please complete all fields."), category="error")
+        return render_title_template('register.html', title=_("Register"), page="register")
+    try:
+        nickname = check_username(nickname)
+        email = check_email(to_save.get("email", ""))
+    except Exception as ex:
+        flash(str(ex), category="error")
+        return render_title_template('register.html', title=_("Register"), page="register")
+
+    content = ub.User()
+    if check_valid_domain(email):
+        content.name = nickname
+        content.email = email
+        password = generate_random_password(config.config_password_min_length)
+        content.password = generate_password_hash(password)
+        content.role = config.config_default_role
+        content.locale = config.config_default_locale
+        content.sidebar_view = config.config_default_show
+        # Seed the instance default theme, same as the admin-created paths. Goes
+        # through config_theme_code rather than assigning the raw value: a legacy
+        # config_theme of 0 means light, but a User.theme of 0 reads back as dark,
+        # so a raw copy would hand self-registered users a different theme than
+        # admin-created ones from the same setting (#736).
+        try:
+            content.theme = config_theme_code(getattr(config, 'config_theme', None))
+        except Exception:
+            pass
+        seed_new_user_ui_font_defaults(content, config)
+        try:
+            ub.session.add(content)
+            ub.session.commit()
+            if feature_support['oauth']:
+                register_user_with_oauth(content)
+            send_registration_mail(strip_whitespaces(to_save.get("email", "")), nickname, password)
+        except Exception:
+            ub.session.rollback()
+            flash(_("Oops! An unknown error occurred. Please try again later."), category="error")
+            return render_title_template('register.html', title=_("Register"), page="register")
+    else:
+        flash(_("Oops! Your Email is not allowed."), category="error")
+        log.warning('Registering failed for user "{}" Email: {}'.format(nickname, to_save.get("email","")))
+        return render_title_template('register.html', title=_("Register"), page="register")
+    flash(_("Success! Confirmation Email has been sent."), category="success")
+    return redirect(url_for('web.login'))
+
+
+@web.route('/register', methods=['GET'])
+def register():
+    if not config.config_public_reg:
+        abort(404)
+    if current_user is not None and current_user.is_authenticated:
+        return redirect(url_for('web.index'))
+    if not config.get_mail_server_configured():
+        flash(_("Oops! Email server is not configured, please contact your administrator."), category="error")
+        return render_title_template('register.html', title=_("Register"), page="register")
+    if feature_support['oauth']:
+        register_user_with_oauth()
+    return render_title_template('register.html', config=config, title=_("Register"), page="register")
+
+
+def handle_login_user(user, remember, message, category):
+    login_user(user, remember=remember)
+    
+    # Track login activity
+    try:
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
+        cwa_db = CWA_DB()
+        cwa_db.log_activity(
+            user_id=int(user.id),
+            user_name=user.name,
+            event_type='LOGIN'
+        )
+    except Exception as e:
+        log.debug(f"Failed to log login activity: {e}")
+    
+    flash(message, category=category)
+    rate_limits.clear_current_limits(limiter)
+
+    # Clear redirect-loop and automatic OAuth-attempt state on success.
+    flask_session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)
+    oauth_auto_redirect.clear_auto_redirect_state(flask_session)
+
+    return redirect(get_redirect_location(request.form.get('next', None), "web.index"))
+
+
+def render_login(username="", password=""):
+    # Detect authentication redirect loops
+    redirect_count = flask_session.get(
+        oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, 0
+    )
+    if redirect_count > oauth_auto_redirect.MAX_LOGIN_REDIRECTS:
+        flask_session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)
+        log.warning("Authentication redirect loop detected from IP: %s", request.remote_addr)
+        flash(_("Authentication loop detected. If you're experiencing login issues, please contact your administrator."), category="error")
+    else:
+        flask_session[oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY] = redirect_count + 1
+
+    next_url = request.args.get('next', default=url_for("web.index"), type=str)
+    if url_for("web.logout") == next_url:
+        next_url = url_for("web.index")
+
+    # Get OAuth check status
+    oauth_check = oauth_bb.oauth_check if feature_support['oauth'] else {}
+
+    # Get generic OAuth login button text for display. Shares the single source of
+    # truth with the SPA login (cps/api/auth.py::_oauth_providers) so both surfaces
+    # render the same admin-configured label (fork issue #807).
+    generic_login_button = None
+    if feature_support['oauth']:
+        generic_login_button = oauth_bb.generic_oauth_login_button()
+
+    return render_title_template('login.html',
+                                 title=_("Login"),
+                                 next_url=next_url,
+                                 config=config,
+                                 username=username,
+                                 password=password,
+                                 oauth_check=oauth_check,
+                                 generic_login_button=generic_login_button,
+                                 mail=config.get_mail_server_configured(), page="login")
+
+
+@web.route('/login', methods=['GET'])
+def login():
+    if current_user is not None and current_user.is_authenticated:
+        oauth_auto_redirect.clear_auto_redirect_state(flask_session)
+        return redirect(url_for('web.index'))
+
+    # Start the sole configured provider before the SPA preference redirect so
+    # Classic- and SPA-preferring browsers behave consistently. ``?local=1``
+    # only suppresses automatic startup; normal SPA-or-Classic routing below
+    # still decides which login surface is shown.
+    #
+    # Disabling standard login keeps the v4.1.33 auto-start behavior. The
+    # explicit auto-forward setting additionally allows an admin to auto-start
+    # the sole provider while retaining local credentials as a break-glass
+    # path through ``?local=1``.
+    if (config.config_login_type == constants.LOGIN_OAUTH
+            and (config.config_disable_standard_login
+                 or getattr(config, "config_enable_oauth_auto_forward", False))
+            and feature_support['oauth']):
+        oauth_endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
+            request.args,
+            oauth_bb.get_oauth_blueprints(),
+            flask_session,
+        )
+        if oauth_endpoint:
+            values = {
+                oauth_auto_redirect.AUTO_REDIRECT_PARAMETER:
+                    oauth_auto_redirect.AUTO_REDIRECT_VALUE,
+            }
+            if next_url:
+                values["next"] = next_url
+            return redirect(url_for(oauth_endpoint, **values))
+
+    if config.config_login_type != constants.LOGIN_OAUTH:
+        oauth_auto_redirect.clear_auto_redirect_state(flask_session)
+
+    # A no-JS browser reaches the fixed Classic feedback URL from the SPA
+    # shell. On login-required instances the index decorator redirects here
+    # before index() can stamp the opt-out, with that URL nested in ``next``.
+    # Finish the handoff on the Classic login surface; sending it back to the
+    # SPA would repeat shell -> feedback index -> login forever. The predicate
+    # accepts only our prefix-scoped marker and never redirects to ``next``.
+    if spa.classic_fallback_requested_from_next(request.args.get("next")):
+        response = make_response(render_login())
+        spa.prefer_classic_for_session()
+        spa.clear_prefer_spa_cookie(response)
+        return response
+
+    # Every configured login mode has an SPA authentication path. Only the
+    # transient Classic escape hatch keeps this browser session on Classic login.
+    if spa.preferred_spa_html_request():
+        # The destination is fixed and app-owned. spa_shell_url() preserves a
+        # valid reverse-proxy subpath while rejecting hostile forwarded prefixes;
+        # ``next`` is carried only as encoded data for the SPA's strict
+        # post-auth sanitizer, never used as the redirect destination itself.
+        destination = spa.spa_shell_url()
+        next_url = request.args.get("next")
+        if next_url:
+            destination = "%s?%s" % (destination, urlencode({"next": next_url}))
+        # The SPA has no Flask flash renderer. Do not carry Classic-only login
+        # messages forward to accumulate or surface later on an unrelated page.
+        flask_session.pop("_flashes", None)
+        return redirect(destination)
+
+    # Handle OAuth-only authentication mode
+    if config.config_login_type == constants.LOGIN_OAUTH:
+        if not feature_support['oauth']:
+            oauth_auto_redirect.clear_auto_redirect_state(flask_session)
+            log.error("OAuth authentication is enabled but OAuth support is not available")
+            flash(_("OAuth authentication is not properly configured. Please contact administrator."), category="error")
+        return render_login()
+
+    if config.config_login_type == constants.LOGIN_LDAP and not services.ldap:
+        log.error(u"Cannot activate LDAP authentication")
+        flash(_(u"Cannot activate LDAP authentication"), category="error")
+    return render_login()
+
+
+@web.route('/login', methods=['POST'])
+@limiter.limit("40/day", key_func=lambda: strip_whitespaces(request.form.get('username', "")).lower())
+@limiter.limit("3/minute", key_func=lambda: strip_whitespaces(request.form.get('username', "")).lower())
+def login_post():
+    if config.standard_login_disabled():
+        flash(_("Standard login is disabled."), category="error")
+        return render_login()
+
+    form = request.form.to_dict()
+    username = strip_whitespaces(form.get('username', "")).lower().replace("\n","").replace("\r","")
+    try:
+        limiter.check()
+    except RateLimitExceeded:
+        flash(_("Please wait one minute before next login"), category="error")
+        return render_login(username, form.get("password", ""))
+    except (ConnectionError, Exception) as e:
+        log.error("Connection error to limiter backend: %s", e)
+        flash(_("Connection error to limiter backend, please contact your administrator"), category="error")
+        return render_login(username, form.get("password", ""))
+    if current_user is not None and current_user.is_authenticated:
+        return redirect(url_for('web.index'))
+    if config.config_login_type == constants.LOGIN_LDAP and not services.ldap:
+        log.error(u"Cannot activate LDAP authentication")
+        flash(_(u"Cannot activate LDAP authentication"), category="error")
+    user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
+    remember_me = bool(form.get('remember_me'))
+
+    if config.config_login_type == constants.LOGIN_LDAP and services.ldap and form.get('password', '') != "":
+        # Validate username before attempting LDAP authentication
+        if not username or not username.strip():
+            log.warning("LDAP authentication attempted with empty username")
+            flash(_(u"Username cannot be empty"), category="error")
+        else:
+            # Try LDAP authentication first, regardless of whether user exists locally
+            login_result, error = services.ldap.bind_user(username, form['password'])
+
+            if login_result:
+                # LDAP authentication successful
+                if user:
+                    # Existing user - login normally
+                    log.debug(u"You are now logged in as: '{}'".format(user.name))
+                    return handle_login_user(user,
+                                             remember_me,
+                                             _(u"you are now logged in as: '%(nickname)s'", nickname=user.name),
+                                             "success")
+                else:
+                    # New user - create if auto-creation is enabled
+                    if getattr(config, 'config_ldap_auto_create_users', True):
+                        try:
+                            # Get user details from LDAP
+                            ldap_user_details = services.ldap.get_object_details(username)
+                            if ldap_user_details:
+                                # Create user using existing LDAP import function
+                                from . import admin
+                                create_result, error_msg = admin.ldap_import_create_user(username, ldap_user_details)
+                                if create_result:
+                                    # Get the newly created user
+                                    user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
+                                    if user:
+                                        log.info("LDAP auto-created user: '%s'", username)
+                                        return handle_login_user(user,
+                                                                 remember_me,
+                                                                 _(u"Welcome! Your account has been automatically created. You are now logged in as: '%(nickname)s'", nickname=user.name),
+                                                                 "success")
+
+                            # If we get here, user creation failed
+                            log.error("LDAP auto-creation failed for user '%s'", username)
+                            flash(_(u"Authentication successful, but account creation failed. Please contact your administrator."), category="error")
+                        except Exception as ex:
+                            log.error("LDAP auto-creation error for user '%s': %s", username, ex)
+                            flash(_(u"Authentication successful, but account creation failed. Please contact your administrator."), category="error")
+                    else:
+                        # Auto-creation disabled
+                        log.info("LDAP user '%s' authenticated but not found locally, auto-creation disabled", username)
+                        flash(_(u"Authentication successful, but no local account found. Please contact your administrator to create your account."), category="error")
+
+            elif login_result is None and user and check_password_hash(str(user.password), form['password']) \
+                    and user.name != "Guest":
+                # LDAP unavailable, try local fallback
+                log.info("Local Fallback Login as: '{}'".format(user.name))
+                return handle_login_user(user,
+                                         remember_me,
+                                         _(u"Fallback Login as: '%(nickname)s', "
+                                           u"LDAP Server not reachable, or user not known", nickname=user.name),
+                                         "warning")
+            elif login_result is None:
+                # LDAP unavailable and no local fallback
+                log.info(error)
+                flash(_(u"Could not login: %(message)s", message=error), category="error")
+            elif login_result is False and user and user.password \
+                    and check_password_hash(str(user.password), form['password']) \
+                    and user.name != "Guest":
+                # LDAP rejected the credentials, try the stored local password
+                log.info("Local Fallback Login as: '{}' (LDAP rejected)".format(user.name))
+                return handle_login_user(user,
+                                         remember_me,
+                                         _(u"Local Login as: '%(nickname)s', "
+                                           u"LDAP authentication rejected", nickname=user.name),
+                                         "warning")
+            else:
+                # LDAP authentication failed
+                # Use request.remote_addr (already corrected by ProxyFix) instead of raw header
+                ip_address = request.remote_addr
+                log.warning('LDAP Login failed for user "%s" IP-address: %s', username, ip_address)
+                
+                # Track failed login attempt
+                try:
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
+                    cwa_db = CWA_DB()
+                    cwa_db.log_activity(
+                        user_id=None,
+                        user_name='Anonymous',
+                        event_type='LOGIN_FAILED',
+                        item_id=None,
+                        item_title=None,
+                        extra_data=json.dumps({'username_attempted': username, 'ip': ip_address, 'method': 'LDAP'})
+                    )
+                except Exception as e:
+                    log.debug(f"Failed to log failed login attempt: {e}")
+                
+                flash(_(u"Wrong Username or Password"), category="error")
+    else:
+        # Use request.remote_addr (already corrected by ProxyFix) instead of raw header
+        ip_address = request.remote_addr
+        if form.get('forgot', "") == 'forgot':
+            if user is not None and user.name != "Guest":
+                ret, __ = reset_password(user.id)
+                if ret == 1:
+                    flash(_(u"New Password was sent to your email address"), category="info")
+                    log.info('Password reset for user "%s" IP-address: %s', username, ip_address)
+                else:
+                    log.error(u"An unknown error occurred. Please try again later")
+                    flash(_(u"An unknown error occurred. Please try again later."), category="error")
+            else:
+                flash(_(u"Please enter valid username to reset password"), category="error")
+                log.warning('Username missing for password reset IP-address: %s', ip_address)
+        else:
+            if user and check_password_hash(str(user.password), form['password']) and user.name != "Guest":
+                config.config_is_initial = False
+                log.debug(u"You are now logged in as: '{}'".format(user.name))
+                return handle_login_user(user,
+                                         remember_me,
+                                         _(u"You are now logged in as: '%(nickname)s'", nickname=user.name),
+                                         "success")
+            else:
+                log.warning('Login failed for user "{}" IP-address: {}'.format(username, ip_address))
+                
+                # Track failed login attempt
+                try:
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
+                    cwa_db = CWA_DB()
+                    cwa_db.log_activity(
+                        user_id=None,
+                        user_name='Anonymous',
+                        event_type='LOGIN_FAILED',
+                        item_id=None,
+                        item_title=None,
+                        extra_data=json.dumps({'username_attempted': username, 'ip': ip_address, 'method': 'standard'})
+                    )
+                except Exception as e:
+                    log.debug(f"Failed to log failed login attempt: {e}")
+                
+                flash(_(u"Wrong Username or Password"), category="error")
+    return render_login(username, form.get("password", ""))
+
+
+@web.route('/logout')
+@user_login_required
+def logout():
+    cleanup_local_logout()
+
+    log.debug("User logged out")
+    if config.config_anonbrowse:
+        location = get_redirect_location(request.args.get('next', None), "web.login")
+    else:
+        location = None
+    if location:
+        return redirect(location)
+    else:
+        return redirect(url_for('web.login'))
+
+
+# ################################### Users own configuration #########################################################
+def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_status, translations, languages):
+    to_save = request.form.to_dict()
+    current_user.random_books = 0
+    desired_library_mode = to_save.get(
+        "library_mode", user_library.mode_for_user(current_user)
+    )
+    library_seed_prepared = False
+    try:
+        if desired_library_mode not in constants.LIBRARY_MODES:
+            raise ValueError(_("Invalid library mode"))
+        if (desired_library_mode != user_library.mode_for_user(current_user)
+                and not current_user.role_browse_global()):
+            raise user_library.UserLibraryError(
+                _("Your library contents are managed by an administrator."))
+        if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+                and not bool(current_user.user_library_seeded)):
+            # This combined classic form edits many fields. Seed first so its
+            # bounded commits cannot persist unrelated half-validated input.
+            user_library.prepare_user_library_seed(current_user)
+            library_seed_prepared = True
+        if current_user.role_passwd() or current_user.role_admin():
+            if to_save.get("password", "") != "":
+                current_user.password = generate_password_hash(valid_password(to_save.get("password")))
+        if to_save.get("kindle_mail", current_user.kindle_mail) != current_user.kindle_mail:
+            current_user.kindle_mail = valid_email(to_save.get("kindle_mail"))
+        if to_save.get("kindle_mail_subject", current_user.kindle_mail_subject) != current_user.kindle_mail_subject:
+            current_user.kindle_mail_subject = strip_whitespaces(to_save.get("kindle_mail_subject", "")) or ""
+        new_email = valid_email(to_save.get("email", current_user.email))
+        if not new_email:
+            raise Exception(_("Email can't be empty and has to be a valid Email"))
+        if new_email != current_user.email:
+            current_user.email = check_email(new_email)
+        if current_user.role_admin():
+            if to_save.get("name", current_user.name) != current_user.name:
+                # Query username, if not existing, change
+                current_user.name = check_username(to_save.get("name"))
+        current_user.random_books = 1 if to_save.get("show_random") == "on" else 0
+        current_user.default_language = to_save.get("default_language", "all")
+        # Per-custom-column sidebar visibility (independent of the built-in
+        # section bitflags); stored in User.view_settings as 'cc_sidebar'
+        try:
+            for option in get_custom_column_visibility_options():
+                key = 'show_cc_%d' % option['id']
+                current_user.set_view_property('cc_sidebar', key,
+                                               to_save.get(key) == 'on', commit=False)
+        except Exception:
+            log.error("Could not save custom column sidebar visibility", exc_info=True)
+        # A stored locale is returned verbatim by get_locale() on every later
+        # request, so it has to be one we actually ship (F-011141). An
+        # unusable value leaves the current one alone rather than being stored.
+        validated_locale = sanitize_locale_for_write(to_save.get("locale"))
+        if validated_locale:
+            current_user.locale = validated_locale
+        old_state = current_user.kobo_only_shelves_sync
+        current_user.kobo_only_shelves_sync = int(to_save.get("kobo_only_shelves_sync") == "on") or 0
+        if kobo_sync_status.needs_shelf_reconciliation(old_state,
+                                                       current_user.kobo_only_shelves_sync):
+            # Before the commit here: a failed save rolls the tombstones back
+            # with the setting, so the two cannot disagree.
+            kobo_sync_status.update_on_sync_shelfs(current_user.id)
+        current_user.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
+        if "kobo_two_way_annotation_sync_present" in to_save:
+            current_user.kobo_two_way_annotation_sync = int(
+                to_save.get("kobo_two_way_annotation_sync") == "on"
+            ) or 0
+        # The hidden sentinel distinguishes an unchecked control from a
+        # partial/older form submission. Guests always use the default-visible
+        # behavior and cannot change the shared Guest preference.
+        set_checkbox_preference_from_form(
+            current_user, to_save, "show_original_filename",
+            "show_original_filename_present",
+        )
+        current_user.hardcover_token = to_save.get("hardcover_token","" ).replace("Bearer ","" ) or None
+        # Auto-send and metadata fetch settings
+        current_user.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
+        current_user.auto_metadata_fetch = to_save.get("auto_metadata_fetch") == "on"
+        current_user.allow_additional_ereader_emails = to_save.get("allow_additional_ereader_emails") == "on"
+        
+        # Handle hidden magic shelf templates and custom shelves
+        from . import magic_shelf
+        if not current_user.is_anonymous:
+            # Get all system template keys
+            all_template_keys = set(magic_shelf.SYSTEM_SHELF_TEMPLATES.keys())
+            # Get currently hidden items for this user
+            current_hidden = ub.session.query(ub.HiddenMagicShelfTemplate).filter(
+                ub.HiddenMagicShelfTemplate.user_id == current_user.id
+            ).all()
+            current_hidden_template_keys = {h.template_key for h in current_hidden if h.template_key}
+            current_hidden_shelf_ids = {h.shelf_id for h in current_hidden if h.shelf_id}
+            
+            # Handle system templates
+            visible_template_keys = {key for key in all_template_keys if to_save.get(f"show_magic_shelf_{key}") == "on"}
+            should_be_hidden_templates = all_template_keys - visible_template_keys
+            
+            # Add newly hidden templates
+            for key in should_be_hidden_templates:
+                if key not in current_hidden_template_keys:
+                    new_hidden = ub.HiddenMagicShelfTemplate(
+                        user_id=current_user.id,
+                        template_key=key
+                    )
+                    ub.session.add(new_hidden)
+                    log.info(f"User {current_user.id} hid system shelf template '{key}'")
+            
+            # Remove templates that should no longer be hidden
+            for hidden in current_hidden:
+                if hidden.template_key and hidden.template_key in visible_template_keys:
+                    ub.session.delete(hidden)
+                    log.info(f"User {current_user.id} unhid system shelf template '{hidden.template_key}'")
+            
+            # Handle custom public shelves - get all available ones
+            all_public_shelves = ub.session.query(ub.MagicShelf).filter(
+                ub.MagicShelf.is_public == 1,
+                ub.MagicShelf.user_id != current_user.id,
+                ub.MagicShelf.is_system == False
+            ).all()
+            
+            # Check which ones should be visible (checked)
+            visible_shelf_ids = {s.id for s in all_public_shelves if to_save.get(f"show_custom_shelf_{s.id}") == "on"}
+            
+            # Hide shelves that are unchecked but not currently hidden
+            for shelf in all_public_shelves:
+                if shelf.id not in visible_shelf_ids and shelf.id not in current_hidden_shelf_ids:
+                    new_hidden = ub.HiddenMagicShelfTemplate(
+                        user_id=current_user.id,
+                        shelf_id=shelf.id
+                    )
+                    ub.session.add(new_hidden)
+                    log.info(f"User {current_user.id} hid custom shelf {shelf.id}")
+            
+            # Unhide shelves that are checked but currently hidden
+            for hidden in current_hidden:
+                if hidden.shelf_id and hidden.shelf_id in visible_shelf_ids:
+                    ub.session.delete(hidden)
+                    log.info(f"User {current_user.id} unhid custom shelf {hidden.shelf_id}")
+        
+        # OPDS root order
+        opds_order_raw = to_save.get("opds_root_order", "").strip()
+        if opds_order_raw:
+            from .opds import normalize_opds_root_order
+            opds_order_list = [item.strip() for item in opds_order_raw.split(',') if item.strip()]
+            normalized_order = normalize_opds_root_order(opds_order_list)
+            if current_user.view_settings is None:
+                current_user.view_settings = {}
+            current_user.view_settings.setdefault('opds', {})['root_order'] = normalized_order
+            flag_modified(current_user, "view_settings")
+        else:
+            if current_user.view_settings and current_user.view_settings.get('opds', {}).get('root_order'):
+                current_user.view_settings['opds'].pop('root_order', None)
+                if not current_user.view_settings['opds']:
+                    current_user.view_settings.pop('opds', None)
+                flag_modified(current_user, "view_settings")
+
+        # OPDS hidden entries
+        opds_hidden_raw = to_save.get("opds_hidden_entries", "").strip()
+        if opds_hidden_raw:
+            from .opds import OPDS_ROOT_ENTRY_DEFS
+            hidden_entries = [item.strip() for item in opds_hidden_raw.split(',') if item.strip()]
+            hidden_entries = [key for key in hidden_entries if key in OPDS_ROOT_ENTRY_DEFS]
+            if current_user.view_settings is None:
+                current_user.view_settings = {}
+            current_user.view_settings.setdefault('opds', {})['hidden_entries'] = hidden_entries
+            flag_modified(current_user, "view_settings")
+        else:
+            if current_user.view_settings and current_user.view_settings.get('opds', {}).get('hidden_entries'):
+                current_user.view_settings['opds'].pop('hidden_entries', None)
+                if not current_user.view_settings['opds']:
+                    current_user.view_settings.pop('opds', None)
+                flag_modified(current_user, "view_settings")
+
+        # Magic shelf order settings
+        magic_shelf_order_raw = to_save.get("magic_shelf_order", "").strip()
+        magic_shelf_order_mode = to_save.get("magic_shelf_order_mode", magic_shelf.DEFAULT_MAGIC_SHELF_ORDER_MODE)
+        if magic_shelf_order_mode not in magic_shelf.MAGIC_SHELF_ORDER_MODES:
+            magic_shelf_order_mode = magic_shelf.DEFAULT_MAGIC_SHELF_ORDER_MODE
+
+        # Validate order list against accessible shelf IDs
+        accessible_shelves = ub.session.query(ub.MagicShelf).filter(
+            or_(
+                ub.MagicShelf.is_public == 1,
+                ub.MagicShelf.user_id == current_user.id
+            )
+        ).all()
+        accessible_ids = {s.id for s in accessible_shelves}
+        magic_shelf_order_list = []
+        if magic_shelf_order_raw:
+            for item in [item.strip() for item in magic_shelf_order_raw.split(',') if item.strip()]:
+                try:
+                    shelf_id = int(item)
+                except ValueError:
+                    continue
+                if shelf_id in accessible_ids and shelf_id not in magic_shelf_order_list:
+                    magic_shelf_order_list.append(shelf_id)
+
+        if current_user.view_settings is None:
+            current_user.view_settings = {}
+        magic_shelf_settings = current_user.view_settings.setdefault('magic_shelves', {})
+        magic_shelf_settings['order_mode'] = magic_shelf_order_mode
+        if magic_shelf_order_list:
+            magic_shelf_settings['order'] = magic_shelf_order_list
+        else:
+            magic_shelf_settings.pop('order', None)
+        flag_modified(current_user, "view_settings")
+
+    except Exception as ex:
+        flash(str(ex), category="error")
+        from . import magic_shelf
+        system_shelf_templates = magic_shelf.SYSTEM_SHELF_TEMPLATES
+        hidden_items = ub.session.query(
+            ub.HiddenMagicShelfTemplate.template_key,
+            ub.HiddenMagicShelfTemplate.shelf_id
+        ).filter(
+            ub.HiddenMagicShelfTemplate.user_id == current_user.id
+        ).all()
+        hidden_shelf_templates = {item.template_key for item in hidden_items if item.template_key}
+        hidden_custom_shelf_ids = {item.shelf_id for item in hidden_items if item.shelf_id}
+
+        all_public_shelves = ub.session.query(ub.MagicShelf).filter(
+            ub.MagicShelf.is_public == 1,
+            ub.MagicShelf.user_id != current_user.id,
+            ub.MagicShelf.is_system == False
+        ).all()
+
+        hidden_custom_shelves = [s for s in all_public_shelves if s.id in hidden_custom_shelf_ids]
+        visible_public_shelves = [s for s in all_public_shelves if s.id not in hidden_custom_shelf_ids]
+
+        from .opds import (
+            get_opds_root_order_for_user,
+            get_opds_hidden_entries_for_user,
+            OPDS_ROOT_ENTRY_DEFS,
+            OPDS_ROOT_ORDER_DEFAULT,
+        )
+        opds_root_order = get_opds_root_order_for_user(current_user)
+        opds_root_order_string = ",".join(opds_root_order)
+        opds_hidden_entries = list(get_opds_hidden_entries_for_user(current_user))
+        opds_hidden_entries_string = ",".join(opds_hidden_entries)
+        opds_root_labels = [
+            {
+                "key": key,
+                "label": _(OPDS_ROOT_ENTRY_DEFS[key]['title']),
+            }
+            for key in OPDS_ROOT_ORDER_DEFAULT
+            if key in OPDS_ROOT_ENTRY_DEFS
+        ]
+
+        magic_shelves_for_order = list(getattr(g, 'magic_shelves_access', []) or [])
+        magic_shelf_order_labels = [
+            {
+                "key": str(shelf.id),
+                "label": shelf.name,
+                "icon": shelf.icon,
+            }
+            for shelf in magic_shelves_for_order
+        ]
+        magic_shelf_order_settings = (current_user.view_settings or {}).get('magic_shelves', {})
+        magic_shelf_order_mode = magic_shelf_order_settings.get('order_mode', magic_shelf.DEFAULT_MAGIC_SHELF_ORDER_MODE)
+        if magic_shelf_order_mode not in magic_shelf.MAGIC_SHELF_ORDER_MODES:
+            magic_shelf_order_mode = magic_shelf.DEFAULT_MAGIC_SHELF_ORDER_MODE
+        available_ids = [shelf.id for shelf in magic_shelves_for_order]
+        magic_shelf_order_normalized = magic_shelf.normalize_magic_shelf_order(
+            magic_shelf_order_settings.get('order', []),
+            available_ids
+        )
+        magic_shelf_order_string = ",".join(str(sid) for sid in magic_shelf_order_normalized)
+        # Fork #319: the GET profile() path computes hidden_book_count and
+        # passes it to gate the "Hidden Books (N)" link. This error-path
+        # render must do the same — otherwise a user who hits a validation
+        # error (e.g. invalid email) on profile save lands on a re-render
+        # without the link, even if they have hidden books that need
+        # recovery. (Greptile catch on PR #337.)
+        hidden_book_count = ub.session.query(ub.UserHiddenBook).filter(
+            ub.UserHiddenBook.user_id == current_user.id
+        ).count()
+        return render_title_template("user_edit.html",
+                                     content=current_user,
+                                     config=config,
+                                     translations=translations,
+                                     profile=1,
+                                     hidden_book_count=hidden_book_count,
+                                     languages=languages,
+                                     system_shelf_templates=system_shelf_templates,
+                                     hidden_shelf_templates=hidden_shelf_templates,
+                                     hidden_custom_shelf_ids=hidden_custom_shelf_ids,
+                                     hidden_custom_shelves=hidden_custom_shelves,
+                                     visible_public_shelves=visible_public_shelves,
+                                     opds_root_order_string=opds_root_order_string,
+                                     opds_hidden_entries_string=opds_hidden_entries_string,
+                                     opds_root_labels=opds_root_labels,
+                                     magic_shelf_order_string=magic_shelf_order_string,
+                                     magic_shelf_order_labels=magic_shelf_order_labels,
+                                     magic_shelf_order_mode=magic_shelf_order_mode,
+                                     title=_(f"{current_user.name.capitalize()}'s Profile", name=current_user.name),
+                                     page="me",
+                                     kobo_support=kobo_support,
+                                     hardcover_support=hardcover_support,
+                                     registered_oauth=local_oauth_check,
+                                     oauth_status=oauth_status)
+
+    val = 0
+    for key, __ in to_save.items():
+        if key.startswith('show') and not key.startswith('show_magic_shelf_') and not key.startswith('show_custom_shelf_'):
+            try:
+                val += int(key[5:])
+            except (ValueError, IndexError) as e:
+                log.warning(f"Skipping invalid sidebar checkbox key: {key}")
+                continue
+    current_user.sidebar_view = val
+    if to_save.get("Show_detail_random"):
+        current_user.sidebar_view += constants.DETAIL_RANDOM
+
+    try:
+        user_library.set_library_mode(
+            current_user,
+            desired_library_mode,
+            seed_rows_prepared=library_seed_prepared,
+            commit=False,
+        )
+        ub.session.commit()
+        flash(_("Success! Profile Updated"), category="success")
+        log.debug("Profile updated")
+        # Redirect to refresh sidebar with updated shelf visibility
+        return redirect(url_for('web.profile'))
+    except user_library.UserLibraryError as ex:
+        ub.session.rollback()
+        flash(str(ex), category="error")
+    except IntegrityError:
+        ub.session.rollback()
+        flash(_("Oops! An account already exists for this Email."), category="error")
+        log.debug("Found an existing account for this Email")
+    except OperationalError as e:
+        ub.session.rollback()
+        log.error("Database error: %s", e)
+        flash(_("Oops! Database Error: %(error)s.", error=e), category="error")
+
+
+@web.route("/me", methods=["GET", "POST"])
+@user_login_required
+def profile():
+    languages = calibre_db.speaking_language()
+    translations = get_available_locale()
+    kobo_support = feature_support['kobo'] and config.config_kobo_sync
+    hardcover_support = feature_support['hardcover']
+    if feature_support['oauth'] and config.config_login_type == 2:
+        oauth_status = get_oauth_status()
+        local_oauth_check = oauth_bb.oauth_check
+    else:
+        oauth_status = None
+        local_oauth_check = {}
+    
+    if request.method == "POST":
+        return change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_status, translations, languages)
+    
+    # Query magic shelf data after POST to get updated values
+    from . import magic_shelf
+    system_shelf_templates = magic_shelf.SYSTEM_SHELF_TEMPLATES
+    hidden_items = ub.session.query(
+        ub.HiddenMagicShelfTemplate.template_key,
+        ub.HiddenMagicShelfTemplate.shelf_id
+    ).filter(
+        ub.HiddenMagicShelfTemplate.user_id == current_user.id
+    ).all()
+    hidden_shelf_templates = {item.template_key for item in hidden_items if item.template_key}
+    hidden_custom_shelf_ids = {item.shelf_id for item in hidden_items if item.shelf_id}
+    
+    # Get ALL public custom shelves that user doesn't own (both hidden and visible)
+    all_public_shelves = ub.session.query(ub.MagicShelf).filter(
+        ub.MagicShelf.is_public == 1,
+        ub.MagicShelf.user_id != current_user.id,
+        ub.MagicShelf.is_system == False
+    ).all()
+    
+    # Separate into hidden and visible
+    hidden_custom_shelves = [s for s in all_public_shelves if s.id in hidden_custom_shelf_ids]
+    visible_public_shelves = [s for s in all_public_shelves if s.id not in hidden_custom_shelf_ids]
+
+    from .opds import get_opds_root_order_for_user, get_opds_hidden_entries_for_user, OPDS_ROOT_ENTRY_DEFS, OPDS_ROOT_ORDER_DEFAULT
+    opds_root_order = get_opds_root_order_for_user(current_user)
+    opds_root_order_string = ",".join(opds_root_order)
+    opds_hidden_entries = list(get_opds_hidden_entries_for_user(current_user))
+    opds_hidden_entries_string = ",".join(opds_hidden_entries)
+    opds_root_labels = [
+        {
+            "key": key,
+            "label": _(OPDS_ROOT_ENTRY_DEFS[key]['title'])
+        }
+        for key in OPDS_ROOT_ORDER_DEFAULT
+        if key in OPDS_ROOT_ENTRY_DEFS
+    ]
+
+    magic_shelves_for_order = list(getattr(g, 'magic_shelves_access', []) or [])
+    magic_shelf_order_labels = [
+        {
+            "key": str(shelf.id),
+            "label": shelf.name,
+            "icon": shelf.icon,
+        }
+        for shelf in magic_shelves_for_order
+    ]
+    magic_shelf_order_settings = (current_user.view_settings or {}).get('magic_shelves', {})
+    magic_shelf_order_mode = magic_shelf_order_settings.get('order_mode', magic_shelf.DEFAULT_MAGIC_SHELF_ORDER_MODE)
+    if magic_shelf_order_mode not in magic_shelf.MAGIC_SHELF_ORDER_MODES:
+        magic_shelf_order_mode = magic_shelf.DEFAULT_MAGIC_SHELF_ORDER_MODE
+    available_ids = [shelf.id for shelf in magic_shelves_for_order]
+    magic_shelf_order_normalized = magic_shelf.normalize_magic_shelf_order(
+        magic_shelf_order_settings.get('order', []),
+        available_ids
+    )
+    magic_shelf_order_string = ",".join(str(sid) for sid in magic_shelf_order_normalized)
+
+    # #319 pushback @droM4X: surface a discoverable link to /hidden/stored
+    # on the profile page when (and only when) the user has hidden books.
+    # The /hidden redirect alone wasn't reachable without already knowing
+    # the URL.
+    hidden_book_count = ub.session.query(ub.UserHiddenBook).filter(
+        ub.UserHiddenBook.user_id == current_user.id
+    ).count()
+
+    return render_title_template("user_edit.html",
+                                 translations=translations,
+                                 profile=1,
+                                 hidden_book_count=hidden_book_count,
+                                 languages=languages,
+                                 content=current_user,
+                                 config=config,
+                                 kobo_support=kobo_support,
+                                 hardcover_support=hardcover_support,
+                                 cc_visibility=get_custom_column_visibility_options(),
+                                 system_shelf_templates=system_shelf_templates,
+                                 hidden_shelf_templates=hidden_shelf_templates,
+                                 hidden_custom_shelf_ids=hidden_custom_shelf_ids,
+                                 hidden_custom_shelves=hidden_custom_shelves,
+                                 visible_public_shelves=visible_public_shelves,
+                                 opds_root_order_string=opds_root_order_string,
+                                 opds_hidden_entries_string=opds_hidden_entries_string,
+                                 opds_root_labels=opds_root_labels,
+                                 magic_shelf_order_string=magic_shelf_order_string,
+                                 magic_shelf_order_labels=magic_shelf_order_labels,
+                                 magic_shelf_order_mode=magic_shelf_order_mode,
+                                 title=_(f"{current_user.name.capitalize()}'s Profile", name=current_user.name),
+                                 page="me",
+                                 registered_oauth=local_oauth_check,
+                                 oauth_status=oauth_status,
+                                 pending_app_password=flask_session.get("pending_app_password"),
+                                 app_passwords=ub.session.query(ub.UserAppPassword).filter(
+                                     ub.UserAppPassword.user_id == current_user.id,
+                                     ub.UserAppPassword.revoked == False,  # noqa: E712
+                                 ).order_by(ub.UserAppPassword.created_at.desc()).all())
+
+
+# App passwords — fork issue #95 / CWA #1269. Per-user labeled tokens for HTTP Basic auth
+# on OPDS / KOSync, since OAuth users have no usable local password and LDAP users may
+# prefer not to expose their directory password. Cleartext shown once at create time via
+# Flask flash; only the werkzeug hash is persisted. See `notes/oauth-opds-app-passwords-DESIGN.md`.
+
+
+@web.route("/me/app-passwords", methods=["POST"])
+@user_login_required
+def app_password_create():
+    label = (request.form.get("label") or "").strip()
+    if not label or len(label) > 64:
+        flash(_("App-password label must be 1-64 characters."), category="error")
+        return redirect(url_for("web.profile"))
+    if current_user.role_anonymous():
+        abort(403)
+    _row, cleartext = app_passwords.mint(current_user.id, label)
+    ub.session.commit()
+    # Cleartext shown inline on the profile page (fork issue #223). Survives
+    # reloads of /me; cleared on navigation to any other route by the
+    # _clear_pending_app_password before_request hook below.
+    flask_session["pending_app_password"] = {"label": label, "token": cleartext}
+    # Anchor scroll to the inline box on load (fork #223 follow-up @droM4X):
+    # without this the user lands at the top of /me and has to scroll down
+    # to find the freshly-generated token.
+    return redirect(url_for("web.profile", _anchor="pending-app-password"))
+
+
+@web.route("/me/app-passwords/<int:app_password_id>/revoke", methods=["POST"])
+@user_login_required
+def app_password_revoke(app_password_id):
+    if current_user.role_anonymous():
+        abort(403)
+    row = ub.session.query(ub.UserAppPassword).filter(
+        ub.UserAppPassword.id == app_password_id,
+        ub.UserAppPassword.user_id == current_user.id,  # scope to caller — never leak revoke across users
+    ).first()
+    if row is None:
+        abort(404)
+    row.revoked = True
+    ub.session.commit()
+    flash(_("App password '%(label)s' revoked.", label=row.label), category="info")
+    return redirect(url_for("web.profile"))
+
+
+# ###################################Show single book ##################################################################
+
+
+@web.route("/read/<int:book_id>/<book_format>")
+@login_required_if_no_ano
+@viewer_required
+def read_book(book_id, book_format):
+    lookup_mode = request.args.get("lookup") == "1"
+    # allow_show_hidden=True: a user can read their own hidden book — the
+    # detail page's reading icon must not bounce with "unavailable" just
+    # because the book is on the user's hide list (#319 pushback @droM4X).
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_hidden=True, allow_public_shelf_books=True)
+
+    if not book:
+        flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
+              category="error")
+        log.debug("Selected book is unavailable. File does not exist or is not accessible")
+        return redirect(url_for("web.index"))
+
+    book.ordered_authors = calibre_db.order_authors([book], False)
+
+    # Kobo annotation overlays anchor on KoboSpan ids (`kobo.x.y`), which
+    # the reader resolves in the live document to regenerate each
+    # highlight's CFI (see annotations.js). Those spans only exist in the
+    # .kepub, not the plain .epub. When an authenticated user opens an
+    # EPUB-family book for which they have annotations AND a KEPUB format
+    # exists, serve the kepub so the highlights can anchor and render.
+    # Scoped to annotated books so we don't change the reader format (and
+    # orphan epub-keyed bookmarks) for everyone.
+    if (
+        current_user.is_authenticated
+        and book_format.lower() == "epub"
+        and any((d.format or "").upper() == "KEPUB" for d in (book.data or []))
+    ):
+        try:
+            has_annotations = ub.session.query(ub.Annotation).filter(
+                ub.Annotation.user_id == int(current_user.id),
+                ub.Annotation.book_id == book_id,
+                ub.Annotation.hidden == False,  # noqa: E712
+            ).first() is not None
+        except Exception as e:
+            log.debug("read_book: annotation lookup failed for %d: %s", book_id, e)
+            has_annotations = False
+        if has_annotations:
+            log.debug("read_book: serving kepub for %d so annotation overlays resolve", book_id)
+            book_format = "kepub"
+
+    # check if book has a bookmark. Position is keyed by format, but the
+    # epub<->kepub switch above must not orphan it — match either
+    # epub-family format so the reading position survives.
+    bookmark = None
+    if current_user.is_authenticated:
+        bm_q = ub.session.query(ub.Bookmark).filter(and_(ub.Bookmark.user_id == int(current_user.id),
+                                                         ub.Bookmark.book_id == book_id,
+                                                         ub.Bookmark.format == book_format.lower())).first()
+        if bm_q is None and book_format.lower() in ("epub", "kepub"):
+            # fall back to the sibling epub-family format's bookmark
+            sibling = "epub" if book_format.lower() == "kepub" else "kepub"
+            bm_q = ub.session.query(ub.Bookmark).filter(and_(ub.Bookmark.user_id == int(current_user.id),
+                                                             ub.Bookmark.book_id == book_id,
+                                                             ub.Bookmark.format == sibling)).first()
+        bookmark = bm_q
+
+    kosync_progress = None
+    if current_user.is_authenticated:
+        try:
+            kobo_state = (ub.session.query(ub.KoboReadingState)
+                          .filter(ub.KoboReadingState.user_id == int(current_user.id),
+                                  ub.KoboReadingState.book_id == book_id)
+                          .first())
+            if kobo_state and kobo_state.current_bookmark:
+                kosync_progress = kobo_state.current_bookmark.progress_percent
+        except Exception as e:
+            log.debug(f"Failed to load KOReader progress for book {book_id}: {e}")
+    # Track read activity
+    if current_user.is_authenticated and not lookup_mode:
+        try:
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
+
+            # Detect source of book discovery
+            source = request.args.get('from', 'direct')
+            referer = request.headers.get('Referer', '')
+            if not source or source == 'direct':
+                if '/search' in referer:
+                    source = 'search'
+                elif '/series' in referer:
+                    source = 'series'
+                elif '/author' in referer:
+                    source = 'author'
+                elif '/category' in referer:
+                    source = 'category'
+                elif '/shelf' in referer:
+                    source = 'shelf'
+            
+            cwa_db = CWA_DB()
+            cwa_db.log_activity(
+                user_id=int(current_user.id),
+                user_name=current_user.name,
+                event_type='READ',
+                item_id=book_id,
+                item_title=book.title,
+                extra_data=json.dumps({'format': book_format.upper(), 'source': source})
+            )
+        except Exception as e:
+            log.debug(f"Failed to log read activity: {e}")
+
+    # CWA #1364 fix: bump `book_read_link.last_time_started_reading` and
+    # `times_started_reading` when an authenticated user opens the web
+    # reader. The Kobo + KOSync code paths already do this; the web
+    # reader was the only book-opening surface that never wrote to
+    # those fields, so a user who only reads through the browser had
+    # no "read history" recorded at all (`/read`, `/unread` filters
+    # never reflected web-reader activity).
+    #
+    # Debounce: only bump the counter when the transition is into
+    # IN_PROGRESS from a NON-in-progress state. A user refreshing the
+    # reader tab or hitting Back/Forward doesn't count as a new
+    # reading session. Always touch `last_time_started_reading` so
+    # "recently read" sorting reflects every open.
+    if current_user.is_authenticated and not lookup_mode:
+        try:
+            read_row = ub.session.query(ub.ReadBook).filter(
+                ub.ReadBook.user_id == int(current_user.id),
+                ub.ReadBook.book_id == book_id,
+            ).first()
+            now = datetime.now(timezone.utc)
+            if read_row is None:
+                read_row = ub.ReadBook(
+                    user_id=int(current_user.id),
+                    book_id=book_id,
+                    read_status=ub.ReadBook.STATUS_IN_PROGRESS,
+                    times_started_reading=1,
+                    last_time_started_reading=now,
+                )
+                ub.session.add(read_row)
+            else:
+                prev_status = read_row.read_status or 0
+                if prev_status != ub.ReadBook.STATUS_IN_PROGRESS \
+                        and prev_status != ub.ReadBook.STATUS_FINISHED:
+                    read_row.times_started_reading = (read_row.times_started_reading or 0) + 1
+                    read_row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
+                read_row.last_time_started_reading = now
+            ub.session_commit()
+        except Exception as e:
+            log.debug(f"Failed to record web reader open in book_read_link: {e}")
+            try:
+                ub.session.rollback()
+            except Exception:
+                pass
+
+    if book_format.lower() in ("epub", "kepub"):
+        log.debug("Start epub reader for %d (%s)", book_id, book_format.lower())
+        # Per-user reader display settings (theme/font/size/spread/reflow/margin/line height)
+        # so the reader boots with the user's saved choices instead of waiting
+        # for a localStorage read. Anonymous users get {} and fall back to
+        # localStorage. Persistence is owned by /api/v1/reader/settings.
+        reader_settings = {}
+        if current_user.is_authenticated:
+            reader_settings = (getattr(current_user, "view_settings", None) or {}).get("reader", {}) or {}
+        font_choice = reader_settings.get("font") if isinstance(reader_settings, dict) else None
+        try:
+            reader_custom_ids = (reader_fonts.custom_font_ids()
+                                 if isinstance(font_choice, str) and font_choice.startswith("custom:")
+                                 else set())
+        except Exception:
+            log.warning("Could not read uploaded reader-font catalog while opening a book", exc_info=True)
+            reader_custom_ids = set()
+        reader_settings = sanitize_reader_settings(reader_settings, reader_custom_ids)
+        try:
+            reader_font_catalogue = reader_fonts.catalogue(
+                lambda font_uuid: url_for("api_v1.reader_font_file", font_uuid=font_uuid)
+            )
+        except Exception:
+            # Uploaded fonts are an optional enhancement; a broken catalog must
+            # not block the established EPUB reader or built-in font controls.
+            log.warning("Could not load uploaded reader-font options", exc_info=True)
+            reader_font_catalogue = {"items": list(reader_fonts.BUILTIN_FONTS)}
+        return render_title_template('read.html', bookid=book_id, title=book.title,
+                                     bookmark=bookmark, kosync_progress=kosync_progress,
+                                     reader_settings=json.dumps(reader_settings),
+                                     lookup_mode=lookup_mode,
+                                     reader_fonts=reader_font_catalogue["items"],
+                                     book_format=book_format.lower())
+    elif book_format.lower() == "pdf":
+        log.debug("Start pdf reader for %d", book_id)
+        return render_title_template('readpdf.html', pdffile=book_id, title=book.title,
+                                     lookup_mode=lookup_mode)
+    elif book_format.lower() == "txt":
+        log.debug("Start txt reader for %d", book_id)
+        return render_title_template('readtxt.html', txtfile=book_id, title=book.title,
+                                     lookup_mode=lookup_mode)
+    elif book_format.lower() in ["djvu", "djv"]:
+        log.debug("Start djvu reader for %d", book_id)
+        return render_title_template('readdjvu.html', djvufile=book_id, title=book.title,
+                                     extension=book_format.lower(), lookup_mode=lookup_mode)
+    else:
+        for fileExt in constants.EXTENSIONS_AUDIO:
+            if book_format.lower() == fileExt:
+                # allow_show_hidden=True: mirror read_book's outer gate so
+                # the audio reader doesn't re-block a user's own hidden
+                # book after the outer check let them through (#319).
+                entries = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
+                log.debug("Start mp3 listening for %d", book_id)
+                return render_title_template('listenmp3.html', mp3file=book_id, audioformat=book_format.lower(),
+                                             entry=entries, bookmark=bookmark, lookup_mode=lookup_mode)
+        for fileExt in ["cbr", "cbt", "cbz"]:
+            if book_format.lower() == fileExt:
+                all_name = str(book_id)
+                title = book.title
+                if len(book.series):
+                    title = title + " - " + book.series[0].name
+                    if book.series_index:
+                        title = title + " #" + '{0:.2f}'.format(book.series_index).rstrip('0').rstrip('.')
+                log.debug("Start comic reader for %d", book_id)
+                return render_title_template('readcbr.html', comicfile=all_name, title=title,
+                                             extension=fileExt, bookmark=bookmark, lookup_mode=lookup_mode)
+        log.debug("Reader requested for an unsupported format: %s", book_format)
+        # 404, not a redirect to the library.
+        #
+        # This route is reachable from inside the web reader's own content frame:
+        # a link in an EPUB resolves against the section's path, so a stray
+        # request can arrive here with a format this reader cannot open. Answering
+        # with the library home page rendered THE APP inside the book frame — the
+        # user's book replaced by the catalogue. A reader frame must never be
+        # handed a page of the app, and a caller can recognise a status code.
+        abort(404)
+
+
+@web.route("/book/<int:book_id>")
+@login_required_if_no_ano
+def show_book(book_id):
+    # Ensure book_id is a plain int to avoid SQLite binding errors
+    try:
+        book_id = int(book_id)
+    except (ValueError, TypeError):
+        log.error(f"Invalid book_id passed to show_book: {book_id}")
+        flash(_("Invalid book ID."), category="error")
+        return redirect(url_for("web.index"))
+    # allow_show_hidden=True: a user who hid a book must still be able to open
+    # its detail page to unhide it (the Unhide toggle lives there). Without
+    # this the detail route 404s for hidden books and recovery is impossible
+    # (issue #319).
+    entries = calibre_db.get_book_read_archived(book_id, config.config_read_column,
+                                                allow_show_archived=True, allow_show_hidden=True,
+                                                allow_public_shelf_books=True)
+    if entries:
+        read_book = entries[1]
+        archived_book = entries[2]
+        entry = entries[0]
+        if config.config_read_column:
+            # read_book carries the custom column's boolean value here, which
+            # can never express the in-progress tri-state — KOReader/Kobo sync
+            # writes that only to ub.ReadBook, whatever column is configured.
+            # Overlay it so the currently-reading marker still renders for
+            # custom-read-column users (fork #634).
+            entry.read_status = bool(read_book)
+            entry.read_status_raw = (ub.ReadBook.STATUS_FINISHED if read_book
+                                     else ub.ReadBook.STATUS_UNREAD)
+            if not read_book and current_user.is_authenticated:
+                in_progress = ub.session.query(ub.ReadBook).filter(
+                    ub.ReadBook.user_id == int(current_user.id),
+                    ub.ReadBook.book_id == book_id,
+                    ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
+                if in_progress:
+                    entry.read_status_raw = ub.ReadBook.STATUS_IN_PROGRESS
+        else:
+            entry.read_status = read_book == ub.ReadBook.STATUS_FINISHED
+            # Raw tri-state for the "currently reading" detail-page marker. fork #509.
+            entry.read_status_raw = read_book or ub.ReadBook.STATUS_UNREAD
+        entry.is_archived = archived_book
+        for lang_index in range(0, len(entry.languages)):
+            entry.languages[lang_index].language_name = isoLanguages.get_language_name(get_locale(), entry.languages[
+                lang_index].lang_code)
+        cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+        book_in_shelves = []
+        shelves = ub.session.query(ub.BookShelf).filter(ub.BookShelf.book_id == book_id).all()
+        for sh in shelves:
+            book_in_shelves.append(sh.shelf)
+
+        entry.tags = sort(entry.tags, key=lambda tag: tag.name)
+        
+        # Filter tags based on user's allowed/denied tags (Issue #906)
+        if current_user.is_authenticated:
+            allowed_tags = current_user.list_allowed_tags()
+            denied_tags = current_user.list_denied_tags()
+            
+            # If allowed tags are configured (not empty), filter to only show allowed tags
+            if allowed_tags and allowed_tags != ['']:
+                entry.tags = [tag for tag in entry.tags if tag.name in allowed_tags]
+            
+            # Remove denied tags
+            if denied_tags and denied_tags != ['']:
+                entry.tags = [tag for tag in entry.tags if tag.name not in denied_tags]
+
+        entry.ordered_authors = calibre_db.order_authors([entry])
+
+        # Offer sending only where send_mail sends: a book reached through a
+        # public shelf opens here without membership, but it is not sent.
+        entry.email_share_list = (check_send_to_ereader(entry)
+                                  if get_sendable_book(book_id, current_user) else [])
+        entry.reader_list = check_read_formats(entry)
+        # Such a book is not in the reader's library either, so the page keeps
+        # the library's own controls (shelves, favorite, read and archive
+        # state, hiding, removal) for books that are, as the new UI does.
+        in_my_library = user_library.contains_book(current_user, book_id)
+
+        entry.audio_entries = []
+        for media_format in entry.data:
+            if media_format.format.lower() in constants.EXTENSIONS_AUDIO:
+                entry.audio_entries.append(media_format.format.lower())
+
+        kosync_progress = None
+        kosync_progress_timestamp = None
+        kosync_progress_created_at = None
+        if current_user.is_authenticated:
+            # #627: resolved as one unit — with no position the two timestamps
+            # describe nothing, and showing them left a book the user had just
+            # marked unread still reporting when it was started and synced.
+            (kosync_progress,
+             kosync_progress_timestamp,
+             kosync_progress_created_at) = get_kosync_progress_display(
+                ub.session, current_user.id, book_id)
+
+        cwa_db = CWA_DB()
+        cwa_settings = cwa_db.cwa_settings
+
+        # Per-user hide state — fork issue #64. Logged-in users see a Hide
+        # button on the detail page; the toggle endpoint flips the row.
+        is_hidden = False
+        if not current_user.is_anonymous:
+            is_hidden = ub.session.query(ub.UserHiddenBook).filter(
+                ub.UserHiddenBook.user_id == int(current_user.id),
+                ub.UserHiddenBook.book_id == int(book_id),
+            ).first() is not None
+
+        # Per-user favorite / starred state — fork #27.
+        is_favorited = False
+        if not current_user.is_anonymous:
+            is_favorited = ub.session.query(ub.FavoriteBook).filter(
+                ub.FavoriteBook.user_id == int(current_user.id),
+                ub.FavoriteBook.book_id == int(book_id),
+            ).first() is not None
+
+        # Fork #276 (@magdalar): admin checkboxes for sending to OTHER
+        # users' kindle_mail addresses (family eReader management). Only
+        # admins see other users' emails — those are PII otherwise.
+        # Excludes the current user (avoids duplicate display next to
+        # the existing self.kindle_mail checkboxes) and users with no
+        # kindle_mail configured.
+        other_users_with_kindle = []
+        if current_user.is_authenticated and current_user.role_admin():
+            other_users_with_kindle = other_users_with_ereader(current_user.id)
+
+        original_filename_row = ub.session.query(ub.BookOriginalFilename).filter(
+            ub.BookOriginalFilename.book_id == book_id).first()
+        show_original_filename = True
+        if not current_user.is_anonymous:
+            stored_filename_preference = current_user.get_view_property(
+                "preferences", "show_original_filename"
+            )
+            if type(stored_filename_preference) is bool:
+                show_original_filename = stored_filename_preference
+        return render_title_template('detail.html',
+                                     entry=entry,
+                                     original_filename=(original_filename_row.filename
+                                                        if original_filename_row else None),
+                                     show_original_filename=show_original_filename,
+                                     cc=cc,
+                                     hierarchical_cc_ids=calibre_db.get_hierarchical_column_ids(),
+                                     is_xhr=request.headers.get('X-Requested-With') == 'XMLHttpRequest',
+                                     title=entry.title,
+                                     books_shelfs=book_in_shelves,
+                                     cwa_settings=cwa_settings,
+                                     kosync_progress=kosync_progress,
+                                     kosync_progress_timestamp=kosync_progress_timestamp,
+                                     kosync_progress_created_at=kosync_progress_created_at,
+                                     is_hidden=is_hidden,
+                                     is_favorited=is_favorited,
+                                     in_my_library=in_my_library,
+                                     other_users_with_kindle=other_users_with_kindle,
+                                     page="book")
+    else:
+        log.debug("Selected book is unavailable. File does not exist or is not accessible")
+        flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
+              category="error")
+        return redirect(url_for("web.index"))

@@ -358,7 +358,8 @@ test('New UI preserves an existing built-in choice when the optional catalog is 
   })).toContain('Arial');
   await openAppearance(page, testInfo.project.name === 'mobile');
   await expect(page.getByLabel('Font family')).toHaveValue('Arial');
-  await expect(page.getByLabel('Font family').locator('option')).toHaveCount(5);
+  await expect(page.getByLabel('Font family').locator('option')).toHaveCount(6);
+  await expect(page.getByLabel('Font family').locator('option[value="Literata"]')).toHaveText('Literata');
   await expect(page.getByText('Could not load reader fonts.', { exact: true })).toBeVisible();
   expect(await savedReaderFont(page)).toBe('Arial');
 });

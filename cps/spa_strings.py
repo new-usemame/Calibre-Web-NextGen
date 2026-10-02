@@ -1916,7 +1916,6 @@ _('New accounts sync only selected shelves. If no books arrive, add books to a s
 _("Actions for {title}")
 _("Could not update this book. Try again.")
 _("Favorite")
-
 # Uploaded reader fonts (#915).
 _("Choose fonts you are allowed to share with this server’s readers. Files stay in the configuration volume across upgrades.")
 _("Could not load reader fonts.")

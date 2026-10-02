@@ -253,6 +253,7 @@ def font_option(record: dict, url_for_font=None) -> dict:
 
 BUILTIN_FONTS = (
     {"id": "default", "label": "Book default", "family": "initial", "builtin": True},
+    {"id": "Literata", "label": "Literata", "family": "'Literata', serif", "builtin": True},
     {"id": "Arial", "label": "Arial", "family": "Arial, Helvetica, sans-serif", "builtin": True},
     {"id": "Yahei", "label": "Microsoft YaHei", "family": '"Microsoft YaHei", sans-serif', "builtin": True},
     {"id": "SimSun", "label": "SimSun", "family": "SimSun, serif", "builtin": True},

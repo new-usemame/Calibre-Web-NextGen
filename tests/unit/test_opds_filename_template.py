@@ -73,7 +73,7 @@ def test_missing_metadata_is_empty_even_with_padding(book):
 @pytest.mark.parametrize('template', [
     '{title', '{}', '{unknown}', '{title.__class__}', '{title[__class__]}',
     '{title!r}', '{title:{id}}', '{series_index:999s}', '{title:1000000000s}',
-    '{title:.999s}', '{title:uppercase()}', 'x' * 1025, None, 12, ['{title}'],
+    '{title:.999s}', '{title:uppercase()}', 'x' * 1025, None, 12, ['{title}'], '\ud800', '{title}\udfff',
 ])
 def test_invalid_templates_are_rejected(template):
     with pytest.raises(ValueError):
@@ -293,6 +293,21 @@ def test_invalid_template_does_not_partially_change_configuration(admin_config):
     with app.test_request_context('/api/v1/admin/config', method='POST', json=data):
         response, status = inspect.unwrap(api.admin_update_config)()
         assert status == 400 and response.json['error']['code'] == 'invalid_opds_filename_template'
+    assert config.config_opds_filename_template == '{title}'
+    assert config.config_calibre_web_title == 'Library'
+    config.save.assert_not_called()
+
+
+def test_unencodable_json_template_is_rejected_before_config_mutation(admin_config):
+    """JSON can carry a lone surrogate that SQLite cannot store; reject before writes."""
+    config, classic, api = admin_config
+    app = Flask(__name__)
+    with app.test_request_context(method='POST', json={
+        'config_opds_filename_template': '\ud800',
+        'config_books_per_page': 45, 'config_calibre_web_title': 'Changed',
+    }):
+        response, status = inspect.unwrap(api.admin_update_config)()
+    assert status == 400 and response.json['error']['code'] == 'invalid_opds_filename_template'
     assert config.config_opds_filename_template == '{title}'
     assert config.config_calibre_web_title == 'Library'
     config.save.assert_not_called()

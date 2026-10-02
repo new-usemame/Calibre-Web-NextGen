@@ -8,6 +8,7 @@ This preference does not rename library files, change book metadata, or change f
 ## Set the template
 
 The preference applies to all users and all book formats downloaded through OPDS.
+A template can use custom fields hidden from the book pages; their values become part of the filename for every user who can download the book. Choose fields suitable for that audience.
 In the React interface, the preference is under Admin → Library settings.
 In the Classic interface, it is under Admin → UI Configuration → OPDS Downloads.
 

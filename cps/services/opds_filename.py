@@ -51,6 +51,10 @@ def _parts(template):
     if not isinstance(template, str) or len(template) > MAX_TEMPLATE_LENGTH:
         raise ValueError(_('Use a text template of at most 1024 characters.'))
     try:
+        template.encode('utf-8')
+    except UnicodeEncodeError:
+        raise ValueError(_('Use a text template of at most 1024 characters.')) from None
+    try:
         parts = list(Formatter().parse(template))
     except ValueError:
         raise ValueError(_('Unmatched braces in the OPDS filename template.')) from None

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Shield, Trash2, Mail, UserPlus, Settings, Lock, RefreshCw, KeyRound, Info, AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 import {
@@ -385,6 +385,7 @@ function AdminConfigForm() {
   const [form, setForm] = useState<Record<string, string | number>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [filenameError, setFilenameError] = useState<string | null>(null);
+  const filenameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!cfg) return;
@@ -415,6 +416,7 @@ function AdminConfigForm() {
       onError: (err) => {
         if (err instanceof ApiError && err.detail?.code === 'invalid_opds_filename_template') {
           setFilenameError(err.message);
+          requestAnimationFrame(() => filenameInput.current?.focus());
         } else {
           setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') });
         }
@@ -497,7 +499,7 @@ function AdminConfigForm() {
       </div>
       <div className={styles.field}>
         <label htmlFor="opds-filename-template">{t('OPDS download filename template')}</label>
-        <input id="opds-filename-template" value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
+        <input id="opds-filename-template" ref={filenameInput} value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
           placeholder="{author_sort} - {title} ({id})"
           aria-invalid={filenameError ? true : undefined}
           aria-describedby={`opds-filename-help${filenameError ? ' opds-filename-error' : ''}`}

@@ -30,6 +30,9 @@ case "$WATCH_FOLDER" in
 esac
 echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
 
+# Internal lifecycle state is initialized before the consumer function uses it.
+SHUTDOWN_PENDING=0
+
 # Persistent retry state. Each physical row is one path. As before, this
 # line-oriented format cannot represent a path containing a newline.
 QUEUE_FILE="${CWA_INGEST_RETRY_QUEUE:-/config/cwa_ingest_retry_queue}"
@@ -584,7 +587,6 @@ post_batch_follow_up_loop() {
 POST_BATCH_FOLLOW_UP_PID=""
 STALE_TEMP_CLEANUP_PID=""
 MAIN_WATCHER_PID=""
-SHUTDOWN_PENDING=0
 
 stop_process_group() {
         local pid="$1"

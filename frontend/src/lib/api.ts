@@ -112,6 +112,12 @@ export interface Me {
   opds_only_shelves_sync?: boolean;
   features?: ServerFeatures;
   instance_name?: string;
+  /** Instance support links, resolved by the server for this account. */
+  support?: {
+    show_project_links: boolean;
+    url: string | null;
+    label: string | null;
+  };
   display?: {
     books_per_page: number;
     random_books: number;

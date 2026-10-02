@@ -218,6 +218,13 @@ msgstr ""
 
 #: cps/admin.py
 msgid ""
+"Support settings were not saved. Use an HTTP or HTTPS URL without "
+"credentials, with a URL up to 2048 characters and a label up to 80 "
+"characters."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -2272,6 +2279,10 @@ msgid ""
 msgstr ""
 "幫助改進 Calibre-Web NextGen 的 %(language)s 翻譯 — 您所用的語言還有 "
 "%(count)s 字符仍需要翻譯"
+
+#: cps/api/auth.py cps/render_template.py cps/spa_strings.py
+msgid "Contact support"
+msgstr ""
 
 #: cps/search.py
 msgid "Published after "
@@ -12669,6 +12680,37 @@ msgid "Site Customization"
 msgstr "查看配置"
 
 #: cps/templates/config_view_edit.html
+msgid "Show Calibre-Web NextGen support links to readers"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When enabled, readers see the project support links. Administrators always "
+"see them."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support URL"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When project support links are hidden, readers can use this destination "
+"instead. Leave blank to hide those links without a replacement. Use an "
+"absolute HTTP or HTTPS URL without username or password."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support link label"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Up to 80 characters. If left blank while a URL is set, the link says "
+"“Contact support”."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
 msgid "Server announcement banner"
 msgstr "伺服器公告橫幅"
 
@@ -14897,16 +14939,8 @@ msgid "Logout"
 msgstr "登出"
 
 #: cps/templates/layout.html
-msgid "Support Calibre-Web NextGen"
-msgstr "支援 Calibre-Web NextGen"
-
-#: cps/templates/layout.html
 msgid "Refresh Library"
 msgstr "重整書庫"
-
-#: cps/templates/layout.html
-msgid "Support"
-msgstr "支援"
 
 #: cps/templates/layout.html
 msgid "See Changelog"
@@ -15643,6 +15677,14 @@ msgstr "任務進度"
 #: cps/templates/stats.html
 msgid "Installed Version"
 msgstr "已安裝版本"
+
+#: cps/templates/support_links.html
+msgid "Support"
+msgstr "支援"
+
+#: cps/templates/support_links.html
+msgid "Support Calibre-Web NextGen"
+msgstr "支援 Calibre-Web NextGen"
 
 #: cps/templates/tasks.html
 msgid "Background Tasks Overview"

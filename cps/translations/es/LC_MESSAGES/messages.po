@@ -240,6 +240,13 @@ msgstr ""
 
 #: cps/admin.py
 msgid ""
+"Support settings were not saved. Use an HTTP or HTTPS URL without "
+"credentials, with a URL up to 2048 characters and a label up to 80 "
+"characters."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -2455,6 +2462,10 @@ msgid ""
 msgstr ""
 "Ayuda a mejorar las traducciones al %(language)s de Calibre-Web NextGen: aún "
 "quedan %(count)s cadenas por traducir en tu idioma."
+
+#: cps/api/auth.py cps/render_template.py cps/spa_strings.py
+msgid "Contact support"
+msgstr ""
 
 #: cps/search.py
 msgid "Published after "
@@ -13292,6 +13303,37 @@ msgid "Site Customization"
 msgstr "Personalización del sitio"
 
 #: cps/templates/config_view_edit.html
+msgid "Show Calibre-Web NextGen support links to readers"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When enabled, readers see the project support links. Administrators always "
+"see them."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support URL"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When project support links are hidden, readers can use this destination "
+"instead. Leave blank to hide those links without a replacement. Use an "
+"absolute HTTP or HTTPS URL without username or password."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Your support link label"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Up to 80 characters. If left blank while a URL is set, the link says "
+"“Contact support”."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
 msgid "Server announcement banner"
 msgstr "Banner de anuncio del servidor"
 
@@ -15801,16 +15843,8 @@ msgid "Logout"
 msgstr "Cerrar sesión"
 
 #: cps/templates/layout.html
-msgid "Support Calibre-Web NextGen"
-msgstr "Apoya a Calibre-Web NextGen"
-
-#: cps/templates/layout.html
 msgid "Refresh Library"
 msgstr "Actualizar Biblioteca"
-
-#: cps/templates/layout.html
-msgid "Support"
-msgstr "Apoyo"
 
 #: cps/templates/layout.html
 msgid "See Changelog"
@@ -16554,6 +16588,14 @@ msgstr "Programa"
 #: cps/templates/stats.html
 msgid "Installed Version"
 msgstr "Versión Instalada"
+
+#: cps/templates/support_links.html
+msgid "Support"
+msgstr "Apoyo"
+
+#: cps/templates/support_links.html
+msgid "Support Calibre-Web NextGen"
+msgstr "Apoya a Calibre-Web NextGen"
 
 #: cps/templates/tasks.html
 msgid "Background Tasks Overview"

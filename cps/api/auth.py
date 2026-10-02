@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 
 from flask import jsonify, request, url_for
+from flask_babel import gettext as _
 from sqlalchemy import func
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -252,6 +253,18 @@ def _me_payload(user):
         "books_per_page": int(getattr(config, "config_books_per_page", 60) or 60),
         "random_books": int(getattr(config, "config_random_books", 4) or 4),
     }
+    from ..services.support_policy import support_policy
+    role_admin = getattr(user, "role_admin", None)
+    try:
+        contact_support_label = _("Contact support")
+    except (KeyError, RuntimeError):
+        # Minimal Flask apps used by auth bootstrap/tests may not install Babel.
+        contact_support_label = "Contact support"
+    payload["support"] = support_policy(
+        config,
+        is_admin=bool(role_admin()) if callable(role_admin) else False,
+        contact_support_label=contact_support_label,
+    )
     return payload
 
 

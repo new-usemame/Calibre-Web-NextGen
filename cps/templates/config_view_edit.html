@@ -120,6 +120,27 @@
     <!-- Site Customization Card (fork #463: moved here from Basic Configuration) -->
     <div class="settings-container">
       <h4 class="settings-section-header">{{_('Site Customization')}}</h4>
+      <input type="hidden" name="support_settings_present" value="1">
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="config_show_project_support" value="on"
+                 {% if conf.config_show_project_support is not defined or conf.config_show_project_support %}checked{% endif %}>
+          {{_('Show Calibre-Web NextGen support links to readers')}}
+        </label>
+        <p class="settings-explanation">{{_('When enabled, readers see the project support links. Administrators always see them.')}}</p>
+      </div>
+      <div class="form-group">
+        <label for="config_support_url">{{_('Your support URL')}}</label>
+        <input type="url" class="form-control" name="config_support_url" id="config_support_url"
+               maxlength="2048" value="{{ conf.config_support_url or '' }}" autocomplete="off">
+        <p class="settings-explanation">{{_('When project support links are hidden, readers can use this destination instead. Leave blank to hide those links without a replacement. Use an absolute HTTP or HTTPS URL without username or password.')}}</p>
+      </div>
+      <div class="form-group">
+        <label for="config_support_label">{{_('Your support link label')}}</label>
+        <input type="text" class="form-control" name="config_support_label" id="config_support_label"
+               maxlength="80" value="{{ conf.config_support_label or '' }}" autocomplete="off">
+        <p class="settings-explanation">{{_('Up to 80 characters. If left blank while a URL is set, the link says “Contact support”.')}}</p>
+      </div>
       {# Fork #225 (@froggybottomboys): admin-set server-wide announcement banner. #}
       <div class="form-group">
         <label for="config_server_announcement">{{_('Server announcement banner')}}</label>

@@ -254,6 +254,16 @@ msgstr ""
 
 #: cps/admin.py
 msgid ""
+"Support settings were not saved. Use an HTTP or HTTPS URL without "
+"credentials, with a URL up to 2048 characters and a label up to 80 "
+"characters."
+msgstr ""
+"Les paramètres d’assistance n’ont pas été enregistrés. Utilisez une URL HTTP "
+"ou HTTPS sans identifiants, de 2048 caractères maximum, et un libellé de 80 "
+"caractères maximum."
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -2467,6 +2477,10 @@ msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
 msgstr ""
+
+#: cps/api/auth.py cps/render_template.py cps/spa_strings.py
+msgid "Contact support"
+msgstr "Contacter l’assistance"
 
 #: cps/search.py
 msgid "Published after "
@@ -13495,6 +13509,45 @@ msgid "Site Customization"
 msgstr "Configuration du mode d’affichage"
 
 #: cps/templates/config_view_edit.html
+msgid "Show Calibre-Web NextGen support links to readers"
+msgstr "Afficher les liens d’assistance de Calibre-Web NextGen aux lecteurs"
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When enabled, readers see the project support links. Administrators always "
+"see them."
+msgstr ""
+"Lorsqu’ils sont activés, les lecteurs voient les liens d’assistance du "
+"projet. Les administrateurs les voient toujours."
+
+#: cps/templates/config_view_edit.html
+msgid "Your support URL"
+msgstr "Votre URL d’assistance"
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"When project support links are hidden, readers can use this destination "
+"instead. Leave blank to hide those links without a replacement. Use an "
+"absolute HTTP or HTTPS URL without username or password."
+msgstr ""
+"Lorsque les liens d’assistance du projet sont masqués, les lecteurs peuvent "
+"utiliser cette adresse à la place. Laissez ce champ vide pour masquer les "
+"liens sans les remplacer. Utilisez une URL HTTP ou HTTPS absolue, sans nom "
+"d’utilisateur ni mot de passe."
+
+#: cps/templates/config_view_edit.html
+msgid "Your support link label"
+msgstr "Libellé de votre lien d’assistance"
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Up to 80 characters. If left blank while a URL is set, the link says "
+"“Contact support”."
+msgstr ""
+"80 caractères maximum. Si ce champ reste vide alors qu’une URL est définie, "
+"le lien indique « Contacter l’assistance »."
+
+#: cps/templates/config_view_edit.html
 msgid "Server announcement banner"
 msgstr ""
 
@@ -15878,16 +15931,8 @@ msgid "Logout"
 msgstr "Déconnexion"
 
 #: cps/templates/layout.html
-msgid "Support Calibre-Web NextGen"
-msgstr ""
-
-#: cps/templates/layout.html
 msgid "Refresh Library"
 msgstr "Actualiser la bibliothèque"
-
-#: cps/templates/layout.html
-msgid "Support"
-msgstr ""
 
 #: cps/templates/layout.html
 msgid "See Changelog"
@@ -16645,6 +16690,14 @@ msgstr "Programme"
 #: cps/templates/stats.html
 msgid "Installed Version"
 msgstr "Version installée"
+
+#: cps/templates/support_links.html
+msgid "Support"
+msgstr ""
+
+#: cps/templates/support_links.html
+msgid "Support Calibre-Web NextGen"
+msgstr ""
 
 #: cps/templates/tasks.html
 msgid "Background Tasks Overview"

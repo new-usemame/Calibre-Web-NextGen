@@ -699,7 +699,7 @@ def _child_ownership():
 def main():
     global _maintenance_fd
     try:
-        with ownership.maintenance(str(app_paths.config_dir())) as fd:
+        with ownership.maintenance(str(app_paths.config_dir()), wait_timeout=120) as fd:
             _maintenance_fd = fd
             try:
                 return _main()

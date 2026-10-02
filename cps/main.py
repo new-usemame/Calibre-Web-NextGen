@@ -180,5 +180,5 @@ def main():
     except Exception as ex:  # an optional side service must not keep the app down
         logger.create().error("Calibre content server failed to start: %s", ex)
     success = web_server.start()
-    content_server.stop()
+    content_server.stop_before_app_exit()
     sys.exit(0 if success else 1)

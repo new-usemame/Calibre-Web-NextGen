@@ -77,23 +77,30 @@ def offline_writer_ownership(fd):
         _offline_writer_fd.reset(token)
 
 
-def offline_library_operation(callback):
-    """Keep raw Calibre imports outside the managed server's live cache.
+@contextmanager
+def offline_library_access():
+    """Drain the managed server only around a raw Calibre transaction.
 
-    Acquire maintenance before the caller's existing metadata gate. The raw
-    helper inherits ownership so an ingest-parent crash cannot resume the
-    managed server while that helper is still importing.
+    Enter before the metadata gate. Both locks are inherited by the raw child,
+    so a killed ingest parent cannot expose an unfinished import to a restart.
+    Post-processing and network requests run after this scope releases.
     """
+    if _offline_owner_fd.get() is not None:
+        yield
+        return
+    with ownership.maintenance(config_dir()) as fd:
+        token = _offline_owner_fd.set(fd)
+        try:
+            yield
+        finally:
+            _offline_owner_fd.reset(token)
+
+
+def offline_library_operation(callback):
     @wraps(callback)
     def run(*args, **kwargs):
-        if _offline_owner_fd.get() is not None:
+        with offline_library_access():
             return callback(*args, **kwargs)
-        with ownership.maintenance(config_dir()) as fd:
-            token = _offline_owner_fd.set(fd)
-            try:
-                return callback(*args, **kwargs)
-            finally:
-                _offline_owner_fd.reset(token)
     return run
 
 

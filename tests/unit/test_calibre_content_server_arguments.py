@@ -847,3 +847,32 @@ def test_lifecycle_gate_timeout_preserves_monitoring_and_start_retry(content_ser
         callbacks[0]()
     assert starts == [True]
     assert len(attempts) >= 2
+
+
+def test_completed_conversion_hold_does_not_leak_when_another_writer_has_gate(
+        content_server, monkeypatch, tmp_path):
+    _spawns(content_server, monkeypatch, tmp_path)
+    content_server.start()
+    hold = content_server.hold_library()
+    deferred = []
+    monkeypatch.setattr(content_server, "_defer_for_maintenance", lambda: deferred.append(True))
+    from contextlib import contextmanager
+    @contextmanager
+    def blocked(*_a, **_kw):
+        raise TimeoutError("Restore owns gate")
+        yield
+    monkeypatch.setattr(content_server.ownership, "operation", blocked)
+    hold.release()
+    assert hold.released and content_server._library_holds == 0
+    assert deferred == [True]
+    hold.release()
+    assert content_server._library_holds == 0 and deferred == [True]
+
+
+def test_app_exit_uses_lifeline_when_stop_cannot_enter_busy_writer_gate(
+        content_server, monkeypatch):
+    def blocked():
+        raise TimeoutError("Restore owns gate")
+    monkeypatch.setattr(content_server, "stop", blocked)
+    content_server.stop_before_app_exit()
+    assert any("lifeline" in message for message in content_server.log_records)

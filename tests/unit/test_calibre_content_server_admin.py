@@ -82,3 +82,28 @@ def test_native_windows_rejects_enabled_server_but_keeps_default_off_usable(monk
     assert admin._content_server_settings_error({}) is None
     assert "POSIX" in admin._content_server_settings_error({
         "config_calibre_server_enabled": "on", "config_calibre_server_anonymous_writes": "on"})
+
+
+@pytest.mark.parametrize("helper_name", ["_configuration_update_helper", "_db_configuration_update_helper", "clear_calibre_server_password"])
+def test_busy_gate_rejects_save_with_recoverable_result_before_mutation(monkeypatch, helper_name):
+    from contextlib import contextmanager
+    from cps import admin, content_server
+    @contextmanager
+    def blocked(*_a, **_kw):
+        raise TimeoutError("Restore owns gate")
+        yield
+    monkeypatch.setattr(content_server.ownership, "operation", blocked)
+    monkeypatch.setattr(admin, "_configuration_result", lambda error, *args: {"error": error})
+    monkeypatch.setattr(admin, "_", lambda message: message)
+    helper = getattr(admin, helper_name)
+    while helper_name == "clear_calibre_server_password" and hasattr(helper, "__wrapped__") and helper.__wrapped__.__name__ == helper.__name__:
+        # Strip only auth wrappers: retain the generation wrapper itself.
+        if helper.__module__ == "cps.content_server":
+            break
+        if helper.__wrapped__.__code__.co_filename.endswith("content_server.py"):
+            helper = helper.__wrapped__
+            break
+        helper = helper.__wrapped__
+    with Flask(__name__).test_request_context(method="POST", data={}):
+        result = helper()
+    assert "maintenance" in result["error"].lower()

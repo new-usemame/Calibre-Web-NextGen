@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 from calibre_library_target import (library_target, calibredb_command, operation,
-                                    offline_library_operation, offline_child_ownership,
+                                    offline_library_operation, offline_library_access, offline_child_ownership,
                                     offline_writer_ownership, LibraryBusyError, check_maintenance)
 import tempfile
 import time
@@ -1371,6 +1371,7 @@ class NewBookProcessor:
                   f"{book_id}: {error}", flush=True)
             return False
 
+    @offline_library_operation
     def _fix_unicode_path(self, book_id: int) -> None:
         """Rename the path calibredb add generated with ascii_filename() to the
         CWA-canonical form produced by get_valid_filename_shared().
@@ -2237,6 +2238,7 @@ class NewBookProcessor:
             )
         return True
 
+    @offline_library_operation
     def _current_overwrite_candidates(
         self,
         staged_path: Path,
@@ -2274,7 +2276,6 @@ class NewBookProcessor:
         return True
 
 
-    @offline_library_operation
     def add_book_to_library(
         self,
         book_path: str,
@@ -2416,7 +2417,7 @@ class NewBookProcessor:
                 # not run overwrite inspection or format recovery for it:
                 # those Calibre opens can fail independently of this safe
                 # additive tag operation, and no format should be replaced.
-                with metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
+                with offline_library_access(), metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     replay_result = self._run_calibre_transaction(
                         staged_path,
                         staged_identity_path,
@@ -2494,6 +2495,8 @@ class NewBookProcessor:
                     )
                 else:
                     candidates = []
+            except (LibraryBusyError, TimeoutError):
+                raise
             except Exception as error:
                 self._quarantine_or_preserve_source(
                     staged_path,
@@ -2515,7 +2518,7 @@ class NewBookProcessor:
                 # Reinspect under the cooperating-writer lock. If a matching
                 # format appeared after the unlocked inspection, release the
                 # lock and validate before trying again.
-                with metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
+                with offline_library_access(), metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     try:
                         candidates = self._current_overwrite_candidates(
                             staged_path,
@@ -2524,6 +2527,8 @@ class NewBookProcessor:
                             source_digest,
                             metadata_override,
                         )
+                    except (LibraryBusyError, TimeoutError):
+                        raise
                     except Exception as error:
                         self._quarantine_or_preserve_source(
                             staged_path,
@@ -2680,7 +2685,7 @@ class NewBookProcessor:
             )
             if imported_ids:
                 try:
-                    with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                    with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
                         else:
@@ -2695,6 +2700,8 @@ class NewBookProcessor:
                                     print(f"[ingest-processor] INFO: Derived title sort for {resorted} imported book(s) whose embedded sort was the bare title (fork #2219).", flush=True)
                             except sqlite3.Error as e:
                                 print(f"[ingest-processor] WARN: Could not derive title sort for imported book(s) {imported_ids}: {e}", flush=True)
+                except (LibraryBusyError, TimeoutError):
+                    raise
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to set timestamp for new book: {e}", flush=True)
 
@@ -2704,7 +2711,7 @@ class NewBookProcessor:
             # Update timestamp to last_modified for any rows changed by this import so sorting by 'new' reflects overwrites.
             if self.cwa_settings.get('auto_ingest_automerge') == 'overwrite':
                 try:
-                    with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                    with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                         cur = con.cursor()
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
@@ -2717,6 +2724,8 @@ class NewBookProcessor:
                         affected = cur.rowcount
                         if affected:
                             print(f"[ingest-processor] INFO: Updated timestamp for {affected} overwritten book(s) to reflect latest import.", flush=True)
+                except (LibraryBusyError, TimeoutError):
+                    raise
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to adjust timestamps after overwrite import: {e}", flush=True)
 
@@ -2727,7 +2736,7 @@ class NewBookProcessor:
             )
             print(f"[ingest-processor] ERROR: {message}", flush=True)
             raise RetryIngestSourceError(message) from e
-        except (PreserveIngestSourceError, RetryIngestSourceError):
+        except (PreserveIngestSourceError, RetryIngestSourceError, LibraryBusyError, TimeoutError):
             raise
         except Exception as e:
             print(f"[ingest-processor] ingest-processor ran into the following error:\n{e}", flush=True)
@@ -2793,6 +2802,8 @@ class NewBookProcessor:
             print(f"[ingest-processor] Failed to add format for book id {book_id}: {os.path.basename(str(staged_path))}\nCALIBREDB EXIT/ERROR CODE: {e.returncode}\nError details: {stderr_output}", flush=True)
             self.backup(str(staged_path), backup_type="failed")
             raise RetryIngestSourceError("Calibre did not commit the new format") from e
+        except (LibraryBusyError, TimeoutError):
+            raise
         except Exception as e:
             print(f"[ingest-processor] Unexpected error while adding format for book id {book_id}: {e}", flush=True)
             raise RetryIngestSourceError(str(e)) from e
@@ -3160,10 +3171,10 @@ def main(filepath=None):
                         exit_code = int(child_exit)
             return exit_code
 
+        check_maintenance()
         if not initialize_runtime():
             return 2
 
-        check_maintenance()
         nbp = NewBookProcessor(filepath)
 
         # If this file is not an ignored temporary, wait briefly for stability to avoid importing a still-growing file
@@ -3328,6 +3339,8 @@ def main(filepath=None):
                                     print(f"[ingest-processor] Original file no longer exists or is empty, cannot retain format: {filepath}", flush=True)
                             else:
                                 print(f"[ingest-processor] Could not find book ID to add retained format for: {nbp.filename}", flush=True)
+                        except (LibraryBusyError, TimeoutError):
+                            raise
                         except Exception as e:
                             print(f"[ingest-processor] Error adding retained format: {e}", flush=True)
                             raise RetryIngestSourceError("Original format was not retained") from e

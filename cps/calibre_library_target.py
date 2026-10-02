@@ -76,7 +76,7 @@ def server_target(library_dir, enabled, port, listen, anonymous_writes, username
 
 def path_is_available(owner_busy):
     if owner_busy is not None and owner_busy():
-        raise RuntimeError("Managed Calibre server still owns the library; retry after reconciliation")
+        raise TimeoutError("Managed Calibre server still owns the library; retry after reconciliation")
 
 
 def server_ready(host, port, library_dir, timeout=0.5):

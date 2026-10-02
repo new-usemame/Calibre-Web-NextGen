@@ -2145,11 +2145,19 @@ def convert_library_start(queue):
     # to itself. The server comes back only if it was running, and also when the
     # run cannot be launched at all -- otherwise a failed launch left it stopped
     # until the next save or restart (#2210 review).
-    library_hold = content_server.hold_library()
+    library_hold = None
     try:
+        library_hold = content_server.hold_library()
         cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
-    except Exception:
-        library_hold.release()
+    except Exception as error:
+        try:
+            with open(_service_log_path("convert-library.log"), "a") as failed_log:
+                failed_log.write(f"\n[convert-library]: Cannot start library conversion: {error}\n")
+                failed_log.write(f"NextGen Convert Library Service - Run Failed: {datetime.now()}\n")
+                failed_log.write(f"NextGen Convert Library Service - Run Ended: {datetime.now()}\n")
+        finally:
+            if library_hold is not None:
+                library_hold.release()
         raise
     queue.put(cl_process)
     try:
@@ -2184,7 +2192,12 @@ def kill_convert_library(queue):
         sleep(0.05) # Required to prevent high cpu usage
         if trigger_file.exists():
             # Kill the convert_library process
-            cl_process = queue.get()
+            try:
+                cl_process = queue.get(timeout=0.1)
+            except Empty:
+                if is_convert_library_finished():
+                    break
+                continue
             cl_process.terminate()
             # Remove any potentially left over lock files
             try:

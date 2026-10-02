@@ -16770,3 +16770,7 @@ msgstr ""
 #: cps/admin.py
 msgid "The managed Calibre content server requires a POSIX platform. Use the Linux container on Windows."
 msgstr ""
+
+#: cps/admin.py
+msgid "Library maintenance is running; try again when it finishes."
+msgstr ""

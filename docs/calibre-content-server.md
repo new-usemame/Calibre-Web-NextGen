@@ -58,7 +58,9 @@ Direct database edits from outside that server require a reload. NextGen checks
 `metadata.db` and its WAL every five seconds, and reloads after thirty seconds
 without further changes. This deliberately conservative watcher cannot identify
 which process wrote the database; even server-originated writes may cause a
-later reload. Reads can be briefly interrupted during that reload.
+later reload. Reads can be briefly interrupted during that reload. Until it reloads, a Calibre
+client can see old metadata or a path that NextGen has renamed. Avoid editing the
+same book simultaneously through both applications.
 
 An unexpected server exit is retried. Three quick exits stop automatic retries
 and preserve the last server output in the application log. Correct the reported
@@ -88,7 +90,9 @@ This integration began with [@benjitobz's contribution](https://github.com/new-u
 
 The managed server supports POSIX platforms, including the Linux container.
 Native Windows cannot enable it; use the Linux container there. The ownership
-protocol relies on a descriptor inherited by the Calibre child. Without that
+protocol relies on a descriptor inherited by the Calibre child and shared local
+filesystem locks. Keep `/config` on a local filesystem; NFS/CIFS lock inheritance
+and ownership changes are not verified. Without that
 ownership, a killed supervisor could leave a running server invisible to the
 next app process. This restriction applies to the optional server; the normal
 server-disabled app and command-line tools keep their path-based operation.
@@ -97,8 +101,13 @@ The supervisor stops and reaps Calibre when the app lifeline closes. On Linux,
 Calibre also receives a parent-death signal if its supervisor is killed. On
 other POSIX platforms, a child that survives a forced supervisor kill retains
 the owner lock: subsequent operations refuse path access until it exits.
-Raw ingest imports also pause the managed cache for their whole operation; their
-Calibre transaction child inherits both maintenance and metadata-writer locks.
+Raw ingest imports pause the managed cache only around raw Calibre inspection and
+transactions; their Calibre child inherits both maintenance and metadata-writer
+locks. Network metadata fetch, cover generation and delivery run after the raw
+transaction releases that pause. Raw imports and Convert Library serialize even
+when the optional server is disabled, because both use Calibre directly on the
+same library. Convert Library waits up to two minutes for an existing raw import;
+a busy ingest retains its source and retries through the service queue.
 A standalone Convert Library run owns its maintenance lock for the whole run,
 including across an app restart. Restore holds the shared writer gate through
 its subprocesses, and settings changes retain that gate until the server uses

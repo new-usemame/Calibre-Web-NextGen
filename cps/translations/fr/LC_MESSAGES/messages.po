@@ -19283,3 +19283,7 @@ msgstr ""
 #: cps/admin.py
 msgid "The managed Calibre content server requires a POSIX platform. Use the Linux container on Windows."
 msgstr "Le serveur de contenu Calibre géré nécessite une plateforme POSIX. Utilisez le conteneur Linux sous Windows."
+
+#: cps/admin.py
+msgid "Library maintenance is running; try again when it finishes."
+msgstr "La maintenance de la bibliothèque est en cours ; réessayez après sa fin."

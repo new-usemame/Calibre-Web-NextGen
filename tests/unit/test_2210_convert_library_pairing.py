@@ -127,3 +127,21 @@ def test_reaper_thread_failure_keeps_conversion_cancellable_and_waits_before_rel
     cwa_functions.convert_library_start(process_queue)
     assert observed == [(False, True)]
     assert fake.running and fake.starts == 1
+
+
+def test_hold_failure_marks_conversion_terminal_before_any_child(monkeypatch, tmp_path):
+    log_path = tmp_path / "convert-library.log"
+    monkeypatch.setattr(cwa_functions, "_service_log_path", lambda _name: str(log_path))
+    def busy():
+        raise TimeoutError("restore owns metadata gate")
+    monkeypatch.setattr(cwa_functions.content_server, "hold_library", busy)
+    monkeypatch.setattr(cwa_functions.subprocess, "Popen",
+                        lambda *_a, **_k: pytest.fail("unowned conversion launched"))
+    try:
+        cwa_functions.convert_library_start(queue.Queue())
+    except TimeoutError:
+        pass
+    assert log_path.exists(), "the Tasks poller has no terminal conversion result"
+    text = log_path.read_text()
+    assert "NextGen Convert Library Service - Run Failed:" in text
+    assert "NextGen Convert Library Service - Run Ended:" in text

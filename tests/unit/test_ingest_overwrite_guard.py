@@ -542,3 +542,24 @@ def test_recovery_copy_uses_digest_and_retention_limit(
         file.read_bytes() == b"known good"
         for directory in recovery_sets for file in directory.iterdir()
     )
+
+
+def test_raw_import_owns_maintenance_but_remote_post_processing_does_not(
+        ingest_processor, monkeypatch, tmp_path):
+    import calibre_library_target as routing
+    monkeypatch.setattr(routing, "config_dir", lambda: str(tmp_path))
+    source = tmp_path / "new.epub"
+    source.write_bytes(b"new book")
+    p = _processor(ingest_processor, tmp_path)
+    p.cwa_settings["auto_ingest_automerge"] = "new_record"
+    _disable_post_import_work(ingest_processor, p, monkeypatch)
+    observed = []
+    def transaction(*_args):
+        assert routing.ownership.busy(str(tmp_path), "maintenance")
+        return {"status": "imported", "book_ids": [7]}
+    p._run_calibre_transaction = transaction
+    p.fetch_metadata_if_enabled = lambda **_kw: observed.append(
+        routing.ownership.busy(str(tmp_path), "maintenance"))
+    p.add_book_to_library(str(source))
+    assert observed == [False], "network metadata fetch unnecessarily holds the offline library"
+    assert not routing.ownership.busy(str(tmp_path), "maintenance")

@@ -223,5 +223,5 @@ def test_scripts_never_fall_back_to_path_while_managed_owner_is_alive(target_mod
     elif case == "missing-credentials":
         _make_app_db(target_module.app_db, username="", password_e=None)
     monkeypatch.setattr(target_module.ownership, "busy", lambda *_args: True)
-    with pytest.raises(RuntimeError, match="owns the library"):
+    with pytest.raises(TimeoutError, match="owns the library"):
         target_module.library_target(LIBRARY)

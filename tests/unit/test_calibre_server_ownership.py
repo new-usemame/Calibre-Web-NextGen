@@ -196,3 +196,22 @@ import_book()
             import signal
             os.kill(child, signal.SIGTERM)
         eventually(lambda: not ownership.busy(str(tmp_path), "maintenance"))
+
+
+def test_conversion_wait_budget_outlasts_a_short_raw_ingest(ownership, tmp_path):
+    entered = threading.Event()
+    failures = []
+    def conversion():
+        try:
+            with ownership.maintenance(str(tmp_path), timeout=3, wait_timeout=3):
+                entered.set()
+        except BaseException as error:
+            failures.append(error)
+    with ownership.maintenance(str(tmp_path)):
+        worker = threading.Thread(target=conversion)
+        worker.start()
+        time.sleep(1.15)
+        assert not entered.is_set(), "conversion stole an active raw import"
+    worker.join(timeout=4)
+    assert not worker.is_alive() and not failures
+    assert entered.is_set(), "a short raw ingest incorrectly caused conversion failure"

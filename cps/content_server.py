@@ -482,18 +482,35 @@ def _stop_blocking(gate_owned=False):
         _locked_stop()
 
 
-def configuration_update(callback):
+
+def stop_before_app_exit():
+    """App exit/exec closes the guardian lifeline even when a writer is busy."""
+    try:
+        stop()
+    except TimeoutError:
+        log.warning("Calibre stop deferred to app-exit lifeline while the library is busy")
+
+
+def configuration_update(callback=None, *, on_busy=None):
     """Keep settings persistence and process reconciliation one generation.
 
     Flask/session work stays on its caller. Capture gate ownership before
     offloading lifecycle work: native gevent workers do not inherit ContextVars.
     """
+    if callback is None:
+        return lambda function: configuration_update(function, on_busy=on_busy)
+
     @wraps(callback)
     def update(*args, **kwargs):
         if _configuration_gate_owned.get():
             return callback(*args, **kwargs)
         operation = ownership.operation(constants.CONFIG_DIR)
-        _run_lifecycle(operation.__enter__)
+        try:
+            _run_lifecycle(operation.__enter__)
+        except TimeoutError:
+            if on_busy is not None:
+                return on_busy()
+            raise
         token = _configuration_gate_owned.set(True)
         try:
             return callback(*args, **kwargs)
@@ -519,18 +536,28 @@ class _LibraryHold:
 
     def _release_blocking(self):
         global _library_holds, _restart_on_release
-        operation = nullcontext() if self.exclusive_context is not None else ownership.operation(constants.CONFIG_DIR)
+        # Releasing a completed owner is state bookkeeping, not a database
+        # write. Drop its count even when a separate Restore owns the gate.
+        # Never acquire the gate while holding _lock: lifecycle order is gate
+        # then _lock. Actual restart below still requires the writer gate.
         try:
-            with operation, _lock:
+            with _lock:
                 if self.released:
                     return
                 self.released = True
                 _library_holds -= 1
+                restart = not _library_holds and _restart_on_release
                 if not _library_holds:
-                    restart = _restart_on_release
                     _restart_on_release = False
-                    if restart and setting("config_calibre_server_enabled"):
+            if restart and setting("config_calibre_server_enabled"):
+                operation = (nullcontext() if self.exclusive_context is not None
+                             else ownership.operation(constants.CONFIG_DIR, timeout=0.2))
+                try:
+                    with operation, _lock:
                         _locked_start()
+                except TimeoutError:
+                    with _lock:
+                        _defer_for_maintenance()
         finally:
             if self.exclusive_context is not None:
                 self.exclusive_context.__exit__(None, None, None)

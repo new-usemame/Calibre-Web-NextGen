@@ -64,11 +64,13 @@ def test_default_off_ingest_keeps_source_while_convert_library_owns_maintenance(
     assert result == 2, "busy input must enter the service's existing retry queue"
 
 
-@pytest.mark.parametrize("failure", [RuntimeError("unready owner"), TimeoutError("writer deadline")])
+@pytest.mark.parametrize("failure", [TimeoutError("writer deadline"), "maintenance busy"])
 def test_add_format_coordination_failure_keeps_source_and_manifest(
     ingest, monkeypatch, tmp_path, failure
 ):
     module, _routing = ingest
+    if failure == "maintenance busy":
+        failure = module.LibraryBusyError("maintenance owner")
     source = tmp_path / "incoming.epub"
     source.write_bytes(b"new format source")
     manifest = source.with_name(source.name + ".cwa.json")
@@ -86,7 +88,7 @@ def test_add_format_coordination_failure_keeps_source_and_manifest(
     assert source.is_file(), "unacknowledged format source was deleted"
     assert source.read_bytes() == b"new format source"
     assert manifest.is_file(), "the add_format intent must remain paired with the source"
-    assert result in (1, 2), "uncommitted add_format cannot be acknowledged as success"
+    assert result == 2, "transient library ownership must remain eligible for periodic retry"
 
 
 def test_failed_add_format_command_is_not_acknowledged_or_deleted(ingest, monkeypatch, tmp_path):
@@ -111,8 +113,9 @@ def test_failed_add_format_command_is_not_acknowledged_or_deleted(ingest, monkey
     assert result == 1
 
 
+@pytest.mark.parametrize("busy", [False, True])
 def test_retained_original_format_failure_keeps_source_for_idempotent_retry(
-        ingest, monkeypatch, tmp_path):
+        ingest, monkeypatch, tmp_path, busy):
     """A committed conversion does not acknowledge its uncommitted original format."""
     module, _routing = ingest
     source = tmp_path / "incoming.txt"
@@ -133,13 +136,14 @@ def test_retained_original_format_failure_keeps_source_for_idempotent_retry(
     p.last_added_book_id = 7
 
     def busy_original(*_args):
-        raise module.RetryIngestSourceError("unready library owner")
+        error = module.LibraryBusyError if busy else module.RetryIngestSourceError
+        raise error("unready library owner")
 
     p.add_format_to_book = busy_original
     monkeypatch.setattr(module, "NewBookProcessor", lambda _path: p)
     result = module.main(str(source))
     assert source.is_file(), "converted book cleanup deleted its uncommitted retained format"
-    assert result == 1, "retained-format retry was incorrectly acknowledged as success"
+    assert result == (2 if busy else 1), "retained-format failure lost its retry class"
 
 
 def test_busy_maintenance_is_checked_before_conversion(ingest, monkeypatch, tmp_path):
@@ -163,3 +167,13 @@ def test_busy_maintenance_is_checked_before_conversion(ingest, monkeypatch, tmp_
         result = module.main(str(source))
     assert converted == [], "busy maintenance still allowed an expensive conversion"
     assert result == 2 and source.is_file()
+
+
+def test_busy_maintenance_skips_expensive_runtime_initialization(ingest, monkeypatch, tmp_path):
+    module, routing = ingest
+    source = tmp_path / "waiting.epub"
+    source.write_bytes(b"source waiting for conversion")
+    monkeypatch.setattr(module, "initialize_runtime", lambda: pytest.fail("busy retry loaded conversion runtime"))
+    with routing.ownership.maintenance(str(tmp_path)):
+        assert module.main(str(source)) == 2
+    assert source.read_bytes() == b"source waiting for conversion"

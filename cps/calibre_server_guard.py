@@ -57,12 +57,12 @@ def busy(config_dir, kind):
 
 
 @contextmanager
-def maintenance(config_dir, timeout=120):
+def maintenance(config_dir, timeout=120, wait_timeout=1):
     """Own maintenance before accessing the library; do not steal another run."""
     fd = _open_lock(config_dir, "maintenance")
     acquired = False
     try:
-        acquire_deadline = time.monotonic() + min(timeout, 1)
+        acquire_deadline = time.monotonic() + min(timeout, wait_timeout)
         while not _locks.acquire(fd, blocking=False):
             if time.monotonic() >= acquire_deadline:
                 raise LibraryBusyError("Calibre library maintenance is already running")

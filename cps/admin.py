@@ -2984,7 +2984,11 @@ def _db_simulate_change():
     return db_change, db_valid
 
 
-@content_server.configuration_update
+def _library_busy_configuration_result():
+    return _configuration_result(_("Library maintenance is running; try again when it finishes."))
+
+
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
 def _db_configuration_update_helper():
     db_change = False
     to_save = request.form.to_dict()
@@ -3106,7 +3110,7 @@ def _content_server_settings_error(to_save):
     return None
 
 
-@content_server.configuration_update
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
 def _configuration_update_helper():
     reboot_required = False
     content_server_changed = False
@@ -3365,7 +3369,7 @@ def _configuration_update_helper():
 @admi.route("/admin/config/clear_calibre_server_password", methods=['POST'])
 @user_login_required
 @admin_required
-@content_server.configuration_update
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
 def clear_calibre_server_password():
     config.config_calibre_server_password_e = ""
     config.save()

@@ -36,7 +36,10 @@ function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, shel
     // the stable catalog heading when the original trigger no longer exists;
     // ordinary dismissal still uses the focus trap's trigger restoration.
     queueMicrotask(() => {
-      if (!opener?.isConnected && document.activeElement === document.body) {
+      // Native touch may restore the route's main landmark because tapping
+      // the opener never focused it. Treat that neutral route focus like body.
+      const active = document.activeElement;
+      if (!opener?.isConnected && (active === document.body || active === document.querySelector('main'))) {
         document.querySelector<HTMLElement>('[data-testid="catalog-heading"], [data-testid="shelf-heading"]')?.focus();
       }
     });

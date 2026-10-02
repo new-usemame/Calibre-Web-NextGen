@@ -11,3 +11,10 @@ Independent root review found and corrected policy parity and hidden early-direc
 Focused initialization/ownership regressions: 134 passed. Full local smoke/unit run: 10,256 passed, 124 skipped, four failures. Two are the established baseline metadata-replacement SQLite I/O failures. The malformed new changelog fragment was corrected; an obsolete assertion on literal install commands was removed. The real helper test now creates and writes the runtime and separate opt-in-plugin directories, retaining plugin separation coverage. These tests, remaining Calibre environment checks and actual changelog assembly now pass: 25 passed. No second full-suite run is claimed after these test/fragment-only changes.
 
 The no-op discovery test was seen red before the guard, including an explicit denied-write reproduction. Runtime failure tests detect a failed early directory hidden by a later success. Shell syntax and diff checks pass. This patch may conflict with PR #2403 and the separate #995 cache change in cwa-init; rebase after the first merge rather than bundling their scopes.
+
+
+## Serial merge integration (2026-10-02)
+
+Rebased onto current main4369e2c56, including complete-view selection and its translation follow-up. Only CHANGES add/link conflicts were resolved; all preceding rows and SPA strings are preserved. Dockerfile, cwa-init, AutoLibrary, both new shell helpers and feature tests are byte-identical to the independently reviewed original. Original actual explicit UID1000/root-PUID1000 whole-image startup evidence remains applicable to unchanged initialization code. Other-owner #2403 remains outside this work.
+
+Current focused startup/environment/fragment/classifier packet26 passed; adjacent AutoLibrary discovery and root/non-root service-helper packet51 passed, total77. Shell syntax and diff checks pass. Independently measured classifier closure214 of272 matches the README. Fresh exact-head CI is required after rebase.

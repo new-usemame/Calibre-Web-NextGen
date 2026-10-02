@@ -22,6 +22,18 @@ def _font_stream(data=b"fixture-font", signature=b"\x00\x01\x00\x00"):
     return BytesIO(signature + data)
 
 
+def test_uploaded_catalogue_retains_bundled_literata_choice(font_catalog):
+    """Uploading a face must preserve the already shipped bundled EPUB choice."""
+    for has_upload in (False, True):
+        if has_upload:
+            font_catalog.upload_font(_font_stream(), "book-face.ttf")
+        options = font_catalog.catalogue()["items"]
+        literata = next((item for item in options if item["id"] == "Literata"), None)
+        assert literata is not None, "the catalog must retain the bundled Literata choice"
+        assert literata["family"] == "'Literata', serif"
+        assert literata["builtin"] is True
+
+
 def test_upload_catalogue_deduplicates_bytes_and_delete_invalidates_choice(font_catalog):
     catalog = font_catalog
     first, created = catalog.upload_font(_font_stream(), "book-face.ttf", "My Book Font")

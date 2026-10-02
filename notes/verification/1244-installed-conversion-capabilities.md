@@ -23,3 +23,12 @@ The probe bounds combined output at 256 KiB and runtime at eight seconds. On POS
 Product source `e07fe4a2b08ffbcf97e37fd8e9a9efc58b83b404` was built into image `sha256:08fc7a4273bd40a6c5a36bcaea16b5ae5ce94485abe978924009ebc76a5d676e`. Subsequent changes are test/documentation only. Seven checked runtime source hashes match the worktree and container. Served bundle `/static/app/assets/index-aRtHK6ty.js` has SHA-256 `82be1fee991a15a859daa23a9b92ab8ff9c7997aefd4060c5915b2d042fb20c9`.
 
 Evidence is retained privately in the feature work state. No schema change, new dependency, bundled plugin or external service. No physical-device, proxy-subpath, Windows tree-cleanup or format-pair-wide promise. Existing pair-specific Calibre/Kepubify limitations are unchanged. No release or deployment was performed.
+
+
+## Serial current-main integration — 2026-10-02
+
+Rebased onto `b25a10d7c23d8db26f22123119c584c4b75955e6`, including all preceding reader/font/selection/Discover/file-ISBN/export/cover improvements. Runtime rebase head `e856b0490d8775289639fc197e404adfffbb589b` preserves the original independently reviewed capability service and both feature test files byte-for-byte. Changelog resolution retains every current-main row and links PR2429; the classifier README retains current worker/isolated-parser guidance and measures225/284.
+
+Automatic locale merges retained all keys but interleaved the feature entries inside main. FR/NL and POT now retain their complete raw main prefixes followed by exactly the two original capability messages, with original values/flags. No feature behavior or permission change was made during this integration.
+
+Current capability/format-validation/user-plugin/API/translation/classifier packet:161passed/1existing skip38.35s. Original full suite and Linux active-plugin/off/on/hot-change/conversion/restart proofs above remain historical. Independent current-main source disposition, new complete-source artifact with bounded actual conversion behavior, exact resulting-head CI and fresh main/head/persona gates remain required for the serial merge. No release, deployment, original-issue mutation or comment.

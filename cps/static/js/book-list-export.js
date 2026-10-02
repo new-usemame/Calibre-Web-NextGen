@@ -25,6 +25,7 @@
           } catch (_) { status.textContent = box.dataset.error; }
           finally { buttons.forEach(function (item) { item.disabled = false; }); box.removeAttribute("aria-busy"); }
         });
+        button.disabled = false;
       });
     });
   }

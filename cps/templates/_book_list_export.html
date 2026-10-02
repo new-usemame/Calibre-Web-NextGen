@@ -36,8 +36,8 @@
   data-limit="{{ _('Too many books to export. Narrow the filters and try again.') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div style="display:flex;flex-wrap:wrap;gap:8px">
-    <button type="button" class="btn btn-default" data-export-format="csv" style="min-height:44px">{{ _('Export CSV') }}</button>
-    <button type="button" class="btn btn-default" data-export-format="txt" style="min-height:44px">{{ _('Export TXT') }}</button>
+    <button type="button" disabled class="btn btn-default" data-export-format="csv" style="min-height:44px">{{ _('Export CSV') }}</button>
+    <button type="button" disabled class="btn btn-default" data-export-format="txt" style="min-height:44px">{{ _('Export TXT') }}</button>
   </div>
   <p class="help-block">{{ _('Exports all matching books, including pages you have not loaded.') }}</p>
   <p role="status"></p>

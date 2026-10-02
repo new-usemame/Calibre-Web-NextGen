@@ -71,11 +71,6 @@ from .services.restriction_columns import (
     bool_tokens_valid,
     normalize_bool_token,
 )
-from .custom_column_visibility import (
-    load_browsable_columns,
-    persist_configured_default_visible,
-    seed_cc_visibility,
-)
 
 log = logger.create()
 
@@ -750,32 +745,12 @@ def view_configuration():
         .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
         .filter(db.CustomColumns.mark_for_delete == 0).all()
     sortable_columns = load_eligible_columns() or []
-    cc_browse_columns = load_browsable_columns() or []
-    # What an unconfigured install would actually seed, so the form shows the
-    # boxes that are really going to be ticked rather than an empty list.
-    cc_hierarchical_column_ids = [
-        col.id for col in cc_browse_columns if not calibre_db.is_flat_cc_column(col.id)
-    ] if cc_browse_columns else []
-    # The tri-state is resolved here rather than in the template. Jinja's
-    # `default(none, true)` also substitutes for "", which silently collapses
-    # "the administrator cleared the list" into "never configured" and shows
-    # hierarchical columns as ticked when they would seed hidden.
-    configured_cc_columns = getattr(config, "config_default_cc_columns", None)
-    if configured_cc_columns is None:
-        cc_selected_default_ids = set(cc_hierarchical_column_ids)
-    else:
-        cc_selected_default_ids = {
-            value.strip() for value in configured_cc_columns.split(",") if value.strip()
-        }
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
                                  restriction_is_bool=(restricted_column_datatype(
                                      config.config_restricted_column) == "bool"),
-                                 ccBrowseColumns=cc_browse_columns,
-                                 ccHierarchicalColumnIds=cc_hierarchical_column_ids,
-                                 ccSelectedDefaultIds=cc_selected_default_ids,
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -1159,14 +1134,6 @@ def update_view_configuration():
         config,
         request.form.getlist("config_sortable_custom_columns"),
         load_eligible_columns(),
-    )
-    # Seed template for per-user custom-column browse visibility. Read once per
-    # user when they are seeded, then frozen -- so editing this changes who sees
-    # what on their NEXT signup or reseed, not who sees what right now.
-    persist_configured_default_visible(
-        config,
-        request.form.getlist("config_default_cc_columns"),
-        load_browsable_columns(),
     )
     if _config_string(to_save, "config_title_regex"):
         # title_sort UDF reads ``CalibreDB.config.config_title_regex`` at
@@ -3367,18 +3334,6 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
                                  title=_("Database Configuration"), page="dbconfig")
 
 
-def _seed_new_user_cc_visibility(content):
-    """Write the initial per-column browse visibility for a freshly created user.
-
-    Wrapped by every caller: a library that cannot be read must not stop an
-    account from being created, and the user then simply resolves through the
-    seed default like an anonymous session would.
-    """
-    columns = load_browsable_columns()
-    if columns:
-        seed_cc_visibility(content, columns, commit=False)
-
-
 def _handle_new_user(to_save, content, languages, translations, kobo_support):
     content.default_language = to_save["default_language"]
     # Only a locale we ship may be stored: get_locale() returns it verbatim
@@ -3446,15 +3401,6 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
         seed_new_user_ui_font_defaults(content, config)
-        # Materialise an explicit per-column browse visibility for the new
-        # account, so it starts from a frozen set instead of resolving against
-        # the administrator's template on every request. Written before the add
-        # and persisted by the commit below.
-        try:
-            _seed_new_user_cc_visibility(content)
-        except Exception:
-            log.error("Could not seed custom column visibility for the new user",
-                      exc_info=True)
         ub.session.add(content)
         ub.session.commit()
         flash(_("User '%(user)s' created", user=content.name), category="success")

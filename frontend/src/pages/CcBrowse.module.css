@@ -43,7 +43,7 @@
 .viewToggle button {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 var(--sp-3);
   color: var(--text-muted);
   font-size: var(--fs-sm);
@@ -135,13 +135,10 @@
   border-radius: var(--r-sm);
   cursor: pointer;
   list-style: none; /* hide the default disclosure marker; the chevron is ours */
-  min-height: 40px;
+  min-height: 44px;
 }
-.treeNode summary::-webkit-details-marker { display: none; }
-.treeNode summary:hover { background: var(--surface-2); }
-.treeNode summary:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
-/* Leaf rows use the same flex row as summaries (marker | name | count) but
+/* Leaf rows use the same flex row (marker | name | count) but
    without cursor/hover affordances that imply expandability. This is also the
    whole presentation of a FLAT column: every value is a leaf, because a flat
    value has no children to expand into. */
@@ -165,7 +162,7 @@ div.treeSummary:hover { background: transparent; }
   color: var(--text-faint);
   transition: transform 0.15s ease;
 }
-.treeNode[open] > summary .chevron { transform: rotate(90deg); }
+.chevronOpen { transform: rotate(90deg); }
 
 .nodeIcon {
   flex-shrink: 0;
@@ -173,6 +170,9 @@ div.treeSummary:hover { background: transparent; }
 }
 
 .nodeLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   flex: 1;
   min-width: 0;
   color: var(--text);
@@ -272,7 +272,7 @@ div.treeSummary:hover { background: transparent; }
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  min-height: 40px;
+  min-height: 44px;
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -294,3 +294,27 @@ div.treeSummary:hover { background: transparent; }
   font-size: var(--fs-sm);
   margin-bottom: var(--sp-4);
 }
+
+
+.profile { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); text-decoration: underline; }
+.profile:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.disclosure:hover { background: var(--surface-2); }
+.disclosure:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+.requestError { margin-top: var(--sp-4); }
+.requestError button { min-height: 44px; }

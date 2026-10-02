@@ -29,38 +29,22 @@ omitted here too, and a hidden column id 404s — so the SPA and the classic
 sidebar can never disagree on what is browsable, and neither can be used to
 route around the other.
 """
-from flask import jsonify, request
+from flask import abort, jsonify, request
 
 from . import api_v1
 from .books import _rows_to_items
 from .. import calibre_db, config, constants, db, hierarchy
 from ..cw_login import current_user
-from ..custom_column_visibility import is_cc_visible
+from ..custom_column_visibility import browsable_columns, is_cc_visible, retryable_column_reads
 from ..sort_orders import book_sort_order
 from ..usermanagement import login_required_if_no_ano
 
-# The datatypes that render as browsable tag-like lists/trees, mirroring
-# cps/render_template.py::get_custom_column_sidebar_entries.
-_BROWSABLE_DATATYPES = ('text', 'enumeration')
-
-
 def _cc_disabled(col_id):
-    """Whether the caller hid this column's section on their profile page.
-
-    Delegates to the shared resolver so this surface, the classic sidebar, the
-    classic browse route and both OPDS feeds can never disagree about what a
-    user may browse. The ``try/except`` mirrors the previous inline check: a
-    user object that cannot answer degrades to visible rather than 500ing the
-    browse surface.
-    """
-    try:
-        return not is_cc_visible(current_user, col_id)
-    except Exception:
-        return False
+    return not is_cc_visible(current_user, col_id, fail_on_error=True)
 
 
 def _visible_columns():
-    """The browsable custom columns for the current user, degrading to [].
+    """The browsable custom columns for the current user; failed reads are 503.
 
     Mirrors ``get_custom_column_sidebar_entries``: text/enumeration columns
     honouring the per-user ``show_cc_<id>`` toggle. The read-column and
@@ -75,16 +59,14 @@ def _visible_columns():
     try:
         if not db.cc_classes:
             return items
-        for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in _BROWSABLE_DATATYPES:
-                continue
+        for col in browsable_columns(calibre_db.get_cc_columns(config, fail_on_error=True)):
             if _cc_disabled(col.id):
                 continue
             items.append(col)
     except Exception:
-        # Same degrade rule as get_cc_columns: an unreadable definitions
-        # table must not take the browse surface down with a 500.
-        return []
+        # This is the primary content of the browse surface, unlike optional
+        # fields on a book detail. An unavailable read must remain retryable.
+        abort(503, description="Custom-column definitions temporarily unavailable")
     return items
 
 
@@ -115,10 +97,11 @@ def _may_browse_columns():
 
 @api_v1.route("/columns")
 @login_required_if_no_ano
+@retryable_column_reads
 def list_columns():
     """Browsable custom columns with their hierarchy status."""
     if not _may_browse_columns():
-        return []
+        return jsonify({"items": []})
     return jsonify({"items": [{
         "id": col.id,
         "name": col.name,
@@ -126,7 +109,7 @@ def list_columns():
         # False means "values are atomic strings" — Dewey 778.3 is one
         # classification, not a 778 node with a 3 child. The SPA must know:
         # without this flag it cannot tell a flat column from a hierarchy.
-        "hierarchical": not calibre_db.is_flat_cc_column(col.id),
+        "hierarchical": not calibre_db.is_flat_cc_column(col.id, fail_on_error=True),
     } for col in _visible_columns()]})
 
 
@@ -143,6 +126,7 @@ def _node_to_json(node):
 
 @api_v1.route("/columns/<int:col_id>/tree")
 @login_required_if_no_ano
+@retryable_column_reads
 def column_tree(col_id):
     """Every value of a column as nodes, honouring visibility filters.
 
@@ -156,9 +140,9 @@ def column_tree(col_id):
     col = _get_column_or_none(col_id)
     if col is None:
         return _not_found("Column not found")
-    is_hierarchical = not calibre_db.is_flat_cc_column(col_id)
-    nodes = (calibre_db.get_hierarchical_tree(col_id) if is_hierarchical
-             else calibre_db.get_cc_flat_list(col_id))
+    is_hierarchical = not calibre_db.is_flat_cc_column(col_id, fail_on_error=True)
+    nodes = (calibre_db.get_hierarchical_tree(col_id, fail_on_error=True) if is_hierarchical
+             else calibre_db.get_cc_flat_list(col_id, fail_on_error=True))
     return jsonify({
         "column": {
             "id": col.id,
@@ -172,6 +156,7 @@ def column_tree(col_id):
 
 @api_v1.route("/columns/<int:col_id>/books")
 @login_required_if_no_ano
+@retryable_column_reads
 def column_books(col_id):
     """Books under one node of a custom column, paginated.
 
@@ -191,10 +176,10 @@ def column_books(col_id):
     page = max(1, request.args.get("page", 1, type=int))
     per_page = max(1, min(200, request.args.get(
         "per_page", config.config_books_per_page, type=int)))
-    raw_path = (request.args.get("path") or "").strip()
+    raw_path = request.args.get("path") or ""
 
     cc_rel = getattr(db.Books, 'custom_column_' + str(col_id))
-    is_hierarchical = not calibre_db.is_flat_cc_column(col_id)
+    is_hierarchical = not calibre_db.is_flat_cc_column(col_id, fail_on_error=True)
 
     if is_hierarchical:
         # Normalise exactly the way web.py::render_cc_category and
@@ -213,7 +198,7 @@ def column_books(col_id):
     if path:
         if is_hierarchical:
             node = hierarchy.get_node_by_path(
-                calibre_db.get_hierarchical_tree(col_id), path)
+                calibre_db.get_hierarchical_tree(col_id, fail_on_error=True), path)
             if node is None:
                 return _not_found("Category not found")
             db_filter = cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, node))

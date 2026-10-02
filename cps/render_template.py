@@ -14,7 +14,7 @@ from .cw_login import current_user
 from sqlalchemy.sql.expression import or_
 
 from . import config, constants, logger, ub
-from .custom_column_visibility import is_cc_visible
+from .custom_column_visibility import browsable_columns, is_cc_visible
 from .ub import User
 from .duplicate_notice import duplicate_setup_notice_dismissed
 from .translation_notice import last_notified, record_notified
@@ -300,9 +300,7 @@ def get_custom_column_sidebar_entries():
         # NOT a filter here: gating enumeration on the hierarchy detector is
         # what made Dewey/LCC columns disappear from the sidebar, from /me and
         # from OPDS with no way for a user to switch them back on.
-        for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration'):
-                continue
+        for col in browsable_columns(calibre_db.get_cc_columns(config)):
             if not is_cc_visible(current_user, col.id):
                 continue
             entries.append({
@@ -337,9 +335,7 @@ def get_custom_column_visibility_options():
         # gets a checkbox. The option list and the sidebar are gated by the
         # SAME predicate on purpose -- if only one were filtered, a user could
         # tick a column with no sidebar entry and vice versa.
-        for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration'):
-                continue
+        for col in browsable_columns(calibre_db.get_cc_columns(config)):
             options.append({
                 'id': col.id,
                 'name': col.name,

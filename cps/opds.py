@@ -19,7 +19,7 @@ from sqlalchemy.sql.expression import func, text, or_, and_, true, false
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy
-from .custom_column_visibility import is_cc_visible
+from .custom_column_visibility import retryable_column_reads, browsable_columns, is_cc_visible
 from .usermanagement import requires_basic_auth_if_no_ano, auth
 from .helper import get_download_link, get_book_cover, hot_books_page
 from .pagination import Pagination
@@ -590,9 +590,7 @@ def get_opds_hierarchy_root_entries(user):
     if not user.check_visibility(constants.SIDEBAR_CATEGORY):
         return []
     entries = []
-    for col in calibre_db.get_cc_columns(config):
-        if col.datatype not in ('text', 'enumeration'):
-            continue
+    for col in browsable_columns(calibre_db.get_cc_columns(config)):
         # A column the user hid on their profile page is not advertised. The
         # classic sidebar omits it and the SPA API 404s it, so listing it here
         # would be the one surface where hiding a column does not hide it.
@@ -826,6 +824,7 @@ def feed_category(book_id):
 @opds.route("/opds/custom_column/<int:column_id>", defaults={'category_path': ''})
 @opds.route("/opds/custom_column/<int:column_id>/<path:category_path>")
 @requires_basic_auth_if_no_ano
+@retryable_column_reads
 def feed_cc_category(column_id, category_path):
     """OPDS navigation/acquisition feed for one custom column, in either mode.
 
@@ -842,22 +841,22 @@ def feed_cc_category(column_id, category_path):
     """
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
-    if not any(col.id == column_id and col.datatype in ('text', 'enumeration')
-               for col in calibre_db.get_cc_columns(config)):
+    if not any(col.id == column_id
+               for col in browsable_columns(calibre_db.get_cc_columns(config, fail_on_error=True))):
         abort(404)
     # A hidden column 404s its whole subtree, not just its root entry: a reader
     # who bookmarked a node must not keep reaching it after unticking the
     # column. Same contract the SPA API already has.
-    if not is_cc_visible(auth.current_user(), column_id):
+    if not is_cc_visible(auth.current_user(), column_id, fail_on_error=True):
         abort(404)
 
-    is_hierarchical = not calibre_db.is_flat_cc_column(column_id)
+    is_hierarchical = not calibre_db.is_flat_cc_column(column_id, fail_on_error=True)
     if is_hierarchical:
         # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
         path = hierarchy.join_path([category_path or ''])
     else:
         # Flat values are opaque atomic strings -- never canonicalised.
-        path = (category_path or '').strip()
+        path = category_path or ''
     off = int(request.args.get("offset") or 0)
     cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
     opds_filter = get_opds_restricted_common_filter()
@@ -878,7 +877,7 @@ def feed_cc_category(column_id, category_path):
 
     if path and is_hierarchical:
         opds_tree = calibre_db.get_hierarchical_tree(
-            column_id, book_filter=opds_filter)
+            column_id, book_filter=opds_filter, fail_on_error=True)
         node = hierarchy.get_node_by_path(opds_tree, path)
         if node is None:
             abort(404)
@@ -896,9 +895,9 @@ def feed_cc_category(column_id, category_path):
             calibre_db.flat_cc_filter(column_id, path)))
 
     if is_hierarchical:
-        nodes = calibre_db.get_hierarchical_tree(column_id, book_filter=opds_filter)
+        nodes = calibre_db.get_hierarchical_tree(column_id, book_filter=opds_filter, fail_on_error=True)
     else:
-        nodes = calibre_db.get_cc_flat_list(column_id, book_filter=opds_filter)
+        nodes = calibre_db.get_cc_flat_list(column_id, book_filter=opds_filter, fail_on_error=True)
     elements = [{'column_id': column_id, 'path': n['path'], 'name': n['name']}
                 for n in nodes]
     pagination = Pagination(1, max(len(elements), 1), len(elements))

@@ -4,7 +4,7 @@ import {
   Library, Globe, BookCopy, BookPlus, Tag,
   Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff, ChevronDown, Plus,
 } from 'lucide-react';
-import { useShelves, useMe, useMagicShelves, useUpdateSidebar, useColumns } from '../lib/queries';
+import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
@@ -110,12 +110,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const [smartExpanded, setSmartExpanded] = usePersistentBool('cwng:smart-shelves-expanded', true);
   const magicShelves = useMagicShelves().data?.items ?? [];
   const me = useMe().data;
-  // Custom-column browse (tag-like text/enumeration columns). The entry only
-  // renders when at least one column is browsable, so a library without any
-  // keeps the sidebar unchanged. Pinned rather than added to ORDERABLE_ENTRIES:
-  // those keys map 1:1 to the server's ORDERABLE_SIDEBAR_KEYS contract, and
-  // per-column visibility is already honoured server-side.
-  const ccColumns = useColumns().data?.items ?? [];
   const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
   const isAuthed = !!me?.id && !me.role.anonymous;
@@ -408,17 +402,17 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
             {/* Custom columns (tag-like text/enumeration; a hierarchical one
                 renders as a tree, a flat one as a plain list of values) —
                 SPA parity with the classic sidebar's per-column entries. */}
-            {ccColumns.length > 0 && (
+            {me?.sidebar?.category && (
               <ul className={styles.list} role="list">
                 <li>
                   <Link
                     href="/cc"
-                    className={isActive(location, '/cc', true) ? styles.itemActive : styles.item}
-                    aria-current={isActive(location, '/cc', true) ? 'page' : undefined}
+                    className={isActive(location, '/cc') ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/cc') ? 'page' : undefined}
                     onClick={onNavigate}
                   >
                     <Tag size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                    <span>{t('Custom Columns')}</span>
+                    <span>{t('Custom columns')}</span>
                   </Link>
                 </li>
               </ul>

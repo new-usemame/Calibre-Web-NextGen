@@ -1,58 +1,28 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Per-user custom-column browse visibility: seeding, freezing, and parity.
 
-A tag-like custom column (datatype ``text``/``enumeration``) is a browse
-surface. Which surfaces a given user sees is a per-user stored value
-(``User.view_settings['cc_sidebar']['show_cc_<id>']``), and the three rules it
-follows are these:
+"""Custom-column visibility defaults and real HTTP cross-surface parity."""
 
-1. **Seed once.** Hierarchical columns seed visible, flat ones hidden.
-2. **Saved wins.** Nothing overrides a stored value -- not the backfill, not
-   the administrator's template.
-3. **No dynamic re-evaluation.** A column that later turns flat ->
-   hierarchical changes nothing.
-
-Rules 2 and 3 are the ones a refactor can quietly break, so most of what
-follows guards them directly. The parity tests at the end are behavioural
-rather than source-scanning on purpose: a text assertion cannot catch a
-surface forgetting to call the shared resolver, which is exactly how the
-classic browse route and both OPDS feeds drifted in the first place.
-"""
 import json
+
 from types import SimpleNamespace
 
 import flask
+
 import pytest
+
 from sqlalchemy import Column, Integer, String, create_engine, text
+
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from cps import custom_column_visibility as ccv
+
 from cps import db, hierarchy
 
 pytestmark = pytest.mark.unit
 
-
-# --------------------------------------------------------------------------
-# Fixtures
-# --------------------------------------------------------------------------
-
 def _col(col_id, name, datatype="text"):
     return SimpleNamespace(id=col_id, name=name, datatype=datatype,
                            mark_for_delete=0)
-
-
-@pytest.fixture(autouse=True)
-def _clear_hierarchy_cache(monkeypatch):
-    """Reset the process-wide hierarchy verdict around every test here.
-
-    ``CalibreDB._hier_cache`` lives on the *class*, not the instance, so a
-    verdict computed by one test is still there for the next one. Several
-    tests here deliberately move a column across the flat/hierarchical
-    boundary, and a stale verdict would make their precondition silently
-    wrong -- a failure that looks like a bug in the seeding code and is not.
-    """
-    monkeypatch.setattr(db.CalibreDB, "_hier_cache", None, raising=False)
-
 
 @pytest.fixture
 def library(monkeypatch):
@@ -103,7 +73,6 @@ def library(monkeypatch):
     monkeypatch.setattr(ccv, "calibre_db", cdb)
     return cdb
 
-
 class FakeUser:
     """Just enough of ``ub.User`` for the resolution and seeding helpers."""
 
@@ -123,273 +92,29 @@ class FakeUser:
         self.view_settings.setdefault(page, {})[prop] = value
         self.committed = getattr(self, "committed", 0) + (1 if commit else 0)
 
-
 def _ub_stub(monkeypatch, users):
     """The smallest thing ``backfill_existing_users`` needs from ``ub``."""
     stub = SimpleNamespace(User=object)
     stub.session = SimpleNamespace(
-        query=lambda _model: SimpleNamespace(all=lambda: list(users)))
+        query=lambda _model: SimpleNamespace(all=lambda: list(users)),
+        commit=lambda: None, rollback=lambda: None)
     monkeypatch.setattr(ccv, "ub", stub)
     monkeypatch.setattr(ccv.config, "save", lambda: None, raising=False)
     return stub
 
-
 @pytest.fixture
 def unconfigured(monkeypatch):
-    """A config whose cc template has never been set by an administrator.
+    """Unconfigured library defaults, shared by all browse surfaces.
 
     Carries the rest of the attributes ``get_cc_columns`` reads, because the
     browsable set is built through the same call the sidebar makes.
     """
     config = SimpleNamespace(
-        config_default_cc_columns=None,
         config_columns_to_ignore=None,
         config_read_column=0,
     )
     monkeypatch.setattr(ccv, "config", config)
     return config
-
-
-# --------------------------------------------------------------------------
-# Rule 1 -- the seed value
-# --------------------------------------------------------------------------
-
-def test_the_seed_shows_hierarchical_columns_and_hides_flat_ones(library, unconfigured):
-    """A Dewey column and a genre column, seeded from an unconfigured install."""
-    user = FakeUser()
-    written = ccv.seed_cc_visibility(user, [_col(2, "Genre"), _col(3, "DDC")])
-
-    assert written == 2
-    assert user.get_view_property("cc_sidebar", "show_cc_2") is True
-    assert user.get_view_property("cc_sidebar", "show_cc_3") is False
-
-
-def test_one_value_per_book_columns_are_hidden_by_default(library, unconfigured):
-    """The reported problem: #goodreads_id has one value per book and is not a
-    category, so it must not be a sidebar entry by default."""
-    user = FakeUser()
-    ccv.seed_cc_visibility(user, [_col(7, "goodreads_id")])
-
-    assert user.get_view_property("cc_sidebar", "show_cc_7") is False
-
-
-def test_a_flat_column_stays_hidden_after_it_becomes_hierarchical(library, unconfigured):
-    """Rule 3. Seeded flat, then a book adds the prefix pair that would make
-    the detector report it hierarchical. The stored value must not move."""
-    user = FakeUser()
-    ccv.seed_cc_visibility(user, [_col(3, "DDC")])
-    assert user.get_view_property("cc_sidebar", "show_cc_3") is False
-
-    with library.session.get_bind().begin() as connection:
-        connection.execute(text("INSERT INTO custom_column_3 (id, book, value) "
-                                "VALUES (99, 1, '778')"))
-    library.session.expire_all()
-    library.get_hierarchical_column_ids(ttl=0)
-    assert not library.is_flat_cc_column(3), "precondition: now detected hierarchical"
-
-    assert ccv.is_cc_visible(user, 3) is False
-
-
-def test_a_hierarchical_column_stays_visible_when_it_stops_being_one(library, unconfigured):
-    """Rule 3 in the other direction: losing the prefix pair must not hide a
-    column the user already had."""
-    user = FakeUser()
-    ccv.seed_cc_visibility(user, [_col(2, "Genre")])
-    assert user.get_view_property("cc_sidebar", "show_cc_2") is True
-
-    with library.session.get_bind().begin() as connection:
-        connection.execute(text("DELETE FROM custom_column_2"))
-    library.session.expire_all()
-    library.get_hierarchical_column_ids(ttl=0)
-    assert library.is_flat_cc_column(2), "precondition: now detected flat"
-
-    assert ccv.is_cc_visible(user, 2) is True
-
-
-# --------------------------------------------------------------------------
-# Rule 2 -- saved wins
-# --------------------------------------------------------------------------
-
-def test_seeding_never_overwrites_a_value_the_user_already_saved(library, unconfigured):
-    """The backfill's whole safety property, isolated."""
-    user = FakeUser(stored=json.dumps(
-        {"cc_sidebar": {"show_cc_3": True, "show_cc_2": False}}))
-
-    written = ccv.seed_cc_visibility(user, [_col(2, "Genre"), _col(3, "DDC")])
-
-    assert written == 0
-    assert user.get_view_property("cc_sidebar", "show_cc_3") is True
-    assert user.get_view_property("cc_sidebar", "show_cc_2") is False
-
-
-def test_an_explicitly_hidden_column_stays_hidden_even_if_hierarchical(library, unconfigured):
-    user = FakeUser(stored=json.dumps({"cc_sidebar": {"show_cc_2": False}}))
-    assert ccv.is_cc_visible(user, 2) is False
-
-
-def test_a_stored_true_beats_a_template_that_would_hide_it(library, monkeypatch):
-    """The template is only a seed. It must not override a live choice."""
-    monkeypatch.setattr(ccv, "config",
-                        SimpleNamespace(config_default_cc_columns="3"))
-    user = FakeUser(stored=json.dumps({"cc_sidebar": {"show_cc_2": True}}))
-    assert ccv.is_cc_visible(user, 2) is True
-    assert ccv.is_cc_visible(user, 3) is True
-
-
-def test_changing_the_template_does_not_change_an_existing_user(library, monkeypatch):
-    """Rule 2 end to end: the administrator edits the template and every user
-    who already has a value is unaffected."""
-    monkeypatch.setattr(ccv, "config",
-                        SimpleNamespace(config_default_cc_columns="2"))
-    user = FakeUser()
-    ccv.seed_cc_visibility(user, [_col(2, "Genre"), _col(3, "DDC")])
-    before = json.dumps(user.view_settings, sort_keys=True)
-
-    monkeypatch.setattr(ccv, "config",
-                        SimpleNamespace(config_default_cc_columns="3"))
-    assert json.dumps(user.view_settings, sort_keys=True) == before
-    assert ccv.is_cc_visible(user, 2) is True
-    assert ccv.is_cc_visible(user, 3) is False
-
-
-# --------------------------------------------------------------------------
-# The administrator's template
-# --------------------------------------------------------------------------
-
-def test_the_template_is_tri_state(unconfigured, library):
-    """NULL derives from the hierarchy; "" seeds nothing visible; "3" seeds
-    only column 3. The middle case is the one that needs care -- an empty
-    submission is a choice, not an absence."""
-    assert ccv.configured_default_visible(unconfigured) is None
-    assert ccv.is_cc_visible(FakeUser(), 2) is True, "derived: hierarchical"
-    assert ccv.is_cc_visible(FakeUser(), 3) is False, "derived: flat"
-
-    unconfigured.config_default_cc_columns = ""
-    assert ccv.configured_default_visible(unconfigured) == frozenset()
-    assert ccv.is_cc_visible(FakeUser(), 2) is False
-
-    unconfigured.config_default_cc_columns = "3"
-    assert ccv.is_cc_visible(FakeUser(), 2) is False
-    assert ccv.is_cc_visible(FakeUser(), 3) is True
-
-
-@pytest.mark.parametrize("hostile", [
-    "3; DROP TABLE books",
-    "٣",
-    "99999999999999999999",
-    "-1",
-    "1,,2",
-    "",
-])
-def test_hostile_template_values_are_ignored(unconfigured, hostile):
-    unconfigured.config_default_cc_columns = hostile
-    # Must not raise, and must not resolve to something surprising.
-    assert ccv.configured_default_visible(unconfigured) is not None
-
-
-def test_persisting_the_template_rejects_ids_that_are_not_browsable(unconfigured, library):
-    columns = [_col(2, "Genre"), _col(3, "DDC")]
-    stored = ccv.persist_configured_default_visible(
-        unconfigured, ["2", "3", "99", "3; DROP TABLE books"], columns)
-    assert stored == "2,3"
-    assert unconfigured.config_default_cc_columns == "2,3"
-
-
-def test_a_failed_column_load_preserves_the_stored_template(unconfigured, library):
-    """``columns is None`` means the library was unreadable. Ticking nothing
-    then must NOT be read as "the administrator cleared the list"."""
-    unconfigured.config_default_cc_columns = "2"
-    stored = ccv.persist_configured_default_visible(unconfigured, [], None)
-    assert stored == "2"
-    assert unconfigured.config_default_cc_columns == "2"
-
-
-def test_a_real_clear_is_persisted(unconfigured, library):
-    """The counterpart: with definitions in hand, an empty submission really
-    does mean "seed nothing visible"."""
-    unconfigured.config_default_cc_columns = "2"
-    stored = ccv.persist_configured_default_visible(
-        unconfigured, [], [_col(2, "Genre")])
-    assert stored == ""
-    assert unconfigured.config_default_cc_columns == ""
-
-
-# --------------------------------------------------------------------------
-# The backfill
-# --------------------------------------------------------------------------
-
-def test_the_backfill_reaches_a_user_who_already_existed(library, unconfigured,
-                                                        monkeypatch):
-    """The step that makes the administrator's configuration reach the users the
-    report is about. Without it the configuration is a no-op for them."""
-    unconfigured.config_cc_visibility_seeded = False
-    _ub_stub(monkeypatch, [FakeUser("existing-1"), FakeUser("existing-2")])
-
-    assert ccv.backfill_existing_users() == 4
-    assert unconfigured.config_cc_visibility_seeded is True
-
-
-def test_the_backfill_does_not_touch_a_user_who_already_saved(library, unconfigured,
-                                                              monkeypatch):
-    """Rule 2, at the only place a bulk write could breach it."""
-    saved = FakeUser("has-a-choice", stored=json.dumps(
-        {"cc_sidebar": {"show_cc_3": True}}))
-    keyless = FakeUser("no-choice")
-    unconfigured.config_cc_visibility_seeded = False
-    _ub_stub(monkeypatch, [saved, keyless])
-
-    ccv.backfill_existing_users()
-
-    assert saved.get_view_property("cc_sidebar", "show_cc_3") is True
-    assert saved.get_view_property("cc_sidebar", "show_cc_2") is True, "gap filled"
-    assert keyless.get_view_property("cc_sidebar", "show_cc_2") is True
-
-
-def test_the_backfill_leaves_every_user_alone_when_the_library_is_unreadable(
-        library, unconfigured, monkeypatch):
-    """Seeding from an empty column list would write False for every column
-    and hide the lot, so an unreadable library must abort the pass and leave
-    the flag unset so the next start retries."""
-    unconfigured.config_cc_visibility_seeded = False
-    monkeypatch.setattr(db, "cc_classes", {})
-    queried = []
-    monkeypatch.setattr(ccv, "ub", SimpleNamespace(
-        session=SimpleNamespace(query=lambda _m: queried.append(1))))
-
-    assert ccv.backfill_existing_users() == 0
-    assert queried == [], "must not even enumerate users"
-    assert unconfigured.config_cc_visibility_seeded is False, "must retry later"
-
-
-def test_the_seed_record_names_every_column_it_chose(library, unconfigured):
-    """The seed is frozen for every user on its first pass, so the one log line
-    saying why each column came out the way it did is the only audit trail.
-    A wrong verdict here is not self-correcting."""
-    record = ccv.describe_seed([_col(2, "Genre"), _col(3, "DDC")])
-
-    assert record == "Genre=visible, DDC=hidden"
-
-
-def test_the_backfill_runs_only_once(library, unconfigured, monkeypatch):
-    unconfigured.config_cc_visibility_seeded = True
-    monkeypatch.setattr(ccv, "ub", SimpleNamespace(
-        session=SimpleNamespace(query=lambda _m: pytest.fail("re-ran when already seeded"))))
-
-    assert ccv.backfill_existing_users() == 0
-
-
-def test_load_browsable_columns_distinguishes_unreadable_from_empty(library, monkeypatch,
-                                                                    unconfigured):
-    monkeypatch.setattr(ccv, "config", unconfigured)
-    assert sorted(c.id for c in ccv.load_browsable_columns()) == [2, 3]
-
-    monkeypatch.setattr(db, "cc_classes", {})
-    assert ccv.load_browsable_columns() is None
-
-
-# --------------------------------------------------------------------------
-# Parity -- behavioural, across every surface
-# --------------------------------------------------------------------------
 
 def _app():
     from cps.api import api_v1
@@ -401,12 +126,10 @@ def _app():
     app.register_blueprint(api_v1)
     return app
 
-
 def _viewer(stored=None, categories=True):
     user = FakeUser("viewer", stored=stored)
     user.check_visibility = lambda flag: categories
     return user
-
 
 def _bable_app():
     """A request context that can translate and build the URLs entries link to.
@@ -432,7 +155,6 @@ def _bable_app():
     app.register_blueprint(opds_stub)
     app.register_blueprint(web_stub)
     return app
-
 
 def _patch_all_surfaces(monkeypatch, library, unconfigured, user, columns):
     """Point every surface at the same user, library and column list.
@@ -499,9 +221,7 @@ def _patch_all_surfaces(monkeypatch, library, unconfigured, user, columns):
     monkeypatch.setattr(usermanagement_module, "config", route_config)
     return columns_api
 
-
 BOTH_COLUMNS = [_col(2, "Genre"), _col(3, "DDC")]
-
 
 def test_a_hidden_column_is_absent_from_the_api_list_and_404s_both_subroutes(
         library, unconfigured, monkeypatch):
@@ -519,11 +239,6 @@ def test_a_hidden_column_is_absent_from_the_api_list_and_404s_both_subroutes(
     assert client.get("/api/v1/columns/3/books?path=778.3").status_code == 404
     assert columns_api._cc_disabled(3) is True
     assert columns_api._cc_disabled(2) is False
-    # No "visible column returns 200" case here on purpose: the tree/books
-    # views reach through db.Books.custom_column_<id>, an ORM relationship that
-    # only setup_db_cc_classes() installs. Asserting it in this fixture would
-    # be testing the fixture, not the visibility gate.
-
 
 def test_the_classic_browse_route_404s_a_column_the_sidebar_hides(
         library, unconfigured, monkeypatch):
@@ -538,7 +253,6 @@ def test_the_classic_browse_route_404s_a_column_the_sidebar_hides(
     with pytest.raises(NotFound):
         web_module.render_cc_category(1, 3, "", (None, None))
 
-
 def test_the_opds_root_omits_a_column_the_user_hid(library, unconfigured, monkeypatch):
     """The OPDS root listed every browsable column whatever the profile page
     said, so an OPDS client saw what the web UI hid."""
@@ -551,7 +265,6 @@ def test_the_opds_root_omits_a_column_the_user_hid(library, unconfigured, monkey
         entries = opds.get_opds_hierarchy_root_entries(_viewer())
 
     assert [entry["title"] for entry in entries] == ["Genre"]
-
 
 def test_the_opds_feed_404s_a_column_the_user_hid(library, unconfigured, monkeypatch):
     """The whole subtree, not just the root entry: a reader who bookmarked a
@@ -568,7 +281,6 @@ def test_the_opds_feed_404s_a_column_the_user_hid(library, unconfigured, monkeyp
         # is ever reached. What is under test is the per-column check.
         with pytest.raises(NotFound):
             opds.feed_cc_category.__wrapped__(3, "")
-
 
 @pytest.mark.parametrize("stored,expected_visible", [
     (None, False),                                       # seeded flat, never shown
@@ -619,93 +331,195 @@ def test_every_surface_agrees_about_one_column(library, unconfigured, monkeypatc
         reached = True
     assert reached is expected_visible
 
+def test_categories_disabled_list_is_an_empty_envelope(library, unconfigured, monkeypatch):
+    _patch_all_surfaces(monkeypatch, library, unconfigured, _viewer(categories=False), BOTH_COLUMNS)
+    response = _app().test_client().get('/api/v1/columns')
+    assert response.status_code == 200
+    assert response.get_json() == {'items': []}
 
-def test_an_anonymous_session_resolves_to_the_seed_and_is_never_written(
-        library, unconfigured, monkeypatch):
-    """Anonymous has no row, so it can never be seeded. It has to resolve
-    through the same resolver, and nothing may try to store a value for it."""
-    from cps import ub as ub_module
-
-    class SessionBackedAnonymous:
-        """What matters: answers from the flask session, which is empty.
-
-        Constructing the real ``ub.Anonymous`` would drag in a user-database
-        session that has nothing to do with the property under test.
-        """
-        def get_view_property(self, page, prop):
-            return None
-
-        def set_view_property(self, page, prop, value, commit=True):
-            raise AssertionError("an anonymous session must never be written to")
-
-    monkeypatch.setattr(ub_module, "Anonymous", SessionBackedAnonymous, raising=False)
-    anonymous = SessionBackedAnonymous()
-    assert ccv.is_cc_visible(anonymous, 3) is False
-    assert ccv.is_cc_visible(anonymous, 2) is True
-
-
-# --------------------------------------------------------------------------
-# The browsable set is the sidebar's set
-# --------------------------------------------------------------------------
-
-def _selected_in_template(config_default_cc_columns, columns, hierarchical_ids):
-    """Mirror of the /admin/viewconfig checkbox block, in isolation.
-
-    The tri-state was first written in Jinja and got it wrong: `default(none,
-    true)` substitutes for "" as well as None, so "the administrator cleared
-    the list" rendered as "never configured" and showed the hierarchical
-    columns ticked when they would in fact seed hidden. It now lives in
-    admin.view_configuration and is passed down as ccSelectedDefaultIds;
-    this keeps the rendering honest without needing a logged-in admin.
-    """
-    if config_default_cc_columns is None:
-        selected = set(hierarchical_ids)
-    else:
-        selected = {v.strip() for v in config_default_cc_columns.split(",") if v.strip()}
-    return [c["name"] for c in columns if str(c["id"]) in selected]
-
-
-@pytest.mark.parametrize("stored,expected", [
-    (None, ["Genre"]),        # never configured -> the hierarchical columns
-    ("", []),                # cleared on purpose -> nothing seeds visible
-    ("3", ["DDC"]),          # an explicit choice
-    ("1,3", ["Genre", "DDC"]),
-])
-def test_the_admin_form_reflects_the_tri_state(library, stored, expected):
-    """Whichever box is ticked must be the one that actually seeds visible."""
-    columns = [{"id": 1, "name": "Genre"}, {"id": 3, "name": "DDC"},
-               {"id": 4, "name": "LCC"}]
-
-    ticked = _selected_in_template(stored, columns, ["1"])
-
-    assert ticked == expected
-    # The ticked set and the seed function must agree, column for column --
-    # otherwise the form is describing a different installation than the one a
-    # new user will get.
-    config = SimpleNamespace(config_default_cc_columns=stored)
-    for column in columns:
-        seeds_visible = ccv.seed_default_visible(config, column["id"])
-        if stored is None:
-            continue        # derived from hierarchy, which the template mirrors
-        assert seeds_visible is (column["name"] in expected)
-
-
-def test_the_seeded_set_matches_what_the_sidebar_renders(library, unconfigured):
-    """A column the admin hid by name regex must not be seeded, or a user
-    would carry a stored value for a column they can never see."""
-    unconfigured.config_columns_to_ignore = "^DD"
-
+def test_unsaved_default_tracks_calibre_mode_without_writing_reader_choice(library, unconfigured):
+    session = library.session
+    session.execute(text('CREATE TABLE preferences (key TEXT PRIMARY KEY, val TEXT)'))
+    session.execute(text("INSERT INTO preferences VALUES ('categories_using_hierarchy', '[]')"))
+    session.commit()
     user = FakeUser()
-    ccv.seed_cc_visibility(user, ccv.load_browsable_columns())
+    assert not ccv.is_cc_visible(user, 3)
+    session.execute(text("UPDATE preferences SET val='[\"#ddc\"]' WHERE key='categories_using_hierarchy'"))
+    session.commit()
+    assert ccv.is_cc_visible(user, 3)
+    assert user.view_settings == {}
 
-    assert user.get_view_property("cc_sidebar", "show_cc_2") is True
-    assert user.get_view_property("cc_sidebar", "show_cc_3") is None
+def test_compatibility_backfill_preserves_only_legacy_visible_columns(library, unconfigured, monkeypatch):
+    user = FakeUser()
+    _ub_stub(monkeypatch, [user])
+    assert ccv.backfill_existing_users() == 1
+    assert user.view_settings == {'cc_sidebar': {'show_cc_2': True}}
 
 
-def test_hierarchy_detection_still_owns_the_rendering_mode(library, unconfigured):
-    """Rule 3 covers sidebar visibility ONLY. The tree/flat presentation stays
-    with live data via is_flat_cc_column; this pins that deliberately so the
-    two concerns are not quietly conflated later."""
-    assert library.is_flat_cc_column(3) is True
-    assert library.is_flat_cc_column(2) is False
-    assert hierarchy.is_hierarchical_value_set is not None
+def test_unchanged_profile_checkboxes_do_not_freeze_derived_defaults(library, unconfigured):
+    user = FakeUser()
+    options = [{'id': 2, 'visible': True}, {'id': 3, 'visible': False}]
+    ccv.save_cc_visibility(user, options, {'initial_show_cc_2': 'true', 'show_cc_2': 'on', 'initial_show_cc_3': 'false'})
+    assert user.view_settings == {}
+    ccv.save_cc_visibility(user, options, {'initial_show_cc_2': 'true', 'initial_show_cc_3': 'false', 'show_cc_3': 'on'})
+    assert user.view_settings == {'cc_sidebar': {'show_cc_2': False, 'show_cc_3': True}}
+
+
+def test_readable_empty_library_completes_compatibility_upgrade(library, unconfigured, monkeypatch):
+    library.session.execute(text('DELETE FROM custom_columns'))
+    library.session.commit()
+    monkeypatch.setattr(db, 'cc_classes', {})
+    _ub_stub(monkeypatch, [])
+    assert ccv.backfill_existing_users() == 0
+    assert unconfigured.config_cc_visibility_seeded
+
+@pytest.mark.parametrize('existing', [False, True])
+def test_fresh_settings_skip_legacy_upgrade_and_existing_settings_keep_it(existing):
+    from cps import config_sql
+    engine = create_engine('sqlite://')
+    config_sql._Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        if existing:
+            session.add(config_sql._Settings(config_cc_visibility_seeded=False))
+            session.commit()
+            # A real old table, rather than a row in an already-new schema.
+            session.execute(text('ALTER TABLE settings DROP COLUMN config_cc_visibility_seeded'))
+            session.commit()
+            session.expire_all()
+        config_sql.load_configuration(session, None)
+        assert session.query(config_sql._Settings).one().config_cc_visibility_seeded is (not existing)
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("session_choice,expected", [(None, True), (False, False), (True, True)])
+def test_guest_uses_preserved_visibility_unless_browser_session_overrides(monkeypatch, session_choice, expected):
+    from cps import ub
+    guest = ub.Anonymous.__new__(ub.Anonymous)
+    guest.view_settings = {"cc_sidebar": {"show_cc_2": True}}
+    monkeypatch.setattr(ccv.calibre_db, "get_hierarchical_column_ids", lambda: set())
+    with _app().test_request_context():
+        if session_choice is not None:
+            flask.session["view"] = {"cc_sidebar": {"show_cc_2": session_choice}}
+        assert ccv.is_cc_visible(guest, 2) is expected
+
+
+def test_api_definition_read_failure_is_retryable_not_empty(library, unconfigured, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+    _patch_all_surfaces(monkeypatch, library, unconfigured, _viewer(), BOTH_COLUMNS)
+    def unavailable(*args, **kwargs):
+        raise OperationalError("SELECT custom_columns", {}, Exception("database locked"))
+    monkeypatch.setattr(library, "get_cc_columns", unavailable)
+    response = _app().test_client().get("/api/v1/columns")
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "service_unavailable"
+
+
+def test_compatibility_upgrade_retries_after_a_legacy_value_read_failure(library, unconfigured, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+    _ub_stub(monkeypatch, [FakeUser()])
+    unconfigured.config_cc_visibility_seeded = False
+    original_query = library.session.query
+    def query(*args, **kwargs):
+        if args and args[0] is db.cc_classes[2].value:
+            raise OperationalError("SELECT values", {}, Exception("database locked"))
+        return original_query(*args, **kwargs)
+    monkeypatch.setattr(library.session, "query", query)
+    assert ccv.backfill_existing_users() == 0
+    assert not unconfigured.config_cc_visibility_seeded
+
+
+def test_no_configured_library_does_not_seed_a_later_library(monkeypatch):
+    saved = []
+    config = SimpleNamespace(config_cc_visibility_seeded=False, config_calibre_dir=None, save=lambda: saved.append(True))
+    monkeypatch.setattr(ccv, "config", config)
+    def must_not_read():
+        raise AssertionError("an unconfigured library has no legacy columns to preserve")
+    monkeypatch.setattr(ccv, "load_browsable_columns", must_not_read)
+    assert ccv.backfill_existing_users() == 0
+    config.config_calibre_dir = "/later/library"
+    assert ccv.backfill_existing_users() == 0
+    assert saved == [True]
+
+
+@pytest.mark.parametrize("path", ["/api/v1/columns", "/api/v1/columns/2/tree", "/api/v1/columns/2/books?path=Art"])
+def test_hierarchy_preference_failure_is_retryable_primary_content(library, unconfigured, monkeypatch, path):
+    from sqlalchemy.exc import OperationalError
+    _patch_all_surfaces(monkeypatch, library, unconfigured, _viewer(), BOTH_COLUMNS)
+    def unavailable(*args, **kwargs):
+        raise OperationalError("SELECT preferences", {}, Exception("database locked"))
+    monkeypatch.setattr(library, "_read_hierarchical_column_ids", unavailable)
+    response = _app().test_client().get(path)
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "service_unavailable"
+
+
+@pytest.mark.parametrize("column_id", [2, 3])
+def test_value_query_failure_is_not_an_empty_column(library, unconfigured, monkeypatch, column_id):
+    from sqlalchemy.orm import relationship, foreign
+    from sqlalchemy.exc import OperationalError
+    base = declarative_base()
+    subject, ddc = db.cc_classes[2], db.cc_classes[3]
+    class BrowseBook(base):
+        __table__ = db.Books.__table__
+        custom_column_2 = relationship(subject, primaryjoin=__table__.c.id == foreign(subject.book), viewonly=True)
+        custom_column_3 = relationship(ddc, primaryjoin=__table__.c.id == foreign(ddc.book), viewonly=True)
+    monkeypatch.setattr(db, "Books", BrowseBook)
+    _patch_all_surfaces(monkeypatch, library, unconfigured, _viewer(), BOTH_COLUMNS)
+    monkeypatch.setattr(library, "common_filters", lambda: text("1=1"))
+    # Flat defaults are hidden until explicitly chosen.
+    from cps.api import columns as api
+    api.current_user.view_settings = {"cc_sidebar": {"show_cc_3": True}}
+    # Determine mode successfully first; only the actual value SELECT fails.
+    from sqlalchemy import event
+    def fail_values(connection, cursor, statement, parameters, context, executemany):
+        if "JOIN custom_column_" in statement:
+            raise OperationalError(statement, {}, Exception("database locked"))
+    engine = library.session.get_bind()
+    event.listen(engine, "before_cursor_execute", fail_values)
+    try:
+        response = _app().test_client().get(f"/api/v1/columns/{column_id}/tree")
+        assert response.status_code == 503
+        assert response.get_json()["error"]["code"] == "service_unavailable"
+    finally:
+        event.remove(engine, "before_cursor_execute", fail_values)
+
+
+def test_delayed_compatibility_upgrade_excludes_accounts_created_after_migration(library, unconfigured, monkeypatch):
+    old, new = FakeUser("old"), FakeUser("new")
+    old.id, new.id = 9, 10
+    unconfigured.config_cc_visibility_legacy_user_id = 9
+    _ub_stub(monkeypatch, [old, new])
+    monkeypatch.setattr(ccv, "load_browsable_columns", lambda: None)
+    assert ccv.backfill_existing_users() == 0
+    monkeypatch.setattr(ccv, "load_browsable_columns", lambda: BOTH_COLUMNS)
+    assert ccv.backfill_existing_users() == 1
+    assert old.view_settings == {"cc_sidebar": {"show_cc_2": True}}
+    assert new.view_settings == {}
+
+
+def test_upgrade_account_boundary_survives_restart_before_library_available():
+    from cps import config_sql
+    engine = create_engine("sqlite://")
+    config_sql._Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE user (id INTEGER PRIMARY KEY)"))
+        connection.execute(text("INSERT INTO user VALUES (9)"))
+        connection.execute(text("INSERT INTO settings (config_cc_visibility_seeded) VALUES (0)"))
+        connection.execute(text("ALTER TABLE settings DROP COLUMN config_cc_visibility_seeded"))
+        connection.execute(text("ALTER TABLE settings DROP COLUMN config_cc_visibility_legacy_user_id"))
+    session = sessionmaker(bind=engine)()
+    try:
+        config_sql.load_configuration(session, None)
+        assert session.query(config_sql._Settings).one().config_cc_visibility_legacy_user_id == 9
+        session.execute(text("INSERT INTO user VALUES (10)"))
+        session.commit()
+        session.close()
+        session = sessionmaker(bind=engine)()
+        config_sql.load_configuration(session, None)
+        assert session.query(config_sql._Settings).one().config_cc_visibility_legacy_user_id == 9
+    finally:
+        session.close()
+        engine.dispose()

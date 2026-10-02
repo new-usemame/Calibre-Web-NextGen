@@ -152,18 +152,12 @@ class _Settings(_Base):
     # Comma-separated Calibre custom-column IDs selected by an administrator.
     # Request-time use is revalidated against the live Calibre schema.
     config_sortable_custom_columns = Column(String, default="")
-    # Seed template for per-user custom-column browse visibility, read ONCE per
-    # user when they are seeded (signup, or the one-time upgrade backfill) and
-    # then frozen in User.view_settings. NULL = never configured, so the
-    # default is derived from the column's own hierarchy (hierarchical columns
-    # visible, flat ones hidden). "" = the administrator saved nothing ticked,
-    # which seeds every column hidden. Never consulted on a request path for a
-    # user who already has a value.
-    config_default_cc_columns = Column(String, default=None)
-    # Set once the upgrade backfill has run, so it cannot re-run. Only recorded
-    # after a successful pass; an unreadable library leaves it unset so the next
-    # start retries.
+    # One-time compatibility upgrade preserves previously visible hierarchical
+    # custom columns without freezing hidden defaults for empty/flat columns.
     config_cc_visibility_seeded = Column(Boolean, default=False)
+    # Freeze the pre-upgrade account boundary before the service can create
+    # users. A delayed library read must not stamp newly created profiles.
+    config_cc_visibility_legacy_user_id = Column(Integer, default=None)
 
     config_denied_tags = Column(String, default="")
     config_allowed_tags = Column(String, default="")
@@ -1091,7 +1085,15 @@ def _migrate_database(session, secret_key):
 def load_configuration(session, secret_key):
     _migrate_database(session, secret_key)
     if not session.query(_Settings).count():
-        session.add(_Settings())
+        session.add(_Settings(config_cc_visibility_seeded=True, config_cc_visibility_legacy_user_id=0))
+        session.commit()
+    settings = session.query(_Settings).first()
+    if not settings.config_cc_visibility_seeded and settings.config_cc_visibility_legacy_user_id is None:
+        tables = sa_inspect(session.get_bind()).get_table_names()
+        settings.config_cc_visibility_legacy_user_id = (session.execute(text(
+            "SELECT coalesce(max(id), 0) FROM user")).scalar() if "user" in tables else 0)
+        # Raise on failure: startup must not serve account creation before the
+        # compatibility boundary is durably captured.
         session.commit()
 
 

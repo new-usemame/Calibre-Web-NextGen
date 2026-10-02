@@ -270,9 +270,8 @@
     <!-- Default Visibilities for New Users Card -->
     <div class="settings-container">
       <h4 class="settings-section-header">{{_('Default Visibilities for New Users')}}</h4>
-      <p class="settings-explanation">{{_('Choose which sidebar sections and custom columns are visible by default for new users. This is written to a user when their account is created or when an existing account is upgraded; anyone who has already chosen for themselves keeps their own choice.')}}</p>
+      <p class="settings-explanation">{{_('Choose which sidebar sections are visible by default for new users.')}}</p>
 
-      {% set selected_cc_columns = ccSelectedDefaultIds|map('string')|list %}
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 20px; background: #202c34a3; padding: 2rem; border-radius: 4px;">
         {% for element in sidebar %}
           {% if element['config_show'] %}
@@ -282,29 +281,11 @@
           </div>
           {% endif %}
         {% endfor %}
-
-        {#- Custom columns are the same kind of decision as the sidebar sections
-            above: a per-section toggle a new user starts out with. They share the
-            grid rather than sitting in a box of their own. "hierarchical" is the
-            detection as it stands right now, which is what the default is derived
-            from until an administrator overrides it here. -#}
-        {% for col in ccBrowseColumns %}
-        <div>
-          <input type="checkbox" name="config_default_cc_columns" id="config_default_cc_columns_{{col.id}}" value="{{col.id}}"
-                 {% if col.id|string in selected_cc_columns %}checked{% endif %} style="accent-color: var(--color-secondary);">
-          <label for="config_default_cc_columns_{{col.id}}">{{col.name}} <span style="opacity: 0.6;">({{col.datatype}})</span>{% if col.id|string in ccHierarchicalColumnIds %} <span style="opacity: 0.6;">&mdash; {{_('hierarchical')}}</span>{% endif %}</label>
-        </div>
-        {% endfor %}
-
         <div>
           <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if conf.show_detail_random() %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
       </div>
-
-      {% if ccBrowseColumns %}
-      <p class="settings-explanation" style="margin-top: 1rem;">{{_('An unticked custom column is hidden from the sidebar, the OPDS catalogue root and the New UI, and its pages return 404. Users can change their own columns on their profile page.')}}</p>
-      {% endif %}
 
       {% if not simple %}
       <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #5c6b74;">

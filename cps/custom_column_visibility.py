@@ -118,7 +118,6 @@ def backfill_existing_users():
             config.save()
     except Exception:
         ub.session.rollback()
-        config.config_cc_visibility_seeded = False
         log.error("Custom-column compatibility upgrade failed; will retry", exc_info=True)
         return 0
     log.info("Preserved %s legacy custom-column visibility choices", changed)

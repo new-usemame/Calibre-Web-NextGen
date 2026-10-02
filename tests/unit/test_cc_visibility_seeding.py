@@ -523,3 +523,14 @@ def test_upgrade_account_boundary_survives_restart_before_library_available():
     finally:
         session.close()
         engine.dispose()
+
+
+def test_admin_column_options_use_the_edited_readers_choices(library, unconfigured, monkeypatch):
+    from cps import render_template
+    admin = _viewer()
+    target = FakeUser("Guest", stored='{"cc_sidebar":{"show_cc_2":false,"show_cc_3":true}}')
+    _patch_all_surfaces(monkeypatch, library, unconfigured, admin, BOTH_COLUMNS)
+    with _bable_app().test_request_context():
+        options = render_template.get_custom_column_visibility_options(target)
+    assert {item["id"]: item["visible"] for item in options} == {2: False, 3: True}
+    assert admin.view_settings == {}

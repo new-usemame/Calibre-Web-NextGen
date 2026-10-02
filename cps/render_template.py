@@ -322,10 +322,11 @@ def get_custom_column_sidebar_entries():
     return entries
 
 
-def get_custom_column_visibility_options():
+def get_custom_column_visibility_options(user=None):
     """All browsable custom columns with their per-user sidebar visibility
     state, for the named checkbox group on the profile page (/me).
     Disabled columns are included so they can be re-enabled."""
+    user = current_user if user is None else user
     options = []
     try:
         from . import calibre_db, db
@@ -339,7 +340,7 @@ def get_custom_column_visibility_options():
             options.append({
                 'id': col.id,
                 'name': col.name,
-                'visible': is_cc_visible(current_user, col.id),
+                'visible': is_cc_visible(user, col.id),
             })
     except Exception:
         log.debug("Could not build custom column visibility options", exc_info=True)

@@ -2652,11 +2652,12 @@ def category_list():
 @login_required_if_no_ano
 @retryable_column_reads
 def cc_category_list(column_id, category_path):
-    """Tree/list view for one hierarchical custom column.
+    """Tree or atomic-value list for one browsable custom column.
 
-    /custom_column/5                     -> top-level nodes of column #5
-    /custom_column/5/Computers           -> books under 'Computers' (+ descendants)
-    /custom_column/5/Computers/DB        -> books under 'Computers.DB'
+    /custom_column/5                     -> values/categories of column #5
+    /custom_column/5/Computers           -> books under 'Computers'
+    /custom_column/5/Computers.DB        -> books under 'Computers.DB'
+    A slash is part of the stored value, never a hierarchy separator.
     """
     order = get_sort_function(request.args.get('sort_param', 'stored'), 'cc_%d' % column_id)
     return render_cc_category(request.args.get('page', 1), column_id,
@@ -2672,6 +2673,7 @@ def browsable_cc_column(col_id):
     return None
 
 
+@retryable_column_reads
 def render_cc_category(page, col_id, path, order):
     """Render one custom column's browse view: a tree, a flat list, or the
     books under one node of either.

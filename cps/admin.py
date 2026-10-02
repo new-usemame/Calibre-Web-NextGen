@@ -40,7 +40,8 @@ from .helper import check_valid_domain, send_test_mail, reset_password, generate
     valid_email, check_username, send_broadcast_email
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
-from .render_template import render_title_template, get_sidebar_config
+from .render_template import render_title_template, get_sidebar_config, get_custom_column_visibility_options
+from .custom_column_visibility import save_cc_visibility
 from .services import file_lock
 from .services.worker import WorkerThread
 from .services.kobo_import import (
@@ -2689,6 +2690,7 @@ def edit_user(user_id):
                                  languages=languages,
                                  new_user=0,
                                  content=content,
+                                 cc_visibility=get_custom_column_visibility_options(content),
                                  config=config,
                                  restriction_is_bool=(restricted_column_datatype(
                                      config.config_restricted_column) == "bool"),
@@ -3475,7 +3477,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             flash(str(ex), category="error")
             return "", 400
 
-    val = [int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_')]
+    val = [int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_') and not k.startswith('show_cc_')]
     sidebar, __ = get_sidebar_config()
     for element in sidebar:
         value = element['visibility']
@@ -3669,6 +3671,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.kindle_mail = valid_email(to_save["kindle_mail"]) if to_save["kindle_mail"] else ""
         if to_save.get("kindle_mail_subject") is not None:
             content.kindle_mail_subject = (to_save.get("kindle_mail_subject", "") or "").strip()
+        save_cc_visibility(content, get_custom_column_visibility_options(content), to_save)
 
     except Exception as ex:
         log.error(ex)
@@ -3682,6 +3685,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
                                      kobo_support=kobo_support,
                                      new_user=0,
                                      content=content,
+                                 cc_visibility=get_custom_column_visibility_options(content),
                                      config=config,
                                      restriction_is_bool=(restricted_column_datatype(
                                          config.config_restricted_column) == "bool"),

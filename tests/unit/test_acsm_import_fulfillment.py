@@ -40,6 +40,7 @@ def _epub(path):
 
 
 def _processor(monkeypatch, tmp_path):
+    monkeypatch.setattr(ingest_processor.app_paths, 'processed_books_dir', lambda: tmp_path / 'processed_books')
     processor = ingest_processor.NewBookProcessor.__new__(ingest_processor.NewBookProcessor)
     processor.filepath = str(tmp_path / 'ticket.acsm')
     Path(processor.filepath).write_text('owned-ticket')
@@ -81,9 +82,12 @@ def test_fulfilled_book_uses_normal_import_identity_and_optional_conversion(
         assert timeout == 5
         assert owned_process_group is True
         dest = Path(cmd[cmd.index('--destination') + 1])
-        book = _epub(dest / 'fulfilled.epub')
+        dest.mkdir(parents=True, exist_ok=True)
+        book = _epub(dest / 'ticket.epub')
         fulfilled.append(str(book))
-        return 'CWNG_FULFILLMENT_RESULT=' + json.dumps({'path': str(book), 'format': 'epub'})
+        from calibre_ticket_fulfillment import persist_result, file_digest
+        return 'CWNG_FULFILLMENT_RESULT=' + json.dumps(persist_result(
+            book.parent, file_digest(processor.filepath), book))
     monkeypatch.setattr(ingest_processor, '_run_converter_streaming', hook_process)
     def convert():
         calls.append((processor.filepath, processor.input_format))
@@ -161,7 +165,7 @@ def test_import_hook_must_return_a_materialized_book(monkeypatch, tmp_path, retu
         run_import_plugins=hook, run_import_plugins_before_metadata=lambda p: nullcontext()))
     with pytest.raises(ValueError): helper.fulfill_ticket(source, tmp_path / 'result')
     assert source.read_text() == 'owned-ticket'
-    assert list((tmp_path / 'result').iterdir()) == []
+    assert not (tmp_path / 'result').exists()
 
 
 @pytest.mark.skipif(__import__('os').name != 'posix', reason='Owned process-group cleanup is a POSIX behavior')
@@ -204,3 +208,74 @@ def test_failed_backup_preserves_original_for_manual_recovery(monkeypatch, tmp_p
     monkeypatch.setattr(processor, 'backup', lambda *a, **kw: False)
     with pytest.raises(ingest_processor.PreserveIngestSourceError): processor.ingest_acsm()
     assert Path(processor.filepath).read_text() == 'owned-ticket'
+
+
+def test_import_retry_reuses_fulfilled_bytes_after_conversion_cleanup(monkeypatch, tmp_path):
+    import shutil
+    processor = _processor(monkeypatch, tmp_path)
+    hooks = []
+    def fulfill(cmd, **kw):
+        hooks.append(cmd)
+        assert len(hooks) == 1, 'a retry must not spend the ticket again'
+        destination = Path(cmd[cmd.index('--destination') + 1])
+        destination.mkdir(parents=True, exist_ok=True)
+        book = _epub(destination / 'ticket.epub')
+        from calibre_ticket_fulfillment import persist_result, file_digest
+        return 'CWNG_FULFILLMENT_RESULT=' + json.dumps(persist_result(
+            book.parent, file_digest(processor.filepath), book))
+    monkeypatch.setattr(ingest_processor, '_run_converter_streaming', fulfill)
+    def fail_import(*a, **kw):
+        raise ingest_processor.RetryIngestSourceError('precommit import failure')
+    monkeypatch.setattr(processor, 'add_book_to_library', fail_import)
+    with pytest.raises(ingest_processor.RetryIngestSourceError): processor.ingest_acsm()
+    shutil.rmtree(processor.tmp_conversion_dir)
+    Path(processor.tmp_conversion_dir).mkdir()
+    def recovered(path, **kw):
+        assert Path(path).read_bytes().startswith(b'PK')
+        processor.last_added_book_ids = [7]
+    monkeypatch.setattr(processor, 'add_book_to_library', recovered)
+    processor.ingest_acsm()
+    assert len(hooks) == 1
+    assert Path(processor.filepath).read_text() == 'owned-ticket'
+
+
+def test_fulfillment_preserves_ticket_basename_for_filename_metadata(monkeypatch, tmp_path):
+    import sys
+    from contextlib import nullcontext
+    import calibre_ticket_fulfillment as helper
+    source = tmp_path / 'First Book.acsm'
+    source.write_text('owned-ticket')
+    def hook(paths):
+        staged = Path(paths[0])
+        assert staged.name == source.name
+        output = staged.parent / 'plugin-generic.pdf'
+        output.write_bytes(b'%PDF-1.4\n% owned metadata-free test document\n%%EOF')
+        return [str(output)]
+    monkeypatch.setitem(sys.modules, 'calibre.db.adding', types.SimpleNamespace(
+        run_import_plugins=hook, run_import_plugins_before_metadata=lambda p: nullcontext()))
+    result = helper.fulfill_ticket(source, tmp_path / 'result')
+    assert Path(result['path']).name == 'First Book.pdf'
+
+
+@pytest.mark.parametrize('damage', ['missing_manifest', 'modified_book', 'wrong_ticket', 'escape'])
+def test_damaged_recovery_entry_preserves_source_without_refilling(monkeypatch, tmp_path, damage):
+    from calibre_ticket_fulfillment import persist_result, file_digest
+    processor = _processor(monkeypatch, tmp_path)
+    digest = file_digest(processor.filepath)
+    destination = tmp_path / 'processed_books' / 'acsm_fulfilled' / digest
+    destination.mkdir(parents=True)
+    book = _epub(destination / 'ticket.epub')
+    persist_result(destination, digest, book)
+    manifest = destination / 'result.json'
+    if damage == 'missing_manifest':
+        manifest.unlink()
+    elif damage == 'modified_book':
+        book.write_bytes(b'changed')
+    else:
+        data = json.loads(manifest.read_text())
+        data['source_sha256' if damage == 'wrong_ticket' else 'file'] = ('0' * 64 if damage == 'wrong_ticket' else '../escape.epub')
+        manifest.write_text(json.dumps(data))
+    monkeypatch.setattr(ingest_processor, '_run_converter_streaming', lambda *a, **k: pytest.fail('damaged recovery must not spend ticket again'))
+    with pytest.raises(ingest_processor.PreserveIngestSourceError): processor.ingest_acsm()
+    assert Path(processor.filepath).read_text() == 'owned-ticket'
+    assert destination.exists()

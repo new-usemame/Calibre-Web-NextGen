@@ -450,18 +450,26 @@ class TestConversionBudgetIsSharedAcrossStages:
             "against converter time unless the message says otherwise"
         )
 
-    def test_kepubify_also_receives_the_shared_budget(self):
-        """Both converters must draw on the same allowance; a source-pin here
-        because the two callsites are what the sharing property depends on."""
-        source = INGEST_PROCESSOR_PATH.read_text()
-        assert source.count("timeout=conversion_budget_remaining()") == 2, (
-            "both ebook-convert and kepubify must use the shared budget, not "
-            "a fresh per-subprocess deadline"
-        )
-        assert "timeout=conversion_deadline_seconds()" not in source, (
-            "the raw total must not be handed to a subprocess — that is the "
-            "per-stage deadline this class exists to prevent"
-        )
+    def test_kepubify_also_receives_the_shared_budget(self, monkeypatch, tmp_path):
+        processor = _conversion_processor(tmp_path)
+        processor.db = type('DB', (), {'conversion_add_entry': lambda *args: None})()
+        monkeypatch.setenv('CWA_CONVERSION_DEADLINE_SECONDS', '10')
+        clock = [100.0]
+        monkeypatch.setattr(ingest_processor, '_PROCESS_START_MONOTONIC', 100.0)
+        monkeypatch.setattr(ingest_processor.time, 'monotonic', lambda: clock[0])
+        observed = []
+        def convert(cmd, **kw):
+            observed.append((cmd[0], kw['timeout']))
+            Path(cmd[2]).write_bytes(b'intermediate epub')
+            clock[0] += 4
+            return ''
+        monkeypatch.setattr(ingest_processor, '_run_converter_streaming', convert)
+        def kepub(cmd, **kw):
+            observed.append((cmd[0], kw['timeout']))
+            return subprocess.CompletedProcess(cmd, 0)
+        monkeypatch.setattr(subprocess, 'run', kepub)
+        assert processor.convert_to_kepub()[0] is True
+        assert observed == [('ebook-convert', 10.0), ('kepubify', 6.0)]
 
 
 class TestShellDeadlineArithmetic:
@@ -631,6 +639,7 @@ class TestNotABookFormatsAreNotRescued:
         def _factory(filepath):
             fake = _FakeProcessor(filepath, convert_result=(False, ""))
             fake.input_format = "acsm"
+            fake.ingest_acsm = lambda: None
             holder["fake"] = fake
             return fake
 
@@ -759,6 +768,8 @@ class TestFailedTicketFulfilmentDoesNotImportTickets:
                 return False, ""
 
             fake.convert_book = _failed_ticket_conversion
+            if fmt == 'acsm':
+                fake.ingest_acsm = _failed_ticket_conversion
             holder["fake"] = fake
             return fake
 

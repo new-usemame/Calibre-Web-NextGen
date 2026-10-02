@@ -1709,7 +1709,7 @@ class NewBookProcessor:
 
     def ingest_acsm(self) -> None:
         """Fulfill once through import hooks, then use guarded ordinary ingest."""
-        from calibre_ticket_fulfillment import RESULT_PREFIX, validate_book
+        from calibre_ticket_fulfillment import RESULT_PREFIX, load_result
 
         ticket = Path(self.filepath)
         source_digest = _sha256_file(ticket)
@@ -1718,31 +1718,45 @@ class NewBookProcessor:
         existing = previous["book_ids"] if previous else (
             [] if acquisition else self._content_marker_book_ids(source_digest)
         )
+        destination = app_paths.processed_books_dir() / 'acsm_fulfilled' / source_digest
         if existing:
             # This path reuses the normal durable receipt acknowledgement; it
             # returns before metadata hooks and never fulfills the ticket again.
             self.add_book_to_library(str(ticket), identity_path=str(ticket))
+            if self.last_added_book_ids:
+                shutil.rmtree(destination, ignore_errors=True)
             return
 
-        destination = Path(tempfile.mkdtemp(prefix="fulfilled-acsm-", dir=self.tmp_conversion_dir))
-        helper = Path(__file__).with_name("calibre_ticket_fulfillment.py")
-        print(f"[ingest-processor] Fulfilling ACSM through Calibre import hooks: {self.filename}", flush=True)
         try:
-            output = _run_converter_streaming(
-                ["calibre-debug", "-e", str(helper), "--", "--source", str(ticket),
-                 "--destination", str(destination)],
-                env=self.calibre_env, timeout=conversion_budget_remaining(), owned_process_group=True,
-            )
-            result = next(json.loads(line[len(RESULT_PREFIX):]) for line in reversed(output.splitlines())
-                          if line.startswith(RESULT_PREFIX))
-            fulfilled = Path(result["path"])
-            if fulfilled.resolve().parent != destination.resolve():
-                raise ValueError("Fulfillment result escaped its staging directory")
-            fulfilled_format = validate_book(fulfilled)
-            if result["format"] != fulfilled_format or _sha256_file(ticket) != source_digest:
-                raise ValueError("Fulfillment changed the ticket identity or result format")
+            recovered = load_result(destination, source_digest)
+        except ValueError as error:
+            print(f"[ingest-processor] {error}; original retained for manual recovery", flush=True)
+            raise PreserveIngestSourceError(str(error)) from error
+        helper = Path(__file__).with_name("calibre_ticket_fulfillment.py")
+        try:
+            if recovered:
+                print(f"[ingest-processor] Reusing validated ACSM book: {recovered['path']}", flush=True)
+                result = recovered
+            else:
+                print(f"[ingest-processor] Fulfilling ACSM through Calibre import hooks: {self.filename}", flush=True)
+                output = _run_converter_streaming(
+                    ["calibre-debug", "-e", str(helper), "--", "--source", str(ticket),
+                     "--destination", str(destination)],
+                    env=self.calibre_env, timeout=conversion_budget_remaining(), owned_process_group=True,
+                )
+                result = next(json.loads(line[len(RESULT_PREFIX):]) for line in reversed(output.splitlines())
+                              if line.startswith(RESULT_PREFIX))
+                if result != load_result(destination, source_digest):
+                    raise ValueError("Fulfillment acknowledgement did not match its durable result")
+            fulfilled = Path(result['path'])
+            fulfilled_format = result['format']
+            if _sha256_file(ticket) != source_digest:
+                raise ValueError("Fulfillment changed the ticket identity")
         except (OSError, ValueError, KeyError, StopIteration, subprocess.SubprocessError) as error:
             print(f"[ingest-processor] ACSM fulfillment failed: {type(error).__name__}", flush=True)
+            if destination.exists():
+                print(f"[ingest-processor] Retained ACSM recovery entry at {destination}", flush=True)
+                raise PreserveIngestSourceError("ACSM fulfillment interrupted; original and recovery entry retained") from error
             guidance = conversion_failure_guidance("acsm", self.filename,
                 converter_output=getattr(error, "output", None))
             if guidance:
@@ -1772,14 +1786,9 @@ class NewBookProcessor:
                 self.filepath, self.input_format = old_path, old_format
         self.add_book_to_library(import_path, identity_path=str(ticket))
         if not self.last_added_book_ids:
-            # A guarded overwrite may deliberately refuse the resulting book.
-            # Keep that materialized book as well as its original ticket for
-            # recovery; never report the raw ticket as successfully imported.
-            self.backup(str(fulfilled), backup_type="failed")
-            if not self.backup(str(ticket), backup_type="failed"):
-                raise PreserveIngestSourceError("ACSM book import failed; original retained")
-            if acquisition:
-                raise RetryIngestSourceError("Fulfilled ACSM book import incomplete; original retained")
+            print(f"[ingest-processor] Fulfilled ACSM import incomplete; book retained at {fulfilled}", flush=True)
+            raise PreserveIngestSourceError("Fulfilled ACSM book import incomplete; original and fulfilled book retained")
+        shutil.rmtree(destination, ignore_errors=True)
 
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""

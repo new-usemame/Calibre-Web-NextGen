@@ -8,6 +8,7 @@ and opt-in configuration as ingest. Only a materialized EPUB/PDF leaves the
 plugin temporary directory. The original ticket is never given to a hook.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -53,41 +54,118 @@ def validate_book(path):
     return extension.lstrip(".")
 
 
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _sync_directory(path):
+    fd = os.open(str(path), os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def persist_result(destination, source_digest, book):
+    """Publish a ticket-bound, byte-validated result before acknowledging it."""
+    destination, book = Path(destination), Path(book)
+    if book.resolve().parent != destination.resolve():
+        raise ValueError('Fulfillment result escaped its recovery directory')
+    result = {'source_sha256': source_digest, 'file': book.name,
+              'format': validate_book(book), 'book_sha256': file_digest(book)}
+    temporary = destination / 'result.json.part'
+    with temporary.open('w', encoding='utf-8') as stream:
+        json.dump(result, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, destination / 'result.json')
+    _sync_directory(destination)
+    return {'path': str(book), 'format': result['format']}
+
+
+def load_result(destination, source_digest):
+    """An interrupted or damaged entry is never permission to spend it again."""
+    destination = Path(destination)
+    if not destination.exists():
+        return None
+    try:
+        if destination.is_symlink():
+            raise ValueError('Fulfillment recovery directory is a symlink')
+        manifest = destination / 'result.json'
+        if manifest.stat().st_size > 8192:
+            raise ValueError('Invalid fulfillment recovery manifest')
+        result = json.loads(manifest.read_text(encoding='utf-8'))
+        name = result['file']
+        if not isinstance(name, str) or Path(name).name != name:
+            raise ValueError('Invalid recovered book filename')
+        book = destination / name
+        if (book.is_symlink() or book.resolve().parent != destination.resolve()
+                or result['source_sha256'] != source_digest
+                or validate_book(book) != result['format']
+                or file_digest(book) != result['book_sha256']):
+            raise ValueError('Fulfillment recovery identity or book bytes changed')
+        return {'path': str(book), 'format': result['format']}
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError('Incomplete or damaged ACSM recovery entry: ' + str(destination)) from error
+
+
 def fulfill_ticket(source, destination):
-    # Imports remain local: ordinary Python can validate the persisted result,
-    # while only calibre-debug initializes and executes the plugin registry.
     from calibre.db.adding import run_import_plugins, run_import_plugins_before_metadata
 
     source, destination = Path(source), Path(destination)
-    if source.suffix.lower() != ".acsm":
-        raise ValueError("Only ACSM tickets use this fulfillment path")
-    destination.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="cwng-acsm-") as temp_dir:
-        staged = Path(temp_dir) / "source.acsm"
-        shutil.copy2(source, staged)
-        with run_import_plugins_before_metadata(temp_dir):
-            outputs = run_import_plugins([str(staged)])
-            if len(outputs) != 1:
-                raise ValueError("ACSM import hooks returned an invalid book list")
-            output = Path(outputs[0])
-            extension = validate_book(output)
-            target = destination / ("fulfilled." + extension)
-            temporary = destination / ("fulfilled." + extension + ".part")
-            try:
-                with output.open("rb") as incoming, temporary.open("wb") as outgoing:
+    if source.suffix.lower() != '.acsm':
+        raise ValueError('Only ACSM tickets use this fulfillment path')
+    source_digest = file_digest(source)
+    previous = load_result(destination, source_digest)
+    if previous:
+        return previous
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.mkdir()  # Reserve before executing any potentially consumptive hook.
+    intent = destination / 'intent.json'
+    with intent.open('w', encoding='utf-8') as stream:
+        json.dump({'source_sha256': source_digest}, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    _sync_directory(destination)
+    _sync_directory(destination.parent)
+    try:
+        with tempfile.TemporaryDirectory(prefix='cwng-acsm-') as temp_dir:
+            staged = Path(temp_dir) / source.name
+            shutil.copy2(source, staged)
+            with run_import_plugins_before_metadata(temp_dir):
+                outputs = run_import_plugins([str(staged)])
+                if len(outputs) != 1:
+                    raise ValueError('ACSM import hooks returned an invalid book list')
+                output = Path(outputs[0])
+                extension = validate_book(output)
+                target = destination / (source.stem + '.' + extension)
+                temporary = destination / (target.name + '.part')
+                with output.open('rb') as incoming, temporary.open('wb') as outgoing:
                     shutil.copyfileobj(incoming, outgoing)
                     outgoing.flush()
                     os.fsync(outgoing.fileno())
-                validate_book(output)
                 os.replace(temporary, target)
-            finally:
-                temporary.unlink(missing_ok=True)
-            return {"path": str(target), "format": extension}
+                if file_digest(source) != source_digest:
+                    raise ValueError('Original ticket changed during fulfillment')
+                return persist_result(destination, source_digest, target)
+    except Exception:
+        # A controlled plugin rejection with no materialized/partial book can
+        # be tried again after configuration is repaired. An interrupted copy
+        # or publication retains its reservation and bytes for manual recovery.
+        if set(path.name for path in destination.iterdir()) == {'intent.json'}:
+            intent.unlink()
+            destination.rmdir()
+        raise
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", required=True)
-    parser.add_argument("--destination", required=True)
+    parser.add_argument('--source', required=True)
+    parser.add_argument('--destination', required=True)
     args = parser.parse_args()
     print(RESULT_PREFIX + json.dumps(fulfill_ticket(args.source, args.destination)))

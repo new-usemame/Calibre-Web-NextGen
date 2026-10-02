@@ -16,4 +16,8 @@ The list API includes the first series relation ID alongside its existing name a
 
 ## Limits
 
-This changes New UI cards. Classic navigation and physical devices were not exercised for this change. Owned private rigs use copied test data and temporary series metadata; shared services and household devices are untouched. Operator owns merging and releasing.
+This changes New UI cards. Classic navigation and physical devices were not exercised for this change. Owned private rigs use copied test data and temporary series metadata; shared services and household devices are untouched. Merge requires current-main verification; release remains separately owned.
+
+## Current-main integration, 2026-10-02
+
+Rebased onto `e13f1d530` after #2405. CHANGES-only conflicts were resolved additively, preserving all preceding rows and SPA anchors. BookCard source/styles, the direct-series browser spec, and serializer behavioral tests are byte-identical to the originally reviewed `ff22d3b38`; the serializer and accessibility files also retain main’s shelf-sharing role, original-filename diagnostic comment and `/app/magic/new` route. Current focused serializer/catalog/classifier checks passed 50 tests; frontend units passed all 193 cases, E2E TypeScript and production build passed. Original full-image desktop/phone keyboard, axe and series/selection proof remains applicable. Fresh exact-head CI is the final merge gate.

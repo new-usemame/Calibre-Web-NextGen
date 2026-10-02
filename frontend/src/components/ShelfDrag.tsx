@@ -75,7 +75,7 @@ export function ShelfDragProvider({ children }: { children: ReactNode }) {
   const complete = async (value: Payload, shelfId: number) => {
     cancel();
     const shelf = shelvesRef.current.find(s => s.id === shelfId);
-    if (!shelf || pending.current) return;
+    if (!shelf || pending.current || selection.current?.current.busy) return;
     pending.current = true;
     const startedInView = viewVersion.current;
     setMessage('');

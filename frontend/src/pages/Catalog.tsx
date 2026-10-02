@@ -535,16 +535,36 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     constrainMenu();
     const toolbar = settingsMenuRef.current?.closest<HTMLElement>(`.${styles.toolbar}`);
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(constrainMenu);
-    if (toolbar) {
-      observer?.observe(toolbar);
-      for (const item of toolbar.children) observer?.observe(item);
-    }
+    const observedItems = new Set<Element>();
+    const observeItems = () => {
+      if (!toolbar || !active) return;
+      for (const item of observedItems) {
+        if (item.parentElement !== toolbar) {
+          observer?.unobserve(item);
+          observedItems.delete(item);
+        }
+      }
+      for (const item of toolbar.children) {
+        if (!observedItems.has(item)) {
+          observer?.observe(item);
+          observedItems.add(item);
+        }
+      }
+      constrainMenu();
+    };
+    if (toolbar) observer?.observe(toolbar);
+    observeItems();
+    // Select mode inserts a control after the menu has opened. Its later
+    // loading-label size changes must be observed too, without a resize.
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(observeItems);
+    if (toolbar) mutations?.observe(toolbar, { childList: true });
     void document.fonts?.ready.then(constrainMenu);
     document.fonts?.addEventListener('loadingdone', constrainMenu);
     window.addEventListener('resize', constrainMenu);
     return () => {
       active = false;
       observer?.disconnect();
+      mutations?.disconnect();
       document.fonts?.removeEventListener('loadingdone', constrainMenu);
       window.removeEventListener('resize', constrainMenu);
     };

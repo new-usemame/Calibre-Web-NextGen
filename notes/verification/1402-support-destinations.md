@@ -21,3 +21,7 @@ Independent review found two initial gaps: the Ko-fi banner bypassed the Help po
 The private image was built as one complete product artifact from `8977f7e4c`, with no source overlays. Container `c887446ead5d`, image ID `sha256:7338a36973e9720a0d5e5b78bed23452544a543aaab55b0a5210e4c9397540f0`. Served policy, configuration template and auth hashes matched the worktree; index and bundle fingerprints are preserved in the private evidence record. Subsequent changes are test/POT/documentation only. The private seed contains invalid old EPUB files whose KEPUB backfill startup errors are pre-existing; the exercised configuration and support requests do not produce errors.
 
 Large logs, JSON evidence, temporary private probe and named JPEGs are retained outside the repository. This PR adds no dependency. The operator owns merging and release.
+
+## Serial merge integration, 2026-10-02
+
+Rebased onto `f4f3ddbe4`, the translation follow-up to #2400 squash `0fd14f768`. The admin-save conflict retains the existing Boolean-restriction compatibility validator and the support URL/label validator before any settings mutation. All base changelog rows and SPA strings remain present. The measured request/import closure is 214 of 272 modules. Focused support policy, complete classic layout, Boolean restriction, locale/catalog compilation and classifier checks pass 114 cases with one pre-existing skip; all 193 frontend units, E2E TypeScript and the production build pass. The original product implementation is unchanged; fresh exact-head CI is required before merge.

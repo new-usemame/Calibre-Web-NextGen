@@ -679,6 +679,10 @@ pause_before_pid_publication_for_test() {
 
 process_retry_queue() {
         local retry_scope="${1:-all}"
+        if [ "$retry_scope" = "busy-only" ] && [ "${#BUSY_RETRY_PATHS[@]}" -eq 0 ]; then
+                maybe_run_post_batch_follow_up
+                return 0
+        fi
         if [ -s "$QUEUE_FILE" ]; then
                 echo "[cwa-ingest-service] Processing retry queue..."
                 local temp_queue commit_status

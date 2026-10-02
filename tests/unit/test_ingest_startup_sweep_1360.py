@@ -215,6 +215,25 @@ def test_periodic_retry_does_not_repeat_a_failed_conversion(harness):
     assert harness.retry_queue.read_text().strip() == str(book)
 
 
+def test_idle_timer_leaves_an_ordinary_failure_queue_untouched(harness):
+    """An ineligible queue must not produce timer logs or durable queue rewrites."""
+    import shlex
+    book = harness.watch / "failed.epub"
+    book.write_bytes(b"failed input")
+    harness.retry_queue.write_text(str(book) + "\n")
+    before_file = harness.watch / ".queue-before"
+    output = harness.watch.parent / "timer-output"
+    harness(f"""
+        python3 -c 'import os,sys; print(os.stat(sys.argv[1]).st_mtime_ns)' "$QUEUE_FILE" > {shlex.quote(str(before_file))}
+        for tick in 1 2 3; do
+            process_retry_queue busy-only
+        done > {shlex.quote(str(output))} 2>&1
+    """)
+    assert output.read_text() == "", "idle retry timer kept emitting queue activity"
+    assert harness.retry_queue.stat().st_mtime_ns == int(before_file.read_text()), "idle timer rewrote a durable queue"
+    assert harness.retry_queue.read_text() == str(book) + "\n"
+
+
 #
 # `wait_for_stable_file` samples the size every STABLE_INTERVAL and calls a
 # file settled after two consecutive equal reads. This harness sets

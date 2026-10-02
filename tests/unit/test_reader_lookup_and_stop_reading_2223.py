@@ -29,6 +29,7 @@ def test_stop_reading_changes_only_active_status_and_preserves_carriers():
         book_id = Column(Integer, nullable=False)
         read_status = Column(Integer, nullable=False)
         last_modified = Column(DateTime(timezone=True))
+        read_status_choice_at = Column(DateTime(timezone=True))
         last_time_started_reading = Column(DateTime(timezone=True))
         times_started_reading = Column(Integer, nullable=False)
 
@@ -68,6 +69,9 @@ def test_stop_reading_changes_only_active_status_and_preserves_carriers():
     still_finished = session.query(ReadBook).filter_by(user_id=10, book_id=8).one()
     saved = session.query(SavedCarrier).filter_by(user_id=10, book_id=7).one()
     assert changed.read_status == ReadBook.STATUS_UNREAD
+    assert changed.read_status_choice_at > modified.replace(tzinfo=None)
+    assert untouched.read_status_choice_at is None
+    assert still_finished.read_status_choice_at is None
     assert (changed.last_time_started_reading, changed.times_started_reading) == (
         started.replace(tzinfo=None), 4,
     )

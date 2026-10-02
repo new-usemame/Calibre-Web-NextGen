@@ -1411,7 +1411,7 @@
                     window.location.reload();
                 },
                 error: function () {
-                    $message.text("{{ _('Could not update reading status.')|e('js') }}");
+                    $message.text({{ _('Could not update reading status.')|tojson }});
                     $button.prop("disabled", false);
                 }
             });

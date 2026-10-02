@@ -19,10 +19,17 @@ Bulk work uses at most eight concurrent per-book requests. Every failure retains
 
 ## Limits
 
-This adds New UI bulk selection; classic is unchanged. Browser evidence uses copied private test data and owned temporary users/shelves, not production accounts. Existing count/permission policies are reused, without a physical-device sync claim. Operator owns merging and releasing.
+This adds New UI bulk selection; classic is unchanged. Browser evidence uses copied private test data and owned temporary users/shelves, not production accounts. Existing count/permission policies are reused, without a physical-device sync claim. Current-head merge verification governs landing; releases remain separately owned.
 
 ## Broad CI follow-up
 
 Run 36852036795 passed 918 browser cases and failed the desktop/phone beyond-loaded-page precondition: a six-book visible CI library auto-filled both three-card pages before Select all. The test now holds later real page responses until bulk proof is complete, releasing them in finally. It still uses actual server listing/selection/mutations and requires fewer loaded cards than selected IDs; no assertion or product behavior is relaxed. All 13 focused cases passed after the boundary fix. Final cleanup waits for owned route handlers before fixture teardown. A fresh broad CI run is required.
 
 CI follow-up36857278746 again failed the unloaded-page precondition because its page-wide link count included the Discover strip. The count/readiness assertion now scopes to catalog-grid, retaining real select_all IDs, held later page responses and persisted bulk-save/retry proof. Independent follow-up review clear; final focused desktop/mobile13/13 pass. The same broad run had917passed/106skipped and one unrelated reader-columns case passed on retry. No product change in this correction.
+
+
+## Serial merge integration (2026-10-02)
+
+Rebased onto current main292483452, preserving the catalog-source search, host support, lookup/Stop reading, sharing and direct series card links. Only CHANGES row/link conflicts occurred; all preceding rows and SPA anchors survive. Selection API, Catalog/BulkBar/retry logic and the complete focused selection browser spec are byte-identical to the reviewed original. Shared DB query policy retains newer Boolean restriction/account-aware filtering; shelf UI/API retains current sharing, owner-only device marks, OPDS exposure and single-main landmarks. Card series navigation remains main-identical, with one selection toggle.
+
+Current focused backend/query/permission/retry/catalog/translation/classifier packet:134 passed,one existing skip. Frontend197 passed, E2E TypeScript and production build pass. Measured classifier import closure214 of272 matches the README. Original actual whole-image beyond-loaded-page/failed-ID retry/route-cancellation proof and independent REVIEW-2268 remain applicable to unchanged feature bytes. Fresh exact-head CI required after rebase.

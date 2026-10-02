@@ -228,6 +228,14 @@ msgstr "Instellingen database is niet schrijfbaar."
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+"Deze Booleaanse kolom kan pas worden geselecteerd nadat incompatibele "
+"globale en gebruikersbeperkingen zijn gecorrigeerd of gewist."
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -396,6 +404,10 @@ msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
 msgstr ""
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr "Booleaanse beperkingen moeten Ja, Nee of Ongedefinieerd zijn."
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -3265,12 +3277,14 @@ msgid "Not rated"
 msgstr "Niet beoordeeld"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Ja"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Nee"
 
@@ -13215,8 +13229,12 @@ msgstr "Bekijk restricties gebaseerd op Calibre kolommen"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
+"Beperk de zichtbaarheid van boeken op basis van waarden in een Calibre-"
+"aangepaste kolom van het type tekst, opsomming of Booleaans. Booleaanse "
+"kolommen onderscheiden Ja, Nee en Ongedefinieerd."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -15765,6 +15783,10 @@ msgstr "Selecteer toegestane/geweigerde tags van gebruikers"
 msgid "Select Allowed/Denied Custom Column Values of User"
 msgstr ""
 "Selecteer toegestane/geweigerde aangepaste kolom waarden van gebruikers"
+
+#: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr "Ongedefinieerd"
 
 #: cps/templates/modal_dialogs.html
 msgid "Enter Tag"

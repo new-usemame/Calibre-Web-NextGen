@@ -246,6 +246,14 @@ msgstr "La base de données des paramètres n'est pas accessible en écriture"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+"Impossible de sélectionner cette colonne booléenne avant d'avoir corrigé ou "
+"supprimé les restrictions globales et utilisateur incompatibles."
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -410,6 +418,10 @@ msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
 msgstr ""
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr "Les restrictions booléennes doivent être Oui, Non ou Non défini."
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -3379,12 +3391,14 @@ msgid "Not rated"
 msgstr "Non évalué"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Oui"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Non"
 
@@ -13432,10 +13446,12 @@ msgstr "Visualiser les restrictions basées sur la colonne Calibre"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"Limiter la visibilité des livres en fonction des valeurs d'une colonne "
-"personnalisée de texte Calibre."
+"Restreindre la visibilité des livres selon les valeurs d'une colonne "
+"personnalisée Calibre de type texte, énumération ou booléen. Les colonnes "
+"booléennes distinguent Oui, Non et Non défini."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -16101,6 +16117,10 @@ msgstr ""
 "Sélectionner les colonnes personnalisées d'utilisateur autorisées/refusées"
 
 #: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr "Non défini"
+
+#: cps/templates/modal_dialogs.html
 msgid "Enter Tag"
 msgstr "Saisir une étiquette"
 
@@ -17250,6 +17270,12 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid ""
+#~ "Restrict book visibility based on values in a Calibre text custom column."
+#~ msgstr ""
+#~ "Limiter la visibilité des livres en fonction des valeurs d'une colonne "
+#~ "personnalisée de texte Calibre."
 
 #~ msgid "Create"
 #~ msgstr "Créer"

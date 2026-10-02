@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import shutil  # noqa: F401 -- test/extension monkeypatch compatibility
 import subprocess
 import tempfile
+from types import SimpleNamespace
 
 from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
@@ -62,6 +63,12 @@ from . import debug_info
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
 from .custom_column_sort import load_eligible_columns, persist_configured_columns
+from .services.restriction_columns import (
+    BOOL_CHOICES,
+    RESTRICTION_DATATYPES,
+    bool_tokens_valid,
+    normalize_bool_token,
+)
 
 log = logger.create()
 
@@ -722,12 +729,15 @@ def view_configuration():
     read_column = calibre_db.session.query(db.CustomColumns) \
         .filter(and_(db.CustomColumns.datatype == 'bool', db.CustomColumns.mark_for_delete == 0)).all()
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
-        .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all()
+        .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
+        .filter(db.CustomColumns.mark_for_delete == 0).all()
     sortable_columns = load_eligible_columns() or []
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -749,7 +759,13 @@ def edit_user_table():
         .order_by(db.Tags.name).all()
     if config.config_restricted_column:
         try:
-            custom_values = calibre_db.session.query(db.cc_classes[config.config_restricted_column]).all()
+            if restricted_column_datatype(config.config_restricted_column) == "bool":
+                custom_values = [
+                    SimpleNamespace(id=token, name=_(label))
+                    for token, label in BOOL_CHOICES
+                ]
+            else:
+                custom_values = calibre_db.session.query(db.cc_classes[config.config_restricted_column]).all()
         except (KeyError, AttributeError, IndexError):
             custom_values = []
             log.error("Custom Column No.{} does not exist in calibre database".format(
@@ -766,6 +782,8 @@ def edit_user_table():
                                  users=all_user.all(),
                                  tags=tags,
                                  custom_values=custom_values,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  translations=translations,
                                  languages=languages,
                                  visiblility=visibility,
@@ -911,6 +929,16 @@ def edit_list_user(param):
         vals['value'] = vals['value'][0]
     elif 'value[]' not in vals:
         return _("Malformed request"), 400
+    if (param in ('allowed_column_value', 'denied_column_value')
+            and restricted_column_datatype(config.config_restricted_column) == "bool"):
+        try:
+            if 'value[]' in vals:
+                vals['value[]'] = [_canonical_boolean_restriction(value)
+                                   for value in vals['value[]']]
+            else:
+                vals['value'] = _canonical_boolean_restrictions_csv(vals['value'])
+        except ValueError as ex:
+            return str(ex), 400
     for user in users:
         try:
             if param in ['denied_tags', 'allowed_tags', 'allowed_column_value', 'denied_column_value']:
@@ -1048,6 +1076,19 @@ def update_table_settings():
 @admin_required
 def update_view_configuration():
     to_save = request.form.to_dict()
+
+    # Validate a switch to Boolean restrictions before changing any settings:
+    # these persisted fields are comma-separated literals, so silently changing
+    # their meaning would either hide the whole library (fail-closed) or damage
+    # existing restrictions. Keep every saved value intact and require the
+    # administrator to correct or clear incompatible entries first.
+    selected_restriction_column = to_save.get("config_restricted_column", "0")
+    if (restricted_column_datatype(selected_restriction_column) == "bool"
+            and str(selected_restriction_column) != str(config.config_restricted_column)
+            and not boolean_restrictions_compatible()):
+        flash(_("Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."),
+              category="error")
+        return view_configuration()
 
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
@@ -1228,6 +1269,12 @@ def list_domain(allow):
 @admin_required
 def edit_restriction(res_type, user_id):
     element = request.form.to_dict()
+    if res_type in (1, 3) and restricted_column_datatype(
+            config.config_restricted_column) == "bool":
+        try:
+            element["Element"] = _canonical_boolean_restriction(element["Element"])
+        except (KeyError, ValueError) as ex:
+            return str(ex), 400
     if element['id'].startswith('a'):
         if res_type == 0:  # Tags as template
             elementlist = config.list_allowed_tags()
@@ -1301,6 +1348,12 @@ def add_user_0_restriction(res_type):
 @admin_required
 def add_restriction(res_type, user_id):
     element = request.form.to_dict()
+    if res_type in (1, 3) and restricted_column_datatype(
+            config.config_restricted_column) == "bool":
+        try:
+            element["add_element"] = _canonical_boolean_restriction(element["add_element"])
+        except (KeyError, ValueError) as ex:
+            return str(ex), 400
     if res_type == 0:  # Tags as template
         if 'submit_allow' in element:
             config.config_allowed_tags = restriction_addition(element, config.list_allowed_tags)
@@ -1352,6 +1405,8 @@ def delete_user_0_restriction(res_type):
 @admin_required
 def delete_restriction(res_type, user_id):
     element = request.form.to_dict()
+    bool_column_restriction = (res_type in (1, 3) and restricted_column_datatype(
+        config.config_restricted_column) == "bool")
     if res_type == 0:  # Tags as template
         if element['id'].startswith('a'):
             config.config_allowed_tags = restriction_deletion(element, config.list_allowed_tags)
@@ -1361,10 +1416,16 @@ def delete_restriction(res_type, user_id):
             config.save()
     elif res_type == 1:  # CustomC as template
         if element['id'].startswith('a'):
-            config.config_allowed_column_value = restriction_deletion(element, config.list_allowed_column_values)
+            config.config_allowed_column_value = (
+                restriction_delete_by_id(element, config.list_allowed_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, config.list_allowed_column_values))
             config.save()
         elif element['id'].startswith('d'):
-            config.config_denied_column_value = restriction_deletion(element, config.list_denied_column_values)
+            config.config_denied_column_value = (
+                restriction_delete_by_id(element, config.list_denied_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, config.list_denied_column_values))
             config.save()
     elif res_type == 2:  # Tags per user
         if isinstance(user_id, int):
@@ -1383,11 +1444,17 @@ def delete_restriction(res_type, user_id):
         else:
             usr = current_user
         if element['id'].startswith('a'):
-            usr.allowed_column_value = restriction_deletion(element, usr.list_allowed_column_values)
+            usr.allowed_column_value = (
+                restriction_delete_by_id(element, usr.list_allowed_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, usr.list_allowed_column_values))
             ub.session_commit("Deleted allowed columns of user {}: {}".format(usr.name, usr.list_allowed_column_values()))
 
         elif element['id'].startswith('d'):
-            usr.denied_column_value = restriction_deletion(element, usr.list_denied_column_values)
+            usr.denied_column_value = (
+                restriction_delete_by_id(element, usr.list_denied_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, usr.list_denied_column_values))
             ub.session_commit("Deleted denied columns of user {}: {}".format(usr.name, usr.list_denied_column_values()))
     return ""
 
@@ -1397,6 +1464,8 @@ def delete_restriction(res_type, user_id):
 @user_login_required
 @admin_required
 def list_restriction(res_type, user_id):
+    is_bool_column = (res_type in (1, 3) and restricted_column_datatype(
+        config.config_restricted_column) == "bool")
     if res_type == 0:  # Tags as template
         restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(config.list_denied_tags()) if x != '']
@@ -1404,9 +1473,9 @@ def list_restriction(res_type, user_id):
                  for i, x in enumerate(config.list_allowed_tags()) if x != '']
         json_dumps = restrict + allow
     elif res_type == 1:  # CustomC as template
-        restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
+        restrict = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(config.list_denied_column_values()) if x != '']
-        allow = [{'Element': x, 'type': _('Allow'), 'id': 'a' + str(i)}
+        allow = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Allow'), 'id': 'a' + str(i)}
                  for i, x in enumerate(config.list_allowed_column_values()) if x != '']
         json_dumps = restrict + allow
     elif res_type == 2:  # Tags per user
@@ -1424,9 +1493,9 @@ def list_restriction(res_type, user_id):
             usr = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
         else:
             usr = current_user
-        restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
+        restrict = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(usr.list_denied_column_values()) if x != '']
-        allow = [{'Element': x, 'type': _('Allow'), 'id': 'a' + str(i)}
+        allow = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Allow'), 'id': 'a' + str(i)}
                  for i, x in enumerate(usr.list_allowed_column_values()) if x != '']
         json_dumps = restrict + allow
     else:
@@ -1706,9 +1775,70 @@ def check_valid_read_column(column):
 def check_valid_restricted_column(column):
     if column != "0":
         if not calibre_db.session.query(db.CustomColumns).filter(db.CustomColumns.id == column) \
-          .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all():
+          .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
+          .filter(db.CustomColumns.mark_for_delete == 0).all():
             return False
     return True
+
+
+def restricted_column_datatype(column):
+    """Return the active custom-column datatype selected for restrictions."""
+    if not column or str(column) == "0":
+        return None
+    custom_column = calibre_db.session.query(db.CustomColumns).filter(
+        db.CustomColumns.id == column,
+        db.CustomColumns.mark_for_delete == 0,
+    ).first()
+    return custom_column.datatype if custom_column else None
+
+
+def _canonical_boolean_restriction(value):
+    token = normalize_bool_token(value)
+    if token is None:
+        raise ValueError(_("Boolean restrictions must be Yes, No, or Undefined."))
+    return token
+
+
+def _canonical_boolean_restrictions_csv(value):
+    if value == "":
+        return ""
+    values = value.split(",")
+    if not bool_tokens_valid(values):
+        raise ValueError(_("Boolean restrictions must be Yes, No, or Undefined."))
+    return ",".join(_canonical_boolean_restriction(item) for item in values)
+
+
+def display_boolean_restriction(value, is_bool_column=None):
+    """Show canonical Boolean tokens while preserving legacy bad values for repair."""
+    if is_bool_column is None:
+        is_bool_column = restricted_column_datatype(
+            config.config_restricted_column) == "bool"
+    if not is_bool_column:
+        return value
+    return normalize_bool_token(value) or value
+
+
+def restriction_delete_by_id(element, list_func):
+    """Delete a Boolean state by its stored list index, including legacy aliases."""
+    values = list_func()
+    if values == [""]:
+        values = []
+    index = int(element["id"][1:])
+    if 0 <= index < len(values):
+        del values[index]
+    return ",".join(values)
+
+
+def boolean_restrictions_compatible():
+    """Whether every saved global and user restriction is a Boolean state."""
+    if not all(bool_tokens_valid(values) for values in (
+            config.list_allowed_column_values(),
+            config.list_denied_column_values())):
+        return False
+    users = ub.session.query(ub.User.allowed_column_value,
+                             ub.User.denied_column_value).all()
+    return all(bool_tokens_valid(allowed) and bool_tokens_valid(denied)
+               for allowed, denied in users)
 
 
 def restriction_addition(element, list_func):
@@ -1734,15 +1864,18 @@ def prepare_tags(user, action, tags_name, id_list):
             raise Exception(_("Tag not found"))
         new_tags_list = [x.name for x in tags]
     else:
-        try:
-            tags = calibre_db.session.query(db.cc_classes[config.config_restricted_column]) \
-                .filter(db.cc_classes[config.config_restricted_column].id.in_(id_list)).all()
-        except (KeyError, AttributeError, IndexError):
-            log.error("Custom Column No.{} does not exist in calibre database".format(
-                config.config_restricted_column))
-            raise Exception(_("Custom Column No.%(column)d does not exist in calibre database",
-                    column=config.config_restricted_column))
-        new_tags_list = [x.value for x in tags]
+        if restricted_column_datatype(config.config_restricted_column) == "bool":
+            new_tags_list = [_canonical_boolean_restriction(value) for value in id_list]
+        else:
+            try:
+                tags = calibre_db.session.query(db.cc_classes[config.config_restricted_column]) \
+                    .filter(db.cc_classes[config.config_restricted_column].id.in_(id_list)).all()
+            except (KeyError, AttributeError, IndexError):
+                log.error("Custom Column No.{} does not exist in calibre database".format(
+                    config.config_restricted_column))
+                raise Exception(_("Custom Column No.%(column)d does not exist in calibre database",
+                        column=config.config_restricted_column))
+            new_tags_list = [x.value for x in tags]
     saved_tags_list = user.__dict__[tags_name].split(",") if len(user.__dict__[tags_name]) else []
     if action == "remove":
         saved_tags_list = [x for x in saved_tags_list if x not in new_tags_list]
@@ -2146,6 +2279,8 @@ def new_user():
     magic_shelf_context = _build_magic_shelf_order_context(content)
     return render_title_template("user_edit.html", new_user=1, content=content,
                                  config=config, translations=translations,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  languages=languages, title=_("Add New User"), page="newuser",
                                  kobo_support=kobo_support, registered_oauth=oauth_bb.oauth_check,
                                  opds_root_order_string=opds_context["opds_root_order_string"],
@@ -2505,6 +2640,8 @@ def edit_user(user_id):
                                  new_user=0,
                                  content=content,
                                  config=config,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  registered_oauth=oauth_bb.oauth_check,
                                  mail_configured=config.get_mail_server_configured(),
                                  kobo_support=kobo_support,
@@ -3183,6 +3320,8 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         magic_shelf_context = _build_magic_shelf_order_context(content)
         return render_title_template("user_edit.html", new_user=1, content=content,
                                      config=config,
+                                     restriction_is_bool=(restricted_column_datatype(
+                                         config.config_restricted_column) == "bool"),
                                      translations=translations,
                                      languages=languages, title=_("Add new user"), page="newuser",
                                      kobo_support=kobo_support, registered_oauth=oauth_bb.oauth_check,
@@ -3485,6 +3624,8 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
                                      new_user=0,
                                      content=content,
                                      config=config,
+                                     restriction_is_bool=(restricted_column_datatype(
+                                         config.config_restricted_column) == "bool"),
                                      registered_oauth=oauth_bb.oauth_check,
                                      opds_root_order_string=opds_context["opds_root_order_string"],
                                      opds_hidden_entries_string=opds_context["opds_hidden_entries_string"],

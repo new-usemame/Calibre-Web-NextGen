@@ -214,6 +214,12 @@ msgstr ""
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -366,6 +372,10 @@ msgstr ""
 msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
+msgstr ""
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
 msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
@@ -3145,12 +3155,14 @@ msgid "Not rated"
 msgstr ""
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Ano"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Ne"
 
@@ -12720,7 +12732,8 @@ msgstr "Zobrazit omezení podle Calibre sloupce"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
 
 #: cps/templates/config_view_edit.html
@@ -15258,6 +15271,10 @@ msgstr "Vybrat povolené/zakázané uživatelské štítky"
 #: cps/templates/modal_dialogs.html
 msgid "Select Allowed/Denied Custom Column Values of User"
 msgstr "Vybrat povolené/zakázané hodnoty vlastních sloupců uživatele"
+
+#: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
 
 #: cps/templates/modal_dialogs.html
 msgid "Enter Tag"

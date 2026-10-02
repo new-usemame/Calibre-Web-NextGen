@@ -221,6 +221,12 @@ msgstr "Einstellungsdatenbank ist nicht schreibbar"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -398,6 +404,10 @@ msgid ""
 msgstr ""
 "Die ausgewählten Bücher stimmen nicht mit dieser Vorschau überein. Laden Sie "
 "die Geräte-Datenbank erneut hoch."
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -3247,12 +3257,14 @@ msgid "Not rated"
 msgstr "Nicht bewertet"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Ja"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Nein"
 
@@ -12908,10 +12920,9 @@ msgstr "Sichtbarkeitsbeschränkung basierend auf Calibre-Spalte"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"Beschränkt die Sichtbarkeit von Büchern basierend auf den Werten einer "
-"benutzerdefinierten Calibre-Textspalte."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -15540,6 +15551,10 @@ msgid "Select Allowed/Denied Custom Column Values of User"
 msgstr "Erlaubte/Verbotene Spaltenwerte des Benutzers auswählen"
 
 #: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
+
+#: cps/templates/modal_dialogs.html
 msgid "Enter Tag"
 msgstr "Tag eingeben"
 
@@ -16656,6 +16671,12 @@ msgstr "Ausgewählte Regale für OPDS freigeben"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
+
+#~ msgid ""
+#~ "Restrict book visibility based on values in a Calibre text custom column."
+#~ msgstr ""
+#~ "Beschränkt die Sichtbarkeit von Büchern basierend auf den Werten einer "
+#~ "benutzerdefinierten Calibre-Textspalte."
 
 #~ msgid "Create"
 #~ msgstr "Erstellen"

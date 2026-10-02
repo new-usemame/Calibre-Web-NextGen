@@ -230,6 +230,12 @@ msgstr "Baza danych ustawień nie jest zapisywalna"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -399,6 +405,10 @@ msgstr ""
 msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
+msgstr ""
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
 msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
@@ -3239,12 +3249,14 @@ msgid "Not rated"
 msgstr "Brak oceny"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Tak"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Nie"
 
@@ -12949,10 +12961,9 @@ msgstr "Ograniczenie przeglądania w oparciu o kolumnę Calibre"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"Ogranicz widoczność książek na podstawie wartości w tekstowej kolumnie "
-"niestandardowej Calibre."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -15663,6 +15674,10 @@ msgid "Select Allowed/Denied Custom Column Values of User"
 msgstr "Wybierz dozwolone/zabronione wartości własnych kolumn użytkownika"
 
 #: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
+
+#: cps/templates/modal_dialogs.html
 msgid "Enter Tag"
 msgstr "Wpisz etykietę"
 
@@ -16807,6 +16822,12 @@ msgstr "Udostępniaj wybrane półki przez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
+
+#~ msgid ""
+#~ "Restrict book visibility based on values in a Calibre text custom column."
+#~ msgstr ""
+#~ "Ogranicz widoczność książek na podstawie wartości w tekstowej kolumnie "
+#~ "niestandardowej Calibre."
 
 #~ msgid "Create"
 #~ msgstr "Utwórz"

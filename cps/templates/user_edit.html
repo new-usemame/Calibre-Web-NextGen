@@ -979,7 +979,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% endblock %}
 {% block modal %}
-{{ restrict_modal() }}
+{{ restrict_modal(restriction_is_bool|default(false)) }}
 {{ delete_confirm_modal() }}
 {% endblock %}
 {% block js %}

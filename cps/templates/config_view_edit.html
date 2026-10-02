@@ -107,7 +107,7 @@
           <option value="{{ restrictColumn.id }}" {% if restrictColumn.id == conf.config_restricted_column %}selected{% endif %}>{{ restrictColumn.name }}</option>
           {% endfor %}
         </select>
-        <p class="settings-explanation">{{_('Restrict book visibility based on values in a Calibre text custom column.')}}</p>
+        <p class="settings-explanation">{{_('Restrict book visibility based on values in a Calibre text, enumeration, or Boolean custom column. Boolean columns distinguish Yes, No, and Undefined.')}}</p>
       </div>
       
       <div class="form-group">
@@ -263,7 +263,7 @@
 </div>
 {% endblock %}
 {% block modal %}
-{{ restrict_modal() }}
+{{ restrict_modal(restriction_is_bool|default(false)) }}
 {% endblock %}
 {% block js %}
 <script src="{{ url_for('static', filename='js/libs/bootstrap-table/bootstrap-table.min.js') }}"></script>

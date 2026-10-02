@@ -796,9 +796,11 @@ $(function() {
 
     function startTable(target, userId) {
         var type = 0;
+        var columnRestriction = false;
         switch(target) {
             case "get_column_values":
                 type = 1;
+                columnRestriction = true;
                 $("#h2").removeClass("hidden");
                 break;
             case "get_tags":
@@ -807,6 +809,7 @@ $(function() {
                 break;
             case "get_user_column_values":
                 type = 3;
+                columnRestriction = true;
                 $("#h4").removeClass("hidden");
                 break;
             case "get_user_tags":
@@ -827,16 +830,45 @@ $(function() {
                 break;
             case "allowed_column_value":
                 type = 3;
+                columnRestriction = true;
                 $("#h2").removeClass("hidden");
                 $("#submit_restrict").addClass("hidden");
                 $("#submit_allow").removeClass("hidden");
                 break;
             case "denied_column_value":
                 type = 3;
+                columnRestriction = true;
                 $("#h2").removeClass("hidden");
                 $("#submit_allow").addClass("hidden");
                 $("#submit_restrict").removeClass("hidden");
                 break;
+        }
+
+        var boolMode = columnRestriction &&
+            $("#restrict-elements-table").attr("data-bool-mode") === "true";
+        var boolChoices = $("#restrict-elements-table").data("bool-choices") || [];
+        var elementHeader = $("#Element");
+        $("#restriction-error").addClass("hidden").text("");
+        $("#add_element").toggleClass("hidden", boolMode);
+        $("#add_element_bool").toggleClass("hidden", !boolMode);
+        if (boolMode) {
+            elementHeader.attr("data-editable-type", "select");
+            var editableBoolChoices = boolChoices.map(function(choice) {
+                return {value: "bool:" + choice.value, text: choice.text};
+            });
+            // bootstrap-table reads header data-* values through jQuery.data(),
+            // which parses a JSON array into objects. The editable extension
+            // writes those values into a generated HTML attribute, where an
+            // object array becomes `[object Object],...`; entity-escape the
+            // quotes so jQuery keeps the source as JSON text and x-editable can
+            // parse it after the browser decodes the generated attribute.
+            elementHeader.attr("data-editable-source", JSON.stringify(editableBoolChoices).replace(/"/g, "&quot;"));
+        } else {
+            elementHeader.attr("data-editable-type", "text");
+            elementHeader.removeAttr("data-editable-source");
+        }
+        if ($("#restrict-elements-table").data("bootstrap.table")) {
+            $("#restrict-elements-table").bootstrapTable("destroy");
         }
 
         $("#restrict-elements-table").bootstrapTable({
@@ -880,20 +912,38 @@ $(function() {
             striped: false
         });
         $("#restrict-elements-table").removeClass("table-hover");
-        $("#restrict-elements-table").on("editable-save.bs.table", function (e, field, row) {
+        $("#restrict-elements-table").off("editable-save.bs.table").on("editable-save.bs.table", function (e, field, row) {
+            if (boolMode && field === "Element" && typeof row.Element === "string" && row.Element.indexOf("bool:") === 0) {
+                row.Element = row.Element.substring(5);
+            }
             $.ajax({
                 url: getPath() + "/ajax/editrestriction/" + type + "/" + userId,
                 type: "Post",
-                data: row
+                data: row,
+                error: function (xhr) {
+                    $("#restriction-error").text(xhr.responseText || xhr.statusText).removeClass("hidden");
+                    $("#restrict-elements-table").bootstrapTable("refresh");
+                }
             });
         });
-        $("[id^=submit_]").click(function() {
+        $("[id^=submit_]").off("click.restrictions").on("click.restrictions", function() {
             $(this)[0].blur();
+            var addData;
+            if (boolMode) {
+                addData = $(this).closest("form").serializeArray()
+                    .filter(function (field) { return field.name !== "add_element"; });
+                addData.push({name: "add_element", value: $("#add_element_bool").val()});
+                addData.push({name: $(this)[0].name, value: ""});
+                addData = $.param(addData);
+            } else {
+                addData = $(this).closest("form").serialize() + "&" + $(this)[0].name + "=";
+            }
             $.ajax({
                 url: getPath() + "/ajax/addrestriction/" + type + "/" + userId,
                 type: "Post",
-                data: $(this).closest("form").serialize() + "&" + $(this)[0].name + "=",
+                data: addData,
                 success: function () {
+                    $("#restriction-error").addClass("hidden").text("");
                     $.ajax ({
                         method:"get",
                         url: getPath() + "/ajax/listrestriction/" + type + "/" + userId,
@@ -903,6 +953,9 @@ $(function() {
                             $("#restrict-elements-table").bootstrapTable("load", data);
                         }
                     });
+                },
+                error: function (xhr) {
+                    $("#restriction-error").text(xhr.responseText || xhr.statusText).removeClass("hidden");
                 }
             });
             return;
@@ -1070,6 +1123,18 @@ function RestrictionActions (value, row) {
         "<i class=\"glyphicon glyphicon-trash\"></i>",
         "</div>"
     ].join("");
+}
+
+function restrictionValueFormatter(value) {
+    // Keep a stable token in the widget cell so bootstrap-editable can match
+    // its select source and render the translated label. X-editable reads
+    // data-value through jQuery, which turns `true` and `false` into booleans;
+    // use a string prefix in the widget and strip it from edit submissions.
+    var $table = $("#restrict-elements-table");
+    if ($table.attr("data-bool-mode") === "true" && ["true", "false", "undefined"].indexOf(value) !== -1) {
+        return "bool:" + value;
+    }
+    return $("<span>").text(value == null ? "" : value).html();
 }
 
 /* Function for deleting books */

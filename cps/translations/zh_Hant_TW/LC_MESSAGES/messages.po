@@ -212,6 +212,12 @@ msgstr "設定資料庫為不可寫"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -364,6 +370,10 @@ msgstr "請至少選擇一本書進行封存。"
 msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
+msgstr ""
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
 msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
@@ -3087,12 +3097,14 @@ msgid "Not rated"
 msgstr "無評價"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "確認"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "沒有"
 
@@ -12613,7 +12625,8 @@ msgstr "選擇自定義欄位作為書籍可見性"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
 
 #: cps/templates/config_view_edit.html
@@ -15109,6 +15122,10 @@ msgstr "選擇標籤值顯示或隱藏書籍"
 #: cps/templates/modal_dialogs.html
 msgid "Select Allowed/Denied Custom Column Values of User"
 msgstr "選擇自定義欄目值顯示或隱藏本用戶書籍"
+
+#: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
 
 #: cps/templates/modal_dialogs.html
 msgid "Enter Tag"

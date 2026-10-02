@@ -49,12 +49,25 @@ from .pagination import Pagination
 from .string_helper import strip_whitespaces
 from .sqlite_utils import network_share_mode_enabled
 from .unicode_collation import unicode_initial, unicode_sort_key
+from .services.restriction_columns import restriction_predicate
 
 log = logger.create()
 
 
 class FilteredBookVisibilityUnavailable(RuntimeError):
     """The configured filtered-library policy could not be resolved safely."""
+
+
+def _restriction_datatype(value_model):
+    """Return the policy-relevant datatype for a dynamic custom column.
+
+    Text and enumeration columns both retain their literal-string matching;
+    only Boolean columns need three-state interpretation.
+    """
+    return "bool" if isinstance(
+        value_model.value.property.columns[0].type, Boolean
+    ) else "text"
+
 
 # Rate-limit author-sort drift diagnostics. Books.author_sort is denormalized
 # from Authors.sort and can drift after an Authors edit; the divergence is
@@ -1719,14 +1732,17 @@ class CalibreDB:
                     values = cc_classes[self.config.config_restricted_column]
                     allowed_values = filter_user.list_allowed_column_values()
                     denied_values = filter_user.list_denied_column_values()
-                    allowed_column_filter = (
-                        true() if allowed_values == [""]
-                        else column.any(values.value.in_(allowed_values))
+                    column_policy = restriction_predicate(
+                        column,
+                        values,
+                        _restriction_datatype(values),
+                        allowed_values,
+                        denied_values,
                     )
-                    denied_column_filter = (
-                        false() if denied_values == [""]
-                        else column.any(values.value.in_(denied_values))
-                    )
+                    # Invalid persisted Boolean values fail closed inside the
+                    # shared predicate rather than broadening this user's view.
+                    allowed_column_filter = column_policy
+                    denied_column_filter = false()
                 except (KeyError, AttributeError, IndexError):
                     log.error(
                         "Custom Column No.%s does not exist in calibre database",
@@ -1941,14 +1957,20 @@ class CalibreDB:
         pos_content_tags_filter = true() if postags_list == [''] else Books.tags.any(Tags.name.in_(postags_list))
         if self.config.config_restricted_column:
             try:
-                pos_cc_list = filter_user.allowed_column_value.split(',')
-                pos_content_cc_filter = true() if pos_cc_list == [''] else \
-                    getattr(Books, 'custom_column_' + str(self.config.config_restricted_column)). \
-                    any(cc_classes[self.config.config_restricted_column].value.in_(pos_cc_list))
-                neg_cc_list = filter_user.denied_column_value.split(',')
-                neg_content_cc_filter = false() if neg_cc_list == [''] else \
-                    getattr(Books, 'custom_column_' + str(self.config.config_restricted_column)). \
-                    any(cc_classes[self.config.config_restricted_column].value.in_(neg_cc_list))
+                column = getattr(
+                    Books,
+                    'custom_column_' + str(self.config.config_restricted_column),
+                )
+                values = cc_classes[self.config.config_restricted_column]
+                column_policy = restriction_predicate(
+                    column,
+                    values,
+                    _restriction_datatype(values),
+                    filter_user.allowed_column_value,
+                    filter_user.denied_column_value,
+                )
+                pos_content_cc_filter = column_policy
+                neg_content_cc_filter = false()
             except (KeyError, AttributeError, IndexError):
                 pos_content_cc_filter = false()
                 neg_content_cc_filter = true()
@@ -2018,14 +2040,15 @@ class CalibreDB:
                     pos_content_cc_filter, ~neg_content_cc_filter, archived_filter,
                     hidden_filter, membership_filter, extra_filter)
 
-    def generate_linked_query(self, config_read_column, database):
+    def generate_linked_query(self, config_read_column, database, user=None):
         # Safety: session can be briefly None during DB reconnects
         self.ensure_session()
+        linked_user = user or current_user
         if not config_read_column:
             query = (self.session.query(database, ub.ArchivedBook.is_archived, ub.ReadBook.read_status)
                      .select_from(Books)
                      .outerjoin(ub.ReadBook,
-                                and_(ub.ReadBook.user_id == int(current_user.id), ub.ReadBook.book_id == Books.id)))
+                                and_(ub.ReadBook.user_id == int(linked_user.id), ub.ReadBook.book_id == Books.id)))
         else:
             try:
                 read_column = cc_classes[config_read_column]
@@ -2037,7 +2060,7 @@ class CalibreDB:
                 # Skip linking read column and return None instead of read status
                 query = self.session.query(database, None, ub.ArchivedBook.is_archived)
         return query.outerjoin(ub.ArchivedBook, and_(Books.id == ub.ArchivedBook.book_id,
-                                                     int(current_user.id) == ub.ArchivedBook.user_id))
+                                                     int(linked_user.id) == ub.ArchivedBook.user_id))
 
     @staticmethod
     def get_checkbox_sorted(inputlist, state, offset, limit, order, combo=False):
@@ -2294,14 +2317,14 @@ class CalibreDB:
         return self.session.query(Books) \
             .filter(and_(Books.authors.any(and_(*q)), func.lower(Books.title).ilike("%" + title + "%"))).first()
 
-    def search_query(self, term, config, *join, allow_show_hidden=False):
+    def search_query(self, term, config, *join, allow_show_hidden=False, user=None):
         self.ensure_session()
         strip_whitespaces(term).lower()
         q = list()
         author_terms = re.split("[, ]+", term)
         for author_term in author_terms:
             q.append(Books.authors.any(func.lower(Authors.name).ilike("%" + author_term + "%")))
-        query = self.generate_linked_query(config.config_read_column, Books)
+        query = self.generate_linked_query(config.config_read_column, Books, user=user)
         if len(join) == 6:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4]).outerjoin(join[5])
         if len(join) == 3:
@@ -2325,7 +2348,7 @@ class CalibreDB:
                         func.lower(cc_classes[c.id].value).ilike("%" + term + "%")))
         # Eagerly load the data relationship to prevent session errors
         query = query.options(joinedload(Books.data))
-        return query.filter(self.common_filters(True, allow_show_hidden=allow_show_hidden)) \
+        return query.filter(self.common_filters(True, allow_show_hidden=allow_show_hidden, user=user)) \
             .filter(or_(*filter_expression))
 
     def get_cc_columns(self, config, filter_config_custom_read=False):

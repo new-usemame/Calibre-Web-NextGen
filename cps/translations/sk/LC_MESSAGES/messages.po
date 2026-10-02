@@ -224,6 +224,12 @@ msgstr "Nie je možné zapisovať do databázy nastavení"
 
 #: cps/admin.py
 msgid ""
+"Cannot select this Boolean column until incompatible global and user "
+"restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
@@ -391,6 +397,10 @@ msgid ""
 msgstr ""
 "Vybrané knihy nezodpovedajú tomuto náhľadu. Nahrajte databázu zariadenia "
 "znova."
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -3304,12 +3314,14 @@ msgid "Not rated"
 msgstr "Nehodnotené"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "Yes"
 msgstr "Áno"
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/modal_dialogs.html
+#: cps/templates/search_form.html
 msgid "No"
 msgstr "Nie"
 
@@ -13185,10 +13197,9 @@ msgstr "Zobraziť obmedzenia založené na Calibre stĺpcoch"
 
 #: cps/templates/config_view_edit.html
 msgid ""
-"Restrict book visibility based on values in a Calibre text custom column."
+"Restrict book visibility based on values in a Calibre text, enumeration, or "
+"Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"Obmedziť viditeľnosť kníh na základe hodnôt vo vlastnom textovom stĺpci "
-"Calibre."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -15933,6 +15944,10 @@ msgstr ""
 "používateľa"
 
 #: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""
+
+#: cps/templates/modal_dialogs.html
 msgid "Enter Tag"
 msgstr "Zadať štítok"
 
@@ -17082,6 +17097,12 @@ msgstr "Sprístupniť vybrané police cez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zobraziť sekciu Prečítané/Neprečítané"
+
+#~ msgid ""
+#~ "Restrict book visibility based on values in a Calibre text custom column."
+#~ msgstr ""
+#~ "Obmedziť viditeľnosť kníh na základe hodnôt vo vlastnom textovom stĺpci "
+#~ "Calibre."
 
 #~ msgid "Create"
 #~ msgstr "Vytvoriť"

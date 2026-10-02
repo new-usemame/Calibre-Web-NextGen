@@ -68,7 +68,11 @@ that Calibre started successfully.
 Planned maintenance pauses do not count toward that crash limit. Contention
 defers startup and reload until the writer gate becomes available. Failed or
 busy ingest operations retain their input and add-format intent for the ingest
-service's retry queue instead of acknowledging an uncommitted format.
+service's retry queue instead of acknowledging an uncommitted format. While the
+library is busy, ingest checks before conversion and retries periodically when
+maintenance ends. Other failures retry at startup or after another book is
+successfully ingested, avoiding repeated conversions of a persistently failing
+input. Restarting the service rechecks the durable queue.
 
 Split-library mode is currently unsupported. Disable it before enabling the
 content server, or disable the server before enabling split-library mode. The

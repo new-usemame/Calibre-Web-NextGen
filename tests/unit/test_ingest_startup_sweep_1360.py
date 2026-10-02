@@ -193,6 +193,28 @@ def test_retry_processor_stdin_cannot_consume_another_queued_path(harness):
     assert not harness.retry_queue.read_text().strip()
 
 
+def test_periodic_retry_does_not_repeat_a_failed_conversion(harness):
+    """Non-busy failures retain the old explicit retry triggers, not a five-second loop."""
+    import shlex
+    book = harness.watch / "failed.epub"
+    book.write_bytes(b"published book")
+    path = shlex.quote(str(book))
+    processed = harness(f"""
+        run_processor_with_timeout() {{
+            printf '%s\\n' "$2" >> "$PROCESSOR_LOG"
+            return 1
+        }}
+        cwa-as-abc() {{
+            printf 'CLOSE_WRITE %s\\n' {path}
+            sleep 2.5
+        }}
+        run_fallback >/dev/null 2>&1
+    """)
+    assert processed == [str(book)], "a persistent conversion failure became a periodic hot loop"
+    assert book.is_file()
+    assert harness.retry_queue.read_text().strip() == str(book)
+
+
 #
 # `wait_for_stable_file` samples the size every STABLE_INTERVAL and calls a
 # file settled after two consecutive equal reads. This harness sets

@@ -140,3 +140,26 @@ def test_retained_original_format_failure_keeps_source_for_idempotent_retry(
     result = module.main(str(source))
     assert source.is_file(), "converted book cleanup deleted its uncommitted retained format"
     assert result == 1, "retained-format retry was incorrectly acknowledged as success"
+
+
+def test_busy_maintenance_is_checked_before_conversion(ingest, monkeypatch, tmp_path):
+    """A queued book waiting for Convert Library must not repeatedly run ebook-convert."""
+    module, routing = ingest
+    source = tmp_path / "incoming.txt"
+    source.write_bytes(b"source waiting on maintenance")
+    p = processor(module, source, tmp_path)
+    p.input_format = "txt"
+    p.is_target_format = False
+    p.is_supported_audiobook = lambda: False
+    p.can_convert = True
+    p.auto_convert_on = True
+    p.convert_ignored_formats = []
+    p.target_format = "epub"
+    converted = []
+    p.convert_book = lambda: (converted.append(True) or False, "")
+    p.add_book_to_library = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(module, "NewBookProcessor", lambda _path: p)
+    with routing.ownership.maintenance(str(tmp_path)):
+        result = module.main(str(source))
+    assert converted == [], "busy maintenance still allowed an expensive conversion"
+    assert result == 2 and source.is_file()

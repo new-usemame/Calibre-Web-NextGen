@@ -13,7 +13,7 @@ import subprocess
 import sys
 from calibre_library_target import (library_target, calibredb_command, operation,
                                     offline_library_operation, offline_child_ownership,
-                                    offline_writer_ownership, LibraryBusyError)
+                                    offline_writer_ownership, LibraryBusyError, check_maintenance)
 import tempfile
 import time
 import shutil
@@ -3163,6 +3163,7 @@ def main(filepath=None):
         if not initialize_runtime():
             return 2
 
+        check_maintenance()
         nbp = NewBookProcessor(filepath)
 
         # If this file is not an ignored temporary, wait briefly for stability to avoid importing a still-growing file

@@ -10,7 +10,6 @@ same settings from app.db without importing Flask.
 """
 
 import os
-import socket
 import sqlite3
 import sys
 import importlib.util
@@ -51,6 +50,12 @@ LibraryBusyError = ownership.LibraryBusyError
 
 def operation(timeout=120):
     return ownership.operation(config_dir(), timeout=timeout)
+
+
+def check_maintenance():
+    """Avoid expensive conversion while an offline run already owns the library."""
+    if ownership.busy(config_dir(), "maintenance"):
+        raise LibraryBusyError("Calibre library maintenance is already running")
 
 
 _offline_owner_fd = ContextVar("calibre_offline_owner_fd", default=None)

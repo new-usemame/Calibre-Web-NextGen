@@ -489,6 +489,8 @@ The book editor's conversion choices come from the configured Calibre install's 
 
 ACSM tickets use Calibre’s import hooks before ordinary book processing. Auto-Convert off imports the fulfilled EPUB/PDF as returned; when enabled, conversion applies to that resulting book. A failed optional conversion keeps the fulfilled book. A missing or unsuccessful ACSM plugin preserves the original ticket in the failed-books folder, and no raw ACSM format is added to the library. Successful source receipts prevent duplicate imports and repeated fulfillment after completion. Configure the plugin’s account authorization first; installing its zip alone cannot authorize Adobe fulfillment.
 
+Before import, the fulfilled book is stored under `processed_books/acsm_fulfilled/<ticket SHA-256>/` with its original ticket basename and a manifest binding the ticket and book bytes. If import fails, the original ticket and fulfilled book remain; retry uses the validated book without spending the ticket again. The recovery entry is removed only after a confirmed library import. An interrupted or damaged entry stops automatic fulfillment and prints its path for manual recovery: preserve these files, inspect the downloaded EPUB/PDF, and import that book directly if needed. Do not delete a recovery entry merely to retry an already consumed ticket.
+
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
 ```

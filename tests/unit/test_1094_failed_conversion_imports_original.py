@@ -639,7 +639,7 @@ class TestNotABookFormatsAreNotRescued:
         def _factory(filepath):
             fake = _FakeProcessor(filepath, convert_result=(False, ""))
             fake.input_format = "acsm"
-            fake.ingest_acsm = lambda: None
+            fake.ingest_acsm = lambda: ingest_processor._fail_not_a_book_input(fake, filepath)
             holder["fake"] = fake
             return fake
 

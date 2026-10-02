@@ -534,6 +534,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   useLayoutEffect(() => {
     if (!changedDiscover) return;
     previousDiscoverIdentity.current = discoverIdentity;
+    // A different source is a new bulk-action scope, even while selection mode stays on.
+    setSelected(new Set());
     setPage(1); setAllBooks([]); accKeyRef.current = '';
   }, [changedDiscover, discoverIdentity]);
   // Use page 1 in this render, before the effect updates pagination. Otherwise

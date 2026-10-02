@@ -14,6 +14,12 @@ async function discoverIds(page: Page) {
   return (await res.json() as { items: { id: number }[] }).items.map(book => book.id);
 }
 
+async function discoverSelection(page: Page) {
+  const response = await page.request.get('/api/v1/books?filter=discover&select_all=1');
+  expect(response.ok(), await response.text()).toBeTruthy();
+  return await response.json() as { ids: number[]; total: number };
+}
+
 // The source belongs to an owned account, so changing it cannot alter parallel
 // cases' shared seed login. Shelves and smart shelves are owned and cleaned too.
 test('Discover uses the account shelf across New UI, Classic and OPDS and recovers from empty/deleted sources', async ({ page: admin, secondaryUser }, testInfo) => {
@@ -75,6 +81,7 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await strip.getByRole('button', { name: 'Save Discover source', exact: true }).click();
       await expect(strip.getByText('Discover source saved.', { exact: true })).toBeVisible();
       await expect.poll(() => discoverIds(page)).toEqual([chosen]);
+      await expect.poll(() => discoverSelection(page)).toEqual({ ids: [chosen], total: 1 });
       await expect(strip.locator('a[href*="/book/"]').filter({ hasText: book.title }).first()).toBeVisible();
       await strip.getByRole('button', { name: 'Shuffle picks' }).click();
       await expect(strip.getByRole('button', { name: 'Shuffle picks' })).toBeEnabled();
@@ -87,6 +94,7 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await page.getByRole('button', { name: 'Save Discover source', exact: true }).click();
       await expect(page.getByRole('status').filter({ hasText: 'Discover source saved.' })).toBeVisible();
       await expect.poll(() => discoverIds(page)).toEqual([]);
+      await expect.poll(() => discoverSelection(page)).toEqual({ ids: [], total: 0 });
       await expect(page.getByTestId('catalog-grid').locator('a[href*="/book/"]')).toHaveCount(0);
       await expect(page.getByLabel('Discover source', { exact: true })).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath(`new-empty-${width}.jpg`), type: 'jpeg', quality: 75 });
@@ -96,7 +104,11 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await classic.getByLabel('Discover source', { exact: true }).selectOption(source);
       await classic.getByRole('button', { name: 'Save Discover source', exact: true }).click();
       await expect(classic.getByLabel('Discover source', { exact: true })).toHaveValue(source);
-      await expect(page.locator('.book .title').filter({ hasText: book.title })).toBeVisible();
+      // Classic deliberately shortens visible titles; its title attribute keeps the exact identity.
+      const classicTitle = page.locator(`.book a[href="/book/${chosen}"] .title`);
+      await expect(classicTitle).toHaveCount(1);
+      await expect(classicTitle).toHaveAttribute('title', book.title);
+      await expect(classicTitle).toBeVisible();
       const classicAxe = await new AxeBuilder({ page }).include('#discover-source-form').analyze();
       expect(classicAxe.violations.filter(v => ['serious', 'critical'].includes(v.impact ?? ''))).toEqual([]);
       await page.screenshot({ path: testInfo.outputPath(`classic-shelf-${width}.jpg`), type: 'jpeg', quality: 75 });
@@ -116,6 +128,7 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
     expect(await discoverIds(page)).toEqual([chosen]);
     expect((await admin.request.post(`/api/v1/shelves/${publicShelf}`, { headers: ah, data: { is_public: false } })).ok()).toBeTruthy();
     expect(await discoverIds(page)).toEqual([]);
+    expect(await discoverSelection(page)).toEqual({ ids: [], total: 0 });
     await page.goto('/app');
     await expect(page.getByTestId('discover-section').getByText('This Discover source is unavailable. Choose another source.')).toBeVisible();
     await expect(page.getByLabel('Discover source', { exact: true })).toHaveValue(`shelf:${publicShelf}`);
@@ -210,14 +223,31 @@ test('cold Discover waits for the saved source before showing an empty state', a
     // Source options were fetched before this owned shelf was created.
     await page.reload();
     const select = page.getByLabel('Discover source', { exact: true });
+    // A new source is a new action scope: books selected in the old sample
+    // must not remain bulk-actionable when those cards disappear.
+    await page.getByRole('button', { name: 'Select', exact: true }).click();
+    const all = page.getByRole('button', { name: /^Select all \d+ books$/ });
+    await expect(all).toBeEnabled();
+    await all.click();
+    const selection = page.getByRole('region', { name: /^\d+ selected$/ });
+    await expect(selection).toBeVisible();
+    expect(Number.parseInt(await selection.getAttribute('aria-label') ?? '0', 10)).toBeGreaterThan(1);
     await select.selectOption(`shelf:${shelfId}`);
     await page.getByRole('button', { name: 'Save Discover source', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Discover source saved.' })).toBeVisible();
     await expect.poll(() => discoverIds(page)).toEqual([chosen]);
-    const gridLinks = page.getByTestId('catalog-grid').locator('a[href*="/book/"]');
+    const grid = page.getByTestId('catalog-grid');
+    await expect(grid.locator('[data-book-id]')).toHaveCount(1);
+    await expect(selection).toHaveCount(0);
+    await expect(all).toHaveText('Select all 1 books');
+    await expect(all).toBeEnabled();
+    await all.click();
+    await expect(page.getByRole('region', { name: '1 selected', exact: true })).toBeVisible();
+    expect(await discoverSelection(page)).toEqual({ ids: [chosen], total: 1 });
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    const gridLinks = grid.locator('a[href*="/book/"]');
     await expect(gridLinks).toHaveCount(1);
     await expect(gridLinks.first()).toHaveAttribute('aria-label', `Open details for ${book.title}`);
-
     await gridLinks.first().click();
     await page.waitForURL(url => url.pathname.endsWith(`/book/${chosen}`));
     await page.goBack();

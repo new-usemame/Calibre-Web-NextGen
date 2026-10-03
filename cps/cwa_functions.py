@@ -2450,8 +2450,8 @@ def start_epub_fixer():
 
 
 @epub_fixer.route('/cwa-epub-fixer/run-book', methods=["POST"])
-@csrf.exempt
 @login_required_if_no_ano
+@admin_required
 def run_epub_fixer_for_book():
     if config.config_use_google_drive:
         return jsonify({"success": False, "error": _("Single-book EPUB Fixer is not supported with Google Drive libraries.")}), 400

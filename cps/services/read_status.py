@@ -3,6 +3,9 @@
 """Small, HTTP-free transitions for the per-user reader status."""
 
 
+from datetime import datetime, timezone
+
+
 def stop_reading(session, user_id, book_id, read_book_model):
     """Move only an existing in-progress row to unread.
 
@@ -20,4 +23,5 @@ def stop_reading(session, user_id, book_id, read_book_model):
         return False
 
     row.read_status = read_book_model.STATUS_UNREAD
+    row.read_status_choice_at = datetime.now(timezone.utc)
     return True

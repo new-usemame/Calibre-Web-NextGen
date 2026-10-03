@@ -837,6 +837,42 @@ jobs:
           echo "books with a comic format: $comics"
           [ "${comics:-0}" -ge 1 ] || { echo "::error::no comic-format book after seeding"; exit 1; }
 
+      - name: Seed twenty-book shelf-drag fixture
+        run: |
+          # #946 drags twenty distinct real books and checks persisted membership.
+          # The normal five EPUBs plus PDF/comic supply only seven. Small EPUBs
+          # keep that real-write invariant runnable without large ingest inputs.
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location("synthetic", "tests/fixtures/generate_synthetic.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.create_minimal_epub(Path("/tmp/shelf-drag-fixture.epub"))
+          PY
+          docker cp /tmp/shelf-drag-fixture.epub cwn-e2e:/tmp/shelf-drag-fixture.epub
+          for number in $(seq 1 13); do
+            added=$(docker exec cwn-e2e calibredb add /tmp/shelf-drag-fixture.epub \
+              --title "Shelf drag fixture $number" --authors "CWA Shelf Drag Suite" --duplicates \
+              --with-library /calibre-library | tee /dev/stderr \
+              | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+            [ -n "$added" ] || { echo "::error::shelf-drag fixture $number was not added"; exit 1; }
+            # Keep the established reader/RTL/PDF fixtures first in newest sort.
+            docker exec cwn-e2e calibredb set_metadata \
+              --field timestamp:2000-01-01T00:00:00+00:00 "$added" \
+              --with-library /calibre-library >/dev/null
+          done
+          jar=$(mktemp)
+          csrf=$(curl -fsS -c "$jar" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          curl -fsS -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+            -d '{"username":"admin","password":"admin123"}' -o /dev/null
+          count=$(curl -fsS -b "$jar" 'http://localhost:8083/api/v1/books?per_page=20&sort=new' \
+            | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["items"]))')
+          [ "$count" -eq 20 ] || { echo "::error::shelf-drag fixture exposes only $count of 20 books"; exit 1; }
+          rm -f "$jar" /tmp/shelf-drag-fixture.epub
+
       - name: Seed shelves and series
         run: |
           # The library the harness gets had three books and NO shelves, so

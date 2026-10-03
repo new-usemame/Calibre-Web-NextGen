@@ -429,6 +429,7 @@
         {% if cc_visibility %}
           {% for option in cc_visibility %}
             <div class="form-group">
+              <input type="hidden" name="initial_show_cc_{{option.id}}" value="{{ 'true' if option.visible else 'false' }}">
               <input type="checkbox" name="show_cc_{{option.id}}" id="show_cc_{{option.id}}" {% if option.visible %}checked{% endif %}>
               <label for="show_cc_{{option.id}}">{{_('Show %(name)s Section', name=option.name)}}</label>
             </div>

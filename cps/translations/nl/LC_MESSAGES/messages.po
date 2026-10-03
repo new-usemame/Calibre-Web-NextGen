@@ -227,6 +227,11 @@ msgid "Settings DB is not Writeable"
 msgstr "Instellingen database is niet schrijfbaar."
 
 #: cps/admin.py
+#, python-format
+msgid "Invalid OPDS filename template: %(error)s"
+msgstr "Ongeldig OPDS-bestandsnaamsjabloon: %(error)s"
+
+#: cps/admin.py
 msgid ""
 "Cannot select this Boolean column until incompatible global and user "
 "restrictions are corrected or cleared."
@@ -253,18 +258,18 @@ msgid "Invalid default display font option"
 msgstr "Ongeldige standaardlettertypeoptie voor koppen"
 
 #: cps/admin.py
-msgid ""
-"The title-sort rule was saved, but reordering the existing library failed — "
-"books may keep their previous order until you retry or edit them."
-msgstr ""
-
-#: cps/admin.py
 msgid "Invalid Read Column"
 msgstr "Ongeldige gelezen kolom"
 
 #: cps/admin.py
 msgid "Invalid Restricted Column"
 msgstr "Ongeldige beperkte kolom"
+
+#: cps/admin.py
+msgid ""
+"The title-sort rule was saved, but reordering the existing library failed — "
+"books may keep their previous order until you retry or edit them."
+msgstr ""
 
 #: cps/admin.py
 msgid "Calibre-Web NextGen configuration updated"
@@ -1750,6 +1755,14 @@ msgid "The requested file could not be read. Maybe wrong permissions?"
 msgstr ""
 "Het opgevraagde bestand kan niet worden gelezen. Ben je hiertoe gemachtigd?"
 
+#: cps/helper.py cps/spa_strings.py
+msgid "Invalid reading status"
+msgstr "Ongeldige leesstatus"
+
+#: cps/helper.py cps/spa_strings.py
+msgid "Read status could not be set"
+msgstr "Leesstatus kon niet worden ingesteld"
+
 #: cps/helper.py
 #, python-brace-format
 msgid "Read status could not set: {}"
@@ -1928,13 +1941,26 @@ msgstr "Onlangs toegevoegd"
 msgid "Highly Rated"
 msgstr "Hoog beoordeeld"
 
-#: cps/magic_shelf.py cps/opds.py cps/spa_strings.py
+#: cps/magic_shelf.py cps/opds.py cps/render_template.py cps/spa_strings.py
+#: cps/web.py
 msgid "Currently Reading"
 msgstr "Nu aan het lezen"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Yet to Read"
 msgstr "Nog te lezen"
+
+#: cps/magic_shelf.py cps/opds.py cps/render_template.py cps/spa_strings.py
+#: cps/templates/detail.html cps/templates/image.html
+#: cps/templates/search_form.html cps/web.py
+msgid "Did not finish"
+msgstr "Niet uitgelezen"
+
+#: cps/magic_shelf.py cps/opds.py cps/render_template.py cps/spa_strings.py
+#: cps/templates/detail.html cps/templates/image.html
+#: cps/templates/search_form.html cps/web.py
+msgid "On hold"
+msgstr "Gepauzeerd"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Recent Publications"
@@ -2150,6 +2176,14 @@ msgstr "Gelezen boeken"
 msgid "Books currently being read"
 msgstr "Huidige versie"
 
+#: cps/opds.py cps/spa_strings.py
+msgid "Books you chose not to finish"
+msgstr "Boeken die je niet wilde uitlezen"
+
+#: cps/opds.py cps/spa_strings.py
+msgid "Books you have paused for later"
+msgstr "Boeken die je later wilt verder lezen"
+
 #: cps/opds.py cps/render_template.py cps/web.py
 msgid "Unread Books"
 msgstr "Ongelezen boeken"
@@ -2244,6 +2278,11 @@ msgstr "omschrijving"
 
 #: cps/opds.py
 #, python-format
+msgid "Books by %(name)s"
+msgstr "Boeken op %(name)s"
+
+#: cps/opds.py
+#, python-format
 msgid "Books by %(name)s, including every sub-category"
 msgstr ""
 
@@ -2318,6 +2357,18 @@ msgstr "Gelezen/Ongelezen boeken tonen"
 #: cps/render_template.py
 msgid "Show unread"
 msgstr "Ongelezen boeken tonen"
+
+#: cps/render_template.py cps/spa_strings.py
+msgid "Show Currently Reading Books"
+msgstr "Boeken die je leest tonen"
+
+#: cps/render_template.py cps/spa_strings.py
+msgid "Show Books You Did Not Finish"
+msgstr "Niet uitgelezen boeken tonen"
+
+#: cps/render_template.py cps/spa_strings.py
+msgid "Show Books On Hold"
+msgstr "Gepauzeerde boeken tonen"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -4079,7 +4130,7 @@ msgstr "Labels (door komma's gescheiden)"
 msgid "Title"
 msgstr "Titel"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/detail.html cps/templates/search_form.html
 msgid "Unread"
 msgstr "Ongelezen"
 
@@ -4887,6 +4938,10 @@ msgid "Shows the name a book had when it was imported."
 msgstr "Toont de naam die het boek had toen het werd geïmporteerd."
 
 #: cps/spa_strings.py
+msgid "Public"
+msgstr "Openbaar"
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
 
@@ -5074,6 +5129,14 @@ msgstr "Geavanceerd"
 msgid "Advanced search"
 msgstr "Geavanceerd zoeken"
 
+#: cps/spa_strings.py
+msgid "After children"
+msgstr "Na subcategorieën"
+
+#: cps/spa_strings.py
+msgid "After tree"
+msgstr "Na de lijst"
+
 # Cover designer v2 (SPA)
 #: cps/spa_strings.py
 msgid "Alignment"
@@ -5144,6 +5207,10 @@ msgid ""
 msgstr ""
 "Een beheerder moet planksynchronisatie inschakelen voordat deze optie "
 "beschikbaar is."
+
+#: cps/spa_strings.py
+msgid "An unexpected error occurred"
+msgstr "Er is een onverwachte fout opgetreden"
 
 #: cps/spa_strings.py
 msgid "Annotation pages"
@@ -5397,12 +5464,20 @@ msgid "Books"
 msgstr "Boeken"
 
 #: cps/spa_strings.py
+msgid "Books assigned a value in this column will appear here."
+msgstr "Boeken met een waarde in deze kolom verschijnen hier."
+
+#: cps/spa_strings.py
 msgid "Books awaiting authority"
 msgstr "Boeken wachten op autoriteit"
 
 #: cps/spa_strings.py
 msgid "Books per page"
 msgstr "Aantal boeken per pagina"
+
+#: cps/spa_strings.py
+msgid "Books placement"
+msgstr "Plaatsing van boeken"
 
 #: cps/spa_strings.py
 msgid "Books seeding"
@@ -5425,6 +5500,10 @@ msgstr ""
 "Boeken die niet op een met e-readers gesynchroniseerde boekenplank staan, "
 "verdwijnen dan bij de volgende synchronisatie uit de bibliotheek van de e-"
 "reader. Ze blijven wel in je bibliotheek hier."
+
+#: cps/spa_strings.py
+msgid "Browse by Column"
+msgstr "Bladeren per kolom"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5612,6 +5691,10 @@ msgstr "Een andere positie kiezen"
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "Kies velden"
+
+#: cps/spa_strings.py
+msgid "Choose visible columns"
+msgstr "Zichtbare kolommen kiezen"
 
 #: cps/spa_strings.py
 msgid "Choose your theme"
@@ -5826,8 +5909,20 @@ msgid "Could not export the book list. Please try again."
 msgstr "De boekenlijst kon niet worden geëxporteerd. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid "Could not load books"
+msgstr "Boeken konden niet worden geladen"
+
+#: cps/spa_strings.py
 msgid "Could not load candidates."
 msgstr "Kan kandidaten niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not load column"
+msgstr "Kolom kon niet worden geladen"
+
+#: cps/spa_strings.py
+msgid "Could not load columns"
+msgstr "Kolommen konden niet worden geladen"
 
 #: cps/spa_strings.py
 msgid "Could not load device annotations."
@@ -6091,7 +6186,7 @@ msgid "Current password"
 msgstr "Huidig wachtwoord"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/image.html
-#: cps/templates/index.html
+#: cps/templates/index.html cps/templates/search_form.html
 msgid "Currently reading"
 msgstr "Momenteel aan het lezen"
 
@@ -7662,6 +7757,10 @@ msgid "No books are ready yet — they appear here as they become ready."
 msgstr "Nog geen boeken klaar — ze verschijnen hier zodra ze klaar zijn."
 
 #: cps/spa_strings.py
+msgid "No books here yet"
+msgstr "Hier zijn nog geen boeken"
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr ""
 "Er zijn momenteel geen boeken die overeenkomen met deze slimme boekenplank."
@@ -7694,6 +7793,10 @@ msgstr "Nog geen catalogi."
 #: cps/spa_strings.py
 msgid "No contents found."
 msgstr "Geen inhoud gevonden."
+
+#: cps/spa_strings.py
+msgid "No custom columns to browse"
+msgstr "Geen aangepaste kolommen om te bekijken"
 
 #: cps/spa_strings.py
 msgid "No devices or browser reading data yet."
@@ -7782,6 +7885,10 @@ msgid "No valid ISBN found in the scanned text."
 msgstr "Geen geldig ISBN gevonden in de gescande tekst."
 
 #: cps/spa_strings.py
+msgid "No values in this column yet"
+msgstr "Deze kolom bevat nog geen waarden"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No {items} yet."
 msgstr "Nog geen {items}."
@@ -7851,6 +7958,10 @@ msgstr ""
 msgid "Nothing in this category yet."
 msgstr "Nog niets in deze categorie."
 
+#: cps/spa_strings.py
+msgid "Nothing in this column matches the selected value."
+msgstr "Niets in deze kolom komt overeen met de gekozen waarde."
+
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
 "Nothing is missing — the global library is still on the server. What you see "
@@ -7860,6 +7971,10 @@ msgstr ""
 "Er ontbreekt niets — de globale bibliotheek staat nog steeds op de server. "
 "Wat je hier ziet is je selectie in Mijn bibliotheek. Voeg boeken toe vanuit "
 "de globale bibliotheek; ze verschijnen hier en op je e-reader."
+
+#: cps/spa_strings.py
+msgid "Nothing on this page"
+msgstr "Geen resultaten op deze pagina"
 
 #: cps/spa_strings.py
 msgid "Nothing requested yet."
@@ -8081,6 +8196,10 @@ msgid "Page {page} of {pages}"
 msgstr "Pagina {page} van {pages}"
 
 #: cps/spa_strings.py
+msgid "Pagination"
+msgstr "Paginering"
+
+#: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
 msgstr "Een Kobo of KOReader koppelen"
 
@@ -8223,10 +8342,6 @@ msgstr "Voortgang"
 #: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
 msgid "Progress is not being saved."
 msgstr "Voortgang wordt niet opgeslagen."
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Openbaar"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8800,6 +8915,17 @@ msgstr "Geïnitialiseerde boeken"
 msgid "Select"
 msgstr "Selecteer"
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid ""
+"Select a category to see the books assigned to it and all of its sub-"
+"categories."
+msgstr ""
+"Kies een categorie om de boeken ervan en van alle subcategorieën te zien."
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Select a value to see the books assigned to it."
+msgstr "Kies een waarde om de bijbehorende boeken te zien."
+
 #: cps/spa_strings.py
 msgid "Select all in group"
 msgstr "Alles in de groep selecteren"
@@ -9347,6 +9473,11 @@ msgstr "Label verwijderd van {n} boek(en)."
 #, python-brace-format
 msgid "Tag removed from {succeeded}; {failed} failed."
 msgstr "Label verwijderd van {succeeded}; {failed} mislukt."
+
+#: cps/spa_strings.py
+msgid "Tag-like custom columns defined in the library appear here."
+msgstr ""
+"Aangepaste kolommen met tekstwaarden uit de bibliotheek verschijnen hier."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
@@ -9907,6 +10038,10 @@ msgstr ""
 "Deze magic link is verlopen. Genereer een nieuwe om het opnieuw te proberen."
 
 #: cps/spa_strings.py
+msgid "This node has fewer pages than the one you were reading."
+msgstr "Deze categorie heeft minder pagina’s dan de vorige."
+
+#: cps/spa_strings.py
 msgid "This page could not be refreshed, so what is shown may be out of date."
 msgstr ""
 "Deze pagina kon niet worden vernieuwd, dus wat je ziet kan verouderd zijn."
@@ -10033,6 +10168,10 @@ msgstr "Bovenkant van de catalogus"
 #: cps/spa_strings.py
 msgid "Transmission download client"
 msgstr "Transmission-downloadclient"
+
+#: cps/spa_strings.py
+msgid "Tree"
+msgstr "Boomstructuur"
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
@@ -10586,6 +10725,16 @@ msgstr "{count} catalogi zijn nog niet doorzocht."
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} column"
+msgstr "{count} kolom"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} columns"
+msgstr "{count} kolommen"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} file queued for import"
 msgstr "{count} bestand in de wachtrij geplaatst voor import"
 
@@ -11084,6 +11233,105 @@ msgstr ""
 msgid "A few random picks from your Discover source"
 msgstr "Een paar willekeurige suggesties uit je bron voor ontdekken"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Reading status"
+msgstr "Leesstatus"
+
+#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
+#: cps/templates/search_form.html
+msgid "Finished"
+msgstr "Voltooid"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Update status"
+msgstr "Status bijwerken"
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr "Leesstatus bijgewerkt"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Could not update reading status."
+msgstr "De leesstatus kon niet worden bijgewerkt."
+
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr "De leesstatus kon niet worden bijgewerkt. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr "Niet uitgelezen en Gepauzeerd behouden je leespositie."
+
+# Grid-to-shelf drag (#946).
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to a shelf"
+msgstr "{title} aan een plank toevoegen"
+
+#: cps/spa_strings.py
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "Sleep naar een plank of kies een plank"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} book(s) added to {shelf}."
+msgstr "{n} boek(en) toegevoegd aan {shelf}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
+"for retry."
+msgstr ""
+"{succeeded} toegevoegd aan {shelf}; {failed} mislukt. Mislukte boeken "
+"blijven geselecteerd om opnieuw te proberen."
+
+#: cps/spa_strings.py
+msgid "Could not add books to the shelf. Please try again."
+msgstr ""
+"Boeken konden niet aan de plank worden toegevoegd. Probeer het opnieuw."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr "Voorbeeld:"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr "Velden en voorbeelden voor bestandsnaamsjablonen"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr "Eerste teken:"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr ""
+"Schakel in KOReader Serverbestandsnamen gebruiken in voor de OPDS-catalogus."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr ""
+"Laat leeg om de huidige bestandsnaam met titel en eerste auteur te behouden. "
+"Voeg geen bestandsextensie toe."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+"Ontbrekende metadata wordt lege tekst. Titel en reeks gebruiken hun "
+"sorteernamen. Schuine strepen worden onderstrepingstekens, geen mappen."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr "Bestandsnaamsjabloon voor OPDS-downloads"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr "Opgevuld reeksnummer:"
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Wachten"
@@ -11091,10 +11339,6 @@ msgstr "Wachten"
 #: cps/tasks_status.py
 msgid "Started"
 msgstr "Gestart"
-
-#: cps/tasks_status.py
-msgid "Finished"
-msgstr "Voltooid"
 
 #: cps/tasks_status.py
 msgid "Ended"
@@ -11585,6 +11829,41 @@ msgstr ""
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr "Geen geldig gmail.json bestand gevonden met OAuth informatie"
+
+#: cps/services/opds_filename.py
+msgid "Conditional text needs both prefix and suffix separators."
+msgstr ""
+"Voorwaardelijke tekst vereist scheidingstekens voor zowel voorvoegsel als "
+"achtervoegsel."
+
+#: cps/services/opds_filename.py
+msgid "Nested fields are not supported in conditional text."
+msgstr "Geneste velden worden niet ondersteund in voorwaardelijke tekst."
+
+#: cps/services/opds_filename.py
+msgid "Use a text template of at most 1024 characters."
+msgstr "Gebruik een tekstsjabloon van maximaal 1024 tekens."
+
+#: cps/services/opds_filename.py
+msgid "Unmatched braces in the OPDS filename template."
+msgstr "Niet-overeenkomende accolades in het OPDS-bestandsnaamsjabloon."
+
+#: cps/services/opds_filename.py
+#, python-format
+msgid "Unknown or unsupported OPDS filename field: %(field)s"
+msgstr "Onbekend of niet-ondersteund OPDS-bestandsnaamveld: %(field)s"
+
+#: cps/services/opds_filename.py
+msgid "Conversions such as !r are not supported in OPDS filenames."
+msgstr "Conversies zoals !r worden niet ondersteund in OPDS-bestandsnamen."
+
+#: cps/services/opds_filename.py
+msgid "Use string padding such as 0>3s, with a maximum width of 128."
+msgstr "Gebruik tekstopvulling zoals 0>3s, met een maximale breedte van 128."
+
+#: cps/services/opds_filename.py
+msgid "Use explicit alignment for zero padding, such as 0>3s."
+msgstr "Gebruik expliciete uitlijning voor opvulling met nullen, zoals 0>3s."
 
 #: cps/tasks/annotation_sync.py
 msgid "Syncing annotations to reading services"
@@ -12739,12 +13018,6 @@ msgstr "Versturen naar eReader"
 
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
-msgstr ""
-
-#: cps/templates/cc_list.html
-msgid ""
-"Select a category to see the books assigned to it and all of its sub-"
-"categories."
 msgstr ""
 
 #: cps/templates/cc_list.html
@@ -14055,6 +14328,10 @@ msgid ""
 "Accept-Language header and the request does not include a ?lang= override. "
 "Authenticated users keep their own selected locale."
 msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "OPDS Downloads"
+msgstr "OPDS-downloads"
 
 #: cps/templates/config_view_edit.html
 msgid "Default Visibilities for New Users"

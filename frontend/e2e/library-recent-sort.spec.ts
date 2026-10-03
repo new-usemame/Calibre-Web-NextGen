@@ -346,9 +346,27 @@ test.describe('Recent library sort', () => {
     // The instrument check: this listing does contain the book the reader has
     // been reading, so opening on Recent here would have been visible — the
     // assertion above is not passing because the case cannot arise.
-    await expect.poll(async () => (await renderedIds(page)).includes(readBookId),
-      { message: `${readBookTitle} must be in this author's listing for the check to bite` })
-      .toBe(true);
+    // The oldest book can be beyond the first mobile page of a large author.
+    // Load the real remaining pages without changing the first-request sort.
+    while (!(await renderedIds(page)).includes(readBookId)) {
+      const more = page.getByRole('button', { name: 'Load more', exact: true });
+      await expect(more, `${readBookTitle} must be reachable in this author's listing`).toBeVisible();
+      const nextPage = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/v1/books' && url.searchParams.get('author') === String(author.id)
+          && Number(url.searchParams.get('page')) > 1 && response.ok();
+      });
+      await more.click();
+      await nextPage;
+      // The last response can remove Load more before the book's paint.
+      // Inspect the current elements without auto-waiting for a button that
+      // has gone, so the next poll can observe the now-rendered book.
+      await expect.poll(async () => (await renderedIds(page)).includes(readBookId)
+        || await more.evaluateAll(elements => elements.some(element => !(element as HTMLButtonElement).disabled)))
+        .toBe(true);
+    }
+    expect((await renderedIds(page)).includes(readBookId)).toBe(true);
+    expect(sorts.filter(sort => sort !== 'new')).toEqual([]);
 
     // Worth a picture: this is the surface the Library's new default would have
     // changed without being asked to, so the evidence that it did not should be

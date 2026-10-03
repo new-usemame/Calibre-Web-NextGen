@@ -22,6 +22,8 @@ export const SPA_ROUTES = {
   language: '/languages/:id',
   ratings: '/ratings',
   rating: '/ratings/:id',
+  ccList: '/cc',
+  cc: '/cc/:id',
   formats: '/formats',
   format: '/formats/:id',
   shelves: '/shelves',

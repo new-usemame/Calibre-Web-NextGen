@@ -19,7 +19,7 @@ import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 
-type ReadStatus = 'all' | 'read' | 'unread';
+type ReadStatus = 'all' | 'read' | 'unread' | 'in_progress' | 'did_not_finish' | 'on_hold';
 
 interface FormState {
   title: string;
@@ -224,12 +224,13 @@ export function AdvancedSearch() {
           </Field>
 
           <Field label={t('Read status')}>
-            <div className={styles.segmented}>
-              {(['all', 'unread', 'read'] as ReadStatus[]).map((rs) => (
+            <div className={styles.segmented} role="group" aria-label={t('Read status')}>
+              {(['all', 'unread', 'read', 'in_progress', 'did_not_finish', 'on_hold'] as ReadStatus[]).map((rs) => (
                 <button key={rs} type="button"
                   className={form.read_status === rs ? styles.segActive : styles.seg}
+                  aria-pressed={form.read_status === rs}
                   onClick={() => set('read_status', rs)}>
-                  {rs === 'all' ? t('Any') : t(rs === 'unread' ? 'Unread' : 'Read')}
+                  {t(({ all: 'Any', unread: 'Unread', read: 'Read', in_progress: 'Currently reading', did_not_finish: 'Did not finish', on_hold: 'On hold' })[rs])}
                 </button>
               ))}
             </div>

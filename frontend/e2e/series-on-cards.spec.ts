@@ -155,7 +155,10 @@ test.describe('#657 series on book cards', () => {
     await page.getByRole('button', { name: 'Select', exact: true }).click();
     const selectCard = card.getByRole('button', { name: `Select ${title}`, exact: true });
     await expect(selectCard).toBeVisible();
-    await expect(card.locator('button')).toHaveCount(1);
+    // The selection toggle is unique. A writable shelf may also expose the
+    // separate drag/picker grip; neither control may contain another control.
+    await expect(selectCard).toHaveCount(1);
+    await expect(card.locator('button button, button a, a button')).toHaveCount(0);
     await expect(selectCard.locator('a')).toHaveCount(0);
     await expect(selectCard.getByTestId('book-card-series')).toContainText(series!);
     await selectCard.click();

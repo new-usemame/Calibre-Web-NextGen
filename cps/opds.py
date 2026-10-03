@@ -19,11 +19,12 @@ from sqlalchemy.sql.expression import func, text, or_, and_, true, false
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy
+from .custom_column_visibility import retryable_column_reads, browsable_columns, is_cc_visible
 from .usermanagement import requires_basic_auth_if_no_ano, auth
 from .helper import get_download_link, get_book_cover, hot_books_page
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS
-from .web import render_read_books
+from .web import render_read_books, render_personal_read_status_books
 
 
 opds = Blueprint('opds', __name__)
@@ -141,6 +142,8 @@ OPDS_ROOT_ORDER_DEFAULT = [
     'random',
     'read',
     'currently_reading',
+    'did_not_finish',
+    'on_hold',
     'unread',
     'authors',
     'publishers',
@@ -204,6 +207,18 @@ OPDS_ROOT_ENTRY_DEFS = {
         'endpoint': 'opds.feed_currently_reading',
         'title': N_('Currently Reading'),
         'description': N_('Books currently being read'),
+        'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
+    },
+    'did_not_finish': {
+        'endpoint': 'opds.feed_did_not_finish',
+        'title': N_('Did not finish'),
+        'description': N_('Books you chose not to finish'),
+        'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
+    },
+    'on_hold': {
+        'endpoint': 'opds.feed_on_hold',
+        'title': N_('On hold'),
+        'description': N_('Books you have paused for later'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
     },
     'unread': {
@@ -565,18 +580,36 @@ def feed_index():
 
 
 def get_opds_hierarchy_root_entries(user):
-    """One root entry per browsable custom column whose values form a
-    hierarchy; flat columns stay out of the catalog root."""
+    """One root entry per browsable custom column, in either mode.
+
+    Hierarchical and flat columns both appear: the feed itself decides which
+    it is, so a Dewey or LCC column a cataloger defined is reachable from an
+    OPDS client. Excluding flat columns here is what kept them undiscoverable
+    in OPDS even though the browse route already served them.
+    """
     if not user.check_visibility(constants.SIDEBAR_CATEGORY):
         return []
-    hierarchical = calibre_db.get_hierarchical_column_ids()
-    return [{
-        'key': 'cc_%d' % col.id,
-        'title': col.name,
-        'description': _('Books by %(name)s, including every sub-category', name=col.name),
-        'url': url_for('opds.feed_cc_category', column_id=col.id),
-    } for col in calibre_db.get_cc_columns(config)
-        if col.id in hierarchical and col.datatype in ('text', 'enumeration')]
+    entries = []
+    for col in browsable_columns(calibre_db.get_cc_columns(config)):
+        # A column the user hid on their profile page is not advertised. The
+        # classic sidebar omits it and the SPA API 404s it, so listing it here
+        # would be the one surface where hiding a column does not hide it.
+        if not is_cc_visible(user, col.id):
+            continue
+        # A hierarchical feed offers every sub-category under a node; a flat
+        # one has no sub-categories, so claiming them would be a lie the
+        # reader will not find when it follows the link.
+        if calibre_db.is_flat_cc_column(col.id):
+            description = _('Books by %(name)s', name=col.name)
+        else:
+            description = _('Books by %(name)s, including every sub-category', name=col.name)
+        entries.append({
+            'key': 'cc_%d' % col.id,
+            'title': col.name,
+            'description': description,
+            'url': url_for('opds.feed_cc_category', column_id=col.id),
+        })
+    return entries
 
 
 @opds.route("/opds/osd")
@@ -791,29 +824,60 @@ def feed_category(book_id):
 @opds.route("/opds/custom_column/<int:column_id>", defaults={'category_path': ''})
 @opds.route("/opds/custom_column/<int:column_id>/<path:category_path>")
 @requires_basic_auth_if_no_ano
+@retryable_column_reads
 def feed_cc_category(column_id, category_path):
-    """OPDS navigation/acquisition feed for one hierarchical custom column.
+    """OPDS navigation/acquisition feed for one custom column, in either mode.
 
-    /opds/custom_column/1                    -> top-level nodes
-    /opds/custom_column/1/Computers          -> child nodes (navigation)
-    /opds/custom_column/1/Computers.DB       -> books under the leaf (acquisition)
-    Nodes with children take precedence over directly attached books;
-    those remain reachable through the OPDS search.
+    Hierarchical:
+      /opds/custom_column/1                  -> top-level nodes
+      /opds/custom_column/1/Computers        -> child nodes (navigation)
+      /opds/custom_column/1/Computers.DB     -> books under the leaf (acquisition)
+    Nodes with children take precedence over directly attached books; those
+    remain reachable through the OPDS search.
+
+    Flat (Dewey 778.3 is ONE value, never a 778 node with a 3 child):
+      /opds/custom_column/3                  -> the distinct values
+      /opds/custom_column/3/778.3            -> books with that exact value
     """
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
-    if not any(col.id == column_id and col.datatype in ('text', 'enumeration')
-               for col in calibre_db.get_cc_columns(config)):
+    if not any(col.id == column_id
+               for col in browsable_columns(calibre_db.get_cc_columns(config, fail_on_error=True))):
+        abort(404)
+    # A hidden column 404s its whole subtree, not just its root entry: a reader
+    # who bookmarked a node must not keep reaching it after unticking the
+    # column. Same contract the SPA API already has.
+    if not is_cc_visible(auth.current_user(), column_id, fail_on_error=True):
         abort(404)
 
-    # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
-    path = hierarchy.join_path([category_path or ''])
+    is_hierarchical = not calibre_db.is_flat_cc_column(column_id, fail_on_error=True)
+    if is_hierarchical:
+        # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
+        path = hierarchy.join_path([category_path or ''])
+    else:
+        # Flat values are opaque atomic strings -- never canonicalised.
+        path = category_path or ''
     off = int(request.args.get("offset") or 0)
     cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
-    opds_tree = calibre_db.get_hierarchical_tree(
-        column_id, book_filter=get_opds_restricted_common_filter())
+    opds_filter = get_opds_restricted_common_filter()
 
-    if path:
+    def cc_book_filter(inner):
+        return getattr(db.Books, 'custom_column_' + str(column_id)).any(inner)
+
+    def books_feed(db_filter):
+        entries, __, pagination = fill_opds_indexpage(
+            (int(off) / (int(config.config_books_per_page)) + 1), 0,
+            db.Books, db_filter,
+            # Shared map entry, tiebreaker included (#1331) — an inline
+            # [db.Books.timestamp.desc()] here paged plan-dependently.
+            BOOK_SORT_ORDERS["new"],
+            True, config.config_read_column)
+        return render_xml_template('feed.xml', entries=entries,
+                                   pagination=pagination, cc=cc)
+
+    if path and is_hierarchical:
+        opds_tree = calibre_db.get_hierarchical_tree(
+            column_id, book_filter=opds_filter, fail_on_error=True)
         node = hierarchy.get_node_by_path(opds_tree, path)
         if node is None:
             abort(404)
@@ -823,22 +887,19 @@ def feed_cc_category(column_id, category_path):
             pagination = Pagination(1, max(len(elements), 1), len(elements))
             return render_xml_template('feed.xml', hierarchyelements=elements,
                                        pagination=pagination, cc=cc)
+        return books_feed(cc_book_filter(
+            calibre_db.hierarchical_cc_filter(column_id, node)))
 
     if path:
-        entries, __, pagination = fill_opds_indexpage(
-            (int(off) / (int(config.config_books_per_page)) + 1), 0,
-            db.Books,
-            getattr(db.Books, 'custom_column_' + str(column_id)).any(
-                calibre_db.hierarchical_cc_filter(column_id, node)),
-            # Shared map entry, tiebreaker included (#1331) — an inline
-            # [db.Books.timestamp.desc()] here paged plan-dependently.
-            BOOK_SORT_ORDERS["new"],
-            True, config.config_read_column)
-        return render_xml_template('feed.xml', entries=entries,
-                                   pagination=pagination, cc=cc)
+        return books_feed(cc_book_filter(
+            calibre_db.flat_cc_filter(column_id, path)))
 
+    if is_hierarchical:
+        nodes = calibre_db.get_hierarchical_tree(column_id, book_filter=opds_filter, fail_on_error=True)
+    else:
+        nodes = calibre_db.get_cc_flat_list(column_id, book_filter=opds_filter, fail_on_error=True)
     elements = [{'column_id': column_id, 'path': n['path'], 'name': n['name']}
-                for n in opds_tree]
+                for n in nodes]
     pagination = Pagination(1, max(len(elements), 1), len(elements))
     return render_xml_template('feed.xml', hierarchyelements=elements,
                                pagination=pagination, cc=cc)
@@ -1117,7 +1178,8 @@ def opds_download_link(book_id, book_format):
     abort_unless_opds_book_exposed(book_id)
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
     return get_download_link(
-        book_id, book_format.lower(), client, allow_public_shelf_books=True)
+        book_id, book_format.lower(), client, allow_public_shelf_books=True,
+        filename_template=getattr(config, 'config_opds_filename_template', ''))
 
 
 @opds.route("/ajax/book/<string:uuid>/<library>")
@@ -1209,6 +1271,36 @@ def feed_currently_reading():
         db.Books.id == db.books_series_link.c.book,
         db.Series,
     )
+    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+
+
+@opds.route("/opds/didnotfinish")
+@requires_basic_auth_if_no_ano
+def feed_did_not_finish():
+    user = auth.current_user()
+    if not (user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD)
+            and not user.is_anonymous):
+        return abort(403)
+    off = request.args.get("offset") or 0
+    result, pagination = render_personal_read_status_books(
+        int(off) // int(config.config_books_per_page) + 1,
+        ub.ReadBook.STATUS_DID_NOT_FINISH, as_xml=True,
+        extra_filter=get_opds_book_filter())
+    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+
+
+@opds.route("/opds/onhold")
+@requires_basic_auth_if_no_ano
+def feed_on_hold():
+    user = auth.current_user()
+    if not (user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD)
+            and not user.is_anonymous):
+        return abort(403)
+    off = request.args.get("offset") or 0
+    result, pagination = render_personal_read_status_books(
+        int(off) // int(config.config_books_per_page) + 1,
+        ub.ReadBook.STATUS_ON_HOLD, as_xml=True,
+        extra_filter=get_opds_book_filter())
     return render_xml_template('feed.xml', entries=result, pagination=pagination)
 
 

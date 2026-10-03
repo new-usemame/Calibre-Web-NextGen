@@ -36,18 +36,33 @@ function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, shel
     // the stable catalog heading when the original trigger no longer exists;
     // ordinary dismissal still uses the focus trap's trigger restoration.
     queueMicrotask(() => {
-      if (!opener?.isConnected && document.activeElement === document.body) {
+      // Native touch may restore the route's main landmark because tapping
+      // the opener never focused it. Treat that neutral route focus like body.
+      const active = document.activeElement;
+      if (!opener?.isConnected && (active === document.body || active === document.querySelector('main'))) {
         document.querySelector<HTMLElement>('[data-testid="catalog-heading"], [data-testid="shelf-heading"]')?.focus();
       }
     });
   }, [opener]);
   useLayoutEffect(() => {
-    const box = panel.current!.getBoundingClientRect();
-    setPosition({
-      left: Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8)),
-      top: anchor.bottom + box.height + 8 <= window.innerHeight
-        ? anchor.bottom + 8 : Math.max(8, anchor.top - box.height - 8),
-    });
+    const element = panel.current!;
+    const place = () => {
+      const box = element.getBoundingClientRect();
+      const preferredTop = anchor.bottom + box.height + 8 <= window.innerHeight
+        ? anchor.bottom + 8 : anchor.top - box.height - 8;
+      const next = {
+        left: Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8)),
+        // Keyboard focus can scroll the opener after its anchor is captured.
+        // Errors, translated text and loaded fonts can then grow the panel.
+        top: Math.max(8, Math.min(preferredTop, window.innerHeight - box.height - 8)),
+      };
+      setPosition(previous => previous.left === next.left && previous.top === next.top ? previous : next);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(element);
+    window.addEventListener('resize', place);
+    return () => { observer.disconnect(); window.removeEventListener('resize', place); };
   }, [anchor]);
   const failed = () => {
     setError(true);
@@ -90,7 +105,7 @@ function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, shel
             <Check size={18} aria-hidden="true" focusable={false} />
             {book.read ? t('Mark as unread') : t('Mark as read')}
           </button>
-          <p className={styles.status}>{book.in_progress ? t('Reading') : book.read ? t('Read') : t('Unread')}</p>
+          <p className={styles.status}>{book.read_status === 'did_not_finish' ? t('Did not finish') : book.read_status === 'on_hold' ? t('On hold') : book.in_progress ? t('Reading') : book.read ? t('Read') : t('Unread')}</p>
         </>}
         {shelfNames.length > 0 && <section className={styles.shelves} aria-label={t('Shelves')}>
           <h3>{t('Shelves')}</h3>

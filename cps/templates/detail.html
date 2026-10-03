@@ -8,6 +8,20 @@
       <meta property="og:image" content="{{url_for('web.get_cover', book_id=entry.id, resolution='og', c=entry|last_modified)}}" />
     {% endif %}
     <style>
+        #read-status-form {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        #read-status-form select,
+        #read-status-form button {
+            min-height: 44px;
+            max-width: 100%;
+        }
+
         .modal-card {
             background-color: #6d6d6d40;
             padding: 2rem;
@@ -890,11 +904,6 @@
                                 {% endif %}
                             {% endfor %}
                         </p>
-                        {# Passive "currently reading" marker (fork #509). Shows when the book's
-                           read state is IN_PROGRESS (read_status_raw == 2) — i.e. a book a user is
-                           partway through on KOReader/Kobo. The read toggle below stays a 2-state
-                           read/unread control; in-progress is sync-driven display only, not a
-                           user-set toggle position. #}
                         {% if entry.read_status_raw == 2 %}
                         <p class="currently-reading cover-badge-in-progress" id="currently-reading-badge">
                             <span class="glyphicon glyphicon-book" aria-hidden="true"></span>
@@ -908,6 +917,26 @@
                             </button>
                             {% endif %}
                         </p>
+                        {% elif entry.read_status_raw == 3 %}
+                        <p class="cover-badge" id="did-not-finish-badge">{{ _('Did not finish') }}</p>
+                        {% elif entry.read_status_raw == 4 %}
+                        <p class="cover-badge" id="on-hold-badge">{{ _('On hold') }}</p>
+                        {% endif %}
+                        {% if not current_user.is_anonymous and in_my_library %}
+                        <form id="read-status-form" class="form-inline" method="POST"
+                              action="{{ url_for('web.set_read_status', book_id=entry.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label for="read-status-select">{{ _('Reading status') }}</label>
+                            <select id="read-status-select" name="status" class="form-control">
+                                <option value="unread" {% if entry.read_status_raw == 0 %}selected{% endif %}>{{ _('Unread') }}</option>
+                                <option value="finished" {% if entry.read_status_raw == 1 %}selected{% endif %}>{{ _('Finished') }}</option>
+                                <option value="in_progress" {% if entry.read_status_raw == 2 %}selected{% endif %}>{{ _('Currently reading') }}</option>
+                                <option value="did_not_finish" {% if entry.read_status_raw == 3 %}selected{% endif %}>{{ _('Did not finish') }}</option>
+                                <option value="on_hold" {% if entry.read_status_raw == 4 %}selected{% endif %}>{{ _('On hold') }}</option>
+                            </select>
+                            <button type="submit" class="btn btn-default">{{ _('Update status') }}</button>
+                            <span id="read-status-message" role="status" aria-live="polite"></span>
+                        </form>
                         {% endif %}
                         {% set current_rating = (entry.ratings[0].rating / 2)|int if entry.ratings|length > 0 else 0 %}
                         <div class="rating" id="detail-rating-block">
@@ -1115,14 +1144,23 @@
                                                                 {{ column.value|clean_string|safe }}
                                                             {% elif c.datatype == 'series' %}
                                                                 {{ '%s [%s]' % (column.value, column.extra|formatfloat(2)) }}
-                                                            {% elif c.datatype == 'text' %}
-                                                                {% if hierarchical_cc_ids and c.id in hierarchical_cc_ids and '.' in column.value %}
-                                                                    {% set parts = column.value.strip().split('.') %}
+                                                            {% elif c.datatype in ['text', 'enumeration'] %}
+                                                                {# Hierarchical column: each level is its own node,
+                                                                   so every level links to the node it names.
+                                                                   Flat column: the whole stored value is ONE atomic
+                                                                   string (Dewey '778.3' is not a '778' node with a
+                                                                   '3' child), so it links as a single exact-value
+                                                                   target instead of being split into invented levels. #}
+                                                                {% set cc_value = column.value %}
+                                                                {% if c.id in cc_browse_ids and hierarchical_cc_ids and c.id in hierarchical_cc_ids and '.' in cc_value %}
+                                                                    {% set parts = cc_value.split('.') %}
                                                                     {% for part in parts %}
                                                                         <a class="hierarchy-crumb" href="{{ url_for('web.cc_category_list', column_id=c.id, category_path=parts[:loop.index]|join('.')) }}">{{ part }}</a>{% if not loop.last %}. {% endif %}
                                                                     {% endfor %}
+                                                                {% elif c.id in cc_browse_ids and cc_value %}
+                                                                    <a class="hierarchy-crumb" href="{{ url_for('web.cc_category_list', column_id=c.id, category_path=cc_value) }}">{{ cc_value }}</a>
                                                                 {% else %}
-                                                                    {{ column.value.strip() }}
+                                                                    {{ cc_value }}
                                                                 {% endif %}{% if not loop.last %}, {% endif %}
                                                             {% else %}
                                                                 {{ column.value }}
@@ -1355,12 +1393,35 @@
                     // longer in-progress) — drop it so the page doesn't show
                     // "Currently reading" next to "Mark As Unread" until reload (#509).
                     $("#currently-reading-badge").remove();
+                    $("#did-not-finish-badge, #on-hold-badge").remove();
+                    $("#read-status-select").val(isRead ? "finished" : "unread");
                     var $btn = $("#toggle-read-btn");
                     var toastMsg = isRead ? $btn.data("toast-on") : $btn.data("toast-off");
                     showActionToast(toastMsg, $btn[0]);
                 },
                 error: function () {
                     $cb.prop("checked", !nextChecked);
+                }
+            });
+        });
+
+        $("#read-status-form").on("submit", function (event) {
+            event.preventDefault();
+            var $form = $(this);
+            var $button = $form.find("button[type=submit]");
+            var $message = $("#read-status-message");
+            $button.prop("disabled", true);
+            $message.text("");
+            $.ajax({
+                url: $form.attr("action"),
+                method: "post",
+                data: $form.serialize(),
+                success: function () {
+                    window.location.reload();
+                },
+                error: function () {
+                    $message.text({{ _('Could not update reading status.')|tojson }});
+                    $button.prop("disabled", false);
                 }
             });
         });

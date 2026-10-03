@@ -66,6 +66,22 @@ class TestModelConstraints:
 # uniqueness on the four target tables.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.unit
+def test_duplicate_pause_resume_recovery_retains_winners_choice_clock(memory_db_session_no_unique_indexes):
+    from cps.ub import ReadBook, _dedupe_book_read_link
+    session, _ = memory_db_session_no_unique_indexes
+    session.add_all([
+        ReadBook(user_id=1, book_id=42, read_status=4, times_started_reading=2,
+                 last_modified=datetime(2020, 1, 1), read_status_choice_at=datetime(2020, 1, 1)),
+        ReadBook(user_id=1, book_id=42, read_status=2, times_started_reading=3,
+                 last_modified=datetime(2025, 1, 1), read_status_choice_at=datetime(2025, 1, 1)),
+    ])
+    session.commit()
+    assert _dedupe_book_read_link(session) == 1
+    session.commit()
+    row = session.query(ReadBook).filter_by(user_id=1, book_id=42).one()
+    assert (row.read_status, row.times_started_reading, row.last_modified) == (2, 5, datetime(2025, 1, 1))
+
 @pytest.fixture
 def memory_db_session():
     from sqlalchemy import create_engine
@@ -105,6 +121,7 @@ def memory_db_session_no_unique_indexes(memory_db_session):
                 user_id INTEGER,
                 read_status INTEGER NOT NULL DEFAULT 0,
                 last_modified DATETIME,
+                read_status_choice_at DATETIME,
                 last_time_started_reading DATETIME,
                 times_started_reading INTEGER NOT NULL DEFAULT 0
             )

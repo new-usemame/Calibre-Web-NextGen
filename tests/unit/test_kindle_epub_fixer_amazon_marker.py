@@ -177,3 +177,17 @@ def test_legacy_encoding_roundtrip_keeps_reader_text(fixer_module, tmp_path, fil
     digest = hashlib.sha256(book.read_bytes()).hexdigest()
     assert fixer_module.EPUBFixer().process(str(book)) == []
     assert hashlib.sha256(book.read_bytes()).hexdigest() == digest
+
+
+@pytest.mark.parametrize("filename,source", [
+    ("UPPER.CSS", '@charset "iso-8859-1";\np.note:before { content: "café"; }'),
+    ("UPPER.OPF", '<?xml version="1.0" encoding="iso-8859-1"?><package>café</package>'),
+])
+def test_case_expansion_is_limited_to_marker_markup(fixer_module, tmp_path, filename, source):
+    book = build_epub(tmp_path / "book.epub")
+    payload = epub_payload(book)
+    payload["OEBPS/" + filename] = source.encode("iso-8859-1")
+    replace_payload(book, payload)
+    assert fixer_module.EPUBFixer().process(str(book)) == []
+    assert epub_payload(book) == payload
+    assert backups_taken(fixer_module) == []

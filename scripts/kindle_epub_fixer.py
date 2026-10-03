@@ -509,8 +509,11 @@ class EPUBFixer:
         with zipfile.ZipFile(epub_path, 'r') as zip_ref:
             self.entries = zip_ref.namelist()
             for filename in self.entries:
-                # ZIP names stay exact; extension recognition is case-insensitive.
-                ext = filename.split('.')[-1].lower()
+                # ZIP names stay exact; recognize marker-bearing markup in
+                # either case without widening other existing repair passes.
+                ext = filename.split('.')[-1]
+                if ext.lower() in ('html', 'xhtml', 'htm', 'svg'):
+                    ext = ext.lower()
                 if filename == 'mimetype':
                     self.files[filename] = zip_ref.read(filename)
                     continue

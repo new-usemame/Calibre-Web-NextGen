@@ -87,6 +87,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_torrent_metadata_runtime_probe.py": "/tmp/acquisition_torrent_metadata_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
+        ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
     }
     for source, target in files.items():
@@ -137,6 +139,11 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert len(bundle["outcomes"]) == 3
     assert bundle["outcomes"][0]["book_ids"] != bundle["outcomes"][1]["book_ids"]
     assert bundle["outcomes"][2]["book_ids"] == bundle["outcomes"][0]["book_ids"]
+    detail = proof["opds_publication"]
+    assert detail["explicit_detail_read"] and detail["cross_account_read_refused"]
+    assert detail["no_loan_or_purchase_get"] and detail["original_edition_preserved"]
+    assert detail["source_unchanged"] and detail["private_cleanup"] and detail["full_processor_subprocess"]
+    assert detail["saved_display_locale"] == "fr_CA" and detail["edition_language"] == "en"
     metadata = proof["torrent_metadata"]
     assert metadata["loopback_transmission_rpc"] and metadata["full_processor_subprocess"]
     assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]

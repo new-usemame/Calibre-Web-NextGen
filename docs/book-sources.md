@@ -40,7 +40,7 @@ A result's navigation or next page opens that exact page in individual catalog b
 | Capability | Current support |
 | --- | --- |
 | Catalogs | OPDS 1 Atom and OPDS 2 JSON; Newznab/Torznab search, including Prowlarr and Jackett presets |
-| Browsing | Catalog navigation, groups, facets and pagination |
+| Browsing | Catalog navigation, groups, facets, pagination and explicitly opened OPDS 2 publication details |
 | Search | Individual or shared keyword search using advertised OpenSearch descriptions, supported OPDS 2 templates and Newznab/Torznab book search |
 | Files | Direct EPUB/PDF links, NZB releases and v1 torrent files/magnets containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
 | Download client | SABnzbd/NZBGet after successful postprocessing; qBittorrent/Transmission after every file finishes downloading |
@@ -51,6 +51,10 @@ A result's navigation or next page opens that exact page in individual catalog b
 A catalog may list books without a supported direct file. Purchase, borrowing, DRM, previews, HTML landing pages and indirect acquisition flows are not presented as downloadable files. Inline catalog artwork is optional and is not downloaded.
 
 Anna's Archive is outside this Beta. Shelfmark is deferred because this slice has no inexpensive completion contract that attributes its result to a CWNG request. Torrent results require qBittorrent or Transmission; Usenet clients accept NZB results. The framework separates catalog discovery, file transport and library ingestion so additional protocol adapters can reuse the same permission, request and import boundaries.
+
+OPDS 2 metadata may supply publication titles and contributor names in several languages. CWNG chooses the saved account locale, trying the exact tag, a matching regional variant and language parents, then English or a stable alphabetical fallback. Every supplied variant is validated. This changes display text only: the edition’s declared languages, identifiers, downloaded bytes and import identity stay unchanged.
+
+A summary can advertise a `self` or `alternate` link of type `application/opds-publication+json`. Open that link explicitly to read its details and see any supported direct EPUB/PDF offer. CWNG does not fetch details eagerly or turn buy, borrow, subscribe, sample, preview, indirect or templated offers into downloads or automatic detail reads. A detail document’s own self-link is suppressed. The same connection transport policy and owner-bound opaque selections apply. See [OPDS metadata and detail verification](verification/virtual-library-opds-publications.md).
 
 ## Connect an existing Usenet stack
 

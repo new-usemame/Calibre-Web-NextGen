@@ -394,10 +394,12 @@ def acquisition_catalog():
     if set(request.args)-{'connection','selection','q'}: raise admission.AdmissionError('invalid_request')
     database,owner,connection_id=ub.app_DB_path,_owner(),request.args.get('connection')
     selection,query=request.args.get('selection'),request.args.get('q')
+    # Capture account presentation state before leaving the request context.
+    language = getattr(current_user, 'locale', None) or 'en'
     def browse():
         with runtime.open_repository(database) as repo:
             row = _require_connection(repo,connection_id,catalog=True)
-            service = IndexerService(repo) if row.adapter == 'newznab' else CatalogService(repo)
+            service = IndexerService(repo) if row.adapter == 'newznab' else CatalogService(repo, preferred_language=language)
             result=service.browse(owner,connection_id,selection=selection,query=query)
             allowed=admission.configured_media_types(repo.engine)
             formats={name for name,media in (('EPUB','application/epub+zip'),('PDF','application/pdf')) if media in allowed}

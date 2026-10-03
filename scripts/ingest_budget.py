@@ -21,7 +21,9 @@ def wait_for_file_ready(path, timeout):
     events. Keep the configured wait separate from the conversion watchdog.
     """
     start = time.monotonic()
-    while time.monotonic() - start < timeout:
+    first_check = True
+    while first_check or time.monotonic() - start < timeout:
+        first_check = False
         if not os.path.exists(path):
             return False
         try:
@@ -40,6 +42,8 @@ def wait_for_file_ready(path, timeout):
             return True
         except Exception as error:
             print(f'[ingest-processor] WARN: Error checking file usage with lsof: {error}', file=sys.stderr, flush=True)
+        if timeout <= 0:
+            return False
         time.sleep(1)
     return False
 

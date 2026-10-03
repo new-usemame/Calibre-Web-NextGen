@@ -205,6 +205,23 @@ def test_readwrite_descriptor_is_not_ready_until_closed(tmp_path, monkeypatch):
     assert all(call[1]['timeout'] == 10 for call in calls)
 
 
+@pytest.mark.parametrize('descriptor, ready', [('', True), ('f1w\n', False), ('f1u\n', False)])
+def test_zero_readiness_allowance_checks_once_without_waiting(tmp_path, monkeypatch, descriptor, ready):
+    module = load_budget()
+    source = tmp_path / 'unlimited.pdf'
+    source.write_bytes(b'original fixture')
+    calls = []
+    def observe(*args, **kwargs):
+        calls.append(args[0])
+        return subprocess.CompletedProcess(args[0], 0, stdout=descriptor)
+    monkeypatch.setattr(module.subprocess, 'run', observe)
+    def forbidden_sleep(_):
+        raise AssertionError('zero readiness allowance waited')
+    monkeypatch.setattr(module.time, 'sleep', forbidden_sleep)
+    assert module.wait_for_file_ready(source, 0) is ready
+    assert len(calls) == 1
+
+
 def test_busy_pdf_retains_configured_wait_and_requests_retry_without_counting(tmp_path, monkeypatch):
     module = load_budget()
     source = tmp_path / 'still-writing.pdf'

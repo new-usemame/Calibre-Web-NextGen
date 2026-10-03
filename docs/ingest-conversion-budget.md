@@ -2,7 +2,7 @@
 
 Ingest uses **Ingest Timeout** in CWA Settings to wait for a file to finish copying. Its normal conversion safety budget is three times that setting. PDF inputs above 500 pages now receive a longer conversion budget automatically; the file-stability wait keeps the configured value.
 
-The selected safety budget is the existing budget multiplied by `pages / 500`, rounded up to the next whole second. Books with 500 pages or fewer retain the existing budget. Automatic extensions stop at 12 hours; an explicitly configured base budget above that is preserved. An existing zero timeout remains unlimited.
+The selected safety budget is the existing budget multiplied by `pages / 500`, rounded up to the next whole second. Books with 500 pages or fewer retain the existing budget. Automatic extensions stop at 12 hours; an explicitly configured base budget above that is preserved. An existing zero timeout remains unlimited for conversion. Its readiness allowance performs one immediate writer check: a closed file proceeds, while an active writer stays queued until a later attempt.
 
 For example, at the default 15-minute setting:
 

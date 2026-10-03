@@ -83,6 +83,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_calibre_runtime_probe.py": "/tmp/acquisition_calibre_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_bundle_runtime_probe.py": "/tmp/acquisition_bundle_runtime_probe.py",
+        ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
     }
     for source, target in files.items():
@@ -127,3 +129,9 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     ]
     assert proof["results"][0]["receipt_retry"]
     assert all(case["source_and_private_cleanup"] for case in proof["results"])
+    bundle = proof["bundle"]
+    assert bundle["remote_submissions"] == 1 and bundle["source_files_unchanged"]
+    assert bundle["waiting_not_polled"] and bundle["private_manifests"] and bundle["real_sab_http"]
+    assert len(bundle["outcomes"]) == 3
+    assert bundle["outcomes"][0]["book_ids"] != bundle["outcomes"][1]["book_ids"]
+    assert bundle["outcomes"][2]["book_ids"] == bundle["outcomes"][0]["book_ids"]

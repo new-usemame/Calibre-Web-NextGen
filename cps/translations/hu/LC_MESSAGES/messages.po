@@ -18404,3 +18404,103 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ msgstr ""
 #~ "A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy "
 #~ "egy könyvet biztonságosan törölhessen."
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "Könyvválasztásra vár"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Könyv igényelve. Egy rendszergazdának jóvá kell hagynia."
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "A könyv hozzáadva a tevékenységeidhez."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Ez a könyvválasztás elavult. A lista frissítése…"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr "Az igénylések szünetelnek. Az elérhető könyveket továbbra is megtekintheted."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "A könyvet nem sikerült igényelni. Próbáld újra."
+
+#: cps/spa_strings.py
+msgid "The choice was out of date and the available books could not be refreshed. Try again."
+msgstr "A választás elavult, és az elérhető könyveket nem sikerült frissíteni. Próbáld újra."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr "Ez a könyvválasztás elavult. A lista frissült; válassz újra."
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "Az elérhető könyveket nem sikerült betölteni. Próbáld újra."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} elérhető könyv található."
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Válassz könyvet ebből a letöltésből"
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Elérhető könyvek elrejtése"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Másik könyv választása"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Elérhető könyvek betöltése…"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "Ebben a letöltésben nincs elérhető könyv."
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Könyv importálása"
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Könyv igénylése"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Könyv importálása: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Könyv igénylése: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} bájt"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Igényelve"
+
+#: cps/spa_strings.py
+msgid "The chosen book is no longer in the completed download. Restore its original file before trying again."
+msgstr "A kiválasztott könyv már nincs a befejezett letöltésben. Újrapróbálkozás előtt állítsd vissza az eredeti fájlt."
+
+#: cps/spa_strings.py
+msgid "The book or completed download changed. Restore its original files before trying again."
+msgstr "A könyv vagy a befejezett letöltés megváltozott. Újrapróbálkozás előtt állítsd vissza az eredeti fájlokat."
+
+#: cps/spa_strings.py
+msgid "The completed download exceeds the safe file limits. Choose a smaller release."
+msgstr "A befejezett letöltés túllépi a biztonságos fájlkorlátokat. Válassz kisebb kiadást."

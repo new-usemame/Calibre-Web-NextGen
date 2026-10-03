@@ -18398,3 +18398,103 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ msgstr ""
 #~ "Bücher müssen zuerst archiviert werden und dann mit dem Gerät "
 #~ "synchronisiert werden, bevor ein Buch sicher gelöscht werden kann."
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "Wartet auf deine Buchauswahl"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Buch angefragt. Ein Administrator muss es genehmigen."
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Buch zu deinen Anfragen hinzugefügt."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Diese Buchauswahl war veraltet. Die Liste wird aktualisiert…"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr "Anfragen sind pausiert. Du kannst die verfügbaren Bücher weiterhin ansehen."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Dieses Buch konnte nicht angefragt werden. Versuche es erneut."
+
+#: cps/spa_strings.py
+msgid "The choice was out of date and the available books could not be refreshed. Try again."
+msgstr "Die Auswahl war veraltet und die verfügbaren Bücher konnten nicht aktualisiert werden. Versuche es erneut."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr "Diese Buchauswahl war veraltet. Die Liste wurde aktualisiert; wähle erneut."
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "Die verfügbaren Bücher konnten nicht geladen werden. Versuche es erneut."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} verfügbare Bücher gefunden."
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Wähle ein Buch aus diesem Download"
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Verfügbare Bücher ausblenden"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Weiteres Buch auswählen"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Verfügbare Bücher werden geladen…"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "In diesem Download sind keine Bücher verfügbar."
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Dieses Buch importieren"
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Dieses Buch anfragen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Dieses Buch importieren: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Dieses Buch anfragen: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} Bytes"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Angefragt"
+
+#: cps/spa_strings.py
+msgid "The chosen book is no longer in the completed download. Restore its original file before trying again."
+msgstr "Das ausgewählte Buch ist nicht mehr im abgeschlossenen Download. Stelle vor einem erneuten Versuch die Originaldatei wieder her."
+
+#: cps/spa_strings.py
+msgid "The book or completed download changed. Restore its original files before trying again."
+msgstr "Das Buch oder der abgeschlossene Download hat sich geändert. Stelle vor einem erneuten Versuch die Originaldateien wieder her."
+
+#: cps/spa_strings.py
+msgid "The completed download exceeds the safe file limits. Choose a smaller release."
+msgstr "Der abgeschlossene Download überschreitet die sicheren Dateigrenzen. Wähle eine kleinere Veröffentlichung."

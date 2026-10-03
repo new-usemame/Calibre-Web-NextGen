@@ -18,9 +18,10 @@ from .http import TransportError, run_transfer
 from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
                       publish, publication_state, validate_book)
 from .storage import Conflict
-from .clients import CLIENTS, USENET_KINDS, TORRENT_KINDS, torrent_book
+from .clients import CLIENTS, USENET_KINDS, TORRENT_KINDS, torrent_book, torrent_books
 from .torrent import validate_magnet, validate_torrent
-from .sabnzbd import SABClient, ClientError, completed_book, open_completed_file, validate_nzb
+from .sabnzbd import SABClient, ClientError, completed_book, completed_books, open_completed_file, validate_nzb, _safe_root
+from .bundle_files import fingerprint_candidates
 
 # A conversion of a large book can legitimately run for a long time, and a
 # terminal processor result is reported explicitly, so this bound only exists
@@ -153,6 +154,13 @@ class AcquisitionWorker:
                 if usenet:
                     completed = self._download_client(job, token, offer, config, source, checkpoint)
                     if completed is None:
+                        current = repo.get_job(job.owner_id, job.id)
+                        if current.state == 'awaiting_selection':
+                            # Snapshot discovery wrote no source. Its lease is
+                            # already released and this state is not claimable.
+                            shutil.rmtree(private)
+                            private.parent.rmdir()
+                            return current
                         repo.release(job.id, token, delay_seconds=30)
                         shutil.rmtree(private)
                         return repo.get_job(job.owner_id, job.id)
@@ -296,8 +304,21 @@ class AcquisitionWorker:
                 raise ClientError('client_job_stalled')
             return None
         try:
-            return self._copy_client_book(client_config, remote, source, checkpoint, torrent=offer['transport'] == 'torrent')
+            selected = repo.selected_artifact(job.id, token)
+            books = (torrent_books(client_config, remote.get('directory'), remote.get('files'), max_bytes=self.max_bytes)
+                if offer['transport'] == 'torrent' else completed_books(client_config, remote.get('storage'), max_bytes=self.max_bytes))
+            if not books and selected is None:
+                raise ClientError('no_usable_book')
+            if selected is None and len(books) > 1:
+                manifest = fingerprint_candidates(client_config, books, repo.box, job.id, checkpoint, max_bytes=self.max_bytes)
+                checkpoint()
+                repo.await_choices(job.id, token, manifest)
+                return None
+            return self._copy_client_book(client_config, remote, source, checkpoint,
+                torrent=offer['transport'] == 'torrent', books=books, selected=selected)
         except FileNotFoundError:
+            if repo.selected_artifact(job.id, token) is not None:
+                raise ClientError('artifact_unavailable') from None
             if offer['transport'] != 'torrent': raise
             # Download completion can precede the final directory move, in
             # either client. Preserve the owned submission and poll again.
@@ -305,8 +326,18 @@ class AcquisitionWorker:
                 raise ClientError('client_job_stalled')
             return None
 
-    def _copy_client_book(self, client_config, remote, source, checkpoint, *, torrent):
-        if torrent:
+    def _copy_client_book(self, client_config, remote, source, checkpoint, *, torrent, books=None, selected=None):
+        if selected is not None:
+            root = _safe_root(client_config)
+            found = next(((p,m) for p,m in books if p.relative_to(root).as_posix() == selected['relative_path']), None)
+            if found is None:
+                raise ClientError('artifact_unavailable')
+            book, media = found
+            if media != selected['media_type'] or book.stat().st_size != selected['size']:
+                raise ClientError('artifact_changed')
+        elif books is not None:
+            book, media = books[0]
+        elif torrent:
             book, media = torrent_book(client_config, remote.get('directory'), remote.get('files'), max_bytes=self.max_bytes)
         else:
             book, media = completed_book(client_config, remote.get('storage'), max_bytes=self.max_bytes)
@@ -337,6 +368,8 @@ class AcquisitionWorker:
             source.unlink(missing_ok=True)
             raise
         try:
+            if selected is not None and digest(source) != selected['sha256']:
+                raise ClientError('artifact_changed')
             validate_book(source, media, max_bytes=self.max_bytes)
         except StagingError:
             raise ClientError('no_usable_book') from None

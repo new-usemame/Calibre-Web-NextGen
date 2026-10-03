@@ -3670,7 +3670,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Створити розумну полицю"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6480,7 +6480,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Редагувати розумну полицю"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9038,7 +9038,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Розумні полиці"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17567,3 +17567,74 @@ msgstr "Показувати вибір серії"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Натисніть на обкладинку, щоб отримати метадані"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Порядок розумних полиць"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Видимість розумних полиць"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Розумні полиці найзручніше редагувати на комп’ютері або планшеті."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Що таке розумні полиці?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Розумні полиці автоматично збирають книги за правилами."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "У старіших версіях розумні полиці називалися «Magic Shelves»."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Розумна полиця — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Помилка завантаження розумної полиці"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Книги, упорядковані на розумних полицях"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Синхронізувати розумні полиці з електронними книгами (Kobo та KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Синхронізувати розумні полиці з Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Коли функцію ввімкнено, позначені розумні полиці надходять на Kobo як колекції. Також увімкніть синхронізацію Kobo в основних налаштуваннях."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader також отримує позначені розумні полиці у своїй бібліотеці."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Спочатку ввімкніть «%(setting)s» у налаштуваннях CWA. До цього прапорець не діє, а полиця не надійде на вашу електронну книгу."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Синхронізацію розумних полиць вимкнено глобально. Увімкніть «%(setting)s» у налаштуваннях CWA, щоб ця полиця з’явилася на ваших електронних книгах."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Виберіть порядок розумних полиць на бічній панелі."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Показувати цю розумну полицю в моїй стрічці OPDS"

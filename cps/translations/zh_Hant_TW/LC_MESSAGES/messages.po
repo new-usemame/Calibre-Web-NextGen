@@ -17602,3 +17602,74 @@ msgstr "顯示已讀/未讀選擇"
 #~ "Books must first be archived and the device synced before a book can "
 #~ "safely be deleted."
 #~ msgstr "必須先將書籍存檔並同步設備，然後才能安全地刪除書籍。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "智慧書架順序"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "智慧書架可見性"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "在電腦或平板裝置上編輯智慧書架效果最佳。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "什麼是智慧書架？"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "智慧書架根據規則自動收集書籍。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "在舊版本中，智慧書架稱為「Magic Shelves」。"
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "智慧書架 — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "載入智慧書架時發生錯誤"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "整理在智慧書架中的書籍"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "將智慧書架同步到電子閱讀器（Kobo 和 KOReader）"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "將智慧書架同步到 Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "啟用後，標記的智慧書架將作為收藏同步到 Kobo。還需在基本設定中啟用 Kobo 同步。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader 的書庫也會收到標記的智慧書架。"
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "請先在 CWA 設定中啟用「%(setting)s」。在此之前，此核取方塊不會生效，書架也不會同步到您的電子閱讀器。"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "智慧書架同步已在全域設定中停用。請在 CWA 設定中啟用「%(setting)s」，使此書架能夠同步到您的電子閱讀器。"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "選擇智慧書架在側邊欄中的順序。"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "在我的 OPDS 目錄中顯示此智慧書架"

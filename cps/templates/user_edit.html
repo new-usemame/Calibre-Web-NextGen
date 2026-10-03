@@ -543,11 +543,11 @@
     </div>
     {% endif %}
     
-    <!-- Magic Shelves Visibility Card -->
+    <!-- Smart shelves visibility Card -->
     {% if not content.role_anonymous() and not new_user %}
     <div class="settings-container" style="max-width: none; margin-inline: 0rem;">
-      <h4 class="settings-section-header">{{_('Magic Shelves Order')}}</h4>
-      <p class="settings-explanation">{{_('Choose how your magic shelves are ordered in the sidebar.')}}</p>
+      <h4 class="settings-section-header">{{_('Smart shelves order')}}</h4>
+      <p class="settings-explanation">{{_('Choose how your smart shelves are ordered in the sidebar.')}}</p>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 20px;">
         <div>
@@ -578,7 +578,7 @@
     </div>
 
     <div class="settings-container" style="max-width: none; margin-inline: 0rem;">
-      <h4 class="settings-section-header">{{_('Magic Shelves Visibility')}}</h4>
+      <h4 class="settings-section-header">{{_('Smart shelves visibility')}}</h4>
       <p class="settings-explanation">{{_('Uncheck shelves you want to hide from your sidebar. System shelves cannot be deleted, only hidden. Public shelves from other users can also be hidden.')}}</p>
       
       {% if system_shelf_templates|length > 0 %}
@@ -884,11 +884,18 @@ document.addEventListener('DOMContentLoaded', function() {
       const li = document.createElement('li');
       li.className = 'opds-order-item magic-shelf-order-item';
       li.dataset.key = key;
-      li.innerHTML = `
-        <span class="opds-order-drag-handle">☰</span>
-        <span class="magic-shelf-icon">${icon}</span>
-        <span class="opds-order-label">${label}</span>
-      `;
+      // Public shelves can belong to another user. Their display values are
+      // text, just as they are in the shelf heading and the New UI.
+      const handle = document.createElement('span');
+      handle.className = 'opds-order-drag-handle';
+      handle.textContent = '☰';
+      const iconElement = document.createElement('span');
+      iconElement.className = 'magic-shelf-icon';
+      iconElement.textContent = icon;
+      const labelElement = document.createElement('span');
+      labelElement.className = 'opds-order-label';
+      labelElement.textContent = label;
+      li.append(handle, iconElement, labelElement);
       container.appendChild(li);
     });
 

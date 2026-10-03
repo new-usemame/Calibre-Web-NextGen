@@ -3688,7 +3688,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "スマート本棚を作成"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6498,7 +6498,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "スマート本棚を編集"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9056,7 +9056,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "スマート本棚"
 
 #: cps/spa_strings.py
 msgid ""
@@ -18210,3 +18210,74 @@ msgstr "既読/未読セクションを表示"
 #~ "書籍を安全に削除するには、まず書籍をアーカイブしてデバイスを同期する必要が"
 #~ "あります。本を安全に削除するためには、初めに本をアーカイブした上で端末と同"
 #~ "期する必要があります"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "スマート本棚の順序"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "スマート本棚の表示設定"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "スマート本棚の編集にはパソコンまたはタブレットが適しています。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "スマート本棚とは？"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "スマート本棚はルールに従って本を自動的に集めます。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "以前のバージョンではスマート本棚は「Magic Shelves」と呼ばれていました。"
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "スマート本棚 — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "スマート本棚の読み込みに失敗しました"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "スマート本棚に整理された本"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "スマート本棚を電子書籍リーダーに同期（KoboとKOReader）"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "スマート本棚をKoboに同期"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "有効にすると、同期対象のスマート本棚がKoboにコレクションとして届きます。基本設定でKobo同期も有効にしてください。"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReaderのライブラリにも同期対象のスマート本棚が届きます。"
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "まずCWA設定で「%(setting)s」を有効にしてください。それまではこのチェックボックスは機能せず、本棚は電子書籍リーダーに届きません。"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "スマート本棚の同期は全体設定で無効になっています。この本棚を電子書籍リーダーに届けるには、CWA設定で「%(setting)s」を有効にしてください。"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "サイドバーでのスマート本棚の順序を選択します。"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "このスマート本棚を自分のOPDSフィードに表示"

@@ -18435,3 +18435,74 @@ msgstr "Visa avsnittet Läst/oläst"
 #~ msgstr ""
 #~ "Böcker måste först arkiveras och enheten synkroniseras innan en bok "
 #~ "säkert kan tas bort."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Ordning för smarta hyllor"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Synlighet för smarta hyllor"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Smarta hyllor redigeras bäst på en dator eller surfplatta."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Vad är smarta hyllor?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Smarta hyllor samlar böcker automatiskt med regler."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Smarta hyllor hette ”Magic Shelves” i äldre versioner."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Smart hylla — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Fel vid inläsning av smart hylla"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Böcker ordnade i smarta hyllor"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synkronisera smarta hyllor till läsplattor (Kobo och KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Synkronisera smarta hyllor till Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "När detta är aktiverat kommer markerade smarta hyllor till Kobo som samlingar. Aktivera även Kobo-synkronisering i grundkonfigurationen."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader får också markerade smarta hyllor i sitt bibliotek."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Aktivera först ”%(setting)s” i CWA-inställningarna. Tills dess har denna kryssruta ingen effekt och hyllan når inte din läsplatta."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Synkronisering av smarta hyllor är inaktiverad globalt. Aktivera ”%(setting)s” i CWA-inställningarna så att denna hylla når dina läsplattor."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Välj ordningen för dina smarta hyllor i sidofältet."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Visa denna smarta hylla i mitt OPDS-flöde"

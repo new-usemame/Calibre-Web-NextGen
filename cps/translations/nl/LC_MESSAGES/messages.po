@@ -19071,3 +19071,74 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Volgorde van slimme boekenplanken"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Zichtbaarheid van slimme boekenplanken"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Slimme boekenplanken bewerken werkt het best op een computer of tablet."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Wat zijn slimme boekenplanken?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Slimme boekenplanken verzamelen boeken automatisch met regels."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Slimme boekenplanken heetten in oudere versies “Magic Shelves”."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Slimme boekenplank — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Fout bij het laden van de slimme boekenplank"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Boeken ingedeeld in slimme boekenplanken"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Slimme boekenplanken synchroniseren met e-readers (Kobo en KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Slimme boekenplanken synchroniseren met Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Als dit is ingeschakeld, verschijnen gemarkeerde slimme boekenplanken als collecties op uw Kobo. Schakel ook Kobo Sync in bij de basisconfiguratie."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader ontvangt gemarkeerde slimme boekenplanken ook in zijn bibliotheek."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Schakel eerst “%(setting)s” in bij CWA-instellingen. Tot die tijd heeft dit selectievakje geen effect en bereikt de boekenplank uw e-reader niet."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Synchronisatie van slimme boekenplanken is globaal uitgeschakeld. Schakel “%(setting)s” in bij CWA-instellingen zodat deze boekenplank uw e-readers bereikt."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Kies de volgorde van uw slimme boekenplanken in de zijbalk."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Deze slimme boekenplank in mijn OPDS-feed tonen"

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The Magic Shelf sync setting names what it reaches.
 
-"Sync Magic Shelves to Kobo" also decides whether magic shelves reach the
+"Sync smart shelves to Kobo" also decides whether magic shelves reach the
 KOReader library (``cps/services/koreader_library.py`` reads the same
 ``config_kobo_sync_magic_shelves``). Once KOReader sync is on, the setting, its
 explanation, and the warning a reader gets for marking a magic shelf while it
@@ -24,8 +24,8 @@ from tests.unit.koreader_library_world import LibraryWorld
 pytestmark = pytest.mark.unit
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "cps" / "templates"
-EREADER_LABEL = "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-KOBO_LABEL = "Sync Magic Shelves to Kobo"
+EREADER_LABEL = "Sync smart shelves to e-readers (Kobo and KOReader)"
+KOBO_LABEL = "Sync smart shelves to Kobo"
 
 
 def _render_settings(**context):

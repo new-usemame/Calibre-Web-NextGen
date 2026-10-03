@@ -3644,7 +3644,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Vytvořit chytrou polici"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6454,7 +6454,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Upravit chytrou polici"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9012,7 +9012,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Chytré police"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17652,3 +17652,74 @@ msgstr "Zobrazit výběr sérií"
 #~ msgstr ""
 #~ "Knihy musí být nejprve archivovány a zařízení musí být synchronizováno, "
 #~ "než bude kniha bezpečně smazána."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Pořadí chytrých polic"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Viditelnost chytrých polic"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Chytré police se nejlépe upravují na počítači nebo tabletu."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Co jsou chytré police?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Chytré police automaticky shromažďují knihy podle pravidel."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Chytré police se ve starších verzích nazývaly „Magic Shelves“."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Chytrá police — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Chyba při načítání chytré police"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Knihy uspořádané v chytrých policích"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synchronizovat chytré police se čtečkami (Kobo a KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Synchronizovat chytré police s Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Po zapnutí se označené chytré police přenesou do Kobo jako kolekce. Zapněte také synchronizaci Kobo v základním nastavení."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader také přijímá označené chytré police do své knihovny."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Nejprve zapněte „%(setting)s“ v nastavení CWA. Do té doby toto políčko nemá účinek a police se do čtečky nepřenese."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Synchronizace chytrých polic je globálně vypnuta. Zapněte „%(setting)s“ v nastavení CWA, aby se tato police dostala do vašich čteček."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Zvolte pořadí chytrých polic v postranním panelu."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Zpřístupnit tuto chytrou polici v mém kanálu OPDS"

@@ -18404,3 +18404,74 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ msgstr ""
 #~ "A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy "
 #~ "egy könyvet biztonságosan törölhessen."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Intelligens polcok sorrendje"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Intelligens polcok láthatósága"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Az intelligens polcokat asztali gépen vagy táblagépen a legjobb szerkeszteni."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Mik azok az intelligens polcok?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Az intelligens polcok szabályok alapján automatikusan gyűjtik a könyveket."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Az intelligens polcok neve a régebbi verziókban „Magic Shelves” volt."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Intelligens polc — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Hiba az intelligens polc betöltésekor"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Intelligens polcokra rendezett könyvek"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Intelligens polcok szinkronizálása e-könyv-olvasókra (Kobo és KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Intelligens polcok szinkronizálása Kobóra"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Bekapcsoláskor a megjelölt intelligens polcok gyűjteményként kerülnek a Kobóra. Az alapbeállításokban a Kobo-szinkronizálást is engedélyezni kell."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "A KOReader könyvtára is megkapja a megjelölt intelligens polcokat."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Először engedélyezze a „%(setting)s” beállítást a CWA-beállításokban. Addig ez a jelölőnégyzet hatástalan, és a polc nem jut el az e-könyv-olvasóra."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Az intelligens polcok szinkronizálása globálisan le van tiltva. Engedélyezze a „%(setting)s” beállítást a CWA-beállításokban, hogy ez a polc eljusson az e-könyv-olvasókra."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Válassza ki az intelligens polcok sorrendjét az oldalsávban."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Ez az intelligens polc jelenjen meg az OPDS-hírcsatornámban"

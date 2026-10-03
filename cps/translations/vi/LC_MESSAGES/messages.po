@@ -3623,7 +3623,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Tạo giá sách thông minh"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6433,7 +6433,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Sửa giá sách thông minh"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8991,7 +8991,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Giá sách thông minh"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17577,3 +17577,74 @@ msgstr "Hiển thị đã đọc và chưa đọc"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Ấn vào ảnh cover để tải metadata vào form"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Thứ tự giá sách thông minh"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Hiển thị giá sách thông minh"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Chỉnh sửa giá sách thông minh phù hợp nhất trên máy tính hoặc máy tính bảng."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Giá sách thông minh là gì?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Giá sách thông minh tự động tập hợp sách theo quy tắc."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Giá sách thông minh được gọi là “Magic Shelves” trong các phiên bản cũ."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Giá sách thông minh — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Lỗi khi tải giá sách thông minh"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Sách được sắp xếp trong giá sách thông minh"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Đồng bộ giá sách thông minh với máy đọc sách (Kobo và KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Đồng bộ giá sách thông minh với Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Khi bật, giá sách thông minh được đánh dấu sẽ đến Kobo dưới dạng bộ sưu tập. Cũng cần bật đồng bộ Kobo trong Cấu hình cơ bản."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader cũng nhận giá sách thông minh được đánh dấu trong thư viện của mình."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Trước tiên hãy bật “%(setting)s” trong Cài đặt CWA. Cho đến lúc đó, ô chọn này không có tác dụng và giá sách sẽ không đến máy đọc sách của bạn."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Đồng bộ giá sách thông minh bị tắt toàn cục. Bật “%(setting)s” trong Cài đặt CWA để giá sách này đến được máy đọc sách của bạn."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Chọn thứ tự giá sách thông minh trong thanh bên."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Hiển thị giá sách thông minh này trong nguồn OPDS của tôi"

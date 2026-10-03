@@ -3618,7 +3618,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "បង្កើតធ្នើឆ្លាតវៃ"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6428,7 +6428,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "កែសម្រួលធ្នើឆ្លាតវៃ"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8986,7 +8986,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "ធ្នើឆ្លាតវៃ"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17453,3 +17453,74 @@ msgstr "បង្ហាញជម្រើសស៊េរី"
 #, fuzzy
 #~ msgid "CWA Discord Server"
 #~ msgstr "ស្រាវជ្រាវ"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "លំដាប់ធ្នើឆ្លាតវៃ"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "ភាពមើលឃើញនៃធ្នើឆ្លាតវៃ"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "ការកែសម្រួលធ្នើឆ្លាតវៃដំណើរការល្អបំផុតនៅលើកុំព្យូទ័រ ឬថេប្លេត។"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "តើធ្នើឆ្លាតវៃជាអ្វី?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "ធ្នើឆ្លាតវៃប្រមូលសៀវភៅដោយស្វ័យប្រវត្តិតាមច្បាប់។"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "ធ្នើឆ្លាតវៃត្រូវបានហៅថា «Magic Shelves» នៅក្នុងកំណែមុនៗ។"
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "ធ្នើឆ្លាតវៃ — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "មានកំហុសក្នុងការផ្ទុកធ្នើឆ្លាតវៃ"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "សៀវភៅដែលរៀបចំក្នុងធ្នើឆ្លាតវៃ"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "ធ្វើសមកាលកម្មធ្នើឆ្លាតវៃទៅឧបករណ៍អានអេឡិចត្រូនិក (Kobo និង KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "ធ្វើសមកាលកម្មធ្នើឆ្លាតវៃទៅ Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "នៅពេលបើក ធ្នើឆ្លាតវៃដែលបានសម្គាល់នឹងទៅដល់ Kobo ជាបណ្ដុំ។ សូមបើក Kobo Sync ក្នុងការកំណត់មូលដ្ឋានផងដែរ។"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader ក៏ទទួលធ្នើឆ្លាតវៃដែលបានសម្គាល់ក្នុងបណ្ណាល័យរបស់វាផងដែរ។"
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "សូមបើក «%(setting)s» ក្នុងការកំណត់ CWA ជាមុនសិន។ រហូតដល់ពេលនោះ ប្រអប់ធីកនេះគ្មានឥទ្ធិពល ហើយធ្នើនឹងមិនទៅដល់ឧបករណ៍អានរបស់អ្នកទេ។"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "ការធ្វើសមកាលកម្មធ្នើឆ្លាតវៃត្រូវបានបិទជាសកល។ សូមបើក «%(setting)s» ក្នុងការកំណត់ CWA ដើម្បីឱ្យធ្នើនេះទៅដល់ឧបករណ៍អានរបស់អ្នក។"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "ជ្រើសរើសលំដាប់ធ្នើឆ្លាតវៃរបស់អ្នកនៅក្នុងរបារចំហៀង។"
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "បង្ហាញធ្នើឆ្លាតវៃនេះក្នុងមតិព័ត៌មាន OPDS របស់ខ្ញុំ"

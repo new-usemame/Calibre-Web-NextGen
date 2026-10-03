@@ -2412,8 +2412,11 @@ class CalibreDB:
         )) \
             .filter(or_(*filter_expression))
 
-    def get_cc_columns(self, config, filter_config_custom_read=False):
+    def get_cc_columns(self, config, filter_config_custom_read=False, fail_on_error=False):
         """Custom-column display definitions, or ``[]`` if they can't be read.
+
+        Primary browse and upgrade callers use fail_on_error to retry a failed
+        read. Optional metadata callers retain the historical empty-list fallback.
 
         Degrading here rather than at each callsite is deliberate: five callers
         (book detail page, book detail API, books table, and both search
@@ -2447,6 +2450,8 @@ class CalibreDB:
             # `session` is None whenever session_factory is (before init_db, or
             # after an explicit `session = None`), and None.query() is an
             # AttributeError rather than a SQLAlchemyError.
+            if fail_on_error:
+                raise
             log.warning("Custom-column definitions unavailable; continuing without them",
                         exc_info=True)
             return []
@@ -2476,26 +2481,95 @@ class CalibreDB:
         cc = cc_classes[col_id]
         return cc.value.in_(hierarchy.subtree_values(node))
 
-    def get_hierarchical_column_ids(self, ttl=300):
-        """Return the set of custom column ids that behave as hierarchies.
+    def flat_cc_filter(self, col_id, value):
+        """SQLAlchemy filter matching one exact stored value of a flat column.
 
-        A column qualifies only when at least one stored value is a proper
-        prefix (value + separator) of another stored value, e.g. 'Computers'
-        and 'Computers.DB'. This avoids false positives on columns whose
-        values merely contain dots (Dewey '778.3', LCC 'QA76.76.C68', ...).
-        Result is cached process-wide for `ttl` seconds.
+        The counterpart to ``hierarchical_cc_filter``: a flat column's stored
+        value is an opaque atomic string. Dewey ``778.3`` is ONE
+        classification, not a ``778`` node with a ``3`` child, so there is
+        deliberately no prefix expansion and no LIKE here. A node that happens
+        to be a valid hierarchical path (``778.3`` where ``778`` also exists)
+        must not pull in its "descendants".
         """
+        return cc_classes[col_id].value == value
+
+    def is_flat_cc_column(self, col_id, fail_on_error=False):
+        """Whether a registered tag-like column uses exact atomic values."""
+        return (col_id in cc_classes
+                and col_id not in self.get_hierarchical_column_ids(fail_on_error=fail_on_error))
+
+    def get_hierarchical_column_ids(self, ttl=300, fail_on_error=False):
+        """Resolve mode once per request, scoped to the active library engine."""
+        self.ensure_session()
+        engine = self.session.get_bind()
+        cache = getattr(g, '_cc_hierarchy_modes', {}) if has_request_context() else {}
+        if engine in cache:
+            return cache[engine]
+        try:
+            ids = self._read_hierarchical_column_ids(ttl)
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
+            # Supplementary metadata must not break a book detail page. An
+            # unreadable setting is no evidence of a configured hierarchy.
+            log.warning("Calibre hierarchy preferences unavailable", exc_info=True)
+            return set()
+        if has_request_context():
+            cache[engine] = ids
+            g._cc_hierarchy_modes = cache
+        return ids
+
+    def _read_hierarchical_column_ids(self, ttl=300):
+        """Read Calibre's hierarchy configuration, without changing its schema.
+
+        Calibre stores category names such as ``#subjects`` in the JSON
+        ``categories_using_hierarchy`` preference. Book values do not decide
+        the mode: an empty configured tree stays a tree and dotted identifiers
+        stay atomic. Read the small preference on each request so a Calibre
+        setting change or a library switch cannot reuse a stale process cache.
+        Libraries predating the preferences table retain legacy detection.
+        """
+        self.ensure_session()
+        attached = self.session.execute(text("PRAGMA database_list")).all()
+        # Runtime sessions attach metadata.db as calibre to an in-memory main
+        # database. Bare-library sessions use main instead. The schema comes
+        # only from this fixed allowlist, never from user input.
+        schema = "calibre" if any(row[1] == "calibre" for row in attached) else "main"
+        has_preferences = self.session.execute(text(
+            "SELECT 1 FROM " + schema + ".sqlite_master WHERE type='table' AND name='preferences'"
+        )).first()
+        if not has_preferences:
+            return self.get_legacy_hierarchical_column_ids(ttl, fail_on_error=True)
+        raw = self.session.execute(text(
+            "SELECT val FROM " + schema + ".preferences WHERE key='categories_using_hierarchy'"
+        )).scalar()
+        try:
+            categories = json.loads(raw) if raw is not None else []
+        except (TypeError, ValueError):
+            log.warning("Invalid Calibre categories_using_hierarchy preference")
+            return set()
+        if not isinstance(categories, list):
+            return set()
+        configured = {value for value in categories if isinstance(value, str)}
+        return {row.id for row in self.session.query(CustomColumns).filter(
+            CustomColumns.datatype.in_(('text', 'enumeration')),
+            or_(CustomColumns.mark_for_delete == 0, CustomColumns.mark_for_delete.is_(None)),
+        ) if '#' + row.label in configured and row.id in cc_classes}
+
+    def get_legacy_hierarchical_column_ids(self, ttl=300, fail_on_error=False):
+        """Compatibility scan for old libraries and one-time visibility upgrade."""
         now = time.monotonic()
-        cached = getattr(self.__class__, '_hier_cache', None)
-        if cached is not None and now - cached[0] < ttl:
-            return cached[1]
+        library = self.session.get_bind()
+        cached = getattr(self, '_legacy_hier_cache', None)
+        if cached is not None and cached[0] is library and now - cached[1] < ttl:
+            return cached[2]
         ids = set()
         try:
-            # Only tag-like columns hold dotted paths; int/float/bool/datetime/
-            # rating values are not strings and can never form a hierarchy.
             text_ids = {row.id for row in self.session.query(CustomColumns.id).filter(
                 CustomColumns.datatype.in_(('text', 'enumeration')))}
-        except OperationalError:
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
             return set()
         for cid in text_ids:
             cc = cc_classes.get(cid)
@@ -2503,14 +2577,16 @@ class CalibreDB:
                 continue
             try:
                 values = [r[0] for r in self.session.query(cc.value).distinct()]
-            except OperationalError:
+            except SQLAlchemyError:
+                if fail_on_error:
+                    raise
                 continue
             if hierarchy.is_hierarchical_value_set(values):
                 ids.add(cid)
-        self.__class__._hier_cache = (now, ids)
+        self._legacy_hier_cache = (library, now, ids)
         return ids
 
-    def get_hierarchical_tree(self, col_id, apply_common_filters=True, book_filter=None):
+    def get_hierarchical_tree(self, col_id, apply_common_filters=True, book_filter=None, fail_on_error=False):
         """Return the nested tree (list of root nodes) for custom column `col_id`,
         honouring user visibility filters (``book_filter`` replaces the default
         ``common_filters()``, e.g. OPDS's shelf restriction). See
@@ -2530,10 +2606,53 @@ class CalibreDB:
             q = q.filter(self.common_filters())
         try:
             rows = q.all()
-        except OperationalError:
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
             log.error("Failed to read custom column %s for hierarchy tree", col_id)
             return []
         return hierarchy.parse_tag_hierarchy([(r[0], r[1]) for r in rows])
+
+    def get_cc_flat_list(self, col_id, apply_common_filters=True, book_filter=None, fail_on_error=False):
+        """Return the distinct ``(value, book_count)`` rows of a flat column.
+
+        The flat counterpart to ``get_hierarchical_tree``, shaped so the same
+        node contract serves both modes: each entry carries ``path == name ==
+        value`` and ``children == []``, so the existing hierarchy macros render
+        it as a plain list without ever splitting anything. Dewey ``778.3`` is
+        one entry -- never a ``778`` parent with a ``3`` child.
+
+        Sorted lexically by the complete stored value, ignoring case.
+
+        ``book_filter`` replaces the default ``common_filters()`` (OPDS's
+        shelf restriction). Omitting it would leak books from a restricted
+        shelf into a value list, so every caller must pass the same filter
+        its book queries use.
+        """
+        cc = cc_classes.get(col_id)
+        if cc is None:
+            return []
+        rel = getattr(Books, 'custom_column_' + str(col_id))
+        q = (self.session.query(cc.value, func.count(func.distinct(Books.id)))
+            .select_from(Books)
+            .join(rel)
+            .group_by(cc.value))
+        if book_filter is not None:
+            q = q.filter(book_filter)
+        elif apply_common_filters:
+            q = q.filter(self.common_filters())
+        try:
+            rows = q.all()
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
+            log.error("Failed to read custom column %s for flat list", col_id)
+            return []
+        entries = [{'name': r[0], 'path': r[0], 'count': r[1],
+                    'total_count': r[1], 'children': []}
+                   for r in rows if r[0] is not None and str(r[0]).strip()]
+        entries.sort(key=lambda e: e['name'].lower())
+        return entries
 
     # read search results from calibre-database and return it (function is used for feed and simple search
     def get_search_results(self, term, config, offset=None, order=None, limit=None, *join,

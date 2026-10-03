@@ -1144,14 +1144,23 @@
                                                                 {{ column.value|clean_string|safe }}
                                                             {% elif c.datatype == 'series' %}
                                                                 {{ '%s [%s]' % (column.value, column.extra|formatfloat(2)) }}
-                                                            {% elif c.datatype == 'text' %}
-                                                                {% if hierarchical_cc_ids and c.id in hierarchical_cc_ids and '.' in column.value %}
-                                                                    {% set parts = column.value.strip().split('.') %}
+                                                            {% elif c.datatype in ['text', 'enumeration'] %}
+                                                                {# Hierarchical column: each level is its own node,
+                                                                   so every level links to the node it names.
+                                                                   Flat column: the whole stored value is ONE atomic
+                                                                   string (Dewey '778.3' is not a '778' node with a
+                                                                   '3' child), so it links as a single exact-value
+                                                                   target instead of being split into invented levels. #}
+                                                                {% set cc_value = column.value %}
+                                                                {% if c.id in cc_browse_ids and hierarchical_cc_ids and c.id in hierarchical_cc_ids and '.' in cc_value %}
+                                                                    {% set parts = cc_value.split('.') %}
                                                                     {% for part in parts %}
                                                                         <a class="hierarchy-crumb" href="{{ url_for('web.cc_category_list', column_id=c.id, category_path=parts[:loop.index]|join('.')) }}">{{ part }}</a>{% if not loop.last %}. {% endif %}
                                                                     {% endfor %}
+                                                                {% elif c.id in cc_browse_ids and cc_value %}
+                                                                    <a class="hierarchy-crumb" href="{{ url_for('web.cc_category_list', column_id=c.id, category_path=cc_value) }}">{{ cc_value }}</a>
                                                                 {% else %}
-                                                                    {{ column.value.strip() }}
+                                                                    {{ cc_value }}
                                                                 {% endif %}{% if not loop.last %}, {% endif %}
                                                             {% else %}
                                                                 {{ column.value }}

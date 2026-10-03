@@ -11328,6 +11328,34 @@ msgstr ""
 "Les états « Lecture abandonnée » et « En pause » conservent votre position "
 "de lecture."
 
+# Grid-to-shelf drag (#946).
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to a shelf"
+msgstr "Ajouter {title} à une étagère"
+
+#: cps/spa_strings.py
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "Glisser vers une étagère ou choisir une étagère"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} book(s) added to {shelf}."
+msgstr "{n} livre(s) ajouté(s) à {shelf}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
+"for retry."
+msgstr ""
+"{succeeded} ajouté(s) à {shelf} ; {failed} échec(s). Les livres en échec "
+"restent sélectionnés pour réessayer."
+
+#: cps/spa_strings.py
+msgid "Could not add books to the shelf. Please try again."
+msgstr "Impossible d’ajouter les livres à l’étagère. Veuillez réessayer."
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "En attente"
@@ -12994,7 +13022,8 @@ msgstr ""
 msgid ""
 "Select a category to see the books assigned to it and all of its sub-"
 "categories."
-msgstr ""
+msgstr "Sélectionnez une catégorie pour voir ses livres et ceux de toutes ses sous-catégories."
+
 
 #: cps/templates/cc_list.html
 msgid "Expand all"
@@ -19255,3 +19284,100 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "After children"
+msgstr "Après les sous-catégories"
+
+#: cps/spa_strings.py
+msgid "After tree"
+msgstr "Après la liste"
+
+#: cps/spa_strings.py
+msgid "Books assigned a value in this column will appear here."
+msgstr "Les livres ayant une valeur dans cette colonne apparaîtront ici."
+
+#: cps/spa_strings.py
+msgid "Books placement"
+msgstr "Emplacement des livres"
+
+#: cps/spa_strings.py
+msgid "Browse by Column"
+msgstr "Parcourir par colonne"
+
+#: cps/spa_strings.py
+msgid "Choose visible columns"
+msgstr "Choisir les colonnes visibles"
+
+#: cps/spa_strings.py
+msgid "Could not load books"
+msgstr "Impossible de charger les livres"
+
+#: cps/spa_strings.py
+msgid "Could not load column"
+msgstr "Impossible de charger la colonne"
+
+#: cps/spa_strings.py
+msgid "Could not load columns"
+msgstr "Impossible de charger les colonnes"
+
+#: cps/spa_strings.py
+msgid "No books here yet"
+msgstr "Aucun livre ici pour le moment"
+
+#: cps/spa_strings.py
+msgid "No custom columns to browse"
+msgstr "Aucune colonne personnalisée à parcourir"
+
+#: cps/spa_strings.py
+msgid "No values in this column yet"
+msgstr "Cette colonne ne contient pas encore de valeurs"
+
+#: cps/spa_strings.py
+msgid "Nothing in this column matches the selected value."
+msgstr "Aucun livre de cette colonne ne correspond à la valeur sélectionnée."
+
+#: cps/spa_strings.py
+msgid "Nothing on this page"
+msgstr "Aucun résultat sur cette page"
+
+#: cps/spa_strings.py
+msgid "Pagination"
+msgstr "Pagination"
+
+#: cps/spa_strings.py
+msgid "Select a value to see the books assigned to it."
+msgstr "Sélectionnez une valeur pour voir les livres qui lui sont associés."
+
+#: cps/spa_strings.py
+msgid "Tag-like custom columns defined in the library appear here."
+msgstr ""
+"Les colonnes personnalisées de type étiquette définies dans la bibliothèque "
+"apparaissent ici."
+
+#: cps/spa_strings.py
+msgid "This node has fewer pages than the one you were reading."
+msgstr ""
+"Cette catégorie contient moins de pages que celle que vous consultiez."
+
+#: cps/spa_strings.py
+msgid "Tree"
+msgstr "Arborescence"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} columns"
+msgstr "{count} colonnes"
+
+#: cps/opds.py
+#, python-format
+msgid "Books by %(name)s"
+msgstr "Livres par %(name)s"
+
+#: cps/spa_strings.py
+msgid "An unexpected error occurred"
+msgstr "Une erreur inattendue est survenue"
+
+#: cps/spa_strings.py
+msgid "{count} column"
+msgstr "{count} colonne"

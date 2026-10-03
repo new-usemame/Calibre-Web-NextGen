@@ -10666,6 +10666,31 @@ msgstr ""
 msgid "Did not finish and On hold keep your reading position."
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to a shelf"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Drag to a shelf, or choose a shelf"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} book(s) added to {shelf}."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
+"for retry."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not add books to the shelf. Please try again."
+msgstr ""
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Aguardando"
@@ -17497,3 +17522,97 @@ msgstr "Mostrar secção de lidos/não lidos"
 #~ msgstr ""
 #~ "Os livros devem primeiro ser arquivados e o dispositivo deve ser "
 #~ "sincronizado antes que um livro possa ser apagado com segurança."
+
+#: cps/spa_strings.py
+msgid "After children"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "After tree"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Books assigned a value in this column will appear here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Books placement"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browse by Column"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose visible columns"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load column"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load columns"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No books here yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No custom columns to browse"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No values in this column yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Nothing in this column matches the selected value."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Nothing on this page"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pagination"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Select a value to see the books assigned to it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Tag-like custom columns defined in the library appear here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This node has fewer pages than the one you were reading."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Tree"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} columns"
+msgstr ""
+
+#: cps/opds.py
+#, python-format
+msgid "Books by %(name)s"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "An unexpected error occurred"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "{count} column"
+msgstr ""

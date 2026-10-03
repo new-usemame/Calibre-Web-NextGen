@@ -271,7 +271,7 @@
     <div class="settings-container">
       <h4 class="settings-section-header">{{_('Default Visibilities for New Users')}}</h4>
       <p class="settings-explanation">{{_('Choose which sidebar sections are visible by default for new users.')}}</p>
-      
+
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 20px; background: #202c34a3; padding: 2rem; border-radius: 4px;">
         {% for element in sidebar %}
           {% if element['config_show'] %}
@@ -286,7 +286,7 @@
           <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
       </div>
-      
+
       {% if not simple %}
       <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #5c6b74;">
         <a href="#" id="get_tags" data-id="0" class="btn btn-default" data-toggle="modal" data-target="#restrictModal">{{_('Add Allowed/Denied Tags')}}</a>

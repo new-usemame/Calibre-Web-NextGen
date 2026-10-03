@@ -196,7 +196,7 @@ def list_publishers():
             .join(db.Books, db.books_publishers_link.c.book == db.Books.id)
             .filter(calibre_db.common_filters())
             .group_by(db.Publishers.id)
-            .order_by(locale_sort_key(db.Publishers.sort), db.Publishers.sort, db.Publishers.id)
+            .order_by(locale_sort_key(db.Publishers.name), db.Publishers.name, db.Publishers.id)
             .all())
     items = [{"id": p.id, "name": p.name, "count": cnt} for p, cnt in rows]
     return {"items": items}

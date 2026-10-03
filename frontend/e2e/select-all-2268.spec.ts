@@ -45,6 +45,7 @@ test('library select-all uses complete server result and bulk changes books beyo
   // Keep the catalog on the real API but bound ordinary card pages to three;
   // select_all requests still go unchanged to the server's full-view query.
   let ordinaryPageItems = 0;
+  let heldLaterPage = false;
   let releaseLaterPages!: () => void;
   const laterPages = new Promise<void>(resolve => { releaseLaterPages = resolve; });
   await page.route('**/api/v1/books?*', async route => {
@@ -53,7 +54,10 @@ test('library select-all uses complete server result and bulk changes books beyo
       // Infinite scrolling can auto-fill a small CI seed before selection.
       // Hold later real page responses until this scenario has proved that
       // bulk selection reaches beyond the first loaded page.
-      if (Number(url.searchParams.get('page') || '1') > 1) await laterPages;
+      if (Number(url.searchParams.get('page') || '1') > 1) {
+        heldLaterPage = true;
+        await laterPages;
+      }
       url.searchParams.set('per_page', '3');
       const response = await route.fetch({ url: url.toString() });
       const body = await response.json().catch(() => null) as { items?: unknown[] } | null;
@@ -72,6 +76,11 @@ test('library select-all uses complete server result and bulk changes books beyo
       name: `Open details for ${visible[1].title}`,
     })).toBeVisible();
     await expect.poll(() => page.getByTestId('catalog-grid').getByRole('link', { name: /^Open details for / }).count()).toBeLessThan(expected.total);
+    // Reach the slow next-page state through the actual paging control. The
+    // complete-ID selection must work even while that card request is held.
+    await page.getByRole('button', { name: 'Load more', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => heldLaterPage).toBe(true);
     await selectAllOn(page);
     const selected = page.getByRole('region', { name: `${expected.total} selected`, exact: true });
     await expect(selected).toBeVisible();

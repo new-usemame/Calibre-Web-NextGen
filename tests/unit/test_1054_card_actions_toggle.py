@@ -64,7 +64,8 @@ def test_state_owners_read_the_shared_hook():
 
 
 def test_no_book_card_surface_is_missing_from_the_preference_map():
-    known = {name for _, name in _CARD_SURFACES} | {"BookCard.tsx"}
+    # CcBrowse has its own real browser preference oracle.
+    known = {name for _, name in _CARD_SURFACES} | {"BookCard.tsx", "CcBrowse.tsx"}
     renderers = {
         path.name for path in _FE.rglob("*.tsx")
         if not any(path.name.endswith(suffix)

@@ -68,6 +68,29 @@ def test_nordic_author_json_puts_distinct_letters_after_z(catalog, locale):
     assert [row['name'] for row in response.json['items']] == ['Aalto', 'Zulu', 'Åland', 'Ängel', 'Örebro']
 
 
+
+@pytest.mark.parametrize('locale, expected', [
+    ('sv', ['Aalto', 'Zulu', 'Åland', 'Ängel', 'Örebro']),
+    ('de', ['Aalto', 'Åland', 'Ängel', 'Örebro', 'Zulu']),
+])
+def test_publisher_json_sorts_displayed_names_when_calibre_sort_is_null(catalog, locale, expected):
+    from cps import db
+    from cps.api import browse
+    from sqlalchemy import update
+    app, session, _ = catalog
+    # Calibre imports publisher names without a populated sort column. Use
+    # deliberately different ID/name order so NULL-key/ID order cannot pass.
+    for identity in range(1, 6):
+        session.execute(update(db.Publishers).where(db.Publishers.id == identity)
+                        .values(name='Publisher placeholder ' + str(identity), sort=None))
+    for identity, name in enumerate(['Örebro', 'Aalto', 'Åland', 'Zulu', 'Ängel'], 1):
+        session.execute(update(db.Publishers).where(db.Publishers.id == identity).values(name=name, sort=None))
+    session.commit()
+    app.add_url_rule('/publishers', view_func=inspect.unwrap(browse.list_publishers))
+    response = app.test_client().get('/publishers?lang=' + locale)
+    assert response.status_code == 200
+    assert [row['name'] for row in response.json['items']] == expected
+
 def test_two_locales_reuse_one_connection_without_changing_each_other(catalog):
     from cps import db
     from cps.sort_orders import book_sort_order

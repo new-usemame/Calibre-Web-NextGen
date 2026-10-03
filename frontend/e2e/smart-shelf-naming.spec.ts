@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { assertNoHorizontalOverflow, assertNoPageErrors, collectPageErrors } from './utils';
 
 test('Classic creation uses the same smart-shelf name as New UI', async ({ page }) => {
@@ -15,7 +15,7 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
   assertNoPageErrors(errors);
 });
 
-test('stored smart-shelf display values are text in Classic headings, profile and activity', async ({ page }, testInfo) => {
+test('stored smart-shelf display values are text in Classic headings, profile and activity', async ({ page, secondaryUser }, testInfo) => {
   // #1498: renaming the existing safe-HTML heading revealed stored markup injection.
   const csrf = await page.request.get('/api/v1/auth/csrf');
   expect(csrf.status()).toBe(200);
@@ -26,7 +26,7 @@ test('stored smart-shelf display values are text in Classic headings, profile an
       name: `Heading ${testInfo.project.name} ${field} ${Date.now()}`,
       icon: '🪄',
       rules: { condition: 'AND', rules: [{ id: 'title', field: 'title', type: 'string', operator: 'contains', value: 'Native' }] },
-      is_public: false,
+      is_public: true,
     };
     data[field] = payload;
     const created = await page.request.post('/magicshelf', { headers, data });
@@ -48,8 +48,11 @@ test('stored smart-shelf display values are text in Classic headings, profile an
       await expect(row.locator(field === 'name' ? '.opds-order-label' : '.magic-shelf-icon')).toHaveText(payload);
       expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__shelfProbe)).toBe(0);
       if (field === 'name') {
-        // Viewing the shelf above records its actual name in activity history.
-        await page.goto('/cwa-stats-show?tab=activity');
+        // A fresh viewer records this real public-shelf view. Filter by that
+        // user so earlier suite activity cannot push it out of the top ten.
+        const viewed = await secondaryUser.page.request.get(`/magicshelf/${result.shelf_id}`);
+        expect(viewed.status()).toBe(200);
+        await page.goto(`/cwa-stats-show?tab=activity&user_id=${secondaryUser.id}`);
         const activity = page.locator('#shelf-activity-list');
         await expect(activity).toBeVisible();
         await expect(activity.locator('img')).toHaveCount(0);

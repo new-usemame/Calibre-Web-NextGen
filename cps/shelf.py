@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, request, url_for, abort, jsonify
 from flask_babel import gettext as _
+from markupsafe import escape
 from .cw_login import current_user
 from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from sqlalchemy.sql.expression import func, true
@@ -760,7 +761,7 @@ def order_shelf(shelf_id):
                 .join(ub.BookShelf, ub.BookShelf.book_id == db.Books.id, isouter=True) \
                 .filter(ub.BookShelf.shelf == shelf_id).order_by(ub.BookShelf.order.asc()).all()
         return render_title_template('shelf_order.html', entries=result,
-                                     title=_("Change order of Shelf: '%(name)s'", name=shelf.name),
+                                     title=_("Change order of Shelf: '%(name)s'", name=escape(shelf.name)),
                                      shelf=shelf, page="shelfreorder")
     else:
         abort(404)
@@ -984,7 +985,7 @@ def render_show_shelf(shelf_type, shelf_id, page_no, sort_param):
         return render_title_template(page,
                                      entries=result,
                                      pagination=pagination,
-                                     title=_("Shelf: '%(name)s'", name=shelf.name),
+                                     title=_("Shelf: '%(name)s'", name=escape(shelf.name)),
                                      shelf=shelf,
                                      page="shelf",
                                      status=status,

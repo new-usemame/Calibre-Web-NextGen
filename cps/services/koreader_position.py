@@ -319,7 +319,9 @@ def journal_report(session, *, device_id, book_id, document, progress, percentag
         book_id=book_id,
         progress_percent=percentage,
         location_source=document,
-        location_type=KOREADER_LOCATION_TYPE if is_xpointer(progress) else "koreader_page",
+        # A percentage-only report (no ``progress``) names no place at all.
+        location_type=(KOREADER_LOCATION_TYPE if is_xpointer(progress)
+                       else None if progress is None else "koreader_page"),
         location_value=progress,
         client_modified_at=observed_at,
         session=session,

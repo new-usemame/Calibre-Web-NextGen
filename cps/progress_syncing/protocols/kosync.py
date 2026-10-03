@@ -133,6 +133,20 @@ POSITION_KIND_LOCATOR = "locator"
 # resolves the bare ``{}`` it gets today.
 POSITION_KINDS_AVAILABLE_FIELD = "position_kinds_available"
 
+# A client that keeps its place as words rather than as an engine locator
+# (``services/text_anchor``) asks for this kind on GET to receive ``anchor``,
+# the words at the winning position, and may send one on a percentage PUT.
+POSITION_KIND_ANCHOR = "anchor"
+
+# Optional behaviour beyond the KOSync protocol, named on the auth response so
+# a client can tell this server from a stock one before relying on any of it.
+# KOReader's own plugin reads only the auth status, so the field is inert to it.
+#   position_kinds    GET honours ?position_kinds= (percentage-only rows, #1445)
+#   percentage_push   PUT accepts position_kind "percentage" with no progress
+#   anchor            text anchors on a percentage PUT and on GET
+#   book_id_document  a decimal Calibre book id is accepted as ``document``
+SERVER_CAPABILITIES = ("position_kinds", "percentage_push", "anchor", "book_id_document")
+
 
 def is_percentage_only(progress_record) -> bool:
     """True when ``progress_record`` carries a percentage but no seekable locator."""
@@ -176,6 +190,15 @@ def _withheld_position_hint(user_id, document, book_id,
     return {POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]}
 
 
+def _advertised_position_kinds() -> set:
+    """The position kinds named by the request's ``position_kinds`` parameter."""
+    try:
+        raw = request.args.get(POSITION_KINDS_PARAM, "") or ""
+    except RuntimeError:  # outside a request context
+        return set()
+    return {k.strip().lower() for k in raw.split(",")}
+
+
 def client_accepts_percentage_only() -> bool:
     """True when the requesting client advertised percentage-only support.
 
@@ -184,11 +207,35 @@ def client_accepts_percentage_only() -> bool:
     it saw before percentage-only rows existed: it never receives one, so it
     can neither mis-seek on it nor show a sync error for it.
     """
+    return POSITION_KIND_PERCENTAGE in _advertised_position_kinds()
+
+
+def _book_for_numeric_document(response_data, document, user):
+    """Resolve a ``document`` that is a decimal Calibre book id, for ``user``.
+
+    A client that downloaded a book over OPDS knows its book id even when it
+    kept no copy of the file to digest. GET already found the book-id-keyed
+    row for such a key; without resolving it, though, a PUT under it reached
+    neither the Kobo bookmark nor the read status. Only a book this user may
+    open resolves, so the response never names a book hidden from them.
+
+    Returns ``(response_data, book_id)``; ``book_id`` is None when unresolved.
+    """
+    if not isinstance(document, str) or not _is_ascii_book_id(document):
+        return response_data, None
+    from ... import calibre_db
     try:
-        raw = request.args.get(POSITION_KINDS_PARAM, "") or ""
-    except RuntimeError:  # outside a request context
-        return False
-    return POSITION_KIND_PERCENTAGE in {k.strip().lower() for k in raw.split(",")}
+        book = calibre_db.get_filtered_book(
+            int(document), allow_show_archived=True, allow_show_hidden=True, user=user,
+        )
+    except Exception:
+        log.warning("KOReader sync: could not resolve book id %s", document, exc_info=True)
+        return response_data, None
+    if book is None:
+        return response_data, None
+    response_data["calibre_book_id"] = book.id
+    response_data["calibre_book_title"] = book.title
+    return response_data, book.id
 
 
 def _require_kosync_enabled():
@@ -864,6 +911,81 @@ def _exact_xpointer(user_id, book_id, progress_record, document):
     return None
 
 
+def _library_epub(book_id):
+    """Path of the book's library EPUB, or None."""
+    from ... import calibre_db
+    from ...annotations import _book_format_path
+    book = calibre_db.get_book(int(book_id))
+    return _book_format_path(book, "EPUB") if book is not None else None
+
+
+def _locate_anchor(book_id, anchor, percentage):
+    """``(xpointer, library digest)`` of a text anchor in the library EPUB, or None.
+
+    Best-effort: a book with no EPUB, words that are not found or that repeat
+    ambiguously, or any failure leaves the push percentage-only.
+    """
+    from ...services import text_anchor
+    from ...services.koreader_position import file_digest
+    from ...services.parallel import run_blocking
+    try:
+        epub_path = _library_epub(book_id)
+        if not epub_path:
+            return None
+
+        def place():
+            digest = file_digest(epub_path)
+            xpointer = text_anchor.locate(epub_path, anchor, percentage)
+            return (xpointer, digest) if xpointer and digest else None
+        return run_blocking(place)
+    except Exception:
+        log.warning("Could not place a text anchor in book %s", book_id, exc_info=True)
+        return None
+
+
+def _anchor_for_record(user_id, book_id, record):
+    """The words at ``record``'s position in the library EPUB, or None.
+
+    The position must first be provably a place in the library EPUB itself:
+    an XPointer some device reported while holding that very file (its
+    journal names the file's digest), or a web reader's or Kobo's place that
+    converts exactly into it (``_exact_xpointer`` with the library digest as
+    the requesting file). Anything else stays a percentage.
+    """
+    from ...services import text_anchor
+    from ...services.koreader_position import (KOREADER_LOCATION_TYPE, file_digest,
+                                               is_xpointer)
+    from ...services.parallel import run_blocking
+    try:
+        epub_path = _library_epub(book_id)
+        if not epub_path or record is None:
+            return None
+        digest = run_blocking(lambda: file_digest(epub_path))
+        if not digest:
+            return None
+        xpointer = None
+        if is_xpointer(record.progress):
+            reported = ub.session.query(ub.DeviceReadingPosition.id).join(
+                ub.Device, ub.Device.id == ub.DeviceReadingPosition.device_id,
+            ).filter(
+                ub.Device.user_id == int(user_id),
+                ub.Device.kind == "koreader",
+                ub.DeviceReadingPosition.book_id == int(book_id),
+                ub.DeviceReadingPosition.location_type == KOREADER_LOCATION_TYPE,
+                ub.DeviceReadingPosition.location_value == record.progress,
+                func.lower(ub.DeviceReadingPosition.location_source) == digest,
+            ).first()
+            xpointer = record.progress if reported is not None else None
+        elif is_percentage_only(record):
+            xpointer = _exact_xpointer(user_id, book_id, record, digest)
+        if not xpointer:
+            return None
+        return run_blocking(lambda: text_anchor.anchor_at(epub_path, xpointer))
+    except Exception:
+        log.warning("Could not derive a text anchor for book %s", book_id, exc_info=True)
+        return None
+
+
 def _journal_koreader_report(user_id, internal_device_id, book_id, document,
                              progress, percentage, observed_at):
     """Keep this device's own report, and which file it addresses (#324).
@@ -984,7 +1106,8 @@ def auth_user():
 
     user = authenticate_user()
     if user:
-        return create_sync_response({"authorized": "OK"})
+        return create_sync_response({"authorized": "OK",
+                                     "capabilities": list(SERVER_CAPABILITIES)})
     else:
         return create_sync_response({
             "error": ERROR_UNAUTHORIZED_USER,
@@ -1044,6 +1167,8 @@ def get_progress(document: str):
         response_data, book_id, book_format, book_title, _ = enrich_response_with_book_info(
             {}, document
         )
+        if not book_id:
+            response_data, book_id = _book_for_numeric_document(response_data, document, user)
 
         # A client that did not advertise percentage-only support gets exactly
         # what it got before those rows existed: they are excluded from the
@@ -1092,6 +1217,10 @@ def get_progress(document: str):
         }
 
         response_data = {**response_data, **response_updates}
+        if book_id and POSITION_KIND_ANCHOR in _advertised_position_kinds():
+            anchor = _anchor_for_record(user.id, book_id, progress_record)
+            if anchor:
+                response_data["anchor"] = anchor
 
         log.debug(endpoint + f" Response: {response_data}")
 
@@ -2079,12 +2208,34 @@ def update_progress():
         device = data.get("device")
         device_id = data.get("device_id")
 
+        # A client with no engine locator (``services/text_anchor``) reports
+        # ``position_kind: "percentage"`` and leaves ``progress`` out, which
+        # KOSync otherwise requires; it may name its place by words instead.
+        position_kind = data.get("position_kind")
+        if position_kind not in (None, POSITION_KIND_LOCATOR, POSITION_KIND_PERCENTAGE):
+            raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid position_kind field")
+        percentage_push = position_kind == POSITION_KIND_PERCENTAGE
+        anchor = None
+        if percentage_push:
+            if progress not in (None, ""):
+                raise KOSyncError(ERROR_INVALID_FIELDS,
+                                  "progress must be omitted for a percentage position")
+            if data.get("anchor") is not None:
+                from ...services import text_anchor
+                anchor = text_anchor.parse_anchor(data.get("anchor"))
+                if anchor is None:
+                    raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid anchor field")
+        elif data.get("anchor") is not None:
+            raise KOSyncError(ERROR_INVALID_FIELDS,
+                              "anchor requires position_kind percentage")
+
         # Validate required fields
-        if not progress or percentage is None or not device:
+        if (not percentage_push and not progress) or percentage is None or not device:
             raise KOSyncError(ERROR_INVALID_FIELDS, "Missing required fields")
 
         # Validate field lengths
-        if not is_valid_field(progress) or len(progress) > MAX_PROGRESS_LENGTH:
+        if not percentage_push and (
+                not is_valid_field(progress) or len(progress) > MAX_PROGRESS_LENGTH):
             raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid progress field")
         # `progress` is client-controlled, and PERCENTAGE_ONLY_LOCATOR is the
         # only value whose meaning is decided by the server rather than the
@@ -2104,6 +2255,8 @@ def update_progress():
         # KOReader sends percentage as a decimal fraction (0.9411 = 94.11%)
         # Convert to actual percentage (0-100 range)
         try:
+            if isinstance(percentage, bool):
+                raise ValueError("not a number")
             percentage_float = float(percentage)
             if percentage_float <= 1.0:
                 percentage_float *= 100.0
@@ -2125,6 +2278,23 @@ def update_progress():
         response_data, book_id, book_format, book_title, _ = enrich_response_with_book_info(
             response_data, document
         )
+        if not book_id:
+            response_data, book_id = _book_for_numeric_document(response_data, document, user)
+
+        # What is stored, and what the device journal records. A percentage
+        # push stores the sentinel unless its anchor places it in the library
+        # EPUB, in which case it stores that XPointer -- a locator into the
+        # library file, journalled under that file's digest exactly as a
+        # KOReader holding it would report, so every reader that already
+        # consumes such a report lands on the same words.
+        stored_progress, journal_document, journal_progress = progress, document, progress
+        if percentage_push:
+            stored_progress, journal_progress = PERCENTAGE_ONLY_LOCATOR, None
+            if anchor and book_id:
+                located = _locate_anchor(book_id, anchor, percentage_float)
+                if located:
+                    stored_progress, journal_document = located
+                    journal_progress = stored_progress
 
         # Prefer the book_id as the identifier (if we have it) to ensure that all documents associated with the same
         # Calibre book share the same progress record even if they have different checksums.
@@ -2155,7 +2325,7 @@ def update_progress():
         outcome = _conditional_kosync_progress(
             user_id=user.id,
             document=canonical_document,
-            progress=progress,
+            progress=stored_progress,
             percentage=percentage_float,
             device=device,
             device_id=device_id,
@@ -2215,8 +2385,8 @@ def update_progress():
                 )
             if internal_device_id and book_id:
                 _journal_koreader_report(
-                    user.id, internal_device_id, book_id, reported_document,
-                    progress, proposed_percentage, received_at,
+                    user.id, internal_device_id, book_id, journal_document,
+                    journal_progress, proposed_percentage, received_at,
                 )
 
         # Update user's ReadBook status if we matched a book

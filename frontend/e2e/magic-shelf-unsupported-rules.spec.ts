@@ -49,6 +49,9 @@ test('#1617 unavailable fields and unsupported operators stay visible and indivi
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText(unknown.id);
     await expect(rows.nth(0)).toContainText(unknown.value);
+    const rowBox = (await rows.nth(0).boundingBox())!;
+    const removeBox = (await rows.nth(0).getByRole('button', {name: 'Remove rule', exact: true}).boundingBox())!;
+    expect(removeBox.y - rowBox.y, 'removal stays beside the field heading even when details wrap').toBeLessThanOrEqual(24);
     await expect(rows.nth(1)).toContainText(obsolete.operator);
     await expect(rows.nth(1)).toContainText('first');
     await expect(rows.nth(1)).toContainText('second');

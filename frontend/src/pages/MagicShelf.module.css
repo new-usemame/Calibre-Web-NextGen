@@ -62,3 +62,5 @@
 .unsupportedDetails dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-1) var(--sp-2); }
 .unsupportedDetails dt { font-weight: 600; }
 .unsupportedDetails dd { margin: 0; white-space: pre-wrap; }
+/* Keep removal beside the heading, including wrapped phone rows. */
+.unsupportedRule .removeRule { align-self: flex-start; }

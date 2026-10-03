@@ -131,3 +131,62 @@ test('cover actions report paused choices and keep explicit finished and unread 
     await expect.poll(async () => (await (await page.request.get(`/api/v1/books/${book.id}`)).json()).read_status).toBe('unread');
   }
 });
+
+
+test('a wrapped cover-action error stays inside the viewport after content growth and resizing', async ({ statusPage: page }, info) => {
+  // The desktop panel floats above its opener; touch has a separate bottom-anchored layout.
+  test.skip(!!info.project.use.hasTouch, 'Desktop floating-panel geometry');
+  expect((await post(page, '/api/v1/account/profile', { locale: 'fr', theme: 'light' })).status()).toBe(200);
+  const translation = await page.request.get('/api/v1/i18n/fr.json');
+  expect(translation.ok()).toBeTruthy();
+  const catalog = (await translation.json()).catalog as Record<string, string>;
+  const t = (key: string) => catalog[key] ?? key;
+  const errorText = t('Could not update this book. Try again.');
+  expect(errorText).not.toBe('Could not update this book. Try again.');
+  await page.goto('/app');
+  const cards = page.getByTestId('catalog-grid').locator('[data-book-id]');
+  await expect(cards.first()).toBeVisible();
+  const count = await cards.count();
+  expect(count).toBeGreaterThan(10);
+  const card = cards.nth(Math.floor(count / 2));
+  const id = await card.getAttribute('data-book-id');
+  const detail = await page.request.get(`/api/v1/books/${id}`);
+  expect(detail.ok()).toBeTruthy();
+  const book = await detail.json() as { title: string };
+  const opener = card.getByRole('button', {
+    name: t('Actions for {title}').replace('{title}', book.title), exact: true,
+  });
+  await opener.scrollIntoViewIfNeeded();
+  const height = page.viewportSize()!.height;
+  const initial = (await opener.boundingBox())!;
+  // Native scrolling puts the complete trigger at the viewport's lower edge.
+  await page.mouse.wheel(0, initial.y - (height - initial.height - 1));
+  await expect.poll(async () => {
+    const box = (await opener.boundingBox())!;
+    return box.y >= height - box.height - 3 && box.y + box.height <= height;
+  }).toBe(true);
+  await opener.press('Enter');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const insideViewport = () => dialog.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return box.top >= 7.5 && box.bottom <= window.innerHeight - 7.5;
+  });
+  await expect.poll(insideViewport).toBe(true);
+  let refused = 0;
+  await page.route(`**/api/v1/books/${id}/read`, route => {
+    refused++;
+    return route.fulfill({ status: 503, json: { error: { code: 'unavailable', message: 'Owned failure injection' } } });
+  });
+  await dialog.getByRole('button', { name: t('Mark as read'), exact: true }).click();
+  await expect(dialog.getByText(errorText, { exact: true })).toBeVisible();
+  expect(refused).toBe(1);
+  await expect.poll(insideViewport).toBe(true);
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: viewport.width, height: viewport.height - 60 });
+  await expect.poll(insideViewport).toBe(true);
+  await expect(dialog.getByText(errorText, { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+});

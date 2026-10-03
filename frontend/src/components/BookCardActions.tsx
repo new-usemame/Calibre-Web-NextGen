@@ -46,10 +46,13 @@ function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, shel
   }, [opener]);
   useLayoutEffect(() => {
     const box = panel.current!.getBoundingClientRect();
+    const preferredTop = anchor.bottom + box.height + 8 <= window.innerHeight
+      ? anchor.bottom + 8 : anchor.top - box.height - 8;
     setPosition({
       left: Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8)),
-      top: anchor.bottom + box.height + 8 <= window.innerHeight
-        ? anchor.bottom + 8 : Math.max(8, anchor.top - box.height - 8),
+      // Keyboard focus can scroll the opener after its anchor is captured.
+      // Keep both placement directions within the current viewport.
+      top: Math.max(8, Math.min(preferredTop, window.innerHeight - box.height - 8)),
     });
   }, [anchor]);
   const failed = () => {

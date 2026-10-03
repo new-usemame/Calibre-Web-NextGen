@@ -115,6 +115,12 @@ test('cover actions report paused choices and keep explicit finished and unread 
     const dialog = page.getByRole('dialog', { name: `Actions for ${book.title}`, exact: true });
     await expect(dialog.getByText(label, { exact: true })).toBeVisible();
     await expect(dialog.getByText('Unread', { exact: true })).toHaveCount(0);
+    // Keyboard focus can scroll the card while the dialog opens. Its fixed
+    // panel must remain usable without moving it or forcing an offscreen action.
+    await expect.poll(() => dialog.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      return box.top >= 7.5 && box.bottom <= window.innerHeight - 7.5;
+    })).toBe(true);
     await dialog.getByRole('button', { name: 'Mark as read', exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(async () => (await (await page.request.get(`/api/v1/books/${book.id}`)).json()).read_status).toBe('finished');

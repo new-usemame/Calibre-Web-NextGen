@@ -46,6 +46,10 @@ test('Classic bulk metadata dialog associates every visible field label', async 
   const rows = page.locator('#books-table tbody tr:not(.no-records-found)');
   await expect(rows.first()).toBeVisible();
   await rows.first().locator('td.bs-checkbox input[type="checkbox"]').check();
+  // Automatic sorting intentionally disables these fields. Switch off the
+  // actual controls before testing manual sort-label activation.
+  await page.locator('#autoupdate_titlesort').uncheck();
+  await page.locator('#autoupdate_authorsort').uncheck();
   await page.locator('#edit_selected_books').click();
   const modal = page.locator('#edit_selected_modal');
   await expect(modal).toBeVisible();
@@ -81,4 +85,20 @@ test('rich-text breadcrumbs retain block selection with valid button semantics',
   await expect(path.getByRole('button', { name: 'p', exact: true })).toBeVisible();
   const result = await new AxeBuilder({ page }).include('.tox-statusbar__path').withRules(['aria-allowed-attr']).analyze();
   expect(result.violations, 'retained breadcrumb buttons must use supported ARIA').toEqual([]);
+});
+
+
+test('a focused Classic date shows the value being edited', async ({ page }) => {
+  await page.goto(`/admin/book/${await firstBookId(page)}`);
+  const date = page.locator('#pubdate');
+  const mirror = page.locator('#fake_pubdate');
+  await date.focus();
+  await expect(mirror, 'decorative localized text must not cover the editable value').toBeHidden();
+  expect(await date.evaluate(el => getComputedStyle(el).color)).not.toBe('rgba(0, 0, 0, 0)');
+  await date.fill('');
+  await date.pressSequentially('2020-05-03');
+  await expect(date).toHaveValue('2020-05-03');
+  await date.press('Tab');
+  await expect(mirror).toBeVisible();
+  await expect(mirror).toHaveValue('5/3/2020');
 });

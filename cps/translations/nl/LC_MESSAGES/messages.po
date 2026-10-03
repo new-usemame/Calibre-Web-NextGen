@@ -12840,8 +12840,8 @@ msgstr ""
 msgid ""
 "Select a category to see the books assigned to it and all of its sub-"
 "categories."
-msgstr ""
-"Kies een categorie om de boeken ervan en van alle subcategorieën te zien."
+msgstr "Kies een categorie om de boeken ervan en van alle subcategorieën te zien."
+
 
 #: cps/templates/cc_list.html
 msgid "Expand all"

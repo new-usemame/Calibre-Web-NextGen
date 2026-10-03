@@ -18061,10 +18061,6 @@ msgstr "Mostrar Selección Leidos/No Leidos"
 #~ msgid "More actions for {title}"
 #~ msgstr "Más acciones para {title}"
 
-#, python-brace-format
-#~ msgid "Actions for {title}"
-#~ msgstr "Acciones para {title}"
-
 #: cps/spa_strings.py
 msgid "After children"
 msgstr ""

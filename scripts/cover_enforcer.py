@@ -801,8 +801,9 @@ class Enforcer:
         When the admin has opted in, one is designed from the book's own title
         and author first, and enforcement then embeds it like any other cover.
 
-        Best-effort: enforcement carries on after a failure. If the cover file
-        was created but the flag update failed, a later call repairs the flag.
+        Best-effort: enforcement carries on after a failure. A failed flag
+        commit removes only this call's unchanged generated file, allowing a
+        later explicit enabled pass to generate again.
         An existing cover.jpg is never overwritten.
         """
         cover_path = os.path.join(book_dir, "cover.jpg")
@@ -819,12 +820,18 @@ class Enforcer:
             book_id = (list(re.findall(r"\(\d*\)", book_dir))[-1])[1:-1]
             metadata_db = os.path.join(
                 (self.split_library or {}).get("db_path", self.calibre_library), "metadata.db")
+            if os.path.lexists(cover_path):
+                return False
+            with sqlite3.connect(Path(metadata_db).resolve().as_uri() + "?mode=ro", uri=True, timeout=60) as connection:
+                row = connection.execute("SELECT has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+                if not row or row[0]:
+                    return False
             with offline_library_access(), operation():
                 with sqlite3.connect(metadata_db, timeout=60) as connection:
                     row = connection.execute(
                         "SELECT title, has_cover, series_index FROM books WHERE id = ?",
                         (int(book_id),)).fetchone()
-                    if not row or row[1]:
+                    if not row or row[1] or os.path.lexists(cover_path):
                         return False
                     title, _has_cover, series_index = row
                     authors = [name for (name,) in connection.execute(
@@ -833,26 +840,22 @@ class Enforcer:
                     series_row = connection.execute(
                         "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
                         "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
-                written = False
-                if not os.path.isfile(cover_path):
-                    written = cover_generator.generate_cover_file(
-                        cover_path,
-                        cover_generator.BookCoverMeta(
-                            title=title or "", authors=authors,
-                            series=series_row[0] if series_row else None,
-                            series_index=series_index,
-                        ),
-                        preset=settings.default_preset,
-                    )
-                    if not written:
-                        return False
-                with sqlite3.connect(metadata_db, timeout=60) as connection:
-                    connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
-            if written:
-                print(f"[cover-metadata-enforcer] INFO: Designed a cover for book {book_id} "
-                      f"({settings.default_preset}) — it had none.", flush=True)
-            else:
-                print(f"[cover-metadata-enforcer] INFO: Recovered cover flag for book {book_id}.", flush=True)
+                created = []
+                written = cover_generator.generate_cover_file(
+                    cover_path,
+                    cover_generator.BookCoverMeta(
+                        title=title or "", authors=authors,
+                        series=series_row[0] if series_row else None,
+                        series_index=series_index,
+                    ),
+                    preset=settings.default_preset, on_created=created.append,
+                )
+                if not written:
+                    return False
+                cover_generator.commit_generated_cover_flag(
+                    metadata_db, book_id, cover_path, created[0] if created else None, timeout=60)
+            print(f"[cover-metadata-enforcer] INFO: Designed a cover for book {book_id} "
+                  f"({settings.default_preset}) — it had none.", flush=True)
             return True
         except Exception as error:
             print(f"[cover-metadata-enforcer] WARN: Could not design a cover for "

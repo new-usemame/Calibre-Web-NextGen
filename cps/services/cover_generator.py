@@ -63,6 +63,7 @@ from __future__ import annotations
 
 import base64
 import dataclasses
+import hashlib
 import json
 import math
 import os
@@ -70,9 +71,11 @@ import re
 import shutil
 import subprocess
 import sqlite3
+import stat
 import struct
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional, Sequence
 
 from .. import logger
@@ -2236,13 +2239,15 @@ def settings_from_app_db(app_db_path: str) -> GeneratorSettings:
 def generate_cover_file(destination: str, meta: BookCoverMeta,
                         preset: Optional[str] = None,
                         binaries_dir: str = "",
-                        design=None) -> bool:
+                        design=None, on_created=None) -> bool:
     """Write a generated ``cover.jpg`` at *destination*. False if it exists.
 
     Used by the ingest and enforcement paths, which own the ``has_cover`` flag
     themselves. Refusing to overwrite an existing file is what keeps "generate a
     cover for books that arrive with none" from ever touching a book that has
-    one — including on a re-run over the same library.
+    one — including on a re-run over the same library. Automatic callers may
+    receive the created inode/hash through on_created for conservative rollback
+    if their flag commit fails; the identity belongs to the staging file.
     """
     if os.path.exists(destination):
         return False
@@ -2257,7 +2262,63 @@ def generate_cover_file(destination: str, meta: BookCoverMeta,
     staging = destination + ".cwng-generating"
     with open(staging, "wb") as handle:
         handle.write(rendered.data)
+        if on_created is not None:
+            handle.flush()
+            info = os.fstat(handle.fileno())
+            identity = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                        hashlib.sha256(rendered.data).digest())
     os.replace(staging, destination)
+    if on_created is not None:
+        on_created(identity)
     log.info("cover_generator: wrote generated cover (%s renderer) to %s",
              rendered.renderer, destination)
     return True
+
+
+def _remove_generated_cover_if_unchanged(destination, identity):
+    """Remove only the regular file this generator created, under caller's gate."""
+    if identity is None:
+        return False
+    try:
+        info = os.lstat(destination)
+        if not stat.S_ISREG(info.st_mode) or (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) != identity[:4]:
+            return False
+        digest = hashlib.sha256()
+        with open(destination, "rb") as handle:
+            info = os.fstat(handle.fileno())
+            if (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) != identity[:4]:
+                return False
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+        info = os.lstat(destination)
+        if not stat.S_ISREG(info.st_mode) or (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) != identity[:4] \
+                or digest.digest() != identity[4]:
+            return False
+        os.unlink(destination)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def commit_generated_cover_flag(metadata_db, book_id, destination, identity, timeout=30):
+    """Commit a new cover; conservatively undo its file on a failed flag write.
+
+    Caller owns maintenance followed by the metadata writer gate throughout.
+    An uncertain flag state or a changed file is preserved, never inferred as a
+    recoverable cover. A later explicit enabled pass can retry a removed file.
+    """
+    try:
+        with sqlite3.connect(metadata_db, timeout=timeout) as connection:
+            connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+    except Exception:
+        try:
+            uri = Path(metadata_db).resolve().as_uri() + "?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=timeout) as connection:
+                row = connection.execute("SELECT has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+            if row and not row[0]:
+                _remove_generated_cover_if_unchanged(destination, identity)
+        except Exception as cleanup_error:
+            log.warning("Could not roll back failed generated cover: %s", cleanup_error)
+        raise

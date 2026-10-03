@@ -119,18 +119,18 @@ print(json.dumps([ownership.busy(sys.argv[2], 'maintenance'), blocked]))
         pass
 
 
-def test_flag_failure_then_retry_recovers_without_overwriting_cover(automatic_cover):
+def test_flag_failure_removes_owned_file_then_later_pass_generates_again(automatic_cover):
     state = automatic_cover
     with sqlite3.connect(state.metadata) as connection:
         connection.executescript("CREATE TRIGGER fail_cover BEFORE UPDATE OF has_cover ON books "
             "BEGIN SELECT RAISE(ABORT, 'fixture flag failure'); END;")
     assert not state.call()
-    assert state.cover.read_bytes() == b"generated fixture cover" and flag(state) == 0
+    assert not state.cover.exists() and flag(state) == 0
     with sqlite3.connect(state.metadata) as connection:
         connection.execute("DROP TRIGGER fail_cover")
     assert state.call()
     assert flag(state) == 1
-    assert state.cover.read_bytes() == b"generated fixture cover" and len(state.renders) == 1
+    assert state.cover.read_bytes() == b"generated fixture cover" and len(state.renders) == 2
     assert not state.target.ownership.busy(state.config_dir, "maintenance")
 
 
@@ -162,3 +162,123 @@ def test_existing_cover_and_flag_are_never_overwritten(automatic_cover):
         connection.execute("UPDATE books SET has_cover=1 WHERE id=1")
     assert not state.call()
     assert state.cover.read_bytes() == b"reader cover" and state.renders == []
+    assert not (state.config_dir / ".cwa-content-server-maintenance.lock").exists()
+
+
+@pytest.mark.parametrize("cover_bytes", [b"", b"not an image"])
+def test_unproven_existing_file_is_not_blessed_or_drained(automatic_cover, cover_bytes):
+    state = automatic_cover
+    state.cover.write_bytes(cover_bytes)
+    assert not state.call()
+    assert flag(state) == 0 and state.cover.read_bytes() == cover_bytes and state.renders == []
+    assert not (state.config_dir / ".cwa-content-server-maintenance.lock").exists()
+
+
+def test_already_flagged_book_without_file_does_not_take_maintenance(automatic_cover):
+    state = automatic_cover
+    with sqlite3.connect(state.metadata) as connection:
+        connection.execute("UPDATE books SET has_cover=1 WHERE id=1")
+    assert not state.call()
+    assert state.renders == []
+    assert not (state.config_dir / ".cwa-content-server-maintenance.lock").exists()
+
+
+def test_preflight_is_rechecked_after_maintenance_handoff(automatic_cover, monkeypatch):
+    from contextlib import contextmanager
+    state = automatic_cover
+    real_offline = state.module.offline_library_access
+    @contextmanager
+    def offline():
+        # A writer finishes after the readonly preflight but before admission.
+        state.cover.write_bytes(b"concurrent cover")
+        with real_offline():
+            yield
+    monkeypatch.setattr(state.module, "offline_library_access", offline)
+    assert not state.call()
+    assert flag(state) == 0 and state.cover.read_bytes() == b"concurrent cover"
+    assert state.renders == []
+
+
+def test_uncertain_flag_state_preserves_generated_file(automatic_cover, monkeypatch):
+    state = automatic_cover
+    real_connect = sqlite3.connect
+    with real_connect(state.metadata) as connection:
+        connection.executescript("CREATE TRIGGER fail_cover BEFORE UPDATE OF has_cover ON books "
+            "BEGIN SELECT RAISE(ABORT, 'fixture flag failure'); END;")
+    def connect(database, *args, **kwargs):
+        if kwargs.get("uri") and state.cover.exists():
+            raise sqlite3.OperationalError("fixture rollback read unavailable")
+        return real_connect(database, *args, **kwargs)
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    assert not state.call()
+    assert flag(state) == 0 and state.cover.read_bytes() == b"generated fixture cover"
+
+
+@pytest.mark.parametrize("mutation", ["bytes", "inode"])
+def test_failed_flag_commit_preserves_cover_replaced_by_another_writer(automatic_cover, monkeypatch, mutation):
+    state = automatic_cover
+    real_connect = sqlite3.connect
+    def change_cover():
+        if mutation == "bytes":
+            state.cover.write_bytes(b"external replacement")
+        else:
+            replacement = state.cover.with_name("replacement.jpg")
+            replacement.write_bytes(b"external replacement")
+            os.replace(replacement, state.cover)
+        return 1
+    def connect(*args, **kwargs):
+        connection = real_connect(*args, **kwargs)
+        connection.create_function("change_cover", 0, change_cover)
+        return connection
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    with sqlite3.connect(state.metadata) as connection:
+        connection.executescript("CREATE TRIGGER fail_cover BEFORE UPDATE OF has_cover ON books "
+            "BEGIN SELECT change_cover(); SELECT RAISE(ABORT, 'fixture flag failure'); END;")
+    assert not state.call()
+    assert flag(state) == 0 and state.cover.read_bytes() == b"external replacement"
+    with sqlite3.connect(state.metadata) as connection:
+        connection.execute("DROP TRIGGER fail_cover")
+    assert not state.call()
+    assert flag(state) == 0 and state.cover.read_bytes() == b"external replacement"
+
+
+def test_actual_generic_cover_edit_is_preserved_by_later_enforcement(automatic_cover, monkeypatch, tmp_path):
+    import flask
+    from flask_babel import Babel
+    from cps import editbooks
+    from tests.unit.test_f50a5cb_cover_write_staging import _book, _editor
+    state = automatic_cover
+    assert state.call()
+    book = _book()
+    book.id, book.path, book.has_cover = 1, "Author/Book (1)", 1
+    def commit():
+        with sqlite3.connect(state.metadata) as connection:
+            connection.execute("UPDATE books SET has_cover=? WHERE id=1", (book.has_cover,))
+    session = SimpleNamespace(merge=lambda _book: None, commit=commit, rollback=lambda: None)
+    monkeypatch.setattr(editbooks, "current_user", _editor())
+    monkeypatch.setattr(editbooks.calibre_db, "get_filtered_book", lambda *_args, **_kwargs: book)
+    monkeypatch.setattr(editbooks.calibre_db, "session", session)
+    monkeypatch.setattr(editbooks, "metadata_db_write_lock", state.target.operation)
+    monkeypatch.setattr(editbooks, "upload_cover", lambda *_args: None)
+    monkeypatch.setattr(editbooks, "_book_cover_is_locked", lambda _id: False)
+    monkeypatch.setattr(editbooks, "handle_author_on_edit", lambda *_args: (["Author"], False))
+    for name in ("edit_book_ratings", "edit_book_series_index", "edit_book_comments", "edit_book_tags",
+                 "edit_book_series", "edit_book_publisher", "edit_book_languages", "edit_all_cc_data"):
+        monkeypatch.setattr(editbooks, name, lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(editbooks, "identifier_list", lambda *_args: [])
+    monkeypatch.setattr(editbooks, "modify_identifiers", lambda *_args: (False, False))
+    monkeypatch.setattr(editbooks.config, "config_kobo_sync", False, raising=False)
+    monkeypatch.setattr(editbooks.config, "config_use_google_drive", False, raising=False)
+    monkeypatch.setattr(editbooks.constants, "CWA_METADATA_CHANGE_LOGS_DIR", str(tmp_path / "change-logs"))
+    app = flask.Flask(__name__)
+    app.secret_key = "fixture"
+    Babel(app)
+    app.add_url_rule("/book/<int:book_id>", endpoint="web.show_book", view_func=lambda book_id: str(book_id))
+    with app.test_request_context(method="POST", data={"authors": "Author", "detail_view": "1",
+            "cover_url": "/static/generic_cover.svg"}):
+        response = editbooks.do_edit_book(1)
+    assert response.status_code == 302
+    assert list((tmp_path / "change-logs").glob("*.json"))
+    assert flag(state) == 0 and state.cover.read_bytes() == b"generated fixture cover"
+    assert not state.call()
+    assert flag(state) == 0 and state.cover.read_bytes() == b"generated fixture cover"

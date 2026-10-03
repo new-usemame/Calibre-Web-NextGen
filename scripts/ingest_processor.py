@@ -1315,7 +1315,8 @@ class NewBookProcessor:
         because a cover could not be drawn, and a book that already has a cover
         is never touched — ``generate_cover_file`` refuses to overwrite, so a
         re-run over the same library is a no-op rather than a rewrite. If the
-        file was created before a flag update failed, a retry repairs the flag.
+        flag commit fails, only this call's unchanged generated file is removed
+        so a later explicit enabled pass can generate again.
         """
         if book_id is None:
             return False
@@ -1331,7 +1332,10 @@ class NewBookProcessor:
             settings = cover_generator.settings_from_app_db(str(app_paths.app_db_path()))
             if not settings.auto_enabled:
                 return False
-
+            with sqlite3.connect(Path(self.metadata_db).resolve().as_uri() + "?mode=ro", uri=True, timeout=30) as connection:
+                row = connection.execute("SELECT path, has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+                if not row or row[1] or os.path.lexists(os.path.join(self.library_dir, row[0], "cover.jpg")):
+                    return False
             with offline_library_access(), metadata_db_write_lock():
                 with sqlite3.connect(self.metadata_db, timeout=30) as connection:
                     row = connection.execute(
@@ -1341,7 +1345,8 @@ class NewBookProcessor:
                     if not row:
                         return False
                     book_path, title, has_cover, series_index = row
-                    if has_cover:
+                    destination = os.path.join(self.library_dir, book_path, "cover.jpg")
+                    if has_cover or os.path.lexists(destination):
                         return False
                     authors = [name for (name,) in connection.execute(
                         "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
@@ -1350,28 +1355,23 @@ class NewBookProcessor:
                         "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
                         "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
 
-                destination = os.path.join(self.library_dir, book_path, "cover.jpg")
-                written = False
-                if not os.path.isfile(destination):
-                    written = cover_generator.generate_cover_file(
-                        destination,
-                        cover_generator.BookCoverMeta(
-                            title=title or "",
-                            authors=authors,
-                            series=series_row[0] if series_row else None,
-                            series_index=series_index,
-                        ),
-                        preset=settings.default_preset,
-                    )
-                    if not written:
-                        return False
-                with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                    connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
-            if written:
-                print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
-                      f"({settings.default_preset}) — it was imported without one.", flush=True)
-            else:
-                print(f"[ingest-processor] INFO: Recovered cover flag for book {book_id}.", flush=True)
+                created = []
+                written = cover_generator.generate_cover_file(
+                    destination,
+                    cover_generator.BookCoverMeta(
+                        title=title or "",
+                        authors=authors,
+                        series=series_row[0] if series_row else None,
+                        series_index=series_index,
+                    ),
+                    preset=settings.default_preset, on_created=created.append,
+                )
+                if not written:
+                    return False
+                cover_generator.commit_generated_cover_flag(
+                    self.metadata_db, book_id, destination, created[0] if created else None, timeout=30)
+            print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
+                  f"({settings.default_preset}) — it was imported without one.", flush=True)
             return True
         except Exception as error:
             print(f"[ingest-processor] WARN: Could not design a cover for book "

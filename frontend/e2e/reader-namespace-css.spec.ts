@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,4 +87,28 @@ test('#2255 percent escapes in a literal note ID do not target another ID', asyn
   const target = page.frameLocator('iframe').first().locator('[id="note%20id"]');
   await expect(target).toHaveCSS('max-height', 'none');
   await expect(target).toBeInViewport();
+});
+
+
+test('#2255 a long note is keyboard scrollable and Escape returns to its marker', async ({page}) => {
+  await openBook(page);
+  const marker = page.locator('[data-testid="reader-link-hit"][data-href="#fn-80-2"]').first();
+  await marker.focus();
+  await page.keyboard.press('Enter');
+  const note = page.getByRole('dialog', {name: 'Note', exact: true});
+  await expect(note).toBeVisible();
+  const audit = await new AxeBuilder({page}).include('[role="dialog"]')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(audit.violations.filter(v => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);
+  const body = note.getByRole('region', {name: 'Note', exact: true});
+  await note.getByRole('button', {name: 'Close', exact: true}).focus();
+  await page.keyboard.press('Tab');
+  await expect(body).toBeFocused();
+  expect(await body.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+  const start = await body.evaluate(node => node.scrollTop);
+  await page.keyboard.press('PageDown');
+  await expect.poll(() => body.evaluate(node => node.scrollTop)).toBeGreaterThan(start);
+  await page.keyboard.press('Escape');
+  await expect(note).toBeHidden();
+  await expect(marker).toBeFocused();
 });

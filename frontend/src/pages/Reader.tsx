@@ -2551,7 +2551,8 @@ export function Reader({ id }: { id: string }) {
                 <X size={20} aria-hidden="true" focusable={false} />
               </button>
             </div>
-            <div className={styles.noteSheetBody} dangerouslySetInnerHTML={{ __html: note.html }} />
+            <div className={styles.noteSheetBody} role="region" aria-label={t('Note')} tabIndex={0}
+              dangerouslySetInnerHTML={{ __html: note.html }} />
             <div className={styles.noteSheetActions}>
               <Button variant="primary" onClick={() => {
                 const target = note.target;

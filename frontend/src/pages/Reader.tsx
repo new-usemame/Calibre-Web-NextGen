@@ -1414,6 +1414,15 @@ export function Reader({ id }: { id: string }) {
   const syncLinkHits = useCallback(() => {
     const rendition = renditionRef.current;
     if (!rendition) { setLinkHits([]); return; }
+    const viewer = viewerRef.current?.getBoundingClientRect();
+    if (!viewer) { setLinkHits([]); return; }
+    // EPUB columns expand the iframe beyond the reader's visible page. Parent
+    // targets must use the clipped viewer/viewport, not that expanded width.
+    const visible = {
+      left: Math.max(0, viewer.left), top: Math.max(0, viewer.top),
+      right: Math.min(window.innerWidth, viewer.right),
+      bottom: Math.min(window.innerHeight, viewer.bottom),
+    };
     const anchors = new Map<string, { anchor: HTMLAnchorElement; contents: any }>();
     const hits: LinkHit[] = [];
     let sawAnchors = false;
@@ -1425,8 +1434,6 @@ export function Reader({ id }: { id: string }) {
       const frame = contents?.window?.frameElement as HTMLIFrameElement | undefined;
       if (!doc || !frame) return;
       const frameRect = frame.getBoundingClientRect();
-      const pageWidth = doc.documentElement?.clientWidth || frameRect.width;
-      const pageHeight = doc.documentElement?.clientHeight || frameRect.height;
       Array.from(doc.querySelectorAll('a[href]')).forEach((node, anchorIndex) => {
         const anchor = node as HTMLAnchorElement;
         sawAnchors = true;
@@ -1438,22 +1445,34 @@ export function Reader({ id }: { id: string }) {
           // are off-screen in some other column. Only what the reader can
           // actually see gets a hit target.
           if (rect.width <= 0 || rect.height <= 0) return;
-          if (rect.right <= 0 || rect.bottom <= 0) return;
-          if (rect.left >= pageWidth || rect.top >= pageHeight) return;
+          const bounds = {
+            left: Math.max(visible.left, frameRect.left),
+            top: Math.max(visible.top, frameRect.top),
+            right: Math.min(visible.right, frameRect.right),
+            bottom: Math.min(visible.bottom, frameRect.bottom),
+          };
+          const linkLeft = frameRect.left + rect.left;
+          const linkTop = frameRect.top + rect.top;
+          const linkRight = frameRect.left + rect.right;
+          const linkBottom = frameRect.top + rect.bottom;
+          // Test the original glyph before padding so adjacent hidden columns
+          // cannot become keyboard stops or cover the page-turn controls.
+          if (linkRight <= bounds.left || linkBottom <= bounds.top ||
+              linkLeft >= bounds.right || linkTop >= bounds.bottom) return;
           const padX = Math.max(0, (MIN_LINK_HIT_PX - rect.width) / 2);
           const padY = Math.max(0, (MIN_LINK_HIT_PX - rect.height) / 2);
-          const left = Math.max(0, rect.left - padX);
-          const top = Math.max(0, rect.top - padY);
-          const width = Math.min(pageWidth, rect.right + padX) - left;
-          const height = Math.min(pageHeight, rect.bottom + padY) - top;
+          const left = Math.max(bounds.left, linkLeft - padX);
+          const top = Math.max(bounds.top, linkTop - padY);
+          const width = Math.min(bounds.right, linkRight + padX) - left;
+          const height = Math.min(bounds.bottom, linkBottom + padY) - top;
           if (width <= 0 || height <= 0) return;
           const key = `${viewIndex}:${anchorIndex}:${rectIndex}`;
           anchors.set(key, { anchor, contents });
           hits.push({
             key,
             href: anchor.getAttribute('href') || '',
-            left: frameRect.left + left,
-            top: frameRect.top + top,
+            left,
+            top,
             width,
             height,
             label: (anchor.textContent || '').replace(/\s+/g, ' ').trim() || t('Untitled link'),

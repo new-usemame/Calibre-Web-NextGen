@@ -19177,3 +19177,34 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ msgstr ""
 #~ "Перед безопасным удалением книги необходимо сначала заархивировать её и "
 #~ "синхронизировать устройство."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Показать раздел тегов"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Введите теги"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Теги в этой библиотеке"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Теги: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Книги, сгруппированные по тегам"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Для авторов, тегов, языков и издателей можно указать несколько значений. Разделяйте их запятыми (например, «Имя1, Имя2»)."

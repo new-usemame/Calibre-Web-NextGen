@@ -18357,3 +18357,34 @@ msgstr "Mostrar Selección Leidos/No Leidos"
 #, python-brace-format
 #~ msgid "More actions for {title}"
 #~ msgstr "Más acciones para {title}"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Mostrar la sección de etiquetas"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Introduce las etiquetas"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Etiquetas en esta biblioteca"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Etiquetas: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Libros agrupados por etiquetas"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Se admiten varios valores para autores, etiquetas, idiomas y editoriales. Usa valores separados por comas (p. ej., \"Nombre1, Nombre2\")."

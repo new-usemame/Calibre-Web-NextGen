@@ -17574,3 +17574,34 @@ msgstr "Näytä sarjavalinta"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klikkaa kantta ladataksesi metadata lomakkeelle"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Näytä tunnisteosio"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Anna tunnisteet"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Tunnisteet tässä kirjastossa"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Tunnisteet: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Kirjat ryhmitelty tunnisteittain"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Tekijöille, tunnisteille, kielille ja kustantajille voi antaa useita arvoja. Erota arvot pilkuilla (esim. \"Nimi1, Nimi2\")."

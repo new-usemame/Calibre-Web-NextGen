@@ -17909,3 +17909,34 @@ msgstr "읽음/읽지 않음 표시"
 #~ "safely be deleted."
 #~ msgstr ""
 #~ "책을 안전하게 삭제하려면 먼저 보관 처리 후 기기 동기화가 필요합니다."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "태그 섹션 표시"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "태그 입력"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "이 서재의 태그"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "태그: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "태그별로 묶은 책"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "저자, 태그, 언어 및 출판사에 여러 값을 입력할 수 있습니다. 쉼표로 구분하세요(예: \"이름1, 이름2\")."

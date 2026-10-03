@@ -17453,3 +17453,34 @@ msgstr "បង្ហាញជម្រើសស៊េរី"
 #, fuzzy
 #~ msgid "CWA Discord Server"
 #~ msgstr "ស្រាវជ្រាវ"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "បង្ហាញផ្នែក Tag"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "បញ្ចូល Tag"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Tag ក្នុងបណ្ណាល័យនេះ"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Tag៖ %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "សៀវភៅដាក់ជាក្រុមតាម Tag"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "អាចបញ្ចូលតម្លៃច្រើនសម្រាប់អ្នកនិពន្ធ Tag ភាសា និងអ្នកបោះពុម្ពផ្សាយ។ បំបែកតម្លៃដោយសញ្ញាក្បៀស (ឧទាហរណ៍ \"ឈ្មោះ1, ឈ្មោះ2\")។"

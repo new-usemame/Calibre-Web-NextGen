@@ -17784,3 +17784,34 @@ msgstr "Mostrar selección lidos/non lidos"
 #~ msgstr ""
 #~ "Antes de que un libro poida eliminarse con seguridade debe arquivarse e "
 #~ "sincronizarse co dispositivo."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Mostrar a sección de etiquetas"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Introduce as etiquetas"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Etiquetas nesta biblioteca"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Etiquetas: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Libros agrupados por etiquetas"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Admítense varios valores para autores, etiquetas, idiomas e editoriais. Sepáraos con comas (por exemplo, \"Nome1, Nome2\")."

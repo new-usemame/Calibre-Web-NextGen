@@ -17725,3 +17725,34 @@ msgstr "Προβολή επιλογών σειράς"
 #~ msgstr ""
 #~ "Τα βιβλία πρέπει πρώτα να αρχειοθετηθούν και να συγχρονιστεί η συσκευή "
 #~ "πριν μπορέσει να διαγραφεί με ασφάλεια το βιβλίο."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Εμφάνιση ενότητας ετικετών"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Εισαγωγή ετικετών"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Ετικέτες σε αυτή τη βιβλιοθήκη"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Ετικέτες: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Βιβλία ομαδοποιημένα ανά ετικέτα"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Υποστηρίζονται πολλές τιμές για συγγραφείς, ετικέτες, γλώσσες και εκδότες. Χρησιμοποιήστε τιμές χωρισμένες με κόμματα (π.χ. \"Όνομα1, Όνομα2\")."

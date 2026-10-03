@@ -17089,3 +17089,34 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr ""
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr ""
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr ""
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr ""
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr ""
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr ""

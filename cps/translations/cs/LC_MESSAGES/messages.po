@@ -17652,3 +17652,34 @@ msgstr "Zobrazit výběr sérií"
 #~ msgstr ""
 #~ "Knihy musí být nejprve archivovány a zařízení musí být synchronizováno, "
 #~ "než bude kniha bezpečně smazána."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Zobrazit sekci štítků"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Zadejte štítky"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Štítky v této knihovně"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Štítky: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Knihy seskupené podle štítků"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Pro autory, štítky, jazyky a vydavatele lze zadat více hodnot. Oddělte je čárkami (např. \"Jméno1, Jméno2\")."

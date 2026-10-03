@@ -18439,3 +18439,34 @@ msgstr "Zobraziť sekciu Prečítané/Neprečítané"
 #~ msgstr ""
 #~ "Kniha musí byť najskôr archivovaná a zariadenie synchronizované pred tým "
 #~ "než môže byť kniha bezpečne zmazaná."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Zobraziť sekciu značiek"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Zadajte značky"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Značky v tejto knižnici"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Značka: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Knihy zoskupené podľa značiek"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Pre autorov, značky, jazyky a vydavateľov možno zadať viac hodnôt. Oddeľte ich čiarkami (napr. \"Meno1, Meno2\")."

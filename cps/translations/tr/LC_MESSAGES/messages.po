@@ -17558,3 +17558,34 @@ msgstr "Seri seçimini göster"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Forma metaveri yüklemek için kapağa tıklayın"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Etiket bölümünü göster"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Etiketleri girin"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Bu kitaplıktaki etiketler"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Etiketler: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Etiketlere göre gruplandırılmış kitaplar"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Yazarlar, etiketler, diller ve yayıncılar için birden fazla değer desteklenir. Değerleri virgülle ayırın (ör. \"Ad1, Ad2\")."

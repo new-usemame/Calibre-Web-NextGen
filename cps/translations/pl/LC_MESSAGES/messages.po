@@ -18553,3 +18553,34 @@ msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
 #~ msgstr ""
 #~ "Książki muszą najpierw zostać zarchiwizowane a urządzenie "
 #~ "zsynchronizowane, zanim książka będzie mogła zostać bezpiecznie usunięta."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Pokaż sekcję etykiet"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Wprowadź etykiety"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Etykiety w tej bibliotece"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Etykiety: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Książki pogrupowane według etykiet"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Dla autorów, etykiet, języków i wydawców można podać wiele wartości. Oddziel je przecinkami (np. \"Nazwa1, Nazwa2\")."

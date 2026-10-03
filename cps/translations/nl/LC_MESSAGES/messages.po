@@ -19071,3 +19071,34 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Sectie Labels tonen"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Voer labels in"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Labels in deze bibliotheek"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Labels: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Boeken gegroepeerd op labels"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Voor auteurs, labels, talen en uitgevers worden meerdere waarden ondersteund. Scheid de waarden met komma’s (bijvoorbeeld \"Naam1, Naam2\")."

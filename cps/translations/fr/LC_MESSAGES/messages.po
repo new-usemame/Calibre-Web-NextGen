@@ -19633,3 +19633,34 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Afficher la section des étiquettes"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Saisir les étiquettes"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Étiquettes dans cette bibliothèque"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Étiquettes : %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Livres regroupés par étiquettes"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Plusieurs valeurs sont prises en charge pour les auteurs, les étiquettes, les langues et les éditeurs. Séparez les valeurs par des virgules (par exemple « Nom1, Nom2 »)."

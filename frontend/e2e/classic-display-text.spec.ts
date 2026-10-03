@@ -47,6 +47,23 @@ test('Classic rule preview displays actual matching book titles as literal text'
   await expect(content).toContainText(`${result.count} book(s) match these rules`);
 });
 
+test('rule-preview sample-book protocol text remains literal', async ({ page }) => {
+  const title = 'A & <b data-cwng-display="book">literal sample title</b>';
+  // Keep this discriminator even when CI's actual seed library has plain titles.
+  await page.route('**/magicshelf/preview', route => route.fulfill({
+    json: { success: true, count: 1, sample_books: [title] },
+  }));
+  await page.goto('/magicshelf');
+  await page.locator('#builder .rule-filter-container select').selectOption('title');
+  await page.locator('#builder .rule-value-container input').fill('Native');
+  await page.locator('#preview-btn').click();
+  const content = page.locator('#preview-content');
+  await expect(content.locator('.preview-book-list li')).toHaveText(title);
+  await expect(content.locator('.preview-book-list li *')).toHaveCount(0);
+  await expect(content).toContainText('1 book(s) match these rules');
+  await expect(page.locator('#preview-btn')).toBeEnabled();
+});
+
 for (const status of [200, 400]) {
   test(`rule-preview error text stays literal for HTTP ${status}`, async ({ page }) => {
     const message = '<b data-cwng-display="error">Literal error text</b>';

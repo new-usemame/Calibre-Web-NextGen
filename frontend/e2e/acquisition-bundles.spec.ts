@@ -63,7 +63,11 @@ test('a stale choice refreshes without silently importing another candidate',asy
 
 test('failed list stays an error, retry recovers, paused requests still allow reading',async({page})=>{
   const f=await fixture(page,{readError:true,paused:true});
-  await expect(page.getByText('The available books could not be loaded. Try again.',{exact:true})).toBeVisible();
+  const error = 'The available books could not be loaded. Try again.';
+  // The visible paragraph and delayed screen-reader alert intentionally carry
+  // the same text. Check their distinct contracts instead of racing the alert.
+  await expect(page.getByRole('region',{name:'Your requests'}).getByText(error,{exact:true})).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveText(error);
   await expect(page.getByText('No books are available in this download.')).toHaveCount(0);
   await page.getByRole('button',{name:'Try again',exact:true}).click();
   await expect(page.getByText('Second.pdf',{exact:true})).toBeVisible();

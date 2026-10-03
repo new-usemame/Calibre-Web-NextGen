@@ -61,26 +61,47 @@ def book():
 def test_all_standard_metadata_fields(book):
     values = names._BookValues(book, None)
     assert dict(values) == {
-        'id': '42', 'title': 'Book, The', 'title_sort': 'Book, The',
+        'id': '42', 'title': 'The Book', 'title_sort': 'Book, The',
         'author_sort': 'Writer, Ann', 'author': 'Ann Writer & Ben Reader',
         'authors': 'Ann Writer & Ben Reader', 'isbn': '9781234567890', 'identifiers': '',
         'languages': 'eng,fra', 'pubdate': 'May, 2020', 'timestamp': 'Jan, 2024',
         'last_modified': 'Feb, 2024', 'publisher': 'Press', 'rating': '4.5',
-        'series': 'Saga, The', 'series_index': '2', 'tags': 'Fiction, Space',
+        'series': 'The Saga', 'series_sort': 'Saga, The', 'series_index': '2', 'tags': 'Fiction, Space',
     }
 
 
-def test_sorted_names_fall_back_to_configured_article_rule(book):
-    book.sort = book.series[0].sort = None
-    assert names.render_filename('{title} - {series}', book, None, r'^(The|A|An)\s+') == 'Book, The - Saga, The'
+@pytest.mark.parametrize('sort', [None, '', 'Book, The', 'My chosen sort'])
+def test_original_names_ignore_sort_values_and_article_rule(book, sort):
+    book.sort = book.series[0].sort = sort
+    assert names.render_filename('{title} - {series}', book, None, r'^(The|A|An)\s+') == 'The Book - The Saga'
+    values = names._BookValues(book, None)
+    assert values['title_sort'] == values['series_sort'] == (sort or '')
+
+
+@pytest.mark.parametrize('sorting', [None, 'library_order', 'strictly_alphabetic', 'unknown'])
+def test_title_templates_ignore_sorting_tweak(book, sorting):
+    book.title, book.sort = 'The Title', 'Title, The'
+    book.authors = [NS(name='Author')]
+    assert names.render_filename('{title} - {authors}', book, None,
+                                 title_series_sorting=sorting) == 'The Title - Author'
+    assert names.render_filename('{title_sort} - {authors}', book, None,
+                                 title_series_sorting=sorting) == 'Title, The - Author'
+
+
+def test_missing_title_does_not_use_title_sort(book):
+    book.title = None
+    assert names.render_filename('{title}', book, None) == 'book-42'
+    assert names.render_filename('{title_sort}', book, None) == 'Book, The'
 
 
 @pytest.mark.parametrize('template,expected', [
-    ('{author_sort[0]} - {series_index:0>3s} - {title}', 'W - 002 - Book, The'),
+    ('{author_sort[0]} - {series_index:0>3s} - {title}', 'W - 002 - The Book'),
     ('x{series_index:>3s}x', 'x 2x'),
     ('{series_index}', '2'),
-    ('{{title}} {title}', '{title} Book, The'),
+    ('{{title}} {title}', '{title} The Book'),
     ('{author_sort[999]}', 'book-42'),
+    ('{series_sort} - {title_sort}', 'Saga, The - Book, The'),
+    ('{SERIES_SORT[0]:0>3s}', '00S'),
 ])
 def test_substitutions_and_padding(book, template, expected):
     assert names.render_filename(template, book, None) == expected
@@ -90,7 +111,7 @@ def test_missing_metadata_is_empty_even_with_padding(book):
     book.series = book.ratings = book.publishers = book.languages = book.tags = book.authors = []
     book.author_sort = book.isbn = book.last_modified = book.timestamp = None
     book.pubdate = db.Books.DEFAULT_PUBDATE
-    template = 'x{series}{series_index:0>3s}{rating}{publisher}{languages}{tags}{authors}{author_sort[0]}{isbn}{pubdate}{last_modified}{timestamp}x'
+    template = 'x{series}{series_sort:0>3s}{series_index:0>3s}{rating}{publisher}{languages}{tags}{authors}{author_sort[0]}{isbn}{pubdate}{last_modified}{timestamp}x'
     assert names.render_filename(template, book, None) == 'xx'
 
 
@@ -161,7 +182,7 @@ def custom_session():
 def test_custom_lookup_names_and_types(book, custom_session):
     template = '{#shelf} {#count} {#read} {#date} {#saga} {#saga_index} {#stars} {#missing:0>3s}'
     assert names.render_filename(template, book, custom_session) == 'Favorites no May, 2020 Custom Saga 1.5 3.5'
-    assert names.render_filename('{#computed}', book, custom_session) == 'Favorites Book, The'
+    assert names.render_filename('{#computed}', book, custom_session) == 'Favorites The Book'
     assert names.render_filename('{#cycle}', book, custom_session) == 'book-42'
     book.id = 43
     assert names.render_filename('{#shelf}{#count}{#read}', book, custom_session) == 'book-43'
@@ -173,7 +194,7 @@ def test_custom_lookup_names_and_types(book, custom_session):
 def test_unavailable_computed_field_is_empty_and_logged(book, custom_session, caplog, display):
     custom_session.get(db.CustomColumns, 7).display = display
     custom_session.commit()
-    assert names.render_filename('{title}-{#computed}', book, custom_session) == 'Book, The-'
+    assert names.render_filename('{title}-{#computed}', book, custom_session) == 'The Book-'
     assert 'Could not read custom field #computed' in caplog.text
 
 
@@ -246,22 +267,33 @@ def test_expansion_matches_calibre_generated_results(case):
         engine.dispose()
 
 
-def test_stored_series_sort_is_not_used(book):
-    book.series[0].sort = 'Wrong'
-    assert names.render_filename('{series}', book, None) == 'Saga, The'
+def test_series_sort_uses_stored_value_not_calculated_name(book):
+    book.series[0].sort = 'My chosen sort'
+    assert names.render_filename('{series} - {series_sort}', book, None) == 'The Saga - My chosen sort'
 
 
-def test_custom_series_uses_the_configured_article_rule(book, custom_session):
+@pytest.mark.parametrize('sort', [None, ''])
+def test_missing_series_sort_is_empty_even_with_padding(book, sort):
+    book.series[0].sort = sort
+    assert names.render_filename('x{series_sort:0>3s}x', book, None) == 'xx'
+
+
+def test_computed_custom_field_can_use_series_sort(book, custom_session):
+    custom_session.get(db.CustomColumns, 7).display = '{"composite_template": "{series_sort} - {title}"}'
+    custom_session.commit()
+    assert names.render_filename('{#computed}', book, custom_session) == 'Saga, The - The Book'
+
+
+@pytest.mark.parametrize('sorting', [None, 'library_order', 'strictly_alphabetic', 'unknown'])
+def test_series_names_ignore_sorting_rules(book, custom_session, sorting):
     custom_session.execute(text("UPDATE custom_column_5 SET value = 'Le Cycle'"))
-    assert names.render_filename('{#saga}', book, custom_session, r'^(Le|La)\s+') == 'Cycle, Le'
+    assert names.render_filename('{series} - {#saga}', book, custom_session, r'^(The|Le|La)\s+',
+                                 title_series_sorting=sorting) == 'The Saga - Le Cycle'
 
 
-def test_renderer_accepts_explicit_calibre_profile(book, custom_session):
+def test_renderer_accepts_explicit_date_format(book, custom_session):
     assert names.render_filename('{title} {series} {pubdate}', book, custom_session,
-                                 title_series_sorting='strictly_alphabetic', timefmt='%Y-%m-%d') == (
-                                     'The Book The Saga 2020-05-06')
-    with pytest.raises(ValueError):
-        names.render_filename('{title}', book, custom_session, title_series_sorting='unknown')
+                                 timefmt='%Y-%m-%d') == 'The Book The Saga 2020-05-06'
 
 
 @pytest.mark.parametrize('value', ['NaN', 'Infinity', '-Infinity', '1e999999999', 'x' * 1000])
@@ -270,7 +302,8 @@ def test_invalid_custom_number_remains_bounded(book, custom_session, value):
     assert names.render_filename('{#count}', book, custom_session) == 'book-42'
 
 
-def test_settings_column_is_added_on_upgrade_and_persists(tmp_path):
+@pytest.mark.parametrize('saved_template', ['', '{title} - {authors}', '{title_sort} - {authors}'])
+def test_settings_column_is_added_on_upgrade_and_persists(tmp_path, saved_template):
     engine = create_engine(f"sqlite:///{tmp_path / 'app.db'}")
     with engine.begin() as connection:
         connection.execute(text('CREATE TABLE settings (id INTEGER PRIMARY KEY)'))
@@ -278,12 +311,12 @@ def test_settings_column_is_added_on_upgrade_and_persists(tmp_path):
     with Session(engine) as session:
         config_sql._migrate_table(session, config_sql._Settings)
         row = session.query(config_sql._Settings).one()
-        assert row.config_opds_filename_template == ''
-        row.config_opds_filename_template = '{title} ({id})'
+        assert row.config_opds_filename_template == '{title_sort} - {authors}'
+        row.config_opds_filename_template = saved_template
         session.commit()
     with Session(engine) as session:
         config_sql._migrate_table(session, config_sql._Settings)
-        assert session.query(config_sql._Settings).one().config_opds_filename_template == '{title} ({id})'
+        assert session.query(config_sql._Settings).one().config_opds_filename_template == saved_template
     engine.dispose()
 
 
@@ -306,8 +339,18 @@ def test_download_header_uses_template_and_actual_extension(download, fmt):
     response = download.get_download_link(42, fmt, '', filename_template='{series_index:0>3s} - {title}')
     disposition, options = parse_options_header(response.headers['Content-Disposition'])
     assert disposition == 'attachment'
-    assert unquote(options['filename']) == '002 - Book, The.' + fmt
+    assert unquote(options['filename']) == '002 - The Book.' + fmt
     assert response.data == b'book'
+
+
+@pytest.mark.parametrize('template,expected', [
+    ('{title} - {authors}', 'The Book - Ann Writer & Ben Reader.epub'),
+    ('{series_sort} - {title_sort}', 'Saga, The - Book, The.epub'),
+    (config_sql._Settings.config_opds_filename_template.default.arg, 'Book, The - Ann Writer & Ben Reader.epub'),
+])
+def test_explicit_names_in_download_header(download, template, expected):
+    response = download.get_download_link(42, 'epub', '', filename_template=template)
+    assert unquote(parse_options_header(response.headers['Content-Disposition'])[1]['filename']) == expected
 
 
 @pytest.mark.parametrize('template', [None, '', '{title.__class__}'])
@@ -317,7 +360,7 @@ def test_default_and_invalid_stored_template_keep_legacy_name(download, template
 
 
 def test_unicode_header_is_ascii_with_utf8_filename(download, book):
-    book.sort = '日本語 Café'
+    book.title = '日本語 Café'
     response = download.get_download_link(42, 'epub', '', filename_template='{title}')
     header = response.headers['Content-Disposition']
     assert header.isascii() and "filename*=UTF-8''" in header
@@ -373,7 +416,7 @@ def admin_config(monkeypatch):
     return config, admin, api_admin
 
 
-@pytest.mark.parametrize('value', ['{authors} - {title}', ''])
+@pytest.mark.parametrize('value', ['{authors} - {title}', '{series_sort} - {title_sort}', ''])
 def test_both_admin_editors_save_and_reset_template(admin_config, value):
     config, classic, api = admin_config
     app = Flask(__name__)
@@ -475,5 +518,5 @@ def test_real_file_response_keeps_custom_header_and_format_fallback(
         response = browser.get('/download')
         assert response.status_code == 200
         assert response.data == b'unchanged book bytes'
-        assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'Book, The (42).' + extension
+        assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'The Book (42).' + extension
     assert source.read_bytes() == b'unchanged book bytes'

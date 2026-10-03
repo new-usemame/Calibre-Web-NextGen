@@ -24,20 +24,12 @@ MAX_TEMPLATE_LENGTH = 1024
 MAX_FILENAME_LENGTH = 128
 # Calibre's send/save configuration default (not the helper's '%b %Y').
 DEFAULT_TIMEFMT = '%b, %Y'
-DEFAULT_TITLE_REGEX = r'^(A|The|An)\s+'
 _FIELDS = frozenset((
     'author', 'author_sort', 'authors', 'id', 'identifiers', 'isbn', 'languages',
     'last_modified', 'pubdate', 'publisher', 'rating', 'series', 'series_index',
-    'tags', 'timestamp', 'title', 'title_sort',
+    'series_sort', 'tags', 'timestamp', 'title', 'title_sort',
 ))
 _FIELD = re.compile(r'([a-zA-Z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
-# Quote handling follows calibre.ebooks.metadata.title_sort (GPL-3.0).
-_QUOTE_PAIRS = {
-    '"': ('"',), "'": ("'",), '“': ('”', '“'), '”': ('”',),
-    '„': ('”', '“'), '‚': ('’', '‘'), '’': ('’', '‘'), '‘': ('’', '‘'),
-    '‹': ('›',), '›': ('‹',), '《': ('》',), '〈': ('〉',),
-    '»': ('«', '»'), '«': ('«', '»'), '「': ('」',), '『': ('』',),
-}
 _FORMAT = re.compile(r'(?:(.[<^>]|[<^>]))?([0-9]{1,3})?(?:\.([0-9]{1,3}))?s?\Z')
 _UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
 _RESERVED = re.compile(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', re.I)
@@ -140,51 +132,22 @@ def _date(value, timefmt, *, local=False):
     return value.strftime(timefmt)
 
 
-def _unquote(name):
-    if name and name[0] in _QUOTE_PAIRS:
-        closing = _QUOTE_PAIRS[name[0]]
-        name = name[1:]
-        if name and name[-1] in closing:
-            name = name[:-1]
-    return name
-
-
-def _sorted_name(name, title_regex):
-    name = _unquote((name or '').strip())
-    try:
-        match = re.search(title_regex, name, re.IGNORECASE) if title_regex else None
-        if match and match.lastindex and match.group(1):
-            article = match.group(1)
-            # Calibre's article group includes the following whitespace. The
-            # server's configurable group usually does not, so remove that
-            # whitespace before the second quote-handling pass in either case.
-            name = _unquote(name[len(article):].lstrip() + ', ' + article)
-    except re.error:
-        pass
-    return name.strip()
-
-
 class _BookValues(dict):
-    def __init__(self, book, session, title_regex=DEFAULT_TITLE_REGEX, *,
-                 timefmt=DEFAULT_TIMEFMT, title_series_sorting='library_order'):
-        if title_series_sorting not in ('library_order', 'strictly_alphabetic'):
-            raise ValueError('Unsupported filename title/series sorting rule.')
+    def __init__(self, book, session, title_regex=None, *,
+                 timefmt=DEFAULT_TIMEFMT, title_series_sorting=None):
+        # Keep the sorting arguments for callers, but never change field meaning
+        # for filenames. Only explicit *_sort fields use stored sort values.
         self.book = book
         self.session = session
-        self.title_regex = title_regex
         self.timefmt = timefmt
-        self.title_series_sorting = title_series_sorting
         self.columns = None
         self.depth = 0
         series = book.series[0] if book.series else None
-        title = book.title or ''
-        if title and title_series_sorting == 'library_order':
-            title = book.sort or self._series_name(title)
         authors = ' & '.join(author.name.replace('|', ',').replace('&', '&&')
                              for author in book.authors if author.name)
         identifiers = {item.type: item.val for item in getattr(book, 'identifiers', ())}
         super().__init__(
-            title=title, title_sort=book.sort or '',
+            title=book.title or '', title_sort=book.sort or '',
             author_sort=book.author_sort or '', author=authors, authors=authors,
             id=str(book.id), isbn=book.isbn or '',
             identifiers=', '.join('%s:%s' % (key, identifiers[key]) for key in sorted(identifiers)),
@@ -193,17 +156,13 @@ class _BookValues(dict):
             pubdate=_date(book.pubdate, timefmt), timestamp=_date(book.timestamp, timefmt),
             publisher=', '.join(publisher.name for publisher in book.publishers),
             rating=_rating(book.ratings[0].rating) if book.ratings else '',
-            series=self._series_name(series.name) if series else '',
+            series=(series.name or '') if series else '',
+            series_sort=(series.sort or '') if series else '',
             series_index=_series_index(book.series_index) if series else '',
             # Reuse the application's bounded Unicode collation. This is not
             # Calibre's locale-tailored ICU collator (see the OPDS docs).
             tags=', '.join(sorted((tag.name for tag in book.tags), key=unicode_sort_key)).removeprefix('/'),
         )
-
-    def _series_name(self, name):
-        if self.title_series_sorting == 'strictly_alphabetic':
-            return (name or '').strip()
-        return _sorted_name(name, self.title_regex)
 
     def __missing__(self, key):
         # Install the empty value first to break cycles in composite columns.
@@ -257,8 +216,6 @@ class _BookValues(dict):
         values = self.session.execute(text(sql), {'book_id': self.book.id}).scalars().all()
         if index:
             values = [_series_index(v) for v in values]
-        elif column.datatype == 'series':
-            values = [self._series_name(v) for v in values]
         elif column.datatype == 'datetime':
             values = [_date(v, self.timefmt, local=True) for v in values]
         elif column.datatype == 'bool':
@@ -271,8 +228,8 @@ class _BookValues(dict):
         return ','.join(str(v) for v in values if v is not None)
 
 
-def render_filename(template, book, session, title_regex=DEFAULT_TITLE_REGEX, unicode_filename=False,
-                    *, timefmt=DEFAULT_TIMEFMT, title_series_sorting='library_order'):
+def render_filename(template, book, session, title_regex=None, unicode_filename=False,
+                    *, timefmt=DEFAULT_TIMEFMT, title_series_sorting=None):
     """Return a safe basename. The download helper adds the actual extension."""
     values = _BookValues(book, session, title_regex, timefmt=timefmt,
                          title_series_sorting=title_series_sorting)

@@ -4,6 +4,10 @@ This document describes Calibre's rules for filenames from templates. Use it whe
 
 The target is Calibre's save-to-disk and send-to-device behavior. The target is not every use of the Template Editor. A template can produce different text when Calibre prepares its metadata for a different task.
 
+CWNG intentionally differs from Calibre's default filename sorting tweak. It keeps original title and series values and ignores `title_series_sorting`.
+Its default OPDS template is `{title_sort} - {authors}`. Use `{title} - {authors}` to keep the original title.
+See [OPDS download filenames](opds-filename-template.md) for the application rules. The Calibre reference behavior below remains unchanged.
+
 ## Sources and tested version
 
 The runtime comparisons use Calibre 9.2.1. The source links below point to Calibre's upstream `master` branch, which can change. Record the installed Calibre version when you repeat the tests.

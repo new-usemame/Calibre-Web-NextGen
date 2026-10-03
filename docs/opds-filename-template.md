@@ -16,13 +16,16 @@ In the Classic interface, it is under Admin → UI Configuration → OPDS Downlo
 3. Select Save settings in React or Save in Classic.
 
 For example, enter `{series} - {series_index:0>3s} - {title}`.
-For book 2 in “The Saga,” titled “The Book,” this produces `Saga, The - 002 - Book, The.epub`.
+For book 2 in “The Saga,” titled “The Book,” this produces `The Saga - 002 - The Book.epub`.
 Do not include the extension in the template.
 The server adds the extension for the format it sends, such as `.epub` or `.pdf`.
 
 If you want the original naming behavior, clear the preference and save.
 A blank preference keeps `Title - First Author.ext`, with the original title and only the first author.
-Existing installations start with a blank preference.
+The default template is `{title_sort} - {authors}`, such as `Book, The - Ann Writer.epub`.
+Use `{title} - {authors}` for `The Book - Ann Writer.epub` instead.
+New installations and upgrades that add this preference use the default template.
+An upgrade preserves an existing saved template, including a blank value.
 
 ## Fields and formatting
 
@@ -45,11 +48,12 @@ Field names are case-insensitive. Use `{{` and `}}` for literal braces.
 | `{pubdate}` | The publication date. |
 | `{publisher}` | The publisher. |
 | `{rating}` | The rating from 0 to 5 stars, such as `4.0` or `4.5`. An absent rating is empty. A stored zero becomes `0.0`. |
-| `{series}` | The series name after article sorting. |
+| `{series}` | The original series name. |
+| `{series_sort}` | The stored series sort value, such as `Saga, The`, without a calculated fallback. |
 | `{series_index}` | The series number. Integers have no decimal suffix. Fractions use Calibre's two-decimal conversion. No series means no number. |
 | `{tags}` | Sorted tags, separated by a comma and a space. |
 | `{timestamp}` | The date when the book entered the library. |
-| `{title}` | The title sort name, with a calculated fallback. |
+| `{title}` | The original title, such as `The Book`. |
 | `{title_sort}` | The stored title sort value, without a calculated fallback. |
 | `{#lookup_name}` | A custom field, identified by its Calibre lookup name. |
 
@@ -57,10 +61,12 @@ Dates use Calibre's default save/send format, `%b, %Y`, such as `May, 2020`.
 Month names follow the server's time locale. An unset standard Calibre date is empty.
 Custom dates use the server's local timezone. A custom date without a timezone is treated as UTC first.
 
-Title uses its stored sort name. If that value is absent, the server applies the configured title-sort rule.
-Standard and custom series always use that rule, not their stored sort names.
-For example, “The Book” becomes “Book, The.”
-The original blank-preference behavior does not apply this sorting to filenames.
+`{title}` always uses the original title. `{title_sort}` uses the stored title sort value, such as `Book, The`.
+If the stored sort value is absent, `{title_sort}` becomes empty text.
+Standard and custom series keep their original names.
+Use `{series_sort}` for the standard series sort value. If the book has no series or stored sort value, this field becomes empty text.
+For example, `{series_sort} - {title_sort}` produces `Saga, The - Book, The`.
+The server does not apply article sorting to these fields.
 
 Character indexing starts at zero. `{author_sort[0]}` selects the first character, not the first author.
 An index outside the text produces empty text.
@@ -85,14 +91,17 @@ Templates cannot access Python attributes or execute code.
 
 ## Compatibility profile
 
-OPDS uses Calibre's default `library_order` sorting and `%b, %Y` date format.
+OPDS uses Calibre's default `%b, %Y` date format, but does not apply its filename sorting tweak.
 It does not import preferences from a desktop Calibre installation.
-The internal renderer accepts explicit `title_series_sorting` and `timefmt` arguments, but the admin editors do not expose those options.
+The renderer accepts `title_series_sorting` and `title_regex` for existing callers but ignores both arguments.
+It accepts an explicit `timefmt` argument. The admin editors do not expose that option.
 
-Article sorting uses the server's configured title-sort regular expression.
+Calibre's default `library_order` replaces title and series values with sort forms for filenames.
+CWNG keeps their original values, which match Calibre's `strictly_alphabetic` profile.
+Use `{title_sort}` explicitly when you want the stored sort value in either application.
 Tags use the application's Unicode sort key, not Calibre's locale-specific ICU sorting library.
 Boolean text stays in English, independent of the requesting user's language.
-Different language rules, tag collation, or date preferences can therefore produce different filenames.
+Different sorting tweaks, tag ordering, or date preferences can therefore produce different filenames.
 
 The parser still rejects unknown standard fields and unsupported syntax.
 Out-of-range character indexes produce empty text, and recursive composites stop at the safety limit.
@@ -127,7 +136,8 @@ Saving takes effect on the next OPDS download without a restart.
 
 ## Comparison tests
 
-`tests/fixtures/calibre_filename_templates.json` contains expected expansions generated by Calibre 9.2.1.
+`tests/fixtures/calibre_filename_templates.json` contains expected expansions generated by Calibre 9.2.1 with `strictly_alphabetic` sorting.
+Separate unit tests confirm that CWNG ignores the sorting arguments and reads `{series_sort}` from the library database.
 The unit tests read this file and use real SQLite tables for custom fields.
 They do not require Calibre to be installed.
 

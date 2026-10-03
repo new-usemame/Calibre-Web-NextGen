@@ -8,6 +8,8 @@ Run with an isolated Calibre configuration, English locale, and UTC:
 
 Pass -- --check to compare the committed fixture without rewriting it.
 Ordinary unit tests read the fixture and do not need Calibre installed.
+Use strictly_alphabetic to compare original title and series values. The server
+ignores sorting tweaks and requires {title_sort} for a sorted title.
 """
 import argparse
 import copy
@@ -87,6 +89,9 @@ CASES = [
     case('article_before_quote', '{title}', book={'title': 'The "Book"', 'title_sort': None}),
     case('custom_article_before_quote', '{#saga}', custom={'saga': {'value': 'The "Cycle"'}}),
     case('custom_title_sort', '{title}', book={'title_sort': 'My chosen sort'}),
+    case('explicit_title_sort', '{title_sort}', book={'title_sort': 'My chosen sort'}),
+    case('default_template', '{title_sort} - {authors}'),
+    case('original_title_template', '{title} - {authors}'),
     case('alphabetic', '{title} {series} {#saga}', title_series_sorting='strictly_alphabetic'),
     case('helper_date_format', '{pubdate} {#date}', timefmt='%b %Y'),
     case('explicit_date_format', '{pubdate} {#date}', timefmt='%Y-%m-%d'),
@@ -102,8 +107,8 @@ CASES = [
     case('author_escaping', '{authors}', book={'authors': ['A & B', 'Last, First']}),
     case('tag_order', '{tags}', book={'tags': ['zebra', 'Alpha', 'beta']}),
     case('tag_leading_slash', '{tags}', book={'tags': ['/Fiction']}),
-    case('metadata_slashes', '{title} {title[1]}', book={'title_sort': 'A/B\\C'}),
-    case('whitespace', '  x  {title} \t y  ', book={'title_sort': 'Book\n  Title'}),
+    case('metadata_slashes', '{title} {title[1]}', book={'title': 'A/B\\C'}),
+    case('whitespace', '  x  {title} \t y  ', book={'title': 'Book\n  Title'}),
     case('string_precision', '{title:.4s}'),
 ]
 
@@ -138,7 +143,7 @@ def generate():
         custom = copy.deepcopy(CUSTOM)
         for label, updates in item['custom'].items():
             custom[label].update(updates)
-        profile = dict(timefmt='%b, %Y', title_series_sorting='library_order')
+        profile = dict(timefmt='%b, %Y', title_series_sorting='strictly_alphabetic')
         profile.update(item['profile'])
         tweaks['save_template_title_series_sorting'] = profile['title_series_sorting']
         mi = to_metadata(book, custom)
@@ -149,7 +154,7 @@ def generate():
     return {
         'generator': 'scripts/generate_calibre_filename_fixtures.py',
         'calibre_version': __version__, 'locale': 'en', 'timezone': 'UTC',
-        'defaults': {'timefmt': '%b, %Y', 'title_series_sorting': 'library_order'},
+        'defaults': {'timefmt': '%b, %Y', 'title_series_sorting': 'strictly_alphabetic'},
         'book': BOOK, 'custom': CUSTOM, 'cases': records,
     }
 

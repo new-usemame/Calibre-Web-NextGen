@@ -5,7 +5,7 @@
   "timezone": "UTC",
   "defaults": {
     "timefmt": "%b, %Y",
-    "title_series_sorting": "library_order"
+    "title_series_sorting": "strictly_alphabetic"
   },
   "book": {
     "id": 42,
@@ -87,7 +87,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "Book, The"
+      "expected": "The Book"
     },
     {
       "name": "title_sort",
@@ -199,7 +199,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "Saga, The"
+      "expected": "The Saga"
     },
     {
       "name": "series_index",
@@ -263,7 +263,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "Cycle, The"
+      "expected": "The Cycle"
     },
     {
       "name": "#saga_index",
@@ -295,7 +295,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "Favorites,Other Book, The"
+      "expected": "Favorites,Other The Book"
     },
     {
       "name": "#missing",
@@ -311,7 +311,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "Book, The Cycle, The"
+      "expected": "The Book The Cycle"
     },
     {
       "name": "first_character",
@@ -327,7 +327,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "{title} Book, The"
+      "expected": "{title} The Book"
     },
     {
       "name": "space_padding",
@@ -471,7 +471,7 @@
       },
       "custom": {},
       "profile": {},
-      "expected": "Book, The"
+      "expected": "The Book"
     },
     {
       "name": "quoted_title",
@@ -482,7 +482,7 @@
       },
       "custom": {},
       "profile": {},
-      "expected": "Book, The"
+      "expected": "“The Book”"
     },
     {
       "name": "quoted_series",
@@ -492,7 +492,7 @@
       },
       "custom": {},
       "profile": {},
-      "expected": "Saga, The"
+      "expected": "“The Saga”"
     },
     {
       "name": "article_before_quote",
@@ -503,7 +503,7 @@
       },
       "custom": {},
       "profile": {},
-      "expected": "Book\", The"
+      "expected": "The \"Book\""
     },
     {
       "name": "custom_article_before_quote",
@@ -515,7 +515,7 @@
         }
       },
       "profile": {},
-      "expected": "Cycle\", The"
+      "expected": "The \"Cycle\""
     },
     {
       "name": "custom_title_sort",
@@ -525,7 +525,33 @@
       },
       "custom": {},
       "profile": {},
+      "expected": "The Book"
+    },
+    {
+      "name": "explicit_title_sort",
+      "template": "{title_sort}",
+      "book": {
+        "title_sort": "My chosen sort"
+      },
+      "custom": {},
+      "profile": {},
       "expected": "My chosen sort"
+    },
+    {
+      "name": "default_template",
+      "template": "{title_sort} - {authors}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "Book, The - Ann Writer & Ben Reader"
+    },
+    {
+      "name": "original_title_template",
+      "template": "{title} - {authors}",
+      "book": {},
+      "custom": {},
+      "profile": {},
+      "expected": "The Book - Ann Writer & Ben Reader"
     },
     {
       "name": "alphabetic",
@@ -643,7 +669,7 @@
         }
       },
       "profile": {},
-      "expected": "Cycle, The"
+      "expected": "“The Cycle”"
     },
     {
       "name": "author_escaping",
@@ -688,7 +714,7 @@
       "name": "metadata_slashes",
       "template": "{title} {title[1]}",
       "book": {
-        "title_sort": "A/B\\C"
+        "title": "A/B\\C"
       },
       "custom": {},
       "profile": {},
@@ -698,7 +724,7 @@
       "name": "whitespace",
       "template": "  x  {title} \t y  ",
       "book": {
-        "title_sort": "Book\n  Title"
+        "title": "Book\n  Title"
       },
       "custom": {},
       "profile": {},
@@ -710,7 +736,7 @@
       "book": {},
       "custom": {},
       "profile": {},
-      "expected": "Book"
+      "expected": "The"
     }
   ]
 }

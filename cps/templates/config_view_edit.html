@@ -272,12 +272,12 @@
       <div class="form-group">
         <label for="config_opds_filename_template">{{_('OPDS download filename template')}}</label>
         <input type="text" class="form-control" name="config_opds_filename_template" id="config_opds_filename_template"
-               value="{{ conf.config_opds_filename_template or '' }}" maxlength="1024" placeholder="{title} - {authors}">
+               value="{{ conf.config_opds_filename_template or '' }}" maxlength="1024" placeholder="{title_sort} - {authors}">
         <p class="settings-explanation">{{_('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}}</p>
-        <p class="settings-explanation">{{_('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}}</p>
+        <p class="settings-explanation">{{_('Missing metadata becomes empty text. Title and series keep their original names. Use {title_sort} and {series_sort} for stored sort values. Slashes become underscores, not folders.')}}</p>
         <details>
           <summary>{{_('Filename template fields and examples')}}</summary>
-          <p><code>{author}, {author_sort}, {authors}, {id}, {identifiers}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {title_sort}, {{ '{#custom_field}' }}</code></p>
+          <p><code>{author}, {author_sort}, {authors}, {id}, {identifiers}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {series_sort}, {tags}, {timestamp}, {title}, {title_sort}, {{ '{#custom_field}' }}</code></p>
           <p>{{_('First character:')}} <code>{author_sort[0]}</code>. {{_('Padded series number:')}} <code>{series_index:0&gt;3s}</code>.</p>
           <p>{{_('Example:')}} <code>{series} - {series_index:0&gt;3s} - {title}</code></p>
           <p>{{_('In KOReader, enable Use server filenames for the OPDS catalog.')}}</p>

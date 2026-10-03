@@ -600,12 +600,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     void document.fonts?.ready.then(constrainMenu);
     document.fonts?.addEventListener('loadingdone', constrainMenu);
     window.addEventListener('resize', constrainMenu);
+    // Native focus can scroll the page while this panel stays open. Its
+    // available viewport space must follow the moved anchor too.
+    window.addEventListener('scroll', constrainMenu, { passive: true });
     return () => {
       active = false;
       observer?.disconnect();
       mutations?.disconnect();
       document.fonts?.removeEventListener('loadingdone', constrainMenu);
       window.removeEventListener('resize', constrainMenu);
+      window.removeEventListener('scroll', constrainMenu);
     };
   }, [settingsOpen, t, canUpload]);
 

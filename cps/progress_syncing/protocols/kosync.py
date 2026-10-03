@@ -2315,11 +2315,15 @@ def update_progress():
                     journal_progress = stored_progress
                     # Who is furthest is decided on one scale: where these
                     # words are in the library EPUB, not each client's own
-                    # count. A place the client does not call finished is
-                    # never made finished by that conversion.
+                    # count. Finished stays the client's call both ways: the
+                    # conversion neither finishes a book the client has not
+                    # (back matter makes the last words < 100%) nor unfinishes
+                    # one it has.
                     if percentage_float < FINISHED_PERCENT_THRESHOLD:
                         placed_percent = min(placed_percent,
                                              math.nextafter(FINISHED_PERCENT_THRESHOLD, 0.0))
+                    else:
+                        placed_percent = max(placed_percent, percentage_float)
                     percentage_float = placed_percent
 
         # Prefer the book_id as the identifier (if we have it) to ensure that all documents associated with the same

@@ -32,8 +32,10 @@ so a percentage hand-off is often pages away from where the reader actually was.
   without front matter, by words or by pages), so the same sentence has a different figure in each.
   Without this, a client that counts more words could win furthest-wins from behind. Measured on
   Metamorphosis, the derived figure is within 3% of KOReader's own page fraction on 115 recorded
-  pages (mean −0.6%); a word-count client was 7% off. A derived figure never reaches the finished
-  threshold (99%) unless the client's own figure does. An unanchored push keeps the client's figure.
+  pages (mean −0.6%); a word-count client was 7% off. Finished stays the client's call in both
+  directions. A derived figure never reaches the finished threshold (99%) unless the client's own
+  figure does. A client at ≥ 99% keeps that figure even where back matter puts its last words lower
+  (the end of Metamorphosis' story is at 86% of the file). An unanchored push keeps the client's figure.
 - An anchor that GET serves always passes the PUT limits (`text` ≤ 200, `before`/`after` ≤ 600
   characters). Context is trimmed by whole words, dropping the words furthest from the place. A
   script with no spaces between words has no word to name, so it gets no anchor.

@@ -290,6 +290,19 @@ def test_a_place_the_client_has_not_finished_is_not_made_finished(world):
     assert world.session.query(ub.ReadBook).one().read_status != ub.ReadBook.STATUS_FINISHED
 
 
+def test_a_client_that_finished_the_story_finishes_the_book(world):
+    # The story ends where the licence pages begin, well short of 100% of
+    # the file's text; the client, which does not count those pages, is done.
+    from cps.services import text_anchor
+    last_words = {"text": "body.", "before": "get up and stretch out her young", "after": ""}
+    found = text_anchor.place(world.epub, last_words, 100.0)
+    assert found and found[1] < 95.0
+    _push(_client(world), {"document": world.digest, "percentage": 1.0, "anchor": last_words})
+
+    assert world.session.query(ub.ReadBook).one().read_status == ub.ReadBook.STATUS_FINISHED
+    assert world.koreader_pull(world.digest)["percentage"] == pytest.approx(1.0)
+
+
 def test_the_same_client_may_turn_back(world):
     client = _client(world)
     _push(client, {"document": world.digest, "percentage": 0.52,

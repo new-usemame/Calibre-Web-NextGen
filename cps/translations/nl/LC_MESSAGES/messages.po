@@ -15479,7 +15479,7 @@ msgstr ""
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 #, python-format
 msgid "Review %(count)s Pending Match(es)"
-msgstr ""
+msgstr "Openstaande koppelingen controleren: %(count)s"
 
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 msgid "Click to See More"
@@ -18834,3 +18834,701 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/cwa_functions.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
+msgid "All Time"
+msgstr "Alle tijd"
+
+#: cps/cwa_functions.py
+#, python-format
+msgid "Last %(count)s day"
+msgid_plural "Last %(count)s days"
+msgstr[0] "Afgelopen %(count)s dag"
+msgstr[1] "Afgelopen %(count)s dagen"
+
+#: cps/cwa_functions.py
+#, python-format
+msgid "%(start)s to %(end)s"
+msgstr "Van %(start)s tot %(end)s"
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Analytics"
+msgstr "Analyse van API-gebruik"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Track endpoint activity, integration usage, and API patterns"
+msgstr "Volg activiteit van eindpunten en het gebruik van integraties en de API"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 7 Days"
+msgstr "Afgelopen 7 dagen"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 30 Days"
+msgstr "Afgelopen 30 dagen"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 90 Days"
+msgstr "Afgelopen 90 dagen"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 6 Months"
+msgstr "Afgelopen 6 maanden"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last Year"
+msgstr "Afgelopen jaar"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Custom Range"
+msgstr "Aangepaste periode"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Demo Data"
+msgstr "Demogegevens tonen"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "DEMO MODE"
+msgstr "DEMOMODUS"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Kobo Syncs"
+msgstr "Kobo-synchronisaties"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "OPDS Accesses"
+msgstr "OPDS-toegang"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Email Deliveries"
+msgstr "Verzendingen per e-mail"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Web UI Requests"
+msgstr "Verzoeken via de webinterface"
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Breakdown"
+msgstr "Verdeling van API-gebruik"
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Activity Timing"
+msgstr "API-activiteit per uur"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint Access Frequency"
+msgstr "Toegangsfrequentie per eindpunt"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint"
+msgstr "Eindpunt"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Category"
+msgstr "Categorie"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Access Count"
+msgstr "Aantal toegangen"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Last Accessed"
+msgstr "Laatste toegang"
+
+#: cps/templates/cwa_api_stats.html
+msgid "No endpoint data available"
+msgstr "Geen eindpuntgegevens beschikbaar"
+
+#: cps/templates/cwa_api_stats.html
+msgid "No API usage data available"
+msgstr "Geen gegevens over API-gebruik beschikbaar"
+
+#: cps/templates/cwa_api_stats.html
+msgid "No timing data available"
+msgstr "Geen tijdgegevens beschikbaar"
+
+#: cps/templates/cwa_api_stats.html
+#, python-format
+msgid "API Calls: %(count)s"
+msgstr "API-aanroepen: %(count)s"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+msgid "Please select both start and end dates"
+msgstr "Selecteer zowel een begin- als een einddatum"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Real Data"
+msgstr "Werkelijke gegevens tonen"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Comprehensive insights into your Calibre library collection"
+msgstr "Uitgebreide statistieken van uw Calibre-collectie"
+
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_stats_system.html
+msgid "Total Books"
+msgstr "Totaal aantal boeken"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Added Books"
+msgstr "Toegevoegde boeken"
+
+#: cps/templates/cwa_library_stats.html
+msgid "N/A"
+msgstr "N.v.t."
+
+#: cps/templates/cwa_library_stats.html
+msgid "All time view"
+msgstr "Weergave van alle tijd"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Conversions"
+msgstr "Conversies"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Formats"
+msgstr "Totaal aantal formaten"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Library Growth Over Time"
+msgstr "Groei van de bibliotheek"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Largest Series"
+msgstr "Grootste reeksen"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Publication Year Distribution"
+msgstr "Verdeling per publicatiejaar"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Rating Statistics"
+msgstr "Beoordelingsstatistieken"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Top Enforced Books"
+msgstr "Meest verwerkte boeken"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Import Source Flows"
+msgstr "Stromen van importbronnen"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Format Distribution"
+msgstr "Verdeling van formaten"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Most Fixed Books"
+msgstr "Meest gerepareerde boeken"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(count)s fix"
+msgid_plural "%(count)s fixes"
+msgstr[0] "%(count)s reparatie"
+msgstr[1] "%(count)s reparaties"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last fixed: %(date)s"
+msgstr "Laatst gerepareerd: %(date)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No EPUB fixes recorded"
+msgstr "Geen EPUB-reparaties geregistreerd"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No growth data available"
+msgstr "Geen groeigegevens beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Added: %(count)s"
+msgstr "Toegevoegd: %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Total: %(count)s"
+msgstr "Totaal: %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Books Added"
+msgstr "Toegevoegde boeken"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Library Size"
+msgstr "Totale bibliotheekgrootte"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No format data available"
+msgstr "Geen formaatgegevens beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(format)s — books: %(count)s (%(percent)s%%)"
+msgstr "%(format)s — boeken: %(count)s (%(percent)s%%)"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No series data available"
+msgstr "Geen reeksgegevens beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Books: %(count)s"
+msgstr "Boeken: %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Highest Index: %(index)s"
+msgstr "Hoogste reeksnummer: %(index)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Number of Books"
+msgstr "Aantal boeken"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No publication year data available"
+msgstr "Geen publicatiejaargegevens beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(year)s — books: %(count)s"
+msgstr "%(year)s — boeken: %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No rating data available"
+msgstr "Geen beoordelingsgegevens beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+msgid "vs previous period"
+msgstr "vergeleken met de vorige periode"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(percent)s%% Unrated"
+msgstr "%(percent)s%% zonder beoordeling"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Rating: %(stars)s; books: %(count)s"
+msgstr "Beoordeling: %(stars)s; boeken: %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No enforcement data available"
+msgstr "Geen gegevens over toegepaste metadata beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Enforcements: %(count)s"
+msgstr "Toepassingen van metadata: %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last: %(date)s"
+msgstr "Laatste: %(date)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Enforcements"
+msgstr "Toepassingen van metadata"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No conversion data available"
+msgstr "Geen conversiegegevens beschikbaar"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Conversions: %(count)s"
+msgstr "Conversies: %(count)s"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Logins"
+msgstr "Aanmeldingen"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Failed Login Attempts"
+msgstr "Mislukte aanmeldpogingen"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Logouts"
+msgstr "Afmeldingen"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Searches"
+msgstr "Zoekopdrachten"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Added to Shelf"
+msgstr "Toegevoegd aan plank"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Removed from Shelf"
+msgstr "Verwijderd van plank"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf Views"
+msgstr "Plankweergaven"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Magic Shelf Views"
+msgstr "Weergaven van slimme planken"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Kobo Sync"
+msgstr "Kobo-synchronisatie"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "OPDS Feed"
+msgstr "OPDS-feed"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Email Delivery"
+msgstr "Verzending per e-mail"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Web UI"
+msgstr "Webinterface"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Other"
+msgstr "Overig"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Desktop"
+msgstr "Computer"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Mobile"
+msgstr "Telefoon"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Tablet"
+msgstr "Tablet"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Book Detail"
+msgstr "Boekdetails"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Series Page"
+msgstr "Reekspagina"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Author Page"
+msgstr "Auteurspagina"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf"
+msgstr "Plank"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Direct Link"
+msgstr "Directe link"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Server Activity Dashboard"
+msgstr "Dashboard voor serveractiviteit"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Track server activity, file conversions, and automatic fixes."
+msgstr "Volg serveractiviteit, bestandsconversies en automatische reparaties."
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen - Server Stats"
+msgstr "Calibre-Web NextGen — serverstatistieken"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Enforced"
+msgstr "Boeken met toegepaste metadata"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Converted"
+msgstr "Geconverteerde boeken"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Fixed"
+msgstr "Gerepareerde boeken"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Hardcover Auto-Fetch Statistics"
+msgstr "Statistieken voor automatisch ophalen van Hardcover"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Total Processed"
+msgstr "Totaal verwerkt"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Auto-Matched"
+msgstr "Automatisch gekoppeld"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Pending Review"
+msgstr "Wachten op controle"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Manually Reviewed"
+msgstr "Handmatig gecontroleerd"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Conversion History"
+msgstr "Calibre-Web NextGen — conversiegeschiedenis"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Import History"
+msgstr "Calibre-Web NextGen — importgeschiedenis"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen EPUB Fixer History"
+msgstr "Calibre-Web NextGen — geschiedenis van EPUB-reparaties"
+
+#: cps/templates/cwa_stats_system.html
+msgid "EPUB Fixer History with Paths & Fixes"
+msgstr "Geschiedenis van EPUB-reparaties met paden en details"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Enforcement History"
+msgstr "Calibre-Web NextGen — geschiedenis van toegepaste metadata"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Enforcement History with Paths"
+msgstr "Geschiedenis van toegepaste metadata met paden"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "User Activity"
+msgstr "Gebruikersactiviteit"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "Library Stats"
+msgstr "Bibliotheekstatistieken"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "API Usage"
+msgstr "API-gebruik"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "System Stats"
+msgstr "Systeemstatistieken"
+
+#: cps/templates/cwa_user_activity.html
+msgid "User Activity Dashboard"
+msgstr "Dashboard voor gebruikersactiviteit"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Track library usage, downloads, and user engagement"
+msgstr "Volg bibliotheekgebruik, downloads en gebruikersactiviteit"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Filter by User:"
+msgstr "Filteren op gebruiker:"
+
+#: cps/templates/cwa_user_activity.html
+msgid "All Users"
+msgstr "Alle gebruikers"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Time Period:"
+msgstr "Periode:"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Large date ranges may take longer to load"
+msgstr "Het laden van langere perioden kan meer tijd kosten"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Active Users"
+msgstr "Actieve gebruikers"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Total Downloads"
+msgstr "Totaal aantal downloads"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Books Read"
+msgstr "Gelezen boeken"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity Timeline"
+msgstr "Activiteitstijdlijn"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Peak Usage Hours"
+msgstr "Piekuren"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Event Types"
+msgstr "Gebeurtenistypen"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Format Preferences by User"
+msgstr "Formaatvoorkeuren per gebruiker"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Discovery Sources"
+msgstr "Ontdekkingsbronnen"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Device Breakdown"
+msgstr "Verdeling per apparaat"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Most Active Days"
+msgstr "Actiefste dagen"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Top Users"
+msgstr "Actiefste gebruikers"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Popular Books"
+msgstr "Populaire boeken"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Recent Searches"
+msgstr "Recente zoekopdrachten"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Average Session Duration"
+msgstr "Gemiddelde sessieduur"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Avg Session Length"
+msgstr "Gemiddelde sessieduur"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "%(minutes)s min"
+msgstr "%(minutes)s min"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Search Success Rate"
+msgstr "Succespercentage van zoekopdrachten"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Searches Leading to Actions"
+msgstr "Zoekopdrachten gevolgd door een actie"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Successful searches: %(successful)s / %(total)s"
+msgstr "Geslaagde zoekopdrachten: %(successful)s / %(total)s"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Shelf Activity"
+msgstr "Plankactiviteit"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No Activity Data Yet"
+msgstr "Nog geen activiteitsgegevens"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Start using your library to see beautiful visualizations and insights!"
+msgstr "Gebruik uw bibliotheek om grafieken en statistieken te bekijken!"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Downloads, reading sessions, and searches will be tracked here."
+msgstr "Downloads, leessessies en zoekopdrachten worden hier bijgehouden."
+
+#: cps/templates/cwa_user_activity.html
+msgid "Download Formats Distribution"
+msgstr "Verdeling van downloadformaten"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Reading Velocity (Books per Week)"
+msgstr "Leestempo (boeken per week)"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format data yet"
+msgstr "Nog geen formaatgegevens"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No activity data yet"
+msgstr "Nog geen activiteitsgegevens"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Activity: %(count)s"
+msgstr "Activiteit: %(count)s"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity"
+msgstr "Activiteit"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No reading data yet"
+msgstr "Nog geen leesgegevens"
+
+#: cps/templates/cwa_user_activity.html
+msgid "4-Week Avg"
+msgstr "Gemiddelde over 4 weken"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format preference data yet"
+msgstr "Nog geen gegevens over formaatvoorkeuren"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No discovery data yet"
+msgstr "Nog geen ontdekkingsgegevens"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No device data yet"
+msgstr "Nog geen apparaatgegevens"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No failed attempts"
+msgstr "Geen mislukte pogingen"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No user activity yet"
+msgstr "Nog geen gebruikersactiviteit"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No popular books yet"
+msgstr "Nog geen populaire boeken"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No searches yet"
+msgstr "Nog geen zoekopdrachten"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Minutes: %(start)s–%(end)s; sessions: %(count)s"
+msgstr "Minuten: %(start)s–%(end)s; sessies: %(count)s"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Minutes"
+msgstr "Minuten"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Sessions"
+msgstr "Sessies"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No session data available"
+msgstr "Geen sessiegegevens beschikbaar"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Success Rate"
+msgstr "Succespercentage"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Views"
+msgstr "Weergaven"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Added"
+msgstr "Toegevoegd"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Removed"
+msgstr "Verwijderd"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No shelf activity yet"
+msgstr "Nog geen plankactiviteit"

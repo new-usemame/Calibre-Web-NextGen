@@ -5,7 +5,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 from flask import Blueprint, redirect, flash, url_for, request, send_from_directory, abort, jsonify, current_app
-from flask_babel import gettext as _, lazy_gettext as _l
+from flask_babel import gettext as _, lazy_gettext as _l, ngettext, get_locale, format_date
 from markupsafe import escape
 
 from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy
@@ -1282,25 +1282,27 @@ def get_cwa_stats() -> dict[str,int]:
 
     return totals
 
-### TABLE HEADERS
-headers = {
-    "enforcement":{
-        "no_paths":[
-            _("Timestamp"), _("Book ID"), _("Book Title"), _("Book Author"), _("Trigger Type")],
-        "with_paths":[
-            _("Timestamp"), _("Book ID"), _("Filepath")]
-        },
-    "epub_fixer":{
-        "no_fixes":[
-            _("Timestamp"), _("Filename"), _("Manual?"), _("No. Fixes"), _("Original Backed Up?")],
-        "with_fixes":[
-            _("Timestamp"), _("Filename"), _("Filepath"), _("Fixes Applied")]
-        },
-    "imports":[
-        _("Timestamp"), _("Filename"), _("Original Backed Up?")],
-    "conversions":[
-        _("Timestamp"), _("Filename"), _("Original Format"), _("End Format"), _("Original Backed Up?")],
-}
+def get_stats_headers():
+    """Resolve history column labels for this request and keep them extractable."""
+    return {
+        "enforcement":{
+            "no_paths":[
+                _("Timestamp"), _("Book ID"), _("Book Title"), _("Book Author"), _("Trigger Type")],
+            "with_paths":[
+                _("Timestamp"), _("Book ID"), _("Filepath")]
+            },
+        "epub_fixer":{
+            "no_fixes":[
+                _("Timestamp"), _("Filename"), _("Manual?"), _("No. Fixes"), _("Original Backed Up?")],
+            "with_fixes":[
+                _("Timestamp"), _("Filename"), _("Filepath"), _("Fixes Applied")]
+            },
+        "imports":[
+            _("Timestamp"), _("Filename"), _("Original Backed Up?")],
+        "conversions":[
+            _("Timestamp"), _("Filename"), _("Original Format"), _("End Format"), _("Original Backed Up?")],
+    }
+
 
 @cwa_stats.route("/cwa-stats-show", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1322,9 +1324,10 @@ def cwa_stats_show():
     today = datetime.now().strftime('%Y-%m-%d')
     
     # Handle 'all' as a special string value, otherwise parse as int
-    if days_param == 'all':
+    is_all_time = days_param == 'all'
+    if is_all_time:
         days = None  # None means all time
-        date_range_label = "All Time"
+        date_range_label = _("All Time")
     else:
         days = int(days_param) if days_param else None
     
@@ -1332,7 +1335,7 @@ def cwa_stats_show():
     
     # Set default label if not set
     if not date_range_label:
-        date_range_label = "Last 30 days"
+        date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", 30, count=30)
     
     if start_date and end_date:
         try:
@@ -1346,22 +1349,24 @@ def cwa_stats_show():
             if range_days > 365:
                 show_warning = True
             
-            date_range_label = f"{start_date} to {end_date}"
+            date_range_label = _("%(start)s to %(end)s",
+                                 start=format_date(start_dt, format='short'),
+                                 end=format_date(end_dt, format='short'))
         except ValueError:
             # Invalid date format, fall back to 30 days
             start_date = None
             end_date = None
             days = 30
-            date_range_label = "Last 30 days"
+            date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", 30, count=30)
     elif days:
-        if date_range_label != "All Time":
-            date_range_label = f"Last {days} days"
+        if not is_all_time:
+            date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", days, count=days)
         if days > 365:
             show_warning = True
-    elif days is None and date_range_label != "All Time":
+    elif days is None and not is_all_time:
         # Default to 30 days if no parameters provided
         days = 30
-        date_range_label = "Last 30 days"
+        date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", 30, count=30)
     
     cwa_db = CWA_DB()
     
@@ -1513,6 +1518,7 @@ def cwa_stats_show():
         hardcover_stats = None
 
     return render_title_template("cwa_stats_tabs.html", title=_("Calibre-Web NextGen Stats & Activity"),
+                                stats_locale=str(get_locale()),
                                 page="cwa-stats",
                                 active_tab=active_tab,
                                 dashboard_stats=dashboard_stats,
@@ -1549,12 +1555,12 @@ def cwa_stats_show():
                                 selected_user_id=user_id,
                                 cwa_stats=get_cwa_stats(),
                                 hardcover_stats=hardcover_stats,
-                                data_enforcement=data_enforcement, headers_enforcement=headers["enforcement"]["no_paths"], 
-                                data_enforcement_with_paths=data_enforcement_with_paths, headers_enforcement_with_paths=headers["enforcement"]["with_paths"], 
-                                data_imports=data_imports, headers_import=headers["imports"],
-                                data_conversions=data_conversions, headers_conversion=headers["conversions"],
-                                data_epub_fixer=data_epub_fixer, headers_epub_fixer=headers["epub_fixer"]["no_fixes"],
-                                data_epub_fixer_with_fixes=data_epub_fixer_with_fixes, headers_epub_fixer_with_fixes=headers["epub_fixer"]["with_fixes"])
+                                data_enforcement=data_enforcement, headers_enforcement=get_stats_headers()["enforcement"]["no_paths"],
+                                data_enforcement_with_paths=data_enforcement_with_paths, headers_enforcement_with_paths=get_stats_headers()["enforcement"]["with_paths"],
+                                data_imports=data_imports, headers_import=get_stats_headers()["imports"],
+                                data_conversions=data_conversions, headers_conversion=get_stats_headers()["conversions"],
+                                data_epub_fixer=data_epub_fixer, headers_epub_fixer=get_stats_headers()["epub_fixer"]["no_fixes"],
+                                data_epub_fixer_with_fixes=data_epub_fixer_with_fixes, headers_epub_fixer_with_fixes=get_stats_headers()["epub_fixer"]["with_fixes"])
 
 @cwa_stats.route("/cwa-stats-export-csv/<tab_name>", methods=["GET"])
 @login_required_if_no_ano
@@ -1898,7 +1904,7 @@ def show_full_enforcement():
     cwa_db = CWA_DB()
     data = cwa_db.enforce_show(paths=False, verbose=True, web_ui=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Enforcement History"), page="cwa-stats-full",
-                                    table_headers=headers["enforcement"]["no_paths"], data=data)
+                                    table_headers=get_stats_headers()["enforcement"]["no_paths"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-enforcement-with-paths", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1907,7 +1913,7 @@ def show_full_enforcement_path():
     cwa_db = CWA_DB()
     data = cwa_db.enforce_show(paths=True, verbose=True, web_ui=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Enforcement History (w/ Paths)"), page="cwa-stats-full",
-                                    table_headers=headers["enforcement"]["with_paths"], data=data)
+                                    table_headers=get_stats_headers()["enforcement"]["with_paths"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-imports", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1916,7 +1922,7 @@ def show_full_imports():
     cwa_db = CWA_DB()
     data = cwa_db.get_import_history(verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Import History"), page="cwa-stats-full",
-                                    table_headers=headers["imports"], data=data)
+                                    table_headers=get_stats_headers()["imports"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-conversions", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1925,7 +1931,7 @@ def show_full_conversions():
     cwa_db = CWA_DB()
     data = cwa_db.get_conversion_history(verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Conversion History"), page="cwa-stats-full",
-                                    table_headers=headers["conversions"], data=data)
+                                    table_headers=get_stats_headers()["conversions"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-epub-fixer", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1934,7 +1940,7 @@ def show_full_epub_fixer():
     cwa_db = CWA_DB()
     data = cwa_db.get_epub_fixer_history(fixes=False, verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full EPUB Fixer History (w/out Paths & Fixes)"), page="cwa-stats-full",
-                                    table_headers=headers["epub_fixer"]["no_fixes"], data=data)
+                                    table_headers=get_stats_headers()["epub_fixer"]["no_fixes"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-epub-fixer-with-paths-fixes", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1943,7 +1949,7 @@ def show_full_epub_fixer_with_paths_fixes():
     cwa_db = CWA_DB()
     data = cwa_db.get_epub_fixer_history(fixes=True, verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full EPUB Fixer History (w/ Paths & Fixes)"), page="cwa-stats-full",
-                                    table_headers=headers["epub_fixer"]["with_fixes"], data=data)
+                                    table_headers=get_stats_headers()["epub_fixer"]["with_fixes"], data=data)
 
 ##————————————————————————————————————————————————————————————————————————————##
 ##                                                                            ##

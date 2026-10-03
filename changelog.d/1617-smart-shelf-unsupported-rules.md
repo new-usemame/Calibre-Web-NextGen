@@ -1,1 +1,3 @@
-Smart-shelf rules that the New UI cannot edit now remain visible, with their saved field, operator and value. You can keep them or remove individual rules without losing the surrounding groups. Shelves containing only unavailable rules also retain their saved rules when opened. Name-only saves preserve JSON values, including numbers, booleans and empty values. Reported by @alva-seal in #1617.
+### Fixed
+
+- **Unsupported smart-shelf rules remain visible in the New UI.** See their saved field, operator and value, keep them on name-only saves, or remove individual rules without losing surrounding groups. Shelves containing only unavailable rules retain their saved tree when opened. JSON values keep their original types, and removal stays beside the field heading on phones. Reported by @alva-seal in #1617.

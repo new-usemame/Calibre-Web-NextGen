@@ -171,10 +171,17 @@ test('a wrapped cover-action error stays inside the viewport after content growt
     const opener = card.getByRole('button', {
       name: t('Actions for {title}').replace('{title}', book.title), exact: true,
     });
+    // The shelf staggers entry animations: a stable frame during the delay
+    // can still move after the wheel delta is measured. Use settled geometry.
+    await expect.poll(() => card.evaluate(node => node.getAnimations().every(animation =>
+      animation.playState === 'finished' || animation.playState === 'idle',
+    ))).toBe(true);
     await opener.scrollIntoViewIfNeeded();
     const height = page.viewportSize()!.height;
     const initial = (await opener.boundingBox())!;
-    // Native scrolling puts the complete trigger at the viewport's lower edge.
+    // Send native scrolling over the actual card, with its complete trigger
+    // at the viewport's lower edge before ordinary keyboard activation.
+    await page.mouse.move(initial.x + initial.width / 2, initial.y + initial.height / 2);
     await page.mouse.wheel(0, initial.y - (height - initial.height - 1));
     await expect.poll(async () => {
       const box = (await opener.boundingBox())!;

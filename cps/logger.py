@@ -144,15 +144,39 @@ def _make_stream_handler(stream, token):
     return h
 
 
-def _same_regular_file(first, second):
-    """Compare open sinks, including aliases and a fallback log path."""
+def _regular_file_identity(stream):
+    """Identify an open regular file without guessing from its path."""
     try:
-        left = os.fstat(first.fileno())
-        right = os.fstat(second.fileno())
+        opened = os.fstat(stream.fileno())
     except (AttributeError, OSError, TypeError, ValueError):
+        return None
+    if stat.S_ISREG(opened.st_mode):
+        return opened.st_dev, opened.st_ino
+    return None
+
+
+def _shares_rotating_sink(stdout, file_handler, previous_handlers):
+    """Retain a proven shared sink through rollover and settings reloads."""
+    stdout_identity = _regular_file_identity(stdout)
+    file_identity = _regular_file_identity(file_handler.stream)
+    if stdout_identity is None or file_identity is None:
         return False
-    return (stat.S_ISREG(left.st_mode) and stat.S_ISREG(right.st_mode)
-            and (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino))
+    shared = stdout_identity == file_identity
+    if not shared:
+        # Rollover leaves inherited stdout on an old inode. Carry that
+        # relationship only while stdout and the rotating target remain
+        # the same open sinks; changing either must restore dual output.
+        shared = any(
+            isinstance(previous, RotatingFileHandler)
+            and getattr(previous, '_shared_stdout_stream', None) is stdout
+            and getattr(previous, '_shared_stdout_identity', None) == stdout_identity
+            and _regular_file_identity(previous.stream) == file_identity
+            for previous in previous_handlers
+        )
+    if shared:
+        file_handler._shared_stdout_stream = stdout
+        file_handler._shared_stdout_identity = stdout_identity
+    return shared
 
 
 def setup(log_file, log_level=None):
@@ -199,7 +223,7 @@ def setup(log_file, log_level=None):
     if file_path is not None:
         try:
             fh, used_path = _make_file_handler(file_path)
-            if _same_regular_file(sys.stdout, fh.stream):
+            if _shares_rotating_sink(sys.stdout, fh, r.handlers):
                 new_handlers[0].close()
                 new_handlers.clear()
             new_handlers.append(fh)

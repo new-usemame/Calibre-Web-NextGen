@@ -98,6 +98,37 @@ class TestDualHandlerSetup:
             backup = Path(str(path) + '.1').read_text()
             assert backup.count('shared-before-rotation') == 1
             assert 'shared-after-rotation' not in backup
+            # ConfigSQL reloads logging after settings saves. Stdout now
+            # points to the backup, but it still belongs to this log sink.
+            cwa_logger.setup(str(path), logging.INFO)
+            log.info('shared-after-reload')
+            redirected.flush()
+            assert path.read_text().count('shared-after-reload') == 1
+            assert 'shared-after-reload' not in Path(str(path) + '.1').read_text()
+
+    @pytest.mark.parametrize('change', ['target', 'stdout_object', 'stdout_descriptor'])
+    def test_changed_sink_after_rotation_keeps_both_outputs(self, tmp_path, reset_root, monkeypatch, change):
+        path = tmp_path / 'shared.log'
+        output = tmp_path / 'new-stdout.log'
+        with path.open('a', encoding='utf-8') as redirected, output.open('a', encoding='utf-8') as replacement:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            cwa_logger.setup(str(path), logging.INFO)
+            _file_handlers()[0].doRollover()
+            if change == 'target':
+                path = tmp_path / 'new-target.log'
+                stdout_path = tmp_path / 'shared.log.1'
+            elif change == 'stdout_object':
+                monkeypatch.setattr(sys, 'stdout', replacement)
+                stdout_path = output
+            else:
+                os.dup2(replacement.fileno(), redirected.fileno())
+                stdout_path = output
+            cwa_logger.setup(str(path), logging.INFO)
+            logging.getLogger('cps.changed_sink_test').info('changed-sink-marker')
+            redirected.flush()
+            replacement.flush()
+            assert path.read_text().count('changed-sink-marker') == 1
+            assert stdout_path.read_text().count('changed-sink-marker') == 1
 
     def test_fallback_target_shared_with_stdout_writes_once(self, tmp_path, reset_root, monkeypatch):
         fallback = tmp_path / 'fallback.log'
@@ -111,6 +142,12 @@ class TestDualHandlerSetup:
             logging.getLogger('cps.shared_sink_test').info('fallback-single-record')
             redirected.flush()
             assert fallback.read_text().count('fallback-single-record') == 1
+            _file_handlers()[0].doRollover()
+            assert cwa_logger.setup(str(requested), logging.INFO) == ''
+            logging.getLogger('cps.shared_sink_test').info('fallback-after-reload')
+            redirected.flush()
+            assert fallback.read_text().count('fallback-after-reload') == 1
+            assert 'fallback-after-reload' not in Path(str(fallback) + '.1').read_text()
 
     def test_distinct_regular_stdout_and_logfile_both_receive_one_record(self, tmp_path, reset_root, monkeypatch):
         path = tmp_path / 'app.log'

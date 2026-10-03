@@ -102,3 +102,19 @@ test('a focused Classic date shows the value being edited', async ({ page }) => 
   await expect(mirror).toBeVisible();
   await expect(mirror).toHaveValue('5/3/2020');
 });
+
+test('Classic date blur displays one localized value and keeps raw invalid input readable', async ({ page }) => {
+  await page.goto(`/admin/book/${await firstBookId(page)}`);
+  const date = page.locator('#pubdate');
+  const mirror = page.locator('#fake_pubdate');
+  await page.locator('#publisher').focus();
+  await expect(mirror).toBeVisible();
+  await expect(date).toHaveCSS('color', 'rgba(0, 0, 0, 0)');
+  await date.focus();
+  await date.fill('');
+  await date.pressSequentially('not a date');
+  await date.press('Tab');
+  await expect(date).toHaveValue('not a date');
+  await expect(mirror).toBeHidden();
+  expect(await date.evaluate(el => getComputedStyle(el).color)).not.toBe('rgba(0, 0, 0, 0)');
+});

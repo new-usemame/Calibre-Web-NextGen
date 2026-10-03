@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import os
 import unicodedata
+from array import array
+from bisect import bisect_right
 from functools import lru_cache
 from typing import Optional
 
@@ -105,19 +107,34 @@ def parse_anchor(raw) -> Optional[dict]:
 
 
 class _Folded:
-    """The whole book's solid text, folded, with each character's origin."""
+    """The whole book's solid text, folded, with each character's origin.
+
+    ``origin[i]`` is the offset, in the spine's solid texts laid end to end,
+    of the character folded character ``i`` came from; ``starts`` holds where
+    each spine item begins in that run. A flat integer array, because a
+    long novel has millions of characters and this is cached.
+    """
 
     def __init__(self, spine):
         self.members = [member for member, _text in spine]
         self.solids = [text for _member, text in spine]
-        parts, origin = [], []
-        for m, solid in enumerate(self.solids):
+        parts, origin, starts, at = [], array("l"), [], 0
+        for solid in self.solids:
+            starts.append(at)
             for j, char in enumerate(solid):
                 folded = _fold(char)
                 parts.append(folded)
-                origin.extend([(m, j)] * len(folded))
+                origin.extend([at + j] * len(folded))
+            at += len(solid)
         self.text = "".join(parts)
         self.origin = origin
+        self.starts = starts
+
+    def source(self, i):
+        """``(spine item index, solid index in it)`` of folded character ``i``."""
+        at = self.origin[i]
+        m = bisect_right(self.starts, at) - 1
+        return m, at - self.starts[m]
 
 
 @lru_cache(maxsize=8)
@@ -135,7 +152,10 @@ def _book(epub_path) -> Optional[_Folded]:
     return _folded(path, stat.st_mtime_ns, stat.st_size)
 
 
-def _hits(haystack: str, needle: str, limit: int = 64) -> list:
+_HIT_LIMIT = 64
+
+
+def _hits(haystack: str, needle: str, limit: int = _HIT_LIMIT) -> list:
     out, start = [], 0
     while len(out) < limit:
         found = haystack.find(needle, start)
@@ -180,10 +200,12 @@ def locate(epub_path, anchor: dict, percentage: Optional[float] = None) -> Optio
         hits = _hits(book.text, needle)
         if not hits:
             continue
+        if len(hits) >= _HIT_LIMIT:
+            return None  # the nearest repeat may be among those not counted
         chosen = _choose(hits, None if target is None else target - offset, len(book.text))
         if chosen is None:
             return None  # the words repeat; a shorter needle repeats more
-        m, j = book.origin[chosen + offset]
+        m, j = book.source(chosen + offset)
         return kx.xpointer_at_solid_index(epub_path, book.members[m], j, book.solids[m])
     return None
 
@@ -229,8 +251,18 @@ def anchor_at(epub_path, xpointer: str, words: int = ANCHOR_WORDS) -> Optional[d
     end = at
     while end < len(text) and not text[end].isspace():
         end += 1
-    return {
+    # What is served must be what a client may send back (``parse_anchor``):
+    # a script without spaces between words has no "word" to name here.
+    return parse_anchor({
         "text": text[start:end],
-        "before": " ".join(_words_before(texts, m, start, words)),
-        "after": " ".join(_words_after(texts, m, end, words)),
-    }
+        "before": _bounded(_words_before(texts, m, start, words), from_end=True),
+        "after": _bounded(_words_after(texts, m, end, words), from_end=False),
+    })
+
+
+def _bounded(words, *, from_end):
+    """``words`` joined, dropping the words furthest from the place to fit."""
+    words = list(words)
+    while words and len(" ".join(words)) > MAX_CONTEXT_CHARS:
+        words.pop(0 if from_end else -1)
+    return " ".join(words)

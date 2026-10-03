@@ -38,6 +38,7 @@ Reference: https://github.com/koreader/koreader-sync-server
 """
 
 import base64
+import math
 import os
 import re
 from datetime import datetime, timezone
@@ -911,15 +912,25 @@ def _exact_xpointer(user_id, book_id, progress_record, document):
     return None
 
 
-def _library_epub(book_id):
-    """Path of the book's library EPUB, or None."""
+def _readable_epub(book_id, user):
+    """Path of the library EPUB whose text ``user`` may read, or None.
+
+    An anchor is the book's own words, and pushing anchors and reading them
+    back walks the text, so both directions are content reads: the user
+    must be able to see the book and hold the viewer or download role,
+    exactly what reading or downloading it in the web UI requires.
+    """
     from ... import calibre_db
     from ...annotations import _book_format_path
-    book = calibre_db.get_book(int(book_id))
+    if not (getattr(user, "role_viewer", lambda: False)()
+            or getattr(user, "role_download", lambda: False)()):
+        return None
+    book = calibre_db.get_filtered_book(int(book_id), allow_show_archived=True,
+                                        allow_show_hidden=True, user=user)
     return _book_format_path(book, "EPUB") if book is not None else None
 
 
-def _locate_anchor(book_id, anchor, percentage):
+def _locate_anchor(user, book_id, anchor, percentage):
     """``(xpointer, library digest)`` of a text anchor in the library EPUB, or None.
 
     Best-effort: a book with no EPUB, words that are not found or that repeat
@@ -929,7 +940,7 @@ def _locate_anchor(book_id, anchor, percentage):
     from ...services.koreader_position import file_digest
     from ...services.parallel import run_blocking
     try:
-        epub_path = _library_epub(book_id)
+        epub_path = _readable_epub(book_id, user)
         if not epub_path:
             return None
 
@@ -943,7 +954,7 @@ def _locate_anchor(book_id, anchor, percentage):
         return None
 
 
-def _anchor_for_record(user_id, book_id, record):
+def _anchor_for_record(user, book_id, record):
     """The words at ``record``'s position in the library EPUB, or None.
 
     The position must first be provably a place in the library EPUB itself:
@@ -957,7 +968,8 @@ def _anchor_for_record(user_id, book_id, record):
                                                is_xpointer)
     from ...services.parallel import run_blocking
     try:
-        epub_path = _library_epub(book_id)
+        user_id = user.id
+        epub_path = _readable_epub(book_id, user)
         if not epub_path or record is None:
             return None
         digest = run_blocking(lambda: file_digest(epub_path))
@@ -1218,7 +1230,7 @@ def get_progress(document: str):
 
         response_data = {**response_data, **response_updates}
         if book_id and POSITION_KIND_ANCHOR in _advertised_position_kinds():
-            anchor = _anchor_for_record(user.id, book_id, progress_record)
+            anchor = _anchor_for_record(user, book_id, progress_record)
             if anchor:
                 response_data["anchor"] = anchor
 
@@ -2258,6 +2270,8 @@ def update_progress():
             if isinstance(percentage, bool):
                 raise ValueError("not a number")
             percentage_float = float(percentage)
+            if not math.isfinite(percentage_float):
+                raise ValueError("not a finite number")
             if percentage_float <= 1.0:
                 percentage_float *= 100.0
             if percentage_float < 0 or percentage_float > 100:
@@ -2291,7 +2305,7 @@ def update_progress():
         if percentage_push:
             stored_progress, journal_progress = PERCENTAGE_ONLY_LOCATOR, None
             if anchor and book_id:
-                located = _locate_anchor(book_id, anchor, percentage_float)
+                located = _locate_anchor(user, book_id, anchor, percentage_float)
                 if located:
                     stored_progress, journal_document = located
                     journal_progress = stored_progress
@@ -2330,7 +2344,9 @@ def update_progress():
             device=device,
             device_id=device_id,
             timestamp=timestamp,
-            equal_accepts=True,
+            # An unplaced percentage at the same percentage as another
+            # device's exact locator must not replace it with less.
+            equal_accepts=stored_progress != PERCENTAGE_ONLY_LOCATOR,
             same_device_rewind=True,
         )
         if not outcome.accepted:

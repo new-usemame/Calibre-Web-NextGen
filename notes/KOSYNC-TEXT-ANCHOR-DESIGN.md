@@ -23,6 +23,13 @@ so a percentage hand-off is often pages away from where the reader actually was.
   winning position is provably a place in the library EPUB.
 - `document` may be a decimal Calibre book id. It resolves only to a book the account may open
   (`get_filtered_book(user=…)`).
+- An anchor is the book's own text, so placing one or receiving one is a content read. The account
+  must be able to see the book and hold the viewer or download role. Otherwise the push is stored
+  as a plain percentage and GET carries no `anchor`.
+- `percentage` must be a finite number in 0–1 (or 0–100). GET always returns it as 0–1.
+- An anchor that GET serves always passes the PUT limits (`text` ≤ 200, `before`/`after` ≤ 600
+  characters). Context is trimmed by whole words, dropping the words furthest from the place. A
+  script with no spaces between words has no word to name, so it gets no anchor.
 
 ## The fold (clients must implement exactly this)
 
@@ -55,6 +62,11 @@ Shared vectors: `FOLD_VECTORS` in `tests/unit/test_kosync_text_anchor.py`.
   characters the same way as `spine_solid_texts`, and it refuses the book if the two counts
   disagree.
 - **Who wins** is unchanged: furthest position across devices, and a same-device rewind is allowed.
+  The exception is a percentage the server could not place. When it only ties another device's row,
+  it does not replace that row, so an echo of a pulled percentage cannot erase an exact locator.
+- **Cost.** The folded book is cached (8 books, keyed by path, mtime and size) at about 10 bytes
+  per character. A needle with 64 or more hits is not placed, because the nearest repeat may be
+  among those not counted.
 
 ## Measured
 
@@ -72,3 +84,9 @@ Metamorphosis, 116 Kindle page positions, xpointer → anchor → xpointer:
   is unwired) is a follow-up.
 - The device kind of an anchor client is `koreader`, because it is registered through the KOSync
   path. Reading sources show the client's own `device` name.
+- A push without `device_id` stores the located XPointer but writes no device journal. That
+  client's own place then never comes back as an anchor, and the web reader is not given it
+  exactly.
+- `?position_kinds=anchor` without `percentage` is the old locator-only request, so the
+  percentage-only rows (a web or Kobo place) are not served to it. Ask for
+  `locator,percentage,anchor`.

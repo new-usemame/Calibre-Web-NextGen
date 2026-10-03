@@ -23,16 +23,41 @@ from types import SimpleNamespace
 
 import pytest
 
-from cps import calibre_db, ub
+from cps import calibre_db, constants, ub
 from cps.progress_syncing.models import KOSyncProgress
 from cps.services import koreader_xpointer as kx
 from tests.unit.test_koreader_exact_positions import (  # noqa: F401  (fixture)
     BOOK_ID, OTHER_FILE, _cfi_page_text, _drain_resume_workers, _page, _web_cfi, world)
-from tests.unit.test_koreader_xpointer import _squash
+from tests.unit.test_koreader_xpointer import _html_book, _squash
 
 pytestmark = pytest.mark.unit
 
 KINDS = "?position_kinds=locator,percentage,anchor"
+
+
+@pytest.fixture(autouse=True)
+def _a_reader_who_may_open_the_book(request, monkeypatch):
+    """The world's user can see book 221 and read it in the browser.
+
+    The visibility lookup answers for the user it is asked about, so a
+    caller that forgets to pass the user, or asks about another one, is
+    told the book does not exist.
+    """
+    if "world" not in request.fixturenames:
+        return
+    world = request.getfixturevalue("world")
+    world.user.role = constants.ROLE_VIEWER
+    world.session.commit()
+    world.can_see = {BOOK_ID}
+    book = SimpleNamespace(
+        id=BOOK_ID, title="Metamorphosis", path="Franz Kafka/Metamorphosis (221)",
+        data=[SimpleNamespace(format="EPUB", name="Metamorphosis - Franz Kafka")])
+
+    def get_filtered_book(book_id, *args, user=None, **kw):
+        if user is not world.user or book_id not in world.can_see:
+            return None
+        return book
+    monkeypatch.setattr(calibre_db, "get_filtered_book", get_filtered_book, raising=False)
 
 
 def _client(world):
@@ -244,6 +269,88 @@ def test_the_same_client_may_turn_back(world):
     assert body["percentage"] == pytest.approx(0.51)
 
 
+def test_an_unplaced_percentage_level_with_the_kindle_does_not_erase_its_place(world):
+    # The client echoes the percentage it pulled without words (it holds
+    # another copy, say): the Kindle's exact place must survive the tie.
+    page_xpointer, _shown = _page(60)
+    world.koreader_push(page_xpointer, 0.5143, world.digest)
+    _push(_client(world), {"document": world.digest, "percentage": 0.5143})
+
+    body = world.koreader_pull(world.digest)
+    assert body["position_kind"] == "locator" and body["progress"] == page_xpointer
+
+
+# ---------------------------------------------------------------------------
+# the words are the book's content: only a reader of the book gets them
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("who", ["no reading role", "book not visible to them"])
+def test_someone_who_may_not_read_the_book_neither_places_nor_receives_words(world, who):
+    if who == "no reading role":
+        world.user.role = constants.ROLE_UPLOAD
+        world.session.commit()
+    else:
+        world.can_see = set()
+    client = _client(world)
+
+    _push(client, {"document": world.digest, "percentage": 0.51,
+                   "anchor": _anchor_for_page(60)})
+    assert world.session.query(KOSyncProgress).one().progress == "cwng:percentage"
+
+    world.koreader_push(_page(61)[0], 0.52, world.digest)
+    assert "anchor" not in client.get(
+        f"/kosync/syncs/progress/{world.digest}{KINDS}").get_json()
+
+
+def test_the_download_role_alone_is_enough_to_get_the_words(world):
+    world.user.role = constants.ROLE_DOWNLOAD
+    world.session.commit()
+    world.koreader_push(_page(60)[0], 0.5143, world.digest)
+
+    body = _client(world).get(f"/kosync/syncs/progress/{world.digest}{KINDS}").get_json()
+
+    assert body["anchor"]["text"] == "his"
+
+
+# ---------------------------------------------------------------------------
+# what the server serves, it must accept back
+# ---------------------------------------------------------------------------
+
+
+def test_text_without_spaces_between_words_gets_no_anchor(tmp_path):
+    from cps.services import text_anchor
+    epub = _html_book(tmp_path, ["<p>" + "変身" * 300 + "</p>"])
+    member, solid = kx.spine_solid_texts(epub)[0]
+    xpointer = kx.xpointer_at_solid_index(epub, member, 300, solid)
+
+    assert xpointer and text_anchor.anchor_at(epub, xpointer) is None
+
+
+def test_very_long_words_around_the_place_are_trimmed_to_what_a_push_allows(tmp_path):
+    from cps.services import text_anchor
+    long_words = " ".join(f"{chr(97 + i)}" * 150 for i in range(8))
+    epub = _html_book(tmp_path, [f"<p>{long_words} here {long_words}</p>"])
+    member, solid = kx.spine_solid_texts(epub)[0]
+    xpointer = kx.xpointer_at_solid_index(epub, member, solid.index("here"), solid)
+
+    anchor = text_anchor.anchor_at(epub, xpointer)
+
+    assert anchor["text"] == "here"
+    assert text_anchor.parse_anchor(anchor) == anchor
+    # The words nearest the place are the ones kept.
+    assert anchor["before"].endswith("h" * 150) and anchor["after"].startswith("a" * 150)
+
+
+def test_words_that_repeat_more_often_than_are_counted_are_not_placed(world, monkeypatch):
+    from cps.services import text_anchor
+    # The licence's words occur twice; counting only that many cannot show
+    # there is no third copy nearer, so the percentage no longer decides.
+    assert text_anchor.locate(world.epub, LICENCE, 0.0)
+    monkeypatch.setattr(text_anchor, "_HIT_LIMIT", 2)
+    assert text_anchor.locate(world.epub, LICENCE, 0.0) is None
+
+
 # ---------------------------------------------------------------------------
 # the request contract
 # ---------------------------------------------------------------------------
@@ -262,6 +369,8 @@ def test_auth_names_the_capabilities_a_client_may_rely_on(world):
     {"position_kind": "percentage", "percentage": 0.5, "anchor": {"text": "x" * 201}},
     {"position_kind": "percentage", "percentage": 0.5, "anchor": ["his", "sister"]},
     {"position_kind": "percentage", "percentage": True},
+    {"position_kind": "percentage", "percentage": float("nan")},
+    {"position_kind": "percentage", "percentage": "inf"},
     {"position_kind": "words", "percentage": 0.5},
     {"progress": "/body/DocFragment[4]/body/div/p[27]/text().352", "percentage": 0.5,
      "anchor": {"text": "his"}},
@@ -276,6 +385,8 @@ def test_a_malformed_push_changes_nothing(world, body):
         "document": world.digest, "device": "WordReader", "device_id": "phone-1", **body})
 
     assert response.status_code == 400, response.get_json()
+    # Refused as an invalid field, not by the database tripping over it.
+    assert response.get_json()["error"] == 2003, response.get_json()
     world.session.expire_all()
     assert [(r.document, r.progress, r.percentage) for r in
             world.session.query(KOSyncProgress).all()] == before
@@ -291,11 +402,8 @@ def by_book_id(world, monkeypatch):
     """Only the digest of the library file names the book; ids resolve by policy."""
     import importlib
     kosync = importlib.import_module("cps.progress_syncing.protocols.kosync")
-    visible = {BOOK_ID: SimpleNamespace(id=BOOK_ID, title="Metamorphosis")}
     monkeypatch.setattr(kosync, "enrich_response_with_book_info",
                         lambda response, document: (response, None, None, None, None))
-    monkeypatch.setattr(calibre_db, "get_filtered_book",
-                        lambda book_id, **kw: visible.get(book_id), raising=False)
     return world
 
 

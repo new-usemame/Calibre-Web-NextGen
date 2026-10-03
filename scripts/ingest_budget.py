@@ -27,12 +27,11 @@ def wait_for_file_ready(path, timeout):
         if not os.path.exists(path):
             return False
         try:
-            result = subprocess.run(['lsof', '-F', 'f', '--', str(path)],
+            result = subprocess.run(['lsof', '-F', 'fa', '--', str(path)],
                                     capture_output=True, text=True, timeout=10)
-            # lsof marks write-only descriptors w and read/write descriptors
-            # u. Neither permits a reliable count until the writer closes.
-            if not any(line.startswith('f') and line.endswith(('w', 'u'))
-                       for line in result.stdout.splitlines()):
+            # Access mode is a separate a field, not part of the numeric f
+            # descriptor. Both aw and au denote active writers.
+            if not any(line in ('aw', 'au') for line in result.stdout.splitlines()):
                 return True
         except subprocess.TimeoutExpired:
             print('[ingest-processor] WARN: lsof command timed out. Assuming file is not in use.', file=sys.stderr, flush=True)
@@ -102,12 +101,15 @@ def main():
     try:
         if len(sys.argv) == 3 and sys.argv[1] == '--pdf-pages':
             print(_read_pdf_pages(sys.argv[2]))
-        elif len(sys.argv) == 3:
+        elif len(sys.argv) in (3, 4):
             base = int(sys.argv[1])
             if base < 0:
                 raise ValueError('negative budget')
+            readiness_timeout = int(sys.argv[3]) if len(sys.argv) == 4 else base / 3
+            if readiness_timeout < 0:
+                raise ValueError('negative readiness allowance')
             if base and Path(sys.argv[2]).suffix.lower() == '.pdf':
-                if not wait_for_file_ready(sys.argv[2], base / 3):
+                if not wait_for_file_ready(sys.argv[2], readiness_timeout):
                     return NOT_READY_EXIT
             pages = pdf_page_count(sys.argv[2]) if base else None
             print(scaled_budget(base, pages))

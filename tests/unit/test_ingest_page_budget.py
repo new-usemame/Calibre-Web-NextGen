@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import importlib.util
 import time
@@ -29,7 +30,8 @@ import json, os, sys
 from pathlib import Path
 Path(os.environ['TEST_CALLS']).write_text(json.dumps({
     'timeout': int(sys.argv[1]), 'file': sys.argv[-1],
-    'deadline': os.environ.get('CWA_CONVERSION_DEADLINE_SECONDS')}))
+    'deadline': os.environ.get('CWA_CONVERSION_DEADLINE_SECONDS'),
+    'readiness': os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS')}))
 ''')
     timeout.chmod(0o755)
     if complete_pdf is not None:
@@ -42,7 +44,7 @@ first = not record.exists()
 record.write_text(record.read_text() + 'probe\\n' if record.exists() else 'probe\\n')
 if first:
     Path(sys.argv[-1]).write_bytes(Path(os.environ['TEST_COMPLETE_PDF']).read_bytes())
-    print('f1w')
+    print('aw')
 ''')
         lsof.chmod(0o755)
     env = dict(os.environ, PATH=str(binaries) + os.pathsep + str(Path(sys.executable).parent) + os.pathsep + os.environ['PATH'],
@@ -73,6 +75,8 @@ maybe_run_post_batch_follow_up() { :; }
             command += 'handle_event "$3" MOVED_TO'
         else:
             command += 'printf "%s\\n" "$3" > "$QUEUE_FILE"; process_retry_queue all'
+            if complete_pdf is not None:
+                command += '; process_retry_queue all'
     result = subprocess.run(['bash', '-c',
                              command,
                              'test', str(SERVICE), str(budget), str(source)],
@@ -193,7 +197,7 @@ def test_readwrite_descriptor_is_not_ready_until_closed(tmp_path, monkeypatch):
     module = load_budget()
     source = tmp_path / 'writer.pdf'
     source.write_bytes(b'owned fixture')
-    outputs = iter(['f1u\n', 'f1r\n'])
+    outputs = iter(['au\n', 'ar\n'])
     calls = []
     def observe(*args, **kwargs):
         calls.append((args, kwargs))
@@ -205,7 +209,19 @@ def test_readwrite_descriptor_is_not_ready_until_closed(tmp_path, monkeypatch):
     assert all(call[1]['timeout'] == 10 for call in calls)
 
 
-@pytest.mark.parametrize('descriptor, ready', [('', True), ('f1w\n', False), ('f1u\n', False)])
+@pytest.mark.skipif(shutil.which('lsof') is None, reason='Native lsof unavailable; root-owned Linux-image gate required (2026-10-03)')
+@pytest.mark.parametrize('mode', ['w', 'r+'])
+def test_real_open_writer_is_detected_and_closed_writer_is_ready(tmp_path, mode):
+    module = load_budget()
+    source = tmp_path / 'native-writer.pdf'
+    source.write_bytes(b'owned fixture')
+    with source.open(mode) as writer:
+        assert writer.fileno() >= 0
+        assert module.wait_for_file_ready(source, 0) is False
+    assert module.wait_for_file_ready(source, 0) is True
+
+
+@pytest.mark.parametrize('descriptor, ready', [('', True), ('aw\n', False), ('au\n', False)])
 def test_zero_readiness_allowance_checks_once_without_waiting(tmp_path, monkeypatch, descriptor, ready):
     module = load_budget()
     source = tmp_path / 'unlimited.pdf'
@@ -230,7 +246,7 @@ def test_busy_pdf_retains_configured_wait_and_requests_retry_without_counting(tm
     monkeypatch.setattr(module.time, 'monotonic', lambda: next(ticks))
     monkeypatch.setattr(module.time, 'sleep', lambda _: None)
     monkeypatch.setattr(module.subprocess, 'run', lambda *args, **kwargs:
-                        subprocess.CompletedProcess(args[0], 0, stdout='f1w\n'))
+                        subprocess.CompletedProcess(args[0], 0, stdout='aw\n'))
     def forbidden_count(_):
         raise AssertionError('page counting started before the writer closed')
     monkeypatch.setattr(module, 'pdf_page_count', forbidden_count)
@@ -246,6 +262,21 @@ def test_not_ready_helper_status_keeps_source_and_does_not_start_processor(tmp_p
     helper.write_text('raise SystemExit(75)\n')
     record = run_service(tmp_path, source, 2700, helper=helper, expected_exit=2)
     assert record == {'source_present': True, 'processor_started': False}
+
+
+def test_retry_uses_immediate_readiness_in_helper_and_processor(tmp_path, monkeypatch):
+    source = tmp_path / 'retry.pdf'
+    source.write_bytes(b'owned fixture')
+    arguments = tmp_path / 'helper-arguments.json'
+    helper = tmp_path / 'observe-readiness.py'
+    helper.write_text('import json,sys\nfrom pathlib import Path\n'
+                      + f'Path({str(arguments)!r}).write_text(json.dumps(sys.argv))\n'
+                      + 'print(sys.argv[1])\n')
+    monkeypatch.setenv('CWA_INGEST_READINESS_TIMEOUT_SECONDS', '999')
+    record = run_service(tmp_path, source, 2700, helper=helper, event_mode='retry')
+    assert json.loads(arguments.read_text())[3:] == ['0']
+    assert record['readiness'] == '0'
+    assert os.environ['CWA_INGEST_READINESS_TIMEOUT_SECONDS'] == '999'
 
 
 def test_vanished_pdf_does_not_enter_counting(tmp_path, monkeypatch):

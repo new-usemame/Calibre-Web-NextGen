@@ -1972,6 +1972,8 @@ class NewBookProcessor:
         if timeout is None:
             timeout_minutes = self.cwa_settings.get('ingest_timeout_minutes', 15)
             timeout = timeout_minutes * 60  # Convert to seconds
+            if os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS') == '0':
+                timeout = 0  # Retry queues get one immediate writer probe.
 
         from ingest_budget import wait_for_file_ready
         return wait_for_file_ready(self.filepath, timeout)
@@ -3256,6 +3258,8 @@ def main(filepath=None):
         ext_tmp_check = Path(nbp.filename).suffix.replace('.', '')
         if ext_tmp_check not in nbp.ingest_ignored_formats:
             timeout_minutes = nbp.cwa_settings.get('ingest_timeout_minutes', 15)
+            if os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS') == '0':
+                timeout_minutes = 0
             print(f"[ingest-processor] Checking if file is ready (timeout: {timeout_minutes} minutes): {nbp.filename}", flush=True)
             ready = nbp.is_file_in_use()
             if not ready:

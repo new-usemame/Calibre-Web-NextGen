@@ -456,6 +456,7 @@ is_recent_duplicate_event() {
 run_processor_with_timeout() {
         local safety_timeout="$1"
         local filepath="$2"
+        local readiness_timeout="${3:-$(( safety_timeout / 3 ))}"
         local budget_helper="${CWA_INGEST_BUDGET_HELPER:-/app/calibre-web-automated/scripts/ingest_budget.py}"
         local selected_budget
         local helper_exit=0
@@ -463,9 +464,9 @@ run_processor_with_timeout() {
         # the DB setting and the processor's file-stability wait unchanged.
         if [ "$safety_timeout" -gt 0 ] 2>/dev/null; then
                 if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
-                        selected_budget=$(python3 "$budget_helper" "$safety_timeout" "$filepath") || helper_exit=$?
+                        selected_budget=$(python3 "$budget_helper" "$safety_timeout" "$filepath" "$readiness_timeout") || helper_exit=$?
                 else
-                        selected_budget=$(cwa-as-abc python3 "$budget_helper" "$safety_timeout" "$filepath") || helper_exit=$?
+                        selected_budget=$(cwa-as-abc python3 "$budget_helper" "$safety_timeout" "$filepath" "$readiness_timeout") || helper_exit=$?
                 fi
                 if [ "$helper_exit" -eq 75 ]; then
                         echo "[cwa-ingest-service] PDF did not become ready within the configured wait; retaining for retry: $filepath" >&2
@@ -511,9 +512,9 @@ run_processor_with_timeout() {
         # is for test environments where the harness already manages
         # the uid context (and the binary may not exist in /app/...).
         if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
-                timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
+                CWA_INGEST_READINESS_TIMEOUT_SECONDS="$readiness_timeout" timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
         else
-                timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
+                CWA_INGEST_READINESS_TIMEOUT_SECONDS="$readiness_timeout" timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
         fi
 }
 
@@ -737,7 +738,9 @@ process_retry_queue() {
                                 processing_marker=$(processing_marker_for_path "$queued_file")
                                 mkdir -p "$PROCESSING_DIR"
                                 : > "$processing_marker"
-                                run_processor_with_timeout "$safety_timeout" "$queued_file" < /dev/null
+                                # Busy retries probe once so one open writer
+                                # cannot repeatedly monopolize this worker.
+                                run_processor_with_timeout "$safety_timeout" "$queued_file" 0 < /dev/null
                                 local retry_exit=$?
                                 rm -f "$processing_marker" 2>/dev/null || true
 

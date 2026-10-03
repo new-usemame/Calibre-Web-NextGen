@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type DragEvent as ReactDragEvent } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type DragEvent as ReactDragEvent } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { X, GripVertical } from 'lucide-react';
 import { useBulkActions, useMe, useShelves } from '../lib/queries';
@@ -28,12 +28,12 @@ const Context = createContext<{
 export function useShelfDrag() { return useContext(Context); }
 
 /** Register only the mounted source page's selection; dragging snapshots it. */
-export function useShelfDragSelection(selection: Selection) {
+export function useShelfDragSelection(selection: Selection, scope = '') {
   const context = useShelfDrag();
   const latest = useRef(selection);
   latest.current = selection;
   const register = context?.register;
-  useEffect(() => register?.(latest), [register]);
+  useLayoutEffect(() => register?.(latest), [register, scope]);
 }
 
 export function ShelfDragProvider({ children }: { children: ReactNode }) {
@@ -61,12 +61,19 @@ export function ShelfDragProvider({ children }: { children: ReactNode }) {
     stopPointer.current?.(); stopPointer.current = null;
     dragRef.current = null; setDrag(null);
   }, []);
-  useEffect(() => { viewVersion.current++; cancel(); setPicker(null); }, [location, search, cancel]);
+  useLayoutEffect(() => { viewVersion.current++; cancel(); setPicker(null); setMessage(''); }, [location, search, me?.id, cancel]);
   useEffect(() => () => { viewVersion.current++; cancel(); }, [cancel]);
   const register = useCallback((value: React.MutableRefObject<Selection>) => {
     selection.current = value;
-    return () => { if (selection.current === value) selection.current = null; };
-  }, []);
+    return () => {
+      if (selection.current !== value) return;
+      selection.current = null;
+      // A mounted page can change its data source without changing the URL.
+      // Its old drag/picker and pending outcomes no longer own that selection.
+      viewVersion.current++;
+      cancel(); setPicker(null); setMessage('');
+    };
+  }, [cancel]);
   const payload = (id: number): Payload => {
     const source = selection.current?.current;
     return { ids: draggedBookIds(id, source?.ids ?? []), owner: selection.current ?? undefined };

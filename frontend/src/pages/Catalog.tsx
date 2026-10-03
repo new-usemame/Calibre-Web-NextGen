@@ -333,7 +333,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
   useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
     setSelected(new Set(ids)); setSelecting(true);
-  } });
+  } }, `${me?.id ?? 'guest'}:${me?.library_mode ?? 'monolibrary'}:${discoverIdentity}`);
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).

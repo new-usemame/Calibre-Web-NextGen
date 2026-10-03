@@ -8,4 +8,6 @@ For the four marker-bearing markup extensions (.html/.xhtml/.htm/.svg), filename
 
 Backups, checksum updates, run history and repeat-run behavior retain the existing policy. Only changed books are rewritten. Fixer logs report the marker count per changed entry. This repairs a concrete EPUB validation error; it does not guarantee Amazon acceptance of every book or change email delivery.
 
+Single-book runs also save their history after a repair or an unchanged repeat run. The command's output path is stored as text at the history boundary, so a filesystem path object cannot cause the command to fail after it has already repaired the book.
+
 Single-book manual rewrites require an administrator and a valid CSRF token, matching the EPUB Fixer service page. The existing page sends that token through its normal request helper. Anonymous browsing and ordinary reading permissions do not authorize a shared library rewrite.

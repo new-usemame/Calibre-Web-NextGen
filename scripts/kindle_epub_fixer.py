@@ -1256,7 +1256,7 @@ class EPUBFixer:
                                     bool(self.manually_triggered),
                                     len(self.fixed_problems),
                                     str(self.cwa_settings['auto_backup_epub_fixes']),
-                                    output_path,
+                                    str(output_path),
                                     fixed_problems)
 
 

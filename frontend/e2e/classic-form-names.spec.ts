@@ -78,12 +78,13 @@ test('rich-text breadcrumbs retain block selection with valid button semantics',
     editor.setContent('<p><strong>Nested editor probe</strong></p>');
   });
   await page.frameLocator('#comments_ifr').getByText('Nested editor probe', { exact: true }).click();
-  const path = page.locator('.tox-statusbar__path');
+  const pathSelector = '.tox:has(#comments_ifr) .tox-statusbar__path';
+  const path = page.locator(pathSelector);
   await expect(path.getByRole('button', { name: 'p', exact: true })).toBeVisible();
   await path.getByRole('button', { name: 'p', exact: true }).click();
   expect(await page.evaluate(() => (window as unknown as { tinymce: { get(id: string): { selection: { getNode(): Element } } } }).tinymce.get('comments').selection.getNode().nodeName)).toBe('P');
   await expect(path.getByRole('button', { name: 'p', exact: true })).toBeVisible();
-  const result = await new AxeBuilder({ page }).include('.tox-statusbar__path').withRules(['aria-allowed-attr']).analyze();
+  const result = await new AxeBuilder({ page }).include(pathSelector).withRules(['aria-allowed-attr']).analyze();
   expect(result.violations, 'retained breadcrumb buttons must use supported ARIA').toEqual([]);
 });
 

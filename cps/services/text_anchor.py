@@ -183,6 +183,19 @@ def locate(epub_path, anchor: dict, percentage: Optional[float] = None) -> Optio
     ``percentage`` (0-100) is where the client believes it is; it only
     chooses between repeats of the anchor's words (see the module notes).
     """
+    found = place(epub_path, anchor, percentage)
+    return found[0] if found else None
+
+
+def place(epub_path, anchor: dict, percentage: Optional[float] = None):
+    """``(xpointer, percent)`` of the anchor's words in ``epub_path``, or None.
+
+    ``percent`` (0-100) is how far into the book's text the words are. Every
+    client counts its own percentage over its own text (with or without the
+    front matter, by words or by pages), so the same sentence carries a
+    different figure from each; this one is the same for every client that
+    names that sentence, which is what lets positions be compared.
+    """
     book = _book(epub_path)
     if book is None or not book.text:
         return None
@@ -206,7 +219,10 @@ def locate(epub_path, anchor: dict, percentage: Optional[float] = None) -> Optio
         if chosen is None:
             return None  # the words repeat; a shorter needle repeats more
         m, j = book.source(chosen + offset)
-        return kx.xpointer_at_solid_index(epub_path, book.members[m], j, book.solids[m])
+        xpointer = kx.xpointer_at_solid_index(epub_path, book.members[m], j, book.solids[m])
+        if not xpointer:
+            return None
+        return xpointer, (chosen + offset) / len(book.text) * 100.0
     return None
 
 

@@ -931,7 +931,11 @@ def _readable_epub(book_id, user):
 
 
 def _locate_anchor(user, book_id, anchor, percentage):
-    """``(xpointer, library digest)`` of a text anchor in the library EPUB, or None.
+    """``(xpointer, library digest, percent)`` of a text anchor in the library EPUB, or None.
+
+    ``percent`` is how far into the library EPUB's text the words are
+    (``text_anchor.place``), the figure the push is then compared and shared
+    with.
 
     Best-effort: a book with no EPUB, words that are not found or that repeat
     ambiguously, or any failure leaves the push percentage-only.
@@ -946,8 +950,8 @@ def _locate_anchor(user, book_id, anchor, percentage):
 
         def place():
             digest = file_digest(epub_path)
-            xpointer = text_anchor.locate(epub_path, anchor, percentage)
-            return (xpointer, digest) if xpointer and digest else None
+            found = text_anchor.place(epub_path, anchor, percentage)
+            return (found[0], digest, found[1]) if found and digest else None
         return run_blocking(place)
     except Exception:
         log.warning("Could not place a text anchor in book %s", book_id, exc_info=True)
@@ -2307,8 +2311,16 @@ def update_progress():
             if anchor and book_id:
                 located = _locate_anchor(user, book_id, anchor, percentage_float)
                 if located:
-                    stored_progress, journal_document = located
+                    stored_progress, journal_document, placed_percent = located
                     journal_progress = stored_progress
+                    # Who is furthest is decided on one scale: where these
+                    # words are in the library EPUB, not each client's own
+                    # count. A place the client does not call finished is
+                    # never made finished by that conversion.
+                    if percentage_float < FINISHED_PERCENT_THRESHOLD:
+                        placed_percent = min(placed_percent,
+                                             math.nextafter(FINISHED_PERCENT_THRESHOLD, 0.0))
+                    percentage_float = placed_percent
 
         # Prefer the book_id as the identifier (if we have it) to ensure that all documents associated with the same
         # Calibre book share the same progress record even if they have different checksums.

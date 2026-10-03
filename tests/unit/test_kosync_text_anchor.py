@@ -89,6 +89,11 @@ def _anchor_for_page(n, *, typographic=True):
     return {"text": words[0], "before": "", "after": after}
 
 
+def _kindle_fraction(n):
+    """How far into the book the Kindle was on page ``n`` (of its 116)."""
+    return n / 116
+
+
 def _push(client, body, status=200):
     payload = {"device": "WordReader (Phone)", "device_id": "phone-1",
                "position_kind": "percentage", **body}
@@ -116,7 +121,7 @@ def test_the_kindle_and_the_browser_open_at_the_clients_words(world):
     body = world.koreader_pull(world.digest)
     assert body["position_kind"] == "locator"
     assert _solid(world.epub, body["progress"]) == _solid(world.epub, page_xpointer)
-    assert body["percentage"] == pytest.approx(0.51)
+    assert body["percentage"] == pytest.approx(_kindle_fraction(60), abs=0.02)
 
     resume = world.web_resume()
     assert _cfi_page_text(world.epub, resume["cfi"]).startswith(_squash(shown)[:80])
@@ -257,6 +262,34 @@ def test_a_client_behind_another_device_does_not_pull_it_back(world):
     assert body["percentage"] == pytest.approx(0.52)
 
 
+def test_a_client_counting_more_words_does_not_overtake_a_kindle_ahead_of_it(world):
+    # The client counts the front matter too, so the sentence the Kindle
+    # calls 51% is 58% to it. Its place is two pages behind the Kindle's:
+    # it must not win on its own larger figure.
+    client = _client(world)
+    world.koreader_push(_page(62)[0], _kindle_fraction(62), world.digest)
+    _push(client, {"document": world.digest, "percentage": 0.58,
+                   "anchor": _anchor_for_page(60)})
+
+    body = world.koreader_pull(world.digest)
+    assert body["progress"] == _page(62)[0]
+
+
+def test_a_place_the_client_has_not_finished_is_not_made_finished(world):
+    from cps.services import text_anchor
+    member, solid = kx.spine_solid_texts(world.epub)[-1]
+    near_end = kx.xpointer_at_solid_index(world.epub, member, len(solid) - 40, solid)
+    anchor = text_anchor.anchor_at(world.epub, near_end)
+    found = text_anchor.place(world.epub, anchor, 98.9)
+    assert found and found[1] >= 99.0  # these words are in the book's last 1%
+    client = _client(world)
+    _push(client, {"document": world.digest, "percentage": 0.989, "anchor": anchor})
+
+    body = world.koreader_pull(world.digest)
+    assert body["percentage"] < 0.99
+    assert world.session.query(ub.ReadBook).one().read_status != ub.ReadBook.STATUS_FINISHED
+
+
 def test_the_same_client_may_turn_back(world):
     client = _client(world)
     _push(client, {"document": world.digest, "percentage": 0.52,
@@ -266,7 +299,7 @@ def test_the_same_client_may_turn_back(world):
 
     body = world.koreader_pull(world.digest)
     assert _solid(world.epub, body["progress"]) == _solid(world.epub, _page(60)[0])
-    assert body["percentage"] == pytest.approx(0.51)
+    assert body["percentage"] == pytest.approx(_kindle_fraction(60), abs=0.02)
 
 
 def test_an_unplaced_percentage_level_with_the_kindle_does_not_erase_its_place(world):
@@ -415,7 +448,7 @@ def test_a_push_under_the_book_id_reaches_the_kobo_and_the_read_status(by_book_i
 
     assert body["calibre_book_id"] == BOOK_ID
     bookmark = by_book_id.session.query(ub.KoboBookmark).one()
-    assert bookmark.progress_percent == pytest.approx(51.0)
+    assert bookmark.progress_percent == pytest.approx(_kindle_fraction(60) * 100, abs=2)
     read = by_book_id.session.query(ub.ReadBook).one()
     assert read.read_status == ub.ReadBook.STATUS_IN_PROGRESS
     pulled = client.get(f"/kosync/syncs/progress/{BOOK_ID}{KINDS}").get_json()

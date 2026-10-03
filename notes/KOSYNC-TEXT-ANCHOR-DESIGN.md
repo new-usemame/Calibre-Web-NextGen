@@ -27,6 +27,13 @@ so a percentage hand-off is often pages away from where the reader actually was.
   must be able to see the book and hold the viewer or download role. Otherwise the push is stored
   as a plain percentage and GET carries no `anchor`.
 - `percentage` must be a finite number in 0–1 (or 0–100). GET always returns it as 0–1.
+- When the anchor is located, the stored and compared percentage is where those words are in the
+  library EPUB's text, not the client's own figure. Each client counts over its own text (with or
+  without front matter, by words or by pages), so the same sentence has a different figure in each.
+  Without this, a client that counts more words could win furthest-wins from behind. Measured on
+  Metamorphosis, the derived figure is within 3% of KOReader's own page fraction on 115 recorded
+  pages (mean −0.6%); a word-count client was 7% off. A derived figure never reaches the finished
+  threshold (99%) unless the client's own figure does. An unanchored push keeps the client's figure.
 - An anchor that GET serves always passes the PUT limits (`text` ≤ 200, `before`/`after` ≤ 600
   characters). Context is trimmed by whole words, dropping the words furthest from the place. A
   script with no spaces between words has no word to name, so it gets no anchor.

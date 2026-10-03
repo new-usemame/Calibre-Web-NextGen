@@ -59,6 +59,7 @@ import os
 import subprocess
 import sys
 import time
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -480,19 +481,32 @@ class TestShellDeadlineArithmetic:
 
     @staticmethod
     def _derive(safety_timeout):
-        """Run the real derivation block out of the shipped script."""
-        body = _shell_function_body(INGEST_SERVICE_RUN.read_text(),
-                                    "run_processor_with_timeout")
-        lines = body.splitlines()
-        start = next(i for i, l in enumerate(lines)
-                     if 'safety_timeout" -gt 0' in l)
-        end = next(i for i in range(start, len(lines))
-                   if lines[i].strip() == "fi")
-        block = "\n".join(lines[start:end + 1]).replace("local ", "")
-        script = f'safety_timeout={safety_timeout}\n{block}\necho "${{CWA_CONVERSION_DEADLINE_SECONDS:-unset}}"'
-        out = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
-        assert out.returncode == 0, out.stderr
-        return out.stdout.strip()
+        """Observe the real wrapper, without extracting its source blocks.
+
+        Nested budget-selection logic exposed the old source-text extractor:
+        it stopped at the first inner fi and executed an incomplete shell.
+        A timeout command seam observes the actual exported deadline instead.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            tmp = Path(directory)
+            timeout = tmp / 'timeout'
+            timeout.write_text('#!/usr/bin/env bash\nprintf "CWNG_DEADLINE=%s\\n" "${CWA_CONVERSION_DEADLINE_SECONDS:-unset}"\n')
+            timeout.chmod(0o755)
+            env = dict(os.environ, PATH=str(tmp) + os.pathsep + str(Path(sys.executable).parent) + os.pathsep + os.environ['PATH'],
+                       WATCH_FOLDER=str(tmp), CWA_INGEST_SERVICE_TEST_MODE='1',
+                       CWA_INGEST_RETRY_QUEUE=str(tmp / 'queue'),
+                       CWA_INGEST_STATUS_FILE=str(tmp / 'status'),
+                       CWA_INGEST_PROCESSING_DIR=str(tmp / 'processing'),
+                       CWA_INGEST_RECENT_DIR=str(tmp / 'recent'),
+                       CWA_INGEST_PROCESSOR_CMD='/observation-only',
+                       CWA_INGEST_BUDGET_HELPER=str(INGEST_SERVICE_RUN.parents[5] / 'scripts/ingest_budget.py'))
+            out = subprocess.run(['bash', '-c',
+                                  'source "$1" >/dev/null; run_processor_with_timeout "$2" "$3"',
+                                  'test', str(INGEST_SERVICE_RUN), str(safety_timeout), str(tmp / 'plain.txt')],
+                                 env=env, capture_output=True, text=True, timeout=15)
+            assert out.returncode == 0, out.stderr
+            return next(line.split('=', 1)[1] for line in out.stdout.splitlines()
+                        if line.startswith('CWNG_DEADLINE='))
 
     def test_deadline_is_monotonic_in_the_hard_timeout(self):
         previous = -1

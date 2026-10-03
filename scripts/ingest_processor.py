@@ -11,6 +11,9 @@ import json
 import os
 import subprocess
 import sys
+from calibre_library_target import (library_target, calibredb_command, operation,
+                                    offline_library_operation, offline_library_access, offline_child_ownership,
+                                    offline_writer_ownership, LibraryBusyError, check_maintenance)
 import tempfile
 import time
 import shutil
@@ -48,15 +51,14 @@ from contextlib import contextmanager as _contextmanager
 
 
 @_contextmanager
-def _noop_metadata_db_write_lock(*args, **kwargs):
-    # No-op fallback used when running outside the container OR before
-    # _load_optional_cps_modules() has been called. The fcntl-based
-    # lock is advisory; in test paths that don't reach the cps import,
-    # this fallback preserves callsite semantics.
-    yield
+def _standalone_metadata_db_write_lock(*args, **kwargs):
+    # The shared primitive is dependency-free: a failed optional Flask import
+    # must not disable coordination with the app or a managed Calibre server.
+    with operation(timeout=kwargs.get("timeout", 120)) as fd:
+        yield fd
 
 
-metadata_db_write_lock = _noop_metadata_db_write_lock
+metadata_db_write_lock = _standalone_metadata_db_write_lock
 
 
 def _load_fork_cps_imports() -> None:
@@ -82,7 +84,7 @@ def _load_fork_cps_imports() -> None:
         from cps.services.calibre_db_lock import metadata_db_write_lock as _module_lock
         metadata_db_write_lock = _module_lock
     except ImportError:
-        metadata_db_write_lock = _noop_metadata_db_write_lock
+        metadata_db_write_lock = _standalone_metadata_db_write_lock
 
     try:
         from cps.services.kepub_package_normalizer import (
@@ -109,7 +111,7 @@ def _is_lock_error_stderr(stderr_text):
     return any(p in low for p in _LOCK_PATTERNS)
 
 
-def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0):
+def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0, **process_options):
     """Run calibredb add with retry+backoff on transient lock errors.
 
     Returns the successful CompletedProcess. Raises the last
@@ -121,6 +123,7 @@ def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0):
         try:
             return subprocess.run(
                 cmd, env=env, check=True, capture_output=True, text=True,
+                **process_options,
             )
         except subprocess.CalledProcessError as e:
             stderr = e.stderr or ""
@@ -1321,7 +1324,9 @@ class NewBookProcessor:
         arrive without one"). Best-effort throughout: an import must not fail
         because a cover could not be drawn, and a book that already has a cover
         is never touched — ``generate_cover_file`` refuses to overwrite, so a
-        re-run over the same library is a no-op rather than a rewrite.
+        re-run over the same library is a no-op rather than a rewrite. If the
+        flag commit fails, only this call's unchanged generated file is removed
+        so a later explicit enabled pass can generate again.
         """
         if book_id is None:
             return False
@@ -1337,39 +1342,44 @@ class NewBookProcessor:
             settings = cover_generator.settings_from_app_db(str(app_paths.app_db_path()))
             if not settings.auto_enabled:
                 return False
-
-            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                row = connection.execute(
-                    "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
-                    (int(book_id),),
-                ).fetchone()
-                if not row:
+            with sqlite3.connect(Path(self.metadata_db).resolve().as_uri() + "?mode=ro", uri=True, timeout=30) as connection:
+                row = connection.execute("SELECT path, has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+                if not row or row[1] or os.path.lexists(os.path.join(self.library_dir, row[0], "cover.jpg")):
                     return False
-                book_path, title, has_cover, series_index = row
-                if has_cover:
-                    return False
-                authors = [name for (name,) in connection.execute(
-                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
-                    "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
-                series_row = connection.execute(
-                    "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
-                    "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
+            with offline_library_access(), metadata_db_write_lock():
+                with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+                    row = connection.execute(
+                        "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
+                        (int(book_id),),
+                    ).fetchone()
+                    if not row:
+                        return False
+                    book_path, title, has_cover, series_index = row
+                    destination = os.path.join(self.library_dir, book_path, "cover.jpg")
+                    if has_cover or os.path.lexists(destination):
+                        return False
+                    authors = [name for (name,) in connection.execute(
+                        "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
+                        "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
+                    series_row = connection.execute(
+                        "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
+                        "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
 
-            destination = os.path.join(self.library_dir, book_path, "cover.jpg")
-            written = cover_generator.generate_cover_file(
-                destination,
-                cover_generator.BookCoverMeta(
-                    title=title or "",
-                    authors=authors,
-                    series=series_row[0] if series_row else None,
-                    series_index=series_index,
-                ),
-                preset=settings.default_preset,
-            )
-            if not written:
-                return False
-            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+                created = []
+                written = cover_generator.generate_cover_file(
+                    destination,
+                    cover_generator.BookCoverMeta(
+                        title=title or "",
+                        authors=authors,
+                        series=series_row[0] if series_row else None,
+                        series_index=series_index,
+                    ),
+                    preset=settings.default_preset, on_created=created.append,
+                )
+                if not written:
+                    return False
+                cover_generator.commit_generated_cover_flag(
+                    self.metadata_db, book_id, destination, created[0] if created else None, timeout=30)
             print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
                   f"({settings.default_preset}) — it was imported without one.", flush=True)
             return True
@@ -1413,7 +1423,7 @@ class NewBookProcessor:
             return  # user wants ASCII filenames; calibredb already produced them
 
         try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+            with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                 if not self._register_title_sort_function(con):
                     print(f"[ingest-processor] INFO: Skipping path fix for book {book_id} (title_sort unavailable).", flush=True)
                     return
@@ -1598,7 +1608,7 @@ class NewBookProcessor:
             except Exception:
                 print("[ingest-processor] WARN: Acquisition post-import follow-up failed", flush=True)
         try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+            with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                 if self._register_title_sort_function(con):
                     stamp_books_with_import_time(con, self.last_added_book_ids,
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00"))
@@ -2120,6 +2130,7 @@ class NewBookProcessor:
                 action,
             ),
             self.calibre_env,
+            **offline_child_ownership(),
         )
         return self._parse_calibre_transaction_result(completed)
 
@@ -2326,6 +2337,7 @@ class NewBookProcessor:
             )
         return True
 
+    @offline_library_operation
     def _current_overwrite_candidates(
         self,
         staged_path: Path,
@@ -2504,7 +2516,7 @@ class NewBookProcessor:
                 # not run overwrite inspection or format recovery for it:
                 # those Calibre opens can fail independently of this safe
                 # additive tag operation, and no format should be replaced.
-                with metadata_db_write_lock():
+                with offline_library_access(), metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     replay_result = self._run_calibre_transaction(
                         staged_path,
                         staged_identity_path,
@@ -2582,6 +2594,8 @@ class NewBookProcessor:
                     )
                 else:
                     candidates = []
+            except (LibraryBusyError, TimeoutError):
+                raise
             except Exception as error:
                 self._quarantine_or_preserve_source(
                     staged_path,
@@ -2603,7 +2617,7 @@ class NewBookProcessor:
                 # Reinspect under the cooperating-writer lock. If a matching
                 # format appeared after the unlocked inspection, release the
                 # lock and validate before trying again.
-                with metadata_db_write_lock():
+                with offline_library_access(), metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     try:
                         candidates = self._current_overwrite_candidates(
                             staged_path,
@@ -2612,6 +2626,8 @@ class NewBookProcessor:
                             source_digest,
                             metadata_override,
                         )
+                    except (LibraryBusyError, TimeoutError):
+                        raise
                     except Exception as error:
                         self._quarantine_or_preserve_source(
                             staged_path,
@@ -2768,7 +2784,7 @@ class NewBookProcessor:
             )
             if imported_ids:
                 try:
-                    with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                    with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
                         else:
@@ -2792,7 +2808,7 @@ class NewBookProcessor:
             # Update timestamp to last_modified for any rows changed by this import so sorting by 'new' reflects overwrites.
             if self.cwa_settings.get('auto_ingest_automerge') == 'overwrite':
                 try:
-                    with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                    with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                         cur = con.cursor()
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
@@ -2815,7 +2831,7 @@ class NewBookProcessor:
             )
             print(f"[ingest-processor] ERROR: {message}", flush=True)
             raise RetryIngestSourceError(message) from e
-        except (PreserveIngestSourceError, RetryIngestSourceError):
+        except (PreserveIngestSourceError, RetryIngestSourceError, LibraryBusyError, TimeoutError):
             raise
         except Exception as e:
             print(f"[ingest-processor] ingest-processor ran into the following error:\n{e}", flush=True)
@@ -2864,9 +2880,11 @@ class NewBookProcessor:
         try:
             mark_ingest_batch_active()
             wait_for_duplicate_full_scan_to_finish()
-            result = subprocess.run([
-                "calibredb", "add_format", str(book_id), str(staged_path), f"--library-path={self.library_dir}"
-            ], env=self.calibre_env, check=True, capture_output=True, text=True)
+            with operation():
+                target = library_target(self.library_dir)
+                result = subprocess.run(calibredb_command([
+                    "calibredb", "add_format", str(book_id), str(staged_path), *target.args
+                ], target), env=self.calibre_env, check=True, capture_output=True, text=True, input=target.stdin)
             print(f"[ingest-processor] Added new format for book id {book_id}: {os.path.basename(str(staged_path))}", flush=True)
             mark_ingest_batch_dirty()
             run_duplicate_scan_for_books([book_id])
@@ -2878,8 +2896,12 @@ class NewBookProcessor:
             stderr_output = e.stderr if e.stderr else "No error details available"
             print(f"[ingest-processor] Failed to add format for book id {book_id}: {os.path.basename(str(staged_path))}\nCALIBREDB EXIT/ERROR CODE: {e.returncode}\nError details: {stderr_output}", flush=True)
             self.backup(str(staged_path), backup_type="failed")
+            raise RetryIngestSourceError("Calibre did not commit the new format") from e
+        except (LibraryBusyError, TimeoutError):
+            raise
         except Exception as e:
             print(f"[ingest-processor] Unexpected error while adding format for book id {book_id}: {e}", flush=True)
+            raise RetryIngestSourceError(str(e)) from e
         finally:
             clear_ingest_batch_active()
             if staged_path.exists():
@@ -3244,6 +3266,7 @@ def main(filepath=None):
                         exit_code = int(child_exit)
             return exit_code
 
+        check_maintenance()
         if not initialize_runtime():
             return 2
 
@@ -3324,6 +3347,8 @@ def main(filepath=None):
                     return 0
             if nbp.acquisition_required and not getattr(nbp, "acquisition_intent", None):
                 raise PreserveIngestSourceError("Acquisition manifest missing; original retained")
+        except (PreserveIngestSourceError, RetryIngestSourceError, LibraryBusyError, TimeoutError, PermissionError):
+            raise
         except Exception as e:
             if getattr(nbp, "acquisition_required", False):
                 raise PreserveIngestSourceError("Acquisition intent unavailable or invalid; original retained") from None
@@ -3342,7 +3367,10 @@ def main(filepath=None):
         if nbp.input_format == "acsm":
             try:
                 nbp.ingest_acsm()
-            except (PreserveIngestSourceError, RetryIngestSourceError):
+            except (PreserveIngestSourceError, RetryIngestSourceError,
+                    LibraryBusyError, TimeoutError, PermissionError):
+                # Preserve the busy exit status used by the service retry timer,
+                # alongside the ACSM source/recovery preservation classifications.
                 raise
             except Exception:
                 # Receipt lookup or unexpected hook/import failures must not
@@ -3418,8 +3446,11 @@ def main(filepath=None):
                                     print(f"[ingest-processor] Original file no longer exists or is empty, cannot retain format: {filepath}", flush=True)
                             else:
                                 print(f"[ingest-processor] Could not find book ID to add retained format for: {nbp.filename}", flush=True)
+                        except (LibraryBusyError, TimeoutError):
+                            raise
                         except Exception as e:
                             print(f"[ingest-processor] Error adding retained format: {e}", flush=True)
+                            raise RetryIngestSourceError("Original format was not retained") from e
 
                 elif conversion_attempted and is_rescuable_on_conversion_failure(nbp.input_format): # Conversion failed. Import the original anyway — a failed conversion is no reason to drop the book (#1094)
                     print(f"\n[ingest-processor]: {nbp.filename} could not be converted to {nbp.target_format}, importing the original {nbp.input_format} instead so the book still lands in your library...", flush=True)
@@ -3450,7 +3481,12 @@ def main(filepath=None):
         skip_delete = True
         print(f"[ingest-processor] RETRY: {error}", flush=True)
         return 1
+    except (LibraryBusyError, TimeoutError, PermissionError) as error:
+        skip_delete = True
+        print(f"[ingest-processor] BUSY: {error}; original retained", flush=True)
+        return 2
     except Exception as e:
+        skip_delete = True
         print(f"[ingest-processor] Unexpected error during processing: {e}", flush=True)
         raise
     finally:

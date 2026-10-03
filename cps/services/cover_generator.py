@@ -63,16 +63,23 @@ from __future__ import annotations
 
 import base64
 import dataclasses
+import ctypes
+import errno
+import hashlib
 import json
 import math
 import os
+import secrets
 import re
 import shutil
 import subprocess
 import sqlite3
+import stat
 import struct
+import sys
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional, Sequence
 
 from .. import logger
@@ -2233,18 +2240,62 @@ def settings_from_app_db(app_db_path: str) -> GeneratorSettings:
     return GeneratorSettings(bool(row[0]), str(row[1] or DEFAULT_PRESET))
 
 
+def _publish_cover_without_replacement(staging, destination):
+    """Publish the complete sibling atomically, retaining any existing entry."""
+    try:
+        os.link(staging, destination)
+        return True
+    except FileExistsError:
+        return False
+    except OSError as error:
+        if error.errno not in {errno.EPERM, errno.ENOSYS, errno.ENOTSUP,
+                              errno.EOPNOTSUPP, errno.EXDEV, errno.EINVAL}:
+            raise
+    # Some library filesystems cannot create hard links. Native exclusive rename
+    # preserves both completeness and no-replace semantics; ordinary POSIX rename
+    # or copying into the destination would lose one of those guarantees.
+    if os.name == "nt":
+        try:
+            os.rename(staging, destination)
+            return True
+        except FileExistsError:
+            return False
+    libc = ctypes.CDLL(None, use_errno=True)
+    source, target = os.fsencode(staging), os.fsencode(destination)
+    if sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+        rename = libc.renameat2
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
+                           ctypes.c_char_p, ctypes.c_uint]
+        arguments = (-100, source, -100, target, 1)  # AT_FDCWD, RENAME_NOREPLACE
+    elif sys.platform == "darwin" and hasattr(libc, "renamex_np"):
+        rename = libc.renamex_np
+        rename.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        arguments = (source, target, 4)  # RENAME_EXCL
+    else:
+        raise OSError(errno.ENOTSUP, "Atomic exclusive cover publication unavailable")
+    rename.restype = ctypes.c_int
+    if rename(*arguments) == 0:
+        return True
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        return False
+    raise OSError(error_number, os.strerror(error_number), destination)
+
+
 def generate_cover_file(destination: str, meta: BookCoverMeta,
                         preset: Optional[str] = None,
                         binaries_dir: str = "",
-                        design=None) -> bool:
+                        design=None, on_created=None) -> bool:
     """Write a generated ``cover.jpg`` at *destination*. False if it exists.
 
     Used by the ingest and enforcement paths, which own the ``has_cover`` flag
     themselves. Refusing to overwrite an existing file is what keeps "generate a
     cover for books that arrive with none" from ever touching a book that has
-    one — including on a re-run over the same library.
+    one — including on a re-run over the same library. Automatic callers may
+    receive the created inode/hash through on_created for conservative rollback
+    if their flag commit fails; the identity belongs to the staging file.
     """
-    if os.path.exists(destination):
+    if os.path.lexists(destination):
         return False
     # An automatic cover must never fail on a design someone saved months ago:
     # resolve it leniently, the way every stored design is resolved.
@@ -2253,11 +2304,83 @@ def generate_cover_file(destination: str, meta: BookCoverMeta,
     directory = os.path.dirname(destination)
     if directory and not os.path.isdir(directory):
         os.makedirs(directory, exist_ok=True)
-    # Write a sibling and rename so a reader never sees a half-written cover.
-    staging = destination + ".cwng-generating"
-    with open(staging, "wb") as handle:
-        handle.write(rendered.data)
-    os.replace(staging, destination)
+    # Publish a complete sibling without replacing a cover chosen during render.
+    staging = destination + ".cwng-generating-" + secrets.token_hex(8)
+    try:
+        with open(staging, "xb") as handle:
+            handle.write(rendered.data)
+            if on_created is not None:
+                handle.flush()
+                info = os.fstat(handle.fileno())
+                identity = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                            hashlib.sha256(rendered.data).digest())
+        if not _publish_cover_without_replacement(staging, destination):
+            return False
+        if on_created is not None:
+            on_created(identity)
+    finally:
+        try:
+            os.unlink(staging)
+        except FileNotFoundError:
+            pass
+        except OSError as cleanup_error:
+            log.warning("Could not remove generated cover staging file: %s", cleanup_error)
     log.info("cover_generator: wrote generated cover (%s renderer) to %s",
              rendered.renderer, destination)
     return True
+
+
+def _remove_generated_cover_if_unchanged(destination, identity):
+    """Remove only the regular file this generator created, under caller's gate."""
+    if identity is None:
+        return False
+    try:
+        info = os.lstat(destination)
+        if not stat.S_ISREG(info.st_mode) or (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) != identity[:4]:
+            return False
+        digest = hashlib.sha256()
+        with open(destination, "rb") as handle:
+            info = os.fstat(handle.fileno())
+            if (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) != identity[:4]:
+                return False
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+        info = os.lstat(destination)
+        if not stat.S_ISREG(info.st_mode) or (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) != identity[:4] \
+                or digest.digest() != identity[4]:
+            return False
+        os.unlink(destination)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def commit_generated_cover_flag(metadata_db, book_id, destination, identity, timeout=30):
+    """Commit a new cover; conservatively undo its file on a failed flag write.
+
+    Caller owns maintenance followed by the metadata writer gate throughout.
+    An uncertain flag state or a changed file is preserved, never inferred as a
+    recoverable cover. A later explicit enabled pass can retry a removed file.
+    """
+    try:
+        with sqlite3.connect(metadata_db, timeout=timeout) as connection:
+            # Calibre's books_update_trg resolves title_sort even when only the
+            # cover flag changes. Register the canonical UDFs on this fresh,
+            # private connection before executing any library mutation.
+            from ..db import _register_sqlite_udfs
+            _register_sqlite_udfs(connection, None)
+            updated = connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+            if updated.rowcount != 1:
+                raise sqlite3.IntegrityError("Generated cover book no longer exists")
+    except Exception:
+        try:
+            uri = Path(metadata_db).resolve().as_uri() + "?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=timeout) as connection:
+                row = connection.execute("SELECT has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+            if row and not row[0]:
+                _remove_generated_cover_if_unchanged(destination, identity)
+        except Exception as cleanup_error:
+            log.warning("Could not roll back failed generated cover: %s", cleanup_error)
+        raise

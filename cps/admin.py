@@ -9,6 +9,7 @@ import os
 from copy import copy
 import re
 import json
+import ipaddress
 import operator
 import sys
 import string
@@ -65,6 +66,7 @@ from .ui_font_preferences import seed_new_user_ui_font_defaults, validate_defaul
 from .cw_babel import (get_available_locale,
                        get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
+from . import content_server
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
 from .custom_column_sort import load_eligible_columns, persist_configured_columns
@@ -3030,10 +3032,22 @@ def _db_simulate_change():
     return db_change, db_valid
 
 
+def _library_busy_configuration_result():
+    return _configuration_result(_("Library maintenance is running; try again when it finishes."))
+
+
+def _library_busy_db_configuration_result():
+    return _db_configuration_result(_("Library maintenance is running; try again when it finishes."))
+
+
+@content_server.configuration_update(on_busy=_library_busy_db_configuration_result)
 def _db_configuration_update_helper():
     db_change = False
     to_save = request.form.to_dict()
     gdrive_error = None
+    server_before = content_server.configuration_identity()
+    if to_save.get("config_calibre_split") == "on" and content_server.setting("config_calibre_server_enabled"):
+        return _db_configuration_result(_("Disable the Calibre content server before enabling split library mode."), gdrive_error)
 
     incoming = to_save.get('config_calibre_dir')
     if incoming is None:
@@ -3099,12 +3113,66 @@ def _db_configuration_update_helper():
             flash(_("DB is not Writeable"), category="warning")
     calibre_db.update_config(config)
     config.save()
+    if content_server.configuration_identity() != server_before:
+        content_server.start()
     return _db_configuration_result(None, gdrive_error)
 
 
+def _content_server_settings_error(to_save):
+    """Validate the submitted server draft before any shared settings change."""
+    if to_save.get("config_calibre_server_enabled") == "on" and not content_server.platform_supported():
+        return _('The managed Calibre content server requires a POSIX platform. Use the Linux container on Windows.')
+    server_username = to_save.get("config_calibre_server_username", content_server.setting("config_calibre_server_username"))
+    server_password = to_save.get("config_calibre_server_password_e") or content_server.setting("config_calibre_server_password_e")
+    if (to_save.get("config_calibre_server_enabled") == "on"
+            and to_save.get("config_calibre_server_anonymous_writes") != "on"
+            and not (server_username and server_password)):
+        return (_('Please enter a content server username and password, or allow anonymous writes'))
+    problem = content_server.settings_problem(
+        to_save.get("config_calibre_server_port", content_server.setting("config_calibre_server_port")),
+        server_username, to_save.get("config_calibre_server_password_e"),
+        (web_server.listen_port or constants.DEFAULT_PORT)
+        if to_save.get("config_calibre_server_enabled") == "on" else None)
+    if problem:
+        return ({
+            "port": _('Content server port must be a number from 1 to 65535'),
+            "port-in-use": _('Content server port must differ from the port this server listens on'),
+            "username": _('Content server username may only use the letters A-Z, numbers, spaces, '
+                          'underscores and hyphens'),
+            "password": _('Content server password must use only ASCII (English) characters'),
+        }[problem])
+    listen_address = strip_whitespaces(to_save.get("config_calibre_server_listen", ""))
+    if listen_address:
+        try:
+            ipaddress.ip_address(listen_address)
+        except ValueError:
+            return (_('Invalid content server listen address: %(address)s',
+                                           address=listen_address))
+    trusted_ips = []
+    for entry in to_save.get("config_calibre_server_trusted_ips", "").split(","):
+        entry = strip_whitespaces(entry)
+        if not entry:
+            continue
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            return (_('Invalid content server trusted IP/CIDR entry: %(entry)s', entry=entry))
+        trusted_ips.append(entry)
+    to_save["config_calibre_server_trusted_ips"] = ",".join(trusted_ips)
+    return None
+
+
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
 def _configuration_update_helper():
     reboot_required = False
+    content_server_changed = False
     to_save = request.form.to_dict()
+    server_before = content_server.configuration_identity()
+    if to_save.get("config_calibre_server_enabled") == "on" and content_server.setting("config_calibre_split"):
+        return _configuration_result(_("Disable split library mode before enabling the Calibre content server."))
+    server_error = _content_server_settings_error(to_save)
+    if server_error:
+        return _configuration_result(server_error)
     prev_hardcover_sync = config.hardcover_sync_enabled()
     prev_kobo_prefer_kepub = bool(config.config_kobo_prefer_kepub)
     queue_kepub_backfill = False
@@ -3301,6 +3369,16 @@ def _configuration_update_helper():
         reboot_required |= _config_string(to_save, "config_limiter_uri")
         reboot_required |= _config_string(to_save, "config_limiter_options")
 
+        # Calibre content server configuration (validated before mutation)
+        content_server_changed |= _config_checkbox(to_save, "config_calibre_server_enabled")
+        content_server_changed |= _config_int(to_save, "config_calibre_server_port")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_listen")
+        content_server_changed |= _config_checkbox(to_save, "config_calibre_server_anonymous_writes")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_trusted_ips")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_username")
+        if to_save.get("config_calibre_server_password_e"):
+            content_server_changed |= _config_string(to_save, "config_calibre_server_password_e")
+
         # Rarfile Content configuration
         _config_string(to_save, "config_rarfile_location")
         unrar_warning = None
@@ -3315,6 +3393,11 @@ def _configuration_update_helper():
         _configuration_result(_("Oops! Database Error: %(error)s.", error=e.orig))
 
     config.save()
+    if content_server_changed or content_server.configuration_identity() != server_before:
+        if content_server.setting("config_calibre_server_enabled"):
+            content_server.start()
+        else:
+            content_server.stop()
     if queue_kepub_backfill:
         from .tasks.kepub_backfill import enqueue_kepub_backfill
         if not enqueue_kepub_backfill(current_user.name):
@@ -3335,6 +3418,22 @@ def _configuration_update_helper():
     return _configuration_result(None, reboot_required, " ".join(filter(None, [unrar_warning, arch_warning])))
 
 
+@admi.route("/admin/config/clear_calibre_server_password", methods=['POST'])
+@user_login_required
+@admin_required
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
+def clear_calibre_server_password():
+    config.config_calibre_server_password_e = ""
+    config.save()
+    if content_server.setting("config_calibre_server_enabled") and not content_server.setting("config_calibre_server_anonymous_writes"):
+        # No password means no authentication; the server stays down until a
+        # new one is saved rather than restarting open (#2210 review).
+        content_server.stop()
+    elif content_server.setting("config_calibre_server_enabled"):
+        content_server.start()
+    return _configuration_result()
+
+
 def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
     resp = {}
     if error_flash:
@@ -3349,6 +3448,8 @@ def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
             resp['result'].append({'type': "warning", 'message': warning_flash})
     resp['reboot'] = reboot
     resp['config_upload'] = config.config_upload_formats
+    resp['calibre_server_password_set'] = bool(content_server.setting("config_calibre_server_password_e"))
+    resp['calibre_server_password_env'] = getattr(config, 'config_calibre_server_env', {}).get('password', False)
     return Response(json.dumps(resp), mimetype='application/json')
 
 
@@ -3952,6 +4053,7 @@ def _acquire_restore_service_locks():
 def restore_calibre_db():
     """Restore Calibre metadata.db and clean app.db book-linked tables (last resort recovery)."""
     lock_handles = []
+    content_server_hold = None
     try:
         restore_lock = _acquire_restore_lock()
         if restore_lock is None:
@@ -3986,6 +4088,10 @@ def restore_calibre_db():
             return redirect(url_for("admin.db_configuration"))
         lock_handles.extend(service_lock_handles)
 
+        # calibredb's check_library/restore_database need the library path
+        # itself, which a running content server holds open (#2210 review).
+        content_server_hold = content_server.hold_library(exclusive=True)
+
         # 1. Backup both DBs
         backup_dir = constants.config_path(
             "backup", f"restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -4010,7 +4116,8 @@ def restore_calibre_db():
             calibredb_binary, "check_library",
             "--with-library", config.config_calibre_dir
         ]
-        check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300)
+        check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300,
+                                      **content_server_hold.child_ownership())
         log.info("calibredb check_library (pre) output: %s\n%s", check_result.stdout, check_result.stderr)
         if check_result.returncode != 0:
             log.warning("calibredb check_library (pre) returned code %s", check_result.returncode)
@@ -4025,7 +4132,8 @@ def restore_calibre_db():
             "--with-library", config.config_calibre_dir,
             "--really-do-it"
         ]
-        result = subprocess.run(restore_cmd, capture_output=True, text=True, timeout=1200)
+        result = subprocess.run(restore_cmd, capture_output=True, text=True, timeout=1200,
+                                **content_server_hold.child_ownership())
         log.info("calibredb restore_database output: %s\n%s", result.stdout, result.stderr)
         with open(log_path, "a", encoding="utf-8") as log_file:
             log_file.write("\n[restore_database]\n")
@@ -4056,7 +4164,8 @@ def restore_calibre_db():
             return redirect(url_for("admin.db_configuration"))
 
         # 5. Run calibredb check_library (post)
-        check_result_post = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300)
+        check_result_post = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300,
+                                      **content_server_hold.child_ownership())
         log.info("calibredb check_library (post) output: %s\n%s", check_result_post.stdout, check_result_post.stderr)
         if check_result_post.returncode != 0:
             log.warning("calibredb check_library (post) returned code %s", check_result_post.returncode)
@@ -4079,3 +4188,5 @@ def restore_calibre_db():
         return redirect(url_for("admin.db_configuration"))
     finally:
         _release_restore_locks(lock_handles)
+        if content_server_hold is not None:
+            content_server_hold.release()

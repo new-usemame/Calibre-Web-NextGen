@@ -62,6 +62,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 ### Features
 
 | Fork PR | Upstream | Description | SHA | Release |
+| [#2440](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2440) | [#2210](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2210) | Optional managed Calibre content server, based on @benjitobz’s contribution; POSIX process ownership, private-pipe authenticated shared routing, cooperative lifecycle, and child-owned ingest/conversion/restore exclusion; native Windows and split-library mode refused pending complete support. | TBD | Pending |
 |---|---|---|---|---|
 | [#2439](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2439) | Fork contributor PR [#2373](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2373), @trallen | Configurable OPDS suggested filenames in both editors: bounded metadata/custom fields and conditional separators, safe single basenames, retained invalid drafts and legacy blank behavior. Web/native Kobo names and ebook bytes retained. | Pending | Unreleased |
 | [#2429](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2429) | Fork issue [#1244](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1244) | Conversion choices use the installed Calibre plugin registry and both interfaces reject unsupported targets; KFX requires a working enabled output plugin. | Pending | Unreleased |

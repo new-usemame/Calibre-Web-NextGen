@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from calibre_ingest_runtime_probe import _book_count, _processor
@@ -73,8 +74,20 @@ def main():
     assert module.metadata_db_write_lock.__module__ == 'cps.services.calibre_db_lock'
 
     if args.single_root:
-        ingest(module, args.single_root, args.single_source)
-        return
+        # Direct calls bypass the s6 service's exit-2 retry queue. Cooperate with
+        # the same typed pre-commit busy result while retaining the exact input;
+        # ordinary/terminal import failures must still escape immediately.
+        deadline = time.monotonic() + 90
+        while True:
+            try:
+                ingest(module, args.single_root, args.single_source)
+                return
+            except (module.LibraryBusyError, TimeoutError):
+                assert args.single_source.exists(), "busy import lost its source"
+                if time.monotonic() >= deadline:
+                    raise
+                print('CWNG_RETRY_BUSY=' + str(args.single_source), flush=True)
+                time.sleep(0.2)
 
     with tempfile.TemporaryDirectory(prefix='cwng-folder-labels-') as directory:
         root = Path(directory)

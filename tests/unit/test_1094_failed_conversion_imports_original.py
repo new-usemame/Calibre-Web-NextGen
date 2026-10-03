@@ -209,6 +209,29 @@ def _run_main(
     return holder["fake"], str(source)
 
 
+@pytest.mark.parametrize('vanished', [False, True])
+def test_processor_readiness_expiry_retries_remaining_source(monkeypatch, tmp_path, vanished):
+    source = tmp_path / 'Reopened writer.pdf'
+    source.write_bytes(b'original partial bytes')
+    fake = _FakeProcessor(str(source), convert_result=(False, ''))
+    def not_ready(timeout=None):
+        if vanished:
+            source.unlink()
+        return False
+    fake.is_file_in_use = not_ready
+    monkeypatch.setattr(ingest_processor, 'NewBookProcessor', lambda _: fake)
+    monkeypatch.setattr(ingest_processor, '_acquire_process_lock_or_exit', lambda: None)
+    monkeypatch.setattr(ingest_processor, 'check_maintenance', lambda: None)
+    monkeypatch.setattr(ingest_processor, 'initialize_runtime', lambda: True)
+
+    assert ingest_processor.main(str(source)) == (0 if vanished else 2)
+    assert fake.convert_book_calls == 0
+    assert fake.imported == []
+    assert fake.delete_current_file_calls == 0
+    if not vanished:
+        assert source.read_bytes() == b'original partial bytes'
+
+
 class TestFailedConversionStillImports:
     def test_failed_conversion_imports_the_original(self, monkeypatch, tmp_path):
         """#1094: the reported symptom — conversion fails, book is gone."""

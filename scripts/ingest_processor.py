@@ -3261,7 +3261,9 @@ def main(filepath=None):
             if not ready:
                 print(f"[ingest-processor] WARN: File did not become ready in time or vanished (after {timeout_minutes} minutes): {nbp.filename}", flush=True)
                 skip_delete = True
-                return 0
+                # A writer can reopen after PDF preflight. Preserve and queue
+                # an existing source instead of marking it successfully done.
+                return 2 if Path(filepath).exists() else 0
 
         # Sidecar manifest handling for explicit actions (e.g., add_format)
         manifest_path = filepath + ".cwa.json"

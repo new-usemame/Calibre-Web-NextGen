@@ -5,11 +5,43 @@ import os
 import stat
 import subprocess
 import sys
+import time
 
 REFERENCE_PAGES = 500
 AUTOMATIC_CEILING_SECONDS = 12 * 60 * 60
 PDF_PROBE_TIMEOUT_SECONDS = 8
 WORKER = Path(__file__).resolve()
+NOT_READY_EXIT = 75
+
+
+def wait_for_file_ready(path, timeout):
+    """Share the existing configured writer wait with the ingest processor.
+
+    PDF page selection must follow this wait, including MOVED_TO and retry
+    events. Keep the configured wait separate from the conversion watchdog.
+    """
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        if not os.path.exists(path):
+            return False
+        try:
+            result = subprocess.run(['lsof', '-F', 'f', '--', str(path)],
+                                    capture_output=True, text=True, timeout=10)
+            # lsof marks write-only descriptors w and read/write descriptors
+            # u. Neither permits a reliable count until the writer closes.
+            if not any(line.startswith('f') and line.endswith(('w', 'u'))
+                       for line in result.stdout.splitlines()):
+                return True
+        except subprocess.TimeoutExpired:
+            print('[ingest-processor] WARN: lsof command timed out. Assuming file is not in use.', file=sys.stderr, flush=True)
+            return True
+        except FileNotFoundError:
+            print("[ingest-processor] WARN: 'lsof' command not found. Cannot reliably check if file is in use. Proceeding with caution.", file=sys.stderr, flush=True)
+            return True
+        except Exception as error:
+            print(f'[ingest-processor] WARN: Error checking file usage with lsof: {error}', file=sys.stderr, flush=True)
+        time.sleep(1)
+    return False
 
 
 def scaled_budget(base_seconds, pages):
@@ -70,6 +102,9 @@ def main():
             base = int(sys.argv[1])
             if base < 0:
                 raise ValueError('negative budget')
+            if base and Path(sys.argv[2]).suffix.lower() == '.pdf':
+                if not wait_for_file_ready(sys.argv[2], base / 3):
+                    return NOT_READY_EXIT
             pages = pdf_page_count(sys.argv[2]) if base else None
             print(scaled_budget(base, pages))
         else:

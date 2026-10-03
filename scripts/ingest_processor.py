@@ -1973,28 +1973,8 @@ class NewBookProcessor:
             timeout_minutes = self.cwa_settings.get('ingest_timeout_minutes', 15)
             timeout = timeout_minutes * 60  # Convert to seconds
 
-        start = time.time()
-        while time.time() - start < timeout:
-            if not os.path.exists(self.filepath):
-                return False
-            try:
-                # lsof '-F f' gets file access mode; we check for 'w' (write).
-                # Add timeout to prevent hanging (issue #654)
-                result = subprocess.run(['lsof', '-F', 'f', '--', self.filepath],
-                                      capture_output=True, text=True, timeout=10)
-                if 'w' not in result.stdout:
-                    return True # Not in use for writing
-            except subprocess.TimeoutExpired:
-                print("[ingest-processor] WARN: lsof command timed out. Assuming file is not in use.", flush=True)
-                return True  # If lsof hangs, assume file is ready to avoid indefinite wait
-            except FileNotFoundError:
-                print("[ingest-processor] WARN: 'lsof' command not found. Cannot reliably check if file is in use. Proceeding with caution.", flush=True)
-                return True # Fallback for systems without lsof
-            except Exception as e:
-                print(f"[ingest-processor] WARN: Error checking file usage with lsof: {e}", flush=True)
-                # On error, wait and retry to be safe
-            time.sleep(1)
-        return False # Timeout reached
+        from ingest_budget import wait_for_file_ready
+        return wait_for_file_ready(self.filepath, timeout)
 
 
     _COMIC_INGEST_EXTENSIONS = {'.cbz', '.cbt', '.cbr', '.cb7'}

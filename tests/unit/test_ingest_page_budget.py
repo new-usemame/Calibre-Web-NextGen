@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SERVICE = ROOT / 'root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run'
 
 
-def run_service(tmp_path, source, budget, *, helper=None):
+def run_service(tmp_path, source, budget, *, helper=None, complete_pdf=None, event_mode=None, expected_exit=0):
     watch = tmp_path / 'watch'
     watch.mkdir(exist_ok=True)
     binaries = tmp_path / 'bin'
@@ -32,6 +32,19 @@ Path(os.environ['TEST_CALLS']).write_text(json.dumps({
     'deadline': os.environ.get('CWA_CONVERSION_DEADLINE_SECONDS')}))
 ''')
     timeout.chmod(0o755)
+    if complete_pdf is not None:
+        lsof = binaries / 'lsof'
+        lsof.write_text('''#!/usr/bin/env python3
+import os, sys
+from pathlib import Path
+record = Path(os.environ['TEST_WRITER_PROBES'])
+first = not record.exists()
+record.write_text(record.read_text() + 'probe\\n' if record.exists() else 'probe\\n')
+if first:
+    Path(sys.argv[-1]).write_bytes(Path(os.environ['TEST_COMPLETE_PDF']).read_bytes())
+    print('f1w')
+''')
+        lsof.chmod(0o755)
     env = dict(os.environ, PATH=str(binaries) + os.pathsep + str(Path(sys.executable).parent) + os.pathsep + os.environ['PATH'],
                WATCH_FOLDER=str(watch), CWA_INGEST_SERVICE_TEST_MODE='1',
                CWA_INGEST_RETRY_QUEUE=str(tmp_path / 'queue'),
@@ -41,11 +54,32 @@ Path(os.environ['TEST_CALLS']).write_text(json.dumps({
                CWA_INGEST_PROCESSOR_CMD='/owned-observation-only',
                CWA_INGEST_BUDGET_HELPER=str(helper or ROOT / 'scripts/ingest_budget.py'),
                TEST_CALLS=str(output))
+    if complete_pdf is not None:
+        env.update(TEST_WRITER_PROBES=str(tmp_path / 'writer-probes'),
+                   TEST_COMPLETE_PDF=str(complete_pdf))
+    env.update(CWA_INGEST_BATCH_DIRTY_FILE=str(tmp_path / 'batch-dirty'),
+               CWA_INGEST_BATCH_LAST_SUCCESS_FILE=str(tmp_path / 'batch-success'))
+    command = 'source "$1" >/dev/null; run_processor_with_timeout "$2" "$3"'
+    if event_mode is not None:
+        command = '''source "$1" >/dev/null
+get_timeout_from_db() { echo 900; }
+cleanup_stale_temps() { :; }
+is_recent_duplicate_event() { return 1; }
+has_live_processing_marker() { return 1; }
+mark_recent_path() { :; }
+maybe_run_post_batch_follow_up() { :; }
+'''
+        if event_mode == 'moved':
+            command += 'handle_event "$3" MOVED_TO'
+        else:
+            command += 'printf "%s\\n" "$3" > "$QUEUE_FILE"; process_retry_queue all'
     result = subprocess.run(['bash', '-c',
-                             'source "$1" >/dev/null; run_processor_with_timeout "$2" "$3"',
+                             command,
                              'test', str(SERVICE), str(budget), str(source)],
                             env=env, capture_output=True, text=True, timeout=20)
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == expected_exit, result.stderr
+    if expected_exit:
+        return {'source_present': source.exists(), 'processor_started': output.exists()}
     return json.loads(output.read_text())
 
 
@@ -141,3 +175,64 @@ def test_failed_budget_helper_preserves_finite_deadline(tmp_path):
                          helper=tmp_path / 'missing-budget-helper.py')
     assert record['timeout'] == 2700
     assert int(record['deadline']) == 2430
+
+
+@pytest.mark.skipif(sys.platform != 'linux', reason='Actual bounded PDF counter requires Linux resource limits')
+@pytest.mark.parametrize('event_mode', ['moved', 'retry'])
+def test_page_budget_is_selected_after_writer_finishes_for_both_entry_paths(tmp_path, event_mode):
+    complete = pdf(tmp_path, 600)
+    source = tmp_path / 'moved-before-writer-close.pdf'
+    source.write_bytes(b'%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n')
+    record = run_service(tmp_path, source, 2700, complete_pdf=complete, event_mode=event_mode)
+    assert record['timeout'] == 3240, 'The complete 600-page input must select its budget after readiness'
+    assert int(record['deadline']) == 2916
+    assert source.read_bytes() == complete.read_bytes()
+
+
+def test_readwrite_descriptor_is_not_ready_until_closed(tmp_path, monkeypatch):
+    module = load_budget()
+    source = tmp_path / 'writer.pdf'
+    source.write_bytes(b'owned fixture')
+    outputs = iter(['f1u\n', 'f1r\n'])
+    calls = []
+    def observe(*args, **kwargs):
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(args[0], 0, stdout=next(outputs))
+    monkeypatch.setattr(module.subprocess, 'run', observe)
+    monkeypatch.setattr(module.time, 'sleep', lambda _: None)
+    assert module.wait_for_file_ready(source, 10)
+    assert len(calls) == 2
+    assert all(call[1]['timeout'] == 10 for call in calls)
+
+
+def test_busy_pdf_retains_configured_wait_and_requests_retry_without_counting(tmp_path, monkeypatch):
+    module = load_budget()
+    source = tmp_path / 'still-writing.pdf'
+    source.write_bytes(b'original partial bytes')
+    ticks = iter([0, 0, .5, 1.01])
+    monkeypatch.setattr(module.time, 'monotonic', lambda: next(ticks))
+    monkeypatch.setattr(module.time, 'sleep', lambda _: None)
+    monkeypatch.setattr(module.subprocess, 'run', lambda *args, **kwargs:
+                        subprocess.CompletedProcess(args[0], 0, stdout='f1w\n'))
+    def forbidden_count(_):
+        raise AssertionError('page counting started before the writer closed')
+    monkeypatch.setattr(module, 'pdf_page_count', forbidden_count)
+    monkeypatch.setattr(sys, 'argv', ['ingest_budget.py', '3', str(source)])
+    assert module.main() == module.NOT_READY_EXIT
+    assert source.read_bytes() == b'original partial bytes'
+
+
+def test_not_ready_helper_status_keeps_source_and_does_not_start_processor(tmp_path):
+    source = tmp_path / 'pending.pdf'
+    source.write_bytes(b'original still copying')
+    helper = tmp_path / 'not-ready.py'
+    helper.write_text('raise SystemExit(75)\n')
+    record = run_service(tmp_path, source, 2700, helper=helper, expected_exit=2)
+    assert record == {'source_present': True, 'processor_started': False}
+
+
+def test_vanished_pdf_does_not_enter_counting(tmp_path, monkeypatch):
+    module = load_budget()
+    source = tmp_path / 'vanished.pdf'
+    monkeypatch.setattr(sys, 'argv', ['ingest_budget.py', '2700', str(source)])
+    assert module.main() == module.NOT_READY_EXIT

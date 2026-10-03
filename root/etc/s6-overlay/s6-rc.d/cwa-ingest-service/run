@@ -458,15 +458,20 @@ run_processor_with_timeout() {
         local filepath="$2"
         local budget_helper="${CWA_INGEST_BUDGET_HELPER:-/app/calibre-web-automated/scripts/ingest_budget.py}"
         local selected_budget
+        local helper_exit=0
         # Both fresh events and retries use this one budget selection. Keep
         # the DB setting and the processor's file-stability wait unchanged.
         if [ "$safety_timeout" -gt 0 ] 2>/dev/null; then
                 if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
-                        selected_budget=$(python3 "$budget_helper" "$safety_timeout" "$filepath")
+                        selected_budget=$(python3 "$budget_helper" "$safety_timeout" "$filepath") || helper_exit=$?
                 else
-                        selected_budget=$(cwa-as-abc python3 "$budget_helper" "$safety_timeout" "$filepath")
+                        selected_budget=$(cwa-as-abc python3 "$budget_helper" "$safety_timeout" "$filepath") || helper_exit=$?
                 fi
-                if [ "$?" -eq 0 ] && [ -n "$selected_budget" ] && \
+                if [ "$helper_exit" -eq 75 ]; then
+                        echo "[cwa-ingest-service] PDF did not become ready within the configured wait; retaining for retry: $filepath" >&2
+                        return 2
+                fi
+                if [ "$helper_exit" -eq 0 ] && [ -n "$selected_budget" ] && \
                         [ "$selected_budget" = "$(non_negative_integer_or_default "$selected_budget" invalid)" ] && \
                         [ "${#selected_budget}" -le 10 ] && [ "$selected_budget" -ge "$safety_timeout" ]; then
                         safety_timeout="$selected_budget"

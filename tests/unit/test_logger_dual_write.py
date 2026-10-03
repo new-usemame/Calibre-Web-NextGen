@@ -69,6 +69,36 @@ def _stream_handlers_to_stdout():
 
 @pytest.mark.unit
 class TestDualHandlerSetup:
+    @pytest.mark.parametrize('failure', ['directory_permissions', 'descriptor_path', 'partial_rename'])
+    def test_failed_rollover_still_persists_shared_records(self, tmp_path, reset_root, monkeypatch, failure):
+        path = tmp_path / 'shared.log'
+        with path.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            target = '/dev/fd/' + str(redirected.fileno()) if failure == 'descriptor_path' else str(path)
+            cwa_logger.setup(target, logging.INFO)
+            handler = _file_handlers()[0]
+            handler.maxBytes = 1
+            if failure == 'partial_rename':
+                rotate = handler.rotate
+
+                def lose_directory_write_permission(source, destination):
+                    rotate(source, destination)
+                    tmp_path.chmod(0o500)
+                    raise PermissionError('directory became unwritable after rename')
+
+                monkeypatch.setattr(handler, 'rotate', lose_directory_write_permission)
+            try:
+                if failure == 'directory_permissions':
+                    tmp_path.chmod(0o500)
+                for index in range(3):
+                    logging.getLogger('cps.failed_rollover_test').info('failed-rollover-marker-%d', index)
+                redirected.flush()
+                for index in range(3):
+                    assert sum(p.read_text().count('failed-rollover-marker-' + str(index))
+                               for p in tmp_path.glob('shared.log*')) == 1
+            finally:
+                tmp_path.chmod(0o700)
+
     def test_rollover_during_settings_reload_keeps_one_active_writer(self, tmp_path, reset_root, monkeypatch):
         path = tmp_path / 'shared.log'
         with path.open('a', encoding='utf-8') as redirected:

@@ -122,6 +122,37 @@ ACCESS_ROTATION_MAX_BYTES = 2 * 1024 * 1024
 ACCESS_ROTATION_BACKUP_COUNT = 3
 
 
+class _ResilientRotatingFileHandler(RotatingFileHandler):
+    def emit(self, record):
+        """A failed rename must not discard a record we can still append."""
+        try:
+            if self.shouldRollover(record):
+                try:
+                    self.doRollover()
+                except OSError:
+                    # Preserve the usual stderr diagnostic, then try the
+                    # active file without attempting another rollover.
+                    self.handleError(record)
+                    logging.FileHandler.emit(self, record)
+                    return
+            logging.FileHandler.emit(self, record)
+        except OSError:
+            self.handleError(record)
+            # A partially completed rollover may leave no active path that
+            # this service can create, including on subsequent records.
+            # Proven shared stdout still holds an open descriptor to its log.
+            try:
+                stdout = getattr(self, '_shared_stdout_stream', None)
+                identity = getattr(self, '_shared_stdout_identity', None)
+                if identity is not None and _regular_file_identity(stdout) == identity:
+                    stdout.write(self.format(record) + self.terminator)
+                    stdout.flush()
+            except Exception:
+                self.handleError(record)
+        except Exception:
+            self.handleError(record)
+
+
 def _make_file_handler(log_file, max_bytes=ROTATION_MAX_BYTES,
                        backup_count=ROTATION_BACKUP_COUNT,
                        default_path=DEFAULT_LOG_FILE):
@@ -129,13 +160,13 @@ def _make_file_handler(log_file, max_bytes=ROTATION_MAX_BYTES,
     to the default location on IO/permission error (matches legacy
     fallback contract)."""
     try:
-        h = RotatingFileHandler(log_file, maxBytes=max_bytes,
+        h = _ResilientRotatingFileHandler(log_file, maxBytes=max_bytes,
                                 backupCount=backup_count, encoding='utf-8')
         return h, log_file
     except (IOError, PermissionError):
         if log_file == default_path:
             raise
-        h = RotatingFileHandler(default_path, maxBytes=max_bytes,
+        h = _ResilientRotatingFileHandler(default_path, maxBytes=max_bytes,
                                 backupCount=backup_count, encoding='utf-8')
         return h, ""
 

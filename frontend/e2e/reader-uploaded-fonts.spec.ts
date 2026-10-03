@@ -330,7 +330,9 @@ for (const classic of [false, true]) {
     await expect(manager.getByRole('button', { name: `Remove ${uploadedFont!.label}`, exact: true })).toBeFocused();
     await manager.getByRole('button', { name: `Remove ${uploadedFont!.label}`, exact: true }).click();
     await dialog.getByRole('button', { name: 'Remove font', exact: true }).click();
-    await expect(manager.getByText('Font removed.', { exact: true })).toBeVisible();
+    const removalMessage = manager.locator('#reader-font-message');
+    await expect(removalMessage).toHaveText('Font removed.');
+    await expect(removalMessage).toBeVisible();
     await expect(manager.locator('#reader-fonts-heading')).toBeFocused();
     await page.reload();
     await expect(page.locator('iframe').first()).toBeAttached({ timeout: 30_000 });

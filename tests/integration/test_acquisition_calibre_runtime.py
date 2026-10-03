@@ -85,6 +85,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_bundle_runtime_probe.py": "/tmp/acquisition_bundle_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_torrent_metadata_runtime_probe.py": "/tmp/acquisition_torrent_metadata_runtime_probe.py",
+        ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
     }
     for source, target in files.items():
@@ -135,3 +137,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert len(bundle["outcomes"]) == 3
     assert bundle["outcomes"][0]["book_ids"] != bundle["outcomes"][1]["book_ids"]
     assert bundle["outcomes"][2]["book_ids"] == bundle["outcomes"][0]["book_ids"]
+    metadata = proof["torrent_metadata"]
+    assert metadata["loopback_transmission_rpc"] and metadata["full_processor_subprocess"]
+    assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]
+    assert all(case["exact_descriptor_submitted"] and case["source_files_unchanged"]
+        and case["remote_submissions"] == 1 for case in metadata["outcomes"])

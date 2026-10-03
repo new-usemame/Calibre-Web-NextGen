@@ -415,6 +415,8 @@ def main():
                     )
                 from acquisition_bundle_runtime_probe import run_bundle_runtime
                 bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
+                from acquisition_torrent_metadata_runtime_probe import run_torrent_metadata_runtime
+                torrent_metadata = run_torrent_metadata_runtime(root,repo,owner,args.fixture,ingest,library)
                 with sqlite3.connect(root / "app.db") as c:
                     for table, rows in reader_state.items():
                         assert c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
@@ -425,6 +427,7 @@ def main():
                     dict(
                         results=results,
                         bundle=bundle,
+                        torrent_metadata=torrent_metadata,
                         http_gets=gets,
                         full_processor_subprocess=True,
                         network="isolated loopback only",

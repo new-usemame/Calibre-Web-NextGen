@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+import stat
 import sys
 import inspect
 import logging
@@ -143,17 +144,27 @@ def _make_stream_handler(stream, token):
     return h
 
 
+def _same_regular_file(first, second):
+    """Compare open sinks, including aliases and a fallback log path."""
+    try:
+        left = os.fstat(first.fileno())
+        right = os.fstat(second.fileno())
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+    return (stat.S_ISREG(left.st_mode) and stat.S_ISREG(right.st_mode)
+            and (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino))
+
+
 def setup(log_file, log_level=None):
     """
     Configure the logging output.
     May be called multiple times.
 
-    Always attaches a stdout handler so `docker logs` keeps streaming
-    every record. When `log_file` is a real path (the default), ALSO
-    attaches a RotatingFileHandler so the admin → View Logs UI has
-    content to render. This dual-handler design replaces the prior
-    single-handler behavior that left CWNG installs with an empty
-    admin log viewer (fork issue #312).
+    Attach stdout and a rotating file so Docker and admin View Logs both
+    receive records. If redirected stdout already names that same file,
+    keep only the rotating handler: two handlers duplicate every record,
+    and the inherited stdout descriptor would follow the old inode when
+    the file rotates. Explicit stream-only tokens retain their behavior.
     """
     log_level = log_level or DEFAULT_LOG_LEVEL
     logging.setLoggerClass(_Logger)
@@ -188,6 +199,9 @@ def setup(log_file, log_level=None):
     if file_path is not None:
         try:
             fh, used_path = _make_file_handler(file_path)
+            if _same_regular_file(sys.stdout, fh.stream):
+                new_handlers[0].close()
+                new_handlers.clear()
             new_handlers.append(fh)
             return_value = used_path if used_path else ""
         except (IOError, PermissionError):

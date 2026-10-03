@@ -11,7 +11,8 @@ permanently empty.
 
 Pin the new contract:
 
-* setup(<file path>) → 2 root handlers: stdout StreamHandler + RotatingFileHandler at the path
+* setup(<file path>) → stdout and rotating file when their sinks differ;
+  a shared file gets one rotating writer, including after rollover (#1613)
 * setup(LOG_TO_STDOUT) → 1 root handler: stdout StreamHandler, no file
 * rotation defaults: 5 MiB × 5 backups (was 100 KB × 2 — useless)
 * setup() returns the path written to, or "" for default, or LOG_TO_STDOUT for stdout-only
@@ -22,6 +23,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
 from logging import StreamHandler
 from logging.handlers import RotatingFileHandler
 
@@ -66,6 +68,61 @@ def _stream_handlers_to_stdout():
 
 @pytest.mark.unit
 class TestDualHandlerSetup:
+    @pytest.mark.parametrize('alias', ['same', 'symlink', 'hardlink'])
+    def test_shared_file_sink_writes_once_and_follows_rotation(self, tmp_path, reset_root, monkeypatch, alias):
+        path = tmp_path / 'shared.log'
+        path.touch()
+        stdout_path = path
+        if alias != 'same':
+            stdout_path = tmp_path / 'stdout.log'
+            if alias == 'symlink':
+                stdout_path.symlink_to(path)
+            else:
+                os.link(path, stdout_path)
+        with stdout_path.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            assert cwa_logger.setup(str(path), logging.INFO) == str(path)
+            # Settings can be reapplied; the old file handler must close
+            # without reintroducing a second writer to the same sink.
+            assert cwa_logger.setup(str(path), logging.INFO) == str(path)
+            log = logging.getLogger('cps.shared_sink_test')
+            log.info('shared-before-rotation')
+            redirected.flush()
+            assert path.read_text().count('shared-before-rotation') == 1
+            # Force the next emitted record to roll the actual file. The
+            # inherited stdout descriptor still names the old inode.
+            _file_handlers()[0].maxBytes = 1
+            log.info('shared-after-rotation')
+            redirected.flush()
+            assert path.read_text().count('shared-after-rotation') == 1
+            backup = Path(str(path) + '.1').read_text()
+            assert backup.count('shared-before-rotation') == 1
+            assert 'shared-after-rotation' not in backup
+
+    def test_fallback_target_shared_with_stdout_writes_once(self, tmp_path, reset_root, monkeypatch):
+        fallback = tmp_path / 'fallback.log'
+        requested = tmp_path / 'missing-directory' / 'requested.log'
+        make_file_handler = cwa_logger._make_file_handler
+        monkeypatch.setattr(cwa_logger, '_make_file_handler',
+                            lambda path: make_file_handler(path, default_path=str(fallback)))
+        with fallback.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            assert cwa_logger.setup(str(requested), logging.INFO) == ''
+            logging.getLogger('cps.shared_sink_test').info('fallback-single-record')
+            redirected.flush()
+            assert fallback.read_text().count('fallback-single-record') == 1
+
+    def test_distinct_regular_stdout_and_logfile_both_receive_one_record(self, tmp_path, reset_root, monkeypatch):
+        path = tmp_path / 'app.log'
+        output = tmp_path / 'service-output.log'
+        with output.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            cwa_logger.setup(str(path), logging.INFO)
+            logging.getLogger('cps.distinct_sink_test').info('distinct-sink-marker')
+            redirected.flush()
+            assert path.read_text().count('distinct-sink-marker') == 1
+            assert output.read_text().count('distinct-sink-marker') == 1
+
     def test_file_path_attaches_both_stdout_and_file_handler(self, tmp_path, reset_root):
         path = tmp_path / "calibre-web.log"
         cwa_logger.setup(str(path), logging.INFO)

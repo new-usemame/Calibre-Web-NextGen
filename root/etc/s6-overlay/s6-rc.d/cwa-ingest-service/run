@@ -30,9 +30,15 @@ case "$WATCH_FOLDER" in
 esac
 echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
 
+# Internal lifecycle state is initialized before the consumer function uses it.
+SHUTDOWN_PENDING=0
+
 # Persistent retry state. Each physical row is one path. As before, this
 # line-oriented format cannot represent a path containing a newline.
 QUEUE_FILE="${CWA_INGEST_RETRY_QUEUE:-/config/cwa_ingest_retry_queue}"
+# Only busy inputs get timer retries. Other failures keep the existing startup
+# and successful-ingest triggers. A restart reclassifies the durable queue.
+declare -A BUSY_RETRY_PATHS=()
 
 cleanup_queue_transaction_temps() {
         python3 - "$QUEUE_FILE" <<'PY'
@@ -291,6 +297,41 @@ queue_retry_file() {
         fi
 }
 
+consume_ingest_events() {
+        # Retry in the same consumer that writes the queue. A background
+        # drain could race its durable read/replace transaction with an event.
+        local interval pending="" fragment line events filepath read_status
+        interval=$(non_negative_integer_or_default "$INGEST_BATCH_QUIET_SECONDS" 5)
+        [ "$interval" -ge 1 ] || interval=1
+        local next_retry=$((SECONDS + interval))
+        while true; do
+                if [ "$SECONDS" -ge "$next_retry" ]; then
+                        process_retry_queue busy-only < /dev/null
+                        next_retry=$((SECONDS + interval))
+                fi
+                fragment=""
+                if IFS= read -r -t "$interval" fragment; then
+                        line="${pending}${fragment}"
+                        pending=""
+                        events="${line%% *}"
+                        filepath="${line#* }"
+                        handle_event "$filepath" "$events"
+                else
+                        read_status=$?
+                        [ "$SHUTDOWN_PENDING" = "0" ] || return 0
+                        # Bash consumes partial bytes on timeout. Preserve
+                        # them until the watcher finishes the same event line.
+                        pending="${pending}${fragment}"
+                        if [ "$read_status" -gt 128 ]; then
+                                process_retry_queue busy-only < /dev/null
+                                next_retry=$((SECONDS + interval))
+                        else
+                                return 0
+                        fi
+                fi
+        done
+}
+
 run_fallback() {
         echo "[cwa-ingest-service] Falling back to polling watcher" >&2
         cwa-as-abc python3 /app/calibre-web-automated/scripts/watch_fallback.py --path "$WATCH_FOLDER" --interval 5 |
@@ -299,9 +340,7 @@ run_fallback() {
                 # sweep here: watch_fallback.py walks the whole tree on its
                 # first pass, so pre-existing files already arrive as events.
                 process_retry_queue < /dev/null
-                while read -r events filepath; do
-                        handle_event "$filepath" "$events"
-                done
+                consume_ingest_events
         }
 }
 
@@ -548,7 +587,6 @@ post_batch_follow_up_loop() {
 POST_BATCH_FOLLOW_UP_PID=""
 STALE_TEMP_CLEANUP_PID=""
 MAIN_WATCHER_PID=""
-SHUTDOWN_PENDING=0
 
 stop_process_group() {
         local pid="$1"
@@ -642,6 +680,11 @@ pause_before_pid_publication_for_test() {
 }
 
 process_retry_queue() {
+        local retry_scope="${1:-all}" succeeded=0
+        if [ "$retry_scope" = "busy-only" ] && [ "${#BUSY_RETRY_PATHS[@]}" -eq 0 ]; then
+                maybe_run_post_batch_follow_up
+                return 0
+        fi
         if [ -s "$QUEUE_FILE" ]; then
                 echo "[cwa-ingest-service] Processing retry queue..."
                 local temp_queue commit_status
@@ -654,6 +697,14 @@ process_retry_queue() {
 
                 while IFS= read -r queued_file || [ -n "$queued_file" ]; do
                         [ -n "$queued_file" ] || continue
+                        if [ "$retry_scope" = "busy-only" ] && [ "${BUSY_RETRY_PATHS["$queued_file"]:-0}" != "1" ]; then
+                                if ! append_retry_entry_to_file "$temp_queue" "$queued_file"; then
+                                        rewrite_ok=0
+                                        break
+                                fi
+                                continue
+                        fi
+                        unset 'BUSY_RETRY_PATHS[$queued_file]'
                         if [ -f "$queued_file" ]; then
                                 echo "[cwa-ingest-service] Retrying: $queued_file"
                                 local configured_timeout=$(get_timeout_from_db)  # Get configured timeout from database
@@ -662,12 +713,13 @@ process_retry_queue() {
                                 processing_marker=$(processing_marker_for_path "$queued_file")
                                 mkdir -p "$PROCESSING_DIR"
                                 : > "$processing_marker"
-                                run_processor_with_timeout "$safety_timeout" "$queued_file"
+                                run_processor_with_timeout "$safety_timeout" "$queued_file" < /dev/null
                                 local retry_exit=$?
                                 rm -f "$processing_marker" 2>/dev/null || true
 
                                 if [ $retry_exit -eq 2 ]; then
                                         # Still busy, keep in queue
+                                        BUSY_RETRY_PATHS["$queued_file"]=1
                                         if ! append_retry_entry_to_file "$temp_queue" "$queued_file"; then
                                                 rewrite_ok=0
                                                 break
@@ -684,6 +736,7 @@ process_retry_queue() {
                                         mark_recent_path "$queued_file"
                                 elif [ $retry_exit -eq 0 ]; then
                                         echo "[cwa-ingest-service] Successfully processed retry: $queued_file"
+                                        succeeded=1
                                         mark_recent_path "$queued_file"
                                         touch "$INGEST_BATCH_LAST_SUCCESS_FILE" 2>/dev/null || true
                                 elif [ $retry_exit -eq 3 ]; then
@@ -721,6 +774,14 @@ process_retry_queue() {
                 if [ -s "$QUEUE_FILE" ]; then
                         echo "[cwa-ingest-service] $(wc -l < "$QUEUE_FILE") files remain in retry queue"
                 fi
+        fi
+        # A timer retry that imports a book has the same after-success trigger
+        # as handle_event. Commit its removals first, then give ordinary queued
+        # failures one opportunity. The all-scope pass never recurses, and a
+        # failure remains ineligible for later idle timer ticks.
+        if [ "$retry_scope" = "busy-only" ] && [ "$succeeded" -eq 1 ] && [ -s "$QUEUE_FILE" ]; then
+                process_retry_queue all
+                return $?
         fi
         maybe_run_post_batch_follow_up
 }
@@ -867,8 +928,9 @@ handle_event() {
         # Use safety timeout as last resort - processor should handle its own timeout internally
         mkdir -p "$PROCESSING_DIR"
         : > "$processing_marker"
-        run_processor_with_timeout "$safety_timeout" "$filepath"
+        run_processor_with_timeout "$safety_timeout" "$filepath" < /dev/null
         local exit_code=$?
+        unset 'BUSY_RETRY_PATHS[$filepath]'
         rm -f "$processing_marker" 2>/dev/null || true
 
         if [ $exit_code -eq 124 ]; then
@@ -889,6 +951,7 @@ handle_event() {
         elif [ $exit_code -eq 2 ]; then
                 echo "[cwa-ingest-service] Processor busy, adding to retry queue: $filepath"
                 echo "queued:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
+                BUSY_RETRY_PATHS["$filepath"]=1
 
                 queue_retry_file "$filepath" || \
                         echo "[cwa-ingest-service] ERROR: failed to persist retry entry: $filepath" >&2
@@ -1011,9 +1074,7 @@ run_inotify_with_fallback() {
                         # poll already walks the tree, so sweeping there too would
                         # double-process every pending file.
                         startup_ingest_sweep < /dev/null
-                        while read -r events filepath; do
-                                handle_event "$filepath" "$events"
-                        done
+                        consume_ingest_events
                 }
         ) || run_fallback
 }

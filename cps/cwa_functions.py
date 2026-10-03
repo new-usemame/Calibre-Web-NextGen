@@ -8,7 +8,7 @@ from flask import Blueprint, redirect, flash, url_for, request, send_from_direct
 from flask_babel import gettext as _, lazy_gettext as _l, ngettext, get_locale, format_date
 from markupsafe import escape
 
-from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy
+from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy, content_server
 from .constants import LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
@@ -65,6 +65,13 @@ from .tasks.ops import TaskConvertLibraryRun, TaskEpubFixerRun
 
 switch_theme = Blueprint('switch_theme', __name__)
 library_refresh = Blueprint('library_refresh', __name__)
+def _restart_content_server_when_done(process, library_hold):
+    process.wait()
+    # A failed wait does not prove the child exited; retain the hold rather
+    # than let the content server reopen the library while it may be in use.
+    library_hold.release()
+
+
 convert_library = Blueprint('convert_library', __name__)
 epub_fixer = Blueprint('epub_fixer', __name__)
 cover_enforcer_ui = Blueprint('cover_enforcer_ui', __name__)
@@ -2140,8 +2147,32 @@ def _service_status(log_filename: str):
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
-    cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+    # convert_library works on the format files on disk, so it needs the library
+    # to itself. The server comes back only if it was running, and also when the
+    # run cannot be launched at all -- otherwise a failed launch left it stopped
+    # until the next save or restart (#2210 review).
+    library_hold = None
+    try:
+        library_hold = content_server.hold_library()
+        cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+    except Exception as error:
+        try:
+            with open(_service_log_path("convert-library.log"), "a") as failed_log:
+                failed_log.write(f"\n[convert-library]: Cannot start library conversion: {error}\n")
+                failed_log.write(f"NextGen Convert Library Service - Run Failed: {datetime.now()}\n")
+                failed_log.write(f"NextGen Convert Library Service - Run Ended: {datetime.now()}\n")
+        finally:
+            if library_hold is not None:
+                library_hold.release()
+        raise
     queue.put(cl_process)
+    try:
+        Thread(target=_restart_content_server_when_done, args=(cl_process, library_hold), daemon=True).start()
+    except RuntimeError:
+        # This function already runs in a native conversion worker. Keep the
+        # child cancellable and wait here if a separate waiter cannot start.
+        log.warning("Cannot start conversion waiter; waiting in the conversion worker")
+        _restart_content_server_when_done(cl_process, library_hold)
 
 def get_tmp_conversion_dir() -> str:
     return f"{constants.tmp_conversion_dir()}/"
@@ -2167,7 +2198,12 @@ def kill_convert_library(queue):
         sleep(0.05) # Required to prevent high cpu usage
         if trigger_file.exists():
             # Kill the convert_library process
-            cl_process = queue.get()
+            try:
+                cl_process = queue.get(timeout=0.1)
+            except Empty:
+                if is_convert_library_finished():
+                    break
+                continue
             cl_process.terminate()
             # Remove any potentially left over lock files
             try:

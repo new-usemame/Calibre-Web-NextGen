@@ -2273,6 +2273,11 @@ msgstr "omschrijving"
 
 #: cps/opds.py
 #, python-format
+msgid "Books by %(name)s"
+msgstr "Boeken op %(name)s"
+
+#: cps/opds.py
+#, python-format
 msgid "Books by %(name)s, including every sub-category"
 msgstr ""
 
@@ -4928,6 +4933,10 @@ msgid "Shows the name a book had when it was imported."
 msgstr "Toont de naam die het boek had toen het werd geïmporteerd."
 
 #: cps/spa_strings.py
+msgid "Public"
+msgstr "Openbaar"
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
 
@@ -5115,6 +5124,14 @@ msgstr "Geavanceerd"
 msgid "Advanced search"
 msgstr "Geavanceerd zoeken"
 
+#: cps/spa_strings.py
+msgid "After children"
+msgstr "Na subcategorieën"
+
+#: cps/spa_strings.py
+msgid "After tree"
+msgstr "Na de lijst"
+
 # Cover designer v2 (SPA)
 #: cps/spa_strings.py
 msgid "Alignment"
@@ -5185,6 +5202,10 @@ msgid ""
 msgstr ""
 "Een beheerder moet planksynchronisatie inschakelen voordat deze optie "
 "beschikbaar is."
+
+#: cps/spa_strings.py
+msgid "An unexpected error occurred"
+msgstr "Er is een onverwachte fout opgetreden"
 
 #: cps/spa_strings.py
 msgid "Annotation pages"
@@ -5438,12 +5459,20 @@ msgid "Books"
 msgstr "Boeken"
 
 #: cps/spa_strings.py
+msgid "Books assigned a value in this column will appear here."
+msgstr "Boeken met een waarde in deze kolom verschijnen hier."
+
+#: cps/spa_strings.py
 msgid "Books awaiting authority"
 msgstr "Boeken wachten op autoriteit"
 
 #: cps/spa_strings.py
 msgid "Books per page"
 msgstr "Aantal boeken per pagina"
+
+#: cps/spa_strings.py
+msgid "Books placement"
+msgstr "Plaatsing van boeken"
 
 #: cps/spa_strings.py
 msgid "Books seeding"
@@ -5466,6 +5495,10 @@ msgstr ""
 "Boeken die niet op een met e-readers gesynchroniseerde boekenplank staan, "
 "verdwijnen dan bij de volgende synchronisatie uit de bibliotheek van de e-"
 "reader. Ze blijven wel in je bibliotheek hier."
+
+#: cps/spa_strings.py
+msgid "Browse by Column"
+msgstr "Bladeren per kolom"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5653,6 +5686,10 @@ msgstr "Een andere positie kiezen"
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "Kies velden"
+
+#: cps/spa_strings.py
+msgid "Choose visible columns"
+msgstr "Zichtbare kolommen kiezen"
 
 #: cps/spa_strings.py
 msgid "Choose your theme"
@@ -5867,8 +5904,20 @@ msgid "Could not export the book list. Please try again."
 msgstr "De boekenlijst kon niet worden geëxporteerd. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid "Could not load books"
+msgstr "Boeken konden niet worden geladen"
+
+#: cps/spa_strings.py
 msgid "Could not load candidates."
 msgstr "Kan kandidaten niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not load column"
+msgstr "Kolom kon niet worden geladen"
+
+#: cps/spa_strings.py
+msgid "Could not load columns"
+msgstr "Kolommen konden niet worden geladen"
 
 #: cps/spa_strings.py
 msgid "Could not load device annotations."
@@ -7703,6 +7752,10 @@ msgid "No books are ready yet — they appear here as they become ready."
 msgstr "Nog geen boeken klaar — ze verschijnen hier zodra ze klaar zijn."
 
 #: cps/spa_strings.py
+msgid "No books here yet"
+msgstr "Hier zijn nog geen boeken"
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr ""
 "Er zijn momenteel geen boeken die overeenkomen met deze slimme boekenplank."
@@ -7735,6 +7788,10 @@ msgstr "Nog geen catalogi."
 #: cps/spa_strings.py
 msgid "No contents found."
 msgstr "Geen inhoud gevonden."
+
+#: cps/spa_strings.py
+msgid "No custom columns to browse"
+msgstr "Geen aangepaste kolommen om te bekijken"
 
 #: cps/spa_strings.py
 msgid "No devices or browser reading data yet."
@@ -7823,6 +7880,10 @@ msgid "No valid ISBN found in the scanned text."
 msgstr "Geen geldig ISBN gevonden in de gescande tekst."
 
 #: cps/spa_strings.py
+msgid "No values in this column yet"
+msgstr "Deze kolom bevat nog geen waarden"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No {items} yet."
 msgstr "Nog geen {items}."
@@ -7892,6 +7953,10 @@ msgstr ""
 msgid "Nothing in this category yet."
 msgstr "Nog niets in deze categorie."
 
+#: cps/spa_strings.py
+msgid "Nothing in this column matches the selected value."
+msgstr "Niets in deze kolom komt overeen met de gekozen waarde."
+
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
 "Nothing is missing — the global library is still on the server. What you see "
@@ -7901,6 +7966,10 @@ msgstr ""
 "Er ontbreekt niets — de globale bibliotheek staat nog steeds op de server. "
 "Wat je hier ziet is je selectie in Mijn bibliotheek. Voeg boeken toe vanuit "
 "de globale bibliotheek; ze verschijnen hier en op je e-reader."
+
+#: cps/spa_strings.py
+msgid "Nothing on this page"
+msgstr "Geen resultaten op deze pagina"
 
 #: cps/spa_strings.py
 msgid "Nothing requested yet."
@@ -8122,6 +8191,10 @@ msgid "Page {page} of {pages}"
 msgstr "Pagina {page} van {pages}"
 
 #: cps/spa_strings.py
+msgid "Pagination"
+msgstr "Paginering"
+
+#: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
 msgstr "Een Kobo of KOReader koppelen"
 
@@ -8264,10 +8337,6 @@ msgstr "Voortgang"
 #: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
 msgid "Progress is not being saved."
 msgstr "Voortgang wordt niet opgeslagen."
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Openbaar"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8841,6 +8910,17 @@ msgstr "Geïnitialiseerde boeken"
 msgid "Select"
 msgstr "Selecteer"
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid ""
+"Select a category to see the books assigned to it and all of its sub-"
+"categories."
+msgstr ""
+"Kies een categorie om de boeken ervan en van alle subcategorieën te zien."
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Select a value to see the books assigned to it."
+msgstr "Kies een waarde om de bijbehorende boeken te zien."
+
 #: cps/spa_strings.py
 msgid "Select all in group"
 msgstr "Alles in de groep selecteren"
@@ -9388,6 +9468,11 @@ msgstr "Label verwijderd van {n} boek(en)."
 #, python-brace-format
 msgid "Tag removed from {succeeded}; {failed} failed."
 msgstr "Label verwijderd van {succeeded}; {failed} mislukt."
+
+#: cps/spa_strings.py
+msgid "Tag-like custom columns defined in the library appear here."
+msgstr ""
+"Aangepaste kolommen met tekstwaarden uit de bibliotheek verschijnen hier."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
@@ -9948,6 +10033,10 @@ msgstr ""
 "Deze magic link is verlopen. Genereer een nieuwe om het opnieuw te proberen."
 
 #: cps/spa_strings.py
+msgid "This node has fewer pages than the one you were reading."
+msgstr "Deze categorie heeft minder pagina’s dan de vorige."
+
+#: cps/spa_strings.py
 msgid "This page could not be refreshed, so what is shown may be out of date."
 msgstr ""
 "Deze pagina kon niet worden vernieuwd, dus wat je ziet kan verouderd zijn."
@@ -10074,6 +10163,10 @@ msgstr "Bovenkant van de catalogus"
 #: cps/spa_strings.py
 msgid "Transmission download client"
 msgstr "Transmission-downloadclient"
+
+#: cps/spa_strings.py
+msgid "Tree"
+msgstr "Boomstructuur"
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
@@ -10624,6 +10717,16 @@ msgstr "{count} boeken"
 #, python-brace-format
 msgid "{count} catalogs have not been searched yet."
 msgstr "{count} catalogi zijn nog niet doorzocht."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} column"
+msgstr "{count} kolom"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} columns"
+msgstr "{count} kolommen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12835,13 +12938,6 @@ msgstr "Versturen naar eReader"
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr ""
-
-#: cps/templates/cc_list.html
-msgid ""
-"Select a category to see the books assigned to it and all of its sub-"
-"categories."
-msgstr "Kies een categorie om de boeken ervan en van alle subcategorieën te zien."
-
 
 #: cps/templates/cc_list.html
 msgid "Expand all"
@@ -18738,98 +18834,3 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
-
-#: cps/spa_strings.py
-msgid "After children"
-msgstr "Na subcategorieën"
-
-#: cps/spa_strings.py
-msgid "After tree"
-msgstr "Na de lijst"
-
-#: cps/spa_strings.py
-msgid "Books assigned a value in this column will appear here."
-msgstr "Boeken met een waarde in deze kolom verschijnen hier."
-
-#: cps/spa_strings.py
-msgid "Books placement"
-msgstr "Plaatsing van boeken"
-
-#: cps/spa_strings.py
-msgid "Browse by Column"
-msgstr "Bladeren per kolom"
-
-#: cps/spa_strings.py
-msgid "Choose visible columns"
-msgstr "Zichtbare kolommen kiezen"
-
-#: cps/spa_strings.py
-msgid "Could not load books"
-msgstr "Boeken konden niet worden geladen"
-
-#: cps/spa_strings.py
-msgid "Could not load column"
-msgstr "Kolom kon niet worden geladen"
-
-#: cps/spa_strings.py
-msgid "Could not load columns"
-msgstr "Kolommen konden niet worden geladen"
-
-#: cps/spa_strings.py
-msgid "No books here yet"
-msgstr "Hier zijn nog geen boeken"
-
-#: cps/spa_strings.py
-msgid "No custom columns to browse"
-msgstr "Geen aangepaste kolommen om te bekijken"
-
-#: cps/spa_strings.py
-msgid "No values in this column yet"
-msgstr "Deze kolom bevat nog geen waarden"
-
-#: cps/spa_strings.py
-msgid "Nothing in this column matches the selected value."
-msgstr "Niets in deze kolom komt overeen met de gekozen waarde."
-
-#: cps/spa_strings.py
-msgid "Nothing on this page"
-msgstr "Geen resultaten op deze pagina"
-
-#: cps/spa_strings.py
-msgid "Pagination"
-msgstr "Paginering"
-
-#: cps/spa_strings.py
-msgid "Select a value to see the books assigned to it."
-msgstr "Kies een waarde om de bijbehorende boeken te zien."
-
-#: cps/spa_strings.py
-msgid "Tag-like custom columns defined in the library appear here."
-msgstr ""
-"Aangepaste kolommen met tekstwaarden uit de bibliotheek verschijnen hier."
-
-#: cps/spa_strings.py
-msgid "This node has fewer pages than the one you were reading."
-msgstr "Deze categorie heeft minder pagina’s dan de vorige."
-
-#: cps/spa_strings.py
-msgid "Tree"
-msgstr "Boomstructuur"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{count} columns"
-msgstr "{count} kolommen"
-
-#: cps/opds.py
-#, python-format
-msgid "Books by %(name)s"
-msgstr "Boeken op %(name)s"
-
-#: cps/spa_strings.py
-msgid "An unexpected error occurred"
-msgstr "Er is een onverwachte fout opgetreden"
-
-#: cps/spa_strings.py
-msgid "{count} column"
-msgstr "{count} kolom"

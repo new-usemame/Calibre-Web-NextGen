@@ -2180,6 +2180,11 @@ msgstr "簡介"
 
 #: cps/opds.py
 #, python-format
+msgid "Books by %(name)s"
+msgstr ""
+
+#: cps/opds.py
+#, python-format
 msgid "Books by %(name)s, including every sub-category"
 msgstr ""
 
@@ -4714,6 +4719,10 @@ msgid "Shows the name a book had when it was imported."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Public"
+msgstr "公開"
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "（未擷取文字）"
 
@@ -4888,6 +4897,14 @@ msgid "Advanced search"
 msgstr "進階搜尋"
 
 #: cps/spa_strings.py
+msgid "After children"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "After tree"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Alignment"
 msgstr ""
 
@@ -4949,6 +4966,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "An administrator must enable shelf sync before this option is available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "An unexpected error occurred"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5195,12 +5216,20 @@ msgid "Books"
 msgstr "書籍"
 
 #: cps/spa_strings.py
+msgid "Books assigned a value in this column will appear here."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books awaiting authority"
 msgstr "等待授權的書籍"
 
 #: cps/spa_strings.py
 msgid "Books per page"
 msgstr "每頁書籍數"
+
+#: cps/spa_strings.py
+msgid "Books placement"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Books seeding"
@@ -5216,6 +5245,10 @@ msgstr ""
 msgid ""
 "Books that are not on an e-reader sync shelf then leave the e-reader's "
 "library on its next sync. They stay in your library here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browse by Column"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5394,6 +5427,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "選擇欄位"
+
+#: cps/spa_strings.py
+msgid "Choose visible columns"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose your theme"
@@ -5599,8 +5636,20 @@ msgid "Could not export the book list. Please try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not load books"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load candidates."
 msgstr "無法載入候選項目。"
+
+#: cps/spa_strings.py
+msgid "Could not load column"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load columns"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load device annotations."
@@ -7360,6 +7409,10 @@ msgid "No books are ready yet — they appear here as they become ready."
 msgstr "尚無書籍就緒—就緒後會顯示在這裡。"
 
 #: cps/spa_strings.py
+msgid "No books here yet"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr "目前沒有書籍符合此智慧書架。"
 
@@ -7390,6 +7443,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "No contents found."
 msgstr "找不到內容。"
+
+#: cps/spa_strings.py
+msgid "No custom columns to browse"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No devices or browser reading data yet."
@@ -7475,6 +7532,10 @@ msgid "No valid ISBN found in the scanned text."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No values in this column yet"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No {items} yet."
 msgstr "尚無 {items}。"
@@ -7542,11 +7603,19 @@ msgstr ""
 msgid "Nothing in this category yet."
 msgstr "此分類中尚無內容。"
 
+#: cps/spa_strings.py
+msgid "Nothing in this column matches the selected value."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
 "Nothing is missing — the global library is still on the server. What you see "
 "here is your selection in My Library. Add books from the global library; "
 "they appear here and on your e-reader."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Nothing on this page"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7748,6 +7817,10 @@ msgid "Page {page} of {pages}"
 msgstr "第 {page} 頁，共 {pages} 頁"
 
 #: cps/spa_strings.py
+msgid "Pagination"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
 msgstr "配對 Kobo 或 KOReader"
 
@@ -7888,10 +7961,6 @@ msgstr "任務進度"
 #: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
 msgid "Progress is not being saved."
 msgstr ""
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "公開"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8443,6 +8512,16 @@ msgstr "已種子處理的書籍"
 msgid "Select"
 msgstr "選擇"
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid ""
+"Select a category to see the books assigned to it and all of its sub-"
+"categories."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Select a value to see the books assigned to it."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Select all in group"
 msgstr "選取群組中所有項目"
@@ -8960,6 +9039,10 @@ msgstr ""
 msgid "Tag removed from {succeeded}; {failed} failed."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Tag-like custom columns defined in the library appear here."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Tags"
@@ -9446,6 +9529,10 @@ msgid "This magic link expired. Generate a new one to try again."
 msgstr "此魔術連結已過期。請產生新的連結再試一次。"
 
 #: cps/spa_strings.py
+msgid "This node has fewer pages than the one you were reading."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This page could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
@@ -9556,6 +9643,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Transmission download client"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Tree"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10054,6 +10145,16 @@ msgstr "{count} 本書"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} catalogs have not been searched yet."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} column"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} columns"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12206,12 +12307,6 @@ msgstr "發送到Kindle"
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr "將此公告傳送給 __NUM__ 位收件者？"
-
-#: cps/templates/cc_list.html
-msgid ""
-"Select a category to see the books assigned to it and all of its sub-"
-"categories."
-msgstr ""
 
 #: cps/templates/cc_list.html
 msgid "Expand all"
@@ -17305,97 +17400,3 @@ msgstr "顯示已讀/未讀選擇"
 #~ "Books must first be archived and the device synced before a book can "
 #~ "safely be deleted."
 #~ msgstr "必須先將書籍存檔並同步設備，然後才能安全地刪除書籍。"
-
-#: cps/spa_strings.py
-msgid "After children"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "After tree"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Books assigned a value in this column will appear here."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Books placement"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Browse by Column"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Choose visible columns"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load books"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load column"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load columns"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No books here yet"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No custom columns to browse"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No values in this column yet"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Nothing in this column matches the selected value."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Nothing on this page"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Pagination"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Select a value to see the books assigned to it."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Tag-like custom columns defined in the library appear here."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "This node has fewer pages than the one you were reading."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Tree"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{count} columns"
-msgstr ""
-
-#: cps/opds.py
-#, python-format
-msgid "Books by %(name)s"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "An unexpected error occurred"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "{count} column"
-msgstr ""

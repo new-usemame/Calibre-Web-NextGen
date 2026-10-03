@@ -2314,6 +2314,11 @@ msgstr "popis"
 
 #: cps/opds.py
 #, python-format
+msgid "Books by %(name)s"
+msgstr ""
+
+#: cps/opds.py
+#, python-format
 msgid "Books by %(name)s, including every sub-category"
 msgstr "Knihy podľa %(name)s vrátane všetkých podkategórií"
 
@@ -4952,6 +4957,10 @@ msgid "Shows the name a book had when it was imported."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Public"
+msgstr "Verejné"
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(žiadny zachytený text)"
 
@@ -5129,6 +5138,14 @@ msgid "Advanced search"
 msgstr "Pokročilé vyhľadávanie"
 
 #: cps/spa_strings.py
+msgid "After children"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "After tree"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Alignment"
 msgstr "Zarovnanie"
 
@@ -5192,6 +5209,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "An administrator must enable shelf sync before this option is available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "An unexpected error occurred"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5442,12 +5463,20 @@ msgid "Books"
 msgstr "Knihy"
 
 #: cps/spa_strings.py
+msgid "Books assigned a value in this column will appear here."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books awaiting authority"
 msgstr "Knihy čakajúce na autoritu"
 
 #: cps/spa_strings.py
 msgid "Books per page"
 msgstr "Kníh na stránku"
+
+#: cps/spa_strings.py
+msgid "Books placement"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Books seeding"
@@ -5468,6 +5497,10 @@ msgid ""
 msgstr ""
 "Knihy, ktoré nie sú na polici synchronizovanej s čítačkou, potom pri ďalšej "
 "synchronizácii zmiznú z knižnice čítačky. Tu vo vašej knižnici zostanú."
+
+#: cps/spa_strings.py
+msgid "Browse by Column"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -5645,6 +5678,10 @@ msgstr "Vybrať iné miesto"
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "Vybrať polia"
+
+#: cps/spa_strings.py
+msgid "Choose visible columns"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose your theme"
@@ -5854,8 +5891,20 @@ msgid "Could not export the book list. Please try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not load books"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load candidates."
 msgstr "Kandidátov sa nepodarilo načítať."
+
+#: cps/spa_strings.py
+msgid "Could not load column"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load columns"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load device annotations."
@@ -7657,6 +7706,10 @@ msgstr ""
 "Zatiaľ nie sú pripravené žiadne knihy — zobrazia sa tu, keď budú pripravené."
 
 #: cps/spa_strings.py
+msgid "No books here yet"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr "Tejto inteligentnej polici momentálne nevyhovujú žiadne knihy."
 
@@ -7689,6 +7742,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "No contents found."
 msgstr "Nenašiel sa žiadny obsah."
+
+#: cps/spa_strings.py
+msgid "No custom columns to browse"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No devices or browser reading data yet."
@@ -7776,6 +7833,10 @@ msgid "No valid ISBN found in the scanned text."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No values in this column yet"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No {items} yet."
 msgstr "Zatiaľ žiadne {items}."
@@ -7845,6 +7906,10 @@ msgstr ""
 msgid "Nothing in this category yet."
 msgstr "V tejto kategórii zatiaľ nič nie je."
 
+#: cps/spa_strings.py
+msgid "Nothing in this column matches the selected value."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
 "Nothing is missing — the global library is still on the server. What you see "
@@ -7854,6 +7919,10 @@ msgstr ""
 "Nič nechýba — globálna knižnica je stále na serveri. To, čo tu vidíte, je "
 "váš výber v Mojej knižnici. Pridávajte knihy z globálnej knižnice; zobrazia "
 "sa tu aj vo vašej čítačke."
+
+#: cps/spa_strings.py
+msgid "Nothing on this page"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Nothing requested yet."
@@ -8072,6 +8141,10 @@ msgid "Page {page} of {pages}"
 msgstr "Strana {page} z {pages}"
 
 #: cps/spa_strings.py
+msgid "Pagination"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
 msgstr "Spárovať Kobo alebo KOReader"
 
@@ -8215,10 +8288,6 @@ msgstr "Pokrok"
 #: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
 msgid "Progress is not being saved."
 msgstr ""
-
-#: cps/spa_strings.py
-msgid "Public"
-msgstr "Verejné"
 
 #: cps/spa_strings.py
 msgid "Published after"
@@ -8784,6 +8853,18 @@ msgstr "Naplnené knihy"
 msgid "Select"
 msgstr "Vybrať"
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid ""
+"Select a category to see the books assigned to it and all of its sub-"
+"categories."
+msgstr ""
+"Vyberte kategóriu, aby ste videli knihy, ktoré sú k nej priradené, aj všetky "
+"jej podkategórie."
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Select a value to see the books assigned to it."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Select all in group"
 msgstr "Vybrať všetko v skupine"
@@ -9320,6 +9401,10 @@ msgstr ""
 msgid "Tag removed from {succeeded}; {failed} failed."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Tag-like custom columns defined in the library appear here."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Tags"
@@ -9821,6 +9906,10 @@ msgstr ""
 "Platnosť tohto magického odkazu vypršala. Vygenerujte nový a skúste to znova."
 
 #: cps/spa_strings.py
+msgid "This node has fewer pages than the one you were reading."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This page could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
@@ -9937,6 +10026,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Transmission download client"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Tree"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10470,6 +10563,16 @@ msgstr "{count} kníh"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} catalogs have not been searched yet."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} column"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} columns"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12637,14 +12740,6 @@ msgstr "Poslať test mne"
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
 msgstr "Odoslať toto oznámenie príjemcom (__NUM__)?"
-
-#: cps/templates/cc_list.html
-msgid ""
-"Select a category to see the books assigned to it and all of its sub-"
-"categories."
-msgstr ""
-"Vyberte kategóriu, aby ste videli knihy, ktoré sú k nej priradené, aj všetky "
-"jej podkategórie."
 
 #: cps/templates/cc_list.html
 msgid "Expand all"
@@ -18142,97 +18237,3 @@ msgstr "Zobraziť sekciu Prečítané/Neprečítané"
 #~ msgstr ""
 #~ "Kniha musí byť najskôr archivovaná a zariadenie synchronizované pred tým "
 #~ "než môže byť kniha bezpečne zmazaná."
-
-#: cps/spa_strings.py
-msgid "After children"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "After tree"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Books assigned a value in this column will appear here."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Books placement"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Browse by Column"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Choose visible columns"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load books"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load column"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load columns"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No books here yet"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No custom columns to browse"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No values in this column yet"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Nothing in this column matches the selected value."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Nothing on this page"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Pagination"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Select a value to see the books assigned to it."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Tag-like custom columns defined in the library appear here."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "This node has fewer pages than the one you were reading."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Tree"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{count} columns"
-msgstr ""
-
-#: cps/opds.py
-#, python-format
-msgid "Books by %(name)s"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "An unexpected error occurred"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "{count} column"
-msgstr ""

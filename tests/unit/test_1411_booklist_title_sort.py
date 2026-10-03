@@ -25,13 +25,10 @@ to the same ORM column objects.
 
 Test 1 reproduces the exact failure mechanism with a real in-memory SQLite
 engine (the operator-preferred over mocks for SQL-semantics bugs) using the
-same joined-eager-load-under-LIMIT shape the production query uses. Test 2
-source-pins the fix in web.py so a future edit can't silently reintroduce the
-raw text() fragment.
+same joined-eager-load-under-LIMIT shape the production query uses. The public-handler sorting and eager-load/LIMIT behavior are covered by
+test_1050_nordic_request_collation.py.
 """
 
-import os
-import re
 
 import pytest
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, text
@@ -135,22 +132,3 @@ def test_authors_sort_is_a_dead_token_real_column_is_author_sort(session):
     never crash even if something sends it."""
     assert not hasattr(Books, "authors_sort")
     assert hasattr(Books, "author_sort")
-
-
-def test_web_py_list_books_uses_orm_columns_not_raw_text():
-    """Source-pin: the list_books sort branch must map to ORM columns via
-    getattr(db.Books, ...) and must NOT construct a raw text(sort_param + ...)
-    ORDER BY fragment. Guards against silent reintroduction of the bug."""
-    web_py = os.path.join(os.path.dirname(__file__), "..", "..", "cps", "web.py")
-    with open(web_py, encoding="utf-8") as fh:
-        src = fh.read()
-
-    # The crashing branch is uniquely identified by its sort_param membership test.
-    branch_idx = src.find('sort_param in ["sort", "title", "authors_sort", "series_index"]')
-    assert branch_idx != -1, "list_books sort-column branch not found — did the guard move?"
-    branch = src[branch_idx:branch_idx + 1400]
-
-    assert "text(sort_param" not in branch, \
-        "raw text(sort_param + order) ORDER BY reintroduced — CWA#1411 regression"
-    assert "getattr(db.Books" in branch, \
-        "sort branch should map sort_param to an ORM column via getattr(db.Books, ...)"

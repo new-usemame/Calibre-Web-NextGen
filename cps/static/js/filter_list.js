@@ -200,7 +200,7 @@ $(document).on("click", ".char", function() {
     var listlength = listItems.length;
     // check for each element if its Starting character matches
     listItems.each(function() {
-        if (this.attributes["data-id"].value.charAt(0).toUpperCase() !== character) {
+        if ((this.getAttribute("data-initial") || this.attributes["data-id"].value.charAt(0).toUpperCase()) !== character) {
             $(this).hide();
         } else {
             $(this).show();
@@ -243,7 +243,7 @@ $(document).on("change", "#char-dropdown", function() {
     // check for each element if its Starting character matches
     listItems.each(function() {
         var id = this.attributes["data-id"].value;
-        if (id.charAt(0).toUpperCase() !== character.toUpperCase()) {
+        if ((this.getAttribute("data-initial") || id.charAt(0).toUpperCase()) !== character.toUpperCase()) {
             $(this).hide();
         } else {
             $(this).show();

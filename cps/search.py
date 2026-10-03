@@ -15,6 +15,7 @@ from flask_babel import gettext as _
 from sqlalchemy.sql.expression import func, not_, and_, or_, text, true
 from sqlalchemy.sql.functions import coalesce
 
+from .unicode_collation import locale_sort_key
 from . import logger, db, calibre_db, config, ub, helper
 from .string_helper import strip_whitespaces
 from .usermanagement import login_required_if_no_ano
@@ -454,13 +455,13 @@ def render_prepare_search_form(cc):
         .join(db.Books)\
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag'))\
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     series = calibre_db.session.query(db.Series)\
         .join(db.books_series_link)\
         .join(db.Books)\
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_series_link.series'))\
-        .order_by(db.Series.name)\
+        .order_by(locale_sort_key(db.Series.name), db.Series.name, db.Series.id)\
         .filter(calibre_db.common_filters()).all()
     shelves = ub.session.query(ub.Shelf)\
         .filter(or_(ub.Shelf.is_public == 1, ub.Shelf.user_id == int(current_user.id)))\

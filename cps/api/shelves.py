@@ -20,7 +20,7 @@ from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
 from ..services import ereader_scope
-from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id
+from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id, book_sort_order
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
     check_shelf_view_permissions,
@@ -118,7 +118,7 @@ def shelf_detail(shelf_id):
         reader = viewer_id(current_user)
         order = None if reader is None else recent_sort_order(reader)
     else:
-        order = BOOK_SORT_ORDERS.get(sort)
+        order = book_sort_order(sort) if sort in BOOK_SORT_ORDERS else None
     if order is None or sort in ("hotdesc", "hotasc"):
         order = [ub.BookShelf.order.asc()]
 

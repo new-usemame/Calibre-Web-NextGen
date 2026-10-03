@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+from copy import copy
 import re
 import json
 import operator
@@ -44,6 +45,7 @@ from .render_template import render_title_template, get_sidebar_config, get_cust
 from .custom_column_visibility import save_cc_visibility
 from .services import file_lock
 from .services.worker import WorkerThread
+from .services.opds_filename import validate_template as validate_opds_filename_template
 from .services.kobo_import import (
     KoboContentDatabaseError,
     KoboUploadError,
@@ -736,10 +738,43 @@ def calibreweb_alive():
     return "", 200
 
 
+def _view_configuration_draft(form):
+    """Render an invalid submission without persisting or losing its edits."""
+    draft = copy(config)
+    if hasattr(draft, 'dirty'):
+        object.__setattr__(draft, 'dirty', [])
+    for key, value in form.items():
+        if not key.startswith('config_') or not hasattr(config, key):
+            continue
+        original = getattr(config, key)
+        if isinstance(original, bool):
+            value = bool(value)
+        elif isinstance(original, int):
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                continue
+        elif not isinstance(original, (str, type(None))):
+            continue
+        setattr(draft, key, value)
+    draft.config_default_role = (constants.selected_roles(form)
+                                 | constants.preserved_roles(form, config.config_default_role))
+    draft.config_default_role &= ~constants.ROLE_ANONYMOUS
+    draft.config_default_show = sum(int(k[5:]) for k in form
+                                   if k.startswith('show_') and k[5:].isdigit())
+    if 'Show_detail_random' in form:
+        draft.config_default_show |= constants.DETAIL_RANDOM
+    if form.get('support_settings_present') == '1':
+        draft.config_show_project_support = 'config_show_project_support' in form
+    if hasattr(config, 'config_sortable_custom_columns'):
+        draft.config_sortable_custom_columns = ','.join(form.getlist('config_sortable_custom_columns'))
+    return draft
+
+
 @admi.route("/admin/viewconfig")
 @user_login_required
 @admin_required
-def view_configuration():
+def view_configuration(opds_filename_template=None, opds_filename_error=None, draft_config=None):
     read_column = calibre_db.session.query(db.CustomColumns) \
         .filter(and_(db.CustomColumns.datatype == 'bool', db.CustomColumns.mark_for_delete == 0)).all()
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
@@ -748,10 +783,12 @@ def view_configuration():
     sortable_columns = load_eligible_columns() or []
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
-    return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
+    return render_title_template("config_view_edit.html", conf=draft_config or config,
+                                 opds_filename_template=opds_filename_template,
+                                 opds_filename_error=opds_filename_error, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
                                  restriction_is_bool=(restricted_column_datatype(
-                                     config.config_restricted_column) == "bool"),
+                                     (draft_config or config).config_restricted_column) == "bool"),
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -1090,6 +1127,13 @@ def update_table_settings():
 @admin_required
 def update_view_configuration():
     to_save = request.form.to_dict()
+    if "config_opds_filename_template" in to_save:
+        try:
+            validate_opds_filename_template(to_save["config_opds_filename_template"])
+        except ValueError as error:
+            return view_configuration(opds_filename_template=to_save["config_opds_filename_template"],
+                                      opds_filename_error=_("Invalid OPDS filename template: %(error)s", error=str(error)),
+                                      draft_config=_view_configuration_draft(request.form))
 
     # Validate a switch to Boolean restrictions before changing any settings:
     # these persisted fields are comma-separated literals, so silently changing
@@ -1102,7 +1146,7 @@ def update_view_configuration():
             and not boolean_restrictions_compatible()):
         flash(_("Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."),
               category="error")
-        return view_configuration()
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     # This settings card is optional on legacy/partial POST clients. Validate
     # its complete submitted value before mutating any other configuration.
@@ -1116,7 +1160,7 @@ def update_view_configuration():
             )
         except ValueError:
             flash(_("Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."), category="error")
-            return view_configuration()
+            return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     # Validate both presets before any other form fields mutate the config.
     # This keeps a stale/manual POST from partially applying unrelated settings.
@@ -1127,7 +1171,17 @@ def update_view_configuration():
                    if "body" in str(ex)
                    else _("Invalid default display font option"))
         flash(message, category="error")
-        return view_configuration()
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    if not check_valid_read_column(to_save.get("config_read_column", "0")):
+        flash(_("Invalid Read Column"), category="error")
+        log.debug("Invalid Read column")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    if not check_valid_restricted_column(to_save.get("config_restricted_column", "0")):
+        flash(_("Invalid Restricted Column"), category="error")
+        log.debug("Invalid Restricted Column")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
@@ -1155,16 +1209,7 @@ def update_view_configuration():
                     "library failed — books may keep their previous order until "
                     "you retry or edit them."), category="error")
 
-    if not check_valid_read_column(to_save.get("config_read_column", "0")):
-        flash(_("Invalid Read Column"), category="error")
-        log.debug("Invalid Read column")
-        return view_configuration()
     _config_int(to_save, "config_read_column")
-
-    if not check_valid_restricted_column(to_save.get("config_restricted_column", "0")):
-        flash(_("Invalid Restricted Column"), category="error")
-        log.debug("Invalid Restricted Column")
-        return view_configuration()
     _config_int(to_save, "config_restricted_column")
 
     _config_int(to_save, "config_theme")
@@ -1176,6 +1221,7 @@ def update_view_configuration():
     for key, value in font_updates.items():
         setattr(config, key, value)
     _config_string(to_save, "config_opds_default_locale")
+    _config_string(to_save, "config_opds_filename_template")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
     # Configuration page, not buried under Logfile Configuration on the Basic

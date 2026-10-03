@@ -46,7 +46,7 @@ from flask import flash, url_for, has_request_context, g
 
 from . import logger, ub, isoLanguages, hierarchy
 from .pagination import Pagination
-from .string_helper import strip_whitespaces
+from .string_helper import strip_whitespaces, title_sort_name
 from .sqlite_utils import network_share_mode_enabled
 from .unicode_collation import unicode_initial, unicode_sort_key
 from .services.restriction_columns import restriction_predicate
@@ -211,20 +211,9 @@ def _register_sqlite_udfs(dbapi_connection, _connection_record):
         pass
 
     def _title_sort(title):
-        if title is None:
-            return ''
         cfg = CalibreDB.config
-        try:
-            regex = getattr(cfg, 'config_title_regex', None) if cfg is not None else None
-            if regex:
-                title_pat = re.compile(regex, re.IGNORECASE)
-                match = title_pat.search(title)
-                if match:
-                    prep = match.group(1)
-                    title = title[len(prep):] + ', ' + prep
-        except Exception:
-            pass
-        return strip_whitespaces(title)
+        regex = getattr(cfg, 'config_title_regex', None) if cfg is not None else None
+        return title_sort_name(title, regex)
 
     try:
         dbapi_connection.create_function("title_sort", 1, _title_sort)

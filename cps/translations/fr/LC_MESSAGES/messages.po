@@ -245,6 +245,11 @@ msgid "Settings DB is not Writeable"
 msgstr "La base de données des paramètres n'est pas accessible en écriture"
 
 #: cps/admin.py
+#, python-format
+msgid "Invalid OPDS filename template: %(error)s"
+msgstr "Modèle de nom de fichier OPDS invalide : %(error)s"
+
+#: cps/admin.py
 msgid ""
 "Cannot select this Boolean column until incompatible global and user "
 "restrictions are corrected or cleared."
@@ -271,18 +276,18 @@ msgid "Invalid default display font option"
 msgstr "Option de police d’affichage par défaut invalide"
 
 #: cps/admin.py
-msgid ""
-"The title-sort rule was saved, but reordering the existing library failed — "
-"books may keep their previous order until you retry or edit them."
-msgstr ""
-
-#: cps/admin.py
 msgid "Invalid Read Column"
 msgstr "Colonne de lecture non valide"
 
 #: cps/admin.py
 msgid "Invalid Restricted Column"
 msgstr "Colonne restreinte non valide"
+
+#: cps/admin.py
+msgid ""
+"The title-sort rule was saved, but reordering the existing library failed — "
+"books may keep their previous order until you retry or edit them."
+msgstr ""
 
 #: cps/admin.py
 msgid "Calibre-Web NextGen configuration updated"
@@ -11461,6 +11466,49 @@ msgstr ""
 msgid "Could not add books to the shelf. Please try again."
 msgstr "Impossible d’ajouter les livres à l’étagère. Veuillez réessayer."
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr "Exemple :"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr "Champs et exemples du modèle de nom de fichier"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr "Premier caractère :"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr ""
+"Dans KOReader, activez Utiliser les noms de fichiers du serveur pour le "
+"catalogue OPDS."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr ""
+"Laissez vide pour conserver le nom actuel basé sur le titre et le premier "
+"auteur. N’incluez pas l’extension du fichier."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+"Les métadonnées manquantes deviennent du texte vide. Le titre et la série "
+"utilisent leur nom de tri. Les barres obliques deviennent des traits de "
+"soulignement, pas des dossiers."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr "Modèle de nom de fichier des téléchargements OPDS"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr "Numéro de série complété :"
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "En attente"
@@ -11961,6 +12009,47 @@ msgstr ""
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr "Aucun fichier gmail.json avec information OAuth valide trouvé"
+
+#: cps/services/opds_filename.py
+msgid "Conditional text needs both prefix and suffix separators."
+msgstr ""
+"Le texte conditionnel nécessite les séparateurs du préfixe et du suffixe."
+
+#: cps/services/opds_filename.py
+msgid "Nested fields are not supported in conditional text."
+msgstr ""
+"Les champs imbriqués ne sont pas pris en charge dans le texte conditionnel."
+
+#: cps/services/opds_filename.py
+msgid "Use a text template of at most 1024 characters."
+msgstr "Utilisez un modèle de texte de 1024 caractères maximum."
+
+#: cps/services/opds_filename.py
+msgid "Unmatched braces in the OPDS filename template."
+msgstr "Les accolades du modèle de nom de fichier OPDS ne sont pas appariées."
+
+#: cps/services/opds_filename.py
+#, python-format
+msgid "Unknown or unsupported OPDS filename field: %(field)s"
+msgstr "Champ de nom de fichier OPDS inconnu ou non pris en charge : %(field)s"
+
+#: cps/services/opds_filename.py
+msgid "Conversions such as !r are not supported in OPDS filenames."
+msgstr ""
+"Les conversions telles que !r ne sont pas prises en charge dans les noms de "
+"fichiers OPDS."
+
+#: cps/services/opds_filename.py
+msgid "Use string padding such as 0>3s, with a maximum width of 128."
+msgstr ""
+"Utilisez un remplissage de texte tel que 0>3s, avec une largeur maximale de "
+"128."
+
+#: cps/services/opds_filename.py
+msgid "Use explicit alignment for zero padding, such as 0>3s."
+msgstr ""
+"Utilisez un alignement explicite pour le remplissage par des zéros, tel que "
+"0>3s."
 
 #: cps/tasks/annotation_sync.py
 msgid "Syncing annotations to reading services"
@@ -14480,6 +14569,10 @@ msgid ""
 "Accept-Language header and the request does not include a ?lang= override. "
 "Authenticated users keep their own selected locale."
 msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "OPDS Downloads"
+msgstr "Téléchargements OPDS"
 
 #: cps/templates/config_view_edit.html
 msgid "Default Visibilities for New Users"

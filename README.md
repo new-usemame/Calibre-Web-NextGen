@@ -647,7 +647,9 @@ CWA has built-in KOReader sync; no separate kosync server is needed. With the pl
 
 If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
 
-**Matching filenames across devices (OPDS downloads).** If you download books to KOReader over OPDS and sync progress by filename across several e-readers, turn on **Use server filenames** in KOReader's OPDS catalog settings (the checkbox when you add or edit the catalog). By default KOReader names a downloaded file `Author - Title.epub` from the catalog entry, which differs from the on-disk library name `Title - Author.epub` and forces a manual rename. CWA already sends the library name in the download's `Content-Disposition` header; with **Use server filenames** on, KOReader uses that name, so the file matches your library and your other devices without renaming.
+For matching OPDS filenames across devices, enable Use server filenames in KOReader's OPDS catalog configuration. KOReader normally builds `Author - Title.epub` from the feed. The server normally suggests `Title - Author.epub`, with only the first author. With Use server filenames enabled, KOReader uses the server's suggested name.
+
+Administrators can change that name through the OPDS download filename template preference. For fields, examples, and device limits, see [OPDS download filenames](docs/opds-filename-template.md). A blank preference keeps the existing naming behavior.
 
 ### Kobo sync
 
@@ -811,34 +813,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `██████████████████░░` 89% | 3381/3808 | 0 |
-| Slovak (`sk`) | `██████████████████░░` 89% | 3377/3808 | 0 |
-| Swedish (`sv`) | `█████████████████░░░` 86% | 3289/3808 | 0 |
-| French (`fr`) | `█████████████████░░░` 86% | 3270/3808 | 125 |
-| Italian (`it`) | `████████████████░░░░` 81% | 3100/3808 | 0 |
-| Spanish (`es`) | `████████████████░░░░` 81% | 3084/3808 | 0 |
-| Dutch (`nl`) | `███████████████░░░░░` 74% | 2818/3808 | 288 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████████░░░░░░` 70% | 2653/3808 | 179 |
-| Polish (`pl`) | `█████████████░░░░░░░` 67% | 2566/3808 | 0 |
-| German (`de`) | `████████████░░░░░░░░` 62% | 2365/3808 | 12 |
-| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 45% | 1720/3808 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 37% | 1397/3808 | 303 |
-| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 34% | 1310/3808 | 243 |
-| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 32% | 1204/3808 | 311 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 31% | 1170/3808 | 339 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 25% | 939/3808 | 265 |
-| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 21% | 784/3808 | 280 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 699/3808 | 351 |
-| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 18% | 676/3808 | 353 |
-| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 18% | 675/3808 | 352 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 507/3808 | 389 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 13% | 478/3808 | 399 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 447/3808 | 365 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 432/3808 | 426 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 425/3808 | 348 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 358/3808 | 379 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 292/3808 | 377 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 209/3808 | 337 |
+| Russian (`ru`) | `██████████████████░░` 88% | 3381/3826 | 0 |
+| Slovak (`sk`) | `██████████████████░░` 88% | 3377/3826 | 0 |
+| Swedish (`sv`) | `█████████████████░░░` 86% | 3289/3826 | 0 |
+| French (`fr`) | `█████████████████░░░` 86% | 3288/3826 | 125 |
+| Italian (`it`) | `████████████████░░░░` 81% | 3100/3826 | 0 |
+| Spanish (`es`) | `████████████████░░░░` 81% | 3084/3826 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 74% | 2836/3826 | 288 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████████░░░░░░` 69% | 2653/3826 | 179 |
+| Polish (`pl`) | `█████████████░░░░░░░` 67% | 2566/3826 | 0 |
+| German (`de`) | `████████████░░░░░░░░` 62% | 2365/3826 | 12 |
+| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 45% | 1720/3826 | 119 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 36% | 1397/3826 | 303 |
+| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 34% | 1310/3826 | 243 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 32% | 1204/3826 | 311 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 31% | 1170/3826 | 339 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 24% | 939/3826 | 265 |
+| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 20% | 784/3826 | 280 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 699/3826 | 351 |
+| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 18% | 676/3826 | 353 |
+| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 18% | 675/3826 | 352 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 507/3826 | 389 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 478/3826 | 399 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 447/3826 | 365 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 432/3826 | 426 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 425/3826 | 348 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 358/3826 | 379 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 292/3826 | 377 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 209/3826 | 337 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

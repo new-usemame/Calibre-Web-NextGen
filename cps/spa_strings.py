@@ -2080,3 +2080,13 @@ _("Drag to a shelf, or choose a shelf")
 _("{n} book(s) added to {shelf}.")
 _("{succeeded} added to {shelf}; {failed} failed. Failed books remain selected for retry.")
 _("Could not add books to the shelf. Please try again.")
+
+# OPDS filename settings.
+_('Example:')
+_('Filename template fields and examples')
+_('First character:')
+_('In KOReader, enable Use server filenames for the OPDS catalog.')
+_('Leave blank to keep the current title and first-author filename. Do not include the file extension.')
+_('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')
+_('OPDS download filename template')
+_('Padded series number:')

@@ -328,6 +328,13 @@ def _build_read_filter(filter_val):
     built-in per-user ub.ReadBook table. The join for the custom column is provided
     by generate_linked_query inside fill_indexpage, so the value is queryable here.
     """
+    # Personal pauses are independent of the optional shared Boolean column.
+    # Even a removed/misconfigured column must not broaden an exact pause view.
+    if filter_val in ("did_not_finish", "on_hold"):
+        status = (ub.ReadBook.STATUS_DID_NOT_FINISH if filter_val == "did_not_finish"
+                  else ub.ReadBook.STATUS_ON_HOLD)
+        ids = book_ids_with_read_status(_real_user_id(), status)
+        return db.Books.id.in_(ids)
     if config.config_read_column:
         try:
             read_col = db.cc_classes[config.config_read_column].value
@@ -348,14 +355,6 @@ def _build_read_filter(filter_val):
             ids = book_ids_with_read_status(
                 _real_user_id(), ub.ReadBook.STATUS_IN_PROGRESS)
             return and_(db.Books.id.in_(ids), ~coalesce(read_col, False))
-        if filter_val == "did_not_finish":
-            ids = book_ids_with_read_status(
-                _real_user_id(), ub.ReadBook.STATUS_DID_NOT_FINISH)
-            return db.Books.id.in_(ids)
-        if filter_val == "on_hold":
-            ids = book_ids_with_read_status(
-                _real_user_id(), ub.ReadBook.STATUS_ON_HOLD)
-            return db.Books.id.in_(ids)
         return True
     if filter_val == "read":
         return and_(
@@ -370,10 +369,6 @@ def _build_read_filter(filter_val):
                     ~db.Books.id.in_(paused_ids))
     if filter_val == "in_progress":
         return ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
-    if filter_val == "did_not_finish":
-        return ub.ReadBook.read_status == ub.ReadBook.STATUS_DID_NOT_FINISH
-    if filter_val == "on_hold":
-        return ub.ReadBook.read_status == ub.ReadBook.STATUS_ON_HOLD
     return True
 
 
@@ -467,7 +462,8 @@ def _catalog_book_query(*, search=None, author_id=None, series_id=None, tag_id=N
         query = query.filter(_export_ids_filter([row[0] for row in favorites]))
     elif filter_val == "rated":
         query = query.filter(db.Books.ratings.any(db.Ratings.rating > 9))
-    elif filter_val not in (None, "", "all", "read", "unread", "discover"):
+    elif filter_val not in (None, "", "all", "read", "unread", "in_progress",
+                            "did_not_finish", "on_hold", "discover"):
         raise BookExportRequestError("invalid_filter", "Unsupported book-list filter", 400)
 
     entity_filter = _build_entity_filter(
@@ -476,7 +472,7 @@ def _catalog_book_query(*, search=None, author_id=None, series_id=None, tag_id=N
     )
     if entity_filter is not True:
         query = query.filter(entity_filter)
-    if filter_val in ("read", "unread"):
+    if filter_val in ("read", "unread", "in_progress", "did_not_finish", "on_hold"):
         query = query.filter(_build_read_filter(filter_val))
     eager_options = [
         selectinload(db.Books.authors),
@@ -723,7 +719,8 @@ def _catalog_export_query(params, *, classic_tag_view=False):
     filter_val = params.get("filter")
     if filter_val is not None and not isinstance(filter_val, str):
         raise BookExportRequestError("invalid_request", "Filter must be text", 400)
-    if filter_val not in (None, "", "all", "read", "unread", "favorites", "rated", "archived", "discover"):
+    if filter_val not in (None, "", "all", "read", "unread", "in_progress",
+                          "did_not_finish", "on_hold", "favorites", "rated", "archived", "discover"):
         raise BookExportRequestError("invalid_filter", "Unsupported book-list filter", 400)
     for key, limit in (("language", 128), ("format", 32)):
         value = params.get(key)
@@ -751,7 +748,8 @@ def _catalog_export_query(params, *, classic_tag_view=False):
             "invalid_request", "Book IDs are supported only for the Discover sample", 400
         )
 
-    read_filter = filter_val if filter_val in ("read", "unread") else None
+    read_filter = filter_val if filter_val in (
+        "read", "unread", "in_progress", "did_not_finish", "on_hold") else None
     query = _catalog_book_query(
         search=search or None,
         author_id=_strict_int(params.get("author"), "Author ID", optional=True),
@@ -822,7 +820,8 @@ def _advanced_export_query(params):
             raise BookExportRequestError("invalid_request", f"{key} must be a whole-star rating", 400)
         if not 0 <= rating <= 5:
             raise BookExportRequestError("invalid_request", f"{key} must be between 0 and 5", 400)
-    if params.get("read_status", "all") not in ("all", "read", "unread"):
+    if params.get("read_status", "all") not in (
+            "all", "read", "unread", "in_progress", "did_not_finish", "on_hold"):
         raise BookExportRequestError("invalid_request", "Unsupported read-status filter", 400)
     for key in ("publishstart", "publishend"):
         value = params.get(key)
@@ -1123,7 +1122,8 @@ def list_books():
             rating_id=rating_id,
             book_format=book_format,
             filter_val=(filter_val if filter_val in
-                        ("read", "unread", "favorites", "rated", "archived") else None),
+                        ("read", "unread", "in_progress", "did_not_finish", "on_hold",
+                         "favorites", "rated", "archived") else None),
             show_hidden=show_hidden,
         )
         total = query.with_entities(db.Books.id).order_by(None).distinct().count()

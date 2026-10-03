@@ -539,3 +539,13 @@ def test_classic_card_paused_overlay_suppresses_shared_read_badge(status, label)
     assert label in output
     assert "cover-badge-paused" in output
     assert "cover-badge-read" not in output
+
+
+@pytest.mark.parametrize("status,code", [("did_not_finish", 3), ("on_hold", 4)])
+def test_exact_pause_filter_survives_unavailable_shared_read_column(world, status, code):
+    """A personal pause filter must not widen when the shared bool is missing."""
+    seed(world, code)
+    world.monkeypatch.setattr(helper.config, "config_read_column", CC_ID + 1)
+    ids = [bid for (bid,) in world.session.query(db.Books.id)
+           .filter(api_books._build_read_filter(status)).all()]
+    assert ids == [42]

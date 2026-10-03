@@ -581,10 +581,10 @@ export function useSetReadingStatus(id: string | number) {
     mutationFn: (status: ReadingStatus) =>
       apiPost<{ status: ReadingStatus }>(`/api/v1/books/${id}/read-status`, { status }),
     onSuccess: () => {
-      advanceLibraryRevision();
-      for (const key of ['book', 'books', 'shelf', 'magicshelf', 'magicshelves', 'adv-search']) {
-        void qc.invalidateQueries({ queryKey: key === 'book' ? [key, String(id)] : [key] });
-      }
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(qc),
+      ]);
     },
   });
 }

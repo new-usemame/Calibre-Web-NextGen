@@ -775,7 +775,7 @@ def feed_publisherindex():
         .join(db.books_publishers_link)\
         .join(db.Books).filter(get_opds_restricted_common_filter())\
         .group_by(text('books_publishers_link.publisher'))\
-        .order_by(locale_sort_key(db.Publishers.sort, user=auth.current_user()), db.Publishers.sort, db.Publishers.id)\
+        .order_by(locale_sort_key(db.Publishers.name, user=auth.current_user()), db.Publishers.name, db.Publishers.id)\
         .limit(config.config_books_per_page).offset(off)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             len(calibre_db.session.query(db.Publishers).all()))

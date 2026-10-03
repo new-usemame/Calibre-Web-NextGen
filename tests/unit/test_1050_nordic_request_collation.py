@@ -73,7 +73,8 @@ def test_nordic_author_json_puts_distinct_letters_after_z(catalog, locale):
     ('sv', ['Aalto', 'Zulu', 'Åland', 'Ängel', 'Örebro']),
     ('de', ['Aalto', 'Åland', 'Ängel', 'Örebro', 'Zulu']),
 ])
-def test_publisher_json_sorts_displayed_names_when_calibre_sort_is_null(catalog, locale, expected):
+@pytest.mark.parametrize('surface', ['api', 'opds'])
+def test_publisher_json_sorts_displayed_names_when_calibre_sort_is_null(catalog, monkeypatch, locale, expected, surface):
     from cps import db
     from cps.api import browse
     from sqlalchemy import update
@@ -86,10 +87,42 @@ def test_publisher_json_sorts_displayed_names_when_calibre_sort_is_null(catalog,
     for identity, name in enumerate(['Örebro', 'Aalto', 'Åland', 'Zulu', 'Ängel'], 1):
         session.execute(update(db.Publishers).where(db.Publishers.id == identity).values(name=name, sort=None))
     session.commit()
-    app.add_url_rule('/publishers', view_func=inspect.unwrap(browse.list_publishers))
-    response = app.test_client().get('/publishers?lang=' + locale)
-    assert response.status_code == 200
-    assert [row['name'] for row in response.json['items']] == expected
+    if surface == 'api':
+        app.add_url_rule('/publishers', view_func=inspect.unwrap(browse.list_publishers))
+        response = app.test_client().get('/publishers?lang=' + locale)
+        assert response.status_code == 200
+        assert [row['name'] for row in response.json['items']] == expected
+    else:
+        from cps import opds, jinjia
+        from jinja2 import FileSystemLoader
+        from xml.etree import ElementTree
+        from urllib.parse import urlsplit, parse_qs
+        viewer = SimpleNamespace(name='Publisher reader', locale=locale, check_visibility=lambda _: True)
+        monkeypatch.setattr(opds.auth, 'current_user', lambda: viewer)
+        monkeypatch.setattr(opds, 'get_opds_restricted_common_filter', lambda: True)
+        monkeypatch.setattr(opds.config, 'config_books_per_page', 2, raising=False)
+        monkeypatch.setattr(opds.config, 'config_calibre_web_title', 'Catalog', raising=False)
+        app.jinja_loader = FileSystemLoader(str(Path(__file__).parents[2] / 'cps/templates'))
+        app.register_blueprint(jinjia.jinjia)
+        app.register_blueprint(opds.opds)
+        app.view_functions['opds.feed_publisherindex'] = inspect.unwrap(opds.feed_publisherindex)
+        client = app.test_client()
+        path, names = '/opds/publisher?lang=' + locale, []
+        atom = '{http://www.w3.org/2005/Atom}'
+        for page in range(4):
+            response = client.get(path)
+            assert response.status_code == 200
+            xml = ElementTree.fromstring(response.data)
+            names.extend(entry.findtext(atom + 'title') for entry in xml.findall(atom + 'entry'))
+            next_path = next((link.get('href') for link in xml.findall(atom + 'link')
+                              if link.get('rel') == 'next'), None)
+            if not next_path:
+                break
+            assert parse_qs(urlsplit(next_path).query).get('lang') == [locale]
+            path = next_path
+        else:
+            pytest.fail('Publisher paging did not finish')
+        assert names == expected
 
 def test_two_locales_reuse_one_connection_without_changing_each_other(catalog):
     from cps import db

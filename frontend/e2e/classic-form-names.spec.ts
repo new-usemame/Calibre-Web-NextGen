@@ -118,3 +118,25 @@ test('Classic date blur displays one localized value and keeps raw invalid input
   await expect(mirror).toBeHidden();
   expect(await date.evaluate(el => getComputedStyle(el).color)).not.toBe('rgba(0, 0, 0, 0)');
 });
+
+
+test('Classic advanced-search date controls share named canonical fields', async ({ page }) => {
+  await page.goto('/advsearch');
+  await expect(page.locator('#publisher')).toHaveAccessibleName('Publisher');
+  for (const [id, name] of [['publishstart', 'Published Date From'], ['publishend', 'Published Date To']]) {
+    const date = page.locator(`#${id}`);
+    const mirror = page.locator(`#fake_${id}`);
+    await expect(date).toHaveAccessibleName(name);
+    await expect(mirror).toHaveAttribute('aria-hidden', 'true');
+    await expect(mirror).toHaveAttribute('tabindex', '-1');
+    await expect(page.locator(`#${id}_delete`)).toHaveAccessibleName(`Remove ${name}`);
+    await date.fill('');
+    await date.pressSequentially('2020-05-03');
+    await expect(mirror).toBeHidden();
+    await date.press('Tab');
+    await expect(page.locator(`#${id}_delete`)).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(date).toHaveValue('');
+    await expect(mirror).toBeHidden();
+  }
+});

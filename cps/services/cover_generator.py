@@ -2249,7 +2249,7 @@ def _publish_cover_without_replacement(staging, destination):
         return False
     except OSError as error:
         if error.errno not in {errno.EPERM, errno.ENOSYS, errno.ENOTSUP,
-                              errno.EOPNOTSUPP, errno.EXDEV}:
+                              errno.EOPNOTSUPP, errno.EXDEV, errno.EINVAL}:
             raise
     # Some library filesystems cannot create hard links. Native exclusive rename
     # preserves both completeness and no-replace semantics; ordinary POSIX rename

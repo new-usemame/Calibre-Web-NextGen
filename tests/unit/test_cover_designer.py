@@ -541,14 +541,15 @@ def test_optional_cover_survives_staging_cleanup_failure_after_publication(tmp_p
 
 
 @pytest.mark.parametrize('reader_arrives', [False, True])
-def test_unsupported_hard_links_use_atomic_no_replace_publication(tmp_path, monkeypatch, reader_arrives):
+@pytest.mark.parametrize('unsupported_errno', ['EOPNOTSUPP', 'EINVAL'])
+def test_unsupported_hard_links_use_atomic_no_replace_publication(tmp_path, monkeypatch, reader_arrives, unsupported_errno):
     import errno
     destination = tmp_path / 'cover.jpg'
 
     def unsupported_link(*_args, **_kwargs):
         if reader_arrives:
             destination.write_bytes(b'reader cover during publication')
-        raise OSError(errno.EOPNOTSUPP, 'owned no hard-link fixture')
+        raise OSError(getattr(errno, unsupported_errno), 'owned no hard-link fixture')
 
     monkeypatch.setattr(cg.os, 'link', unsupported_link)
     created = []

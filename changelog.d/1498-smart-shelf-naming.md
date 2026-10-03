@@ -4,4 +4,4 @@
 
 ### Security
 
-- **Smart-shelf names and icons display as text in Classic headings and profile ordering.** Escape stored heading values and create profile display nodes as text, preventing shelf content from creating HTML elements.
+- **Smart-shelf names and icons display as text in Classic headings, profile ordering and activity history.** Escape stored heading values and create profile and activity display nodes as text, preventing shelf content from creating HTML elements.

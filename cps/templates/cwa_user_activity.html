@@ -1851,6 +1851,9 @@ function updateShelfActivity() {
             const netColor = netChange >= 0 ? '#4caf50' : '#f44336';
             const netSymbol = netChange >= 0 ? '+' : '';
             const views = viewCount || 0;
+            // Shelf names are stored display text, not card markup.
+            const shelfLabel = document.createElement('span');
+            shelfLabel.textContent = `${icon} ${shelfName}`;
             
             const statsHtml = isMagic 
                 ? `
@@ -1881,7 +1884,7 @@ function updateShelfActivity() {
                     onmouseover="this.style.background='rgba(255,255,255,0.05)'"
                     onmouseout="this.style.background='rgba(255,255,255,0.03)'">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: #fff; font-size: 0.95em;">${icon} ${shelfName}</span>
+                        <span style="font-weight: 600; color: #fff; font-size: 0.95em;">${shelfLabel.innerHTML}</span>
                         <span style="
                             color: ${netColor};
                             font-weight: 700;

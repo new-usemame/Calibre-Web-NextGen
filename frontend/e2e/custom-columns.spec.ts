@@ -63,7 +63,7 @@ test('custom-column paging resets for a new node without showing old-node books'
   }
 });
 
-test('custom-column cards honor the reader action-row preference', async ({ secondaryUser }) => {
+test('custom-column cards honor the reader cover-action preference', async ({ secondaryUser }) => {
   const page = secondaryUser.page;
   const library = await page.request.get('/api/v1/books?per_page=50').then(r => r.json());
   const book = library.items.find((b: { formats: string[] }) => b.formats.includes('EPUB'));
@@ -81,13 +81,29 @@ test('custom-column cards honor the reader action-row preference', async ({ seco
     })).ok()).toBeTruthy();
     await page.goto('/app/cc/77');
   };
-  // Coarse pointers intentionally keep actions on the book page (#1412).
-  // This preference check exercises the desktop row that can be hidden.
-  test.skip(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), 'touch cards keep actions on the book page');
+  const details = page.getByRole('link', { name: `Open details for ${book.title}`, exact: true });
+  const actions = page.getByRole('button', { name: `Actions for ${book.title}`, exact: true });
   await save(false);
-  await expect(page.locator('main').getByRole('link', { name: `Read ${book.title}`, exact: true })).toHaveCount(1);
+  await expect(details).toBeVisible();
+  await expect(actions).toHaveCount(1);
+  if (test.info().project.use.hasTouch) await actions.tap();
+  else { await actions.focus(); await actions.press('Enter'); }
+  const dialog = page.getByRole('dialog', { name: `Actions for ${book.title}`, exact: true });
+  await expect(dialog).toBeVisible();
+  const read = dialog.getByRole('link', { name: 'Read now', exact: true });
+  await expect(read).toBeVisible();
+  await expect(read).toHaveAttribute('href', `/app/read/${book.id}`);
+  if (test.info().project.use.hasTouch) {
+    await dialog.getByRole('button', { name: 'Close', exact: true }).tap();
+  } else {
+    await dialog.press('Escape');
+    await expect(actions).toBeFocused();
+  }
+  await expect(dialog).toHaveCount(0);
   await save(true);
-  await expect(page.locator('main').getByRole('link', { name: `Read ${book.title}`, exact: true })).toHaveCount(0);
+  await expect(actions).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(details).toBeVisible();
 });
 
 
@@ -105,7 +121,12 @@ test('a reader without the viewer role can browse column metadata without a Read
   } }));
   await page.goto('/app/cc/77');
   await expect(page.getByRole('link', { name: `Open details for ${book.title}`, exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: `Read ${book.title}`, exact: true })).toHaveCount(0);
+  const actions = page.getByRole('button', { name: `Actions for ${book.title}`, exact: true });
+  if (test.info().project.use.hasTouch) await actions.tap();
+  else { await actions.focus(); await actions.press('Enter'); }
+  const dialog = page.getByRole('dialog', { name: `Actions for ${book.title}`, exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Read now', exact: true })).toHaveCount(0);
 });
 
 

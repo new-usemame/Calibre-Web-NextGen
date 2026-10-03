@@ -79,7 +79,7 @@ Usenet results can use SABnzbd or NZBGet. Torznab results can use qBittorrent or
 
 This authority controls tracker URLs in submitted descriptors. It does not sandbox the download client's subsequent peer, DHT or DNS networking. Configure the client's own networking and firewall for the sources you trust. A trackerless magnet may depend on the client's existing peer-discovery configuration.
 
-Only v1 info hashes are supported; pure v2/hybrid descriptors with unsupported fields, multi-book bundles, traversal, symlinks and unreported paths are rejected. A multi-file torrent can contain one EPUB/PDF with non-book companions. CWNG checks aggregate completion **and every reported file**, including companions: entering a seeding state from a partial download is insufficient. It copies only the reported regular book file. It never moves/deletes client files or jobs, sets seed ratios/time limits, or stops seeding. Cancelling a CWNG request affects its import, not the client download.
+Only v1 info hashes are supported; pure v2/hybrid descriptors with unsupported fields, traversal, symlinks and unreported paths are rejected. A multi-file torrent can contain EPUB/PDF books with non-book companions. CWNG checks aggregate completion **and every reported file**, including companions: entering a seeding state from a partial download is insufficient. It copies only the chosen reported regular book file. It never moves/deletes client files or jobs, sets seed ratios/time limits, or stops seeding. Cancelling a CWNG request affects its import, not the client download.
 
 A missing queue/history entry, client error, unusable book or seven-day waiting limit produces an explicit failed request. No automatic resubmission occurs. Manual Retry reconciles a failed torrent by its original hash and owned tag/labels; repair it in the client first. A definite failed Usenet download gets a fresh durable attempt. Uncertain submission keeps its identity. Duplicate requests share the owned remote attempt across accounts while retaining private request histories and normal ingest receipts. A torrent already present outside that owned attempt is refused.
 
@@ -95,6 +95,18 @@ These are deliberate protocol bounds, not an assertion that every version has be
 
 The fixtures are in `tests/fixtures/acquisition-clients.json`. See [the client verification record](verification/virtual-library-clients.md) for released primary references and the isolated real-client proof.
 
+## Choose books from a completed download
+
+A completed owned Usenet or torrent download with one usable EPUB/PDF imports automatically. If it contains several books, its request waits for you to **choose a book from this download**. The list shows filenames, formats and sizes. Choose one explicitly; CWNG copies that file through the normal import pipeline and records its own receipt.
+
+Use **Choose another book** on the original request to import another file from the same download, including after the first book has imported. Each selected book has an independent request, approval decision and receipt. Additional choices follow the account's current approval policy. Cancelling or rejecting a selected book leaves the other choices available; cancelling before any book is selected closes that bundle request. Repeating a choice returns its existing request, including a cancelled or rejected request.
+
+All choices reuse the original owned client download, including choices by other permitted accounts. Each account has its own private candidate list and request history. CWNG does not alter client files or seeding. Only a completed import receipt provides an **Open book** link.
+
+The list snapshots the completed files. Before copying a chosen book, CWNG checks that its path, size and bytes still match that snapshot. Missing, replaced, changed or unsafe files fail explicitly; CWNG never substitutes another book. Restore the original files before retrying. New contents under an already imported release need a separately identified fresh release; there is no automatic replacement of the saved choices.
+
+Enumeration is bounded to 1,000 entries and 20 usable books, at most 100MiB per book and 512MiB in total. Larger or unsafe downloads fail with a useful error. No archives are extracted. Administrators can pause new choices while users continue to read their lists.
+
 ## Edit or remove connections
 
 Changing the endpoint to a different origin requires explicitly re-entering the credential; a stored key cannot silently move to another server.
@@ -103,7 +115,7 @@ Changing the endpoint to a different origin requires explicitly re-entering the 
 
 ## Requests and existing books
 
-Requests belong to the account that created them. Requests for the same indexer release resolve to one request per account. Separate accounts retain private request histories while reusing the same client download. A rejected or cancelled release remains in that account’s history; another click returns that request rather than bypassing the earlier decision. Repeating the same submission after an uncertain response returns the original request. Accounts cannot use another account's catalog selections or inspect its requests.
+Requests belong to the account that created them. Catalog requests for the same indexer release resolve to one original request per account; explicitly chosen books from that release get their own artifact requests. Separate accounts retain private request histories while reusing the same client download. A rejected or cancelled release remains in that account’s history; another click returns that request rather than bypassing the earlier decision. Repeating the same submission after an uncertain response returns the original request. Accounts cannot use another account's catalog selections or inspect its requests.
 
 Imported means that CWNG has recorded the actual library book IDs and completed its import receipt. A download finishing alone does not mean the book is available. The book links still follow normal library visibility rules.
 
@@ -136,3 +148,5 @@ NZBGet's released queue/history RPCs do not support pagination or ID filters. Qu
 Torrent copies wait for a settled client state and for the reported final file to appear. A final-directory move can therefore defer an import without issuing a second download. A missing file remains subject to the same seven-day deadline; unsafe paths, symlinks and non-file results are refused. HTTP descriptor redirects ending in a magnet are resolved without fetching the magnet; its v1 hash, tracker origins and credential safety are validated before any submission.
 
 Tracker origins must be configured explicitly; an empty list deliberately trusts no tracker URLs. Magnet trackers are checked during discovery. HTTP `.torrent` links are checked when their bounded descriptor is fetched for a request, so discovery does not fetch every result or spend provider quotas. Unknown metainfo extensions remain unsupported pending a reviewed fixture: accepting them blindly could introduce network or file semantics not covered by the v1 checks.
+
+For an application downgrade, pause acquisition and settle or cancel outstanding bundle work first. Older workers do not understand selected-artifact jobs; do not resume them with unfinished bundle work. Keep the additive columns and manifest table intact. Upgrading preserves the existing permission migration marker and grants.

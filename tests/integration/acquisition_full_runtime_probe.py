@@ -75,6 +75,7 @@ def main():
         )
         ub.session.commit()
         owner = reader.id
+        other_owner = other.id
         ub.session.close()
         ub.session.bind.dispose()
         db = CWA_DB()
@@ -412,11 +413,18 @@ def main():
                             source_and_private_cleanup=True,
                         )
                     )
+                from acquisition_bundle_runtime_probe import run_bundle_runtime
+                bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
+                with sqlite3.connect(root / "app.db") as c:
+                    for table, rows in reader_state.items():
+                        assert c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
+                            (owner,first_id)).fetchall() == rows
             print(
                 "CWNG_ACQUISITION_FULL_RUNTIME="
                 + json.dumps(
                     dict(
                         results=results,
+                        bundle=bundle,
                         http_gets=gets,
                         full_processor_subprocess=True,
                         network="isolated loopback only",

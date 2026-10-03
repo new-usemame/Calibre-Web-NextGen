@@ -3,6 +3,7 @@
 from contextlib import contextmanager, closing
 from pathlib import Path
 import sqlite3
+import re
 
 from ... import constants
 from .migration import VERSION
@@ -92,6 +93,31 @@ def create_request(repo, owner_id, *, connection_id, offer_id, idempotency_key, 
 def has_connections(database):
     with _read(database) as execute:
         return execute('SELECT 1 FROM acquisition_connection LIMIT 1').fetchone() is not None
+
+
+def select_artifact(repo, owner_id, job_id, generation, candidate_id):
+    """Current policy is read under the selection transaction's write fence."""
+    if (not isinstance(generation, str) or not 1 <= len(generation) <= 64
+            or not isinstance(candidate_id, str) or not re.fullmatch('[a-f0-9]{64}', candidate_id)):
+        raise AdmissionError('invalid_request')
+
+    def authorize(connection, parent, candidate):
+        role = connection.exec_driver_sql('SELECT role FROM user WHERE id=?', (owner_id,)).scalar()
+        setting = connection.exec_driver_sql('SELECT config_acquisition_enabled,config_upload_formats FROM settings LIMIT 1').first()
+        marker = connection.exec_driver_sql('SELECT version,status FROM acquisition_schema_migration').all()
+        if (type(role) is not int or role & constants.ROLE_ANONYMOUS
+                or not role & constants.ROLE_ACQUISITION_ACCESS or setting is None or setting[0] != 1
+                or len(marker) != 1 or marker[0][0] != VERSION or marker[0][1] not in ('preserved','mapped')):
+            raise AdmissionError('acquisition_unavailable')
+        if not isinstance(setting[1], str):
+            raise AdmissionError('invalid_request')
+        extensions = {x.strip().lower() for x in setting[1].split(',')}
+        media = _FORMAT_MEDIA_TYPES.get('pdf' if candidate['media_type'] == 'application/pdf' else 'epub')
+        if '' not in extensions and media not in {_FORMAT_MEDIA_TYPES.get(x) for x in extensions}:
+            raise AdmissionError('invalid_request')
+        return not bool(role & constants.ROLE_ACQUISITION_AUTO_APPROVE)
+
+    return repo.select_book(owner_id, job_id, generation, candidate_id, authorize_selection=authorize)
 
 
 def account_grants(database):

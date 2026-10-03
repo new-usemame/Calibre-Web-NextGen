@@ -11412,6 +11412,122 @@ msgstr "Bestandsnaamsjabloon voor OPDS-downloads"
 msgid "Padded series number:"
 msgstr "Opgevuld reeksnummer:"
 
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "Wacht op je boekkeuze"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Boek aangevraagd. Een beheerder moet het goedkeuren."
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Boek toegevoegd aan je activiteit."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Die boekkeuze was verouderd. De lijst wordt vernieuwd…"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr "Aanvragen zijn gepauzeerd. Je kunt de beschikbare boeken nog bekijken."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Dat boek kon niet worden aangevraagd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+"De keuze was verouderd en de beschikbare boeken konden niet worden "
+"vernieuwd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr "Die boekkeuze was verouderd. De lijst is vernieuwd; kies opnieuw."
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "De beschikbare boeken konden niet worden geladen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} beschikbare boeken gevonden."
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Kies een boek uit deze download"
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Beschikbare boeken verbergen"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Nog een boek kiezen"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Beschikbare boeken laden…"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "Er zijn geen boeken beschikbaar in deze download."
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Dit boek importeren"
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Dit boek aanvragen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Dit boek importeren: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Dit boek aanvragen: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} bytes"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Aangevraagd"
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+"Het gekozen boek staat niet meer in de voltooide download. Herstel het "
+"oorspronkelijke bestand voordat je het opnieuw probeert."
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+"Het boek of de voltooide download is gewijzigd. Herstel de oorspronkelijke "
+"bestanden voordat je het opnieuw probeert."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
+"De voltooide download overschrijdt de veilige bestandslimieten. Kies een "
+"kleinere uitgave."
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Wachten"

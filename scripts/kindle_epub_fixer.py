@@ -61,7 +61,9 @@ def _remove_amazon_marker_attributes(content: str) -> tuple[str, int]:
     temporary buffer, independent of the file's preserved target encoding.
     """
     data = content.encode('utf-8')
-    parser = expat.ParserCreate(encoding='utf-8')
+    namespace_separator = '\x1f'
+    parser = expat.ParserCreate(encoding='utf-8', namespace_separator=namespace_separator)
+    parser.namespace_prefixes = True
     parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
     parser.ExternalEntityRefHandler = lambda *args: 1
     removals = set()
@@ -74,7 +76,9 @@ def _remove_amazon_marker_attributes(content: str) -> tuple[str, int]:
         # Entity replacement text has no literal start tag at the reported
         # source offset. Leave declarations/references alone rather than trying
         # to rewrite their shared definition.
-        if tag is None or tag.group(1).decode('utf-8') != name:
+        parts = name.split(namespace_separator)
+        qualified_name = parts[2] + ':' + parts[1] if len(parts) == 3 else parts[-1]
+        if tag is None or tag.group(1).decode('utf-8') != qualified_name:
             return
         for attribute in XML_ATTRIBUTE_PATTERN.finditer(data, tag.start(), tag.end()):
             if attribute.group(1).lower() == b'data-amznremoved':
@@ -505,7 +509,8 @@ class EPUBFixer:
         with zipfile.ZipFile(epub_path, 'r') as zip_ref:
             self.entries = zip_ref.namelist()
             for filename in self.entries:
-                ext = filename.split('.')[-1]
+                # ZIP names stay exact; extension recognition is case-insensitive.
+                ext = filename.split('.')[-1].lower()
                 if filename == 'mimetype':
                     self.files[filename] = zip_ref.read(filename)
                     continue
@@ -529,7 +534,7 @@ class EPUBFixer:
         )
 
         for filename in list(self.files.keys()):
-            ext = filename.split('.')[-1]
+            ext = filename.split('.')[-1].lower()
             content = self._get_text_content(filename)
             if content is None:
                 continue
@@ -544,9 +549,13 @@ class EPUBFixer:
                 if updated != content:
                     self.fixed_problems.append(f"Updated HTML charset in {filename} to {declared_encoding}")
                 self.files[filename] = updated
-                continue
+                content = updated
+                # XHTML can use an HTML suffix. When its XML declaration is
+                # present it must agree with the bytes we emit, too.
+                if not xml_decl_pattern.match(content):
+                    continue
 
-            if ext not in ['xhtml', 'xml', 'opf', 'ncx', 'svg']:
+            if ext not in ['html', 'htm', 'xhtml', 'xml', 'opf', 'ncx', 'svg']:
                 continue
 
             # v4.0.5 onwards: fix XML declaration contributed by DendyA

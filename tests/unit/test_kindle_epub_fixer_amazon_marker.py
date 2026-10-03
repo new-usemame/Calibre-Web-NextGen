@@ -19,7 +19,8 @@ def replace_payload(book, payload):
             z.writestr(name, data, compress_type=zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED)
 
 
-@pytest.mark.parametrize("filename", ["chapter.xhtml", "chapter.html", "chapter.htm", "diagram.svg"])
+@pytest.mark.parametrize("filename", ["chapter.xhtml", "chapter.html", "chapter.htm", "diagram.svg",
+                                           "CHAPTER.XHTML", "CHAPTER.HTML", "Chapter.HtM", "Diagram.SvG"])
 def test_process_removes_only_amazon_attribute_and_second_run_is_noop(fixer_module, tmp_path, filename):
     book = build_epub(tmp_path / "book.epub")
     payload = epub_payload(book)
@@ -78,9 +79,12 @@ def test_parser_handles_multiline_namespaced_and_quoted_attributes(fixer_module)
     minidom.parseString(output)
 
 
-def test_malformed_xml_gets_no_partial_edit(fixer_module, capsys):
+@pytest.mark.parametrize("source", [
+    '<html><span data-AmznRemoved="mobi7">keep</span><unclosed></html>',
+    '<html><span data-AmznRemoved="mobi7">keep</span><bad:p>unbound</bad:p></html>',
+])
+def test_malformed_xml_gets_no_partial_edit(fixer_module, capsys, source):
     fixer = fixer_module.EPUBFixer()
-    source = '<html><span data-AmznRemoved="mobi7">keep</span><unclosed></html>'
     fixer.files = {"chapter.xhtml": source}
     fixer.remove_amazon_marker_attributes()
     assert fixer.files["chapter.xhtml"] == source
@@ -150,3 +154,26 @@ def test_clean_bom_document_is_not_given_a_second_xml_declaration(fixer_module, 
     replace_payload(book, payload)
     assert fixer_module.EPUBFixer().process(str(book)) == []
     assert epub_payload(book) == payload
+
+
+@pytest.mark.parametrize("filename", ["chapter.xhtml", "CHAPTER.XHTML", "chapter.html", "CHAPTER.HTML",
+                                      "chapter.htm", "CHAPTER.HTM", "diagram.svg", "DIAGRAM.SVG"])
+def test_legacy_encoding_roundtrip_keeps_reader_text(fixer_module, tmp_path, filename):
+    book = build_epub(tmp_path / "book.epub")
+    source = ('<?xml version="1.0" encoding="iso-8859-1"?>'
+              '<html xmlns="http://www.w3.org/1999/xhtml"><head>'
+              '<meta charset="iso-8859-1"/></head><body>'
+              '<p data-AmznRemoved="mobi7">café</p></body></html>')
+    payload = epub_payload(book)
+    payload["OEBPS/" + filename] = source.encode("iso-8859-1")
+    replace_payload(book, payload)
+    result = fixer_module.EPUBFixer().process(str(book))
+    repaired = epub_payload(book)["OEBPS/" + filename]
+    dom = minidom.parseString(repaired)
+    paragraph = dom.getElementsByTagName("p")[0]
+    assert paragraph.firstChild.data == "café"
+    assert not paragraph.hasAttribute("data-AmznRemoved")
+    assert any("Amazon" in issue for issue in result)
+    digest = hashlib.sha256(book.read_bytes()).hexdigest()
+    assert fixer_module.EPUBFixer().process(str(book)) == []
+    assert hashlib.sha256(book.read_bytes()).hexdigest() == digest

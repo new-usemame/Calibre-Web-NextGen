@@ -35,6 +35,7 @@ import {
 } from '../lib/readerLinks';
 import { hasNativeAnchor, resolveNativeAnnotations } from '../lib/reader/nativeAnnotations';
 import { readerFontFaceCss, readerFontFamily, BUILTIN_READER_FONTS, type ReaderFont } from '../lib/readerFonts';
+import { restoreBookAttributeNamespaces } from '../lib/reader/attributeNamespaces';
 import styles from './Reader.module.css';
 
 /*
@@ -1509,7 +1510,31 @@ export function Reader({ id }: { id: string }) {
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
     previewingRef.current = false;
-    Promise.resolve(rendition.display(target)).catch(() => {
+    const displayTarget = async () => {
+      const section = bookRef.current?.spine.get(target);
+      const fragmentIndex = target.indexOf('#');
+      const fragment = fragmentIndex < 0 ? '' : target.slice(fragmentIndex);
+      const applyFragment = () => {
+        if (!section || target.startsWith('epubcfi(')) return false;
+        let changed = false;
+        for (const contents of rendition.getContents()) {
+          if (contents.sectionIndex !== section.index || !contents.window) continue;
+          if (contents.window.location.hash !== fragment) {
+            // epub.js scrolls to fragments without activating :target. Keep
+            // the publisher's reveal rules active before measuring the note.
+            contents.window.location.hash = fragment;
+            changed = true;
+          }
+        }
+        return changed;
+      };
+      applyFragment();
+      await rendition.display(target);
+      // A cross-chapter link creates its frame during display. Reveal its
+      // target there, then measure again with the publisher's final layout.
+      if (applyFragment()) await rendition.display(target);
+    };
+    displayTarget().catch(() => {
       Promise.resolve(rendition.display(documentOnly)).catch(() => {/* give up quietly */});
     });
   }, []);
@@ -1686,6 +1711,9 @@ export function Reader({ id }: { id: string }) {
         // that measurement, leaving first-click jumps on the previous spread.
         rendition.hooks.render.register((view: any) => {
           if (!view.contents?.document) return;
+          // Restore publisher attribute selectors before expanding the chapter,
+          // retaining HTML's established element structure and stored CFI paths.
+          restoreBookAttributeNamespaces(view.contents.document.documentElement);
           const appearance = appearanceRef.current;
           applyDocumentTheme(view.contents.document, appearance.theme);
           applyDocumentTypography(view.contents.document, appearance);

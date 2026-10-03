@@ -13,7 +13,7 @@ test('Classic editor exposes author and icon-button names', async ({ page }) => 
   await page.goto(`/admin/book/${await firstBookId(page)}`);
   await expect(page.locator('#authors')).toHaveAccessibleName('Author');
   await expect(page.locator('#xchange')).toHaveAccessibleName('Exchange author & title');
-  await expect(page.locator('#pubdate_delete')).toHaveAccessibleName('Delete: Published Date');
+  await expect(page.locator('#pubdate_delete')).toHaveAccessibleName('Remove Published Date');
   await page.locator('#title').fill('Title field probe');
   await page.locator('#authors').fill('Author field probe');
   await page.locator('#xchange').focus();

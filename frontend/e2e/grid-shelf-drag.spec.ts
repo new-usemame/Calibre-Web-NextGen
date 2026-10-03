@@ -145,7 +145,16 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
       await expect(target).toHaveClass(/dropOver/);
       await touch('touchEnd'); await cdp.detach();
     } else {
+      // The WebKit trace retained an off-viewport source box after scrolling.
+      // Native hover resolves an actionable hit target before measuring input.
+      await selected.hover();
+      await settleAnimations(selected);
       const box = (await selected.boundingBox())!;
+      const viewport = page.viewportSize()!;
+      expect(box.x + box.width / 2).toBeGreaterThan(0);
+      expect(box.x + box.width / 2).toBeLessThan(viewport.width);
+      expect(box.y + box.height / 2).toBeGreaterThan(0);
+      expect(box.y + box.height / 2).toBeLessThan(viewport.height);
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
       await page.mouse.move(box.x + box.width / 2 + 16, box.y + box.height / 2, { steps: 4 });

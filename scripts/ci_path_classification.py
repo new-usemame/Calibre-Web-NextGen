@@ -424,13 +424,20 @@ def classify_paths(paths: Iterable[str], repo_root: Path) -> dict[str, bool]:
     changed = _clean_paths(paths)
     concurrency = concurrency_paths(repo_root)
 
-    frontend = any(
-        path.startswith(("frontend/", "cps/static/app/"))
+    # Classic templates are overlaid by the browser lane, but its overlay only
+    # copies static/app. Other shipped static files need the complete PR image
+    # so CSS, reader scripts and vendor fixes cannot test stale :dev bytes.
+    classic_static_changed = any(
+        path.startswith("cps/static/") and not path.startswith("cps/static/app/")
+        for path in changed
+    )
+    frontend = classic_static_changed or any(
+        path.startswith(("frontend/", "cps/static/app/", "cps/templates/"))
         or path in HARNESS_PATHS
         or path in UI_ROUTING_PATHS
         for path in changed
     )
-    build = any(
+    build = classic_static_changed or any(
         path == "Dockerfile"
         or ("/" not in path and "requirements" in path and path.endswith(".txt"))
         or path.startswith(("root/", "cps/", "scripts/", "tests/docker/", "tests/integration/"))

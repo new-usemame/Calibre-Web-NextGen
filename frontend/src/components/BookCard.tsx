@@ -10,6 +10,7 @@ import { formatCustomColumnDate } from '../lib/customColumnDisplay';
 import styles from './BookCard.module.css';
 import { Spinner } from './Spinner';
 import { BookCardActions } from './BookCardActions';
+import { ShelfDragHandle, useShelfDrag } from './ShelfDrag';
 
 interface BookCardProps {
   book: Book;
@@ -95,6 +96,7 @@ function BookCardInner({
 }: BookCardProps) {
   const t = useT();
   const { locale } = useI18n();
+  const shelfDrag = useShelfDrag();
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
   const readTarget = getPrimaryReadTarget(book.id, book.formats, canRead);
@@ -194,7 +196,11 @@ function BookCardInner({
             the WCAG pass: it announces the badge once, rather than letting the
             icon and the adjacent text be read as two separate things. Keep it
             even now that the label is visible. */}
-        {!hideReadingTags && book.in_progress ? (
+        {!hideReadingTags && (book.read_status === 'did_not_finish' || book.read_status === 'on_hold') ? (
+          <span className={styles.readingBadge}>
+            {book.read_status === 'did_not_finish' ? t('Did not finish') : t('On hold')}
+          </span>
+        ) : !hideReadingTags && book.in_progress ? (
           <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
             data-testid="reading-badge">
             <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
@@ -277,8 +283,11 @@ function BookCardInner({
       <div className={styles.wrap} style={style} data-book-id={book.id}>
         <button
           type="button"
+          draggable={!!shelfDrag?.available && !selectionDisabled && !shelfDrag.busy}
+          onDragStart={event => shelfDrag?.nativeStart(book, event)}
+          onDragEnd={() => shelfDrag?.cancel()}
           className={selected ? styles.cardSelected : styles.card}
-          disabled={selectionDisabled}
+          disabled={selectionDisabled || shelfDrag?.busy}
           aria-pressed={selected}
           aria-label={
             selected
@@ -293,6 +302,7 @@ function BookCardInner({
           {info}
           {seriesLine}
         </button>
+        <ShelfDragHandle book={book} disabled={selectionDisabled || shelfDrag?.busy} />
       </div>
     );
   }
@@ -305,7 +315,7 @@ function BookCardInner({
   return (
     <div className={styles.wrap} style={style} data-book-id={book.id}>
       {detailsEnabled ? (
-        <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
+        <Link href={`/book/${book.id}`} draggable={!!shelfDrag?.available && !selectionDisabled && !shelfDrag.busy} onDragStart={event => shelfDrag?.nativeStart(book, event)} onDragEnd={() => shelfDrag?.cancel()} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
           {cover}{info}
         </Link>
       ) : (
@@ -319,6 +329,7 @@ function BookCardInner({
       ) : (
         seriesLine
       ))}
+      <ShelfDragHandle book={book} disabled={selectionDisabled} />
       {coverActions && <div className={styles.coverActions}>
         <BookCardActions book={book} readTarget={readTarget} quickEdit={quickEdit}
           onRemove={onRemove} removeLabel={removeLabel} shelfNames={shelves.map(shelf => shelf.name)} />

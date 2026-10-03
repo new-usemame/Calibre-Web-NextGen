@@ -267,11 +267,31 @@
       </div>
     </div>
     
+    <div class="settings-container">
+      <h4 class="settings-section-header">{{_('OPDS Downloads')}}</h4>
+      <div class="form-group">
+        <label for="config_opds_filename_template">{{_('OPDS download filename template')}}</label>
+        <input type="text" class="form-control" name="config_opds_filename_template" id="config_opds_filename_template"
+               value="{{ opds_filename_template if opds_filename_template is not none and opds_filename_template is defined else conf.config_opds_filename_template or '' }}" maxlength="1024" placeholder="{author_sort} - {title} ({id})"
+               aria-describedby="opds-filename-help{% if opds_filename_error %} opds-filename-error{% endif %}"{% if opds_filename_error %} aria-invalid="true"{% endif %}>
+        {% if opds_filename_error %}<p id="opds-filename-error" class="opds-filename-error" role="alert">{{ opds_filename_error }}</p>{% endif %}
+        <p id="opds-filename-help" class="settings-explanation">{{_('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}}</p>
+        <p class="settings-explanation">{{_('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}}</p>
+        <details>
+          <summary>{{_('Filename template fields and examples')}}</summary>
+          <p><code>{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {{ '{#custom_field}' }}</code></p>
+          <p>{{_('First character:')}} <code>{author_sort[0]}</code>. {{_('Padded series number:')}} <code>{series_index:0&gt;3s}</code>.</p>
+          <p>{{_('Example:')}} <code>{series:|| - }{series_index:0&gt;3s|| - }{title}</code></p>
+          <p>{{_('In KOReader, enable Use server filenames for the OPDS catalog.')}}</p>
+        </details>
+      </div>
+    </div>
+
     <!-- Default Visibilities for New Users Card -->
     <div class="settings-container">
       <h4 class="settings-section-header">{{_('Default Visibilities for New Users')}}</h4>
       <p class="settings-explanation">{{_('Choose which sidebar sections are visible by default for new users.')}}</p>
-      
+
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 20px; background: #202c34a3; padding: 2rem; border-radius: 4px;">
         {% for element in sidebar %}
           {% if element['config_show'] %}
@@ -286,7 +306,7 @@
           <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
       </div>
-      
+
       {% if not simple %}
       <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #5c6b74;">
         <a href="#" id="get_tags" data-id="0" class="btn btn-default" data-toggle="modal" data-target="#restrictModal">{{_('Add Allowed/Denied Tags')}}</a>

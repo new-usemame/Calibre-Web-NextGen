@@ -3,7 +3,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } f
 import { Link, useParams, useLocation } from 'wouter';
 import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
-  useBook, useToggleRead, useStopReading, useToggleFavorite, useToggleArchived, useToggleHidden,
+  useBook, useToggleRead, useStopReading, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
@@ -20,7 +20,7 @@ import { MoreByAuthor } from '../components/MoreByAuthor';
 import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
+import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT, useI18n } from '../lib/i18n';
 import { formatCustomColumnDate } from '../lib/customColumnDisplay';
@@ -425,6 +425,9 @@ export function BookDetail() {
   const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
   const stopReading = useStopReading(id);
+  const setReadingStatus = useSetReadingStatus(id);
+  const resetReadingStatus = setReadingStatus.reset;
+  useEffect(() => { resetReadingStatus(); }, [id, resetReadingStatus]);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
   const toggleHidden = useToggleHidden(id);
@@ -898,6 +901,26 @@ export function BookDetail() {
             {book.rating != null && book.rating > 0 && (
               <div className={styles.rating}>
                 <StarRating rating={book.rating} size={16} />
+              </div>
+            )}
+            {inLibrary && !me?.role?.anonymous && (
+              <div className={styles.readingStatusControl}>
+                <label htmlFor="reading-status">{t('Reading status')}</label>
+                <select id="reading-status"
+                  value={book.read_status ?? (book.read ? 'finished' : book.in_progress ? 'in_progress' : 'unread')}
+                  disabled={setReadingStatus.isPending}
+                  aria-invalid={setReadingStatus.isError || undefined}
+                  aria-describedby={`reading-status-help${setReadingStatus.isError ? ' reading-status-error' : ''}`}
+                  onChange={e => setReadingStatus.mutate(e.target.value as ReadingStatus)}>
+                  <option value="unread">{t('Unread')}</option>
+                  <option value="finished">{t('Finished')}</option>
+                  <option value="in_progress">{t('Currently reading')}</option>
+                  <option value="did_not_finish">{t('Did not finish')}</option>
+                  <option value="on_hold">{t('On hold')}</option>
+                </select>
+                <p id="reading-status-help">{t('Did not finish and On hold keep your reading position.')}</p>
+                <p role="status">{setReadingStatus.isPending ? t('Saving…') : setReadingStatus.isSuccess ? t('Reading status updated') : ''}</p>
+                {setReadingStatus.isError && <p id="reading-status-error" role="alert">{t('Could not update reading status. Please try again.')}</p>}
               </div>
             )}
             {/* Passive read state — the gear menu's "Mark as unread" is the

@@ -183,10 +183,13 @@ def cover_url_for(book, resolution, cover_override=None):
 
 
 def serialize_book_list_item(book, read=False, archived=False, hidden=False,
-                             in_progress=False, cover_override=None, custom_columns=None):
+                             in_progress=False, read_status=None,
+                             cover_override=None, custom_columns=None):
     series_list = getattr(book, "series", None) or []
     series = series_list[0].name if series_list else None
     series_id = getattr(series_list[0], "id", None) if series_list else None
+    if read_status is None:
+        read_status = "finished" if read else ("in_progress" if in_progress else "unread")
     return {
         "id": book.id,
         "title": book.title,
@@ -208,6 +211,7 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False,
         "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
         "read": bool(read),
         "in_progress": bool(in_progress),
+        "read_status": read_status,
         "archived": bool(archived),
         "hidden": bool(hidden),
         # List endpoints send definitions once at the page level; this compact
@@ -252,7 +256,8 @@ def _serialize_custom_columns(book, definitions):
 
 
 def serialize_book_detail(book, read=False, archived=False, favorited=False, hidden=False,
-                          in_progress=False, custom_column_definitions=None,
+                          in_progress=False, read_status=None,
+                          custom_column_definitions=None,
                           original_filename=None, annotation_count=0,
                           cover_override=None):
     """Full detail serializer — pure, no Flask/DB imports.
@@ -263,6 +268,8 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
     without that enrichment.
     """
     bid = book.id
+    if read_status is None:
+        read_status = "finished" if read else ("in_progress" if in_progress else "unread")
 
     # Series (first entry only) — {id, name} so the UI can link to the series view
     series_list = getattr(book, "series", None) or []
@@ -398,5 +405,6 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "favorited": bool(favorited),
         "hidden": bool(hidden),
         "in_progress": bool(in_progress),
+        "read_status": read_status,
         "annotation_count": int(annotation_count or 0),
     }

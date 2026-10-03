@@ -1,4 +1,5 @@
 import { BookListExport } from '../components/BookListExport';
+import { useShelfDragSelection } from '../components/ShelfDrag';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
@@ -61,6 +62,9 @@ export function MagicShelfView({ id }: { id: string }) {
   const [selectAllBusy, setSelectAllBusy] = useState(false);
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
+  useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
+    setSelected(new Set(ids)); setSelecting(true);
+  } });
   const clearSelection = () => {
     selectAllRequest.current += 1;
     setSelectAllBusy(false);

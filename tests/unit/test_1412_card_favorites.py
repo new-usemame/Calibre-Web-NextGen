@@ -23,7 +23,7 @@ def test_list_card_favorites_are_page_bounded_and_account_isolated(monkeypatch):
     session.commit()
     monkeypatch.setattr(ub, 'session', session)
     monkeypatch.setattr(books.config, 'config_read_column', 0, raising=False)
-    monkeypatch.setattr(books, 'book_in_progress_ids', lambda *args: set())
+    monkeypatch.setattr(books, 'read_statuses_for_books', lambda *args, **kwargs: {})
     monkeypatch.setattr(books.user_cover, 'overrides_for_user', lambda *args: {})
     monkeypatch.setattr(books, '_visible_shelves_by_book', lambda *args: {})
     entries = [SimpleNamespace(id=n, title=str(n), series_index=1, authors=[],

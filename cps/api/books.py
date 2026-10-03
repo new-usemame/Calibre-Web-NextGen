@@ -25,7 +25,8 @@ from ..annotations import count_user_annotations
 from ..cw_login import current_user
 from ..services import user_cover, discover_source
 from ..shelf import sort_shelves_for_user
-from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
+from ..helper import edit_book_read_status, canonical_read_status, \
+    book_ids_with_read_status, read_statuses_for_books, set_explicit_book_read_status, \
     get_convert_options, get_kosync_progress_display, hot_books_page
 from ..sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
 from ..sort_orders import RECENT_SORT
@@ -229,23 +230,32 @@ def _list_custom_column_data(entries):
         return [], {}
 
 
-def _row_to_item(e, in_progress_ids, hidden_ids=None, cover_override=None, custom_columns=None):
+def _row_to_item(e, in_progress_ids, hidden_ids=None, cover_override=None,
+                 read_status_by_id=None, custom_columns=None):
     """Unwrap a SQLAlchemy Row (Books, is_archived, read_status) or plain Books object."""
     book = getattr(e, "Books", e)
     read_status = _row_read_status(e)
+    read_status_name = (read_status_by_id or {}).get(int(book.id))
+    if read_status_name is None:
+        if config.config_read_column:
+            read_status_name = "finished" if read_status else (
+                "in_progress" if book.id in (in_progress_ids or set()) else "unread")
+        else:
+            read_status_name = canonical_read_status(read_status)
     if config.config_read_column:
         # Custom read column: generate_linked_query selects read_column.value as the
         # third column (Row attr "value"), NOT ub.ReadBook.read_status — a truthy
         # value means the book is read. Without this the badge is always false when
         # an admin links read status to a Calibre column (fork #579).
-        read = bool(read_status)
+        read = read_status_name == "finished"
     else:
-        read = read_status == ub.ReadBook.STATUS_FINISHED
+        read = read_status_name == "finished"
     archived = bool(getattr(e, "is_archived", False))
     return serialize_book_list_item(
         book,
         read=read,
-        in_progress=book.id in (in_progress_ids or set()),
+        in_progress=read_status_name == "in_progress",
+        read_status=read_status_name,
         archived=archived,
         hidden=book.id in (hidden_ids or set()),
         cover_override=cover_override,
@@ -310,8 +320,10 @@ def _rows_to_items(entries, hidden_ids=None, custom_values=None):
         (getattr(entry, "Books", entry).id, _row_read_status(entry))
         for entry in entries
     ]
-    in_progress_ids = book_in_progress_ids(
+    status_by_id = read_statuses_for_books(
         statuses, config.config_read_column, current_user)
+    in_progress_ids = {book_id for book_id, status in status_by_id.items()
+                       if status == "in_progress"}
     books = [getattr(entry, "Books", entry) for entry in entries]
     overrides = user_cover.overrides_for_user(
         _real_user_id(), [book.id for book in books])
@@ -337,6 +349,7 @@ def _rows_to_items(entries, hidden_ids=None, custom_values=None):
         item = _row_to_item(
             entry, in_progress_ids, hidden_ids,
             cover_override=overrides.get(int(book.id)),
+            read_status_by_id=status_by_id,
             custom_columns=(custom_values or {}).get(int(book.id)),
         )
         item["shelves"] = shelves_by_book.get(int(book.id), [])
@@ -381,13 +394,20 @@ def _build_entity_filter(author, series, tag, publisher, language, rating=None, 
 
 
 def _build_read_filter(filter_val):
-    """Return a db_filter for ?filter=read|unread.
+    """Return a per-user read-status filter for catalog views.
 
     When an admin links read status to a Calibre column (config_read_column),
     filter on that column's value (mirrors web.py's books_list); otherwise use the
     built-in per-user ub.ReadBook table. The join for the custom column is provided
     by generate_linked_query inside fill_indexpage, so the value is queryable here.
     """
+    # Personal pauses are independent of the optional shared Boolean column.
+    # Even a removed/misconfigured column must not broaden an exact pause view.
+    if filter_val in ("did_not_finish", "on_hold"):
+        status = (ub.ReadBook.STATUS_DID_NOT_FINISH if filter_val == "did_not_finish"
+                  else ub.ReadBook.STATUS_ON_HOLD)
+        ids = book_ids_with_read_status(_real_user_id(), status)
+        return db.Books.id.in_(ids)
     if config.config_read_column:
         try:
             read_col = db.cc_classes[config.config_read_column].value
@@ -395,10 +415,19 @@ def _build_read_filter(filter_val):
             log.error("Custom Column No.%s does not exist in calibre database",
                       config.config_read_column)
             return True
+        paused_ids = book_ids_with_read_status(
+            _real_user_id(), ub.ReadBook.STATUS_DID_NOT_FINISH,
+            ub.ReadBook.STATUS_ON_HOLD)
         if filter_val == "read":
-            return coalesce(read_col, False) == True   # noqa: E712
+            return and_(coalesce(read_col, False) == True,  # noqa: E712
+                        ~db.Books.id.in_(paused_ids))
         if filter_val == "unread":
-            return coalesce(read_col, False) != True   # noqa: E712
+            return and_(coalesce(read_col, False) != True,  # noqa: E712
+                        ~db.Books.id.in_(paused_ids))
+        if filter_val == "in_progress":
+            ids = book_ids_with_read_status(
+                _real_user_id(), ub.ReadBook.STATUS_IN_PROGRESS)
+            return and_(db.Books.id.in_(ids), ~coalesce(read_col, False))
         return True
     if filter_val == "read":
         return and_(
@@ -406,7 +435,13 @@ def _build_read_filter(filter_val):
             ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED,
         )
     if filter_val == "unread":
-        return coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
+        paused_ids = book_ids_with_read_status(
+            _real_user_id(), ub.ReadBook.STATUS_DID_NOT_FINISH,
+            ub.ReadBook.STATUS_ON_HOLD)
+        return and_(coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED,
+                    ~db.Books.id.in_(paused_ids))
+    if filter_val == "in_progress":
+        return ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
     return True
 
 
@@ -500,7 +535,8 @@ def _catalog_book_query(*, search=None, author_id=None, series_id=None, tag_id=N
         query = query.filter(_export_ids_filter([row[0] for row in favorites]))
     elif filter_val == "rated":
         query = query.filter(db.Books.ratings.any(db.Ratings.rating > 9))
-    elif filter_val not in (None, "", "all", "read", "unread", "discover"):
+    elif filter_val not in (None, "", "all", "read", "unread", "in_progress",
+                            "did_not_finish", "on_hold", "discover"):
         raise BookExportRequestError("invalid_filter", "Unsupported book-list filter", 400)
 
     entity_filter = _build_entity_filter(
@@ -509,7 +545,7 @@ def _catalog_book_query(*, search=None, author_id=None, series_id=None, tag_id=N
     )
     if entity_filter is not True:
         query = query.filter(entity_filter)
-    if filter_val in ("read", "unread"):
+    if filter_val in ("read", "unread", "in_progress", "did_not_finish", "on_hold"):
         query = query.filter(_build_read_filter(filter_val))
     eager_options = [
         selectinload(db.Books.authors),
@@ -768,7 +804,8 @@ def _catalog_export_query(params, *, classic_tag_view=False):
     filter_val = params.get("filter")
     if filter_val is not None and not isinstance(filter_val, str):
         raise BookExportRequestError("invalid_request", "Filter must be text", 400)
-    if filter_val not in (None, "", "all", "read", "unread", "favorites", "rated", "archived", "discover"):
+    if filter_val not in (None, "", "all", "read", "unread", "in_progress",
+                          "did_not_finish", "on_hold", "favorites", "rated", "archived", "discover"):
         raise BookExportRequestError("invalid_filter", "Unsupported book-list filter", 400)
     for key, limit in (("language", 128), ("format", 32)):
         value = params.get(key)
@@ -796,7 +833,8 @@ def _catalog_export_query(params, *, classic_tag_view=False):
             "invalid_request", "Book IDs are supported only for the Discover sample", 400
         )
 
-    read_filter = filter_val if filter_val in ("read", "unread") else None
+    read_filter = filter_val if filter_val in (
+        "read", "unread", "in_progress", "did_not_finish", "on_hold") else None
     query = _catalog_book_query(
         search=search or None,
         author_id=_strict_int(params.get("author"), "Author ID", optional=True),
@@ -868,7 +906,8 @@ def _advanced_export_query(params):
             raise BookExportRequestError("invalid_request", f"{key} must be a whole-star rating", 400)
         if not 0 <= rating <= 5:
             raise BookExportRequestError("invalid_request", f"{key} must be between 0 and 5", 400)
-    if params.get("read_status", "all") not in ("all", "read", "unread"):
+    if params.get("read_status", "all") not in (
+            "all", "read", "unread", "in_progress", "did_not_finish", "on_hold"):
         raise BookExportRequestError("invalid_request", "Unsupported read-status filter", 400)
     for key in ("publishstart", "publishend"):
         value = params.get(key)
@@ -1172,7 +1211,8 @@ def list_books():
             rating_id=rating_id,
             book_format=book_format,
             filter_val=(filter_val if filter_val in
-                        ("read", "unread", "favorites", "rated", "archived") else None),
+                        ("read", "unread", "in_progress", "did_not_finish", "on_hold",
+                         "favorites", "rated", "archived") else None),
             show_hidden=show_hidden,
         )
         query = _join_sort(query, sort_context)
@@ -1204,6 +1244,10 @@ def list_books():
                 disc_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True  # noqa: E712
             except (KeyError, AttributeError):
                 disc_filter = True
+        paused_ids = book_ids_with_read_status(
+            _real_user_id(), ub.ReadBook.STATUS_DID_NOT_FINISH,
+            ub.ReadBook.STATUS_ON_HOLD)
+        disc_filter = and_(disc_filter, ~db.Books.id.in_(paused_ids))
         discover_per_page = config.config_books_per_page if select_all else per_page
         entries, _random, _pg = calibre_db.fill_indexpage(
             1, discover_per_page, db.Books, disc_filter, [func.randomblob(2)],
@@ -1302,7 +1346,9 @@ def list_books():
     # --- entity + read/unread path ---
     entity_filter = _build_entity_filter(author_id, series_id, tag_id, publisher_id, language_code,
                                          rating=rating_id, book_format=book_format)
-    read_filter = _build_read_filter(filter_val) if filter_val in ("read", "unread") else True
+    read_filter = (_build_read_filter(filter_val)
+                   if filter_val in ("read", "unread", "in_progress",
+                                     "did_not_finish", "on_hold") else True)
 
     if entity_filter is True and read_filter is True:
         db_filter = True
@@ -1488,16 +1534,17 @@ def book_detail(book_id):
     # With a custom read column, get_book_read_archived returns the column's value
     # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the
     # list badge's logic (fork #579) so both surfaces agree.
-    read = show_personal_state and (
-        bool(read_status) if config.config_read_column
-        else read_status == ub.ReadBook.STATUS_FINISHED
-    )
+    effective_read_status = "unread"
+    if show_personal_state:
+        effective_read_status = read_statuses_for_books(
+            ((book_id, read_status),), config.config_read_column,
+            current_user).get(book_id, "unread")
+    read = show_personal_state and effective_read_status == "finished"
     # Sync-driven "currently reading" tri-state (fork #634). The classic detail
     # page renders this marker off read_status_raw == STATUS_IN_PROGRESS; the SPA
     # book page never received the flag, so the badge was missing in the new UI.
     # Derive it from the shared helper so both surfaces stay in agreement.
-    in_progress = show_personal_state and book_is_in_progress(
-        book_id, read_status, config.config_read_column, current_user)
+    in_progress = show_personal_state and effective_read_status == "in_progress"
     body = serialize_book_detail(
         book,
         read=read,
@@ -1505,6 +1552,7 @@ def book_detail(book_id):
         favorited=favorited,
         hidden=hidden,
         in_progress=in_progress,
+        read_status=effective_read_status,
         annotation_count=annotation_count,
         custom_column_definitions=_detail_custom_columns(),
         original_filename=_original_filename(book_id),
@@ -1530,3 +1578,36 @@ def toggle_book_read(book_id):
     read = bool(data.get("read", True))
     edit_book_read_status(book_id, read)
     return jsonify({"read": read})
+
+
+@api_v1.route("/books/<int:book_id>/read-status", methods=["POST"])
+@login_required_if_no_ano
+def set_book_read_status(book_id):
+    """Set an explicit per-user status while preserving legacy boolean writes."""
+    data = request.get_json(silent=True)
+    status = data.get("status") if isinstance(data, dict) else None
+    if status not in ("unread", "finished", "in_progress",
+                      "did_not_finish", "on_hold"):
+        return jsonify({"error": {"code": "invalid_read_status",
+                                   "message": "Invalid reading status"}}), 400
+    if _real_user_id() is None:
+        return jsonify({"error": {"code": "forbidden",
+                                   "message": "A user account is required"}}), 403
+
+    visible = calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=_can_browse_global(),
+        allow_public_shelf_books=True,
+    )
+    if not visible:
+        return jsonify({"error": {"code": "not_found", "message": "Book not found"}}), 404
+    if not user_library.contains_book(current_user, book_id):
+        return jsonify({"error": {"code": "forbidden",
+                                   "message": "Book is not in your library"}}), 403
+
+    message = set_explicit_book_read_status(book_id, status)
+    if message:
+        return jsonify({"error": {"code": "read_status_failed",
+                                   "message": str(message)}}), 500
+    return jsonify({"status": status})

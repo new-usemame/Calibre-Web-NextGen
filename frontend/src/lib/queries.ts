@@ -11,23 +11,25 @@ import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
+import { addShelfBooks } from './shelfAdd';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
-  Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
+  Me, Book, BooksPage, BookDetail, ReadingStatus, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
   NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken, KoreaderPairRequest,
+  CcColumnsPage, CcTree, CcBooksPage,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
  *  endpoints/routes use the plural (author -> authors). */
 export type EntityKind = 'author' | 'series' | 'tag' | 'publisher' | 'language' | 'rating' | 'format';
-export type ReadFilter = 'all' | 'read' | 'unread';
+export type ReadFilter = 'all' | 'read' | 'unread' | 'in_progress' | 'did_not_finish' | 'on_hold';
 /** Discovery "views" — server-side ?filter= categories beyond read/unread. */
 export type DiscoveryView = 'hot' | 'discover' | 'rated' | 'favorites' | 'archived';
 
@@ -546,6 +548,50 @@ export function useDismissMyLibraryIntro() {
   });
 }
 
+// ── Custom columns (browse by tag-like column) ───────────────────────────────
+
+/** Browsable custom columns (tag-like text/enumeration), with their hierarchy
+ *  status. Empty items = the library has no browsable columns (or the caller
+ *  hid every one on their profile page). */
+export function useColumns(enabled = true) {
+  return useQuery<CcColumnsPage>({
+    queryKey: ['cc-columns'],
+    queryFn: () => apiGet<CcColumnsPage>('/api/v1/columns'),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** The nodes of one custom column. For a hierarchical column that is the
+ *  nested tree; for a flat one a one-level list of whole values. The response's
+ *  `column.hierarchical` tells the caller which, so one renderer covers both. */
+export function useCcTree(colId: string | number, enabled = true) {
+  return useQuery<CcTree>({
+    queryKey: ['cc-tree', String(colId)],
+    queryFn: () => apiGet<CcTree>(`/api/v1/columns/${colId}/tree`),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** One page of books under a node of a custom column. An empty `path` lists
+ *  every book carrying any value in the column. */
+export function useCcBooks(
+  colId: string | number, path: string, page: number, enabled = true,
+) {
+  return useQuery<CcBooksPage>({
+    queryKey: ['cc-books', String(colId), path, page],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page) });
+      if (path) params.set('path', path);
+      return apiGet<CcBooksPage>(`/api/v1/columns/${colId}/books?${params.toString()}`);
+    },
+    enabled,
+    staleTime: 60000,
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** Fetch an entity-browse list (authors/series/tags/publishers/languages).
  *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
@@ -617,6 +663,20 @@ function invalidateBookCardViews(qc: QueryClient) {
   // of appending a refreshed single page onto stale membership. This also
   // refreshes advanced-search/default-filter cards through the shared seam.
   return refreshLibraryViews(qc);
+}
+
+export function useSetReadingStatus(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (status: ReadingStatus) =>
+      apiPost<{ status: ReadingStatus }>(`/api/v1/books/${id}/read-status`, { status }),
+    onSuccess: () => {
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(qc),
+      ]);
+    },
+  });
 }
 
 export function useToggleRead(id: string | number) {
@@ -869,6 +929,7 @@ export interface AdminConfig {
   config_default_ui_font_body: string;
   config_default_ui_font_display: string;
   config_server_announcement: string;
+  config_opds_filename_template: string;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
 }
@@ -1107,11 +1168,7 @@ export function useBulkActions() {
   });
   const addToShelf = useMutation({
     mutationFn: (v: { ids: number[]; shelfId: number }) =>
-      // tolerate 409 (already on shelf) per book
-      settleById(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch((err) => {
-        if (err instanceof ApiError && err.status === 409) return null;
-        throw err;
-      })),
+      addShelfBooks(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`)),
     onSuccess: refresh,
   });
   const deleteBooks = useMutation({

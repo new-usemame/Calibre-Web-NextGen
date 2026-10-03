@@ -1,3 +1,4 @@
+import { useShelfDragSelection } from '../components/ShelfDrag';
 import { readGuestCustomFields, readGuestCustomLabels, customFieldsForSave, GUEST_CUSTOM_FIELDS_KEY, GUEST_CUSTOM_LABELS_KEY } from '../lib/customColumnDisplay';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,6 +59,9 @@ const READ_FILTERS: { label: string; value: ReadFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'Unread', value: 'unread' },
   { label: 'Read', value: 'read' },
+  { label: 'Currently reading', value: 'in_progress' },
+  { label: 'Did not finish', value: 'did_not_finish' },
+  { label: 'On hold', value: 'on_hold' },
 ];
 
 // Fork #640 — the plain Library view remembers its sort order and read filter
@@ -328,6 +332,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
   const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
+  useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
+    setSelected(new Set(ids)); setSelecting(true);
+  } }, `${me?.id ?? 'guest'}:${me?.library_mode ?? 'monolibrary'}:${discoverIdentity}`);
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
@@ -545,32 +552,62 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // the menu itself to the selected option.
   useLayoutEffect(() => {
     if (!settingsOpen) return;
+    let active = true;
     const constrainMenu = () => {
+      if (!active) return;
       const menu = settingsMenuRef.current;
       if (!menu) return;
-      const trigger = settingsTriggerRef.current;
-      const anchor = menu.parentElement;
-      if (!trigger || !anchor) return;
-      const viewportWidth = document.documentElement.clientWidth;
-      menu.style.maxWidth = `${Math.max(0, viewportWidth - 16)}px`;
-      const desiredLeft = trigger.getBoundingClientRect().right - menu.offsetWidth;
-      const left = Math.max(8, Math.min(desiredLeft, viewportWidth - menu.offsetWidth - 8));
-      menu.style.left = `${left - anchor.getBoundingClientRect().left}px`;
-      menu.style.right = 'auto';
-      const available = window.innerHeight - trigger.getBoundingClientRect().bottom - 20;
+      // The toolbar can wrap at desktop widths too. A gear on the left
+      // cannot right-align a wider menu without putting its inputs offscreen.
+      // The mobile containing block is the toolbar; respect either anchor.
+      const parent = menu.offsetParent;
+      if (parent instanceof HTMLElement) {
+        const right = parent.getBoundingClientRect().right;
+        const left = Math.max(8, Math.min(right - menu.offsetWidth,
+          window.innerWidth - menu.offsetWidth - 8));
+        menu.style.right = `${right - left - menu.offsetWidth}px`;
+      }
+      const available = window.innerHeight - menu.getBoundingClientRect().top - 12;
       menu.style.maxHeight = `${Math.max(60, available)}px`;
     };
     constrainMenu();
-    const observer = new ResizeObserver(constrainMenu);
-    if (settingsMenuRef.current) observer.observe(settingsMenuRef.current);
-    const toolbar = settingsTriggerRef.current?.parentElement?.parentElement;
-    if (toolbar) observer.observe(toolbar);
+    const toolbar = settingsMenuRef.current?.closest<HTMLElement>(`.${styles.toolbar}`);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(constrainMenu);
+    const observedItems = new Set<Element>();
+    const observeItems = () => {
+      if (!toolbar || !active) return;
+      for (const item of observedItems) {
+        if (item.parentElement !== toolbar) {
+          observer?.unobserve(item);
+          observedItems.delete(item);
+        }
+      }
+      for (const item of toolbar.children) {
+        if (!observedItems.has(item)) {
+          observer?.observe(item);
+          observedItems.add(item);
+        }
+      }
+      constrainMenu();
+    };
+    if (settingsMenuRef.current) observer?.observe(settingsMenuRef.current);
+    if (toolbar) observer?.observe(toolbar);
+    observeItems();
+    // Select mode inserts a control after the menu has opened. Its later
+    // loading-label size changes must be observed too, without a resize.
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(observeItems);
+    if (toolbar) mutations?.observe(toolbar, { childList: true });
+    void document.fonts?.ready.then(constrainMenu);
+    document.fonts?.addEventListener('loadingdone', constrainMenu);
     window.addEventListener('resize', constrainMenu);
     return () => {
-      observer.disconnect();
+      active = false;
+      observer?.disconnect();
+      mutations?.disconnect();
+      document.fonts?.removeEventListener('loadingdone', constrainMenu);
       window.removeEventListener('resize', constrainMenu);
     };
-  }, [settingsOpen]);
+  }, [settingsOpen, t, canUpload]);
 
   // The saved default view is part of the filter identity: turning it on/off (or
   // saving a different one) changes which books belong here, so the accumulator
@@ -694,7 +731,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     ? { ...defaultFilter, sort, ...(readFilter !== 'all' ? { read_status: readFilter } : {}) }
     : null;
   const advQuery = useAdvancedSearch(advParams, requestPage, perPage);
-  const { data, isLoading, isFetching, isPlaceholderData, error } =
+  const { data, dataUpdatedAt, isLoading, isFetching, isPlaceholderData, error } =
     filterActive ? advQuery : booksQuery;
   const customSortOptions = view === 'hot' || view === 'discover'
     ? [] : (data?.custom_sort_options ?? []);
@@ -753,7 +790,10 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     } else {
       setAllBooks((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, isPlaceholderData, resetKey]);
+  // A successful idempotent bulk action can refetch byte-identical data.
+  // React Query keeps that object identity, but the cleared accumulator still
+  // needs to consume the newly confirmed result.
+  }, [data, dataUpdatedAt, isPlaceholderData, resetKey]);
 
   const total = data?.total ?? 0;
 
@@ -1133,7 +1173,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         {selecting && (
           <button type="button" className={styles.selectAllBtn}
             onClick={() => { void selectAllBooks(); }}
-            disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
+            // The complete-ID query does not depend on the next card page.
+            // Keep new-view loading guarded, but let a settled view select
+            // all while its background pagination is slow.
+            disabled={selectAllBusy || bulkBusy || total === 0
+              || (isFetching && (requestPage === 1 || resetKey !== accKeyRef.current))}
             aria-busy={selectAllBusy}>
             {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
           </button>
@@ -1309,6 +1353,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       {/* Discover: random picks, library landing only (not while searching). */}
       {!hideLibraryControls && !search && !discoverHidden && (
         <DiscoverSection
+          actionsDisabled={bulkBusy || selectAllBusy}
           onClose={() => setDiscoverHidden(true)}
           closeDisabled={discoverPreferenceSaving}
           hideActions={cardActionsHidden}
@@ -1387,7 +1432,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             search && !filtered
               ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
-                ? t('No {filter} books here.', { filter: readFilter })
+                ? t('No {filter} books here.', { filter: t(READ_FILTERS.find(rf => rf.value === readFilter)!.label) })
                 : view === 'discover' ? t('No unread books in this Discover source.') : t('No books here.')
           }>
           {search && !filtered && personalLibrary && me?.role?.browse_global && (

@@ -207,8 +207,10 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             session.delete(state)
     session.flush()
 
-    # ReadBook: UNIQUE(user_id, book_id); merge keeps the further-along
-    # read status. Bulk delete (no ORM cascade) — the loser's
+    # ReadBook: keep the further-along legacy state. A paused classification
+    # is a user's explicit choice rather than a progress rank, so when either
+    # copy has one, preserve the newer classification instead.
+    # Bulk delete (no ORM cascade) — the loser's
     # KoboReadingState was already merged above.
     _READ_RANK = {ub.ReadBook.STATUS_UNREAD: 0,
                   ub.ReadBook.STATUS_IN_PROGRESS: 1,
@@ -219,15 +221,42 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             ub.ReadBook.user_id == rb.user_id,
             ub.ReadBook.book_id == to_book_id).first()
         if existing is None:
+            moved_values = {ub.ReadBook.book_id: to_book_id}
+            if rb.read_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                   ub.ReadBook.STATUS_ON_HOLD):
+                moved_values[ub.ReadBook.last_modified] = rb.last_modified
             session.query(ub.ReadBook).filter(ub.ReadBook.id == rb.id).update(
-                {ub.ReadBook.book_id: to_book_id}, synchronize_session=False)
+                moved_values, synchronize_session=False)
         else:
-            if _READ_RANK.get(rb.read_status, 0) > _READ_RANK.get(existing.read_status, 0):
+            paused = (ub.ReadBook.STATUS_DID_NOT_FINISH, ub.ReadBook.STATUS_ON_HOLD)
+            has_paused = rb.read_status in paused or existing.read_status in paused
+            chosen_clock = existing.last_modified
+            if has_paused:
+                replace_status = _newer(rb.read_status_choice_at, existing.read_status_choice_at)
+                if (not replace_status
+                        and not _newer(existing.read_status_choice_at, rb.read_status_choice_at)
+                        and rb.read_status in paused and existing.read_status not in paused):
+                    replace_status = True  # A tied/unknown clock cannot imply resume intent.
+            else:
+                replace_status = (_READ_RANK.get(rb.read_status, 0)
+                                  > _READ_RANK.get(existing.read_status, 0))
+            if replace_status:
                 existing.read_status = rb.read_status
+                if has_paused:
+                    chosen_clock = rb.last_modified
+                    existing.read_status_choice_at = rb.read_status_choice_at
+            if not has_paused and _newer(rb.read_status_choice_at, existing.read_status_choice_at):
+                existing.read_status_choice_at = rb.read_status_choice_at
             existing.times_started_reading = \
                 (existing.times_started_reading or 0) + (rb.times_started_reading or 0)
             if _newer(rb.last_time_started_reading, existing.last_time_started_reading):
                 existing.last_time_started_reading = rb.last_time_started_reading
+            if has_paused:
+                # Summing counters is not a new reading-state choice. Supply
+                # even an unchanged winner's clock to defeat onupdate=now.
+                from sqlalchemy.orm.attributes import flag_modified
+                existing.last_modified = chosen_clock
+                flag_modified(existing, "last_modified")
             session.query(ub.ReadBook).filter(ub.ReadBook.id == rb.id).delete(
                 synchronize_session=False)
     session.flush()

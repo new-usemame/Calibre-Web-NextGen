@@ -15,7 +15,7 @@ from flask_babel import gettext as _
 from sqlalchemy.sql.expression import func, not_, and_, or_, text, true
 from sqlalchemy.sql.functions import coalesce
 
-from . import logger, db, calibre_db, config, ub
+from . import logger, db, calibre_db, config, ub, helper
 from .string_helper import strip_whitespaces
 from .usermanagement import login_required_if_no_ano
 from .render_template import render_title_template
@@ -141,25 +141,64 @@ def adv_search_ratings(q, rating_high, rating_low):
 
 
 def adv_search_read_status(read_status):
-    if not config.config_read_column:
-        if read_status == "True":
-            db_filter = and_(ub.ReadBook.user_id == int(current_user.id),
-                             ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED)
-        else:
-            db_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
-    else:
+    user_id = int(current_user.id)
+    status_values = {
+        "in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+        "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+        "on_hold": ub.ReadBook.STATUS_ON_HOLD,
+    }
+    if read_status == "finished":
+        read_status = "True"
+    if read_status in status_values:
+        status = status_values[read_status]
+        ids = helper.book_ids_with_read_status(user_id, status)
+        db_filter = db.Books.id.in_(ids)
+        if config.config_read_column and status == ub.ReadBook.STATUS_IN_PROGRESS:
+            try:
+                relationship = getattr(
+                    db.Books, "custom_column_{}".format(config.config_read_column))
+                db_filter = and_(
+                    db_filter,
+                    ~relationship.any(db.cc_classes[config.config_read_column].value == True),
+                )
+            except (KeyError, AttributeError, IndexError):
+                log.error("Custom Column No.{} does not exist in calibre database".format(
+                    config.config_read_column))
+                return true()
+        return db_filter
+
+    paused_ids = helper.book_ids_with_read_status(
+        user_id, ub.ReadBook.STATUS_DID_NOT_FINISH, ub.ReadBook.STATUS_ON_HOLD)
+    if read_status == "unread":
+        if not config.config_read_column:
+            return and_(coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED,
+                        ~db.Books.id.in_(paused_ids))
         try:
-            if read_status == "":
-                db_filter = coalesce(db.cc_classes[config.config_read_column].value, 2) == 2
-            else:
-                db_filter = db.cc_classes[config.config_read_column].value == bool(read_status == "True")
+            return and_(coalesce(db.cc_classes[config.config_read_column].value, False) != True,
+                        ~db.Books.id.in_(paused_ids))
         except (KeyError, AttributeError, IndexError):
-            log.error("Custom Column No.{} does not exist in calibre database".format(config.config_read_column))
-            flash(_("Custom Column No.%(column)d does not exist in calibre database",
-                    column=config.config_read_column),
-                  category="error")
+            log.error("Custom Column No.{} does not exist in calibre database".format(
+                config.config_read_column))
             return true()
-    return db_filter
+    if not config.config_read_column:
+        if read_status in ("True", "finished"):
+            return and_(ub.ReadBook.user_id == user_id,
+                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED)
+        return and_(coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED,
+                    ~db.Books.id.in_(paused_ids))
+    try:
+        read_column = db.cc_classes[config.config_read_column]
+        if read_status == "":
+            return and_(coalesce(read_column.value, 2) == 2,
+                        ~db.Books.id.in_(paused_ids))
+        return and_(read_column.value == bool(read_status == "True"),
+                    ~db.Books.id.in_(paused_ids))
+    except (KeyError, AttributeError, IndexError):
+        log.error("Custom Column No.{} does not exist in calibre database".format(config.config_read_column))
+        flash(_("Custom Column No.%(column)d does not exist in calibre database",
+                column=config.config_read_column),
+              category="error")
+        return true()
 
 
 def adv_search_extension(q, include_extension_inputs, exclude_extension_inputs):

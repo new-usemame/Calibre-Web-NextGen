@@ -150,7 +150,6 @@ def test_list_books_search():
         with patch.object(books_mod, "_catalog_book_query", return_value=query) as mock_query, \
              patch.object(books_mod.config, "config_books_per_page", 60, create=True), \
              patch.object(books_mod.config, "config_read_column", 0, create=True), \
-             patch.object(books_mod, "book_in_progress_ids", return_value=set()), \
              patch.object(books_mod.user_cover, "overrides_for_user", return_value={}), \
              patch.object(books_mod.ub, "session", app_session), \
              patch.object(books_mod, "_visible_shelves_by_book", return_value={}), \
@@ -443,6 +442,7 @@ def test_select_all_discover_returns_only_the_current_random_page_ids():
              patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
              patch.object(books_mod.config, "config_read_column", 0, create=True), \
              patch.object(books_mod, "_real_user_id", return_value=7), \
+             patch.object(books_mod, "book_ids_with_read_status", return_value=[]), \
              patch.object(books_mod, "_hidden_book_ids", return_value=set()):
             response = inspect.unwrap(books_mod.list_books)()
 
@@ -485,6 +485,7 @@ def test_select_all_discover_keeps_saved_source_filter_and_random_page_bound(ava
         with app.test_request_context("/api/v1/books?filter=discover&select_all=1"):
             with patch.object(books_mod, "current_user", account), \
                  patch.object(books_mod, "_real_user_id", return_value=7), \
+                 patch.object(books_mod, "book_ids_with_read_status", return_value=[]), \
                  patch.object(books_mod, "_hidden_book_ids", return_value=set()), \
                  patch.object(books_mod.config, "config_books_per_page", 2, create=True), \
                  patch.object(books_mod.config, "config_read_column", 0, create=True), \

@@ -31,7 +31,7 @@ def classic_library(sortable_library, monkeypatch):
     config = SimpleNamespace(config_sortable_custom_columns="12",
         config_books_per_page=20, config_read_column=0, config_columns_to_ignore="")
     library.config = config
-    user = SimpleNamespace(id=7, is_anonymous=False,
+    user = SimpleNamespace(id=7, is_anonymous=False, is_authenticated=True,
         show_detail_random=lambda: False, check_visibility=lambda *_: True, filter_language=lambda: "all",
         get_view_property=lambda *_: None, set_view_property=lambda *_: None)
     monkeypatch.setattr(library, "common_filters", lambda *a, **k:
@@ -45,11 +45,14 @@ def classic_library(sortable_library, monkeypatch):
     monkeypatch.setattr(custom_column_sort, "load_configured_columns",
         lambda _config: [ColumnDefinition(12, name="Difficulty")])
     monkeypatch.setattr(ub, "searched_ids", {})
+    monkeypatch.setattr(ub, "session", session)
     for module in [web, search]:
         monkeypatch.setattr(module, "render_title_template", lambda _template, **ctx: ctx)
         monkeypatch.setattr(module, "_", lambda message, **values: message % values if values else message)
     app = flask.Flask(__name__)
     app.secret_key = "fixture"
+    from flask_babel import Babel
+    Babel(app)
     try:
         with app.test_request_context():
             yield SimpleNamespace(library=library, session=session, user=user, app=app)
@@ -201,6 +204,37 @@ class MenuLinks(HTMLParser):
             self.urls.append(attrs["href"])
 
 
+def test_custom_category_menu_keeps_opaque_path_for_every_sort():
+    from urllib.parse import parse_qs, unquote, urlsplit
+    from cps import web
+    app = flask.Flask(__name__)
+    app.register_blueprint(web.web)
+    env = template_environment()
+    env.globals["url_for"] = flask.url_for
+    path = "Node.With/Slash & Space."
+    with app.test_request_context():
+        html = env.from_string("{% import '_book_organizer.html' as o with context %}"
+            "{{ o.books_list_organizer('cc_5', category_path, 'new', multiselect=false, settings=false,"
+            "custom_sort_columns=columns) }}").render(
+                category_path=path, columns=[ColumnDefinition(12)])
+        links = MenuLinks()
+        links.feed(html)
+        adapter = app.url_map.bind("localhost")
+        keys = []
+        for url in links.urls:
+            parsed = urlsplit(url)
+            endpoint, values = adapter.match(unquote(parsed.path))
+            assert endpoint == "web.cc_category_list"
+            assert values["column_id"] == 5
+            assert values["category_path"] == path
+            query = parse_qs(parsed.query)
+            assert set(query) == {"sort_param"}
+            assert len(query["sort_param"]) == 1
+            keys.append(query["sort_param"][0])
+        assert set(keys) == {"new", "old", "abc", "zyx", "authaz", "authza", "pubnew", "pubold",
+                             "cc-12-asc", "cc-12-desc"}
+
+
 @pytest.mark.parametrize("recent_missing", [False, True])
 def test_global_menu_links_use_actual_global_route_and_preserve_search(recent_missing):
     from urllib.parse import parse_qs, urlsplit
@@ -259,7 +293,7 @@ def test_author_menu_offers_both_custom_directions_on_actual_author_route():
 
 
 def _exercise_real_custom_relationships():
-    from cps import db, web, search, ub, custom_column_sort
+    from cps import db, web, search, ub, custom_column_sort, custom_column_visibility
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     engine = create_engine("sqlite://")
@@ -295,7 +329,7 @@ def _exercise_real_custom_relationships():
         show_detail_random=lambda: False, check_visibility=lambda *_: True,
         get_view_property=lambda *_: None, set_view_property=lambda *_: None)
     library.common_filters = lambda *args, **kwargs: true()
-    for module in [web, search, custom_column_sort]:
+    for module in [web, search, custom_column_sort, custom_column_visibility]:
         module.calibre_db = library
         module.config = config
     for module in [db, web, search, ub]:

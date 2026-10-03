@@ -175,7 +175,9 @@
 {# index.html / search.html book lists. `page` is the route page key, `id` is the book_id param. #}
 {% macro books_list_organizer(page, id, order, query=none, multiselect=true, settings=true, can_delete=false, can_edit_public_shelf=false, shelves=none, custom_sort_columns=none) %}
 {% macro list_sort_url(key) -%}
-  {%- if page == 'global_library' -%}
+  {%- if page.startswith('cc_') -%}
+    {{- url_for('web.cc_category_list', column_id=page[3:]|int, category_path=id, sort_param=key) -}}
+  {%- elif page == 'global_library' -%}
     {{- url_for('web.global_library', sort_param=key, search=global_search|default('')) -}}
   {%- elif query is not none -%}
     {{- url_for('web.books_list', data=page, sort_param=key, query=query) -}}

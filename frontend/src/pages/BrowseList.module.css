@@ -172,7 +172,7 @@
   text-align: center;
   font-size: var(--fs-xs);
   font-weight: var(--fw-semi);
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-soft);
   border-radius: var(--r-full);
   padding: 2px var(--sp-2);

@@ -201,6 +201,8 @@ export default defineConfig({
       // with anything — including a second project running it. It creates a
       // reader of its own per test instead, and therefore runs here too.
       testIgnore: [
+        // Desktop wrapping is covered by desktop and native Safari lanes.
+        /catalog-settings-wrap\.spec\.ts/,
         /subpath\.spec\.ts/,
         /default-library-view\.spec\.ts/,
         /series-sort-order\.spec\.ts/,
@@ -210,6 +212,25 @@ export default defineConfig({
         ...CATALOG_LAYOUT_SPECS,
         ...SERVER_STATE_SPECS,
       ],
+    },
+
+    {
+      name: 'catalog-settings-webkit', testMatch: /catalog-settings-wrap\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    // Shelf dragging uses native desktop drag and a keyboard/tap alternative.
+    {
+      name: 'shelf-drag-webkit', testMatch: /(?:grid-shelf-drag|shelf-drag-source-scope)\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'shelf-picker-webkit-phone', testMatch: /(?:grid-shelf-drag|shelf-drag-source-scope)\.spec\.ts/,
+      // Trusted touch dragging is exercised through Chromium's input protocol;
+      // this lane covers the actual Safari engine's picker, retry and focus.
+      grepInvert: /twenty selected/,
+      use: { ...devices['iPhone 13'], storageState: STORAGE }, dependencies: ['setup'],
     },
 
     // 4. iPad-class touch viewport — card actions remain persistent and the
@@ -274,7 +295,7 @@ export default defineConfig({
     //    Keep this project narrow: the broad suite remains Chromium-backed.
     {
       name: 'webkit-reader',
-      testMatch: [WEBKIT_READER_SPEC, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
+      testMatch: [/paused-reading-states\.spec\.ts/, WEBKIT_READER_SPEC, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
       use: {
         ...devices['Desktop Safari'],
         viewport: { width: 1280, height: 800 },
@@ -285,7 +306,7 @@ export default defineConfig({
 
     {
       name: 'webkit-reader-mobile',
-      testMatch: [/reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
+      testMatch: [/paused-reading-states\.spec\.ts/, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
       use: { ...devices['iPhone 13'], storageState: STORAGE },
       dependencies: ['setup'],
     },

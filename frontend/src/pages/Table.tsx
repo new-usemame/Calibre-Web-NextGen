@@ -218,7 +218,13 @@ export function Table() {
                         {c.key === 'formats' && (b.formats || []).join(', ')}
                         {c.key === 'date_added' && <time dateTime={b.date_added ?? undefined}>{formatLibraryDate(b.date_added)}</time>}
                         {c.key === 'last_modified' && <time dateTime={b.last_modified ?? undefined}>{formatLibraryDate(b.last_modified)}</time>}
-                        {c.key === 'read' && (b.read
+                        {c.key === 'read' && (b.read_status === 'did_not_finish'
+                          ? <span>{t('Did not finish')}</span>
+                          : b.read_status === 'on_hold'
+                            ? <span>{t('On hold')}</span>
+                            : b.in_progress
+                              ? <span>{t('Currently reading')}</span>
+                              : b.read
                           ? <Check size={15} className={styles.readYes} role="img" aria-label={t('Read')} />
                           : <span aria-label={t('Unread')} role="img">—</span>)}
                         {c.custom && formatCustomCell(b, c.custom, locale)}

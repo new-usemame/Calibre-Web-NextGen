@@ -11,7 +11,7 @@ import pytest
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("selection_filter", ["search", "favorites", "rated", "archived"])
+@pytest.mark.parametrize("selection_filter", ["search", "favorites", "rated", "archived", "in_progress", "did_not_finish", "on_hold"])
 def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch, selection_filter):
     """The visible query returns only rows satisfying all three SQL predicates."""
     from sqlalchemy import create_engine
@@ -65,6 +65,11 @@ def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch, s
     cdb.config = config
     monkeypatch.setattr(cdb, "get_cc_columns", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(books_api, "calibre_db", cdb)
+    # Advanced exports use the same real DB through the search module.
+    import importlib
+    search_module = importlib.import_module("cps.search")
+    monkeypatch.setattr(search_module, "calibre_db", cdb)
+    monkeypatch.setattr(search_module, "current_user", viewer)
     monkeypatch.setattr(ub, "session", app_session)
     monkeypatch.setattr(db, "current_user", viewer)
     monkeypatch.setattr(books_api, "current_user", viewer)
@@ -112,7 +117,27 @@ def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch, s
                 rows[i][0].ratings.append(rating)
             metadata_session.commit()
         app_session.commit()
+        if selection_filter in ("in_progress", "did_not_finish", "on_hold"):
+            status = {"in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+                      "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+                      "on_hold": ub.ReadBook.STATUS_ON_HOLD}[selection_filter]
+            app_session.add_all([
+                ub.ReadBook(user_id=viewer.id, book_id=rows[i][0].id, read_status=status)
+                for i in (0, 2)
+            ])
+            app_session.commit()
+            # The merged export/query seam must accept all five statuses while
+            # retaining the same author and title predicates as Select all.
+            query = books_api._catalog_book_query(
+                search="dune", author_id=target_id, filter_val=selection_filter)
+            assert [row.Books.id for row in query.all()] == [rows[0][0].id]
+            advanced = books_api._advanced_export_query({
+                "title": "dune", "read_status": selection_filter})
+            assert {row.Books.id for row in advanced.all()} == {
+                rows[0][0].id, rows[2][0].id}
         selection_args = ("search=dune&filter=unread" if selection_filter == "search"
+                          else f"search=dune&filter={selection_filter}"
+                          if selection_filter in ("in_progress", "did_not_finish", "on_hold")
                           else f"filter={selection_filter}")
         app = flask.Flask(__name__)
         with app.test_request_context(
@@ -120,6 +145,20 @@ def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch, s
         ):
             selected = inspect.unwrap(books_api.list_books)().get_json()
         assert selected == {"ids": [rows[0][0].id], "total": 1}
+        if selection_filter in ("in_progress", "did_not_finish", "on_hold"):
+            with app.test_request_context("/api/v1/books/export", method="POST", json={
+                "source": "catalog", "format": "csv", "params": {
+                    "search": "dune", "author": target_id, "filter": selection_filter}}):
+                response = inspect.unwrap(books_api.export_book_list)()
+                assert response.status_code == 200
+                assert response.headers["X-Export-Count"] == "1"
+                assert len(list(csv.reader(io.StringIO(response.get_data(as_text=True))))) == 2
+                response.close()
+            # Unread retains active reading and excludes personal pauses.
+            expected_unread = 1 if selection_filter == "in_progress" else 0
+            assert books_api._count_export_rows(books_api._catalog_book_query(
+                search="dune", author_id=target_id, filter_val="unread")) == expected_unread
+            return
 
         # The shared search query must retain the existing hidden-book toggle.
         monkeypatch.setattr(config, "config_user_hide_enabled", True, raising=False)

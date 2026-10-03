@@ -50,7 +50,7 @@ def env(monkeypatch):
 
     monkeypatch.setattr(ub, "session", session)
     monkeypatch.setattr(mod, "config", SimpleNamespace(config_read_column=0))
-    monkeypatch.setattr(mod, "book_in_progress_ids", lambda *a, **k: set())
+    monkeypatch.setattr(mod, "read_statuses_for_books", lambda *a, **k: {})
     monkeypatch.setattr(mod.user_cover, "overrides_for_user", lambda *a, **k: {})
 
     def as_viewer(user_id):

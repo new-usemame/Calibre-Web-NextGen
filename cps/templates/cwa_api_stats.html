@@ -170,41 +170,41 @@
 </style>
 
 <div class="stats-hero">
-    <h1>📱 API Usage Analytics</h1>
-    <p>Track endpoint activity, integration usage, and API patterns</p>
+    <h1>📱 {{ _('API Usage Analytics') }}</h1>
+    <p>{{ _('Track endpoint activity, integration usage, and API patterns') }}</p>
 </div>
 
 <!-- Time Period Filter -->
 <div class="filter-row">
     <select id="api-time-period" class="time-period-select" onchange="changeApiTimePeriod()">
-        <option value="7" {{ 'selected' if request.args.get('days') == '7' else '' }}>Last 7 Days</option>
-        <option value="30" {{ 'selected' if request.args.get('days') == '30' or not request.args.get('days') else '' }}>Last 30 Days</option>
-        <option value="90" {{ 'selected' if request.args.get('days') == '90' else '' }}>Last 90 Days</option>
-        <option value="180" {{ 'selected' if request.args.get('days') == '180' else '' }}>Last 6 Months</option>
-        <option value="365" {{ 'selected' if request.args.get('days') == '365' else '' }}>Last Year</option>
-        <option value="all" {{ 'selected' if request.args.get('days') == 'all' else '' }}>All Time</option>
-        <option value="custom" {{ 'selected' if request.args.get('start_date') else '' }}>Custom Range</option>
+        <option value="7" {{ 'selected' if request.args.get('days') == '7' else '' }}>{{ _('Last 7 Days') }}</option>
+        <option value="30" {{ 'selected' if request.args.get('days') == '30' or not request.args.get('days') else '' }}>{{ _('Last 30 Days') }}</option>
+        <option value="90" {{ 'selected' if request.args.get('days') == '90' else '' }}>{{ _('Last 90 Days') }}</option>
+        <option value="180" {{ 'selected' if request.args.get('days') == '180' else '' }}>{{ _('Last 6 Months') }}</option>
+        <option value="365" {{ 'selected' if request.args.get('days') == '365' else '' }}>{{ _('Last Year') }}</option>
+        <option value="all" {{ 'selected' if request.args.get('days') == 'all' else '' }}>{{ _('All Time') }}</option>
+        <option value="custom" {{ 'selected' if request.args.get('start_date') else '' }}>{{ _('Custom Range') }}</option>
     </select>
     
     <div id="api-custom-date-range" style="display: {{ 'flex' if request.args.get('start_date') else 'none' }}; gap: 10px; align-items: center;">
         <input type="date" id="api-start-date" value="{{ request.args.get('start_date', '') }}" />
-        <span>to</span>
+        <span>{{ _('to') }}</span>
         <input type="date" id="api-end-date" value="{{ request.args.get('end_date', '') }}" />
-        <button onclick="applyApiDateRange()" class="btn btn-primary btn-sm">Apply</button>
+        <button onclick="applyApiDateRange()" class="btn btn-primary btn-sm">{{ _('Apply') }}</button>
     </div>
 
     <button onclick="window.location.href='/cwa-stats-show?tab=api'" class="demo-toggle" style="margin-left: 10px;">
-        🔄 Reset
+        🔄 {{ _('Reset') }}
     </button>
     
     <button onclick="exportApiCSV()" class="demo-toggle" style="margin-left: 10px; background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);">
-        📥 Export CSV
+        📥 {{ _('Export CSV') }}
     </button>
     
     <button onclick="toggleApiDemoMode()" class="demo-toggle" id="api-demo-button" style="margin-left: auto;">
-        🎨 Show Demo Data
+        🎨 {{ _('Show Demo Data') }}
     </button>
-    <span class="demo-badge" id="api-demo-badge" style="display: none;">DEMO MODE</span>
+    <span class="demo-badge" id="api-demo-badge" style="display: none;">{{ _('DEMO MODE') }}</span>
     
 </div>
 
@@ -212,22 +212,22 @@
 <div class="metrics-container">
     <div class="metric-card">
         <div class="metric-icon">🔄</div>
-        <div class="metric-label">Kobo Syncs</div>
+        <div class="metric-label">{{ _('Kobo Syncs') }}</div>
         <div class="metric-value" id="kobo-sync-count">0</div>
     </div>
     <div class="metric-card">
         <div class="metric-icon">📡</div>
-        <div class="metric-label">OPDS Accesses</div>
+        <div class="metric-label">{{ _('OPDS Accesses') }}</div>
         <div class="metric-value" id="opds-access-count">0</div>
     </div>
     <div class="metric-card">
         <div class="metric-icon">📧</div>
-        <div class="metric-label">Email Deliveries</div>
+        <div class="metric-label">{{ _('Email Deliveries') }}</div>
         <div class="metric-value" id="email-delivery-count">0</div>
     </div>
     <div class="metric-card">
         <div class="metric-icon">🌐</div>
-        <div class="metric-label">Web UI Requests</div>
+        <div class="metric-label">{{ _('Web UI Requests') }}</div>
         <div class="metric-value" id="web-ui-count">0</div>
     </div>
 </div>
@@ -236,13 +236,13 @@
 <div class="row cwa-stats-row">
     <div class="col-md-6">
         <div class="chart-container">
-            <div class="chart-title">📊 API Usage Breakdown</div>
+            <div class="chart-title">📊 {{ _('API Usage Breakdown') }}</div>
             <div id="api-usage-chart" style="width: 100%; height: 350px;"></div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="chart-container">
-            <div class="chart-title">🕐 API Activity Timing</div>
+            <div class="chart-title">🕐 {{ _('API Activity Timing') }}</div>
             <div id="api-timing-chart" style="width: 100%; height: 350px;"></div>
         </div>
     </div>
@@ -252,21 +252,21 @@
 <div class="row cwa-stats-row">
     <div class="col-md-12">
         <div class="chart-container">
-            <div class="chart-title">🎯 Endpoint Access Frequency</div>
+            <div class="chart-title">🎯 {{ _('Endpoint Access Frequency') }}</div>
             <div style="overflow-x: auto;">
                 <table class="endpoint-table" id="endpoint-table">
                     <thead>
                         <tr>
-                            <th>Endpoint</th>
-                            <th>Category</th>
-                            <th style="text-align: right;">Access Count</th>
-                            <th>Last Accessed</th>
+                            <th>{{ _('Endpoint') }}</th>
+                            <th>{{ _('Category') }}</th>
+                            <th style="text-align: right;">{{ _('Access Count') }}</th>
+                            <th>{{ _('Last Accessed') }}</th>
                         </tr>
                     </thead>
                     <tbody id="endpoint-table-body">
                         <tr>
                             <td colspan="4" style="text-align: center; padding: 40px; color: #999;">
-                                No endpoint data available
+                                {{ _('No endpoint data available') }}
                             </td>
                         </tr>
                     </tbody>
@@ -337,7 +337,7 @@ function updateApiUsageChart() {
     if (data.length === 0) {
         apiUsageChart.setOption({
             title: {
-                text: 'No API usage data available',
+                text: {{ _('No API usage data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: { color: '#999', fontSize: 14 }
@@ -362,12 +362,13 @@ function updateApiUsageChart() {
             trigger: 'item',
             backgroundColor: 'rgba(0,0,0,0.8)',
             textStyle: { color: '#fff' },
-            formatter: '{b}: {c} ({d}%)'
+            formatter: statsPieTooltip
         },
         legend: {
             orient: 'horizontal',
             bottom: '5%',
-            textStyle: { color: '#fff' }
+            textStyle: { color: '#fff' },
+            formatter: statsLabel
         },
         series: [{
             type: 'pie',
@@ -382,7 +383,7 @@ function updateApiUsageChart() {
             })),
             label: {
                 color: '#fff',
-                formatter: '{b}\n{d}%'
+                formatter: statsPieLabel
             },
             emphasis: {
                 itemStyle: {
@@ -401,7 +402,7 @@ function updateApiTimingChart() {
     if (data.length === 0) {
         apiTimingChart.setOption({
             title: {
-                text: 'No timing data available',
+                text: {{ _('No timing data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: { color: '#999', fontSize: 14 }
@@ -410,7 +411,7 @@ function updateApiTimingChart() {
         return;
     }
     
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = statsWeekdays;
     const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
     
     // Convert data to heatmap format
@@ -425,7 +426,7 @@ function updateApiTimingChart() {
                 const hour = params.value[0];
                 const day = days[params.value[1]];
                 const count = params.value[2];
-                return `${day} ${hour}:00<br/>API Calls: ${count}`;
+                return statsEscape(`${day} ${hour}:00`) + "<br/>" + statsEscape(statsFormat({{ _('API Calls: %(count)s', count='%(count)s') | tojson }}, {count}));
             }
         },
         grid: {
@@ -490,7 +491,7 @@ function updateEndpointTable() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="4" style="text-align: center; padding: 40px; color: #999;">
-                    No endpoint data available
+                    ${statsEscape({{ _('No endpoint data available') | tojson }})}
                 </td>
             </tr>
         `;
@@ -510,7 +511,7 @@ function updateEndpointTable() {
     
     tbody.innerHTML = data.map(([endpoint, category, count, lastAccessed]) => {
         const badgeClass = categoryMap[category] || 'category-other';
-        const formattedDate = new Date(lastAccessed).toLocaleString('en-US', {
+        const formattedDate = new Date(lastAccessed).toLocaleString(statsLocale, {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
@@ -519,10 +520,10 @@ function updateEndpointTable() {
         
         return `
             <tr>
-                <td style="font-family: monospace; font-size: 0.9em;">${endpoint}</td>
-                <td><span class="category-badge ${badgeClass}">${category}</span></td>
-                <td style="text-align: right; font-weight: 600; color: #ff9800;">${count.toLocaleString()}</td>
-                <td style="color: #aaa; font-size: 0.85em;">${formattedDate}</td>
+                <td style="font-family: monospace; font-size: 0.9em;">${statsEscape(endpoint)}</td>
+                <td><span class="category-badge ${badgeClass}">${statsEscape(statsLabel(category))}</span></td>
+                <td style="text-align: right; font-weight: 600; color: #ff9800;">${statsEscape(count.toLocaleString(statsLocale))}</td>
+                <td style="color: #aaa; font-size: 0.85em;">${statsEscape(formattedDate)}</td>
             </tr>
         `;
     }).join('');
@@ -580,7 +581,7 @@ function applyApiDateRange() {
     const endDate = document.getElementById('api-end-date').value;
     
     if (!startDate || !endDate) {
-        alert('Please select both start and end dates');
+        alert({{ _('Please select both start and end dates') | tojson }});
         return;
     }
     
@@ -594,12 +595,12 @@ function toggleApiDemoMode() {
     
     if (apiDemoMode) {
         currentApiData = generateApiDemoData();
-        button.textContent = '📊 Show Real Data';
+        button.textContent = '📊 ' + {{ _('Show Real Data') | tojson }};
         button.classList.add('active');
         badge.style.display = 'inline-block';
     } else {
         currentApiData = realApiData;
-        button.textContent = '🎨 Show Demo Data';
+        button.textContent = '🎨 ' + {{ _('Show Demo Data') | tojson }};
         button.classList.remove('active');
         badge.style.display = 'none';
     }

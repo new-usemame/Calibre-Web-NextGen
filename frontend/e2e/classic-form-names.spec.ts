@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 async function firstBookId(page: import('@playwright/test').Page) {
   const response = await page.request.get('/api/v1/books?limit=1');
@@ -54,7 +55,7 @@ test('Classic bulk metadata dialog associates every visible field label', async 
     ['author_sort_input', 'Author Sort'], ['authors_input', 'Authors'],
     ['categories_input', 'Tags'], ['series_input', 'Series'],
     ['languages_input', 'Languages'], ['publishers_input', 'Publishers'],
-    ['comments_input', 'Description'],
+    ['comments_input', 'Comments'],
   ]) {
     await expect(modal.locator(`#${id}`)).toHaveAccessibleName(name);
     await modal.getByText(name, { exact: true }).click();
@@ -62,4 +63,22 @@ test('Classic bulk metadata dialog associates every visible field label', async 
   }
   await modal.locator('#edit_selected_abort').click();
   await expect(modal).toBeHidden();
+});
+
+
+test('rich-text breadcrumbs retain block selection with valid button semantics', async ({ page }) => {
+  await page.goto(`/admin/book/${await firstBookId(page)}`);
+  await expect(page.locator('#comments_ifr')).toBeVisible();
+  await page.evaluate(() => {
+    const editor = (window as unknown as { tinymce: { get(id: string): { setContent(content: string): void } } }).tinymce.get('comments');
+    editor.setContent('<p><strong>Nested editor probe</strong></p>');
+  });
+  await page.frameLocator('#comments_ifr').getByText('Nested editor probe', { exact: true }).click();
+  const path = page.locator('.tox-statusbar__path');
+  await expect(path.getByRole('button', { name: 'p', exact: true })).toBeVisible();
+  await path.getByRole('button', { name: 'p', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { tinymce: { get(id: string): { selection: { getNode(): Element } } } }).tinymce.get('comments').selection.getNode().nodeName)).toBe('P');
+  await expect(path.getByRole('button', { name: 'p', exact: true })).toBeVisible();
+  const result = await new AxeBuilder({ page }).include('.tox-statusbar__path').withRules(['aria-allowed-attr']).analyze();
+  expect(result.violations, 'retained breadcrumb buttons must use supported ARIA').toEqual([]);
 });

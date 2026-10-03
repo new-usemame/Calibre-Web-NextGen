@@ -6,9 +6,11 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+import stat
 import sys
 import inspect
 import logging
+import threading
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 
@@ -24,6 +26,7 @@ DEFAULT_LOG_FILE    = os.path.join(_CONFIG_DIR, "calibre-web.log")
 DEFAULT_ACCESS_LOG  = os.path.join(_CONFIG_DIR, "access.log")
 LOG_TO_STDERR       = '/dev/stderr'
 LOG_TO_STDOUT       = '/dev/stdout'
+_SETUP_LOCK = threading.RLock()
 
 logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(logging.CRITICAL, "CRIT")
@@ -119,6 +122,37 @@ ACCESS_ROTATION_MAX_BYTES = 2 * 1024 * 1024
 ACCESS_ROTATION_BACKUP_COUNT = 3
 
 
+class _ResilientRotatingFileHandler(RotatingFileHandler):
+    def emit(self, record):
+        """A failed rename must not discard a record we can still append."""
+        try:
+            if self.shouldRollover(record):
+                try:
+                    self.doRollover()
+                except OSError:
+                    # Preserve the usual stderr diagnostic, then try the
+                    # active file without attempting another rollover.
+                    self.handleError(record)
+                    logging.FileHandler.emit(self, record)
+                    return
+            logging.FileHandler.emit(self, record)
+        except OSError:
+            self.handleError(record)
+            # A partially completed rollover may leave no active path that
+            # this service can create, including on subsequent records.
+            # Proven shared stdout still holds an open descriptor to its log.
+            try:
+                stdout = getattr(self, '_shared_stdout_stream', None)
+                identity = getattr(self, '_shared_stdout_identity', None)
+                if identity is not None and _regular_file_identity(stdout) == identity:
+                    stdout.write(self.format(record) + self.terminator)
+                    stdout.flush()
+            except Exception:
+                self.handleError(record)
+        except Exception:
+            self.handleError(record)
+
+
 def _make_file_handler(log_file, max_bytes=ROTATION_MAX_BYTES,
                        backup_count=ROTATION_BACKUP_COUNT,
                        default_path=DEFAULT_LOG_FILE):
@@ -126,13 +160,13 @@ def _make_file_handler(log_file, max_bytes=ROTATION_MAX_BYTES,
     to the default location on IO/permission error (matches legacy
     fallback contract)."""
     try:
-        h = RotatingFileHandler(log_file, maxBytes=max_bytes,
+        h = _ResilientRotatingFileHandler(log_file, maxBytes=max_bytes,
                                 backupCount=backup_count, encoding='utf-8')
         return h, log_file
     except (IOError, PermissionError):
         if log_file == default_path:
             raise
-        h = RotatingFileHandler(default_path, maxBytes=max_bytes,
+        h = _ResilientRotatingFileHandler(default_path, maxBytes=max_bytes,
                                 backupCount=backup_count, encoding='utf-8')
         return h, ""
 
@@ -143,17 +177,65 @@ def _make_stream_handler(stream, token):
     return h
 
 
+def _regular_file_identity(stream):
+    """Identify an open regular file without guessing from its path."""
+    try:
+        opened = os.fstat(stream.fileno())
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None
+    if stat.S_ISREG(opened.st_mode):
+        return opened.st_dev, opened.st_ino
+    return None
+
+
+def _shares_rotating_sink(stdout, file_handler, previous_handlers):
+    """Retain a proven shared sink through rollover and settings reloads."""
+    stdout_identity = _regular_file_identity(stdout)
+    file_identity = _regular_file_identity(file_handler.stream)
+    if stdout_identity is None or file_identity is None:
+        return False
+    shared = stdout_identity == file_identity
+    if not shared:
+        # Rollover leaves inherited stdout on an old inode. Carry that
+        # relationship only while stdout and the rotating target remain
+        # the same open sinks; changing either must restore dual output.
+        shared = any(
+            isinstance(previous, RotatingFileHandler)
+            and getattr(previous, '_shared_stdout_stream', None) is stdout
+            and getattr(previous, '_shared_stdout_identity', None) == stdout_identity
+            and _regular_file_identity(previous.stream) == file_identity
+            for previous in previous_handlers
+        )
+    if shared:
+        file_handler._shared_stdout_stream = stdout
+        file_handler._shared_stdout_identity = stdout_identity
+    return shared
+
+
 def setup(log_file, log_level=None):
+    """Configure output without racing an existing rotating writer."""
+    with _SETUP_LOCK:
+        previous_files = [handler for handler in logging.root.handlers
+                          if isinstance(handler, RotatingFileHandler)]
+        for handler in previous_files:
+            handler.acquire()
+        try:
+            return _setup(log_file, log_level)
+        finally:
+            for handler in reversed(previous_files):
+                handler.release()
+
+
+def _setup(log_file, log_level=None):
     """
     Configure the logging output.
     May be called multiple times.
 
-    Always attaches a stdout handler so `docker logs` keeps streaming
-    every record. When `log_file` is a real path (the default), ALSO
-    attaches a RotatingFileHandler so the admin → View Logs UI has
-    content to render. This dual-handler design replaces the prior
-    single-handler behavior that left CWNG installs with an empty
-    admin log viewer (fork issue #312).
+    Attach stdout and a rotating file so Docker and admin View Logs both
+    receive records. If redirected stdout already names that same file,
+    keep only the rotating handler: two handlers duplicate every record,
+    and the inherited stdout descriptor would follow the old inode when
+    the file rotates. Explicit stream-only tokens retain their behavior.
     """
     log_level = log_level or DEFAULT_LOG_LEVEL
     logging.setLoggerClass(_Logger)
@@ -188,6 +270,22 @@ def setup(log_file, log_level=None):
     if file_path is not None:
         try:
             fh, used_path = _make_file_handler(file_path)
+            # Reuse the same rotating writer for an unchanged destination.
+            # A thread may already have selected it before setup took its
+            # lock; replacing/closing it could let that late emit rotate
+            # underneath a newly opened handler after the lock is released.
+            previous = next((handler for handler in r.handlers
+                             if isinstance(handler, RotatingFileHandler)
+                             and handler.baseFilename == fh.baseFilename
+                             and _regular_file_identity(handler.stream) is not None
+                             and _regular_file_identity(handler.stream)
+                             == _regular_file_identity(fh.stream)), None)
+            if previous is not None:
+                fh.close()
+                fh = previous
+            if _shares_rotating_sink(sys.stdout, fh, r.handlers):
+                new_handlers[0].close()
+                new_handlers.clear()
             new_handlers.append(fh)
             return_value = used_path if used_path else ""
         except (IOError, PermissionError):
@@ -198,15 +296,17 @@ def setup(log_file, log_level=None):
     for h in new_handlers:
         h.setFormatter(FORMATTER)
 
-    # Replace root handlers atomically.
-    for h in list(r.handlers):
-        r.removeHandler(h)
+    # A logger walking the old list finishes against that list, while new
+    # records see the complete replacement. Retained file handlers stay open.
+    previous_handlers = r.handlers
+    r.handlers = new_handlers
+    for h in previous_handlers:
+        if h in new_handlers:
+            continue
         try:
             h.close()
         except Exception:
             pass
-    for h in new_handlers:
-        r.addHandler(h)
     logging.captureWarnings(True)
 
     if return_value == DEFAULT_LOG_FILE:

@@ -105,8 +105,8 @@ the owner lock: subsequent operations refuse path access until it exits.
 Raw ingest imports pause the managed cache only around raw Calibre inspection and
 transactions; their Calibre child inherits both maintenance and metadata-writer
 locks. Network metadata fetch and delivery run after the raw transaction releases
-that pause. Optional generated-cover updates take a second maintenance scope for
-the cover file and its metadata flag. Its isolated renderer and font probe each
+that pause. Optional generated-cover updates during ingest and cover enforcement take a maintenance scope and the shared writer gate for
+the cover file and its metadata flag. If a generated file was saved before a flag update failed, a later cover pass repairs the flag without overwriting the file. A cover failure remains best-effort and does not requeue a committed import. Its isolated renderer and font probe each
 have a 25-second limit, so an enabled managed server can be paused for tens of
 seconds per generated cover. Automatic cover generation is off by default;
 leave it off when uninterrupted external reads matter more than generated covers. Raw imports and Convert Library serialize even

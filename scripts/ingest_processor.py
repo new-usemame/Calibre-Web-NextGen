@@ -1314,7 +1314,8 @@ class NewBookProcessor:
         arrive without one"). Best-effort throughout: an import must not fail
         because a cover could not be drawn, and a book that already has a cover
         is never touched — ``generate_cover_file`` refuses to overwrite, so a
-        re-run over the same library is a no-op rather than a rewrite.
+        re-run over the same library is a no-op rather than a rewrite. If the
+        file was created before a flag update failed, a retry repairs the flag.
         """
         if book_id is None:
             return False
@@ -1350,22 +1351,27 @@ class NewBookProcessor:
                         "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
 
                 destination = os.path.join(self.library_dir, book_path, "cover.jpg")
-                written = cover_generator.generate_cover_file(
-                    destination,
-                    cover_generator.BookCoverMeta(
-                        title=title or "",
-                        authors=authors,
-                        series=series_row[0] if series_row else None,
-                        series_index=series_index,
-                    ),
-                    preset=settings.default_preset,
-                )
-                if not written:
-                    return False
+                written = False
+                if not os.path.isfile(destination):
+                    written = cover_generator.generate_cover_file(
+                        destination,
+                        cover_generator.BookCoverMeta(
+                            title=title or "",
+                            authors=authors,
+                            series=series_row[0] if series_row else None,
+                            series_index=series_index,
+                        ),
+                        preset=settings.default_preset,
+                    )
+                    if not written:
+                        return False
                 with sqlite3.connect(self.metadata_db, timeout=30) as connection:
                     connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
-            print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
-                  f"({settings.default_preset}) — it was imported without one.", flush=True)
+            if written:
+                print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
+                      f"({settings.default_preset}) — it was imported without one.", flush=True)
+            else:
+                print(f"[ingest-processor] INFO: Recovered cover flag for book {book_id}.", flush=True)
             return True
         except Exception as error:
             print(f"[ingest-processor] WARN: Could not design a cover for book "

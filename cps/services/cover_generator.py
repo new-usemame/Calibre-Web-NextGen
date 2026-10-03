@@ -67,6 +67,7 @@ import hashlib
 import json
 import math
 import os
+import secrets
 import re
 import shutil
 import subprocess
@@ -2258,18 +2259,25 @@ def generate_cover_file(destination: str, meta: BookCoverMeta,
     directory = os.path.dirname(destination)
     if directory and not os.path.isdir(directory):
         os.makedirs(directory, exist_ok=True)
-    # Write a sibling and rename so a reader never sees a half-written cover.
-    staging = destination + ".cwng-generating"
-    with open(staging, "wb") as handle:
-        handle.write(rendered.data)
+    # Publish a complete sibling without replacing a cover chosen during render.
+    staging = destination + ".cwng-generating-" + secrets.token_hex(8)
+    try:
+        with open(staging, "xb") as handle:
+            handle.write(rendered.data)
+            if on_created is not None:
+                handle.flush()
+                info = os.fstat(handle.fileno())
+                identity = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                            hashlib.sha256(rendered.data).digest())
+        try:
+            os.link(staging, destination)
+        except FileExistsError:
+            return False
         if on_created is not None:
-            handle.flush()
-            info = os.fstat(handle.fileno())
-            identity = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
-                        hashlib.sha256(rendered.data).digest())
-    os.replace(staging, destination)
-    if on_created is not None:
-        on_created(identity)
+            on_created(identity)
+    finally:
+        if os.path.exists(staging):
+            os.unlink(staging)
     log.info("cover_generator: wrote generated cover (%s renderer) to %s",
              rendered.renderer, destination)
     return True
@@ -2311,7 +2319,9 @@ def commit_generated_cover_flag(metadata_db, book_id, destination, identity, tim
     """
     try:
         with sqlite3.connect(metadata_db, timeout=timeout) as connection:
-            connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+            updated = connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+            if updated.rowcount != 1:
+                raise sqlite3.IntegrityError("Generated cover book no longer exists")
     except Exception:
         try:
             uri = Path(metadata_db).resolve().as_uri() + "?mode=ro"

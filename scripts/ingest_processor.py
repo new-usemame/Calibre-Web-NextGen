@@ -3367,7 +3367,10 @@ def main(filepath=None):
         if nbp.input_format == "acsm":
             try:
                 nbp.ingest_acsm()
-            except (PreserveIngestSourceError, RetryIngestSourceError):
+            except (PreserveIngestSourceError, RetryIngestSourceError,
+                    LibraryBusyError, TimeoutError, PermissionError):
+                # Preserve the busy exit status used by the service retry timer,
+                # alongside the ACSM source/recovery preservation classifications.
                 raise
             except Exception:
                 # Receipt lookup or unexpected hook/import failures must not

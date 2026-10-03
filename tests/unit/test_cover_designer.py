@@ -459,3 +459,40 @@ def test_a_render_failure_never_hands_the_reader_the_server_s_stderr():
     assert "Could not design a cover for this book." in body
     for secret in ("/srv/calibre-library", "/usr/lib/x86_64-linux-gnu", "qt.qpa.plugin", "RuntimeError"):
         assert secret not in body, f"the response leaked {secret!r}: {body}"
+
+@pytest.mark.parametrize("arrival", ["regular", "symlink"])
+def test_reader_cover_published_during_render_is_not_replaced(tmp_path, monkeypatch, arrival):
+    destination = tmp_path / "cover.jpg"
+    reader_cover = tmp_path / "reader.jpg"
+    reader_cover.write_bytes(b"reader chosen cover")
+    real_render = cg.render
+
+    def render_then_reader_publishes(*args, **kwargs):
+        rendered = real_render(*args, **kwargs)
+        if arrival == "regular":
+            destination.write_bytes(reader_cover.read_bytes())
+        else:
+            destination.symlink_to(reader_cover)
+        return rendered
+
+    monkeypatch.setattr(cg, "render", render_then_reader_publishes)
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append) is False
+    assert destination.read_bytes() == b"reader chosen cover"
+    assert destination.is_symlink() is (arrival == "symlink")
+    assert created == []
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["cover.jpg", "reader.jpg"]
+
+
+def test_generated_cover_flag_does_not_report_success_for_a_deleted_book(tmp_path):
+    import sqlite3
+    metadata = tmp_path / "metadata.db"
+    with sqlite3.connect(metadata) as connection:
+        connection.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, has_cover INTEGER)")
+    destination = tmp_path / "cover.jpg"
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append)
+    with pytest.raises(sqlite3.IntegrityError):
+        cg.commit_generated_cover_flag(str(metadata), 7, str(destination), created[0])
+    # Unknown metadata state is never treated as proof that file cleanup is safe.
+    assert destination.read_bytes()[:2] == b"\xff\xd8"

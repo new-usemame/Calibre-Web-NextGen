@@ -37,9 +37,9 @@ test('stored smart-shelf names and icons are text in Classic headings', async ({
       await page.addInitScript(() => { (window as unknown as Record<string, unknown>).__shelfProbe = 0; });
       await page.goto(`/magicshelf/${result.shelf_id}`);
       const heading = page.locator('.discover.load-more h2');
-      await expect(heading).toContainText('Smart shelf —');
-      await expect(heading).toContainText(payload);
       await expect(heading.locator('img')).toHaveCount(0);
+      await expect(heading).toContainText(payload);
+      await expect(heading).toContainText('Smart shelf —');
       expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__shelfProbe)).toBe(0);
     } finally {
       const removed = await page.request.post(`/magicshelf/${result.shelf_id}/delete`, { headers });

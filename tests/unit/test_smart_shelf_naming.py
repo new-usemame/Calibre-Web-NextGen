@@ -100,3 +100,27 @@ def test_renamed_smart_shelf_copy_is_present_in_compiled_catalog(locale):
         "name": "A & B",
     }
     assert catalog.gettext(_SMART_COPY[-1]) % {"setting": "Sync"}
+
+
+def test_koreader_unreadable_shelf_scope_keeps_the_smart_name(monkeypatch, tmp_path):
+    """The device error names the same shelves as the web controls (#1498)."""
+    from tests.unit.koreader_library_world import LibraryWorld
+    from cps import kobo
+
+    world = LibraryWorld(monkeypatch, tmp_path)
+    try:
+        world.add_user("reader", shelf_only=True)
+        world.add_book(1, "Anything")
+        monkeypatch.setattr(
+            kobo, "get_magic_shelf_book_ids_for_kobo", lambda _: ({1}, False)
+        )
+        response = world.client.get(
+            "/kosync/syncs/library", headers=world.device_headers("reader")
+        )
+        assert response.status_code == 503
+        body = response.get_json()
+        assert body["error"] == "scope_unavailable"
+        assert "smart shelves" in body["message"].lower()
+        assert "magic shelves" not in body["message"].lower()
+    finally:
+        world.close()

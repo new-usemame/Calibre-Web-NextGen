@@ -45,6 +45,39 @@ def test_opds_smart_shelf_parent_and_index_match_new_ui(locale_context):
     )
 
 
+@pytest.mark.parametrize("public", [False, True])
+def test_opds_smart_shelf_entry_uses_the_localized_type_name(locale_context, public):
+    from types import SimpleNamespace
+    from xml.etree import ElementTree
+    from flask import current_app, render_template
+    from jinja2 import FileSystemLoader
+    from cps.jinjia import jinjia
+
+    current_app.register_blueprint(jinjia)
+    current_app.jinja_loader = FileSystemLoader(
+        str(Path(__file__).resolve().parents[2] / "cps/templates")
+    )
+    current_app.jinja_env.globals.update(
+        url_for=lambda *_, **__: "/opds",
+        opds_search_url_path=lambda: "/opds/search",
+    )
+    shelf = SimpleNamespace(
+        id=17, name="A & <Probe>", icon="🪄", is_magic_shelf=True,
+        is_public=int(public), opds_url="/opds/magicshelf/17",
+    )
+    document = ElementTree.fromstring(render_template(
+        "feed.xml", listelements=[shelf], entries=[], letterelements=[],
+        pagination=None, instance="Library", feed_title=gettext("Smart shelves"),
+        current_time="2026-10-03T00:00:00Z",
+    ))
+    entry = document.find("{http://www.w3.org/2005/Atom}entry")
+    expected = "🪄 A & <Probe> (" + gettext("Smart shelves") + ")"
+    if public:
+        expected += " " + gettext("(Public)")
+    assert entry.find("{http://www.w3.org/2005/Atom}title").text == expected
+    assert entry.find("{http://www.w3.org/2005/Atom}link").get("href") == shelf.opds_url
+
+
 _SMART_COPY = [
     "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers.",
     "Choose how your smart shelves are ordered in the sidebar.",

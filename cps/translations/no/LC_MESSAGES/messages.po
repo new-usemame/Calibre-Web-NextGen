@@ -17748,3 +17748,34 @@ msgstr "Vis serieutvalg"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klikk på omslaget for å laste metadata til skjemaet"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Vis taggseksjonen"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Skriv inn tagger"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Tagger i dette biblioteket"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Tagger: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Bøker gruppert etter tagger"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Flere verdier støttes for forfattere, tagger, språk og utgivere. Skill verdiene med komma (for eksempel \"Navn1, Navn2\")."

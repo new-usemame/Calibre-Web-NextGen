@@ -18404,3 +18404,34 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ msgstr ""
 #~ "A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy "
 #~ "egy könyvet biztonságosan törölhessen."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Címkék szakaszának megjelenítése"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Címkék bevitele"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Címkék ebben a könyvtárban"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Címkék: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Könyvek címkék szerint csoportosítva"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Több érték adható meg a szerzőkhöz, címkékhez, nyelvekhez és kiadókhoz. Vesszővel válassza el őket (például: \"Név1, Név2\")."

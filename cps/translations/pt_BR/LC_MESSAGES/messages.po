@@ -18145,3 +18145,34 @@ msgstr "Mostrar seção de lidos/não lidos"
 #~ msgstr ""
 #~ "Os livros devem primeiro ser arquivados e o dispositivo deve ser "
 #~ "sincronizado antes que um livro possa ser apagado com segurança."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Mostrar seção de tags"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Digite as tags"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Tags nesta biblioteca"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Tags: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Livros agrupados por tags"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Vários valores são aceitos para autores, tags, idiomas e editoras. Separe os valores por vírgulas (por exemplo, \"Nome1, Nome2\")."

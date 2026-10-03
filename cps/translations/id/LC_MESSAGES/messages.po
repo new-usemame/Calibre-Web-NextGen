@@ -17748,3 +17748,34 @@ msgstr "Tampilkan pilihan baca/belum dibaca"
 #~ msgstr ""
 #~ "Buku harus diarsipkan terlebih dahulu dan perangkat disinkronkan sebelum "
 #~ "buku dapat dihapus dengan aman."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Tampilkan bagian tag"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Masukkan tag"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Tag dalam pustaka ini"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Tag: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Buku dikelompokkan berdasarkan tag"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Beberapa nilai dapat dimasukkan untuk penulis, tag, bahasa, dan penerbit. Pisahkan nilai dengan koma (misalnya, \"Nama1, Nama2\")."

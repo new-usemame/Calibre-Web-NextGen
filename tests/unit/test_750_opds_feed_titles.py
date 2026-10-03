@@ -97,7 +97,7 @@ def babel_app_context():
         # per-entity detail feeds inherit the parent title
         ("opds.feed_author", "Authors"),
         ("opds.feed_series", "Series"),
-        ("opds.feed_category", "Categories"),
+        ("opds.feed_category", "Tags"),
         ("opds.feed_publisher", "Publishers"),
         ("opds.feed_format", "File formats"),
         ("opds.feed_languages", "Languages"),

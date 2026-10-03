@@ -18210,3 +18210,34 @@ msgstr "既読/未読セクションを表示"
 #~ "書籍を安全に削除するには、まず書籍をアーカイブしてデバイスを同期する必要が"
 #~ "あります。本を安全に削除するためには、初めに本をアーカイブした上で端末と同"
 #~ "期する必要があります"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "タグセクションを表示"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "タグを入力"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "このライブラリ内のタグ"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "タグ: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "タグ別にまとめた書籍"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "著者、タグ、言語、出版社には複数の値を指定できます。カンマで区切ってください（例：「名前1, 名前2」）。"

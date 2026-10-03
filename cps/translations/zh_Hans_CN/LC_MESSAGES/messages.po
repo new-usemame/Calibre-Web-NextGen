@@ -17930,3 +17930,34 @@ msgstr "显示已读、未读栏目"
 #~ "Books must first be archived and the device synced before a book can "
 #~ "safely be deleted."
 #~ msgstr "在安全删除图书之前，必须先将图书归档并与设备同步"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "显示标签栏目"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "输入标签"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "此书库中的标签"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "标签：%(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "按标签分组的书籍"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "作者、标签、语言和出版社均支持多个值。请使用逗号分隔（例如：“名字1, 名字2”）。"

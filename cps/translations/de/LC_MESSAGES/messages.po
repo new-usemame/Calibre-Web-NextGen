@@ -18398,3 +18398,34 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ msgstr ""
 #~ "Bücher müssen zuerst archiviert werden und dann mit dem Gerät "
 #~ "synchronisiert werden, bevor ein Buch sicher gelöscht werden kann."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Tags-Bereich anzeigen"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Tags eingeben"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Tags in dieser Bibliothek"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Tags: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Bücher nach Tags gruppiert"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Für Autoren, Tags, Sprachen und Verlage werden mehrere Werte unterstützt. Verwenden Sie kommagetrennte Werte (z. B. „Name1, Name2“)."

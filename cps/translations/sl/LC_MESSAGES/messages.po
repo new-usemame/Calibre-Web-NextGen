@@ -18259,3 +18259,34 @@ msgstr "Prikaži razdelek Prebrano/neprebrano"
 #~ msgstr ""
 #~ "Preden lahko knjigo varno izbrišete, jo morate najprej arhivirati in "
 #~ "sinhronizirati napravo."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Prikaži razdelek oznak"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Vnesite oznake"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Oznake v tej knjižnici"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Oznake: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Knjige, razvrščene po oznakah"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Za avtorje, oznake, jezike in založnike lahko vnesete več vrednosti. Ločite jih z vejicami (npr. \"Ime1, Ime2\")."

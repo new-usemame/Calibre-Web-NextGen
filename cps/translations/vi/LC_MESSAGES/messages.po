@@ -17577,3 +17577,34 @@ msgstr "Hiển thị đã đọc và chưa đọc"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Ấn vào ảnh cover để tải metadata vào form"
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Hiển thị mục đánh dấu"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Nhập đánh dấu"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Đánh dấu trong thư viện này"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Đánh dấu: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Sách được nhóm theo đánh dấu"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Có thể nhập nhiều giá trị cho tác giả, đánh dấu, ngôn ngữ và nhà xuất bản. Phân cách các giá trị bằng dấu phẩy (ví dụ: \"Tên1, Tên2\")."

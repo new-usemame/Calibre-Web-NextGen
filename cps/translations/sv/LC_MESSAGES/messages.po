@@ -18435,3 +18435,34 @@ msgstr "Visa avsnittet Läst/oläst"
 #~ msgstr ""
 #~ "Böcker måste först arkiveras och enheten synkroniseras innan en bok "
 #~ "säkert kan tas bort."
+
+
+#: cps/render_template.py cps/templates/user_table.html
+msgid "Show Tags Section"
+msgstr "Visa taggsektionen"
+
+
+#: cps/templates/book_table.html
+msgid "Enter Tags"
+msgstr "Ange taggar"
+
+
+#: cps/templates/stats.html
+msgid "Tags in this Library"
+msgstr "Taggar i det här biblioteket"
+
+
+#: cps/web.py
+#, python-format
+msgid "Tags: %(name)s"
+msgstr "Taggar: %(name)s"
+
+
+#: cps/opds.py
+msgid "Books grouped by tags"
+msgstr "Böcker grupperade efter taggar"
+
+
+#: cps/templates/book_table.html
+msgid "Multiple values are supported for Authors, Tags, Languages, and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+msgstr "Flera värden stöds för författare, taggar, språk och förlag. Avgränsa värdena med kommatecken (t.ex. \"Namn1, Namn2\")."

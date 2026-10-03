@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import {
@@ -44,6 +44,8 @@ export function AcquisitionBundleChoices({
   const announce = useAnnouncer();
   const queryClient = useQueryClient();
   const panelId = useId();
+  const disclosureRef = useRef<HTMLButtonElement>(null);
+  const focusAfterChoice = useRef(false);
   const isParent = job.bundle_parent_id === job.id && job.bundle_selectable === true;
   const waiting = job.state === 'awaiting_selection';
   const [open, setOpen] = useState(waiting);
@@ -65,6 +67,14 @@ export function AcquisitionBundleChoices({
       selectAcquisitionBundleBook(job.id, candidate),
     onSuccess: (selectedJob) => {
       setActionMessage(null);
+      focusAfterChoice.current = true;
+      // The successful response already settles the parent's waiting state.
+      // Keep its disclosure reachable even if the background list refresh fails.
+      if (selectedJob.id === job.id) {
+        queryClient.setQueryData<{ jobs: AcquisitionJob[] }>(['acquisition', 'jobs'],
+          (current) => current && { ...current, jobs: current.jobs.map(
+            (row) => row.id === job.id ? { ...row, ...selectedJob } : row) });
+      }
       setOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['acquisition', 'jobs'] });
       announce(selectedJob.state === 'awaiting_approval'
@@ -93,6 +103,13 @@ export function AcquisitionBundleChoices({
   });
 
   useEffect(() => {
+    if (focusAfterChoice.current && !open && !waiting && isParent) {
+      disclosureRef.current?.focus();
+      focusAfterChoice.current = false;
+    }
+  }, [open, waiting, isParent]);
+
+  useEffect(() => {
     if (choices.isError) announce(t('The available books could not be loaded. Try again.'), { assertive: true });
   }, [announce, choices.isError, t]);
 
@@ -114,6 +131,7 @@ export function AcquisitionBundleChoices({
         <button
           type="button"
           className={styles.disclosure}
+          ref={disclosureRef}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((value) => !value)}

@@ -17,9 +17,9 @@ The real SPA, API, session login and CSRF checks were exercised on an isolated n
 
 ## Browser and translation checks
 
-The new keyboard-choice browser regression failed on the pre-change SPA built from the merged slice6 source, because no candidate action existed. It passed with the current SPA. Five browser scenarios cover first/later choices, receipt-only Open links, stale choices without substitution, failed-list retry, paused reads, cancelled selected parents, long filenames and both palettes at 1280, 375 and 320 pixels. All scoped layouts had zero serious/critical axe violations. Frontend typecheck/build and 212 unit tests passed.
+The new keyboard-choice browser regression failed on the pre-change SPA built from the merged slice6 source, because no candidate action existed. It passed with the current SPA. Six browser scenarios cover first/later choices, receipt-only Open links, stale choices without substitution, failed-list retry, paused reads, cancelled selected parents, long filenames and both palettes at 1280, 375 and 320 pixels. All scoped layouts had zero serious/critical axe violations. Independent UI refutation found focus lost after a successful choice; a seen-red focus regression now verifies transfer to the persistent disclosure. The successful parent response updates its known queued state even if the background activity refresh fails. Frontend typecheck/build and 212 unit tests passed.
 
-New text is anchored for Babel extraction and translated in German, French, Hungarian and Dutch. Runtime session locale and final immutable image checks are recorded with the PR's final verification, along with independent UI refutation and current-head CI.
+New text is anchored for Babel extraction and translated in German, French, Hungarian and Dutch. Real session profile saves and authenticated user payloads drove the panel in all four household locales at 375 pixels without overflow. Final independent UI recheck, current-head CI and immutable image checks are recorded with the PR's final verification.
 
 ## Security and limits
 

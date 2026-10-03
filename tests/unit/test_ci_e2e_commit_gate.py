@@ -67,11 +67,11 @@ def test_ui_routing_surfaces_trigger_frontend_e2e(path):
     "cps/templates/book_edit.html",
     "cps/templates/search_form.html",
 ])
-def test_classic_template_change_runs_browser_contract_on_current_overlay(path):
-    """Template-only fixes must reach browsers; the template overlay suffices."""
+def test_classic_template_change_uses_current_full_stack_browser_image(path):
+    """A merged template copy cannot remove deleted files; test the exact tree."""
     result = classify_paths([path], REPO)
     assert result["frontend"] is True
-    assert result["build"] is False
+    assert result["build"] is True
     assert result["concurrency"] is False
 
 

@@ -1267,7 +1267,7 @@ msgstr "Onbekende gebruiker"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Stats & Activity"
-msgstr ""
+msgstr "Calibre-Web NextGen — Statistieken en activiteit"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Enforcement History"

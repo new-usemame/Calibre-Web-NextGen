@@ -1058,18 +1058,21 @@ function updateImportSankeyChart() {
         return;
     }
     
-    // Extract unique nodes (formats)
-    const nodeSet = new Set();
+    // A format can be both an input and an output. Separate the two stages so
+    // reciprocal conversions and same-format imports remain an acyclic graph.
+    const nodeMap = new Map();
     data.forEach(([source, target, value]) => {
-        nodeSet.add(source);
-        nodeSet.add(target);
+        nodeMap.set(`source:${source}`, {name: `source:${source}`, format: source});
+        nodeMap.set(`target:${target}`, {name: `target:${target}`, format: target});
     });
-    
-    const nodes = Array.from(nodeSet).map(name => ({ name }));
+
+    const nodes = Array.from(nodeMap.values());
     const links = data.map(([source, target, value]) => ({
-        source,
-        target,
-        value
+        source: `source:${source}`,
+        target: `target:${target}`,
+        value,
+        sourceFormat: source,
+        targetFormat: target
     }));
     
     const option = {
@@ -1078,9 +1081,9 @@ function updateImportSankeyChart() {
             triggerOn: 'mousemove',
             formatter: (params) => {
                 if (params.dataType === 'edge') {
-                    return statsEscape(`${params.data.source} → ${params.data.target}`) + "<br/>" + statsEscape(statsFormat({{ _('Conversions: %(count)s', count='%(count)s') | tojson }}, {count: params.data.value}));
+                    return statsEscape(`${statsFormatLabel(params.data.sourceFormat)} → ${statsFormatLabel(params.data.targetFormat)}`) + "<br/>" + statsEscape(statsFormat({{ _('Conversions: %(count)s', count='%(count)s') | tojson }}, {count: params.data.value}));
                 }
-                return statsEscape(params.name);
+                return statsEscape(statsFormatLabel(params.data.format));
             }
         },
         series: [{
@@ -1103,7 +1106,8 @@ function updateImportSankeyChart() {
             label: {
                 color: '#fff',
                 fontSize: 12,
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                formatter: params => statsFormatLabel(params.data.format)
             }
         }]
     };

@@ -19,3 +19,5 @@ Translators can find the messages in `messages.pot` and their locale’s
 `cps/translations/<locale>/LC_MESSAGES/messages.po`. Existing contributed
 translations are preserved. Other languages use English for new messages
 until translations are supplied.
+
+Conversion flow charts use distinct input and output stages while keeping the visible format labels and conversion counts. This supports reciprocal and same-format conversions without cycles in the Sankey renderer. Search demo totals, successful counts and the gauge now derive from one coherent sample; actual server metrics are unchanged. Existing empty French and Dutch page-title translations are filled alongside the new messages.

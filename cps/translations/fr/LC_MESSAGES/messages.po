@@ -1327,7 +1327,7 @@ msgstr "Utilisateur inconnu"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Stats & Activity"
-msgstr ""
+msgstr "Calibre-Web NextGen — Statistiques et activité"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Enforcement History"

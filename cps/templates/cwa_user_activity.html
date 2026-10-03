@@ -637,6 +637,11 @@ function generateDemoData() {
     
     // Check if we're in single user mode
     const selectedUserId = urlParams.get('user_id');
+
+    // Derive every display from one sample instead of independently generating
+    // totals, successful counts and a percentage that can contradict each other.
+    const demoSearchTotal = 150 + Math.floor(Math.random() * 100);
+    const demoSearchSuccessful = Math.floor(demoSearchTotal * (0.55 + Math.random() * 0.3));
     
     // Generate appropriate topUsers data based on mode
     let topUsersData;
@@ -717,14 +722,14 @@ function generateDemoData() {
             total_logins: 47,
             total_downloads: 1356,
             total_reads: 432,
-            total_searches: 234,
+            total_searches: demoSearchTotal,
             total_events: 2178
         } : {
             // All users mode: show active_users
             active_users: 24,
             total_downloads: 1356,
             total_reads: 432,
-            total_searches: 234,
+            total_searches: demoSearchTotal,
             total_events: 2178
         },
         // Generate heatmap data (day of week, hour, count)
@@ -819,9 +824,9 @@ function generateDemoData() {
         },
         // Generate search success rate
         searchSuccess: {
-            total_searches: 150 + Math.floor(Math.random() * 100),
-            successful_searches: 100 + Math.floor(Math.random() * 80),
-            success_rate: 55 + Math.floor(Math.random() * 30), // 55-85%
+            total_searches: demoSearchTotal,
+            successful_searches: demoSearchSuccessful,
+            success_rate: Math.round(1000 * demoSearchSuccessful / demoSearchTotal) / 10,
             trend: Math.floor(Math.random() * 20) - 5 // -5 to +15
         },
         // Generate shelf activity (shelf_name, add_count, remove_count, net_change)

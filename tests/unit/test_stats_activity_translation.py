@@ -18,7 +18,7 @@ from babel.messages.catalog import Catalog
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from flask import Flask, render_template
-from flask_babel import Babel
+from flask_babel import Babel, gettext
 from jinja2 import ChoiceLoader, DictLoader
 
 pytestmark = pytest.mark.unit
@@ -193,6 +193,9 @@ def test_shipped_catalog_renders_live_controls_and_counted_fixes(tmp_path, local
     assert heading in html and fixes in html
     result = _execute(html, "initApiCharts(); toggleApiDemoMode();")
     assert real_data in result["nodes"]["api-demo-button"]["textContent"]
+    app = _render(tmp_path / 'page_title', locale, return_app=True, shipped=True)
+    with app.test_request_context():
+        assert gettext('Calibre-Web NextGen Stats & Activity') != 'Calibre-Web NextGen Stats & Activity'
 
 
 def test_client_count_formatter_preserves_reordered_fields_and_single_percent(tmp_path):
@@ -206,3 +209,35 @@ document.getElementById('reordered-message').textContent = statsFormat('%(total)
 """)
     assert result["nodes"]["format-tooltip"]["textContent"] == "EPUB — books: 1 (100%)"
     assert result["nodes"]["reordered-message"]["textContent"] == "2 / 1"
+
+
+def test_conversion_chart_keeps_input_and_output_stages_distinct(tmp_path):
+    html = _render(tmp_path, import_source_flows=[['PDF', 'MOBI', 7], ['MOBI', 'PDF', 3], ['EPUB', 'EPUB', 2]])
+    result = _execute(html, """
+importSankeyChart = echarts.init(document.getElementById('import-sankey-chart'));
+updateImportSankeyChart();
+const graph = __charts['import-sankey-chart'];
+const edge = graph.series[0].links[0];
+document.getElementById('conversion-tooltip').textContent = graph.tooltip.formatter({dataType:'edge',data:edge});
+""")
+    graph = result['charts']['import-sankey-chart']['series'][0]
+    incoming = {edge['target'] for edge in graph['links']}
+    outgoing = {edge['source'] for edge in graph['links']}
+    assert incoming.isdisjoint(outgoing), 'conversion stages must form a DAG even with reciprocal/same-format conversions'
+    assert sum(edge['value'] for edge in graph['links']) == 12
+    assert len(graph['data']) == 6
+    assert result['nodes']['conversion-tooltip']['textContent'] == 'PDF → MOBI<br/>Conversions: 7'
+
+
+@pytest.mark.parametrize('random_value', [0, 0.99])
+def test_demo_search_rate_and_summary_share_the_same_counts(tmp_path, random_value):
+    html = _render(tmp_path)
+    result = _execute(html, f"""
+Math.random = () => {random_value};
+const demo = generateDemoData();
+document.getElementById('demo-consistency').textContent = JSON.stringify([demo.totals.total_searches,demo.searchSuccess]);
+""")
+    total, search = json.loads(result['nodes']['demo-consistency']['textContent'])
+    assert total == search['total_searches']
+    assert 0 <= search['successful_searches'] <= total
+    assert search['success_rate'] == pytest.approx(round(100 * search['successful_searches'] / total, 1))

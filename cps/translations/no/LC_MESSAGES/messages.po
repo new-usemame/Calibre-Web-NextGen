@@ -3677,7 +3677,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Opprett smart hylle"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6487,7 +6487,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Rediger smart hylle"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9045,7 +9045,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Smarte hyller"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17748,3 +17748,74 @@ msgstr "Vis serieutvalg"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klikk på omslaget for å laste metadata til skjemaet"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Rekkefølge for smarte hyller"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Synlighet for smarte hyller"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Smarte hyller redigeres best på en datamaskin eller et nettbrett."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Hva er smarte hyller?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Smarte hyller samler bøker automatisk med regler."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Smarte hyller het «Magic Shelves» i eldre versjoner."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Smart hylle — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Feil ved lasting av smart hylle"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Bøker ordnet i smarte hyller"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synkroniser smarte hyller til lesebrett (Kobo og KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Synkroniser smarte hyller til Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Når dette er aktivert, kommer merkede smarte hyller til Kobo som samlinger. Aktiver også Kobo-synkronisering i grunnkonfigurasjonen."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader mottar også merkede smarte hyller i biblioteket sitt."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Aktiver først «%(setting)s» i CWA-innstillingene. Inntil da har denne avkrysningsboksen ingen effekt, og hyllen når ikke lesebrettet."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Synkronisering av smarte hyller er deaktivert globalt. Aktiver «%(setting)s» i CWA-innstillingene slik at denne hyllen når lesebrettene dine."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Velg rekkefølgen for de smarte hyllene dine i sidefeltet."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Vis denne smarte hyllen i OPDS-strømmen min"

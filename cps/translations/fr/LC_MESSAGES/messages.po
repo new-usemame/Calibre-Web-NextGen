@@ -19633,3 +19633,74 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Ordre des étagères intelligentes"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Visibilité des étagères intelligentes"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "La modification des étagères intelligentes fonctionne mieux sur ordinateur ou tablette."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Que sont les étagères intelligentes ?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Les étagères intelligentes rassemblent automatiquement les livres selon des règles."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Les étagères intelligentes s’appelaient « Magic Shelves » dans les anciennes versions."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Étagère intelligente — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Erreur lors du chargement de l’étagère intelligente"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Livres organisés en étagères intelligentes"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synchroniser les étagères intelligentes avec les liseuses (Kobo et KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Synchroniser les étagères intelligentes avec Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Une fois activées, les étagères intelligentes marquées arrivent sur votre Kobo sous forme de collections. Activez aussi Kobo Sync dans la configuration de base."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader reçoit également les étagères intelligentes marquées dans sa bibliothèque."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Activez d’abord « %(setting)s » dans les paramètres CWA. Jusque-là, cette case n’a aucun effet et l’étagère n’arrivera pas sur votre liseuse."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "La synchronisation des étagères intelligentes est désactivée globalement. Activez « %(setting)s » dans les paramètres CWA pour que cette étagère arrive sur vos liseuses."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Choisissez l’ordre de vos étagères intelligentes dans la barre latérale."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Afficher cette étagère intelligente dans mon catalogue OPDS"

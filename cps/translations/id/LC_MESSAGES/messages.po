@@ -3672,7 +3672,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Buat rak pintar"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6482,7 +6482,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Edit rak pintar"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9040,7 +9040,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Rak pintar"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17748,3 +17748,74 @@ msgstr "Tampilkan pilihan baca/belum dibaca"
 #~ msgstr ""
 #~ "Buku harus diarsipkan terlebih dahulu dan perangkat disinkronkan sebelum "
 #~ "buku dapat dihapus dengan aman."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Urutan rak pintar"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Visibilitas rak pintar"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Rak pintar paling mudah diedit di komputer atau tablet."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Apa itu rak pintar?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Rak pintar mengumpulkan buku secara otomatis menggunakan aturan."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Rak pintar disebut “Magic Shelves” pada versi sebelumnya."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Rak pintar — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Gagal memuat rak pintar"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Buku yang disusun dalam rak pintar"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Sinkronkan rak pintar ke pembaca elektronik (Kobo dan KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Sinkronkan rak pintar ke Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Jika diaktifkan, rak pintar yang ditandai dikirim ke Kobo sebagai koleksi. Aktifkan juga Kobo Sync di Konfigurasi Dasar."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader juga menerima rak pintar yang ditandai dalam perpustakaannya."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Aktifkan “%(setting)s” di Pengaturan CWA terlebih dahulu. Sampai saat itu, kotak centang ini tidak berpengaruh dan rak tidak akan dikirim ke pembaca elektronik Anda."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Sinkronisasi rak pintar dinonaktifkan secara global. Aktifkan “%(setting)s” di Pengaturan CWA agar rak ini dapat dikirim ke pembaca elektronik Anda."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Pilih urutan rak pintar Anda di bilah samping."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Tampilkan rak pintar ini dalam umpan OPDS saya"

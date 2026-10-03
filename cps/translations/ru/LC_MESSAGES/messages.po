@@ -3839,7 +3839,7 @@ msgstr "Обложка обновлена."
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr "Создать умную полку"
+msgstr "Создать смарт-полку"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -19177,3 +19177,74 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ msgstr ""
 #~ "Перед безопасным удалением книги необходимо сначала заархивировать её и "
 #~ "синхронизировать устройство."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Порядок смарт-полок"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Видимость смарт-полок"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Смарт-полки удобнее редактировать на компьютере или планшете."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Что такое смарт-полки?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Смарт-полки автоматически собирают книги по правилам."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "В старых версиях смарт-полки назывались «Magic Shelves»."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Смарт-полка — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Ошибка загрузки смарт-полки"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Книги на смарт-полках"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Синхронизировать смарт-полки с электронными книгами (Kobo и KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Синхронизировать смарт-полки с Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Когда функция включена, отмеченные смарт-полки передаются на Kobo как коллекции. Также включите синхронизацию Kobo в основных настройках."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader также получает отмеченные смарт-полки в своей библиотеке."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Сначала включите «%(setting)s» в настройках CWA. До этого флажок не действует и полка не появится на вашей электронной книге."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Синхронизация смарт-полок отключена глобально. Включите «%(setting)s» в настройках CWA, чтобы эта полка появилась на ваших электронных книгах."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Выберите порядок смарт-полок на боковой панели."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Показывать эту смарт-полку в моей ленте OPDS"

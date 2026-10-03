@@ -3689,7 +3689,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Δημιουργία έξυπνου ραφιού"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6499,7 +6499,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Επεξεργασία έξυπνου ραφιού"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9057,7 +9057,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Έξυπνα ράφια"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17725,3 +17725,74 @@ msgstr "Προβολή επιλογών σειράς"
 #~ msgstr ""
 #~ "Τα βιβλία πρέπει πρώτα να αρχειοθετηθούν και να συγχρονιστεί η συσκευή "
 #~ "πριν μπορέσει να διαγραφεί με ασφάλεια το βιβλίο."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Σειρά έξυπνων ραφιών"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Ορατότητα έξυπνων ραφιών"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Η επεξεργασία έξυπνων ραφιών λειτουργεί καλύτερα σε υπολογιστή ή tablet."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Τι είναι τα έξυπνα ράφια;"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Τα έξυπνα ράφια συλλέγουν αυτόματα βιβλία με κανόνες."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Τα έξυπνα ράφια ονομάζονταν «Magic Shelves» σε παλαιότερες εκδόσεις."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Έξυπνο ράφι — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Σφάλμα φόρτωσης έξυπνου ραφιού"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Βιβλία οργανωμένα σε έξυπνα ράφια"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Συγχρονισμός έξυπνων ραφιών με ηλεκτρονικούς αναγνώστες (Kobo και KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Συγχρονισμός έξυπνων ραφιών με Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Όταν ενεργοποιηθεί, τα επισημασμένα έξυπνα ράφια φτάνουν στο Kobo ως συλλογές. Ενεργοποιήστε επίσης τον συγχρονισμό Kobo στη βασική διαμόρφωση."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "Το KOReader λαμβάνει επίσης τα επισημασμένα έξυπνα ράφια στη βιβλιοθήκη του."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Ενεργοποιήστε πρώτα το «%(setting)s» στις ρυθμίσεις CWA. Μέχρι τότε, αυτό το πλαίσιο ελέγχου δεν έχει επίδραση και το ράφι δεν θα φτάσει στον αναγνώστη σας."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Ο συγχρονισμός έξυπνων ραφιών είναι απενεργοποιημένος καθολικά. Ενεργοποιήστε το «%(setting)s» στις ρυθμίσεις CWA ώστε αυτό το ράφι να φτάσει στους αναγνώστες σας."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Επιλέξτε τη σειρά των έξυπνων ραφιών σας στην πλαϊνή στήλη."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Εμφάνιση αυτού του έξυπνου ραφιού στη ροή OPDS μου"

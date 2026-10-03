@@ -3701,7 +3701,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Criar estante inteligente"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6511,7 +6511,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Editar estante inteligente"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9069,7 +9069,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Estantes inteligentes"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17819,3 +17819,74 @@ msgstr "Mostrar secção de lidos/não lidos"
 #~ msgstr ""
 #~ "Os livros devem primeiro ser arquivados e o dispositivo deve ser "
 #~ "sincronizado antes que um livro possa ser apagado com segurança."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Ordem das estantes inteligentes"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Visibilidade das estantes inteligentes"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "A edição de estantes inteligentes funciona melhor num computador ou tablet."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "O que são estantes inteligentes?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "As estantes inteligentes reúnem livros automaticamente através de regras."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "As estantes inteligentes chamavam-se “Magic Shelves” em versões anteriores."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Estante inteligente — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Erro ao carregar a estante inteligente"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Livros organizados em estantes inteligentes"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Sincronizar estantes inteligentes com leitores digitais (Kobo e KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Sincronizar estantes inteligentes com Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Quando ativado, as estantes inteligentes assinaladas chegam ao Kobo como coleções. Ative também Kobo Sync na Configuração básica."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "O KOReader também recebe as estantes inteligentes assinaladas na sua biblioteca."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Ative primeiro “%(setting)s” nas Definições CWA. Até lá, esta caixa não tem efeito e a estante não chegará ao seu leitor digital."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "A sincronização de estantes inteligentes está desativada globalmente. Ative “%(setting)s” nas Definições CWA para que esta estante chegue aos seus leitores digitais."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Escolha a ordem das suas estantes inteligentes na barra lateral."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Mostrar esta estante inteligente no meu catálogo OPDS"

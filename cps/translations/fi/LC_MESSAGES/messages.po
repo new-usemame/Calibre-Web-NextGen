@@ -3640,7 +3640,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Luo älykäs hylly"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6450,7 +6450,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Muokkaa älykästä hyllyä"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9008,7 +9008,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Älykkäät hyllyt"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17574,3 +17574,74 @@ msgstr "Näytä sarjavalinta"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klikkaa kantta ladataksesi metadata lomakkeelle"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "Älykkäiden hyllyjen järjestys"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "Älykkäiden hyllyjen näkyvyys"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Älykkäitä hyllyjä on paras muokata tietokoneella tai tabletilla."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "Mitä älykkäät hyllyt ovat?"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Älykkäät hyllyt keräävät kirjoja automaattisesti sääntöjen avulla."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Älykkäitä hyllyjä kutsuttiin vanhemmissa versioissa nimellä ”Magic Shelves”."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Älykäs hylly — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "Älykkään hyllyn lataaminen epäonnistui"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "Älykkäisiin hyllyihin järjestetyt kirjat"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synkronoi älykkäät hyllyt lukulaitteisiin (Kobo ja KOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "Synkronoi älykkäät hyllyt Koboon"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "Kun toiminto on käytössä, merkityt älykkäät hyllyt siirtyvät Koboon kokoelmina. Ota myös Kobo-synkronointi käyttöön perusasetuksissa."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader vastaanottaa myös merkityt älykkäät hyllyt kirjastoonsa."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "Ota ensin ”%(setting)s” käyttöön CWA-asetuksissa. Siihen asti tällä valintaruudulla ei ole vaikutusta eikä hylly siirry lukulaitteeseen."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "Älykkäiden hyllyjen synkronointi on poistettu käytöstä koko järjestelmässä. Ota ”%(setting)s” käyttöön CWA-asetuksissa, jotta tämä hylly siirtyy lukulaitteisiisi."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Valitse älykkäiden hyllyjesi järjestys sivupalkissa."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Näytä tämä älykäs hylly OPDS-syötteessäni"

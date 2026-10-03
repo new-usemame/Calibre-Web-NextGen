@@ -3637,7 +3637,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "إنشاء رف ذكي"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6447,7 +6447,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "تعديل رف ذكي"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9005,7 +9005,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "رفوف ذكية"
 
 #: cps/spa_strings.py
 msgid ""
@@ -17598,3 +17598,74 @@ msgstr "إظهار قسم المقروء/غير المقروء"
 #~ "Books must first be archived and the device synced before a book can "
 #~ "safely be deleted."
 #~ msgstr "يجب أولاً أرشفة الكتب ومزامنة الجهاز قبل أن يتم حذف الكتاب بأمان."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves order"
+msgstr "ترتيب الرفوف الذكية"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves visibility"
+msgstr "ظهور الرفوف الذكية"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "يُفضّل تعديل الرفوف الذكية على حاسوب أو جهاز لوحي."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "What are smart shelves?"
+msgstr "ما هي الرفوف الذكية؟"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves collect books automatically using rules."
+msgstr "تجمع الرفوف الذكية الكتب تلقائيًا باستخدام القواعد."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "كانت الرفوف الذكية تُسمّى «Magic Shelves» في الإصدارات السابقة."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "رف ذكي — %(icon)s %(name)s"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Error loading smart shelf"
+msgstr "خطأ في تحميل الرف الذكي"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Books organized in smart shelves"
+msgstr "كتب منظّمة في رفوف ذكية"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "مزامنة الرفوف الذكية مع أجهزة القراءة (Kobo وKOReader)"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "Sync smart shelves to Kobo"
+msgstr "مزامنة الرفوف الذكية مع Kobo"
+
+#. Consistent smart-shelf naming and transition help.
+msgid "When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too."
+msgstr "عند التفعيل، تصل الرفوف الذكية المحدّدة إلى Kobo كمجموعات. فعّل أيضًا مزامنة Kobo في الإعدادات الأساسية."
+
+#. Consistent smart-shelf naming and transition help.
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "يستقبل KOReader أيضًا الرفوف الذكية المحدّدة في مكتبته."
+
+#. Consistent smart-shelf naming and transition help.
+#, python-format
+msgid "Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader."
+msgstr "فعّل أولًا «%(setting)s» في إعدادات CWA. حتى ذلك الحين، لن يؤثر مربع الاختيار هذا ولن يصل الرف إلى جهاز القراءة."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+#, python-format
+msgid "Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings so this shelf can reach your e-readers."
+msgstr "مزامنة الرفوف الذكية معطّلة على مستوى النظام. فعّل «%(setting)s» في إعدادات CWA كي يصل هذا الرف إلى أجهزة القراءة."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "اختر كيفية ترتيب رفوفك الذكية في الشريط الجانبي."
+
+#. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "إظهار هذا الرف الذكي في موجز OPDS الخاص بي"

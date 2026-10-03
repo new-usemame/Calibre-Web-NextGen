@@ -17,6 +17,7 @@ from calibre_library_target import (library_target, calibredb_command, operation
 import tempfile
 import time
 import shutil
+import signal
 import sqlite3
 import fcntl
 import threading
@@ -792,7 +793,7 @@ def run_duplicate_scan_for_books(book_ids) -> None:
 _CONVERSION_FAILURE_GUIDANCE = {
     'acsm': (
         "ACSM_NOTICE: '{filename}' is an Adobe ACSM fulfillment ticket, not an ebook — "
-        "Calibre can only convert it when an ACSM-capable plugin (e.g. the ACSM Input "
+        "Ingest can fulfill it when an ACSM-capable import plugin (e.g. the ACSM Input "
         "plugin) is installed. Your options: (1) set CWA_CALIBRE_USER_PLUGINS=true and "
         "place the ACSM Input plugin zip in /config/.config/calibre/plugins (see the "
         "'Calibre plugins' section of the README), or (2) open the .acsm in Adobe "
@@ -979,7 +980,7 @@ _CONVERTER_LOG_TAIL_LINES = 400
 _CONVERTER_LOG_LINE_CHARS = 4096
 
 
-def _run_converter_streaming(cmd, env, timeout=None):
+def _run_converter_streaming(cmd, env, timeout=None, *, owned_process_group=False):
     """Run a converter, echoing its output live while keeping a bounded tail.
 
     The converter's output is the only place a Calibre plugin says why it
@@ -993,7 +994,7 @@ def _run_converter_streaming(cmd, env, timeout=None):
     when the deadline passes, OSError when the converter cannot be run.
     """
     proc = subprocess.Popen(
-        cmd, env=env,
+        cmd, env=env, start_new_session=owned_process_group and os.name == "posix",
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         # errors='replace' is load-bearing, not defensive. Under the default
         # strict policy one undecodable byte — a latin-1 title echoed by a
@@ -1004,6 +1005,13 @@ def _run_converter_streaming(cmd, env, timeout=None):
         # here may reintroduce a decode that can raise.
         text=True, encoding='utf-8', errors='replace', bufsize=1,
     )
+    def stop_owned_group():
+        if owned_process_group and os.name == "posix":
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass  # Leader and all ordinary descendants already exited.
+
     tail = collections.deque(maxlen=_CONVERTER_LOG_TAIL_LINES)
 
     def _pump():
@@ -1025,6 +1033,7 @@ def _run_converter_streaming(cmd, env, timeout=None):
     try:
         returncode = proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
+        stop_owned_group()
         proc.kill()
         proc.wait()
         # Join before reading the tail, not after. This runs before the
@@ -1036,6 +1045,7 @@ def _run_converter_streaming(cmd, env, timeout=None):
         pump.join(timeout=5)
         raise subprocess.TimeoutExpired(cmd, timeout, output=''.join(tail))
     finally:
+        stop_owned_group()
         pump.join(timeout=5)
         try:
             if proc.stdout:
@@ -1706,6 +1716,89 @@ class NewBookProcessor:
             print(f"[ingest-processor]: ERROR - Failed to backup '{input_file}' to '{output_path}': {e}")
             return False
 
+
+    def ingest_acsm(self) -> None:
+        """Fulfill once through import hooks, then use guarded ordinary ingest."""
+        from calibre_ticket_fulfillment import RESULT_PREFIX, load_result
+
+        ticket = Path(self.filepath)
+        source_digest = _sha256_file(ticket)
+        acquisition = getattr(self, "acquisition_intent", None)
+        previous = self._acquisition_result(source_digest) if acquisition else None
+        existing = previous["book_ids"] if previous else (
+            [] if acquisition else self._content_marker_book_ids(source_digest)
+        )
+        destination = app_paths.processed_books_dir() / 'acsm_fulfilled' / source_digest
+        if existing:
+            # This path reuses the normal durable receipt acknowledgement; it
+            # returns before metadata hooks and never fulfills the ticket again.
+            self.add_book_to_library(str(ticket), identity_path=str(ticket))
+            if self.last_added_book_ids:
+                shutil.rmtree(destination, ignore_errors=True)
+            return
+
+        try:
+            recovered = load_result(destination, source_digest)
+        except ValueError as error:
+            print(f"[ingest-processor] {error}; original retained for manual recovery", flush=True)
+            raise PreserveIngestSourceError(str(error)) from error
+        helper = Path(__file__).with_name("calibre_ticket_fulfillment.py")
+        try:
+            if recovered:
+                print(f"[ingest-processor] Reusing validated ACSM book: {recovered['path']}", flush=True)
+                result = recovered
+            else:
+                print(f"[ingest-processor] Fulfilling ACSM through Calibre import hooks: {self.filename}", flush=True)
+                output = _run_converter_streaming(
+                    ["calibre-debug", "-e", str(helper), "--", "--source", str(ticket),
+                     "--destination", str(destination)],
+                    env=self.calibre_env, timeout=conversion_budget_remaining(), owned_process_group=True,
+                )
+                result = next(json.loads(line[len(RESULT_PREFIX):]) for line in reversed(output.splitlines())
+                              if line.startswith(RESULT_PREFIX))
+                if result != load_result(destination, source_digest):
+                    raise ValueError("Fulfillment acknowledgement did not match its durable result")
+            fulfilled = Path(result['path'])
+            fulfilled_format = result['format']
+            if _sha256_file(ticket) != source_digest:
+                raise ValueError("Fulfillment changed the ticket identity")
+        except (OSError, ValueError, KeyError, StopIteration, subprocess.SubprocessError) as error:
+            print(f"[ingest-processor] ACSM fulfillment failed: {type(error).__name__}", flush=True)
+            if destination.exists():
+                print(f"[ingest-processor] Retained ACSM recovery entry at {destination}", flush=True)
+                raise PreserveIngestSourceError("ACSM fulfillment interrupted; original and recovery entry retained") from error
+            guidance = conversion_failure_guidance("acsm", self.filename,
+                converter_output=getattr(error, "output", None))
+            if guidance:
+                print(guidance, flush=True)
+            if not self.backup(str(ticket), backup_type="failed"):
+                raise PreserveIngestSourceError("ACSM fulfillment failed; original retained")
+            if acquisition:
+                raise PreserveIngestSourceError("ACSM fulfillment failed; acquisition original retained")
+            _remove_completed_import_manifest(str(ticket))
+            return
+
+        import_path = str(fulfilled)
+        # Auto-Convert governs the resulting book, not whether the ticket must
+        # be fulfilled. Its ignore list applies to the actual EPUB/PDF format.
+        if (self.auto_convert_on and fulfilled_format != self.target_format
+                and fulfilled_format not in self.convert_ignored_formats):
+            old_path, old_format = self.filepath, self.input_format
+            try:
+                self.filepath, self.input_format = str(fulfilled), fulfilled_format
+                successful, converted = (self.convert_to_kepub() if self.target_format == "kepub"
+                                         else self.convert_book())
+                if successful:
+                    import_path = converted
+                else:
+                    print("[ingest-processor] Importing the fulfilled book after optional conversion failed", flush=True)
+            finally:
+                self.filepath, self.input_format = old_path, old_format
+        self.add_book_to_library(import_path, identity_path=str(ticket))
+        if not self.last_added_book_ids:
+            print(f"[ingest-processor] Fulfilled ACSM import incomplete; book retained at {fulfilled}", flush=True)
+            raise PreserveIngestSourceError("Fulfilled ACSM book import incomplete; original and fulfilled book retained")
+        shutil.rmtree(destination, ignore_errors=True)
 
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""
@@ -3271,7 +3364,16 @@ def main(filepath=None):
             skip_delete = True
             return 0
 
-        if nbp.is_target_format: # File can just be imported
+        if nbp.input_format == "acsm":
+            try:
+                nbp.ingest_acsm()
+            except (PreserveIngestSourceError, RetryIngestSourceError):
+                raise
+            except Exception:
+                # Receipt lookup or unexpected hook/import failures must not
+                # delete a potentially consumable ticket in the outer cleanup.
+                raise RetryIngestSourceError("ACSM processing incomplete; original retained") from None
+        elif nbp.is_target_format: # File can just be imported
             if is_a_book_format(nbp.input_format):
                 print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, importing now...", flush=True)
                 nbp.add_book_to_library(filepath)

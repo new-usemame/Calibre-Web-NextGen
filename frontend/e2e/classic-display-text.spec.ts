@@ -14,6 +14,7 @@ test('ordinary shelf names remain text in Classic page titles and ordering', asy
       expect(response?.status()).toBe(200);
       await expect(page.locator('b[data-cwng-display="shelf"]')).toHaveCount(0);
       expect(await page.title()).toContain(name);
+      await expect(page.getByRole('heading', { level: 2 }).first()).toContainText(name);
     }
   } finally {
     const removed = await page.request.post(`/api/v1/shelves/${id}/delete`, { headers });

@@ -8,6 +8,7 @@ import os
 import re
 import zipfile
 from xml.dom import minidom
+from xml.parsers import expat
 import argparse
 from pathlib import Path
 import sys
@@ -39,6 +40,55 @@ except Exception:
 
 # Compile regex pattern once at module level for performance
 LANGUAGE_TAG_PATTERN = re.compile(r'^[a-z]{2,3}(-[a-z]{2,4})?$', re.IGNORECASE)
+
+# These patterns run only on a start tag identified by the XML parser. Consuming
+# whole quoted values prevents a marker mentioned inside another attribute from
+# being mistaken for an attribute of its own. No document is reserialized.
+XML_START_TAG_PATTERN = re.compile(
+    rb'<([^\s/>]+)(?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|\'[^\']*\'))*\s*/?>'
+)
+XML_ATTRIBUTE_PATTERN = re.compile(
+    rb'\s+([^\s=/>]+)\s*=\s*(?:"[^"]*"|\'[^\']*\')'
+)
+
+
+def _remove_amazon_marker_attributes(content: str) -> tuple[str, int]:
+    """Remove actual Amazon marker attributes, retaining all other source bytes.
+
+    Expat handles comments, CDATA, quoted values and namespaces. Parse the whole
+    document before applying edits, so malformed input cannot get a partial
+    repair. External entities are never loaded. UTF-8 byte offsets refer to this
+    temporary buffer, independent of the file's preserved target encoding.
+    """
+    data = content.encode('utf-8')
+    parser = expat.ParserCreate(encoding='utf-8')
+    parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+    parser.ExternalEntityRefHandler = lambda *args: 1
+    removals = set()
+
+    def start_element(name, attributes):
+        if not any(key.lower() == 'data-amznremoved' for key in attributes):
+            return
+        start = parser.CurrentByteIndex
+        tag = XML_START_TAG_PATTERN.match(data, start)
+        # Entity replacement text has no literal start tag at the reported
+        # source offset. Leave declarations/references alone rather than trying
+        # to rewrite their shared definition.
+        if tag is None or tag.group(1).decode('utf-8') != name:
+            return
+        for attribute in XML_ATTRIBUTE_PATTERN.finditer(data, tag.start(), tag.end()):
+            if attribute.group(1).lower() == b'data-amznremoved':
+                removals.add((attribute.start(), attribute.end()))
+
+    parser.StartElementHandler = start_element
+    parser.Parse(data, True)
+    chunks = []
+    previous = 0
+    for start, end in sorted(removals):
+        chunks.append(data[previous:start])
+        previous = end
+    chunks.append(data[previous:])
+    return b''.join(chunks).decode('utf-8'), len(removals)
 
 ### Global Variables
 dirs_json = str(app_paths.dirs_json())
@@ -325,17 +375,25 @@ class EPUBFixer:
         if http_equiv_pattern.search(content):
             return http_equiv_pattern.sub(rf"\1{charset}\3", content, count=1)
 
-        meta_charset_pattern = re.compile(r'<meta[^>]+charset=["\']?[^"\'>\s]+[^>]*>', re.IGNORECASE)
+        meta_charset_pattern = re.compile(
+            r'(<meta\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*?\scharset\s*=\s*)'
+            r'("[^"]*"|\'[^\']*\'|[^\s/>]+)',
+            re.IGNORECASE,
+        )
         if meta_charset_pattern.search(content):
-            return meta_charset_pattern.sub(f'<meta charset="{charset}">', content, count=1)
+            def replace_charset(match):
+                old_value = match.group(2)
+                quote = old_value[0] if old_value[0] in {'"', "'"} else ''
+                return match.group(1) + quote + charset + quote
+            return meta_charset_pattern.sub(replace_charset, content, count=1)
 
         head_pattern = re.compile(r'<head[^>]*>', re.IGNORECASE)
         match = head_pattern.search(content)
         if match:
             insert_at = match.end()
-            return content[:insert_at] + f"\n    <meta charset=\"{charset}\">" + content[insert_at:]
+            return content[:insert_at] + f"\n    <meta charset=\"{charset}\"/>" + content[insert_at:]
 
-        return f"<meta charset=\"{charset}\">\n" + content
+        return f"<meta charset=\"{charset}\"/>\n" + content
 
     def _extract_book_info_from_path(self, file_path: str) -> tuple[int | None, str]:
         """Extract book ID and format from file path.
@@ -464,9 +522,9 @@ class EPUBFixer:
 
     def fix_encoding(self):
         """Add UTF-8 encoding declaration if missing and fix malformed XML declarations"""
-        xml_decl_pattern = re.compile(r'^(\s*)<\?xml[^>]*\?>', re.IGNORECASE)
+        xml_decl_pattern = re.compile(r'^(\ufeff?\s*)<\?xml[^>]*\?>', re.IGNORECASE)
         xml_decl_encoding_pattern = re.compile(
-            r'^\s*<\?xml[^>]*encoding=["\']([^"\']+)["\']',
+            r'^\ufeff?\s*<\?xml[^>]*encoding=["\']([^"\']+)["\']',
             re.IGNORECASE
         )
 
@@ -817,6 +875,28 @@ class EPUBFixer:
                     if updated != content:
                         self.fixed_problems.append(f"Remove stray image tag(s) in {filename}")
                         self.files[filename] = updated
+
+    def remove_amazon_marker_attributes(self):
+        """Drop Amazon conversion markers without dropping their book content."""
+        for filename in list(self.files):
+            if Path(filename).suffix.lower() not in {'.html', '.xhtml', '.htm', '.svg'}:
+                continue
+            content = self._get_text_content(filename)
+            if content is None or 'data-amznremoved' not in content.lower():
+                continue
+            try:
+                updated, count = _remove_amazon_marker_attributes(content)
+            except expat.ExpatError:
+                print_and_log(
+                    f"[cwa-kindle-epub-fixer] Warning: Cannot safely remove Amazon marker attributes from malformed XML in {filename}",
+                    log=self.manually_triggered,
+                )
+                continue
+            if count:
+                self.files[filename] = updated
+                self.fixed_problems.append(
+                    f"Removed {count} Amazon marker attribute(s) from {filename}"
+                )
 
     def strip_embedded_fonts(self):
         """Remove embedded font files and @font-face CSS declarations for Kindle compatibility"""
@@ -1195,6 +1275,8 @@ class EPUBFixer:
         self.fix_book_language(default_language, input_path)
         print_and_log("[cwa-kindle-epub-fixer] Checking for stray images...", log=self.manually_triggered)
         self.fix_stray_img()
+        print_and_log("[cwa-kindle-epub-fixer] Checking for Amazon conversion marker attributes...", log=self.manually_triggered)
+        self.remove_amazon_marker_attributes()
 
         # An archive whose mimetype entry is misplaced or compressed is malformed
         # even when every payload is fine, and write_epub lays it out correctly.

@@ -10,6 +10,7 @@ import stat
 import sys
 import inspect
 import logging
+import threading
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 
@@ -25,6 +26,7 @@ DEFAULT_LOG_FILE    = os.path.join(_CONFIG_DIR, "calibre-web.log")
 DEFAULT_ACCESS_LOG  = os.path.join(_CONFIG_DIR, "access.log")
 LOG_TO_STDERR       = '/dev/stderr'
 LOG_TO_STDOUT       = '/dev/stdout'
+_SETUP_LOCK = threading.RLock()
 
 logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(logging.CRITICAL, "CRIT")
@@ -180,6 +182,20 @@ def _shares_rotating_sink(stdout, file_handler, previous_handlers):
 
 
 def setup(log_file, log_level=None):
+    """Configure output without racing an existing rotating writer."""
+    with _SETUP_LOCK:
+        previous_files = [handler for handler in logging.root.handlers
+                          if isinstance(handler, RotatingFileHandler)]
+        for handler in previous_files:
+            handler.acquire()
+        try:
+            return _setup(log_file, log_level)
+        finally:
+            for handler in reversed(previous_files):
+                handler.release()
+
+
+def _setup(log_file, log_level=None):
     """
     Configure the logging output.
     May be called multiple times.
@@ -223,6 +239,19 @@ def setup(log_file, log_level=None):
     if file_path is not None:
         try:
             fh, used_path = _make_file_handler(file_path)
+            # Reuse the same rotating writer for an unchanged destination.
+            # A thread may already have selected it before setup took its
+            # lock; replacing/closing it could let that late emit rotate
+            # underneath a newly opened handler after the lock is released.
+            previous = next((handler for handler in r.handlers
+                             if isinstance(handler, RotatingFileHandler)
+                             and handler.baseFilename == fh.baseFilename
+                             and _regular_file_identity(handler.stream) is not None
+                             and _regular_file_identity(handler.stream)
+                             == _regular_file_identity(fh.stream)), None)
+            if previous is not None:
+                fh.close()
+                fh = previous
             if _shares_rotating_sink(sys.stdout, fh, r.handlers):
                 new_handlers[0].close()
                 new_handlers.clear()
@@ -236,15 +265,17 @@ def setup(log_file, log_level=None):
     for h in new_handlers:
         h.setFormatter(FORMATTER)
 
-    # Replace root handlers atomically.
-    for h in list(r.handlers):
-        r.removeHandler(h)
+    # A logger walking the old list finishes against that list, while new
+    # records see the complete replacement. Retained file handlers stay open.
+    previous_handlers = r.handlers
+    r.handlers = new_handlers
+    for h in previous_handlers:
+        if h in new_handlers:
+            continue
         try:
             h.close()
         except Exception:
             pass
-    for h in new_handlers:
-        r.addHandler(h)
     logging.captureWarnings(True)
 
     if return_value == DEFAULT_LOG_FILE:

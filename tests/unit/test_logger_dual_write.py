@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 from logging import StreamHandler
 from logging.handlers import RotatingFileHandler
@@ -68,6 +69,48 @@ def _stream_handlers_to_stdout():
 
 @pytest.mark.unit
 class TestDualHandlerSetup:
+    def test_rollover_during_settings_reload_keeps_one_active_writer(self, tmp_path, reset_root, monkeypatch):
+        path = tmp_path / 'shared.log'
+        with path.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            cwa_logger.setup(str(path), logging.INFO)
+            previous = _file_handlers()[0]
+            previous.doRollover()
+            original = cwa_logger._make_file_handler
+            started = threading.Event()
+            completed = threading.Event()
+            workers = []
+
+            def rotate():
+                started.set()
+                with previous.lock:
+                    previous.doRollover()
+                completed.set()
+
+            def interleave(*args, **kwargs):
+                created = original(*args, **kwargs)
+                worker = threading.Thread(target=rotate)
+                workers.append(worker)
+                worker.start()
+                assert started.wait(2)
+                # The broken replacement permits rollover here. A coherent
+                # handoff blocks it until setup releases the existing writer.
+                completed.wait(0.1)
+                return created
+
+            monkeypatch.setattr(cwa_logger, '_make_file_handler', interleave)
+            try:
+                cwa_logger.setup(str(path), logging.INFO)
+            finally:
+                for worker in workers:
+                    worker.join(2)
+                    assert not worker.is_alive()
+            logging.getLogger('cps.concurrent_sink_test').info('concurrent-reload-marker')
+            redirected.flush()
+            assert path.read_text().count('concurrent-reload-marker') == 1
+            assert sum(p.read_text().count('concurrent-reload-marker')
+                       for p in tmp_path.glob('shared.log*')) == 1
+
     @pytest.mark.parametrize('alias', ['same', 'symlink', 'hardlink'])
     def test_shared_file_sink_writes_once_and_follows_rotation(self, tmp_path, reset_root, monkeypatch, alias):
         path = tmp_path / 'shared.log'

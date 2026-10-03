@@ -15,7 +15,7 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
   assertNoPageErrors(errors);
 });
 
-test('stored smart-shelf names and icons are text in Classic headings', async ({ page }, testInfo) => {
+test('stored smart-shelf names and icons are text in Classic headings and profile order', async ({ page }, testInfo) => {
   // #1498: renaming the existing safe-HTML heading revealed stored markup injection.
   const csrf = await page.request.get('/api/v1/auth/csrf');
   expect(csrf.status()).toBe(200);
@@ -40,6 +40,12 @@ test('stored smart-shelf names and icons are text in Classic headings', async ({
       await expect(heading.locator('img')).toHaveCount(0);
       await expect(heading).toContainText(payload);
       await expect(heading).toContainText('Smart shelf —');
+      expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__shelfProbe)).toBe(0);
+      await page.goto('/me');
+      const row = page.locator(`#magic_shelf_order_list li[data-key="${result.shelf_id}"]`);
+      await expect(row).toHaveCount(1);
+      await expect(row.locator('img')).toHaveCount(0);
+      await expect(row.locator(field === 'name' ? '.opds-order-label' : '.magic-shelf-icon')).toHaveText(payload);
       expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__shelfProbe)).toBe(0);
     } finally {
       const removed = await page.request.post(`/magicshelf/${result.shelf_id}/delete`, { headers });

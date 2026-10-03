@@ -1827,7 +1827,8 @@ export function useShelfMembership() {
 
 // ── Magic shelves (smart collections) ────────────────────────────────────────
 
-export interface MagicRule { id: string; operator: string; value: string | string[] }
+export type MagicRuleValue = string | number | boolean | null | MagicRuleValue[] | { [key: string]: MagicRuleValue };
+export interface MagicRule { id: string; operator: string; value: MagicRuleValue }
 export interface MagicRuleSet { condition: 'AND' | 'OR'; rules: MagicRuleNode[] }
 /** A rule set may nest groups: the classic builder's "Add group" writes them. */
 export type MagicRuleNode = MagicRule | MagicRuleSet;

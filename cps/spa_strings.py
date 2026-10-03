@@ -2121,3 +2121,8 @@ _("Requested")
 _("The chosen book is no longer in the completed download. Restore its original file before trying again.")
 _("The book or completed download changed. Restore its original files before trying again.")
 _("The completed download exceeds the safe file limits. Choose a smaller release.")
+
+# Stored smart-shelf rules unavailable in the current New UI schema (#1617).
+_("Unsupported rule")
+_("This rule cannot be edited here. It will be kept unless you remove it.")
+

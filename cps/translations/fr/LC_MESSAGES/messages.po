@@ -19753,3 +19753,11 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr "Règle non prise en charge"
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr "Cette règle ne peut pas être modifiée ici. Elle sera conservée sauf si vous la supprimez."

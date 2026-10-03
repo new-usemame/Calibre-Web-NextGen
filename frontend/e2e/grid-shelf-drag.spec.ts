@@ -95,7 +95,7 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
     await page.goto('/app');
     await page.getByRole('button', { name: 'Select', exact: true }).click();
     for (const book of books) {
-      const card = page.getByRole('button', { name: `Select ${book.title}`, exact: true }).first();
+      const card = page.getByTestId('catalog-grid').locator(`[data-book-id="${book.id}"]`).getByRole('button', { name: `Select ${book.title}`, exact: true });
       // Focus scrolls the real card into view without waiting on WebKit's
       // offscreen content-visibility geometry before it has been painted.
       await card.focus();
@@ -104,13 +104,13 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
     }
     await expect(page.getByRole('region', { name: '20 selected', exact: true })).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
-    const selected = page.getByRole('button', { name: `Deselect ${books[0].title}`, exact: true }).first();
+    const selected = page.getByTestId('catalog-grid').locator(`[data-book-id="${books[0].id}"]`).getByRole('button', { name: `Deselect ${books[0].title}`, exact: true });
     await selected.scrollIntoViewIfNeeded();
     const target = page.locator(`[data-shelf-drop="${shelf.id}"]`);
     if (info.project.use.hasTouch) {
       // Chromium's input protocol produces trusted touchscreen events and
       // touch PointerEvents; dispatchEvent would not establish native dragging.
-      const handle = page.getByRole('button', { name: `Add ${books[0].title} to a shelf`, exact: true }).first();
+      const handle = page.getByTestId('catalog-grid').locator(`[data-book-id="${books[0].id}"]`).getByRole('button', { name: `Add ${books[0].title} to a shelf`, exact: true });
       await handle.scrollIntoViewIfNeeded();
       const box = (await handle.boundingBox())!;
       const x = box.x + box.width / 2, y = box.y + box.height / 2;
@@ -118,24 +118,40 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
       const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', px = x, py = y) => cdp.send('Input.dispatchTouchEvent', {
         type, touchPoints: type === 'touchEnd' ? [] : [{ x: px, y: py, id: 1 }],
       });
+      const initialHit = await handle.evaluate((el, point) => el.contains(document.elementFromPoint(point.x, point.y)), {x,y});
+      expect(initialHit).toBe(true);
       await touch('touchStart'); await touch('touchMove', x - 14, y);
-      await expect(target).toBeVisible();
-      await target.scrollIntoViewIfNeeded();
+      await expect(page.locator('div[class*="ghost"]')).toHaveText('20 selected');
+      const drawer = page.locator('[data-shelf-drag-nav]');
+      await expect(drawer).not.toHaveAttribute('inert', '');
+      await expect(target).toHaveClass(/dropTarget/);
       await settleAnimations(target);
-      const dest = (await target.boundingBox())!;
-      await touch('touchMove', dest.x + dest.width / 2, dest.y + dest.height / 2);
+      // Park outside the drawer to stop its real held-touch edge scrolling.
+      const outside = await drawer.evaluate(el => {
+        const box=el.getBoundingClientRect(); return {x:box.right+16,y:box.top+box.height/2};
+      });
+      await touch('touchMove', outside.x, outside.y);
+      const overlap = await target.evaluate(el => {
+        const nav=document.querySelector<HTMLElement>('[data-shelf-drag-nav]')!;
+        const bar=document.querySelector<HTMLElement>('[role="region"][aria-label="20 selected"]')!;
+        const n=nav.getBoundingClientRect(), b=bar.getBoundingClientRect();
+        const desiredY=Math.min(n.bottom-56,b.bottom-8);
+        nav.scrollTop += el.getBoundingClientRect().top+el.getBoundingClientRect().height/2-desiredY;
+        const r=el.getBoundingClientRect();
+        const x=(Math.max(r.left,b.left)+Math.min(r.right,b.right))/2,y=r.top+r.height/2;
+        return {x,y,row:r.toJSON(),nav:n.toJSON(),bar:b.toJSON(),hit:document.elementFromPoint(x,y)?.closest('[data-shelf-drop]')?.getAttribute('data-shelf-drop')};
+      });
+      expect(overlap.x).toBeGreaterThan(overlap.bar.left);
+      expect(overlap.x).toBeLessThan(overlap.bar.right);
+      expect(overlap.y).toBeGreaterThan(overlap.bar.top);
+      expect(overlap.y).toBeLessThan(overlap.bar.bottom);
+      expect(overlap.y).toBeGreaterThan(overlap.nav.top+48);
+      expect(overlap.y).toBeLessThan(overlap.nav.bottom-48);
+      expect(overlap.hit).toBe(String(shelf.id));
+      await touch('touchMove', overlap.x, overlap.y);
       await expect(target).toHaveClass(/dropOver/);
+      await info.attach('stable-overlap-geometry', {body:JSON.stringify(overlap),contentType:'application/json'});
       await info.attach('shelf-drop-target', { body: await page.screenshot({ path: info.outputPath('shelf-drop-target.jpeg'), type: 'jpeg', quality: 72 }), contentType: 'image/jpeg' });
-      // Keep the release over the target after the evidence capture; native
-      // edge scrolling and drawer transitions can move it during a screenshot.
-      const release = (await target.boundingBox())!;
-      const nav = (await page.locator('[data-shelf-drag-nav]').boundingBox())!;
-      // Follow the moving row out of the 48px edge-scroll band. The point
-      // stays inside the lower shelf row and the floating toolbar's overlap.
-      const releaseY = Math.min(release.y + release.height / 2, nav.y + nav.height - 56);
-      expect(releaseY).toBeGreaterThan(release.y);
-      expect(releaseY).toBeLessThan(release.y + release.height);
-      await touch('touchMove', release.x + release.width / 2, releaseY);
       await expect(target).toHaveClass(/dropOver/);
       // This lower target can lie in the drawer's edge-scroll zone. Keep the
       // overlap hit above, then place the actual drop in the stable centre.
@@ -175,7 +191,7 @@ test('twenty selected books drag together onto a sidebar shelf', async ({ dragPa
     // Re-dropping the same selection is idempotent; the picker is the keyboard
     // alternative to a second long drag.
     await page.evaluate(() => window.scrollTo(0, 0));
-    const pickerHandle = page.getByRole('button', { name: `Add ${books[0].title} to a shelf`, exact: true }).first();
+    const pickerHandle = page.getByTestId('catalog-grid').locator(`[data-book-id="${books[0].id}"]`).getByRole('button', { name: `Add ${books[0].title} to a shelf`, exact: true });
     await pickerHandle.focus(); await page.keyboard.press('Enter');
     await page.getByRole('dialog', { name: 'Add to shelf' }).getByRole('button', { name, exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Add to shelf' })).not.toBeVisible();

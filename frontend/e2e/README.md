@@ -173,7 +173,7 @@ surfaces; reverse dependents cannot be discovered by that traversal and must be 
 prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
 `cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-The isolated file-ISBN parser worker is included in the whole image and launched by its bounded parent service; it deliberately imports no application modules. At this revision the derived set is 232 of 292 local Python modules (the closure correctly picks
+The isolated file-ISBN parser worker is included in the whole image and launched by its bounded parent service; it deliberately imports no application modules. At this revision the derived set is 239 of 294 local Python modules (the closure correctly picks
 up `cps/services/browser_source.py` through the database migration path,
 `cps/user_account_data.py` through the admin user-delete path,
 `cps/services/device_delivery.py` through the book-action request path,
@@ -196,7 +196,7 @@ same way and accounts for the most recent growth: `cps/api/acquisition.py` is un
 protected `cps/api/` tree, and the twelve modules it reaches
 (`cps/services/acquisition/{admission,catalog,contracts,http,ingest,migration,opds,runtime,secrets,
 staging,storage,worker}.py`) followed it down, pulling in `cps/tasks/{clean,database,thumbnail_migration}.py`
-behind the scheduler edge. Measured at `origin/main`
+behind the scheduler edge. The complete `cps/services/acquisition/` package is now also protected explicitly: its background completion, bundle file inspection and client adapters can sit beyond the request-root cutoff, so changes there must still run against a complete current-head image. Measured at `origin/main`
 `e6298e0d560b`, the previous and expanded policies each fired on 26 of the latest 100 first-parent commits;
 protecting `cps/api/` added zero historical gate runs in that sample.
 

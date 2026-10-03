@@ -81,6 +81,36 @@ def test_two_locales_reuse_one_connection_without_changing_each_other(catalog):
             assert [row[0] for row in rows] == expected
 
 
+
+@pytest.mark.parametrize('locale, expected', [
+    ('sv', ['Aalto', 'Zulu', 'Åland', 'Ängel', 'Örebro']),
+    ('fi', ['Aalto', 'Zulu', 'Åland', 'Ängel', 'Örebro']),
+    ('de', ['Aalto', 'Åland', 'Ängel', 'Örebro', 'Zulu']),
+])
+@pytest.mark.parametrize('sort', ['abc', 'zyx'])
+def test_book_json_alphabetical_sort_orders_actual_rows(catalog, monkeypatch, locale, expected, sort):
+    from cps import db
+    from cps.api import books
+    from cps.pagination import Pagination
+    from sqlalchemy.orm import noload
+    app, session, _ = catalog
+    def fill(page, database, limit, predicate, order, *args, **kwargs):
+        rows = session.query(db.Books).options(noload('*')).order_by(*order).offset(1).limit(3).all()
+        # Keep the real sort/query and JSON serializer; unrelated metadata is
+        # represented at the established catalog-row seam.
+        entries = [SimpleNamespace(Books=SimpleNamespace(
+            id=row.id, title=row.title, series_index=row.series_index, has_cover=row.has_cover,
+            authors=[], series=[], data=[]), is_archived=False, read_status=None) for row in rows]
+        return entries, None, Pagination(1, 3, 5)
+    monkeypatch.setattr(books.calibre_db, 'fill_indexpage', fill)
+    monkeypatch.setattr(books.config, 'config_books_per_page', 3, raising=False)
+    monkeypatch.setattr(books.config, 'config_read_column', 0, raising=False)
+    app.add_url_rule('/api/v1/books', view_func=inspect.unwrap(books.list_books))
+    response = app.test_client().get('/api/v1/books?lang=' + locale + '&sort=' + sort)
+    assert response.status_code == 200
+    ordered = expected if sort == 'abc' else expected[::-1]
+    assert [row['title'] for row in response.json['items']] == ordered[1:4]
+
 def test_classic_author_order_and_letter_buckets_share_request_locale(catalog, monkeypatch):
     from cps import web
     app, _, _ = catalog

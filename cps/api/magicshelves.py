@@ -15,7 +15,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
-from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
 from ..services import ereader_scope
@@ -141,7 +141,9 @@ def magic_shelf_books(shelf_id):
     if query_filter is None:
         if select_all:
             return _selection_response([], 0)
-        return jsonify({**shelf_item, "items": [], "page": 1,
+        return jsonify({**shelf_item,
+                        "rules": shelf.rules or {"condition": "AND", "rules": []},
+                        "items": [], "page": 1,
                         "per_page": per_page, "total": 0,
                         "sort": resolved_sort.key,
                         "sort_persistable": resolved_sort.persistable,
@@ -154,11 +156,13 @@ def magic_shelf_books(shelf_id):
         ids_only=select_all)
     if select_all:
         return _selection_response(entries, pagination.total_count)
+    custom_column_definitions, _custom_values = _list_custom_column_data([])
     return jsonify({
         **shelf_item,
         # rules included so the builder can load this shelf for editing
         "rules": shelf.rules or {"condition": "AND", "rules": []},
         "items": _rows_to_items(entries),
+        "custom_column_definitions": custom_column_definitions,
         "sort": resolved_sort.key,
         "sort_persistable": resolved_sort.persistable,
         "custom_sort_options": sort_options,

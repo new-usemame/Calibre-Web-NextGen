@@ -184,7 +184,7 @@ def cover_url_for(book, resolution, cover_override=None):
 
 def serialize_book_list_item(book, read=False, archived=False, hidden=False,
                              in_progress=False, read_status=None,
-                             cover_override=None):
+                             cover_override=None, custom_columns=None):
     series_list = getattr(book, "series", None) or []
     series = series_list[0].name if series_list else None
     series_id = getattr(series_list[0], "id", None) if series_list else None
@@ -214,7 +214,20 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False,
         "read_status": read_status,
         "archived": bool(archived),
         "hidden": bool(hidden),
+        # List endpoints send definitions once at the page level; this compact
+        # id -> values map lets cards and table rows show selected Calibre fields
+        # without paying for a detail request per book.
+        "custom_columns": custom_columns or {},
     }
+
+
+def serialize_custom_column_value(value, datatype):
+    """Match the edit/Classic calendar policy, including Calibre's no-date sentinel."""
+    if datatype == "datetime" and isinstance(value, (datetime, date)):
+        if value.year <= 101:
+            return None
+        return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    return value.isoformat() if isinstance(value, (datetime, date)) else value
 
 
 def _serialize_custom_columns(book, definitions):
@@ -225,9 +238,7 @@ def _serialize_custom_columns(book, definitions):
             continue
         serialized_values = []
         for entry in values:
-            value = getattr(entry, "value", None)
-            if isinstance(value, (datetime, date)):
-                value = value.isoformat()
+            value = serialize_custom_column_value(getattr(entry, "value", None), column.datatype)
             item = {"value": value, "extra": getattr(entry, "extra", None)}
             if column.datatype == "comments" and isinstance(value, str):
                 item["value_html"] = clean_string(value, getattr(book, "id", None))

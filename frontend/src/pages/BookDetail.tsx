@@ -22,7 +22,8 @@ import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
-import { useT } from '../lib/i18n';
+import { useT, useI18n } from '../lib/i18n';
+import { formatCustomColumnDate } from '../lib/customColumnDisplay';
 import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
 import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
 import {
@@ -71,11 +72,11 @@ function formatDate(date: string, alwaysReturnFullDate = false): string {
   return date;
 }
 
-function formatCustomValue(column: CustomColumn, entry: CustomColumnValue, yes: string, no: string): string {
+function formatCustomValue(column: CustomColumn, entry: CustomColumnValue, yes: string, no: string, locale: string): string {
   const value = entry.value;
   if (value === null || value === undefined) return '';
   if (column.datatype === 'bool') return value ? yes : no;
-  if (column.datatype === 'datetime' && typeof value === 'string') return formatDate(value, true);
+  if (column.datatype === 'datetime' && typeof value === 'string') return formatCustomColumnDate(value, locale, { year: 'numeric', month: 'long', day: 'numeric' });
   if (column.datatype === 'rating' && typeof value === 'number') return `${value / 2}/5`;
   if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
     return new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
@@ -407,6 +408,7 @@ export function BookDetail() {
   const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
   const announce = useAnnouncer();
+  const { locale } = useI18n();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -1087,7 +1089,9 @@ export function BookDetail() {
                 </dd>
               </Fragment>
             ))}
-            {(book.custom_columns ?? []).map((column) => (
+            {(book.custom_columns ?? []).filter(column => column.datatype !== 'datetime'
+              || column.values.some(entry => typeof entry.value === 'string'
+                && formatCustomColumnDate(entry.value, locale))).map((column) => (
               <Fragment key={`custom-${column.id}`}>
                 <dt className={styles.metaLabel}>{column.name}</dt>
                 <dd className={styles.metaValue} dir="auto">
@@ -1098,7 +1102,7 @@ export function BookDetail() {
                       dangerouslySetInnerHTML={{ __html: column.values[0].value_html }}
                     />
                   ) : column.values
-                    .map((entry) => formatCustomValue(column, entry, t('Yes'), t('No')))
+                    .map((entry) => formatCustomValue(column, entry, t('Yes'), t('No'), locale))
                     .filter(Boolean)
                     .join(', ')}
                 </dd>

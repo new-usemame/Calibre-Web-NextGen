@@ -647,6 +647,11 @@ _("Shows the name a book had when it was imported.")
 _("Public")
 
 
+# #2115 — custom-column display controls in the SPA catalog.
+_("Custom display name")
+_("Custom fields on book cards")
+_("Display name for {name}")
+
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
 # property in frontend/src that
@@ -1440,6 +1445,7 @@ _("Read from here")
 _("Read status")
 _("Read status filter")
 _("Reader settings saved.")
+_("Reading app")
 _("Reading appearance")
 _("Reading data is kept. Browser reappears when you next save reading progress or annotations.")
 _("Reading from here. This is now your Browser position.")
@@ -2090,3 +2096,34 @@ _('Leave blank to keep the current title and first-author filename. Do not inclu
 _('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')
 _('OPDS download filename template')
 _('Padded series number:')
+
+# Completed-download book choices.
+_("Waiting for you to choose a book")
+_("Book requested. An administrator has to approve it.")
+_("Book added to your activity.")
+_("That book choice was out of date. Refreshing the list…")
+_("Requests are paused. You can still view the available books.")
+_("That book could not be requested. Try again.")
+_("The choice was out of date and the available books could not be refreshed. Try again.")
+_("That book choice was out of date. The list was refreshed; choose again.")
+_("The available books could not be loaded. Try again.")
+_("Found {count} available books.")
+_("Choose a book from this download")
+_("Hide available books")
+_("Choose another book")
+_("Loading available books…")
+_("No books are available in this download.")
+_("Import this book")
+_("Request this book")
+_("Import this book: {filename}")
+_("Request this book: {filename}")
+_("{size} bytes")
+_("Requested")
+_("The chosen book is no longer in the completed download. Restore its original file before trying again.")
+_("The book or completed download changed. Restore its original files before trying again.")
+_("The completed download exceeds the safe file limits. Choose a smaller release.")
+
+# Stored smart-shelf rules unavailable in the current New UI schema (#1617).
+_("Unsupported rule")
+_("This rule cannot be edited here. It will be kept unless you remove it.")
+

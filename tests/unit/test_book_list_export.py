@@ -587,3 +587,27 @@ def test_global_export_requires_global_browse_role():
         with pytest.raises(books_api.BookExportRequestError) as err:
             books_api._global_export_query({"filter": "all"})
     assert err.value.status == 403
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("page,key", [("author", "author"), ("series", "series"),
+    ("publisher", "publisher"), ("category", "tag"), ("language", "language"),
+    ("ratings", "rating"), ("formats", "format")])
+def test_classic_entity_export_renders_translation_and_exact_scope(page, key):
+    from pathlib import Path
+    import html
+    import json
+    import re
+    from jinja2 import Environment, FileSystemLoader
+
+    templates = Path(__file__).resolve().parents[2] / "cps" / "templates"
+    template = Environment(loader=FileSystemLoader(templates), autoescape=True).get_template(
+        "_book_list_export.html")
+    output = template.render(page=page, id=23, order="cc-1-desc",
+        current_user=SimpleNamespace(is_authenticated=True, is_anonymous=False),
+        _=lambda text: "translated: " + text,
+        url_for=lambda *_args, **_kwargs: "/fixture/export", csrf_token=lambda: "fixture")
+    assert 'aria-label="translated: Export this book list"' in output
+    params = json.loads(html.unescape(re.search(r'data-params="([^"]+)"', output).group(1)))
+    assert params == {"sort": "cc-1-desc", key: 23}
+    assert 'data-source="{}"'.format("classic_catalog" if page == "category" else "catalog") in output

@@ -89,7 +89,8 @@ def migrate_acquisition_schema(engine, metadata=None):
         additions = {
             tables.jobs.name: {'importing_since': 'FLOAT', 'client_id': 'VARCHAR(36)',
                 'client_revision': 'INTEGER', 'external_id': 'VARCHAR(128)',
-                'submission_started': 'FLOAT', 'submission_key': 'VARCHAR(32)', 'submission_invalid': 'BOOLEAN', 'release_key': 'VARCHAR(64)'},
+                'submission_started': 'FLOAT', 'submission_key': 'VARCHAR(32)', 'submission_invalid': 'BOOLEAN', 'release_key': 'VARCHAR(64)',
+                'download_release_key': 'VARCHAR(64)', 'bundle_parent_id': 'VARCHAR(36)', 'selected_artifact_id': 'VARCHAR(64)'},
             tables.connections.name: {'deleted': 'BOOLEAN NOT NULL DEFAULT 0'},
         }
         for name, columns in additions.items():
@@ -101,6 +102,10 @@ def migrate_acquisition_schema(engine, metadata=None):
         if tables.jobs.name in table_names:
             conn.exec_driver_sql('CREATE UNIQUE INDEX IF NOT EXISTS uq_acquisition_job_owner_release '
                 'ON acquisition_job(owner_id, release_key)')
+        # Additive bundle storage is independent of the VERSION1 permission
+        # provenance marker, which must never be reclassified on later boots.
+        if tables.jobs.name in table_names:
+            tables.manifests.create(conn, checkfirst=True)
         if marker.name in table_names:
             recorded = conn.execute(select(marker)).mappings().all()
             if recorded:
@@ -153,7 +158,7 @@ def migrate_acquisition_schema(engine, metadata=None):
         # Preserve an explicit setting on subsequent boots; no automatic enables.
         if 'settings' in schema and 'config_acquisition_enabled' not in schema['settings']:
             conn.exec_driver_sql('ALTER TABLE settings ADD COLUMN config_acquisition_enabled BOOLEAN NOT NULL DEFAULT 0')
-        owned = [tables.connections, tables.offers, tables.jobs, tables.receipts, marker]
+        owned = [tables.connections, tables.offers, tables.jobs, tables.receipts, tables.manifests, marker]
         metadata.create_all(conn, tables=owned, checkfirst=True)
         for table in owned:
             for index in table.indexes:

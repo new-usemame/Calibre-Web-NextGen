@@ -6,12 +6,12 @@ from dataclasses import dataclass
 import re
 from typing import Any, Iterable
 
-from sqlalchemy import case
+from sqlalchemy import case, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from . import calibre_db, db, logger
-from .sort_orders import BOOK_SORT_ORDERS, DEFAULT_SORT
+from .sort_orders import BOOK_SORT_ORDERS, DEFAULT_SORT, book_sort_order
 
 
 log = logger.create()
@@ -67,11 +67,23 @@ def eligible_columns(columns: Iterable[Any]) -> list[Any]:
     return [column for column in columns if _is_eligible(column)]
 
 
+def visible_columns(columns: Iterable[Any], config) -> list[Any]:
+    """Respect the existing administrator display-ignore policy before sorting."""
+    ignored = getattr(config, "config_columns_to_ignore", "") or ""
+    try:
+        pattern = re.compile(ignored) if ignored else None
+    except re.error:
+        log.warning("Invalid custom-column ignore pattern; refusing custom fields")
+        return []
+    return [column for column in columns
+            if not pattern or not pattern.match(getattr(column, "name", ""))]
+
+
 def configured_columns(columns: Iterable[Any], config) -> list[Any]:
     """Return eligible live definitions selected by the administrator."""
     configured = configured_column_ids(config)
     return [
-        column for column in eligible_columns(columns)
+        column for column in visible_columns(eligible_columns(columns), config)
         if getattr(column, "id", None) in configured
     ]
 
@@ -83,7 +95,7 @@ def _query_columns(query):
         return query.all()
 
 
-def load_eligible_columns() -> list[Any] | None:
+def load_eligible_columns(config=None) -> list[Any] | None:
     """Load selectable definitions, or ``None`` when the library is unavailable."""
     try:
         query = calibre_db.session.query(db.CustomColumns).filter(
@@ -91,14 +103,18 @@ def load_eligible_columns() -> list[Any] | None:
             db.CustomColumns.is_multiple.is_(False),
             db.CustomColumns.mark_for_delete.is_(False),
         ).order_by(db.CustomColumns.name, db.CustomColumns.id)
-        return eligible_columns(_query_columns(query))
+        return visible_columns(eligible_columns(_query_columns(query)), config)
     except (SQLAlchemyError, AttributeError):
         log.warning("Sortable custom-column definitions unavailable", exc_info=True)
         return None
 
 
-def load_configured_columns(config) -> list[Any] | None:
-    """Load configured definitions, or ``None`` when the library is unavailable."""
+def load_configured_columns(config, *, include_hidden=False) -> list[Any] | None:
+    """Load live configured definitions; hidden fields stay private by default.
+
+    Preference writes may include hidden definitions to retain existing choices
+    while the administrator temporarily suppresses their display.
+    """
     configured = configured_column_ids(config)
     if not configured:
         return []
@@ -106,7 +122,10 @@ def load_configured_columns(config) -> list[Any] | None:
         query = calibre_db.session.query(db.CustomColumns).filter(
             db.CustomColumns.id.in_(configured)
         ).order_by(db.CustomColumns.name, db.CustomColumns.id)
-        return configured_columns(_query_columns(query), config)
+        columns = _query_columns(query)
+        if include_hidden:
+            return eligible_columns(columns)
+        return configured_columns(columns, config)
     except (SQLAlchemyError, AttributeError):
         log.warning("Configured custom-column definitions unavailable", exc_info=True)
         return None
@@ -163,7 +182,7 @@ def resolve_magic_shelf_sort(
     if not isinstance(sort_key, str):
         return _default_sort()
     if sort_key in _MAGIC_SHELF_BUILTIN_SORTS:
-        return ResolvedMagicShelfSort(sort_key, tuple(BOOK_SORT_ORDERS[sort_key]))
+        return ResolvedMagicShelfSort(sort_key, tuple(book_sort_order(sort_key)))
 
     match = _CUSTOM_SORT_KEY.fullmatch(sort_key)
     if match is None:
@@ -183,7 +202,8 @@ def resolve_magic_shelf_sort(
         (column for column in columns if getattr(column, "id", None) == column_id),
         None,
     )
-    if live_column is None or not _is_eligible(live_column):
+    if (live_column is None or not _is_eligible(live_column)
+            or not visible_columns([live_column], config)):
         return _default_sort()
 
     model = db.cc_classes.get(column_id)
@@ -192,6 +212,12 @@ def resolve_magic_shelf_sort(
     if not isinstance(book_column, InstrumentedAttribute) \
             or not isinstance(value_column, InstrumentedAttribute):
         return _default_sort()
+
+    if live_column.datatype == "datetime":
+        # Calibre stores ISO text in SQLite. Sort the displayed calendar day,
+        # with the edit/API no-date sentinel joining absent and NULL rows.
+        calendar_day = func.substr(value_column, 1, 10)
+        value_column = case((calendar_day < "0102-01-01", None), else_=calendar_day)
 
     if direction == "desc":
         value_order = value_column.desc()
@@ -212,3 +238,24 @@ def resolve_magic_shelf_sort(
         order_by,
         (model, db.Books.id == book_column),
     )
+
+
+def sortable_columns(columns: Iterable[Any], config) -> list[Any]:
+    """Compatibility view for catalog callers: live, admin-selected columns."""
+    return configured_columns(columns, config)
+
+
+def resolve(sort_param, config, columns=_COLUMNS_NOT_PROVIDED):
+    """Return the trusted direct model and ordering for a valid custom key.
+
+    Catalog and table consumers only need a custom result; built-in and invalid
+    keys deliberately return ``None`` so their existing sort maps remain in
+    control. The implementation delegates to the canonical Magic Shelf
+    resolver, keeping validation and SQL construction in one place.
+    """
+    if not isinstance(sort_param, str) or _CUSTOM_SORT_KEY.fullmatch(sort_param) is None:
+        return None
+    resolved = resolve_magic_shelf_sort(sort_param, config, columns)
+    if resolved.key != sort_param or not resolved.join:
+        return None
+    return resolved.join[0], list(resolved.order_by)

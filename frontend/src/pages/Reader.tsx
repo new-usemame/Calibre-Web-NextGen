@@ -35,6 +35,7 @@ import {
 } from '../lib/readerLinks';
 import { hasNativeAnchor, resolveNativeAnnotations } from '../lib/reader/nativeAnnotations';
 import { readerFontFaceCss, readerFontFamily, BUILTIN_READER_FONTS, type ReaderFont } from '../lib/readerFonts';
+import { restoreBookAttributeNamespaces } from '../lib/reader/attributeNamespaces';
 import styles from './Reader.module.css';
 
 /*
@@ -111,14 +112,14 @@ interface AnnRow {
   highlighted_text: string | null;
   note_text: string | null;
   highlight_color: string | null;
-  /** 'webreader' | 'kobo' | 'koreader' | null — shown so a device highlight is
+  /** 'webreader' | 'kobo' | 'koreader' | 'textquote' | null — shown so a device highlight is
    *  identifiable, and because only some origins carry a usable CFI. */
   source: string | null;
   /** Public id of the device that MADE this highlight, or null. Resolved
    *  against the `devices` map in the same response — never rendered raw, and
    *  never used to filter: see the loader below. */
   origin_device_id?: string | null;
-  /** 'cfi' | 'pdf_quad' | 'comic_page' | 'koreader_xpointer' | 'unanchored' |
+  /** 'cfi' | 'pdf_quad' | 'comic_page' | 'koreader_xpointer' | 'unanchored' | 'text_quote' |
    *  null. Only 'unanchored' concerns this list: such a row is a note ABOUT the
    *  book with no passage attached, so it must not be drawn as a highlight that
    *  has lost its anchor. NULL means legacy EPUB CFI. */
@@ -1413,6 +1414,15 @@ export function Reader({ id }: { id: string }) {
   const syncLinkHits = useCallback(() => {
     const rendition = renditionRef.current;
     if (!rendition) { setLinkHits([]); return; }
+    const viewer = viewerRef.current?.getBoundingClientRect();
+    if (!viewer) { setLinkHits([]); return; }
+    // EPUB columns expand the iframe beyond the reader's visible page. Parent
+    // targets must use the clipped viewer/viewport, not that expanded width.
+    const visible = {
+      left: Math.max(0, viewer.left), top: Math.max(0, viewer.top),
+      right: Math.min(window.innerWidth, viewer.right),
+      bottom: Math.min(window.innerHeight, viewer.bottom),
+    };
     const anchors = new Map<string, { anchor: HTMLAnchorElement; contents: any }>();
     const hits: LinkHit[] = [];
     let sawAnchors = false;
@@ -1424,8 +1434,6 @@ export function Reader({ id }: { id: string }) {
       const frame = contents?.window?.frameElement as HTMLIFrameElement | undefined;
       if (!doc || !frame) return;
       const frameRect = frame.getBoundingClientRect();
-      const pageWidth = doc.documentElement?.clientWidth || frameRect.width;
-      const pageHeight = doc.documentElement?.clientHeight || frameRect.height;
       Array.from(doc.querySelectorAll('a[href]')).forEach((node, anchorIndex) => {
         const anchor = node as HTMLAnchorElement;
         sawAnchors = true;
@@ -1437,22 +1445,34 @@ export function Reader({ id }: { id: string }) {
           // are off-screen in some other column. Only what the reader can
           // actually see gets a hit target.
           if (rect.width <= 0 || rect.height <= 0) return;
-          if (rect.right <= 0 || rect.bottom <= 0) return;
-          if (rect.left >= pageWidth || rect.top >= pageHeight) return;
+          const bounds = {
+            left: Math.max(visible.left, frameRect.left),
+            top: Math.max(visible.top, frameRect.top),
+            right: Math.min(visible.right, frameRect.right),
+            bottom: Math.min(visible.bottom, frameRect.bottom),
+          };
+          const linkLeft = frameRect.left + rect.left;
+          const linkTop = frameRect.top + rect.top;
+          const linkRight = frameRect.left + rect.right;
+          const linkBottom = frameRect.top + rect.bottom;
+          // Test the original glyph before padding so adjacent hidden columns
+          // cannot become keyboard stops or cover the page-turn controls.
+          if (linkRight <= bounds.left || linkBottom <= bounds.top ||
+              linkLeft >= bounds.right || linkTop >= bounds.bottom) return;
           const padX = Math.max(0, (MIN_LINK_HIT_PX - rect.width) / 2);
           const padY = Math.max(0, (MIN_LINK_HIT_PX - rect.height) / 2);
-          const left = Math.max(0, rect.left - padX);
-          const top = Math.max(0, rect.top - padY);
-          const width = Math.min(pageWidth, rect.right + padX) - left;
-          const height = Math.min(pageHeight, rect.bottom + padY) - top;
+          const left = Math.max(bounds.left, linkLeft - padX);
+          const top = Math.max(bounds.top, linkTop - padY);
+          const width = Math.min(bounds.right, linkRight + padX) - left;
+          const height = Math.min(bounds.bottom, linkBottom + padY) - top;
           if (width <= 0 || height <= 0) return;
           const key = `${viewIndex}:${anchorIndex}:${rectIndex}`;
           anchors.set(key, { anchor, contents });
           hits.push({
             key,
             href: anchor.getAttribute('href') || '',
-            left: frameRect.left + left,
-            top: frameRect.top + top,
+            left,
+            top,
             width,
             height,
             label: (anchor.textContent || '').replace(/\s+/g, ' ').trim() || t('Untitled link'),
@@ -1509,7 +1529,31 @@ export function Reader({ id }: { id: string }) {
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
     previewingRef.current = false;
-    Promise.resolve(rendition.display(target)).catch(() => {
+    const displayTarget = async () => {
+      const section = bookRef.current?.spine.get(target);
+      const fragmentIndex = target.indexOf('#');
+      const fragment = fragmentIndex < 0 ? '' : target.slice(fragmentIndex);
+      const applyFragment = () => {
+        if (!section || target.startsWith('epubcfi(')) return false;
+        let changed = false;
+        for (const contents of rendition.getContents()) {
+          if (contents.sectionIndex !== section.index || !contents.window) continue;
+          if (contents.window.location.hash !== fragment) {
+            // epub.js scrolls to fragments without activating :target. Keep
+            // the publisher's reveal rules active before measuring the note.
+            contents.window.location.hash = fragment;
+            changed = true;
+          }
+        }
+        return changed;
+      };
+      applyFragment();
+      await rendition.display(target);
+      // A cross-chapter link creates its frame during display. Reveal its
+      // target there, then measure again with the publisher's final layout.
+      if (applyFragment()) await rendition.display(target);
+    };
+    displayTarget().catch(() => {
       Promise.resolve(rendition.display(documentOnly)).catch(() => {/* give up quietly */});
     });
   }, []);
@@ -1686,6 +1730,9 @@ export function Reader({ id }: { id: string }) {
         // that measurement, leaving first-click jumps on the previous spread.
         rendition.hooks.render.register((view: any) => {
           if (!view.contents?.document) return;
+          // Restore publisher attribute selectors before expanding the chapter,
+          // retaining HTML's established element structure and stored CFI paths.
+          restoreBookAttributeNamespaces(view.contents.document.documentElement);
           const appearance = appearanceRef.current;
           applyDocumentTheme(view.contents.document, appearance.theme);
           applyDocumentTypography(view.contents.document, appearance);
@@ -2523,7 +2570,8 @@ export function Reader({ id }: { id: string }) {
                 <X size={20} aria-hidden="true" focusable={false} />
               </button>
             </div>
-            <div className={styles.noteSheetBody} dangerouslySetInnerHTML={{ __html: note.html }} />
+            <div className={styles.noteSheetBody} role="region" aria-label={t('Note')} tabIndex={0}
+              dangerouslySetInnerHTML={{ __html: note.html }} />
             <div className={styles.noteSheetActions}>
               <Button variant="primary" onClick={() => {
                 const target = note.target;

@@ -15,6 +15,7 @@ from flask_babel import gettext as _
 from sqlalchemy.sql.expression import func, not_, and_, or_, text, true
 from sqlalchemy.sql.functions import coalesce
 
+from .unicode_collation import locale_sort_key
 from . import logger, db, calibre_db, config, ub, helper
 from .string_helper import strip_whitespaces
 from .usermanagement import login_required_if_no_ano
@@ -407,10 +408,13 @@ def build_adv_search_query(term):
 
 
 def render_adv_search_results(term, offset=None, order=None, limit=None):
+    from .web import _sort_join
     sort = order[0] if order else [db.Books.sort]
     pagination = None
 
     q, search_term = build_adv_search_query(term)
+    if _sort_join(order):
+        q = q.outerjoin(*_sort_join(order))
     q = q.order_by(*sort)
     flask_session['query'] = json.dumps(term)
     # The export action must represent this rendered result set even after a
@@ -454,13 +458,13 @@ def render_prepare_search_form(cc):
         .join(db.Books)\
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag'))\
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     series = calibre_db.session.query(db.Series)\
         .join(db.books_series_link)\
         .join(db.Books)\
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_series_link.series'))\
-        .order_by(db.Series.name)\
+        .order_by(locale_sort_key(db.Series.name), db.Series.name, db.Series.id)\
         .filter(calibre_db.common_filters()).all()
     shelves = ub.session.query(ub.Shelf)\
         .filter(or_(ub.Shelf.is_public == 1, ub.Shelf.user_id == int(current_user.id)))\
@@ -479,8 +483,10 @@ def render_prepare_search_form(cc):
 
 
 def render_search_results(term, offset=None, order=None, limit=None):
+    from .web import _sort_join
     if term:
-        join = db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series
+        join = (db.books_series_link, db.Books.id == db.books_series_link.c.book,
+                db.Series, *_sort_join(order))
         entries, result_count, pagination = calibre_db.get_search_results(term,
                                                                           config,
                                                                           offset,

@@ -88,3 +88,4 @@ class Catalog:
     groups: tuple[Section, ...]
     facets: tuple[Section, ...]
     capabilities: Capabilities
+    is_publication_document: bool = False

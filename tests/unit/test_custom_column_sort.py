@@ -357,6 +357,116 @@ def test_spa_response_exposes_that_an_outage_fallback_must_not_be_persisted():
     assert body["custom_sort_options"] == []
 
 
+def test_classic_sort_options_are_empty_without_a_calibre_session(monkeypatch):
+    from cps import web
+
+    monkeypatch.setattr(web.calibre_db, "session", None)
+
+    assert web._sortable_custom_columns() == []
+
+
+@pytest.mark.parametrize("requested,persistable", [("cc-12-asc", False), ("abc", True)])
+def test_catalog_metadata_outage_keeps_listing_sort_safe_and_reader_choice_retryable(
+        sortable_library, monkeypatch, requested, persistable):
+    """A real missing definition table must not 500 or erase a valid saved custom sort."""
+    from cps import db
+    from cps.api import books
+    engine, _difficulty, _decoy = sortable_library
+    session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(books.calibre_db, "session", session)
+    monkeypatch.setattr(books, "config", SimpleNamespace(config_sortable_custom_columns="12"))
+    try:
+        context = books._sort_context(requested)
+        assert context["sort"] == ("new" if requested.startswith("cc-") else requested)
+        assert context["join"] == ()
+        assert context["custom_sort_options"] == []
+        assert context["sort_persistable"] is persistable
+        assert session.query(db.Books.id).count() == 6
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("select_all", [False, True])
+@pytest.mark.parametrize("direction,expected", [
+    ("asc", [4, 1, 2, 3, 5]),
+    ("desc", [2, 1, 4, 5, 3]),
+])
+def test_simple_search_custom_sort_uses_the_production_query(
+        sortable_library, monkeypatch, select_all, direction, expected):
+    """Visible search and exported IDs share real joins, ties, empties and filtering."""
+    from cps import db, ub
+    from cps.api import books
+    engine, _difficulty, _decoy = sortable_library
+    with engine.begin() as connection:
+        connection.execute(text("ATTACH DATABASE ':memory:' AS calibre"))
+    db.Base.metadata.create_all(engine)
+    ub.ReadBook.__table__.create(engine)
+    ub.ArchivedBook.__table__.create(engine)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE books SET title = 'Unrelated' WHERE id = 6"))
+    session = sessionmaker(bind=engine)()
+    library = db.CalibreDB()
+    library.session = session
+    monkeypatch.setattr(library, "common_filters", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(db, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ub, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ub, "searched_ids", {})
+    monkeypatch.setattr(books, "calibre_db", library)
+    monkeypatch.setattr(books, "config", SimpleNamespace(
+        config_sortable_custom_columns="12", config_books_per_page=20,
+        config_read_column=0, config_columns_to_ignore=""))
+    monkeypatch.setattr(books, "load_configured_columns", lambda _config: [ColumnDefinition(12)])
+    monkeypatch.setattr(books, "_rows_to_items", lambda rows, *_args: [
+        {"id": row.Books.id} for row in rows
+    ])
+    monkeypatch.setattr(books, "_list_custom_column_data", lambda _rows: ([], {}))
+    app = flask.Flask(__name__)
+    try:
+        with app.test_request_context(
+                f"/api/v1/books?search=Book&sort=cc-12-{direction}"
+                f"&select_all={int(select_all)}"):
+            result = inspect.unwrap(books.list_books)().get_json()
+        actual = result["ids"] if select_all else [item["id"] for item in result["items"]]
+        assert actual == expected
+        assert result["total"] == len(expected)
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("select_all", [False, True])
+def test_advanced_search_keeps_the_selected_custom_sort(
+        sortable_library, monkeypatch, select_all):
+    """Applying filters must preserve custom order in visible rows and Select all."""
+    from cps import db
+    from cps.api import books, search
+    engine, _difficulty, _decoy = sortable_library
+    session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(books, "config", SimpleNamespace(
+        config_sortable_custom_columns="12", config_books_per_page=20))
+    monkeypatch.setattr(books, "load_configured_columns", lambda _config: [ColumnDefinition(12)])
+    monkeypatch.setattr(search, "config", SimpleNamespace(config_books_per_page=20))
+    monkeypatch.setattr(search.calibre_db, "get_cc_columns", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(search, "build_adv_search_query", lambda _term: (
+        session.query(db.Books.id).filter(db.Books.title.like("Book %")), "Title = Book"))
+    monkeypatch.setattr(search, "_rows_to_items", lambda rows: [{"id": row[0]} for row in rows])
+    monkeypatch.setattr(books, "_list_custom_column_data", lambda _rows: ([], {}))
+    app = flask.Flask(__name__)
+    try:
+        with app.test_request_context("/api/v1/search/advanced", method="POST", json={
+                "title": "Book", "sort": "cc-12-asc", "select_all": select_all}):
+            result = inspect.unwrap(search.advanced_search)().get_json()
+        if select_all:
+            assert result == {"ids": [4, 1, 2, 6, 3, 5], "total": 6}
+        else:
+            assert [item["id"] for item in result["items"]] == [4, 1, 2, 6, 3, 5]
+            assert result["sort"] == "cc-12-asc"
+            assert result["sort_persistable"] is True
+            assert [choice["value"] for choice in result["custom_sort_options"]] == [
+                "cc-12-asc", "cc-12-desc"]
+    finally:
+        session.close()
+
+
 def test_classic_route_persists_real_fallback_but_not_outage_fallback():
     from cps import web
     from flask_babel import Babel
@@ -414,3 +524,70 @@ def test_classic_route_persists_real_fallback_but_not_outage_fallback():
     assert outage_result["order"] == "new"
     assert persisted == [("magicshelf", "stored", "new")]
     assert invalid_result["order"] == "new"
+
+
+def test_ignored_configured_column_has_no_display_values_or_sort_options(sortable_library, monkeypatch):
+    from cps import calibre_db, custom_column_sort
+    from cps.api import books
+    engine, _difficulty, _decoy = sortable_library
+    definition = ColumnDefinition(12, name="Internal score")
+    config = SimpleNamespace(config_sortable_custom_columns="12", config_columns_to_ignore="")
+    with sessionmaker(bind=engine)() as session:
+        monkeypatch.setattr(calibre_db, "session", session)
+        monkeypatch.setattr(custom_column_sort, "_query_columns", lambda _query: [definition])
+        monkeypatch.setattr(books, "config", config)
+        definitions, values = books._list_custom_column_data([SimpleNamespace(id=1)])
+        assert definitions == [{"id": 12, "name": "Internal score", "datatype": "int"}]
+        assert values == {1: {"12": [{"value": 20, "extra": None}]}}
+        config.config_columns_to_ignore = "Internal.*"
+        assert custom_column_sort.configured_columns([definition], config) == []
+        assert custom_column_sort.custom_sort_options(config) == []
+        definitions, values = books._list_custom_column_data([SimpleNamespace(id=1)])
+        assert definitions == [] and values == {1: {}}
+        assert custom_column_sort.resolve_magic_shelf_sort("cc-12-asc", config).key == "new"
+        assert custom_column_sort.resolve_magic_shelf_sort("cc-12-asc", config, [definition]).key == "new"
+
+@pytest.mark.parametrize("direction,expected", [
+    ("asc", [5, 1, 2, 3, 4, 6]),
+    ("desc", [2, 1, 5, 6, 4, 3]),
+])
+@pytest.mark.parametrize("storage", ["orm", "calibre_text"])
+def test_calendar_sort_uses_displayed_day_and_puts_no_date_last(sortable_library, monkeypatch, direction, expected, storage):
+    from cps.custom_column_sort import resolve_magic_shelf_sort
+    from datetime import datetime
+    from sqlalchemy import DateTime
+    from cps import db
+    engine, _difficulty, _decoy = sortable_library
+    base = declarative_base()
+
+    class Deadline(base):
+        __tablename__ = "custom_column_31"
+        id = Column(Integer, primary_key=True)
+        book = Column(Integer)
+        value = Column(DateTime)
+
+    base.metadata.create_all(engine)
+    monkeypatch.setitem(db.cc_classes, 31, Deadline)
+    config = SimpleNamespace(config_sortable_custom_columns="31", config_columns_to_ignore="")
+    order = resolve_magic_shelf_sort("cc-31-" + direction, config, [ColumnDefinition(31, "datetime")])
+    with sessionmaker(bind=engine)() as session:
+        if storage == "orm":
+            session.add_all([
+                Deadline(book=1, value=datetime(2026, 1, 10, 23)),
+                Deadline(book=2, value=datetime(2026, 1, 10)),
+                Deadline(book=3, value=datetime(101, 1, 1)),
+                Deadline(book=4, value=None),
+                Deadline(book=5, value=datetime(2026, 1, 9)),
+            ])
+            session.commit()
+        else:
+            with engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "INSERT INTO custom_column_31 (book,value) VALUES (?,?)",
+                    [(1, "2026-01-10T23:30:00-05:00"),
+                     (2, "2026-01-10T00:00:00-05:00"),
+                     (3, "0101-01-01T00:00:00+00:00"), (4, None),
+                     (5, "2026-01-09T23:30:00-05:00")],
+                )
+        query = session.query(db.Books.id).outerjoin(*order.join).order_by(*order.order_by)
+        assert [book_id for (book_id,) in query] == expected

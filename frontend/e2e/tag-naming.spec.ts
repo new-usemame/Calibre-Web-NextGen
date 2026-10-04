@@ -29,3 +29,28 @@ test('Statistics and tag browsing use the same Calibre field name', async ({ pag
   await assertNoHorizontalOverflow(page);
   assertNoPageErrors(errors);
 });
+
+// Classic's theme paints a second heading with generated CSS content. DOM-only
+// assertions miss a stale visible label even when its accessible heading is right.
+test('Classic tag browsing paints the localized field name', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  await page.goto('/category');
+  await expect(page.getByRole('heading', { name: 'Tags', exact: true })).toBeVisible();
+  const list = page.locator('body.catlist > .container-fluid > .row-fluid > .col-sm-10 > .container');
+  await expect(list).toBeVisible();
+  const painted = await list.evaluate((element) => {
+    const style = getComputedStyle(element, '::before');
+    return { display: style.display, content: style.content.replace(/^['"]|['"]$/g, '') };
+  });
+  await expect(page.locator('body')).toHaveClass(/blur/);
+  // Require the painted desktop heading so disabling it cannot mask drift.
+  if ((page.viewportSize()?.width ?? 1280) > 767) {
+    expect(painted.display).not.toBe('none');
+    expect(painted.content).toBe('Tags');
+  } else {
+    // Phones show the real localized h1 checked above.
+    expect(painted.display).toBe('none');
+  }
+  await assertNoHorizontalOverflow(page);
+  assertNoPageErrors(errors);
+});

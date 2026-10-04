@@ -89,7 +89,7 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
       if (scenario === 'completed read') await page.screenshot({ path: test.info().outputPath('catalogue-before.jpg'), type: 'jpeg', quality: 75 });
       await target(page).click();
       await page.getByTestId('book-actions-menu').click();
-      await page.getByTestId('book-actions-menu-list').getByRole('link', { name: 'Edit cover…', exact: true }).click();
+      await page.getByTestId('book-actions-menu-list').getByRole('menuitem', { name: 'Edit cover…', exact: true }).click();
       await page.getByRole('tab', { name: 'Upload', exact: true }).click();
       await page.getByLabel('Choose a cover image to upload').setInputFiles({ name: 'cover.png', mimeType: 'image/png', buffer: PNG });
       await page.getByRole('button', { name: 'Upload as cover', exact: true }).click();

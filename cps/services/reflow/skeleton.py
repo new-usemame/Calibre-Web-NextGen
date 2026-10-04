@@ -1452,8 +1452,28 @@ def _preserve_unverified_scan_layout(raw, kept_blocks, skel):
 
 
 def _preserve_tracked_native_lines(raw, kept_blocks, skel):
+    # PDF extraction can split a single tracked paragraph at each spaced name.
+    # Preserve that printed territory together, so disclosure does not interrupt
+    # its lines. Text, line ownership and source order remain unchanged.
+    from .assemble import continues
+    groups=[]
+    for block,lines in kept_blocks:
+        if groups and lines and groups[-1][1]:
+            previous,prior=groups[-1]
+            last,first=prior[-1],lines[0]
+            em=max(1,median(line.size for line in prior+lines))
+            gap=first.bbox[1]-last.bbox[3]
+            if (any(getattr(line,'spacing_uncertain',False) for line in prior+lines)
+                    and -.25*em<=gap<=.8*em
+                    and abs(first.x0-prior[0].x0)<=.4*em
+                    and not CAPTION_LINE.match(first.stripped)
+                    and continues(last.stripped,first.stripped)):
+                merged=prior+lines
+                groups[-1]=(extract.Block(previous.number,_lines_bbox(merged,previous.bbox),merged),merged)
+                continue
+        groups.append((block,lines))
     retained = []
-    for block, lines in kept_blocks:
+    for block, lines in groups:
         # Keep the complete paragraph/list block: removing just its first line
         # can strand a list number or move the continuation before its source.
         box = _lines_bbox(lines, block.bbox)

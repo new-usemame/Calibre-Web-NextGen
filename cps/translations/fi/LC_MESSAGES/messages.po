@@ -2724,6 +2724,18 @@ msgid "Manual (drag below)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Allow direct DRM-free MOBI 6 books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this catalog. The server upload-format setting must also "
+"allow MOBI. Normal conversion settings apply; without conversion, MOBI can "
+"be downloaded but cannot be opened in the web reader. Download clients still "
+"accept EPUB and PDF only."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} added to the shelf; {failed} failed."
 msgstr ""

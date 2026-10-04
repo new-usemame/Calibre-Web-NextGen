@@ -173,7 +173,7 @@ surfaces; reverse dependents cannot be discovered by that traversal and must be 
 prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
 `cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-The isolated file-ISBN parser worker is included in the whole image and launched by its bounded parent service; it deliberately imports no application modules. At this revision the derived set is 241 of 296 local Python modules (the closure correctly picks
+The isolated file-ISBN parser worker is included in the whole image and launched by its bounded parent service; it deliberately imports no application modules. At this revision the derived set is 242 of 297 local Python modules (the closure correctly picks
 up `cps/services/browser_source.py` through the database migration path,
 `cps/user_account_data.py` through the admin user-delete path,
 `cps/services/device_delivery.py` through the book-action request path,

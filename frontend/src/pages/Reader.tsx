@@ -1535,23 +1535,29 @@ export function Reader({ id }: { id: string }) {
       const fragment = fragmentIndex < 0 ? '' : target.slice(fragmentIndex);
       const applyFragment = () => {
         if (!section || target.startsWith('epubcfi(')) return false;
-        let changed = false;
-        for (const contents of rendition.getContents()) {
-          if (contents.sectionIndex !== section.index || !contents.window) continue;
+        let prepared = false;
+        rendition.views().forEach((view: any) => {
+          const contents = view.contents;
+          if (!view.displayed || contents?.sectionIndex !== section.index || !contents.window) return;
           if (contents.window.location.hash !== fragment) {
             // epub.js scrolls to fragments without activating :target. Keep
             // the publisher's reveal rules active before measuring the note.
             contents.window.location.hash = fragment;
-            changed = true;
           }
-        }
-        return changed;
+          // Revealing a long note changes the paginated chapter's extent.
+          // Expand before display measures its destination; a later resize
+          // would otherwise reset the reader to an earlier column. This also
+          // applies when the fragment is already active.
+          view.expand();
+          prepared = true;
+        });
+        return prepared;
       };
-      applyFragment();
+      const prepared = applyFragment();
       await rendition.display(target);
-      // A cross-chapter link creates its frame during display. Reveal its
-      // target there, then measure again with the publisher's final layout.
-      if (applyFragment()) await rendition.display(target);
+      // A cross-chapter link creates its frame during display. Reveal and
+      // expand that new frame, then place its target in the final layout.
+      if (!prepared && applyFragment()) await rendition.display(target);
     };
     displayTarget().catch(() => {
       Promise.resolve(rendition.display(documentOnly)).catch(() => {/* give up quietly */});

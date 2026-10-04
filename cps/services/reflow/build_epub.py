@@ -215,7 +215,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 element_blocks[element_index] = len(blocks)
             caption = ""
             source_caption = ""
+            caption_index = None
             if index < len(elements) and elements[index].kind == "caption":
+                caption_index = index
                 caption = _nav_runs_html(elements[index].runs,
                     _source_nav_marks(navigation,pno,index,None),
                     available, ref_ids, ambiguous)
@@ -308,6 +310,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 if element_index in note_context_figures:
                     image = '<aside class="source-note-context">' + image + '</aside>'
                 blocks.append(image)
+            if caption_index is not None:
+                controls = _native_return_controls(navigation,pno,element_index=caption_index)
+                if controls:blocks.append(controls)
             figure_index += 1
             continue
         if wrappers and element_index in wrappers:
@@ -364,17 +369,21 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             blocks.append('<p class="caption">%s</p>' % inner)
         else:
             blocks.append("<p>%s</p>" % inner)
+        controls = _native_return_controls(navigation,pno,element_index=element_index)
+        if controls:blocks.append(controls)
         if element.punctuation_uncertain:
             blocks.append(_punctuation_notice(pno, element_index))
 
     for note_index, note in enumerate(notes):
         aside = _aside_html(note, ref_ids, available, str(note.num) in ambiguous,
             [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)])
-        arrivals = ''.join('<span id="%s"></span>%s' % (link['id'], _pdf_return(link['id']))
+        arrivals = ''.join('<span id="%s"></span>' % link['id']
                            for link in navigation if link['dest_page'] == pno
                            and link.get('dest_note') == note_index)
         if arrivals:
             aside = aside.replace('<p>', '<p>' + arrivals, 1)
+            controls = _native_return_controls(navigation,pno,note_index=note_index)
+            aside = aside.replace('</aside>',controls+'</aside>')
         blocks.append(aside)
     if any(r[0]=="glyph" for el in elements for r in el.runs) or any(getattr(n,"glyph_fallback",False) for n in notes):
         blocks.append(_source_check_notice('Words/glyphs uncertain',
@@ -399,6 +408,18 @@ def _source_nav_marks(navigation, pno, element_index, item_index):
             marks.append((link['dest_offset'], 'anchor', link['id']))
             marks.append((link['dest_offset'], 'return', link['id']))
     return marks
+
+
+def _native_return_controls(navigation,pno,*,element_index=None,note_index=None):
+    """Visible generated actions follow their source block, never its words."""
+    ids=[]
+    for link in navigation:
+        if link['dest_page']!=pno:continue
+        owned=(link.get('dest_note')==note_index if note_index is not None else
+               link.get('dest_note') is None and link['dest_element']==element_index)
+        if owned and link['id'] not in ids:ids.append(link['id'])
+    return ('<p class="source-evidence-notice">'+ ' '.join(_pdf_return(ident) for ident in ids)+'</p>'
+            if ids else '')
 
 
 def _pdf_reference_id(ident):
@@ -462,8 +483,9 @@ def _nav_runs_html(runs, marks, available, ref_ids, ambiguous):
                 if active != ident:raise ValueError('Unbalanced PDF navigation range')
                 active = None
             elif kind == 'return':
-                linked(None)
-                output.append(_pdf_return(ident))
+                # The precise target anchor stays here; the generated action
+                # follows the complete source block in page_fragment.
+                pass
             elif kind == 'anchor':
                 linked(None)
                 output.append('<span id="%s"></span>' % ident)

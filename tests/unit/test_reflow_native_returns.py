@@ -147,3 +147,25 @@ def test_generated_return_does_not_turn_a_finished_sentence_into_a_continuation(
     pages=build_epub._page_blocks({0:'<p>The source sentence is complete.'+control+'</p>',
                                   1:'<p>another distinct source paragraph begins here.</p>'})
     assert build_epub._join_page_turns(pages)==0
+
+
+def test_native_return_controls_stay_outside_source_prose_and_captions():
+    with _document() as doc:
+        book=assemble.deterministic_book(doc)
+        for pno in book.pages:
+            root=tree(build_epub.page_fragment(book,pno))
+            parents={child:parent for parent in root.iter() for child in parent}
+            for control in root.findall('.//a[@class="pdf-return"]'):
+                assert parents[control].get('class')=='source-evidence-notice'
+            for node in root.findall('.//p'):
+                if node.get('class') in (None,'caption'):
+                    assert node.find('.//a[@class="pdf-return"]') is None
+
+
+def test_native_note_returns_are_separate_from_original_note_text():
+    book,raws=note_fixture();assemble._bind_source_navigation(book,raws)
+    root=tree(build_epub.page_fragment(book,1))
+    parents={child:parent for parent in root.iter() for child in parent}
+    returns=root.findall('.//a[@class="pdf-return"]')
+    assert len(returns)==1
+    assert all(parents[control].get('class')=='source-evidence-notice' for control in returns)

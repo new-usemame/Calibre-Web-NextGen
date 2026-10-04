@@ -8471,6 +8471,10 @@ msgid "Reader settings saved."
 msgstr "Настройки читалки сохранены."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Внешний вид читалки"
 

@@ -8414,6 +8414,10 @@ msgid "Reader settings saved."
 msgstr "Nastavenia čítačky boli uložené."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Vzhľad čítania"
 

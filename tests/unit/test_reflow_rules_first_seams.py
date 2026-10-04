@@ -264,3 +264,29 @@ def test_an_article_can_continue_with_a_printed_proper_noun():
     assert build_epub._join_page_turns(pages)==1
     root=ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+pages[0]['body'][0]+'</root>')
     assert ''.join(root.itertext())=='the third place was known to the Greeks as the house of the Moon Goddess.'
+
+
+@pytest.mark.parametrize('left,right,joined', [
+    ('The Sun lights the sky. The', 'Moon reflects its light.', True),
+    ('The printed source continues with An', 'Example of the next phrase.', True),
+    ('The source compares theory A', 'Moon observations follow.', False),
+    ('This source sentence ends.', 'The Moon follows.', False),
+])
+def test_capitalized_articles_keep_native_fragments_in_their_source_paragraph(left, right, joined):
+    first = assemble.Element('p', [['t', left]], bbox=(40, 50, 350, 62), pages=[0], line_boxes=[(40,50,350,62)])
+    second = assemble.Element('p', [['t', right]], bbox=(40, 66, 300, 78), pages=[0], line_boxes=[(40,66,300,78)])
+    output = assemble._join_within_page([first, second], set())
+    assert len(output) == (1 if joined else 2)
+    assert [e.text for e in output] == ([left+' '+right] if joined else [left,right])
+    if joined:
+        assert output[0].line_boxes == [(40,50,350,62),(40,66,300,78)]
+
+
+def test_capitalized_article_at_page_turn_retains_source_marker_and_note_channel():
+    notice='<p class="source-evidence-notice">Open original page.</p>'
+    pages=build_epub._page_blocks({0:'<p>The source continues. The</p>'+notice,1:'<p>Moon remains in the source paragraph.</p>'})
+    assert build_epub._join_page_turns(pages)==1
+    root=ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+pages[0]['body'][0]+'</root>')
+    assert ''.join(root.itertext())=='The source continues. The Moon remains in the source paragraph.'
+    assert root.find('.//*[@id="pg_0001"]') is not None
+    assert pages[0]['body'][1]==notice

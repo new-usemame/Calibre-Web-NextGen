@@ -457,7 +457,9 @@ def continues(prev_text, next_text):
         return False
     if SENT_END.search(prev_text):
         return False
-    article_noun = (re.search(r'\b(?:a|an|the)\s*$', prev_text)
+    # A printed sentence can break after its capitalized article too.
+    # Capital A stays ambiguous: it can be a source label ("theory A").
+    article_noun = (re.search(r'\b(?:a|[Aa]n|[Tt]he)\s*$', prev_text)
                     and (next_text[:1].isalpha() or
                          re.match(r'[1-9][0-9]*\s*(?:st|nd|rd|th)\s+[a-z]', next_text)))
     return bool(next_text[:1].islower() or next_text[:1] in ",;" or article_noun)

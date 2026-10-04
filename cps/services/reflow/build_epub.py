@@ -995,8 +995,53 @@ def _layout_flow_index(body, last):
         not body[i].startswith('<section class="reflow-retained-furniture"')), None)
 
 
+def _raster_wraps(book):
+    """Source-evidenced wraps between two opaque tracked-text paragraph crops.
+
+    A known wrap authorizes paragraph flow, not transcription or pixel edits.
+    Restrict this to exact factory figures and uniquely contained source text.
+    """
+    words=set(getattr(book,'page_wrap_words',()))
+    compounds=set(getattr(book,'page_wrap_compounds',()))
+    def endpoint(pno,last):
+        elements=book.pages[pno]
+        if not elements:return None
+        element=elements[-1 if last else 0]
+        if element.kind!='fig':return None
+        figures=[f for f in book.figures if f['pno']==pno]
+        matches=[(i,f) for i,f in enumerate(figures) if tuple(f['bbox'])==tuple(element.bbox)
+                 and f.get('found')=='native_spacing_uncertain' and not f.get('full_page')
+                 and not f.get('visual_evidence')]
+        if len(matches)!=1:return None
+        index,figure=matches[0];box=figure['bbox']
+        texts=[a['text'] for a in book.artwork if a['pno']==pno
+               and box[0]<=a['bbox'][0] and box[1]<=a['bbox'][1]
+               and a['bbox'][2]<=box[2] and a['bbox'][3]<=box[3]]
+        if len(texts)!=1:return None
+        return 'images/fig_p%04d_%d.jpg'%(pno,index),texts[0].strip()
+    wraps={}
+    for pno in sorted(book.pages):
+        if pno-1 not in book.pages:continue
+        left,right=endpoint(pno-1,True),endpoint(pno,False)
+        if not left or not right:continue
+        tail=re.search(r'([A-Za-z]+)['+assemble.HYPHENS+r']$',left[1])
+        head=re.match(r'([a-z]+)',right[1])
+        if tail and head:
+            a,b=tail[1].casefold(),head[1].casefold()
+            if a+b in words or a+'-'+b in compounds:
+                wraps[pno]=(left[0],right[0])
+    return wraps
+
+
+def _raster_pair_matches(left,right,pair):
+    from . import _layout_flow
+    return bool(pair and not block_text(left) and not block_text(right)
+        and _IMG_SRC.findall(left)==[pair[0]] and _IMG_SRC.findall(right)==[pair[1]]
+        and _layout_flow.raster_endpoint(left,True) and _layout_flow.raster_endpoint(right,False))
+
+
 def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=None, executed=None,
-                     words=None, compounds=()):
+                     words=None, compounds=(), raster_wraps=None):
     """Use checked model seams for model pages, legacy seams for fallback pairs."""
     joined = 0
     carriers = {}
@@ -1035,7 +1080,8 @@ def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=N
                 from .structural_ops import ContractError
                 raise ContractError('emitted layout boundary is not the admitted paragraph seam')
             continue
-        if not model_owned and (_completed_index_entry_boundary(tail, head) or
+        raster_wrap=not model_owned and _raster_pair_matches(tail,head,(raster_wraps or {}).get(current['pno']))
+        if not model_owned and not raster_wrap and (_completed_index_entry_boundary(tail, head) or
                 not assemble.continues(block_text(tail), block_text(head))):
             continue
         move_page_marker = not previous['asides']
@@ -1048,7 +1094,9 @@ def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=N
                 carriers[current['pno']] = owner
             if executed is not None: executed.add(current['pno'])
         else:
-            owner['body'][tail_index] = merge_paragraphs(tail, current['body'].pop(head_index), marker, words, compounds)
+            head=current['body'].pop(head_index)
+            owner['body'][tail_index] = (_merge_layout_paragraphs(tail,head,marker,None,pixel_boundary=True)
+                if raster_wrap else merge_paragraphs(tail,head,marker,words,compounds))
             if _layout_flow_index(current['body'], False) is None:
                 carriers[current['pno']] = owner
         if not move_page_marker:
@@ -2215,7 +2263,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         executed_layout_boundaries = set()
         joins = _join_page_turns(pages, book.title_pages, compiled_layouts, layout_boundaries, executed_layout_boundaries,
             words=getattr(book, 'page_wrap_words', None) or None,
-            compounds=getattr(book, 'page_wrap_compounds', ()))
+            compounds=getattr(book, 'page_wrap_compounds', ()), raster_wraps=_raster_wraps(book))
         contents_pages = _source_contents_pages(pages, doc)
         chapters = _chapters(pages, book.title_pages, contents_pages)
         chapter_images = {src for chapter in chapters for src in _IMG_SRC.findall('\n'.join(chapter.blocks))}

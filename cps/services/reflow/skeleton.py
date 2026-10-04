@@ -155,6 +155,9 @@ class Region(object):
     display_group: dict = field(default_factory=dict)
     list_groups: list = field(default_factory=list)
     visual_evidence: dict = field(default_factory=dict)
+    #: Detached disputed scan markers attached at a uniquely measured line end.
+    #: Original line objects stay in ownership; assembly projects their pixels.
+    inline_marker_boxes: list = field(default_factory=list)
 
     @property
     def text(self):
@@ -344,14 +347,17 @@ def _sequence_folios(raw_pages, body_size):
         if len(lines)<2:continue
         line=lines[-1]
         gap=line.bbox[1]-max(other.bbox[3] for other in lines[:-1])
+        printed_size=median(sp.size for sp in line.spans if sp.text.strip())
+        deep=line.bbox[1]>=raw.height*.88
         if (line.bbox[1]>=raw.height*.88 and line.size<=body_size*1.02
                 and gap>=line.size*.8):
             if re.fullmatch(r'[0-9]{1,5}',line.stripped):
                 footer_peers[raw.pno]=(int(line.stripped)-raw.pno,line.bbox[1]/raw.height,line.bbox)
             elif re.fullmatch(r'[0-9SsOoIl]{1,5}',line.stripped) and any(ch.isdigit() for ch in line.stripped):
                 damaged.append((raw,line))
-        if (line.bbox[1]<raw.height*.7 or line.size>body_size*1.02
-                or gap<line.size*1.5):continue
+        if (line.bbox[1]<raw.height*.7
+                or printed_size>body_size*(1.15 if deep else 1.02)
+                or gap<printed_size*(.8 if deep else 1.5)):continue
         if not re.fullmatch(r"[0-9]{1,5}",line.stripped):
             # A damaged folio is retained verbatim. Its furniture role can come
             # from the surrounding print geometry, never from guessing digits.
@@ -360,7 +366,7 @@ def _sequence_folios(raw_pages, body_size):
                            line.bbox[1]/raw.height,line.bbox))
     proved={}
     for page,offset,y,box in candidates:
-        peers=sorted(p for p,o,py,b in candidates if o==offset and abs(py-y)<.01)
+        peers=sorted(p for p,o,py,b in candidates if o==offset and abs(py-y)<.03)
         if any(peers[i+2]-peers[i]==2 and peers[i]<=page<=peers[i+2]
                for i in range(len(peers)-2)):
             proved[page]=box
@@ -1206,6 +1212,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
     _preserve_conflicting_outline_heading(raw, style, skel)
     _complete_captioned_scan_top(raw, skel, pixel_probe)
     _coalesce_nested_scan_list_figures(raw, skel)
+    _attach_disputed_scan_markers(raw, skel)
     if visual_objects is not None:
         from .visual_objects import append_regions
         append_regions(raw, skel, visual_objects, layout)
@@ -1497,7 +1504,8 @@ def _preserve_tracked_native_lines(raw, kept_blocks, skel):
 def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover, candidates):
     regions = []
     claimed = {id(line) for region in skel.regions
-               if region.reason == 'uncertain_aligned_scan_list'
+               if region.reason == 'uncertain_aligned_scan_list' or
+                  (region.kind=='furniture' and region.reason=='sequence_folio')
                for line in region.lines}
     for block in raw.text_blocks:
         lines = [line for line in block.lines if id(line) not in claimed]
@@ -1642,9 +1650,57 @@ def _full_bleed_plate(raw, kept_blocks, pixel_probe):
     try:
         if pixel_probe.coverage(rect) < PLATE_INK_COVER:
             return None
+        if raw.text_layer_invisible or raw.text_layer_overpainted:
+            # A dense interior chart can fill many sampling cells. A plate
+            # extends to the page's edges as well; masked surrounding prose
+            # cannot grant that role to the chart between its paragraphs.
+            w,h=raw.width,raw.height
+            edges=((0,0,w,h*.1),(0,h*.9,w,h),
+                   (0,0,w*.1,h),(w*.9,0,w,h))
+            if sum(pixel_probe.coverage(edge)>=PLATE_INK_COVER for edge in edges)<3:
+                return None
     except Exception:
         return None
     return images[0]
+
+
+def _attach_disputed_scan_markers(raw, skel):
+    """Retain a disputed raised digit at its unique printed word boundary.
+
+    Neither its transcription nor a note association is adopted. The complete
+    original digit span is rendered as source pixels inside the measured body
+    line, instead of a separate block sorted before that line.
+    """
+    if not raw.is_page_scan or not (raw.text_layer_invisible or raw.text_layer_overpainted):return
+    for art in list(skel.regions):
+        if art.kind!='artwork' or art.reason!='ocr_uncertain_region' or len(art.lines)!=1:continue
+        marker=art.lines[0];spans=[sp for sp in marker.spans if sp.text.strip()]
+        if not marker.transcription_uncertain or len(spans)!=1 or not re.fullmatch(r'\d{1,3}',spans[0].text):continue
+        small=spans[0];targets=[]
+        for region in skel.regions:
+            if region.kind!='body':continue
+            for index,line in enumerate(region.lines):
+                em=line.size
+                terminal=next((sp for sp in reversed(line.spans) if sp.text.strip()),None)
+                if terminal is None or small.size>em*.72:continue
+                if (abs(terminal.bbox[2]-small.bbox[0])<=em*.35
+                        and line.bbox[1]-em*.5<=small.bbox[1]<line.bbox[1]+em*.2
+                        and line.bbox[1]<small.bbox[3]<line.bbox[3]-em*.2):
+                    targets.append((region,index))
+        if len(targets)!=1:continue
+        carriers=[r for r in skel.regions if r.kind=='figure' and r.reason==art.reason
+            and r.bbox[0]<=marker.bbox[0] and r.bbox[1]<=marker.bbox[1]
+            and r.bbox[2]>=marker.bbox[2] and r.bbox[3]>=marker.bbox[3]]
+        if len(carriers)!=1 or carriers[0].caption_lines:continue
+        carrier=carriers[0]
+        if any(other is not art and other.kind=='artwork' and any(
+                _overlap_share(line.bbox,carrier.bbox)>0 for line in other.lines)
+                for other in skel.regions):continue
+        region,index=targets[0]
+        region.lines.insert(index+1,marker)
+        region.inline_marker_boxes.append(marker.bbox)
+        region.bbox=_lines_bbox(region.lines,region.bbox)
+        skel.regions.remove(art);skel.regions.remove(carrier)
 
 
 def _split_off_notes(raw, style, skel):
@@ -2635,7 +2691,8 @@ def _prose_rows(kept_blocks, raw, style):
     spans = []
     for _, kept in kept_blocks:
         for ln in kept:
-            if _chart_lettering(ln, style) or _squashed_caption(ln.stripped):
+            if (_chart_lettering(ln, style) or _squashed_caption(ln.stripped)
+                    or (ln.transcription_uncertain and len(ln.stripped.split())<8)):
                 continue
             y0, y1 = max(ln.bbox[1], top), min(ln.bbox[3], bottom)
             if y1 > y0:

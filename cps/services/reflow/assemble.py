@@ -1394,6 +1394,14 @@ def _page_elements(skel, repairs, reasons, vocab=None):
             # Native PDF spans carry an observed italic flag. Preserve it through
             # ordinary body assembly so an admitted wrapper cannot discard the
             # source emphasis; scan-layer style is still not trusted here.
+            if line.bbox in getattr(region,'inline_marker_boxes',()):
+                from .native_text import descriptor
+                line_runs=[['glyph',sp.text,descriptor(skel.pno,sp.bbox,sp.size,
+                    sp.font,raised=True,reason='transcript')] if sp.text.strip()
+                    else ['t',sp.text] for sp in line.spans]
+                runs+=line_runs
+                reasons.append('unmapped_native_glyphs')
+                continue
             line_runs = _line_runs(line, skel.pno, page_notes, claimed, repairs, reasons,
                                    preserve_style=not skel.is_scan)
             if display_group:

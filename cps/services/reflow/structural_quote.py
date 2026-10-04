@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-from . import prompts,structural_ops as ops,structural_pipeline,typed_model,pipeline
+from . import prompts,structural_ops as ops,structural_pipeline,typed_model,pipeline,heading_evidence,quote_evidence
 
 VERSION='source-review-quote-2-rules-first'
 
@@ -12,6 +12,10 @@ def _versions():
                 route_version=typed_model.ROUTE_VERSION,
                 proposer_prompt=prompts.OPERATION_PROMPT_VERSION,
                 verifier_prompt=prompts.VERIFICATION_PROMPT_VERSION,
+                preparation_version=ops.PREPARATION_VERSION,
+                max_context_chars=ops.MAX_CONTEXT_CHARS,max_candidates=ops.MAX_CANDIDATES,
+                heading_evidence_version=heading_evidence.VERSION,
+                quote_evidence_version=quote_evidence.VERSION,
                 protocol=ops.PROTOCOL)
 
 

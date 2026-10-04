@@ -16,7 +16,8 @@ from . import extract, heading_evidence, quote_evidence
 
 PROTOCOL = "cwng-source-wrappers-v1"
 MAX_CANDIDATES = 64
-MAX_CONTEXT_CHARS = 24000
+MAX_CONTEXT_CHARS = 64000
+PREPARATION_VERSION = 'source-wrapper-context-2'
 PROVENANCE_KEYS = {"layer", "reason", "engine", "language", "language_identity",
                    "requested_dpi", "effective_dpi", "orientation", "orientation_confidence",
                    "flags", "words", "uncertain_words", "failed", "pno"}
@@ -306,7 +307,8 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         snapshot_id = _digest([snapshot_id, source_page.identity])
     if relational_regions:
         snapshot_id = _digest([snapshot_id, relational_regions])
-    snapshot_id = _digest([snapshot_id, geometry_digest,quote_digest])
+    snapshot_id = _digest([snapshot_id, geometry_digest,quote_digest,
+                          PREPARATION_VERSION,max_candidates,max_context_chars])
     total = len(specs)
     random.Random(seed).shuffle(specs)
     specs = specs[:max_candidates]

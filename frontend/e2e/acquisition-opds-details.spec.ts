@@ -6,7 +6,7 @@ for (const title of ['Original edition', 'Original' + 'X'.repeat(180)]) {
 test(`publication summaries open details explicitly before a supported request (${title.length > 30 ? 'long title' : 'ordinary title'})`, async ({ page }) => {
   await page.route('**/api/v1/auth/me', async route => {
     const response = await route.fetch();
-    await route.fulfill({ response, json: { ...await response.json(), locale: 'en' } });
+    await route.fulfill({ response, json: { ...await response.json(), locale: 'en', acquisition_access: true } });
   });
   const reads: string[] = []; const writes: unknown[] = [];
   const book = { identity: 'original', title, authors: ['Original Writer'], languages: ['en'], description: null };

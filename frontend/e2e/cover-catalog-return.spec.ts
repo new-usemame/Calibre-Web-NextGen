@@ -34,6 +34,8 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
     const pending = new Promise<void>((resolve) => { release = resolve; });
     const started = new Promise<void>((resolve) => { readStarted = resolve; });
     await page.addInitScript(() => {
+      localStorage.setItem('cwng:catalog-density-v1', 'compact');
+      localStorage.setItem('cwng:catalog-rows-v1', '2');
       class NeverIntersectingObserver {
         observe() {} unobserve() {} disconnect() {} takeRecords() { return []; }
       }
@@ -41,6 +43,9 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
     });
     await page.route('**/api/v1/auth/me', async (route) => {
       const response = await route.fetch(); const me = await response.json();
+      // Match this fixture's measured grid so Back does not reset paging while
+      // replacing an unrelated account's fallback column estimate.
+      me.display = { ...(me.display ?? {}), books_per_page: (page.viewportSize()?.width ?? 1280) < 600 ? 4 : 14 };
       me.preferences = { ...(me.preferences ?? {}), discover_hidden: true };
       await route.fulfill({ response, json: me });
     });
@@ -48,7 +53,9 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
       const url = new URL(route.request().url());
       const number = Number(url.searchParams.get('page') || 1);
       const count = Number(url.searchParams.get('per_page') || 24);
-      if (number === 1) firstPageReads++;
+      // Book detail also fetches related author books. Count only this plain
+      // library scope, whose earlier page must not mask snapshot repair.
+      if (number === 1 && !url.searchParams.has('author')) firstPageReads++;
       const items = Array.from({ length: count }, (_, i) => {
         const book = item(number === 1 && i === 0 ? ID : 10_000 + (number - 1) * count + i);
         if (book.id === ID && committed) book.cover_url = AFTER;

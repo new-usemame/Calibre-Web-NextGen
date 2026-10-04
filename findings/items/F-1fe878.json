@@ -1,0 +1,14 @@
+{
+  "area": "logging",
+  "body": "Independent native review of proposed #2451 b035: opening an administrator-selected FIFO while holding the existing rotating-handler lock delays a background logger until a reader opens the FIFO. The prior version let that logger proceed within one second; the settings request itself could block in either version. A hung administrator-selected filesystem is the related source-level concern, not a measured deployed failure.\n\nThe lock preserves the repaired concurrent rotation/replacement identity seam. Narrowing it requires revalidation against the active handler/inode after opening; constructing a replacement before locking without that revalidation restores the independently reproduced duplicate-record race. Separate source/native/installed logging corrections are qualified clear. Investigate bounded target-open behavior without weakening their rotation, fallback or reload guarantees. No whole installed stalled-filesystem or arbitrary FIFO guarantee is made.",
+  "created": "2026-10-04",
+  "id": "F-1fe878",
+  "refs": [
+    "#2451",
+    "#1613"
+  ],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "Logging reload can hold active writers while opening a stalled administrator-selected target"
+}

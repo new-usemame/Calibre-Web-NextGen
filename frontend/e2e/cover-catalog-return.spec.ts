@@ -45,7 +45,7 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
       const response = await route.fetch(); const me = await response.json();
       // Match this fixture's measured grid so Back does not reset paging while
       // replacing an unrelated account's fallback column estimate.
-      me.display = { ...(me.display ?? {}), books_per_page: (page.viewportSize()?.width ?? 1280) < 600 ? 4 : 14 };
+      me.display = { ...(me.display ?? {}), books_per_page: (page.viewportSize()?.width ?? 1280) < 600 ? 6 : 14 };
       me.preferences = { ...(me.preferences ?? {}), discover_hidden: true };
       await route.fulfill({ response, json: me });
     });
@@ -87,7 +87,7 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
     try {
       await page.goto('/app');
       await expect(target(page)).toBeVisible();
-      const count = (page.viewportSize()?.width ?? 1280) < 600 ? 4 : 14;
+      const count = (page.viewportSize()?.width ?? 1280) < 600 ? 6 : 14;
       await expect(grid(page)).toHaveCount(count);
       if (scenario !== 'failed read after page-one return') {
         await page.getByRole('button', { name: 'Load more', exact: true }).click();

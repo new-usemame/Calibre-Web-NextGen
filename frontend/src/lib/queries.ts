@@ -9,6 +9,7 @@ import {
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
+import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
@@ -104,36 +105,17 @@ export function useUpdateSidebar() {
  * the server with an older request winning the race. */
 export function useUpdateNamedPreferences() {
   const queryClient = useQueryClient();
-  return useMutation({
-    scope: { id: 'named-user-preferences' },
-    mutationFn: (preferences: Record<string, boolean>) =>
-      apiPost<{ preferences: Record<string, boolean | null> }>(
-        '/api/v1/account/preferences', { preferences }),
-    onMutate: async (preferences) => {
-      await queryClient.cancelQueries({ queryKey: ['me'] });
-      const previous = queryClient.getQueryData<Me | null>(['me']);
-      queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
-        ...current,
-        preferences: { ...(current.preferences ?? {}), ...preferences },
-      } : current);
-      return { previous };
-    },
-    onError: (_error, _preferences, context) => {
-      if (context) queryClient.setQueryData(['me'], context.previous);
-    },
-    onSuccess: (data, preferences) => {
-      queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
-        ...current,
-        preferences: { ...(current.preferences ?? {}), ...data.preferences },
-      } : current);
-      if ('share_book_ratings' in preferences) {
-        void queryClient.invalidateQueries({ queryKey: ['book-rating'] });
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-    },
-  });
+  const owner = captureNamedPreferencesOwner(queryClient);
+  const mutation = useMutation(namedPreferencesMutationOptions(queryClient, update =>
+    apiPost<{ preferences: Record<string, boolean | null> }>(
+      '/api/v1/account/preferences', { preferences: update.preferences, expected_user_id: update.ownerId })));
+  return {
+    ...mutation,
+    mutate: (preferences: Record<string, boolean>, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ preferences, ...owner }, options),
+    mutateAsync: (preferences: Record<string, boolean>, options?: Parameters<typeof mutation.mutateAsync>[1]) =>
+      mutation.mutateAsync({ preferences, ...owner }, options),
+  };
 }
 
 export interface CatalogCustomFieldsUpdate {

@@ -17,3 +17,5 @@ Sharing starts off. Turn **Share my ratings in the household average** on in you
 Book list/detail responses add `personal_rating` and `household_rating`; their existing `rating` field continues to mean the Calibre library score. `/api/v1/personal-ratings` and `personal_rating=0..10` provide private rating categories and filters, with zero meaning unrated. The existing `/api/v1/ratings` category IDs and `rating=` filter keep their Calibre meaning for existing integrations. Private projections are marked `private, no-store`.
 
 Scores live in app.db. When duplicate books are consolidated, each account’s most recent rating or clear is preserved; a clear is retained as a timestamped choice so an older score cannot reappear. Removing a book or account purges its rating records.
+
+Consent updates in the New UI stay bound to the initiating account and session generation. A delayed response or queued toggle from an earlier account cannot replace the current identity or preferences. The preferences API accepts an optional `expected_user_id`; a mismatch rejects the entire update before any preference is changed. Existing clients may omit it.

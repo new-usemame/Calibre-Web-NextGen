@@ -290,3 +290,19 @@ def test_frontend_uses_generic_named_preference_hook_for_catalog_preferences():
     assert "/account/preferences" in queries_src
     assert "role?.anonymous" in state_src
     assert "localStorage" in hook_src
+
+
+def test_preference_owner_mismatch_rejects_before_consent_or_commit():
+    user = _FakeUser()
+    user.id = 2
+    for owner, expected_status in [(1, 409), (True, 400)]:
+        response, session = _call({"expected_user_id": owner,
+            "preferences": {"share_book_ratings": True}}, user)
+        assert _status(response) == expected_status
+        assert user.view_settings == {}
+        session.commit.assert_not_called()
+    response, session = _call({"expected_user_id": 2,
+        "preferences": {"share_book_ratings": True}}, user)
+    assert _status(response) == 200
+    assert user.view_settings["preferences"]["share_book_ratings"] is True
+    session.commit.assert_called_once_with()

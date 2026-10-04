@@ -142,7 +142,7 @@ def _sorted_name(name, stored_sort, title_regex):
 
 
 class _BookValues(dict):
-    def __init__(self, book, session, title_regex, ordered_authors=None):
+    def __init__(self, book, session, title_regex, ordered_authors=None, sort_names=True):
         self.book = book
         self.session = session
         self.columns = None
@@ -183,7 +183,7 @@ class _BookValues(dict):
                 author_names.append(author.name.replace('|', ','))
         rating = next((item.rating for item in book.ratings if item is not None and item.rating), None)
         super().__init__(
-            title=_sorted_name(book.title, book.sort, title_regex),
+            title=_sorted_name(book.title, book.sort, title_regex) if sort_names else _value(book.title),
             author_sort=book.author_sort or '',
             authors=' & '.join(author_names),
             id=_value(book.id), isbn=book.isbn or '',
@@ -192,7 +192,7 @@ class _BookValues(dict):
             timestamp=_value(book.timestamp),
             publisher=', '.join(publisher.name for publisher in book.publishers if publisher is not None),
             rating=_number(rating / 2) if rating else '',
-            series=_sorted_name(series.name, series.sort, title_regex) if series else '',
+            series=(_sorted_name(series.name, series.sort, title_regex) if sort_names else _value(series.name)) if series else '',
             series_index=_number(book.series_index) if series else '',
             tags=', '.join(tag.name for tag in book.tags if tag is not None),
         )
@@ -292,9 +292,9 @@ class _BookValues(dict):
         return separator.join(_value(v) for v in values if v is not None)
 
 
-def render_filename(template, book, session, title_regex='', unicode_filename=False, ordered_authors=None):
+def render_filename(template, book, session, title_regex='', unicode_filename=False, ordered_authors=None, sort_names=True):
     """Return a safe basename. The download helper adds the actual extension."""
-    values = _BookValues(book, session, title_regex, ordered_authors)
+    values = _BookValues(book, session, title_regex, ordered_authors, sort_names=sort_names)
     rendered = expand_template(template, values)
     rendered = ''.join(char for char in rendered if unicodedata.category(char) not in ('Cc', 'Zl', 'Zp')
                        and (unicodedata.category(char) != 'Cf' or char in ('\u200c', '\u200d')))

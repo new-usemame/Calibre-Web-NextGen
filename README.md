@@ -651,6 +651,8 @@ For matching OPDS filenames across devices, enable Use server filenames in KORea
 
 Administrators can change that name through the OPDS download filename template preference. For fields, examples, and device limits, see [OPDS download filenames](docs/opds-filename-template.md). A blank preference keeps the existing naming behavior.
 
+For books emailed to a reader, **eReader attachment filename template** in the administrator's email settings controls the outgoing attachment name, including series and series numbers. See [Names for emailed book attachments](docs/send-filename-template.md) for examples.
+
 ### Kobo sync
 
 Read your CWA library on a Kobo e-reader, with reading progress syncing both ways. Sync runs against your own server, so your library never leaves your network.

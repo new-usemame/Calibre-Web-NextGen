@@ -67,6 +67,8 @@ class _Settings(_Base):
     # shipped default. Named with the mail_ prefix so it auto-migrates and
     # flows through get_mail_settings() into the settings page.
     mail_body_text = Column(String, default="")
+    # Empty keeps the stored Calibre basename for emailed book attachments.
+    mail_filename_template = Column(String(1024), default="")
 
     config_calibre_dir = Column(String)
     config_calibre_uuid = Column(String)

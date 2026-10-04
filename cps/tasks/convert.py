@@ -138,7 +138,8 @@ class TaskConvert(CalibreTask):
                                                                self.settings['body'],
                                                                id=self.book_id,
                                                                internal=True,
-                                                               cover_user_id=self.cover_user_id)
+                                                               cover_user_id=self.cover_user_id,
+                                                               attachment_name=self.settings.get("attachment_name"))
                                           )
                 except Exception as ex:
                     return self._handleError(str(ex))

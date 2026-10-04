@@ -959,6 +959,7 @@ export interface MailConfig {
   mail_login: string;
   mail_from: string;
   mail_size_mb: number;
+  mail_filename_template: string;
   mail_server_type: number;
   has_password: boolean;
 }

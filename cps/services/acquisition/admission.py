@@ -7,6 +7,7 @@ import re
 
 from ... import constants
 from .migration import VERSION
+from .contracts import DIRECT_FORMATS, MOBI_MEDIA_TYPE
 
 
 class AdmissionError(ValueError):
@@ -61,12 +62,15 @@ def account_allowed(database, owner_id):
     return role is not None and bool(role & constants.ROLE_ACQUISITION_ACCESS)
 
 
-def acquisition_offer(payload, allowed_media_types=None):
+def acquisition_offer(payload, allowed_media_types=None, *, allow_mobi=False):
     if (not isinstance(payload, dict) or payload.get('kind') != 'acquisition'
-            or payload.get('media_type') not in ('application/epub+zip','application/pdf','application/x-nzb','application/x-bittorrent')):
+            or payload.get('media_type') not in tuple(DIRECT_FORMATS) + ('application/x-nzb','application/x-bittorrent')):
+        raise AdmissionError('unsupported_offer')
+    if payload['media_type'] == MOBI_MEDIA_TYPE and allow_mobi is not True:
         raise AdmissionError('unsupported_offer')
     if payload['media_type'] in ('application/x-nzb', 'application/x-bittorrent'):
-        if payload.get('transport') != ('nzb' if payload['media_type'] == 'application/x-nzb' else 'torrent') or not allowed_media_types:
+        if (payload.get('transport') != ('nzb' if payload['media_type'] == 'application/x-nzb' else 'torrent')
+                or not allowed_media_types or not set(allowed_media_types) & {'application/epub+zip', 'application/pdf'}):
             raise AdmissionError('format_disabled')
         return
     if allowed_media_types is not None and payload['media_type'] not in allowed_media_types:
@@ -85,9 +89,11 @@ def create_request(repo, owner_id, *, connection_id, offer_id, idempotency_key, 
     if not any(row.id==connection_id and row.adapter in ('opds', 'newznab') for row in repo.list_connections()):
         raise AdmissionError('unsupported_connection')
     formats=configured_media_types(repo.engine)
+    connection_config = repo.connection_config(connection_id).config
     return repo.create_job(owner_id, offer_id, idempotency_key, connection_id=connection_id,
         requires_approval=not bool(role & constants.ROLE_ACQUISITION_AUTO_APPROVE),
-        add_to_my_library=add_to_my_library, validate_offer=lambda payload: acquisition_offer(payload,formats))
+        add_to_my_library=add_to_my_library, validate_offer=lambda payload: acquisition_offer(
+            payload, formats, allow_mobi=connection_config.get('allow_mobi') is True))
 
 
 def has_connections(database):
@@ -112,7 +118,9 @@ def select_artifact(repo, owner_id, job_id, generation, candidate_id):
         if not isinstance(setting[1], str):
             raise AdmissionError('invalid_request')
         extensions = {x.strip().lower() for x in setting[1].split(',')}
-        media = _FORMAT_MEDIA_TYPES.get('pdf' if candidate['media_type'] == 'application/pdf' else 'epub')
+        media = candidate['media_type']
+        if media not in ('application/epub+zip', 'application/pdf'):
+            raise AdmissionError('invalid_request')
         if '' not in extensions and media not in {_FORMAT_MEDIA_TYPES.get(x) for x in extensions}:
             raise AdmissionError('invalid_request')
         return not bool(role & constants.ROLE_ACQUISITION_AUTO_APPROVE)
@@ -166,14 +174,14 @@ def job_allowed(database, job_id, owner_id):
         return False
 
 
-_FORMAT_MEDIA_TYPES={'epub':'application/epub+zip','pdf':'application/pdf'}
+_FORMAT_MEDIA_TYPES = {extension: media for media, (_label, extension) in DIRECT_FORMATS.items()}
 
 
 def configured_media_types(database):
     """Intersect implemented formats with the current configured upload policy.
 
     An empty upload-format string allows all formats in the existing uploader;
-    this slice still only implements EPUB/PDF. Missing/unreadable config closes
+    direct MOBI additionally requires a catalog opt-in. Missing/unreadable config closes
     admission rather than silently broadening the administrator's policy.
     """
     try:

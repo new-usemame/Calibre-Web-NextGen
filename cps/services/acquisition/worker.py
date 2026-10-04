@@ -14,6 +14,7 @@ import shutil
 import time
 
 from .catalog import policy
+from .contracts import DIRECT_FORMATS, direct_format_allowed
 from .http import TransportError, run_transfer
 from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
                       publish, publication_state, validate_book)
@@ -134,12 +135,15 @@ class AcquisitionWorker:
             checkpoint()
             material = repo.material(job.id, token)
             offer, config = material.offer, material.config
-            if offer.get('kind') != 'acquisition' or offer.get('media_type') not in ('application/epub+zip', 'application/pdf', 'application/x-nzb', 'application/x-bittorrent'):
+            if (offer.get('kind') != 'acquisition'
+                    or offer.get('media_type') not in tuple(DIRECT_FORMATS) + ('application/x-nzb', 'application/x-bittorrent')):
                 raise TransportError('unsupported_offer')
             usenet = offer.get('transport') in ('nzb', 'torrent')
             media_type = None if usenet else offer['media_type']
+            if not usenet and not direct_format_allowed(media_type, config):
+                raise TransportError('unsupported_offer')
             checkpoint()
-            extension = 'epub' if media_type == 'application/epub+zip' else 'pdf'
+            extension = DIRECT_FORMATS.get(media_type, (None, None))[1]
             if state == 'queued':
                 advance('resolving')
             if state == 'resolving':

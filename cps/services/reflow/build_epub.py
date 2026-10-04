@@ -402,7 +402,7 @@ def _pdf_reference_id(ident):
 
 def _pdf_return(ident):
     return ('<a class="pdf-return" href="#%s" aria-label="Return to PDF reference" '
-            'title="Return to PDF reference">↩</a>' % _pdf_reference_id(ident))
+            'title="Return to PDF reference">Return</a>' % _pdf_reference_id(ident))
 
 
 def _nav_runs_html(runs, marks, available, ref_ids, ambiguous):
@@ -654,9 +654,12 @@ def split_blocks(html):
     return [b for b in blocks if b]
 
 
-# Only this post-admission factory shape is generated reading copy. It must not
-# decide source paragraph continuation, source headings or chapter titles.
-_READING_COPY = re.compile(r'<span class="source-reading-annotation" id="reading-return-reading-[a-f0-9]{64}">.*?</span>', re.S)
+# These exact factory shapes are generated controls, never source words. They
+# must not decide source paragraph continuation, headings or chapter titles.
+_READING_COPY = re.compile(
+    r'<span class="source-reading-annotation" id="reading-return-reading-[a-f0-9]{64}">.*?</span>'
+    r'|<a class="pdf-return" href="#pdfref_p\d{4}_x\d+" aria-label="Return to PDF reference" '
+    r'title="Return to PDF reference">Return</a>', re.S)
 
 
 def _reading_copy_parts(fragment):

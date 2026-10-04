@@ -134,3 +134,16 @@ def test_publication_rewrites_exact_forward_and_return_pairs_across_chapters(tmp
             returns.append((name,target,ident))
     assert len(returns)==2
     assert any(a!=b for a,b,_ in returns) and any(a==b for a,b,_ in returns)
+
+
+def test_generated_return_is_visible_without_a_special_arrow_glyph():
+    link=tree(build_epub._pdf_return('pdfgoto_p0000_x9')).find('.//a')
+    assert ''.join(link.itertext())=='Return'
+    assert link.get('href')=='#pdfref_p0000_x9'
+
+
+def test_generated_return_does_not_turn_a_finished_sentence_into_a_continuation():
+    control=build_epub._pdf_return('pdfgoto_p0000_x9')
+    pages=build_epub._page_blocks({0:'<p>The source sentence is complete.'+control+'</p>',
+                                  1:'<p>another distinct source paragraph begins here.</p>'})
+    assert build_epub._join_page_turns(pages)==0

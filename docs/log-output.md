@@ -12,4 +12,4 @@ Explicit `/dev/stdout` and `/dev/stderr` log settings remain stream-only. Applic
 
 If rotation fails, the handler reports the error on stderr and attempts to append the record without rotating. A shared stdout descriptor also provides a fallback if a partially completed rotation leaves no writable active path. The file can grow beyond the rollover limit until the service can rename and create files in its log directory; correct the directory permissions or descriptor-based log path to restore rotation.
 
-Access logs use the same rotation-failure append policy and can exceed their normal 2MiB limit and three backups until the log directory permissions or path are corrected.
+Access logs normally rotate at 2MiB with three backups. They use the same rotation-failure append policy, so the active file can exceed 2MiB until the log directory permissions or path are corrected.

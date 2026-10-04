@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { collectPageErrors } from './utils';
 
 async function firstBookId(page: import('@playwright/test').Page) {
   const response = await page.request.get('/api/v1/books?limit=1');
@@ -140,4 +141,37 @@ test('Classic advanced-search date controls share named canonical fields', async
     await expect(date).toHaveValue('');
     await expect(mirror).toBeHidden();
   }
+});
+
+
+// Use the real authenticated HTML/backend, with a deliberately restrictive
+// response header. No policy opt-in or console filtering can mask the failure.
+test('Chromium Classic editor works with unload denied', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'This control requires Chromium unload Permissions Policy support');
+  const errors = collectPageErrors(page);
+  const editorPath = `/admin/book/${await firstBookId(page)}`;
+  await page.route(`**${editorPath}`, async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, headers: {
+      ...response.headers(), 'permissions-policy': 'unload=()',
+    } });
+  });
+  await page.goto(editorPath);
+  expect(await page.evaluate(() => (document as Document & {
+    featurePolicy?: { allowsFeature(feature: string): boolean };
+  }).featurePolicy?.allowsFeature('unload'))).toBe(false);
+  await expect(page.locator('#comments_ifr')).toBeVisible();
+  const firstBody = page.frameLocator('#comments_ifr').locator('body');
+  await firstBody.fill('Unsubmitted policy probe');
+  await expect(firstBody).toContainText('Unsubmitted policy probe');
+  // Leave this real iframe, then query/edit a newly initialized editor. No
+  // shared fixture metadata is saved by this CI regression.
+  await page.goto('/table');
+  await expect(page.locator('#books-table')).toBeVisible();
+  await page.goto(editorPath);
+  await expect(page.locator('#comments_ifr')).toBeVisible();
+  const nextBody = page.frameLocator('#comments_ifr').locator('body');
+  await nextBody.fill('Second unsubmitted policy probe');
+  await expect(nextBody).toContainText('Second unsubmitted policy probe');
+  expect(errors, `unfiltered editor console/page errors: ${errors.join('\n')}`).toEqual([]);
 });

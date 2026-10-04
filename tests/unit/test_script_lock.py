@@ -16,6 +16,7 @@ cleared, and a run only removes a lock that is still its own.
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -109,3 +110,83 @@ def test_running_the_epub_fixer_while_one_runs_exits(epub_fixer):
     finally:
         owner.kill()
         owner.wait()
+
+
+# --- several starters at once ------------------------------------------------
+
+_RACER = """
+# lockrace
+import os, sys, time
+sys.path.insert(0, {scripts!r})
+import script_lock
+lock, go, done, out = sys.argv[1:5]
+while not os.path.exists(go):
+    time.sleep(0.001)
+won = script_lock.acquire(lock, ("lockrace",))
+with open(out, "w") as f:
+    f.write("1" if won else "0")
+while not os.path.exists(done):
+    time.sleep(0.01)
+"""
+
+
+def _race(tmp_path, racers=8):
+    """Start racers that call acquire at the same moment; return how many got the lock."""
+    lock, go, done = tmp_path / "x.lock", tmp_path / "go", tmp_path / "done"
+    code = _RACER.format(scripts=SCRIPTS_DIR)
+    procs, outs = [], []
+    try:
+        for i in range(racers):
+            out = tmp_path / f"out{i}"
+            outs.append(out)
+            procs.append(subprocess.Popen([sys.executable, "-c", code, str(lock), str(go), str(done), str(out)]))
+        yield lock
+        go.touch()
+        deadline = time.time() + 30
+        while time.time() < deadline and not all(o.exists() and o.read_text() for o in outs):
+            time.sleep(0.01)
+        yield sum(int(o.read_text()) for o in outs)
+    finally:
+        done.touch()
+        for p in procs:
+            try:
+                p.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                p.kill()
+
+
+@pytest.mark.parametrize("start", ["absent", "empty", "dead-pid"])
+@pytest.mark.parametrize("round_", range(3))
+def test_only_one_of_several_simultaneous_starters_gets_the_lock(tmp_path, start, round_):
+    race = _race(tmp_path)
+    lock = next(race)
+    if start == "empty":
+        lock.write_text("")
+    elif start == "dead-pid":
+        gone = _sleeper()
+        gone.kill()
+        gone.wait()
+        lock.write_text(str(gone.pid))
+    assert next(race) == 1
+    race.close()
+
+
+def test_the_lock_is_never_visible_without_a_pid(tmp_path, monkeypatch):
+    """A second starter must not find the lock empty while the first is still writing it."""
+    lock = tmp_path / "x.lock"
+    seen = []
+    real_link = os.link
+
+    def link_and_look(src, dst):
+        real_link(src, dst)
+        seen.append(Path(dst).read_text())
+
+    monkeypatch.setattr(script_lock.os, "link", link_and_look)
+    assert script_lock.acquire(str(lock), ("x",))
+    assert seen == [str(os.getpid())]
+
+
+def test_acquire_leaves_no_staging_file_behind(tmp_path):
+    lock = tmp_path / "x.lock"
+    assert script_lock.acquire(str(lock), ("x",))
+    assert sorted(p.name for p in tmp_path.iterdir() if p.suffix == ".tmp") == []

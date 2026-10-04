@@ -241,6 +241,20 @@ def test_a_deletion_anywhere_reaches_the_client_as_a_newer_tombstone(world, clie
     assert after["server_modified_at"] > before["server_modified_at"]
 
 
+def test_a_deletion_koreader_names_reaches_the_client_as_a_newer_tombstone(world, client):
+    _push(client, [_highlight("ko-1", _quote(70), source="koreader")],
+          document=world.digest, device="KindleBasic5", device_id="kindle-1")
+    before = _pull(client)["ko-1"]
+
+    _push(client, [], deleted=["ko-1"],
+          document=world.digest, device="KindleBasic5", device_id="kindle-1")
+
+    after = _pull(client)["ko-1"]
+    assert after["hidden"] is True
+    assert after["content_revision"] > before["content_revision"]
+    assert after["server_modified_at"] > before["server_modified_at"]
+
+
 def test_an_edit_from_any_device_advances_the_revision_and_a_resend_does_not(world, client):
     _push(client, [_highlight("hl-1", _quote(60))])
     first = _pull(client)["hl-1"]

@@ -5,6 +5,7 @@ Parsing a URL is not SSRF validation. Consumers must enforce connection origins,
 resolve DNS safely, and check redirects before fetching any returned resource.
 """
 import json
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -24,6 +25,9 @@ RELATIONS = {ACQUISITION: "acquisition", ACQUISITION + "/open-access": "download
              ACQUISITION + "/sample": "preview", ACQUISITION + "/subscribe": "subscribe"}
 RELATIONS.update({value: value for value in tuple(RELATIONS.values())})
 CATALOG_TYPES = frozenset(("application/atom+xml", "application/opds+json"))
+PUBLICATION_TYPE = "application/opds-publication+json"
+# Readium language-map schema BCP47 syntax (no IANA registry/network lookup).
+_LANGUAGE_TAG = re.compile('^((?:(en-GB-oed|i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn|i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE)|(art-lojban|cel-gaulish|no-bok|no-nyn|zh-guoyu|zh-hakka|zh-min|zh-min-nan|zh-xiang))|((?:([A-Za-z]{2,3}(-(?:[A-Za-z]{3}(-[A-Za-z]{3}){0,2}))?)|[A-Za-z]{4}|[A-Za-z]{5,8})(-(?:[A-Za-z]{4}))?(-(?:[A-Za-z]{2}|[0-9]{3}))?(-(?:[A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*(-(?:[0-9A-WY-Za-wy-z](-[A-Za-z0-9]{2,8})+))*(-(?:x(-[A-Za-z0-9]{1,8})+))?)|(?:x(-[A-Za-z0-9]{1,8})+))$', re.IGNORECASE)
 
 
 class CatalogParseError(ValueError):
@@ -45,9 +49,12 @@ class ParseLimits:
 
 
 class _Budget:
-    def __init__(self, limits):
+    def __init__(self, limits, preferred_language=None):
         self.limits = limits
         self.links = self.publications = 0
+        if preferred_language is not None and not isinstance(preferred_language, str):
+            raise CatalogParseError("Invalid display language")
+        self.language = (preferred_language or "en").replace("_", "-").lower()
 
     def count(self, kind):
         value = getattr(self, kind) + 1
@@ -66,6 +73,33 @@ class _Budget:
         if required and not value:
             raise CatalogParseError("Required catalog text is empty")
         return value or None
+
+
+    def localized_text(self, value, required=False):
+        if not isinstance(value, dict):
+            return self.text(value, required=required)
+        if not value:
+            raise CatalogParseError("Language map is empty")
+        variants = {}
+        # Validate all values before selecting; an unselected variant is still
+        # remote input and must not bypass text/type/structure limits.
+        for tag, text in value.items():
+            if len(tag) > 128 or not _LANGUAGE_TAG.fullmatch(tag):
+                raise CatalogParseError("Invalid language map tag")
+            key = tag.lower()
+            if key in variants:
+                raise CatalogParseError("Duplicate language map tag")
+            variants[key] = self.text(text, required=True)
+        keys = sorted(variants)
+        language = self.language
+        while language:
+            if language in variants:
+                return variants[language]
+            matches = [key for key in keys if key.startswith(language + "-")]
+            if matches:
+                return variants[matches[0]]
+            language = language.rsplit("-", 1)[0] if "-" in language else ""
+        return variants.get("en", variants[keys[0]])
 
 
 class _PlainText(HTMLParser):
@@ -360,14 +394,14 @@ def _publication_json(value, base, budget):
                 contributors.append(Contributor(budget.text(person, required=True), role))
             else:
                 person = _object(person)
-                contributors.append(Contributor(budget.text(person.get("name"), required=True), role,
+                contributors.append(Contributor(budget.localized_text(person.get("name"), required=True), role,
                                                 budget.text(person.get("identifier"))))
     links = _json_links(value.get("links", []), base, budget)
     images = tuple(link for link, _ in _json_links(value.get("images", []), base, budget, images=True))
     description = budget.text(metadata.get("description"))
     identifiers = _strings(metadata.get("identifier"), budget)
     return Publication(identifiers[0] if identifiers else None,
-                       budget.text(metadata.get("title"), required=True), tuple(contributors),
+                       budget.localized_text(metadata.get("title"), required=True), tuple(contributors),
                        _strings(metadata.get("language"), budget), identifiers,
                        _plain(description) if description else None,
                        tuple(link for link, _ in links), images, _offers(links))
@@ -376,7 +410,7 @@ def _publication_json(value, base, budget):
 def _section(value, base, budget):
     value = _object(value)
     metadata = _object(value.get("metadata"))
-    return Section(budget.text(metadata.get("title"), required=True),
+    return Section(budget.localized_text(metadata.get("title"), required=True),
                    tuple(link for link, _ in _json_links(value.get("navigation", []), base, budget)),
                    tuple(_publication_json(item, base, budget)
                          for item in _array(value.get("publications", []))),
@@ -396,23 +430,39 @@ def _catalog_json(payload, source_url, budget):
     facets = tuple(_section(item, source_url, budget) for item in _array(document.get("facets", [])))
     searches = _searches(links, "opds2")
     all_publications = publications + tuple(pub for group in groups for pub in group.publications)
-    return Catalog(budget.text(metadata.get("title"), required=True), source_url, "opds2",
+    return Catalog(budget.localized_text(metadata.get("title"), required=True), source_url, "opds2",
                    publications, navigation, links, searches, groups, facets,
                    Capabilities(True, bool(searches), any(
                        offer.is_direct_download for pub in all_publications for offer in pub.offers)))
 
 
-def parse_catalog(payload, document_url, *, media_type=None, limits=ParseLimits()):
+def _publication_catalog_json(payload, source_url, budget):
+    document = _json(payload, budget.limits)
+    if any(key in document for key in ("navigation", "publications", "groups")):
+        raise CatalogParseError("Expected one OPDS publication")
+    publication = _publication_json(document, source_url, budget)
+    if not publication.offers:
+        raise CatalogParseError("OPDS publication has no acquisition link")
+    return Catalog(publication.title, source_url, "opds2", (publication,), (),
+                   publication.links, (), (), (),
+                   Capabilities(True, False, any(offer.is_direct_download
+                                                for offer in publication.offers)),
+                   is_publication_document=True)
+
+
+def parse_catalog(payload, document_url, *, media_type=None, limits=ParseLimits(), preferred_language=None):
     """Parse a fetched catalog. ``document_url`` is the final response URL.
 
     Templates are preserved, never expanded. A later transport must implement
     the advertised syntax explicitly; ``Search.syntax == 'unsupported'`` must
     not be silently replaced with a guessed search query.
     """
-    budget = _Budget(limits)
+    budget = _Budget(limits, preferred_language)
     source_url = _url(document_url, "", budget)
     payload = _payload(payload, limits)
     kind = _type(media_type, budget)
+    if kind == PUBLICATION_TYPE:
+        return _publication_catalog_json(payload, source_url, budget)
     if kind == "application/opds+json" or (kind is None and payload.lstrip().startswith((b"{", b"\xef\xbb\xbf{"))):
         return _catalog_json(payload, source_url, budget)
     if kind not in (None, "application/atom+xml", "application/xml", "text/xml"):

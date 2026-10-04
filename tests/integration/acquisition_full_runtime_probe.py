@@ -413,6 +413,8 @@ def main():
                             source_and_private_cleanup=True,
                         )
                     )
+                from acquisition_opds_publication_runtime_probe import run_opds_publication_runtime
+                opds_publication = run_opds_publication_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_bundle_runtime_probe import run_bundle_runtime
                 bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_torrent_metadata_runtime_probe import run_torrent_metadata_runtime
@@ -427,6 +429,7 @@ def main():
                     dict(
                         results=results,
                         bundle=bundle,
+                        opds_publication=opds_publication,
                         torrent_metadata=torrent_metadata,
                         http_gets=gets,
                         full_processor_subprocess=True,

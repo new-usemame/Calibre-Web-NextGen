@@ -20502,3 +20502,19 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "Autoriser les livres MOBI 6 terminés sans DRM"
+
+#: cps/spa_strings.py
+msgid "Applies only to this download client. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader."
+msgstr "S’applique uniquement à ce client de téléchargement. Le paramètre des formats de téléversement du serveur doit également autoriser le MOBI. Les paramètres de conversion habituels s’appliquent ; sans conversion, le MOBI peut être téléchargé, mais ne peut pas être ouvert dans le lecteur Web."
+
+#: cps/spa_strings.py
+msgid "Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients have a separate format opt-in."
+msgstr "S’applique uniquement à ce catalogue. Le paramètre des formats de téléversement du serveur doit également autoriser le MOBI. Les paramètres de conversion habituels s’appliquent ; sans conversion, le MOBI peut être téléchargé, mais ne peut pas être ouvert dans le lecteur Web. Les clients de téléchargement disposent d’une autorisation distincte pour les formats."
+
+#: cps/spa_strings.py
+msgid "CWNG copies completed books allowed by this connection and the server format settings. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label."
+msgstr "CWNG copie les livres terminés autorisés par cette connexion et par les paramètres de formats du serveur. Il ne déplace pas les fichiers, ne supprime pas les tâches du client et ne modifie pas les limites de partage. NZBGet nécessite des identifiants permettant de lire la configuration, la file d’attente et l’historique. qBittorrent nécessite une catégorie existante. Transmission utilise le dossier et le libellé configurés."

@@ -19256,3 +19256,19 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ msgstr ""
 #~ "A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy "
 #~ "egy könyvet biztonságosan törölhessen."
+
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "A DRM-mentes, befejezett MOBI 6 könyvek engedélyezése"
+
+#: cps/spa_strings.py
+msgid "Applies only to this download client. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader."
+msgstr "Csak erre a letöltőkliensre vonatkozik. A szerver feltöltési formátumokra vonatkozó beállításának is engedélyeznie kell a MOBI-t. A szokásos konvertálási beállítások érvényesek; konvertálás nélkül a MOBI letölthető, de a webes olvasóban nem nyitható meg."
+
+#: cps/spa_strings.py
+msgid "Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients have a separate format opt-in."
+msgstr "Csak erre a katalógusra vonatkozik. A szerver feltöltési formátumokra vonatkozó beállításának is engedélyeznie kell a MOBI-t. A szokásos konvertálási beállítások érvényesek; konvertálás nélkül a MOBI letölthető, de a webes olvasóban nem nyitható meg. A letöltőkliensek formátumonként külön engedélyezhetők."
+
+#: cps/spa_strings.py
+msgid "CWNG copies completed books allowed by this connection and the server format settings. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label."
+msgstr "A CWNG átmásolja azokat a befejezett könyveket, amelyeket ez a kapcsolat és a szerver formátumbeállításai engedélyeznek. Nem helyez át fájlokat, nem törli a kliens feladatait, és nem módosítja a megosztási korlátokat. Az NZBGetnek olyan hitelesítő adatokra van szüksége, amelyekkel olvasható a konfiguráció, a várólista és az előzmények. A qBittorrenthez már létező kategória szükséges. A Transmission a beállított mappát és címkét használja."

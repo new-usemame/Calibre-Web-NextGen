@@ -14,7 +14,7 @@ import shutil
 import time
 
 from .catalog import policy
-from .contracts import DIRECT_FORMATS, direct_format_allowed
+from .contracts import DIRECT_FORMATS, MOBI_MEDIA_TYPE, direct_format_allowed
 from .http import TransportError, run_transfer
 from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
                       publish, publication_state, validate_book)
@@ -97,6 +97,7 @@ class AcquisitionWorker:
         private = None
         last_heartbeat = 0.0
         media_type = None
+        usenet = False
 
         def checkpoint():
             nonlocal last_heartbeat
@@ -111,6 +112,10 @@ class AcquisitionWorker:
                 raise TransportError('access_revoked')
             if state not in ('publishing', 'importing') and media_type is not None and not self.media_allowed(media_type):
                 raise TransportError('format_not_allowed')
+            if state not in ('publishing', 'importing') and usenet and media_type == MOBI_MEDIA_TYPE:
+                _, current_client = self._client_material(offer)
+                if current_client.get('allow_mobi') is not True:
+                    raise TransportError('format_not_allowed')
             now = time.monotonic()
             if now - last_heartbeat >= 5:
                 repo.heartbeat(job.id, token, lease_seconds=60)
@@ -188,9 +193,25 @@ class AcquisitionWorker:
                 raise StagingError('source_changed')
             if usenet:
                 with source.open('rb') as stream:
-                    media_type = 'application/pdf' if stream.read(5) == b'%PDF-' else 'application/epub+zip'
+                    signature = stream.read(68)
+                # A staged client source is already hash-bound, but its format
+                # must survive a new worker. Magic selects the existing strict
+                # byte validator; it never grants admission on its own.
+                media_type = ('application/pdf' if signature[:5] == b'%PDF-' else
+                              MOBI_MEDIA_TYPE if signature[60:68] == b'BOOKMOBI' else
+                              'application/epub+zip')
+                if signature[:5] == b'%PDF-' and signature[60:68] == b'BOOKMOBI':
+                    # A legal PalmDB name can begin with the PDF marker, and a
+                    # legal PDF can contain BOOKMOBI at this offset. Resolve
+                    # that ambiguity with the existing full validators.
+                    try:
+                        validate_book(source, MOBI_MEDIA_TYPE, max_bytes=self.max_bytes)
+                    except StagingError:
+                        pass  # Still requires the PDF validator below.
+                    else:
+                        media_type = MOBI_MEDIA_TYPE
                 validate_book(source, media_type, max_bytes=self.max_bytes)
-                extension = 'pdf' if media_type == 'application/pdf' else 'epub'
+                extension = DIRECT_FORMATS[media_type][1]
             token_path = private / 'publication.token'
             if token_path.exists() or token_path.is_symlink():
                 if token_path.is_symlink() or not token_path.is_file() or token_path.stat().st_size > 128:
@@ -204,7 +225,24 @@ class AcquisitionWorker:
                 publication_token = secrets.token_urlsafe(32)
                 persist_capability(token_path, publication_token)
             checkpoint()
-            permit = repo.prepare_publication(job.id, token, publication_token)
+            def authorize_publication():
+                # Pure reads while the repository holds the capability's write
+                # reservation: settings/grants cannot change between this
+                # check and issuance. Do not heartbeat or perform file I/O here.
+                if not self.enabled():
+                    raise Paused()
+                if not self.execution_allowed(job):
+                    raise TransportError('access_revoked')
+                if not self.media_allowed(media_type):
+                    raise TransportError('format_not_allowed')
+                if usenet:
+                    _, current_client = self._client_material(offer)
+                    if media_type == MOBI_MEDIA_TYPE and current_client.get('allow_mobi') is not True:
+                        raise TransportError('format_not_allowed')
+                elif not direct_format_allowed(media_type, repo.connection_config(job.connection_id).config):
+                    raise TransportError('unsupported_offer')
+            permit = repo.prepare_publication(job.id, token, publication_token,
+                                              authorize=authorize_publication)
             if state == 'staged':
                 state = 'publishing'
             publish(source, self.ingest_dir, permit, extension, checkpoint=checkpoint)
@@ -249,16 +287,22 @@ class AcquisitionWorker:
             self._cleanup(job.id)
         return current
 
-    def _download_client(self, job, token, offer, config, source, checkpoint):
-        repo = self.repository
-        clients = [row for row in repo.list_connections() if row.id == offer.get('client_id')
+    def _client_material(self, offer):
+        clients = [row for row in self.repository.list_connections() if row.id == offer.get('client_id')
             and row.adapter in (USENET_KINDS if offer['transport'] == 'nzb' else TORRENT_KINDS) and row.revision == offer.get('client_revision')]
         if not clients:
             raise ClientError('download_client_unavailable')
-        client_config = repo.connection_config(clients[0].id).config
-        client = (self.client_factory or CLIENTS[clients[0].adapter])(client_config, transfer=self.transfer)
+        material = self.repository.connection_config(clients[0].id)
+        if material.revision != clients[0].revision:
+            raise ClientError('download_client_unavailable')
+        return clients[0], material.config
+
+    def _download_client(self, job, token, offer, config, source, checkpoint):
+        repo = self.repository
+        client_row, client_config = self._client_material(offer)
+        client = (self.client_factory or CLIENTS[client_row.adapter])(client_config, transfer=self.transfer)
         def submission_name(key):
-            identity = [offer['release_key'], clients[0].id, clients[0].revision]
+            identity = [offer['release_key'], client_row.id, client_row.revision]
             # Nullable upgrade preserves existing remote names. New attempts
             # have their own durable key, including a retry after definite failure.
             if key:

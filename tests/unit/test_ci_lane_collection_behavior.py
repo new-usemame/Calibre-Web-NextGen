@@ -125,12 +125,16 @@ def test_killed_parent_does_not_abandon_its_collecting_child(tree, resists_term)
     ready, terminated = tree / "ready", tree / "terminated"
     (tree / "tests/unit/test_blocking.py").write_text(
         "import os,signal,time\nfrom pathlib import Path\n"
+        "def publish(path):\n"
+        " pending=path.with_suffix('.pending')\n"
+        " pending.write_text(str(os.getpid()))\n"
+        " pending.replace(path)\n"
         "def stopped(signum, frame):\n"
-        f" Path({str(terminated)!r}).write_text(str(os.getpid()))\n"
+        f" publish(Path({str(terminated)!r}))\n"
         " os._exit(0)\n"
         + ("signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if resists_term else
          "signal.signal(signal.SIGTERM, stopped)\n")
-        + f"Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+        + f"publish(Path({str(ready)!r}))\n"
         "while True: time.sleep(0.1)\n"
     )
     source_root = Path(__file__).resolve().parents[2]

@@ -14,6 +14,7 @@ from .. import config, constants, limiter, ub
 from ..cw_login import current_user
 from ..services.acquisition import admission, runtime
 from ..services.acquisition.catalog import CatalogService, CatalogError, connection_config
+from ..services.acquisition.contracts import DIRECT_FORMATS
 from ..services.acquisition.http import TransportError, origin
 from ..services.acquisition.opds import CatalogParseError
 from ..services.acquisition.newznab import IndexerError, IndexerService, connection_config as indexer_config
@@ -402,10 +403,11 @@ def acquisition_catalog():
             service = IndexerService(repo) if row.adapter == 'newznab' else CatalogService(repo, preferred_language=language)
             result=service.browse(owner,connection_id,selection=selection,query=query)
             allowed=admission.configured_media_types(repo.engine)
-            formats={name for name,media in (('EPUB','application/epub+zip'),('PDF','application/pdf')) if media in allowed}
+            formats={description[0] for media,description in DIRECT_FORMATS.items() if media in allowed}
+            client_formats=bool(formats & {'EPUB','PDF'})
             for section in [result]+result.get('groups',[]):
                 for publication in section.get('publications',[]):
-                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') in ('NZB', 'Torrent') and formats]
+                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') in ('NZB', 'Torrent') and client_formats]
             return result
     return jsonify(_run_private_blocking(browse))
 

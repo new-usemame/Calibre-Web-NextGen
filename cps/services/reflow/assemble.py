@@ -1050,7 +1050,8 @@ def _join_within_page(elements, vocab):
                     break
             if anchor is not None \
                     and all(not _x_overlaps(element.bbox, box) for box in barriers) \
-                    and continues(anchor.text, _prose_opening(element.runs)):
+                    and (continues(anchor.text, _prose_opening(element.runs))
+                         or _same_print_line(anchor, element)):
                 anchor.runs = tidy(stitch_runs(
                     anchor.runs, element.runs, heal=True, vocab=vocab))
                 anchor.pages = sorted(set(anchor.pages + element.pages))
@@ -1079,6 +1080,18 @@ def _prose_opening(runs):
             or (runs[start][0] == 't' and not runs[start][1].strip())):
         start += 1
     return plain_text(runs[start:]).lstrip()
+
+
+def _same_print_line(left, right):
+    """Two extraction fragments occupying adjacent parts of one printed line."""
+    if not left.line_boxes or not right.line_boxes:
+        return False
+    a,b=left.line_boxes[-1],right.line_boxes[0]
+    em=min(a[3]-a[1],b[3]-b[1])
+    return (em>0 and min(a[3],b[3])-max(a[1],b[1])>=em*.5
+            and -.2*em<=b[0]-a[2]<=em*1.5
+            and abs(a[3]-b[3])<=em*.6
+            and (left.band,left.column)==(right.band,right.column))
 
 
 def _copy_element(element):

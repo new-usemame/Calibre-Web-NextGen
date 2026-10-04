@@ -264,8 +264,14 @@ def test_all_detail_links_land_on_visible_heading_with_complete_detail_and_retur
         {'page': 15, 'full': 'images/page.png', 'details': details}, 'ch015.xhtml', 'en'))
     ids = [node.get('id') for node in root.iter() if node.get('id')]
     assert len(ids) == len(set(ids))
-    links = [node for node in root.iter(XHTML + 'a')
-             if node.get('href', '').startswith('#')]
+    index = next(nav for nav in root.iter(XHTML + 'nav')
+                 if nav.get('aria-label') == 'Original source details')
+    links = list(index.iter(XHTML + 'a'))
+    # All supplementary tile links must also resolve to visible detail headings.
+    for link in root.iter(XHTML + 'a'):
+        if link.get('href', '').startswith('#'):
+            target = root.find('.//*[@id="%s"]' % link.get('href')[1:])
+            assert target is not None and target.tag == XHTML + 'h2'
     assert [node.get('href') for node in links] == ['#' + d['id'] for d in details]
     assert [node.text for node in links] == [d['label'] for d in details]
     for link, detail in zip(links, details):

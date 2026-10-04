@@ -246,6 +246,7 @@ class BookStyle(object):
     outline: List[dict] = field(default_factory=list)
     folio_boxes: dict = field(default_factory=dict)
     local_running_boxes: dict = field(default_factory=dict)
+    repeated_head_boxes: dict = field(default_factory=dict)
 
     @property
     def boiler_threshold(self):
@@ -411,6 +412,54 @@ def _local_running_folios(raw_pages, body_size):
     return proved
 
 
+def _repeated_detached_heads(raw_pages, body_size):
+    """Find chapter-local heads without treating the whole top band as furniture.
+
+    Scans have variable margins and often put a folio on a separate line. Require
+    three occurrences of a short, detached top row at the same position and size.
+    The result names exact line boxes, so equal words in prose stay in prose.
+    """
+    groups = defaultdict(list)
+    for raw in raw_pages:
+        lines = sorted((line for block in raw.text_blocks for line in block.lines
+                        if line.stripped), key=lambda line: (line.bbox[1], line.bbox[0]))
+        if len(lines) < 2 or not body_size:
+            continue
+        top = lines[0].bbox[1]
+        row = [line for line in lines if line.bbox[1] < top + body_size]
+        following = [line for line in lines if line not in row]
+        if not following or max(line.bbox[3] for line in row) > raw.height * .20:
+            continue
+        if min(line.bbox[1] for line in following) - max(line.bbox[3] for line in row) < body_size * .8:
+            continue
+        for line in row:
+            text = line.stripped
+            if (len(text) > BAND_TEXT_MAX or sum(c.isalpha() for c in text) < 6
+                    or line.size > body_size * 1.02 or CAPTION_LINE.match(text)):
+                continue
+            leading = _LEADING_PRINTED_FOLIO.fullmatch(text)
+            trailing = _TRAILING_PRINTED_FOLIO.fullmatch(text)
+            if leading:
+                key = (leading[2].casefold(), 'left', int(leading[1])-raw.pno)
+            elif trailing:
+                key = (trailing[1].casefold(), 'right', int(trailing[2])-raw.pno)
+            else:
+                key = (text.casefold(), None, None)
+                if line.size >= body_size * .98:
+                    continue
+            groups[key].append((raw, line))
+    proved = defaultdict(list)
+    for rows in groups.values():
+        for raw, line in rows:
+            peers = {other.pno for other, candidate in rows
+                     if abs(candidate.bbox[1]/other.height - line.bbox[1]/raw.height) <= .006
+                     and abs(candidate.bbox[0]/other.width - line.bbox[0]/raw.width) <= .035
+                     and abs(candidate.size - line.size) <= body_size * .10}
+            if len(peers) >= 3:
+                proved[raw.pno].append(line.bbox)
+    return dict(proved)
+
+
 def book_style(raw_pages, outline=None):
     """Measure the book once: body size, heading ladder, repeated band strings.
 
@@ -448,7 +497,8 @@ def book_style(raw_pages, outline=None):
     return BookStyle(body_size=body_size, ladder=ladder, band_hits=dict(bands),
                      page_count=len(raw_pages), outline=list(outline or []),
                      folio_boxes=_sequence_folios(raw_pages,body_size),
-                     local_running_boxes=_local_running_folios(raw_pages,body_size))
+                     local_running_boxes=_local_running_folios(raw_pages,body_size),
+                     repeated_head_boxes=_repeated_detached_heads(raw_pages,body_size))
 
 
 # ------------------------------------------------------------------ heading vetoes
@@ -1813,6 +1863,8 @@ def _furniture_reason(line, raw, style, top_y=None):
         return "folio_sequence"
     if getattr(style,"local_running_boxes",{}).get(raw.pno) == line.bbox:
         return "local_running_folio"
+    if line.bbox in getattr(style, 'repeated_head_boxes', {}).get(raw.pno, ()):
+        return 'repeated_detached_head'
     y0, y1 = line.bbox[1], line.bbox[3]
     in_head = y1 <= raw.height * HEADER_BAND
     in_foot = y0 >= raw.height * FOOTER_BAND

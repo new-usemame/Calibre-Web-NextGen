@@ -187,6 +187,8 @@ class Book(object):
     reasons: dict = field(default_factory=dict)       # pno -> [reason, ...]
     style: Optional[skeleton.BookStyle] = None
     source_words: Counter = field(default_factory=Counter)
+    page_wrap_words: set = field(default_factory=set)
+    page_wrap_compounds: set = field(default_factory=set)
     #: pno -> [(what the text layer returned, what the book's numbering says), ...]
     renumbered: dict = field(default_factory=dict)
     conservation: Optional[ConservationReport] = None
@@ -1515,6 +1517,10 @@ def assemble(skeletons, style, raw_pages=None):
     stitched = 0
     refused = 0
     vocab = book_vocabulary(raw_pages) if raw_pages is not None else None
+    book.page_wrap_words = set(vocab or ())
+    book.page_wrap_compounds = {match.casefold() for raw in (raw_pages or ())
+        for block in raw.text_blocks for line in block.lines
+        for match in re.findall(r"[A-Za-z][A-Za-z'’]*-[A-Za-z][A-Za-z'’]*", line.text)}
     source_geometry = {raw.pno:getattr(raw,'source_geometry',{}) for raw in (raw_pages or [])}
 
     # Before anything else, because a damaged note number is what a damaged marker

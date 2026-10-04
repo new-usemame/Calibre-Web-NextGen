@@ -56,6 +56,7 @@ OEBPS = "OEBPS"
 ABOUT_HREF = "reflow-about.xhtml"
 SOURCE_INDEX_HREF = "source-pages.xhtml"
 SOURCE_CHECKS_HREF = "source-checks.xhtml"
+FURNITURE_HREF = "printed-furniture.xhtml"
 
 #: Chapters split on the ladder's top two levels, per SPEC §3.
 SPLIT_LEVELS = (1, 2)
@@ -731,15 +732,21 @@ def _open_tag(block):
     return block[:block.find(">") + 1]
 
 
-def merge_paragraphs(left, right, page_marker=""):
+def merge_paragraphs(left, right, page_marker="", words=None, compounds=()):
     """Join two paragraphs the way the typesetter's page turn joined them."""
     if _READING_COPY.search(left+right):
-        return _merge_without_reading_copy(merge_paragraphs,left,right,page_marker)
+        return _merge_without_reading_copy(merge_paragraphs,left,right,page_marker,words,compounds)
     head = _inner(right).lstrip()
     tail = _inner(left).rstrip()
     plain = block_text(tail)
     if _TRAILING_HYPHEN.search(tail) and block_text(head)[:1].islower():
-        tail = _TRAILING_HYPHEN.sub(r"\1\2", tail)
+        prefix = re.search(r"([\w'’]+)[" + assemble.HYPHENS + r"]$", plain)
+        following = re.match(r"[A-Za-z'’]+", block_text(head))
+        earned = words is None or (prefix and following and
+            (prefix[1]+following[0]).casefold() in words and
+            (prefix[1]+'-'+following[0]).casefold() not in compounds)
+        if earned:
+            tail = _TRAILING_HYPHEN.sub(r"\1\2", tail)
         glue = ""
     elif _TRAILING_HYPHEN.search(tail) or assemble.ENDDASH.search(plain):
         glue = ""
@@ -985,19 +992,22 @@ def _layout_flow_index(body, last):
         not body[i].startswith('<section class="reflow-retained-furniture"')), None)
 
 
-def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=None, executed=None):
+def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=None, executed=None,
+                     words=None, compounds=()):
     """Use checked model seams for model pages, legacy seams for fallback pairs."""
     joined = 0
     carriers = {}
     for index in range(1, len(pages)):
         previous, current = pages[index - 1], pages[index]
+        if current['pno'] != previous['pno'] + 1:
+            continue
         model_owned = previous["pno"] in layout_pages or current["pno"] in layout_pages
         decision = (layout_boundaries or {}).get(current["pno"]) if model_owned else None
         if model_owned and (decision is None or current["pno"] != previous["pno"]+1):
             continue
         if not model_owned and (previous['pno'] in title_pages or current['pno'] in title_pages):
             continue
-        owner = carriers.get(previous['pno'], previous) if model_owned else previous
+        owner = carriers.get(previous['pno'], previous)
         tail_index = _layout_flow_index(owner['body'], True) if model_owned else len(owner['body'])-1
         head_index = _layout_flow_index(current['body'], False) if model_owned else 0
         if not model_owned:
@@ -1035,7 +1045,9 @@ def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=N
                 carriers[current['pno']] = owner
             if executed is not None: executed.add(current['pno'])
         else:
-            owner['body'][tail_index] = merge_paragraphs(tail, current['body'].pop(head_index), marker)
+            owner['body'][tail_index] = merge_paragraphs(tail, current['body'].pop(head_index), marker, words, compounds)
+            if _layout_flow_index(current['body'], False) is None:
+                carriers[current['pno']] = owner
         if not move_page_marker:
             # Return to the joined paragraph, without inserting markup into a
             # word that straddles the source boundary.
@@ -1329,6 +1341,28 @@ def _source_page_items(page_homes):
         '<li><a href=%s>PDF page %d</a></li>'
         % (quoteattr("%s#pg_%04d" % (href, pno)), pno + 1)
         for pno, href in sorted(page_homes.items()))
+
+
+def _printed_furniture(book, page_homes, language):
+    """Retain exact marginal text in an accessible, page-bound inspection channel.
+
+    This is published after the source gate: furniture is a separate source
+    channel, never additional words in the body page being checked by that gate.
+    """
+    sections = []
+    for pno, inventory in sorted(getattr(book, 'source_inventory', {}).items()):
+        lines = {row['id']: row['source'] for row in inventory.get('lines', [])}
+        furniture = [lines[key].text for region in inventory.get('regions', [])
+                     if region['suggested_kind'] == 'furniture' for key in region['line_ids']]
+        if not furniture or pno not in page_homes:
+            continue
+        sections.append('<section class="reflow-retained-furniture" id="furniture_p%04d"><h2>PDF page %d</h2>%s'
+                        '<p><a href="%s#pg_%04d">Return to reading</a></p></section>' %
+                        (pno, pno+1, ''.join('<p>%s</p>' % escape(t) for t in furniture), page_homes[pno], pno))
+    if not sections:
+        return None
+    return _document('Printed running heads and folios',
+        '<h1>Printed running heads and folios</h1>' + ''.join(sections), language)
 
 
 def _source_checks(language, evidence=None):
@@ -2139,7 +2173,9 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
 
         pages = _page_blocks(page_html)
         executed_layout_boundaries = set()
-        joins = _join_page_turns(pages, book.title_pages, compiled_layouts, layout_boundaries, executed_layout_boundaries)
+        joins = _join_page_turns(pages, book.title_pages, compiled_layouts, layout_boundaries, executed_layout_boundaries,
+            words=getattr(book, 'page_wrap_words', None) or None,
+            compounds=getattr(book, 'page_wrap_compounds', ()))
         contents_pages = _source_contents_pages(pages, doc)
         chapters = _chapters(pages, book.title_pages, contents_pages)
         chapter_images = {src for chapter in chapters for src in _IMG_SRC.findall('\n'.join(chapter.blocks))}
@@ -2237,6 +2273,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         # An ordinary spine item also works in readers which ignore EPUB page-list.
         # Keep this generated reference after the book, never inside its prose.
         if page_homes:
+            furniture = _printed_furniture(book, page_homes, language)
+            if furniture:
+                documents[FURNITURE_HREF] = furniture
+                manifest.append({'id': 'printed-furniture', 'href': FURNITURE_HREF,
+                                 'type': 'application/xhtml+xml'})
+                spine.append('printed-furniture')
+                entries.append((FURNITURE_HREF, 'Printed running heads and folios'))
             documents[SOURCE_CHECKS_HREF] = _source_checks(language, evidence)
             manifest.append({"id": "source-checks", "href": SOURCE_CHECKS_HREF,
                              "type": "application/xhtml+xml"})

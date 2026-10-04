@@ -296,7 +296,8 @@ def _content_names(zf):
     """The documents that carry the book's text: not the machine navigation."""
     return [n for n in _xhtml_names(zf)
             if posixpath.basename(n) not in ("nav.xhtml", "reflow-about.xhtml",
-                                            "source-pages.xhtml", "source-checks.xhtml")]
+                                            "source-pages.xhtml", "source-checks.xhtml",
+                                            build_epub.FURNITURE_HREF)]
 
 
 _BODY = re.compile(r"<body[^>]*>(.*)</body>", re.S)

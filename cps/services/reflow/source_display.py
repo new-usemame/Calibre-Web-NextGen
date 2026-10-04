@@ -182,6 +182,45 @@ class SourceDisplay:
                 return self._lossless_candidate(pix, jpeg, max_bytes)
         raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
 
+    def complete_detail_rect(self,rect):
+        """Complete ink touching a passage detail's edges in the native bitmap.
+
+        Neighboring source context is allowed here. These are inspection crops,
+        not isolated words or figures. No resizing, recognition, or new pixels
+        supplies the completion; an exhausted halo uses the full original page.
+        """
+        seed=_rect(rect)&self.rect
+        if seed.is_empty:raise ValueError('source detail outside page')
+        proof=dict(version='source-native-detail-edges-1',seed_reading_bbox=list(seed))
+        image=self._native_bitonal()
+        if image is None:return seed,dict(proof,status='withheld',reason='native_bitonal_visible_page_unproved')
+        sx,sy=image.width/self.rect.width,image.height/self.rect.height
+        initial=[max(0,math.floor(seed.x0*sx)),max(0,math.floor(seed.y0*sy)),
+                 min(image.width,math.ceil(seed.x1*sx)),min(image.height,math.ceil(seed.y1*sy))]
+        halo=[max(0,initial[0]-math.ceil(12*sx)),max(0,initial[1]-math.ceil(12*sy)),
+              min(image.width,initial[2]+math.ceil(12*sx)),min(image.height,initial[3]+math.ceil(12*sy))]
+        if (halo[2]-halo[0])*(halo[3]-halo[1])>GRID_QUERY_PIXELS:
+            return seed,dict(proof,status='withheld',reason='bounded_query_exceeded')
+        box=list(initial)
+        def edges():
+            x0,y0,x1,y1=box
+            strips=((x0,y0,min(x1,x0+2),y1),(x0,y0,x1,min(y1,y0+2)),
+                    (max(x0,x1-2),y0,x1,y1),(x0,max(y0,y1-2),x1,y1))
+            return [image.crop(strip).getextrema()!=(255,255) for strip in strips]
+        while True:
+            touching=edges()
+            if not any(touching):break
+            changed=False
+            for index,ink in enumerate(touching):
+                if not ink:continue
+                if index<2 and box[index]>halo[index]:box[index]-=1;changed=True
+                elif index>=2 and box[index]<halo[index]:box[index]+=1;changed=True
+            if not changed:
+                return self.rect,dict(proof,status='full_page_context',reason='complete_edge_not_proved_within_halo')
+        result=extract.pymupdf.Rect(box[0]/sx,box[1]/sy,box[2]/sx,box[3]/sy)
+        return result,dict(proof,status='completed' if box!=initial else 'already_clear',
+            native_pixel_box=box,native_seed_pixel_box=initial,reading_bbox=list(result))
+
     def query_document(self,isolate=False):
         """Existing pixel questions in reading coordinates, without a second renderer."""
         display=self

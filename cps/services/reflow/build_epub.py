@@ -1931,11 +1931,16 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
+            edge_proof = None
+            if key.startswith('text_'):
+                reading_rect, edge_proof = display.complete_detail_rect(reading_rect)
+                rect = display.source_rect(reading_rect) * doc[pno].derotation_matrix
             package_source_image(src, display.source_image(reading_rect,
                                                             scale=2 if pno in native_figures else 3,
                                                             lossless_candidate=pno not in native_figures))
             details.append({"id": key, "label": label, "src": src, "bbox": list(rect),
                             "reading_bbox": list(reading_rect)})
+            if edge_proof is not None:details[-1]['source_edge_completion'] = edge_proof
         from .source_display import grid_regions
         # These new native routes inspect an already-owned figure region; they
         # need no raster grid inference. Preserve that analysis for the existing

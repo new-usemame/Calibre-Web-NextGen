@@ -60,3 +60,17 @@ def test_source_boundary_or_first_line_indent_does_not_join_a_parenthetical(tmp_
         roots=[ET.fromstring(z.read(n)) for n in z.namelist() if n.startswith('OEBPS/ch') and n.endswith('.xhtml')]
         assert not any('well off (ignoring' in ''.join(p.itertext()) for r in roots for p in r.iter(X+'p'))
     doc.close()
+
+
+@pytest.mark.parametrize('control',[None,'finished','indented','gap','short_tail','glyph_tail','other_column'])
+def test_measured_parenthetical_fragment_keeps_same_page_paragraph(control):
+    tail='The source describes the place of property'+('.' if control=='finished' else '')
+    runs=[['glyph',tail]] if control=='glyph_tail' else [['t',tail]]
+    a=assemble.Element('p',runs,bbox=(40,100,340,122),pages=[0],line_boxes=[(58,100,340,109),(40,113,160 if control=='short_tail' else 339,122)])
+    x=58 if control=='indented' else 40;y=140 if control=='gap' else 126
+    b=assemble.Element('p',[['t','(moveable possessions rather than land). The source continues.']],bbox=(x,y,330,y+9),pages=[0],line_boxes=[(x,y,330,y+9)],column=1 if control=='other_column' else 0)
+    out=assemble._join_within_page([a,b],set())
+    assert len(out)==(1 if control is None else 2)
+    if control is None:
+        assert out[0].text==tail+' (moveable possessions rather than land). The source continues.'
+        assert out[0].line_boxes==[(58,100,340,109),(40,113,339,122),(40,126,330,135)]

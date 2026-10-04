@@ -1144,7 +1144,8 @@ def _join_within_page(elements, vocab):
             if anchor is not None \
                     and all(not _x_overlaps(element.bbox, box) for box in barriers) \
                     and (continues(anchor.text, _prose_opening(element.runs))
-                         or _same_print_line(anchor, element)):
+                         or _same_print_line(anchor, element)
+                         or _same_page_parenthetical(anchor, element)):
                 anchor.runs = tidy(stitch_runs(
                     anchor.runs, element.runs, heal=True, vocab=vocab))
                 anchor.pages = sorted(set(anchor.pages + element.pages))
@@ -1173,6 +1174,30 @@ def _prose_opening(runs):
             or (runs[start][0] == 't' and not runs[start][1].strip())):
         start += 1
     return plain_text(runs[start:]).lstrip()
+
+
+def _same_page_parenthetical(left, right):
+    """An unindented parenthetical on the next printed line completes prose."""
+    from statistics import median
+    opening = _prose_opening(right.runs)
+    if (not opening.startswith('(') or not opening[1:].lstrip()[:1].islower()
+            or SENT_END.search(left.text) or left.punctuation_uncertain
+            or right.punctuation_uncertain or len(left.line_boxes) < 2
+            or not right.line_boxes or (left.band, left.column) != (right.band, right.column)):
+        return False
+    tail = next((run for run in reversed(left.runs) if str(run[1]).strip()), None)
+    if tail is None or tail[0] == 'glyph':
+        return False
+    a, b = left.line_boxes[-1], right.line_boxes[0]
+    heights = [box[3] - box[1] for box in left.line_boxes + [b] if box[3] > box[1]]
+    if not heights:
+        return False
+    em = median(heights)
+    margin = min(box[0] for box in left.line_boxes)
+    edge = max(box[2] for box in left.line_boxes)
+    return (abs(a[0] - margin) <= em * .5 and abs(b[0] - margin) <= em * .5
+            and edge - a[2] <= em * .5 and -.2 * em <= b[1] - a[3] <= .6 * em
+            and abs((b[3] - b[1]) / em - 1) <= .15)
 
 
 def _same_print_line(left, right):

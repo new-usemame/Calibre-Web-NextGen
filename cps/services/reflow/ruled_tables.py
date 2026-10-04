@@ -6,7 +6,7 @@ semantics or authorize a transcription, reordered words, or guessed headers.
 from statistics import median
 from . import extract
 
-VERSION='source-ruled-table-1'
+VERSION='source-ruled-table-2'
 
 
 def _rows(lines):
@@ -41,6 +41,10 @@ def regions(raw,kept,probe,candidates):
     for group in groups:
         if len(group)<2:continue
         cells=[line for _,row,_ in group for line in row];em=median(line.size for line in cells)
+        # Multiline prose cells in a ruled register already have a searchable
+        # row reading. This sparse-label detector must not replace that reading
+        # with images merely because each prose line shares a baseline.
+        if median(len(line.stripped.split()) for line in cells)>4:continue
         box=_lines_bbox(cells,cells[0].bbox)
         left=max(0,min(line.bbox[0] for line in lines)-2*em)
         right=min(raw.width,max(line.bbox[2] for line in lines)+2*em)

@@ -126,6 +126,15 @@ async function mockEditEndpoints(page: Page, setTitle: (t: string) => void, curr
       status: 200, contentType: 'application/json', body: JSON.stringify({ review: null }),
     });
   });
+  // Its personal score is also fixture state: the synthetic book has no row
+  // in the server database. Keep real mutation/error paths outside this mock.
+  await page.route(`**/api/v1/books/${TARGET_ID}/rating`, async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ personal_rating: null, household_rating: null }),
+    });
+  });
   await page.route(`**/api/v1/books/${TARGET_ID}/metadata`, async (route) => {
     if (route.request().method() === 'POST') {
       const sent = route.request().postDataJSON() as Partial<BookMetadata>;

@@ -87,6 +87,21 @@ for (const classic of [false, true]) {
     if (!classic) await expect(p.locator('html')).toHaveAttribute('data-theme',
       info.project.name.includes('phone') || info.project.name === 'mobile' ? 'dark' : 'light');
     await expect(select).toHaveValue('0');
+    if (classic) {
+      const retry = region.getByRole('button', { name: 'Retry', exact: true });
+      await expect(retry).not.toBeVisible();
+      const loadRoute = `**/api/v1/books/${bookId}/rating`;
+      await p.route(loadRoute, r => r.request().method() === 'GET'
+        ? r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'unavailable', message: 'Temporary load failure' } }) }) : r.continue());
+      await p.reload();
+      await expect(region.getByRole('alert')).toHaveText('Could not load your rating.');
+      await expect(retry).toBeVisible();
+      await p.unroute(loadRoute);
+      await retry.click();
+      await expect(select).toBeEnabled();
+      await expect(select).toHaveValue('0');
+      await expect(retry).not.toBeVisible();
+    }
     const rejected = await p.request.put(`/api/v1/books/${bookId}/rating`, { data: { rating: 10 } });
     expect(rejected.status(), 'rating writes without CSRF must be rejected').toBe(400);
     const absent = await p.request.put('/api/v1/books/2147483000/rating', {

@@ -8,7 +8,7 @@
   <form id="personal-rating-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="personal-rating-score">{{ _('Your rating') }}</label>
-    <select id="personal-rating-score" aria-describedby="personal-rating-help personal-rating-error" disabled style="min-height:44px;max-width:100%">
+    <select class="form-control" id="personal-rating-score" aria-describedby="personal-rating-help personal-rating-error" disabled style="min-height:44px;max-width:100%;width:auto">
       <option value="0">{{ _('Unrated') }}</option>
       {% for score in range(1,11) %}<option value="{{ score }}">{{ _('%(rating)s out of 5', rating=score / 2) }}</option>{% endfor %}
     </select>

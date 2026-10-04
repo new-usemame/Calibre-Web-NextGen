@@ -494,6 +494,8 @@ def main():
                 torrent_metadata = run_torrent_metadata_runtime(root,repo,owner,args.fixture,ingest,library)
                 from acquisition_hybrid_runtime_probe import run_hybrid_runtime
                 hybrid = run_hybrid_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
+                from acquisition_torrent_v2_runtime_probe import run_torrent_v2_runtime
+                pure_v2 = run_torrent_v2_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_mobi_runtime_probe import run_mobi_runtime
                 mobi = run_mobi_runtime(root,repo,owner,other_owner,ingest,library,
                                         mobi_fixture=args.mobi_fixture, mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
@@ -508,6 +510,12 @@ def main():
                         assert c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
                             (owner,first_id)).fetchall() == rows
                 client_mobi['original_epub_and_reading_state_preserved'] = True
+                pure_v2['original_epub_and_reading_state_preserved'] = True
+                pure_v2['prior_seed_checks'] = dict(
+                    book_id=first_id, stored_sha256=first_hash,
+                    calibre_bookmarks=calibre_annotations,
+                    app_reading_state=reader_state,
+                )
             print(
                 "CWNG_ACQUISITION_FULL_RUNTIME="
                 + json.dumps(
@@ -520,6 +528,7 @@ def main():
                         opds1_entry=opds1_entry,
                         torrent_metadata=torrent_metadata,
                         hybrid=hybrid,
+                        pure_v2=pure_v2,
                         mobi=mobi,
                         client_mobi=client_mobi,
                         http_gets=gets,

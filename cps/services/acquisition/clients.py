@@ -242,13 +242,23 @@ class QBitClient:
                 # LT1 uses v1. Resolve this before the fence or any submission.
                 if engine.startswith('2.0.'):
                     identity = hashes.v2[:40]
+                elif identity is None:
+                    raise ClientError('unsupported_client_version')
         self._prepared_submission = (type(descriptor), descriptor, identity)
         return identity
 
-    def submit(self, name, descriptor, *, checkpoint=lambda: None):
+    def submit_fenced(self, descriptor, before_submit, *, checkpoint=lambda: None):
+        return self.submit(None, descriptor, checkpoint=checkpoint, before_submit=before_submit)
+
+    def submit(self, name, descriptor, *, checkpoint=lambda: None, before_submit=None):
         identity = self.prepare_submission(descriptor, checkpoint=checkpoint)
         # A pre-existing unrelated torrent cannot be adopted or have its policy changed.
         if rows(parsed(self.call('torrents/info', hashes=identity, checkpoint=checkpoint))): raise ClientError('torrent_already_exists')
+        # Read-only collision checks precede the worker's durable POST fence.
+        # A shared attempt adopted at this boundary must never be submitted again.
+        if before_submit is not None:
+            name = before_submit()
+            if name is None: return None
         form = {'category': self.config['category'], 'savepath': self.config['remote_path'], 'tags': name, 'autoTMM': 'false'}
         if isinstance(descriptor, str): form['urls'] = descriptor
         result = self.call('torrents/add', form=form, upload=None if isinstance(descriptor, str) else (name+'.torrent', descriptor), checkpoint=checkpoint)
@@ -310,10 +320,26 @@ class TransmissionClient:
         _safe_root(self.config)
         return {'title': 'Transmission', 'protocol': 'transmission', 'api_version': version, 'browse': False, 'completed_path_readable': True}
 
-    def submit(self, name, descriptor, *, checkpoint=lambda: None):
-        identity = validate_magnet(descriptor) if isinstance(descriptor, str) else validate_torrent(descriptor)
+    def prepare_submission(self, descriptor, *, checkpoint=lambda: None):
+        if isinstance(descriptor, str):
+            return validate_magnet(descriptor)
+        identity = torrent_identities(descriptor).v1
+        # The supported Transmission releases cannot ingest a pure-v2 file.
+        # Refuse before the worker records an irreversible submission attempt.
+        if identity is None:
+            raise ClientError('unsupported_client_version')
+        return identity
+
+    def submit_fenced(self, descriptor, before_submit, *, checkpoint=lambda: None):
+        return self.submit(None, descriptor, checkpoint=checkpoint, before_submit=before_submit)
+
+    def submit(self, name, descriptor, *, checkpoint=lambda: None, before_submit=None):
+        identity = self.prepare_submission(descriptor, checkpoint=checkpoint)
         existing = self.call('torrent-get', {'ids': [identity], 'fields': ['hashString']}, checkpoint=checkpoint)
         if rows(existing.get('torrents')): raise ClientError('torrent_already_exists')
+        if before_submit is not None:
+            name = before_submit()
+            if name is None: return None
         arguments = {'download-dir': self.config['remote_path'], 'labels': [self.config['category'], name], 'paused': False}
         arguments['filename' if isinstance(descriptor, str) else 'metainfo'] = descriptor if isinstance(descriptor, str) else base64.b64encode(descriptor).decode()
         result = self.call('torrent-add', arguments, checkpoint=checkpoint)

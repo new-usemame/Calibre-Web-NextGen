@@ -799,7 +799,7 @@ class Repository(BundleChoicesMixin):
 
     def clear_rejected_submission(self, job_id, token, *, error_code='client_error'):
         """A definite rejection resolves all adopters of this attempt as well."""
-        if error_code not in ('needs_auth', 'client_error'):
+        if error_code not in ('needs_auth', 'client_error', 'torrent_already_exists'):
             raise StorageError('Submission rejection is not definite')
         table, now = self.tables.jobs, self._now()
         with self.engine.begin() as conn:

@@ -161,7 +161,7 @@ def test_unbalanced_piece_layer_uses_zero_subtrees_at_its_own_level(piece_length
 
 
 @pytest.mark.parametrize("mutation", [
-    "pure_v2", "missing_layer", "wrong_layer_root", "wrong_v1_path", "wrong_v1_length",
+    "pure_v2_unknown_extension", "missing_layer", "wrong_layer_root", "wrong_v1_path", "wrong_v1_length",
     "missing_v1_pieces", "misaligned_without_padding", "bad_padding_length",
     "metaversion", "symlink", "unknown_leaf_extension", "extraneous_layer",
     "mixed_leaf_directory", "root_file", "unsafe_path", "utf8_alias",
@@ -170,8 +170,10 @@ def test_unbalanced_piece_layer_uses_zero_subtrees_at_its_own_level(piece_length
 def test_rejects_hybrid_descriptor_mismatches_and_unsafe_tree_semantics(mutation):
     descriptor = hybrid([([b"book.epub"], b"x" * (PIECE + 7))])
     info = descriptor[b"info"]
-    if mutation == "pure_v2":
+    if mutation == "pure_v2_unknown_extension":
+        # Valid pure-v2 is supported; unreviewed info semantics still fail.
         info.pop(b"files"); info.pop(b"pieces")
+        info[b"future extension"] = b"unknown semantics"
     elif mutation == "missing_layer":
         descriptor[b"piece layers"] = {}
     elif mutation == "wrong_layer_root":

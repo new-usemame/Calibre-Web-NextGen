@@ -30,7 +30,7 @@ def resource_hashes(payload, piece_length):
         width *= 2
 
 
-def metainfo(resources, *, name, announce, piece_length=16384, multi=False):
+def metainfo(resources, *, name, announce, piece_length=16384, multi=False, pure_v2=False):
     """resources is an ordered name/bytes list in UTF-8 file-tree order."""
     assert resources == sorted(resources, key=lambda row: row[0].encode())
     tree = {}
@@ -49,17 +49,19 @@ def metainfo(resources, *, name, announce, piece_length=16384, multi=False):
             if padding:
                 files.append({'length': padding, 'path': ['.pad', str(padding)], 'attr': b'p'})
                 payload.extend(bytes(padding))
-    info = {'name': name, 'meta version': 2, 'piece length': piece_length, 'file tree': tree,
-            'pieces': b''.join(hashlib.sha1(payload[i:i+piece_length]).digest()
-                               for i in range(0, len(payload), piece_length))}
-    if multi:
+    info = {'name': name, 'meta version': 2, 'piece length': piece_length, 'file tree': tree}
+    if not pure_v2:
+        info['pieces'] = b''.join(hashlib.sha1(payload[i:i+piece_length]).digest()
+                                  for i in range(0, len(payload), piece_length))
+    if multi and not pure_v2:
         info['files'] = files
-    else:
+    elif not multi:
         assert len(resources) == 1 and resources[0][0] == name
-        info['length'] = len(resources[0][1])
+        if not pure_v2:
+            info['length'] = len(resources[0][1])
     raw_info = bencode(info)
     return bencode({'announce': announce, 'info': info, 'piece layers': layers}), {
-        'v1': hashlib.sha1(raw_info).hexdigest(),
+        'v1': None if pure_v2 else hashlib.sha1(raw_info).hexdigest(),
         'v2': hashlib.sha256(raw_info).hexdigest(),
         'v2_truncated': hashlib.sha256(raw_info).hexdigest()[:40],
         'piece_layer_count': len(layers),

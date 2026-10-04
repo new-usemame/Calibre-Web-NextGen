@@ -93,6 +93,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_hybrid_runtime_probe.py": "/tmp/acquisition_hybrid_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_torrent_v2_runtime_probe.py": "/tmp/acquisition_torrent_v2_runtime_probe.py",
+        ROOT
         / "tests/fixtures/virtual_library_hybrid.py": "/tmp/virtual_library_hybrid.py",
         ROOT
         / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
@@ -220,3 +222,35 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         assert len(case['receipts']) == (2 if case['multi'] else 1)
         if case['adapter'] == 'qbittorrent':
             assert case['build_info_before_submit']
+    pure_v2 = proof['pure_v2']
+    assert pure_v2['real_loopback_http'] and pure_v2['full_processor_subprocess']
+    assert pure_v2['original_epub_and_reading_state_preserved']
+    assert pure_v2['prior_seed_checks']['stored_sha256'] == proof['repackaging']['imported_sha256']
+    assert len(pure_v2['prior_seed_checks']['calibre_bookmarks']) == 1
+    assert all(len(rows) == 1 for rows in pure_v2['prior_seed_checks']['app_reading_state'].values())
+    assert pure_v2['peer_download_or_running_released_client'] is False
+    assert [case['shape'] for case in pure_v2['outcomes']] == ['single', 'multi', 'layered', 'lt1-retry', 'collision-retry', 'hybrid-collision-retry']
+    for case in pure_v2['outcomes']:
+        if case['adapter'] == 'qbittorrent':
+            assert case['v1_infohash'] is None and case['external_id'] == case['v2_infohash'][:40]
+        else:
+            assert case['v1_infohash'] and case['external_id'] == case['v1_infohash']
+        assert case['remote_submissions'] == case['compatible_descriptor_gets'] == 1
+        assert case['descriptor_gets'] == (2 if case['shape'] in ('lt1-retry', 'collision-retry', 'hybrid-collision-retry') else 1)
+        assert all(case[key] for key in ('exact_descriptor_submitted', 'source_files_and_modes_unchanged',
+                                        'private_receipts', 'owned_cleanup', 'fresh_worker_reused_submission'))
+        if case['adapter'] == 'qbittorrent':
+            assert case['build_info_before_submit']
+        assert case['piece_layer_count'] == (1 if case['shape'] == 'layered' else 0)
+        assert len(case['receipts']) == (2 if case['multi'] else 1)
+        assert all(receipt['source_sha256'] == receipt['imported_sha256'] for receipt in case['receipts'])
+    assert pure_v2['outcomes'][0]['receipt_fault_recovery']
+    assert pure_v2['outcomes'][1]['mixed_bundle_explicit_selection']
+    assert pure_v2['outcomes'][1]['synthetic_padding_reported']
+    assert pure_v2['outcomes'][1]['synthetic_padding_excluded_from_choices']
+    assert [case['adapter'] for case in pure_v2['refusals']] == ['qbittorrent', 'transmission']
+    assert all(case['error_code'] == 'unsupported_client_version' and case['downstream_posts'] == 0
+               and case['submission_started'] is None for case in pure_v2['refusals'])
+
+    assert [c['adapter'] for c in pure_v2['collision_retries']] == ['qbittorrent', 'transmission']
+    assert all(c['no_submission_attempt_issued'] and c['submission_key'] is None and c['submission_invalid'] is None and c['remote_submissions_before_retry'] == 0 and c['submission_started'] is None and c['external_id'] is None and c['original_client_files_and_modes_preserved'] for c in pure_v2['collision_retries'])

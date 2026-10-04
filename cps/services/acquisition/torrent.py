@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Bounded v1/hybrid metainfo and v1 magnets; never fetch a supplied URL."""
+"""Bounded v1/v2 metainfo and v1 magnets; never fetch a supplied URL."""
 import base64
 import hashlib
 import re
@@ -88,8 +88,8 @@ def _merkle_root(hashes, piece_length):
     return hashes[0]
 
 
-def _hybrid_files(info, piece_layers):
-    """Validate BEP 52 structure and require its files to match the v1 view."""
+def _v2_files(info, piece_layers):
+    """Validate the reviewed BEP 52 tree/layers and return ordered real files."""
     if (type(info.get(b'meta version')) is not int or info[b'meta version'] != 2
             or not isinstance(info.get(b'file tree'), dict)
             or not isinstance(piece_layers, dict)):
@@ -179,6 +179,12 @@ def _hybrid_files(info, piece_layers):
         if info[b'name.utf-8'] != info.get(b'name'):
             raise TransportError('invalid_torrent')
     text_component(info[b'name'])
+    return tree_files
+
+
+def _hybrid_files(info, tree_files):
+    """Require the fully validated v1 view to match the validated v2 files."""
+    piece_length = info[b'piece length']
     v1_files = info.get(b'files')
     if v1_files is None:
         if type(info.get(b'length')) is not int:
@@ -223,7 +229,7 @@ def _hybrid_files(info, piece_layers):
 
 
 class TorrentIdentities(NamedTuple):
-    v1: str
+    v1: str | None
     v2: str | None = None
 
 
@@ -261,22 +267,22 @@ def torrent_identities(raw, *, tracker_origins=None, secret=None):
         data = read(); info = data[b'info']
         if pos != len(raw) or not isinstance(info, dict) or not info_bytes:
             raise TransportError('invalid_torrent')
-        # Only the v1 contract and reviewed BEP 52 hybrid fields may reach a
-        # client. Pure v2 remains unsupported by the existing client contract.
-        hybrid = any(key in info for key in (b'meta version', b'file tree')) or b'piece layers' in data
+        # V2 structure is shared by pure-v2 and hybrid descriptors. Any v1
+        # view (including single-file hints) still needs full v1 validation.
+        has_v2 = any(key in info for key in (b'meta version', b'file tree')) or b'piece layers' in data
         allowed_info = {b'name', b'name.utf-8', b'pieces', b'piece length', b'length', b'files',
                         b'private', b'source', b'md5sum', b'sha1', b'attr'}
-        if hybrid:
+        if has_v2:
             allowed_info |= {b'meta version', b'file tree'}
         if set(info) - allowed_info:
             raise TransportError('invalid_torrent')
         allowed_top = {b'info', b'announce', b'announce-list', b'comment', b'comment.utf-8',
                        b'created by', b'creation date', b'encoding'}
-        if hybrid:
+        if has_v2:
             allowed_top.add(b'piece layers')
         if set(data) - allowed_top:
             raise TransportError('invalid_torrent')
-        if hybrid and (type(info.get(b'meta version')) is not int or info[b'meta version'] != 2
+        if has_v2 and (type(info.get(b'meta version')) is not int or info[b'meta version'] != 2
                        or b'file tree' not in info or b'piece layers' not in data):
             raise TransportError('invalid_torrent')
         if b'private' in info and (type(info[b'private']) is not int or info[b'private'] not in (0, 1)):
@@ -291,6 +297,12 @@ def torrent_identities(raw, *, tracker_origins=None, secret=None):
         for url in urls: tracker(url.decode('utf-8'), tracker_origins, secret)
         safe_name(info[b'name'].decode('utf-8'))
         if b'name.utf-8' in info: safe_name(info[b'name.utf-8'].decode('utf-8'))
+        has_v1 = any(key in info for key in (b'pieces', b'length', b'files', b'md5sum', b'sha1', b'attr'))
+        if has_v2 and not has_v1:
+            tree_files = _v2_files(info, data[b'piece layers'])
+            if not any(length for _, length in tree_files):
+                raise TransportError('invalid_torrent')
+            return TorrentIdentities(None, hashlib.sha256(info_bytes).hexdigest())
         if not isinstance(info.get(b'pieces'), bytes) or len(info[b'pieces']) % 20 or not info[b'pieces'] or type(info.get(b'piece length')) is not int or info[b'piece length'] <= 0:
             raise TransportError('invalid_torrent')
         files = info.get(b'files')
@@ -322,16 +334,16 @@ def torrent_identities(raw, *, tracker_origins=None, secret=None):
                         # Released hybrid creators repeat .pad/<size> for equal
                         # alignment gaps. These synthetic rows have no payload;
                         # _hybrid_files still validates every exact offset/size.
-                        if path in paths and not (hybrid and padding and paths[path]):
+                        if path in paths and not (has_v2 and padding and paths[path]):
                             raise TransportError('invalid_torrent')
                         paths[path] = padding
         # Piece hashes cover the concatenated v1 payload, including padding.
         if not payload_bytes or len(info[b'pieces']) // 20 != (total_bytes + info[b'piece length'] - 1) // info[b'piece length']:
             raise TransportError('invalid_torrent')
-        if hybrid:
-            _hybrid_files(info, data[b'piece layers'])
+        if has_v2:
+            _hybrid_files(info, _v2_files(info, data[b'piece layers']))
         return TorrentIdentities(hashlib.sha1(info_bytes).hexdigest(),
-                                 hashlib.sha256(info_bytes).hexdigest() if hybrid else None)
+                                 hashlib.sha256(info_bytes).hexdigest() if has_v2 else None)
     except TransportError:
         raise
     except (KeyError, TypeError, ValueError, UnicodeError, AttributeError):
@@ -339,5 +351,6 @@ def torrent_identities(raw, *, tracker_origins=None, secret=None):
 
 
 def validate_torrent(raw, *, tracker_origins=None, secret=None):
-    """Keep the v1 admission identity used by existing workers and Transmission."""
-    return torrent_identities(raw, tracker_origins=tracker_origins, secret=secret).v1
+    """Legacy descriptor identity: v1 SHA1, or native best truncated v2 SHA256."""
+    identities = torrent_identities(raw, tracker_origins=tracker_origins, secret=secret)
+    return identities.v1 if identities.v1 is not None else identities.v2[:40]

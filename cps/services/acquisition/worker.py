@@ -330,19 +330,32 @@ class AcquisitionWorker:
             prepare = getattr(client, 'prepare_submission', None)
             if callable(prepare):
                 prepare(descriptor, checkpoint=checkpoint)
-            checkpoint()
-            fresh = repo.begin_submission(job.id, token)
-            external_id, started, key = repo.submission_identity(job.id, token)
+            fenced_submit = getattr(client, 'submit_fenced', None)
+            fresh = False
+            def before_submit():
+                nonlocal fresh
+                checkpoint()
+                fresh = repo.begin_submission(job.id, token)
+                _, _, attempt_key = repo.submission_identity(job.id, token)
+                return submission_name(attempt_key) if fresh else None
+            try:
+                if callable(fenced_submit):
+                    # Native torrent adapters perform their read-only collision
+                    # check first, then invoke this callback immediately before
+                    # the add operation. An expired preflight never issues a
+                    # durable attempt; accepted/uncertain POSTs remain fenced.
+                    external_id = fenced_submit(descriptor, before_submit, checkpoint=checkpoint)
+                else:
+                    name = before_submit()
+                    if fresh:
+                        external_id = client.submit(name, descriptor, checkpoint=checkpoint)
+            except TransportError as error:
+                if fresh and error.code in ('needs_auth', 'client_error', 'torrent_already_exists'):
+                    repo.clear_rejected_submission(job.id, token, error_code=error.code)
+                raise
             if fresh:
-                try:
-                    external_id = client.submit(submission_name(key), descriptor, checkpoint=checkpoint)
-                except TransportError as error:
-                    if error.code in ('needs_auth', 'client_error'):
-                        repo.clear_rejected_submission(job.id, token, error_code=error.code)
-                    raise
                 repo.record_external(job.id, token, external_id)
-            else:
-                external_id, started, key = repo.submission_identity(job.id, token)
+            external_id, started, key = repo.submission_identity(job.id, token)
         checkpoint()
         remote = client.find(submission_name(key), external_id, checkpoint=checkpoint)
         if remote is None:

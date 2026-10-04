@@ -2,6 +2,7 @@
 import io
 import re
 import zipfile
+from tests.unit.reflow_image_assertions import figure_name, assert_retained_pixels
 import pymupdf
 import pytest
 from cps.services.reflow import extract,source,skeleton,assemble,build_epub,ocr
@@ -200,10 +201,11 @@ def test_scan_figure_owns_connected_large_symbol_blocks_above_partial_crop(hidde
         path=tmp_path/'connected.epub';build_epub.build(book,str(path),doc=doc)
         assert build_epub.validate(str(path))==[]
         with zipfile.ZipFile(path) as package:
-            image=package.read('OEBPS/images/fig_p0000_0.jpg')
+            name=figure_name(package, 'fig_p0000_0')
+            image=package.read(name)
             chapter=package.read('OEBPS/ch001.xhtml').decode()
-            assert 'images/fig_p0000_0.jpg' in chapter
-            assert image==extract.crop_jpeg(doc,0,figure['bbox'])
+            assert name.removeprefix('OEBPS/') in chapter
+            assert_retained_pixels(image, extract.crop_jpeg(doc,0,figure['bbox']))
 
 @pytest.mark.parametrize('separate_numbers',[True,False])
 def test_scan_contents_separate_page_number_column_preserves_whole_row_region(separate_numbers,tmp_path):

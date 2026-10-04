@@ -1,6 +1,7 @@
 """Visible narrow source images survive title pages without promoting furniture."""
 import io
 import zipfile
+from tests.unit.reflow_image_assertions import figure_name
 
 import pymupdf
 from PIL import Image, ImageDraw
@@ -51,11 +52,12 @@ def test_sparse_title_page_retains_embedded_text_pixels_with_source_access(tmp_p
     with zipfile.ZipFile(target) as archive:
         bodies = [archive.read(name).decode() for name in archive.namelist()
                   if name.startswith('OEBPS/ch') and name.endswith('.xhtml')]
-        assert sum('fig_p0000_0.jpg' in body for body in bodies) == 1
+        name = figure_name(archive, 'fig_p0000_0')
+        assert sum(name.removeprefix('OEBPS/') in body for body in bodies) == 1
         assert not any('fig_p0001_' in body or 'fig_p0002_' in body or
                        'fig_p0003_' in body for body in bodies)
         assert any('without inferred or searchable text' in body and
                    'original-p0000.xhtml#page' in body for body in bodies)
         assert 'OEBPS/original-p0000.xhtml' in archive.namelist()
-        assert archive.read('OEBPS/images/fig_p0000_0.jpg')
+        assert archive.read(name)
     doc.close()

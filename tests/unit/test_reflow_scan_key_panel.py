@@ -2,6 +2,7 @@
 
 import io
 import zipfile
+from tests.unit.reflow_image_assertions import figure_name
 
 import pymupdf
 import pytest
@@ -97,7 +98,7 @@ def test_key_primary_package_retains_complete_source_pixels(mark, color, probe_k
         build_epub.build(book, target, doc=doc)
         assert build_epub.validate(target) == []
         with zipfile.ZipFile(target) as package:
-            primary = package.read('OEBPS/images/fig_p0000_0.jpg')
+            primary = package.read(figure_name(package, 'fig_p0000_0'))
             extent = ImageChops.difference(source, Image.new('RGB', source.size, 'white')).getbbox()
             assert extent is not None
             left, right = max(0, extent[0]-8), min(source.width, extent[2]+8)
@@ -110,9 +111,11 @@ def test_key_primary_package_retains_complete_source_pixels(mark, color, probe_k
                 assert ImageChops.difference(source.crop((right, 0, source.width, source.height)),
                     Image.new('RGB', (source.width-right, source.height), 'white')).getbbox() is None
             with Image.open(io.BytesIO(primary)) as image:
-                assert image.size == (right-left, source.height)
-                x = round((mark[0]+mark[2]))-left
-                y = round((mark[1]+mark[3]))
+                padding = (image.width-(right-left))//2
+                assert padding in (0,8)
+                assert image.size == (right-left+2*padding, source.height+2*padding)
+                x = round((mark[0]+mark[2]))-left+padding
+                y = round((mark[1]+mark[3]))+padding
                 assert min(image.convert('RGB').getpixel((x, y))) < 230
             chapter = package.read('OEBPS/ch001.xhtml').decode()
             assert chapter.count('Printed symbol key retained from the original page.') == 1

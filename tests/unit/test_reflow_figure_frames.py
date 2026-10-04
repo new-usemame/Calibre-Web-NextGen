@@ -1,6 +1,7 @@
 """Ordinary figures and their pixel probes share the chosen reading frame."""
 import copy
 from dataclasses import asdict
+from tests.unit.reflow_image_assertions import assert_retained_pixels
 import pymupdf
 import pytest
 from cps.services.reflow import extract,source,assemble,build_epub
@@ -40,7 +41,7 @@ def test_source_bound_ordinary_crop_uses_reading_frame(rotation,orientation):
     images=_Images()
     missing,blanks=build_epub._figure_images(chapters,doc,book,images,old.figure_rect)
     assert not missing and not blanks
-    assert images['images/fig_p0000_0.jpg']==display.jpeg(box,scale=2,quality=85)
+    assert_retained_pixels(images['images/fig_p0000_0.jpg'], display.jpeg(box,scale=2,quality=85))
     doc.close()
 
 

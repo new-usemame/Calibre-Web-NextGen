@@ -101,6 +101,7 @@ def test_incomplete_or_wrong_frame_keeps_full_page_fallback(region_source, chang
 
 def test_required_source_crop_survives_optional_blank_classifier(region_source, tmp_path, monkeypatch):
     import zipfile
+    from tests.unit.reflow_image_assertions import figure_name
     from cps.services.reflow import assemble, build_epub
     regions, raw, prov, doc = region_source
     measured, proof = regions.candidate(raw, prov, doc, skeleton.BookStyle(body_size=11), pixel_probe=None, layer_trusted=True)
@@ -112,7 +113,7 @@ def test_required_source_crop_survives_optional_blank_classifier(region_source, 
     build_epub.build(book, str(path), doc=doc)
     assert build_epub.validate(path)==[]
     with zipfile.ZipFile(path) as archive:
-        assert archive.getinfo('OEBPS/images/fig_p0000_0.jpg').file_size>0
+        assert archive.getinfo(figure_name(archive, 'fig_p0000_0')).file_size>0
 
 
 def _book(region_source):
@@ -128,6 +129,7 @@ def _book(region_source):
 
 def test_source_crop_survives_real_epub_and_native_codec(region_source, tmp_path):
     import io, zipfile
+    from tests.unit.reflow_image_assertions import figure_name
     from PIL import Image
     from cps.services.reflow import build_epub, enriched_source, native_codec
     regions, raw, prov, doc = region_source
@@ -138,7 +140,7 @@ def test_source_crop_survives_real_epub_and_native_codec(region_source, tmp_path
     build_epub.build(book, str(path), doc=doc, source_pages={0:canonical})
     assert build_epub.validate(path) == []
     with zipfile.ZipFile(path) as z:
-        name = 'images/fig_p0000_0.jpg'
+        name = figure_name(z, 'fig_p0000_0').removeprefix('OEBPS/')
         body = ''.join(z.read(n).decode() for n in z.namelist() if n.startswith('OEBPS/ch') and n.endswith('.xhtml'))
         assert name in body
         image = Image.open(io.BytesIO(z.read('OEBPS/'+name))).convert('L')

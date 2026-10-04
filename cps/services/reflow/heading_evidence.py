@@ -7,7 +7,7 @@ from collections import Counter
 
 from . import assemble,extract,skeleton
 
-VERSION='source-heading-evidence-5'
+VERSION='source-heading-evidence-6'
 BOX_TOLERANCE=.02  # two units of serialized source-coordinate precision
 ALIGNMENT_EM=.5
 ISOLATION_LEADING=.5
@@ -138,7 +138,20 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
                 proof['reason']='incomplete_visual_source_unit';continue
         box=element.bbox
         if _continued(book,pno,index):proof['reason']='known_source_continuation';continue
-        if box[3]<=raw['height']*skeleton.HEADER_BAND or box[1]>=raw['height']*skeleton.FOOTER_BAND:
+        top=box[3]<=raw['height']*skeleton.HEADER_BAND
+        # A unique opening title may sit in the top band. Its current body
+        # reference must be an actual canonical unit with matching raw lines,
+        # not merely spare PDF text that could belong to another column/header.
+        em=getattr(getattr(book,'style',None),'body_size',0)
+        opening_reference=any(other is not element and other.kind=='p' and not other.table_row
+            and _valid(other.bbox) and other.bbox[1]>=box[3]
+            and other.bbox[1]-box[3]<=4*em
+            and other.bbox[2]-other.bbox[0]>=raw['width']*.5
+            and abs((other.bbox[0]+other.bbox[2]-box[0]-box[2])/2)<=ALIGNMENT_EM*em
+            and other.line_boxes and all(any(all(abs(a-b)<=BOX_TOLERANCE for a,b in zip(lb,line['bbox']))
+                for line in lines) for lb in other.line_boxes)
+            for other in elements) if top and em>0 else False
+        if (top and not opening_reference) or box[1]>=raw['height']*skeleton.FOOTER_BAND:
             proof['reason']='source_margin_unit';continue
         others=[line for line in lines if line not in mapped]
         spans=_spans(mapped)
@@ -211,4 +224,5 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
         elif aligned and isolated:
             proof.update(supported=True,reason='centered_isolated_source_unit')
         else:proof['reason']='no_standalone_display_evidence'
+        if proof['supported']:proof['alignment']='center' if aligned else 'left'
     return result

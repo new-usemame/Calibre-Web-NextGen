@@ -10,7 +10,7 @@ import hashlib
 import json
 import random
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 from . import extract, heading_evidence, quote_evidence
 
@@ -75,6 +75,7 @@ class _Spec:
     kind: str
     start: int
     end: int
+    alignment: str = ''
 
 
 def _proposals(element,index,quote_units=()):
@@ -197,6 +198,11 @@ class OperationPlan:
         result = {}
         for cid in self.selected:
             spec = by_id[cid]
+            if spec.kind=='heading':
+                geometry=json.loads(self.prepared.heading_source_json)
+                proofs=heading_evidence.heading_evidence(book,self.prepared.page,
+                    geometry['raw_page'],geometry['layer'],geometry['source_rotation'],geometry['reading_size'])
+                spec=replace(spec,alignment=proofs[spec.element]['alignment'])
             result.setdefault(spec.element, []).append(spec)
         return result
 

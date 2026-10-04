@@ -225,6 +225,11 @@ def wrap(fragment, element, specs):
                 raise ContractError('operation splits a canonical uncertainty or marker atom')
     if specs[0].kind == 'heading':
         out = node.cloneNode(True);out.tagName = 'h2'
+        alignment=getattr(specs[0],'alignment','')
+        if alignment:
+            if alignment not in ('center','left'):raise ContractError('invalid source heading alignment')
+            if alignment=='center':
+                out.setAttribute('class',(out.getAttribute('class')+' source-heading-centered').strip())
         return out.toxml()
 
     def sliced(current, lo, hi):

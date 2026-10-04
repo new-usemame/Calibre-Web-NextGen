@@ -95,6 +95,7 @@ _IMG_TAG = re.compile(r"<img\b[^>]*/?>", re.I)
 STYLESHEET = """\
 body { margin: 0 5%; line-height: 1.45; text-align: justify; }
 h1, h2, h3, h4, h5, h6 { text-align: left; page-break-after: avoid; }
+.source-heading-centered { text-align: center; }
 p { margin: 0; text-indent: 1.2em; }
 p.first, h1 + p, h2 + p, h3 + p, blockquote + p { text-indent: 0; }
 blockquote { margin: 1em 2em; font-size: 0.95em; }

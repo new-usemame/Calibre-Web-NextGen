@@ -15,7 +15,7 @@ from xml.parsers.expat import ExpatError
 from . import extract, native_text, source_inventory
 from .source_display import SourceDisplay
 
-VERSION = 'source-glyph-presentation-2'
+VERSION = 'source-glyph-presentation-3'
 INK_VERSION = 'source-glyph-presentation-1'
 METRIC_VERSION = 'source-glyph-pdf-metrics-1'
 MAX_QUERY_PIXELS = 250_000
@@ -120,7 +120,9 @@ def _complete_ink(image, rect, size, display, other_boxes):
     _need(extents,'no_source_ink')
     crop=(min(seed[0],*(b[0]-1 for b in extents)),min(seed[1],*(b[1]-1 for b in extents)),
           max(seed[2],*(b[2]+1 for b in extents)),max(seed[3],*(b[3]+1 for b in extents)))
-    _need(crop!=seed,'original_crop_complete')
+    # A crop that already contains its complete ink still needs the same
+    # source baseline/size projection as one whose ink required expansion.
+    # Both paths must prove ownership and retain the sealed original below.
     _need(x0<=crop[0] and y0<=crop[1] and crop[2]<=x1 and crop[3]<=y1,'ink_component_not_closed')
     for y in range(crop[1],crop[3]):
         for x in range(crop[0],crop[2]):

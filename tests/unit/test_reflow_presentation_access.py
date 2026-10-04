@@ -19,6 +19,30 @@ def metric_source(fixture, origin=52):
     return b,d,enriched_source.prepare_source_page(b,0,{'layer':'native'}),r,t,im
 
 
+def test_complete_native_crop_receives_source_metrics_without_ink_repair(clipped):
+    """A complete crop must not fall back to the generic enlarged image height."""
+    fixture=list(clipped);raw=fixture[3]
+    line=raw.blocks[0].lines[0]
+    line.spans[1]=replace(line.spans[1],bbox=(47,38,58,55))
+    b,d,s,r,t,im=metric_source(fixture)
+    before=(s.identity,s.html,b.conservation.to_dict())
+    built=build_epub.build(b,str(t/'complete-metric.epub'),doc=d,source_pages={0:s},raw_pages={0:r})
+    with zipfile.ZipFile(built.path) as archive:
+        payload=json.loads(archive.read('META-INF/reflow.json'))
+        audit=next(e['glyph_presentation'] for e in payload['source_evidence'] if 'glyph_presentation' in e)
+        row=next(e for e in audit['entries'])
+        assert row['displayed'] and row['presentation']['applied'],row
+        assert row['proof']['native_seed_box']==row['proof']['native_display_box']
+        assert row['presentation']['height_em']==pytest.approx(17/12)
+        from PIL import Image
+        import io
+        image=Image.open(io.BytesIO(archive.read('OEBPS/'+row['display_resource']))).convert('L')
+        assert sum(v==0 for v in image.tobytes())==80
+        original=Image.open(io.BytesIO(archive.read('OEBPS/'+row['source_resource']))).convert('L')
+        assert image.size==original.size and image.tobytes()==original.tobytes()
+    assert before==(s.identity,s.html,b.conservation.to_dict())
+
+
 @pytest.mark.parametrize('origin',[52,0,90])
 def test_written_metric_projection_uses_retained_baseline_or_explicit_fallback(clipped,origin):
     b,d,s,r,t,im=metric_source(clipped,origin)

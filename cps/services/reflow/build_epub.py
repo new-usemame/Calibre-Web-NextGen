@@ -1661,12 +1661,6 @@ def _drop_images(chapters, missing):
         return
     gone = set(missing)
 
-
-def _drop_images(chapters, missing):
-    if not missing:
-        return
-    gone = set(missing)
-
     def strip(match):
         src = _IMG_SRC.match(match.group(0))
         inner = re.search(r'src="([^"]+)"', match.group(0))
@@ -1675,7 +1669,10 @@ def _drop_images(chapters, missing):
         return match.group(0)
 
     for chapter in chapters:
-        chapter.blocks = [_IMG_TAG.sub(strip, block) for block in chapter.blocks]
+        chapter.blocks = [re.sub(
+            r'<figure(?:\s[^>]*)?>\s*(?:<a\b[^>]*>\s*</a>\s*)?'
+            r'<figcaption class="reflow-no-caption"></figcaption>\s*</figure>',
+            '', _IMG_TAG.sub(strip, block)) for block in chapter.blocks]
 
 
 def _losses(dropped, missing):
@@ -2192,6 +2189,25 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                                       should_stop, evidence_progress, source_pages,
                                       runtime_progress, reading_contexts, raw_pages)
 
+        if runtime_progress is not None:
+            runtime_progress({"kind": "phase", "phase": "figure_crops"})
+        figure_fragments = [Chapter(index=0, title="", blocks=list(page_html.values()))]
+        missing, blanks = _figure_images(figure_fragments, doc, book, package,
+                                         figure_transform=figure_transform,
+                                         owned_images=set(package.images)|set(package.aliases),
+                                         runtime_progress=runtime_progress,
+                                         required_source_regions=required_source_regions)
+        if set(required_source_regions).intersection(missing + blanks) or not all(
+                package.aliases.get(src, src) in package.images for src in required_source_regions):
+            from .structural_ops import ContractError
+            raise ContractError('source region image could not be packaged')
+        protected_layout_images = {src for c in compiled_layouts.values() for src in _IMG_SRC.findall(c.page_html)}
+        if protected_layout_images.intersection(missing + blanks):
+            from .structural_ops import ContractError
+            raise ContractError('protected layout resource could not be packaged')
+        _drop_images(figure_fragments, missing + blanks)
+        page_html = dict(zip(page_html, figure_fragments[0].blocks))
+
         pages = _page_blocks(page_html)
         executed_layout_boundaries = set()
         joins = _join_page_turns(pages, book.title_pages, compiled_layouts, layout_boundaries, executed_layout_boundaries,
@@ -2208,22 +2224,6 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         if protected_layout_targets.intersection(dropped):
             from .structural_ops import ContractError
             raise ContractError('protected layout link target is absent from publication')
-        if runtime_progress is not None:
-            runtime_progress({"kind": "phase", "phase": "figure_crops"})
-        missing, blanks = _figure_images(chapters, doc, book, package,
-                                         figure_transform=figure_transform,
-                                         owned_images=set(package.images)|set(package.aliases),
-                                         runtime_progress=runtime_progress,
-                                         required_source_regions=required_source_regions)
-        if set(required_source_regions).intersection(missing + blanks) or not all(
-                package.aliases.get(src, src) in package.images for src in required_source_regions):
-            from .structural_ops import ContractError
-            raise ContractError('source region image could not be packaged')
-        protected_layout_images = {src for c in compiled_layouts.values() for src in _IMG_SRC.findall(c.page_html)}
-        if protected_layout_images.intersection(missing + blanks):
-            from .structural_ops import ContractError
-            raise ContractError('protected layout resource could not be packaged')
-        _drop_images(chapters, missing + blanks)
         images = package.images
         for chapter in chapters:
             chapter.blocks = [_image_aliases(block,package.aliases) for block in chapter.blocks]

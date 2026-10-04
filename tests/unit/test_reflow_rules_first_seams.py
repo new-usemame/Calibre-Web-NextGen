@@ -88,3 +88,39 @@ def test_page_wraps_need_source_word_evidence_and_preserve_printed_compounds(lef
     assert build_epub._join_page_turns(pages,words=words,compounds=compounds)==1
     root = ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+pages[0]['body'][0]+'</root>')
     assert ''.join(root.itertext()) == expected
+
+
+def test_white_figure_candidate_cannot_block_a_real_page_turn(tmp_path):
+    """Blank figure admission must happen before deciding the paragraph seam."""
+    import zipfile
+    import pymupdf
+    doc = pymupdf.open()
+    try:
+        for _ in range(2): doc.new_page(width=300, height=400)
+        doc[0].insert_text((40,80), 'This ordinary source sentence continues', fontsize=12)
+        doc[1].insert_text((40,80), 'over the next printed page.', fontsize=12)
+        first = assemble.Element(kind='p',pno=0,runs=[['t','This ordinary source sentence continues']])
+        blank = assemble.Element(kind='fig',pno=0,bbox=(40,300,260,380))
+        last = assemble.Element(kind='p',pno=1,runs=[['t','over the next printed page.']])
+        book = assemble.Book(pages={0:[first,blank],1:[last]},
+            figures=[dict(pno=0,bbox=blank.bbox,needs_ink=True)],style=skeleton.BookStyle(body_size=12))
+        out=tmp_path/'blank-seam.epub'
+        result=build_epub.build(book,str(out),doc=doc)
+        assert result.page_joins==1
+        with zipfile.ZipFile(out) as z:
+            paragraphs=[p for name in z.namelist() if name.startswith('OEBPS/ch') and name.endswith('.xhtml')
+                for p in ET.fromstring(z.read(name)).iter('{http://www.w3.org/1999/xhtml}p')]
+        assert any(''.join(p.itertext())=='This ordinary source sentence continues over the next printed page.' for p in paragraphs)
+    finally:
+        doc.close()
+
+
+def test_blank_image_with_printed_caption_still_separates_source_prose():
+    chapter=build_epub.Chapter(index=1,title='',blocks=[
+        '<p>An unfinished source paragraph</p>',
+        '<figure><img src="images/blank.jpg"/><figcaption>A separate printed caption.</figcaption></figure>',
+    ])
+    build_epub._drop_images([chapter],['images/blank.jpg'])
+    pages=build_epub._page_blocks({0:''.join(chapter.blocks),1:'<p>the following body paragraph.</p>'})
+    assert build_epub._join_page_turns(pages)==0
+    assert 'A separate printed caption.' in ''.join(pages[0]['body'])

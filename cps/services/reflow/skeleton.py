@@ -3027,8 +3027,13 @@ def _vector_figures(raw):
     area. A dense native chart's traced lettering is still source artwork.
     """
     all_rects = raw.drawing_rects
-    rects = [r for r in all_rects
-             if (r[2] - r[0]) > 4 and (r[3] - r[1]) > 4]
+    # A traced chart's outer strokes and lettering can consist entirely of
+    # sub-point paths. Its dense path inventory is the actual artwork boundary,
+    # not supporting debris around a handful of large core shapes.
+    dense = raw.drawings > 2500
+    rects = [r for r in all_rects if
+             ((r[2] > r[0] or r[3] > r[1]) if dense else
+              (r[2] - r[0]) > 4 and (r[3] - r[1]) > 4)]
     if len(rects) < VEC_COMPACT_MIN_PATHS:
         return []
     clusters = []
@@ -3047,6 +3052,22 @@ def _vector_figures(raw):
                 break
         if not placed:
             clusters.append([tuple(rect), 1])
+    if dense:
+        # A later path can bridge clusters created earlier in extraction order.
+        # Close those geometric overlaps before choosing a crop; otherwise one
+        # wheel can become several overlapping, individually truncated pieces.
+        changed = True
+        while changed:
+            changed = False
+            for i, (a, count) in enumerate(clusters):
+                for j in range(i + 1, len(clusters)):
+                    b, other = clusters[j]
+                    if (max(a[0]-b[2],b[0]-a[2],0)<=VEC_COMPACT_REACH
+                            and max(a[1]-b[3],b[1]-a[3],0)<=VEC_COMPACT_REACH):
+                        clusters[i] = [(min(a[0], b[0]), min(a[1], b[1]),
+                                        max(a[2], b[2]), max(a[3], b[3])), count + other]
+                        clusters.pop(j); changed = True; break
+                if changed:break
     parea = raw.width * raw.height or 1.0
     out = []
     for box, count in clusters:

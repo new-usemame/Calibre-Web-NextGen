@@ -24,7 +24,9 @@ async function share(page: Page, enabled: boolean, classic: boolean) {
   await page.goto(classic ? '/me' : '/app/account');
   const checkbox = page.getByRole('checkbox', { name: /^Share my ratings in the household average/ });
   await expect(checkbox).toBeEnabled();
-  await checkbox.setChecked(enabled);
+  await expect(checkbox).toBeChecked({ checked: !enabled });
+  await checkbox.click();
+  await expect(checkbox).toBeChecked({ checked: enabled });
   if (classic) await page.locator('#user_submit').click();
   await expect.poll(async () => (await (await page.request.get('/api/v1/auth/me')).json()).preferences.share_book_ratings).toBe(enabled);
   await page.goto(classic ? `/book/${bookId}` : `/app/book/${bookId}`);

@@ -207,6 +207,8 @@ def _register_sqlite_udfs(dbapi_connection, _connection_record):
     try:
         dbapi_connection.create_function("ng_sort_key", 1, unicode_sort_key)
         dbapi_connection.create_function("ng_initial", 1, unicode_initial)
+        dbapi_connection.create_function("ng_sort_key", 2, unicode_sort_key)
+        dbapi_connection.create_function("ng_initial", 2, unicode_initial)
     except Exception:
         pass
 
@@ -905,7 +907,9 @@ class AlchemyEncoder(json.JSONEncoder):
                         for ele in data:
                             if hasattr(ele, 'value'):       # converter for custom_column values
                                 if isinstance(ele.value, datetime):
-                                    el.append(ele.value.date().isoformat())
+                                    el.append(ele.value.date().isoformat() if ele.value.year > 101 else "")
+                                elif ele.value is None:
+                                    el.append("")
                                 else:
                                     el.append(str(ele.value))
                             elif ele.get:
@@ -2208,7 +2212,12 @@ class CalibreDB:
             # Selection is an all-or-nothing operation. Returning the empty
             # fallback used by legacy browse callers could silently turn a
             # failed ID query into a partial selection.
-            if ids_only:
+            # A Python SQLite function failure invalidates the whole ordered
+            # cohort. Reporting an empty library hides a collation/key fault.
+            udf_failed = (isinstance(ex, OperationalError) and
+                          isinstance(ex.orig, sqlite3.OperationalError) and
+                          str(ex.orig) == 'user-defined function raised exception')
+            if ids_only or udf_failed:
                 raise
         # display authors in right order
         entries = self.order_authors(entries, True, join_archive_read)
@@ -2364,7 +2373,9 @@ class CalibreDB:
         query = self.generate_linked_query(config.config_read_column, Books, user=user)
         if len(join) == 6:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4]).outerjoin(join[5])
-        if len(join) == 3:
+        elif len(join) == 5:
+            query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4])
+        elif len(join) == 3:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2])
         elif len(join) == 2:
             query = query.outerjoin(join[0], join[1])

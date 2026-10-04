@@ -55,8 +55,15 @@ def test_real_acquisition_retention_reinspection_and_durable_receipt(
     assert proof["helper"]["retained"]["disposition"] == "existing_retained"
     assert proof["helper"]["removed_reacquire"]["status"] == "imported"
     assert (
-        proof["helper"]["replacement_reinspect"]["disposition"] == "existing_retained"
+        proof["helper"]["replacement_reinspect"]["disposition"] == "imported"
     )
+    assert proof["helper"]["distinct"]["disposition"] == "imported"
+    assert proof["helper"]["annotations_preserved"]
+    assert [case["existing_language"] for case in proof["languages"]] == [["eng"], []]
+    assert all(case["annotations_preserved"] for case in proof["languages"])
+    assert proof["boundary"]["helper_and_receipt_agree"]
+    assert proof["boundary"]["external_bytes_unchanged"]
+    assert proof["boundary"]["annotations_preserved"]
     assert proof["helper"]["forged_identifier_ignored"]["book_ids"] != [1]
     assert proof["receipt"]["real_ub_schema"]
     assert proof["receipt"]["receipt_failure_rolled_back_membership"]
@@ -75,6 +82,12 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         / "tests/integration/acquisition_full_runtime_probe.py": "/tmp/acquisition_full_runtime_probe.py",
         ROOT
         / "tests/integration/acquisition_calibre_runtime_probe.py": "/tmp/acquisition_calibre_runtime_probe.py",
+        ROOT
+        / "tests/integration/acquisition_bundle_runtime_probe.py": "/tmp/acquisition_bundle_runtime_probe.py",
+        ROOT
+        / "tests/integration/acquisition_torrent_metadata_runtime_probe.py": "/tmp/acquisition_torrent_metadata_runtime_probe.py",
+        ROOT
+        / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
         ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
     }
@@ -111,12 +124,43 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         "/duplicate.epub",
         "/convert.epub",
         "/direct.pdf",
+        "/repacked.epub",
+        "/catalog",
+        "/repacked.epub",
     ]
     assert [case["format"] for case in proof["results"]] == [
         "epub",
         "epub",
         "kepub",
         "pdf",
+        "epub",
     ]
+    repacked = proof["results"][4]
+    assert repacked["receipt_retry"] and repacked["book_ids"] == proof["results"][0]["book_ids"]
+    assert repacked["source_sha256"] != repacked["imported_sha256"] == proof["results"][0]["imported_sha256"]
+    assert all(proof["repackaging"][key] for key in ("zip_only_equal", "original_bytes_and_annotations", "app_reading_state", "receipt_retry_no_reimport", "other_owner_membership", "distinct_owned_receipts"))
     assert proof["results"][0]["receipt_retry"]
     assert all(case["source_and_private_cleanup"] for case in proof["results"])
+    bundle = proof["bundle"]
+    assert bundle["remote_submissions"] == 1 and bundle["source_files_unchanged"]
+    assert bundle["waiting_not_polled"] and bundle["private_manifests"] and bundle["real_sab_http"]
+    assert len(bundle["outcomes"]) == 3
+    assert bundle["outcomes"][0]["book_ids"] != bundle["outcomes"][1]["book_ids"]
+    assert bundle["outcomes"][2]["book_ids"] == bundle["outcomes"][0]["book_ids"]
+    detail = proof["opds_publication"]
+    assert detail["explicit_detail_read"] and detail["cross_account_read_refused"]
+    assert detail["no_loan_or_purchase_get"] and detail["original_edition_preserved"]
+    assert detail["source_unchanged"] and detail["private_cleanup"] and detail["full_processor_subprocess"]
+    assert detail["saved_display_locale"] == "fr_CA" and detail["edition_language"] == "en"
+    entry = proof["opds1_entry"]
+    assert entry["protocol"] == "opds1" and entry["displayed_title"] == "Original OPDS1 entry edition"
+    assert entry["explicit_detail_read"] and entry["cross_account_read_refused"]
+    assert entry["no_loan_or_purchase_get"] and entry["original_edition_preserved"]
+    assert entry["source_unchanged"] and entry["private_cleanup"] and entry["full_processor_subprocess"]
+    assert entry["source_sha256"] == entry["imported_sha256"] and entry["edition_language"] == "en"
+    assert entry["book_ids"] != detail["book_ids"]
+    metadata = proof["torrent_metadata"]
+    assert metadata["loopback_transmission_rpc"] and metadata["full_processor_subprocess"]
+    assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]
+    assert all(case["exact_descriptor_submitted"] and case["source_files_unchanged"]
+        and case["remote_submissions"] == 1 for case in metadata["outcomes"])

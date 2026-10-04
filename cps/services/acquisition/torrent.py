@@ -53,6 +53,17 @@ def validate_magnet(value, *, tracker_origins=None, secret=None):
     raise TransportError('invalid_magnet')
 
 
+def file_metadata(row, *, single=False):
+    """Reviewed BEP47 hints, without symlink or single-file padding semantics."""
+    if b'sha1' in row and (not isinstance(row[b'sha1'], bytes) or len(row[b'sha1']) != 20):
+        raise TransportError('invalid_torrent')
+    if b'attr' in row:
+        flags = row[b'attr']
+        if (not isinstance(flags, bytes) or len(flags) > 64 or b'l' in flags
+                or single and any(flag not in b'hx' for flag in flags)):
+            raise TransportError('invalid_torrent')
+
+
 def validate_torrent(raw, *, tracker_origins=None, secret=None):
     if not isinstance(raw, bytes) or not 0 < len(raw) <= 512 * 1024:
         raise TransportError('invalid_torrent')
@@ -88,7 +99,9 @@ def validate_torrent(raw, *, tracker_origins=None, secret=None):
             raise TransportError('invalid_torrent')
         # Only v1 file semantics may reach a client. A hybrid's v2 file tree
         # or single-file symlink fields must not bypass the paths checked below.
-        if set(info) - {b'name', b'name.utf-8', b'pieces', b'piece length', b'length', b'files', b'private', b'source', b'md5sum'}:
+        if set(info) - {b'name', b'name.utf-8', b'pieces', b'piece length', b'length', b'files', b'private', b'source', b'md5sum', b'sha1', b'attr'}:
+            raise TransportError('invalid_torrent')
+        if b'private' in info and (type(info[b'private']) is not int or info[b'private'] not in (0, 1)):
             raise TransportError('invalid_torrent')
         urls = [data[b'announce']] if b'announce' in data else []
         tiers = data.get(b'announce-list', [])
@@ -105,14 +118,22 @@ def validate_torrent(raw, *, tracker_origins=None, secret=None):
         files = info.get(b'files')
         if files is None:
             if type(info.get(b'length')) is not int or info[b'length'] <= 0: raise TransportError('invalid_torrent')
+            file_metadata(info, single=True)
+            total_bytes = payload_bytes = info[b'length']
         else:
-            if not isinstance(files, list) or not 0 < len(files) <= 1000 or b'length' in info: raise TransportError('invalid_torrent')
+            if (not isinstance(files, list) or not 0 < len(files) <= 1000
+                    or any(key in info for key in (b'length', b'sha1', b'attr'))):
+                raise TransportError('invalid_torrent')
             paths = set()
+            total_bytes = payload_bytes = 0
             for row in files:
-                if (not isinstance(row, dict) or set(row) - {b'length', b'path', b'path.utf-8', b'md5sum', b'attr'}
-                        or type(row.get(b'length')) is not int or row[b'length'] < 0
-                        or b'attr' in row and (not isinstance(row[b'attr'], bytes) or b'l' in row[b'attr'])):
+                if (not isinstance(row, dict) or set(row) - {b'length', b'path', b'path.utf-8', b'md5sum', b'attr', b'sha1'}
+                        or type(row.get(b'length')) is not int or row[b'length'] < 0):
                     raise TransportError('invalid_torrent')
+                file_metadata(row)
+                total_bytes += row[b'length']
+                if b'p' not in row.get(b'attr', b''):
+                    payload_bytes += row[b'length']
                 for key in (b'path', b'path.utf-8'):
                     if key not in row and key != b'path': continue
                     parts = row[key]
@@ -121,6 +142,9 @@ def validate_torrent(raw, *, tracker_origins=None, secret=None):
                     if key == b'path':
                         if path in paths: raise TransportError('invalid_torrent')
                         paths.add(path)
+        # Piece hashes cover the concatenated v1 payload, including padding.
+        if not payload_bytes or len(info[b'pieces']) // 20 != (total_bytes + info[b'piece length'] - 1) // info[b'piece length']:
+            raise TransportError('invalid_torrent')
         return hashlib.sha1(info_bytes).hexdigest()
     except TransportError:
         raise

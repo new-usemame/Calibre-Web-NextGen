@@ -2223,7 +2223,7 @@ msgstr "書架列表"
 msgid "Books organized in shelves"
 msgstr "書架上的書"
 
-#: cps/opds.py cps/templates/config_view_edit.html
+#: cps/opds.py
 msgid "Magic Shelves"
 msgstr "魔法書架"
 
@@ -4778,6 +4778,19 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Public"
 msgstr "公開"
+
+#: cps/spa_strings.py
+msgid "Custom display name"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Custom fields on book cards"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Display name for {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -8074,6 +8087,10 @@ msgid "Reader settings saved."
 msgstr "閱讀器設定已儲存。"
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "閱讀外觀"
 
@@ -10774,6 +10791,122 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Padded series number:"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
 msgstr ""
 
 #: cps/tasks_status.py

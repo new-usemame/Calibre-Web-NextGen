@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  groupFromStored, groupToStored, leafCount, removeNode, someLeaf, updateNode,
+  groupFromStored, groupToStored, leafCount, removeNode, ruleValueText, someLeaf, updateNode,
 } from '../src/lib/magicRuleTree.ts';
 import type { RuleGroup, RuleLeaf } from '../src/lib/magicRuleTree.ts';
 
@@ -33,7 +33,7 @@ test('a nested rule set survives load and save with every group, condition and r
         condition: 'OR',
         rules: [
           { id: 'tag', operator: 'contains', value: 'Fiction' },
-          { condition: 'AND', rules: [{ id: 'series', operator: 'is_empty', value: '' }] },
+          { condition: 'AND', rules: [{ id: 'series', operator: 'is_empty', value: null }] },
         ],
       },
     ],
@@ -62,4 +62,22 @@ test('editing reaches a nested rule and removing its last rule removes the empti
     condition: 'OR', rules: [{ id: 'tag', operator: 'contains', value: 'Fiction' }],
   });
   assert.equal(leafCount(pruned), 2);
+});
+
+test('stored rule values retain their JSON types when no rule is edited', () => {
+  const values = [8, 0, false, null, [1, 2], { future: ['value', null] }];
+  const stored = { condition: 'AND', rules: values.map((value, index) => ({
+    id: `custom_column_${9000 + index}`, operator: 'future_operator', value,
+  })) };
+  assert.deepEqual(groupToStored(groupFromStored(stored as never, keys())), stored);
+});
+
+
+test('JSON value display avoids object coercion hooks and keeps visible primitives', () => {
+  assert.equal(ruleValueText({ toString: null }), '{"toString":null}');
+  assert.equal(ruleValueText({ toString: 'stored text' }), '{"toString":"stored text"}');
+  assert.equal(ruleValueText([{ toString: null }, false, 0]), '[{"toString":null},false,0]');
+  assert.equal(ruleValueText(null), 'null');
+  assert.equal(ruleValueText(false), 'false');
+  assert.equal(ruleValueText('literal'), 'literal');
 });

@@ -53,6 +53,21 @@ def test_receipt_uses_trusted_owner_and_actual_ids_in_same_transaction(store, tm
     assert intent.publication_token not in repr(intent)
 
 
+@pytest.mark.parametrize('disposition,verified,accepted', [
+    ('existing_retained',False,False),('existing_retained',True,True),('imported',False,True)])
+def test_recovery_reinspects_legacy_retention_but_keeps_verified_and_imported_results(store,tmp_path,disposition,verified,accepted):
+    """Both recovery entry points must require byte-identity proof for retention."""
+    repo,job,source,manifest,intent,metadata,result=published(store,tmp_path)
+    result['disposition']=disposition
+    if verified:result['artifact_identity_version']=1
+    with sqlite3.connect(metadata) as con:
+        con.execute('UPDATE cwng_acquisition_ingest_result SET result_json=?',(json.dumps(result),))
+    recovered=i.read_result(metadata,intent.source_sha256,tmp_path)
+    assert (recovered is not None)==accepted
+    assert source.read_bytes()==b'original downloaded edition'
+    assert repo.get_job(1,job.id).state=='publishing'
+
+
 @pytest.mark.parametrize('change', ['token','path','bytes','symlink','action'])
 def test_forged_or_moved_manifest_cannot_claim_acquisition(store, tmp_path, change):
     repo, job, source, manifest, intent, metadata, result = published(store, tmp_path)

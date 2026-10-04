@@ -1,11 +1,12 @@
 import { memo } from 'react';
 import { BookOpen, BookCheck, BookPlus, Check, EyeOff, List, X, Star } from 'lucide-react';
 import { Link } from 'wouter';
-import type { Book } from '../lib/api';
-import { useT } from '../lib/i18n';
+import type { Book, ListCustomColumnDefinition } from '../lib/api';
+import { useT, useI18n } from '../lib/i18n';
 import { BookCover } from './BookCover';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { formatAuthors } from '../lib/authors';
+import { formatCustomColumnDate } from '../lib/customColumnDisplay';
 import styles from './BookCard.module.css';
 import { Spinner } from './Spinner';
 import { BookCardActions } from './BookCardActions';
@@ -60,6 +61,8 @@ interface BookCardProps {
   /** The authenticated account's viewer role. Kept explicit so a catalog card
    *  can never infer file access from the formats it happens to receive. */
   canRead?: boolean;
+  /** User-selected scalar Calibre fields, defined once by the list response. */
+  customColumnDefinitions?: ListCustomColumnDefinition[];
 }
 
 /** How many shelf names a cover shows before the rest fold into "+N". Two, not
@@ -89,8 +92,10 @@ function BookCardInner({
   addPending = false,
   detailsEnabled = true,
   canRead = false,
+  customColumnDefinitions = [],
 }: BookCardProps) {
   const t = useT();
+  const { locale } = useI18n();
   const shelfDrag = useShelfDrag();
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
@@ -129,6 +134,18 @@ function BookCardInner({
     : (book.shelves ?? []).filter((s) => s.id !== excludeShelfId);
   const shownShelves = shelves.slice(0, MAX_SHELF_TAGS);
   const extraShelves = shelves.slice(MAX_SHELF_TAGS);
+  const customFieldLines = customColumnDefinitions.flatMap((column) => {
+    const value = book.custom_columns?.[String(column.id)]?.[0]?.value;
+    if (value === null || value === undefined || value === '') return [];
+    let display = String(value);
+    if (column.datatype === 'datetime' && typeof value === 'string') {
+      display = formatCustomColumnDate(value, locale);
+    } else if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
+      display = new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
+    }
+    if (!display) return [];
+    return [{ id: column.id, text: `${column.name}: ${display}` }];
+  });
 
   // Cover + overlay badges. All non-interactive (pointer-events: none via CSS) so
   // the single wrapping control (link or toggle button) is the only tab stop.
@@ -239,6 +256,9 @@ function BookCardInner({
     <div className={styles.info}>
       <p className={styles.title} dir="auto">{book.title}</p>
       <p className={styles.author} dir="auto">{authorStr}</p>
+      {customFieldLines.map((field) => (
+        <p key={field.id} className={styles.customField} dir="auto" title={field.text}>{field.text}</p>
+      ))}
     </div>
   );
 

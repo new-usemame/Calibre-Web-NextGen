@@ -2445,7 +2445,7 @@ msgstr "Étagères"
 msgid "Books organized in shelves"
 msgstr "Livres organisés par étagères"
 
-#: cps/opds.py cps/templates/config_view_edit.html
+#: cps/opds.py
 #, fuzzy
 msgid "Magic Shelves"
 msgstr "Étagères magiques ✨"
@@ -5138,6 +5138,19 @@ msgstr "Affiche le nom du livre lors de son importation."
 #: cps/spa_strings.py
 msgid "Public"
 msgstr "Publique"
+
+#: cps/spa_strings.py
+msgid "Custom display name"
+msgstr "Nom d’affichage personnalisé"
+
+#: cps/spa_strings.py
+msgid "Custom fields on book cards"
+msgstr "Champs personnalisés sur les fiches de livres"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Display name for {name}"
+msgstr "Nom d’affichage pour {name}"
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -8619,6 +8632,10 @@ msgid "Reader settings saved."
 msgstr "Paramètres de lecture enregistrés."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr "Application de lecture"
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Apparence de lecture"
 
@@ -11577,6 +11594,136 @@ msgstr "Modèle de nom de fichier des téléchargements OPDS"
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Padded series number:"
 msgstr "Numéro de série complété :"
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "En attente de votre choix de livre"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Livre demandé. Un administrateur doit approuver la demande."
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Livre ajouté à votre activité."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Ce choix de livre était périmé. Actualisation de la liste…"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr ""
+"Les demandes sont suspendues. Vous pouvez toujours consulter les livres "
+"disponibles."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Ce livre n’a pas pu être demandé. Réessayez."
+
+#: cps/spa_strings.py
+msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+"Le choix était périmé et les livres disponibles n’ont pas pu être "
+"actualisés. Réessayez."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr ""
+"Ce choix de livre était périmé. La liste a été actualisée ; choisissez à "
+"nouveau."
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "Les livres disponibles n’ont pas pu être chargés. Réessayez."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} livres disponibles trouvés."
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Choisissez un livre dans ce téléchargement"
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Masquer les livres disponibles"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Choisir un autre livre"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Chargement des livres disponibles…"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "Aucun livre n’est disponible dans ce téléchargement."
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Importer ce livre"
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Demander ce livre"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Importer ce livre : {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Demander ce livre : {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} octets"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Demandé"
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+"Le livre choisi n’est plus dans le téléchargement terminé. Restaurez son "
+"fichier d’origine avant de réessayer."
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+"Le livre ou le téléchargement terminé a changé. Restaurez les fichiers "
+"d’origine avant de réessayer."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
+"Le téléchargement terminé dépasse les limites de fichiers prévues. "
+"Choisissez une publication plus petite."
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr "Règle non prise en charge"
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr ""
+"Cette règle ne peut pas être modifiée ici. Elle sera conservée sauf si vous "
+"la supprimez."
 
 #: cps/tasks_status.py
 msgid "Waiting"

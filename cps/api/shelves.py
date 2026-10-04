@@ -16,11 +16,11 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
 from .serializers import serialize_shelf
-from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
 from ..services import ereader_scope
-from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id
+from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id, book_sort_order
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
     check_shelf_view_permissions,
@@ -118,7 +118,7 @@ def shelf_detail(shelf_id):
         reader = viewer_id(current_user)
         order = None if reader is None else recent_sort_order(reader)
     else:
-        order = BOOK_SORT_ORDERS.get(sort)
+        order = book_sort_order(sort) if sort in BOOK_SORT_ORDERS else None
     if order is None or sort in ("hotdesc", "hotasc"):
         order = [ub.BookShelf.order.asc()]
 
@@ -150,8 +150,10 @@ def shelf_detail(shelf_id):
         return _selection_response(entries, pagination.total_count)
 
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))
+    custom_column_definitions, _custom_values = _list_custom_column_data([])
     body.update({
         "items": _rows_to_items(entries),
+        "custom_column_definitions": custom_column_definitions,
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,

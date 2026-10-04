@@ -75,7 +75,7 @@
 
       <div class="form-group">
         <label>{{_('Custom columns')}}</label>
-        <p class="settings-explanation">{{_('Magic Shelves')}} — {{_('Sort by')}}</p>
+        <p class="settings-explanation">{{_('Sort by')}}</p>
         {% set selected_sort_columns = (conf.config_sortable_custom_columns or '').split(',') %}
         {% for sortColumn in sortableColumns %}
         <div class="checkbox">

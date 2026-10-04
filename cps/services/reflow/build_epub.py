@@ -1932,7 +1932,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
             edge_proof = None
-            if key.startswith('text_'):
+            if key.startswith(('text_', 'caption_')):
                 reading_rect, edge_proof = display.complete_detail_rect(reading_rect)
                 rect = display.source_rect(reading_rect) * doc[pno].derotation_matrix
             package_source_image(src, display.source_image(reading_rect,

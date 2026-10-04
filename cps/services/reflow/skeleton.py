@@ -2707,13 +2707,30 @@ def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
                     and sum(1 for bx0, bx1 in halves
                             if has_caption(bx0, bx1, y1)) >= 2:
                 boxes = halves
-        for bx0, bx1 in boxes:
+        for part, (bx0, bx1) in enumerate(boxes):
+            art_top = y0
+            if len(boxes) > 1 and hasattr(pixel_probe, 'ink_bounds'):
+                try:
+                    ink = pixel_probe.ink_bounds((bx0, y0, bx1, y1))
+                except (ValueError, RuntimeError, AttributeError):
+                    ink = None
+                if ink and ink[3]-ink[1] >= raw.height * SCAN_GAP:
+                    # The masked probe excludes classified running furniture.
+                    # Retained chart labels still constrain the crop: artwork
+                    # ink alone cannot authorize cutting off their territory.
+                    label_tops = [ln.bbox[1] for ln in lines
+                        if y0 <= ln.bbox[1] and ln.bbox[3] <= y1
+                        and bx0 <= (ln.bbox[0]+ln.bbox[2])/2 <= bx1]
+                    art_top = max(y0, min([ink[1]] + label_tops))
             # The pad breathes into empty territory only: padding across the
             # prose's own edge pulls a sliver of every line into the crop.
+            # Internal dividers already come from measured source channels.
+            # Padding across them can pull in the independently captioned
+            # neighboring figure. Breathe only at the outside of the band.
             candidates.append(Region(
                 kind="figure", reason=why, needs_ink=True,
-                bbox=(max(0.0, bx0 - pad_x0), max(0.0, y0 - 2.0),
-                      min(raw.width, bx1 + pad_x1), min(raw.height, y1 + 2.0))))
+                bbox=(max(0.0, bx0 - (pad_x0 if part == 0 else 0)), max(0.0, art_top - 2.0),
+                      min(raw.width, bx1 + (pad_x1 if part == len(boxes)-1 else 0)), min(raw.height, y1 + 2.0))))
             if side:
                 side_seeds.append((side, candidates[-1]))
 

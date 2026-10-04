@@ -14,6 +14,8 @@ import stat
 import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
+from .contracts import DIRECT_FORMATS, MOBI_MEDIA_TYPE
+from .mobi import MobiError, validate_mobi
 
 
 class StagingError(ValueError):
@@ -21,7 +23,7 @@ class StagingError(ValueError):
 
 
 NAME_PREFIX = 'cwng-acquisition-'
-BOOK_EXTENSIONS = ('epub', 'pdf')
+BOOK_EXTENSIONS = tuple(extension for _label, extension in DIRECT_FORMATS.values())
 # Written by cwa-ingest-service when the processor ends terminally on an
 # acquisition file (exit 3 retains the book; the safety timeout, 124, removes
 # it). A name the watcher and the processor already skip. It carries no
@@ -33,7 +35,7 @@ FAILURE_SUFFIX = '.cwa.failed.json'
 def publication_paths(ingest_dir, staging_key):
     """Every path publication may have created for one staging identity.
 
-    Both extensions are considered because the caller reconciling a lost book
+    Supported extensions are considered because the caller reconciling a lost book
     can no longer read the offer that chose it, and because a safety timeout
     removes the book while leaving its sidecar behind.
     """
@@ -95,6 +97,11 @@ def validate_book(path, media_type, *, max_bytes=100 * 1024 * 1024):
     size = path.stat().st_size
     if not 0 < size <= max_bytes:
         raise StagingError('invalid_book_size')
+    if media_type == MOBI_MEDIA_TYPE:
+        try:
+            return validate_mobi(path, max_bytes=max_bytes)
+        except MobiError as error:
+            raise StagingError(str(error)) from None
     if media_type == 'application/pdf':
         with path.open('rb') as stream:
             header = stream.read(16)
@@ -193,7 +200,7 @@ def publish(source, ingest_dir, permit, extension, *, checkpoint=lambda: None):
     source, directory = _regular(source), Path(ingest_dir)
     if directory.is_symlink() or not directory.is_dir():
         raise StagingError('ingest_directory_unavailable')
-    if not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', permit.staging_key) or extension not in ('epub', 'pdf'):
+    if not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', permit.staging_key) or extension not in BOOK_EXTENSIONS:
         raise StagingError('invalid_staging_identity')
     if digest(source) != permit.source_sha256:
         raise StagingError('source_changed')

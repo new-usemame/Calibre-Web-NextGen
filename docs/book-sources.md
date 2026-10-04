@@ -1,6 +1,6 @@
 # Book sources (Beta)
 
-Find books connects an administrator's catalogs to CWNG's library. Accounts with access can browse a connected catalog, choose an available EPUB/PDF, NZB or torrent release, and request its import. Indexer releases download through a connected SABnzbd, NZBGet, qBittorrent or Transmission client. The file goes through CWNG's existing ingest and configured processing before appearing in the Global Library. Accounts using My Library can also add the resulting book to their own selection.
+Find books connects an administrator's catalogs to CWNG's library. Accounts with access can browse a connected catalog, choose an available direct EPUB/PDF or opted-in DRM-free MOBI 6 book, NZB or torrent release, and request its import. Indexer releases download through a connected SABnzbd, NZBGet, qBittorrent or Transmission client. The file goes through CWNG's existing ingest and configured processing before appearing in the Global Library. Accounts using My Library can also add the resulting book to their own selection.
 
 This feature is off by default. Existing accounts and library selections do not gain acquisition permissions automatically.
 
@@ -42,7 +42,7 @@ A result's navigation or next page opens that exact page in individual catalog b
 | Catalogs | OPDS 1 Atom and OPDS 2 JSON; Newznab/Torznab search, including Prowlarr and Jackett presets |
 | Browsing | Catalog navigation, groups, facets, pagination and explicitly opened OPDS 1 complete entries and OPDS 2 publication details |
 | Search | Individual or shared keyword search using advertised OpenSearch descriptions, supported OPDS 2 templates and Newznab/Torznab book search |
-| Files | Direct EPUB/PDF links, NZB releases and v1 torrent files/magnets containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
+| Files | Direct EPUB/PDF and explicitly enabled DRM-free MOBI 6 links, NZB releases and v1 torrent files/magnets containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
 | Download client | SABnzbd/NZBGet after successful postprocessing; qBittorrent/Transmission after every file finishes downloading |
 | Authentication | None, HTTP Basic, or Bearer credentials scoped to configured origins |
 | Local services | Explicit administrator configuration of private origins and network ranges |
@@ -160,3 +160,13 @@ Torrent copies wait for a settled client state and for the reported final file t
 Tracker origins must be configured explicitly; an empty list deliberately trusts no tracker URLs. Magnet trackers are checked during discovery. HTTP `.torrent` links are checked when their bounded descriptor is fetched for a request, so discovery does not fetch every result or spend provider quotas. Unknown metainfo extensions remain unsupported pending a reviewed fixture: accepting them blindly could introduce network or file semantics not covered by the v1 checks.
 
 For an application downgrade, pause acquisition and settle or cancel outstanding bundle work first. Older workers do not understand selected-artifact jobs; do not resume them with unfinished bundle work. Keep the additive columns and manifest table intact. Upgrading preserves the existing permission migration marker and grants.
+
+## Optional direct MOBI 6 books
+
+Each OPDS connection starts with **Allow direct DRM-free MOBI 6 books** off. Edit that catalog in **Book sources** to enable it, save, test and enable the connection again. The server’s allowed upload formats must also include MOBI. Existing catalogs do not gain MOBI acquisition automatically. Disabling the catalog choice or narrowing the upload-format policy prevents new requests and is rechecked for queued work.
+
+Normal ingest conversion settings still apply. A new MOBI import converted to EPUB can use the web reader. With conversion disabled, a new MOBI import keeps its MOBI format and can be downloaded; the web reader does not open MOBI. **Open book** goes to the resulting library record, whose available formats govern reading. An exact source already imported can retain its verified original record and format; changing conversion settings does not replace that record. Matching title and author alone do not overwrite another edition. Receipts retain the requested source hash and the hash of the actual stored artifact.
+
+Only direct, advertised ordinary MOBI 6 (`application/x-mobipocket-ebook`) is supported. NZB/torrent bundles still accept EPUB/PDF only. Encrypted MOBI, KF8/AZW3 or hybrid books, HUFF/CDIC compression, PalmDOC-only PRC and other variants remain unsupported. Admission checks bounded Palm database/header framing and encryption flags; actual Calibre processing establishes the import. This does not remove DRM or promise that a header-valid malformed book will convert successfully.
+
+The preflight uses at most 10,000 ordered records and a 2 MiB first record; it checks declared text size up to 200 MiB, contained title/EXTH records and PalmDOC compression 1/2. The direct download and administrator byte quota remain additional limits. These conservative resource caps can refuse unusual books even when another reader supports them. See [verification scope](verification/virtual-library-direct-mobi.md).

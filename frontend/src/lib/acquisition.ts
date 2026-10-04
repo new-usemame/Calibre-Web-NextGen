@@ -161,6 +161,7 @@ export interface AcquisitionConnectionInput {
    *  server expands it to the allowed ranges and scopes it to this catalog's
    *  origin; loopback, link-local and cloud metadata stay denied either way. */
   allow_private_network?: boolean;
+  allow_mobi?: boolean;
   download_origins?: string[];
   tracker_origins?: string[];
   category?: string;

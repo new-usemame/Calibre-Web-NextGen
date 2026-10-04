@@ -81,6 +81,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_full_runtime_probe.py": "/tmp/acquisition_full_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_mobi_runtime_probe.py": "/tmp/acquisition_mobi_runtime_probe.py",
+        ROOT
         / "tests/integration/acquisition_calibre_runtime_probe.py": "/tmp/acquisition_calibre_runtime_probe.py",
         ROOT
         / "tests/integration/acquisition_bundle_runtime_probe.py": "/tmp/acquisition_bundle_runtime_probe.py",
@@ -90,6 +92,10 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
         ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
+        ROOT
+        / "tests/fixtures/sample_books/test_original_direct.mobi": "/tmp/acquisition-original.mobi",
+        ROOT
+        / "tests/fixtures/sample_books/test_original_direct_uncompressed.mobi": "/tmp/acquisition-original-uncompressed.mobi",
     }
     for source, target in files.items():
         subprocess.run(
@@ -105,6 +111,10 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
             "/tmp/acquisition_full_runtime_probe.py",
             "--fixture",
             "/tmp/acquisition-full-fixture.epub",
+            "--mobi-fixture",
+            "/tmp/acquisition-original.mobi",
+            "--mobi-uncompressed-fixture",
+            "/tmp/acquisition-original-uncompressed.mobi",
         ],
         capture_output=True,
         text=True,
@@ -140,6 +150,15 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert repacked["source_sha256"] != repacked["imported_sha256"] == proof["results"][0]["imported_sha256"]
     assert all(proof["repackaging"][key] for key in ("zip_only_equal", "original_bytes_and_annotations", "app_reading_state", "receipt_retry_no_reimport", "other_owner_membership", "distinct_owned_receipts"))
     assert proof["results"][0]["receipt_retry"]
+    mobi = proof['mobi']
+    assert all(mobi[key] for key in ('receipt_fault_recovery', 'owned_cleanup', 'cross_owner_refused',
+                                    'independent_owner_receipts', 'no_cross_format_metadata_overwrite', 'full_processor_subprocess'))
+    assert [case['actual_format'] for case in mobi['results']] == ['EPUB', 'MOBI', 'MOBI', 'EPUB']
+    assert mobi['results'][0]['book_id'] == mobi['results'][3]['book_id'] != mobi['results'][1]['book_id']
+    assert mobi['results'][1]['book_id'] == mobi['results'][2]['book_id']
+    assert mobi['results'][1]['owner'] != mobi['results'][2]['owner']
+    assert mobi['results'][1]['source_sha256'] == mobi['results'][1]['imported_sha256']
+    assert mobi['results'][0]['source_sha256'] != mobi['results'][0]['imported_sha256']
     assert all(case["source_and_private_cleanup"] for case in proof["results"])
     bundle = proof["bundle"]
     assert bundle["remote_submissions"] == 1 and bundle["source_files_unchanged"]

@@ -47,6 +47,7 @@ from .custom_column_visibility import save_cc_visibility
 from .services import file_lock
 from .services.worker import WorkerThread
 from .services.opds_filename import validate_template as validate_opds_filename_template
+from .services.mail_filename import validate_mail_filename_template
 from .services.kobo_import import (
     KoboContentDatabaseError,
     KoboUploadError,
@@ -2395,8 +2396,10 @@ def new_user():
 @admi.route("/admin/mailsettings", methods=["GET"])
 @user_login_required
 @admin_required
-def edit_mailsettings():
+def edit_mailsettings(mail_filename_template=None):
     content = config.get_mail_settings()
+    if mail_filename_template is not None:
+        content["mail_filename_template"] = mail_filename_template
     return render_title_template("email_edit.html", content=content, title=_("Edit Email Server Settings"),
                                  page="mailset", feature_support=feature_support)
 
@@ -2406,6 +2409,12 @@ def edit_mailsettings():
 @admin_required
 def update_mailsettings():
     to_save = request.form.to_dict()
+    if "mail_filename_template" in to_save:
+        try:
+            validate_mail_filename_template(to_save["mail_filename_template"])
+        except ValueError as error:
+            flash(str(error), category="error")
+            return edit_mailsettings(mail_filename_template=to_save["mail_filename_template"])
     _config_int(to_save, "mail_server_type")
     if to_save.get("invalidate"):
         config.mail_gmail_token = {}
@@ -2435,6 +2444,7 @@ def update_mailsettings():
     # branch (standard / gmail / invalidate) since the textarea is always
     # submitted; blank reverts to the shipped default at send time.
     _config_string(to_save, "mail_body_text")
+    _config_string(to_save, "mail_filename_template")
     try:
         config.save()
     except (OperationalError, InvalidRequestError) as e:

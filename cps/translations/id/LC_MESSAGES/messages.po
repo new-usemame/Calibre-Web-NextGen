@@ -17868,3 +17868,21 @@ msgstr "Tampilkan pilihan baca/belum dibaca"
 #~ msgstr ""
 #~ "Buku harus diarsipkan terlebih dahulu dan perangkat disinkronkan sebelum "
 #~ "buku dapat dihapus dengan aman."
+
+#: cps/spa_strings.py
+msgid "eReader attachment filename template"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Leave blank to keep the existing filename. Example: {series} #{series_index} - {title}. Fields include {title}, {authors}, {series} and {series_index}; the file extension is added automatically."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Use {series:|(|) }{title} to omit the series prefix when no series is set."
+msgstr ""
+
+#: cps/services/mail_filename.py
+msgid "Use a valid attachment filename template with supported metadata fields."
+msgstr ""

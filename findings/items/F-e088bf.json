@@ -1,0 +1,14 @@
+{
+  "area": "epub",
+  "body": "Observed on main852b with a synthetic EPUB containing a lower-case style.css encoded ISO-8859-1 and beginning with @charset \"iso-8859-1\". EPUBFixer.process/write_epub emits UTF-8 while retaining that declaration: the literal cafe with an accented e becomes mojibake when decoded using the declared encoding. The original and emitted bytes differ, and the behavioral text-preservation assertion fails. The probe used existing test settings stubs and no private reporter content; installed reader behavior is unverified.\n\nThe Amazon-marker repair in2447 deliberately keeps the existing lower-case CSS policy and narrows new suffix case folding to marker-bearing markup; it does not fix this inherited encoding defect. A separate repair should retain the original CSS encoding or update its declaration consistently when transcoding, and verify accented text and no-op/idempotent output through the complete EPUB writer. Do not broaden markup processing to other binary-policy suffixes merely to address this finding.",
+  "created": "2026-10-03",
+  "id": "F-e088bf",
+  "refs": [
+    "#2447",
+    "#1528"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Kindle fixer retains a CSS charset declaration after re-encoding to UTF-8"
+}

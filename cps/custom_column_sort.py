@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from . import calibre_db, db, logger
-from .sort_orders import BOOK_SORT_ORDERS, DEFAULT_SORT
+from .sort_orders import BOOK_SORT_ORDERS, DEFAULT_SORT, book_sort_order
 
 
 log = logger.create()
@@ -182,7 +182,7 @@ def resolve_magic_shelf_sort(
     if not isinstance(sort_key, str):
         return _default_sort()
     if sort_key in _MAGIC_SHELF_BUILTIN_SORTS:
-        return ResolvedMagicShelfSort(sort_key, tuple(BOOK_SORT_ORDERS[sort_key]))
+        return ResolvedMagicShelfSort(sort_key, tuple(book_sort_order(sort_key)))
 
     match = _CUSTOM_SORT_KEY.fullmatch(sort_key)
     if match is None:

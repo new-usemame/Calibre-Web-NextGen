@@ -7,11 +7,11 @@ URLs and credentials stay server-side; this service never submits a download.
 import ipaddress
 import re
 import json
-from urllib.parse import quote
+from urllib.parse import quote, urldefrag
 
 from .contracts import Link, Search
 from .http import HTTPPolicy, TransportError, authorization, normalized_url, origin, run_transfer
-from .opds import CATALOG_TYPES, parse_catalog, parse_search_description
+from .opds import ACQUISITION, CATALOG_TYPES, PUBLICATION_TYPE, RELATIONS, parse_catalog, parse_search_description
 from .storage import NotFound
 
 
@@ -184,12 +184,14 @@ def expand_search(search, query):
 
 
 class CatalogService:
-    def __init__(self, repository, *, transfer=run_transfer):
+    def __init__(self, repository, *, transfer=run_transfer, preferred_language=None):
         self.repository, self.transfer = repository, transfer
+        self.preferred_language = preferred_language
 
     def _fetch(self, config, url):
         document = self.transfer(url, policy(config), max_bytes=2 * 1024 * 1024)
-        return parse_catalog(document.body, document.url, media_type=document.content_type)
+        return parse_catalog(document.body, document.url, media_type=document.content_type,
+                             preferred_language=self.preferred_language)
 
     def probe(self, config):
         config = connection_config(config)
@@ -235,10 +237,25 @@ class CatalogService:
                 [kind, owner_id, connection_id, value], separators=(',', ':')))
         def selection(payload):
             return self.repository.create_offer(owner_id, connection_id, payload, expected_revision=expected_revision)
-        def navigation(links):
-            return [{'title': link.title or '', 'relations': list(link.relations),
+        def readable(link):
+            relations = set(link.relations)
+            if (link.templated or any(relation in RELATIONS or relation == 'sample'
+                    or relation.startswith(ACQUISITION) for relation in relations)):
+                return False
+            if catalog.is_publication_document and ('self' in relations
+                    or urldefrag(link.href)[0] == urldefrag(catalog.source_url)[0]):
+                return False
+            if link.media_type in CATALOG_TYPES:
+                return True
+            # Publication acquisition links can initiate loans/purchases. Only
+            # explicit metadata self/alternate links become detail reads.
+            return (link.media_type == PUBLICATION_TYPE and bool(relations)
+                    and relations <= {'self', 'alternate'}
+                    and urldefrag(link.href)[0] != urldefrag(catalog.source_url)[0])
+        def navigation(links, fallback_title=''):
+            return [{'title': link.title or fallback_title, 'relations': list(link.relations),
                      'selection': selection({'kind': 'navigation', 'href': link.href})}
-                    for link in links if link.media_type in CATALOG_TYPES and not link.templated]
+                    for link in links if readable(link)]
         def publications(values):
             result = []
             for publication in values:
@@ -260,7 +277,7 @@ class CatalogService:
                         [publication.title, sorted(item['identity'] for item in offers)]),
                     'authors': [person.name for person in publication.contributors if person.role == 'author'],
                     'languages': list(publication.languages), 'description': publication.description,
-                    'offers': offers, 'navigation': navigation(publication.links)})
+                    'offers': offers, 'navigation': navigation(publication.links, publication.title)})
             return result
         searches = []
         for search in catalog.searches:

@@ -29,6 +29,10 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
     return message
 
 
+_("Allow direct DRM-free MOBI 6 books")
+_("Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients still accept EPUB and PDF only.")
+
+
 _("{succeeded} added to the shelf; {failed} failed.")
 _("{succeeded} book(s) deleted; {failed} failed.")
 _("{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.")
@@ -2126,4 +2130,3 @@ _("The completed download exceeds the safe file limits. Choose a smaller release
 # Stored smart-shelf rules unavailable in the current New UI schema (#1617).
 _("Unsupported rule")
 _("This rule cannot be edited here. It will be kept unless you remove it.")
-

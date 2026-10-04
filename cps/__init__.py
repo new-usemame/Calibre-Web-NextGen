@@ -77,7 +77,14 @@ def protect_user_specific_catalog_responses(response):
     """Prevent a shared cache from crossing account-specific catalog views."""
     if not getattr(g, "_common_filters_user_specific", False):
         return response
-    response.headers["Cache-Control"] = "private, no-store"
+    # A response that already declares a private policy keeps it. `private` is
+    # what keeps a shared cache out, which is all this hook guarantees; covers,
+    # comic pages and fonts set their own private lifetimes on versioned URLs,
+    # and replacing those with no-store made every library visit re-download
+    # every cover (#2386). Anything shareable or unstated still becomes no-store.
+    cache_control = response.cache_control
+    if not cache_control.private or cache_control.public:
+        response.headers["Cache-Control"] = "private, no-store"
     response.vary.add("Cookie")
     response.vary.add("Authorization")
     runtime_config = current_app.extensions.get("cps_config", config)

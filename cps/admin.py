@@ -34,6 +34,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
+from .unicode_collation import locale_sort_key
 from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
 from . import user_account_data, user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
@@ -810,7 +811,7 @@ def edit_user_table():
         .join(db.Books) \
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag')) \
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     if config.config_restricted_column:
         try:
             if restricted_column_datatype(config.config_restricted_column) == "bool":

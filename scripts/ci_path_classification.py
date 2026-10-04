@@ -36,6 +36,8 @@ CONCURRENCY_PREFIXES = (
     "cps/api/",
     "cps/gevent",
     "cps/services/annotation_sync/",
+    # Background acquisition workers can sit beyond the request-root cutoff.
+    "cps/services/acquisition/",
 )
 
 HARNESS_PATHS = {

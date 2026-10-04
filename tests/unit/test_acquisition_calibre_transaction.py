@@ -40,7 +40,7 @@ class Cache:
     def __init__(self,path):
         self.connection=sqlite3.connect(path/'metadata.db')
         self.connection.executescript('CREATE TABLE books (id INTEGER PRIMARY KEY); CREATE TABLE identifiers(book INTEGER,type TEXT,val TEXT, UNIQUE(book,type)); CREATE TABLE cwng_acquisition_ingest_result(source_sha256 TEXT PRIMARY KEY,result_json TEXT);')
-        self.backend=types.SimpleNamespace(execute=self.connection.execute,conn=self.connection)
+        self.backend=types.SimpleNamespace(execute=self.connection.execute,conn=self.connection,library_path=str(path))
         self.write_lock=nullcontext()
         self.paths={}; self.path=path; self.add_calls=0
     def formats(self,book_id): return [extension.upper() for bid,extension in self.paths if bid==book_id]
@@ -64,23 +64,24 @@ class Cache:
         return [book_id],[]
 
 
-@pytest.mark.parametrize('existing_format',[True,False])
-def test_acquisition_never_replaces_existing_edition(helper,monkeypatch,tmp_path,existing_format):
+@pytest.mark.parametrize('existing_format,same_bytes',[(True,True),(True,False),(False,False)])
+def test_acquisition_preserves_existing_and_selected_editions(helper,monkeypatch,tmp_path,existing_format,same_bytes):
     cache=Cache(tmp_path)
     cache.connection.execute('INSERT INTO books VALUES (17)')
     original=tmp_path/'annotated.epub'; original.write_bytes(b'existing annotated edition')
     if existing_format: cache.paths[17,'epub']=str(original)
     monkeypatch.setattr(helper,'find_identical_books',lambda *args:{17})
-    incoming=tmp_path/'incoming.epub'; incoming.write_bytes(b'new candidate edition')
+    incoming=tmp_path/'incoming.epub'; incoming.write_bytes(original.read_bytes() if same_bytes else b'new candidate edition')
     source=helper.content_digest(incoming)
     with cache.connection:
         result=helper.add_acquisition(cache,object(),'epub',str(incoming),source)
     assert original.read_bytes()==b'existing annotated edition'
-    assert cache.add_calls==(0 if existing_format else 1)
-    assert result['disposition']==('existing_retained' if existing_format else 'imported')
-    expected=original if existing_format else incoming
+    retained=existing_format and same_bytes
+    assert cache.add_calls==(0 if retained else 1)
+    assert result['disposition']==('existing_retained' if retained else 'imported')
+    expected=original if retained else incoming
     assert result['imported_sha256']==helper.content_digest(expected)
-    assert result['book_ids']==([17] if existing_format else [18])
+    assert result['book_ids']==([17] if retained else [18])
     replay=helper.acquisition_result(cache,source)
     incoming.write_bytes(b'different conversion on retry')
     assert replay==dict(result,status='already_imported')
@@ -125,7 +126,8 @@ def test_actual_helper_entry_ignores_global_overwrite_and_replays_committed_dige
         metadata_json='{}',action='import',automerge='overwrite',fail_before_commit=False)
     result=helper.run(args)
     assert original.read_bytes()==b'annotated original'
-    assert result['disposition']=='existing_retained' and result['book_ids']==[17]
+    assert result['disposition']=='imported' and result['book_ids']==[18]
+    assert result['imported_sha256']==helper.content_digest(incoming)
     incoming.write_bytes(b'different reconverted package')
     monkeypatch.setattr(helper,'prepare_book',lambda *args:pytest.fail('recovery repeated import plugins'))
     assert helper.run(args)==dict(result,status='already_imported')
@@ -156,8 +158,72 @@ def test_helper_reinspection_does_not_replay_stale_existing_format_digest(helper
     monkeypatch.setattr(helper,'find_identical_books',lambda *args:{book_id})
     with cache.connection: second=helper.add_acquisition(cache,object(),'epub',str(incoming),digest)
     if change=='replaced':
-        assert second['disposition']=='existing_retained'
-        assert second['imported_sha256']==helper.content_digest(stored)!=first['imported_sha256']
+        assert second['disposition']=='imported' and second['book_ids']!=first['book_ids']
+        assert second['imported_sha256']==first['imported_sha256']
+        assert stored.read_bytes()==b'replacement edition'
     else:
         assert second['disposition']=='imported' and second['book_ids']!=first['book_ids']
+    cache.connection.close()
+
+
+def test_acquisition_uses_later_exact_candidate_instead_of_first_metadata_match(helper,monkeypatch,tmp_path):
+    """Metadata equality is only a candidate filter; bytes select the edition."""
+    cache=Cache(tmp_path)
+    incoming=tmp_path/'selected.epub'; incoming.write_bytes(b'selected edition')
+    for book_id,content in [(17,b'different edition'),(18,incoming.read_bytes()),(19,incoming.read_bytes())]:
+        cache.connection.execute('INSERT INTO books VALUES (?)',(book_id,))
+        stored=tmp_path/(str(book_id)+'.epub');stored.write_bytes(content)
+        cache.paths[book_id,'epub']=str(stored)
+    monkeypatch.setattr(helper,'find_identical_books',lambda *args:{19,17,18})
+    with cache.connection:
+        result=helper.add_acquisition(cache,object(),'epub',str(incoming),helper.content_digest(incoming))
+    assert result['disposition']=='existing_retained' and result['book_ids']==[18]
+    assert result['imported_sha256']==helper.content_digest(incoming)
+    assert Path(cache.paths[17,'epub']).read_bytes()==b'different edition'
+    assert cache.add_calls==0
+    cache.connection.close()
+
+
+def test_legacy_metadata_retention_is_reinspected_without_changing_old_book(helper,monkeypatch,tmp_path):
+    """A new request must not recover the old metadata-only substitution."""
+    cache=Cache(tmp_path);monkeypatch.setattr(helper,'find_identical_books',lambda *args:set())
+    original=tmp_path/'original.epub';original.write_bytes(b'old edition')
+    with cache.connection:
+        first=helper.add_acquisition(cache,object(),'epub',str(original),helper.content_digest(original))
+    selected=tmp_path/'selected.epub';selected.write_bytes(b'selected edition');source=helper.content_digest(selected)
+    legacy=dict(first,source_sha256=source,disposition='existing_retained')
+    legacy.pop('artifact_identity_version',None)
+    with cache.connection:
+        cache.connection.execute('INSERT INTO cwng_acquisition_ingest_result VALUES (?,?)',(source,json.dumps(legacy)))
+        assert helper.acquisition_result(cache,source) is None
+    monkeypatch.setattr(helper,'find_identical_books',lambda *args:set(first['book_ids']))
+    with cache.connection:
+        result=helper.add_acquisition(cache,object(),'epub',str(selected),source)
+    assert result['book_ids']!=first['book_ids'] and result['imported_sha256']==source
+    assert Path(cache.paths[first['book_ids'][0],'epub']).read_bytes()==original.read_bytes()
+    cache.connection.close()
+
+
+@pytest.mark.parametrize('recover_existing',[False,True])
+def test_external_format_symlink_cannot_be_retained_or_recovered(helper,monkeypatch,tmp_path,recover_existing):
+    """Helper authority must agree with receipt verification's library boundary."""
+    library=tmp_path/'library';library.mkdir();cache=Cache(library)
+    outside=tmp_path/'outside.epub';outside.write_bytes(b'selected edition')
+    incoming=tmp_path/'incoming.epub';incoming.write_bytes(outside.read_bytes())
+    linked=library/'linked.epub';linked.symlink_to(outside)
+    cache.connection.execute('INSERT INTO books VALUES (17)');cache.paths[17,'epub']=str(linked)
+    source=helper.content_digest(incoming)
+    if recover_existing:
+        retained=dict(source_sha256=source,imported_sha256=source,book_ids=[17],
+                      disposition='existing_retained',format='epub',artifact_identity_version=1)
+        cache.connection.execute('INSERT INTO cwng_acquisition_ingest_result VALUES (?,?)',(source,json.dumps(retained)))
+        with cache.connection:
+            assert helper.acquisition_result(cache,source) is None
+    monkeypatch.setattr(helper,'find_identical_books',lambda *args:{17})
+    with cache.connection:
+        result=helper.add_acquisition(cache,object(),'epub',str(incoming),source)
+    assert result['disposition']=='imported' and result['book_ids']==[18]
+    assert helper.acquisition_result(cache,source)==dict(result,status='already_imported')
+    assert Path(cache.paths[18,'epub']).resolve().is_relative_to(library)
+    assert linked.is_symlink() and outside.read_bytes()==b'selected edition'
     cache.connection.close()

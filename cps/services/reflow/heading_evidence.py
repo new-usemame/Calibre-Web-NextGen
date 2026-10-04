@@ -226,7 +226,9 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
                     or (other.band,other.column)!=(element.band,element.column)):
                 continue
             reference,error=_map(other,lines)
-            if error or not reference or not all(same_size(s) for s in _spans(reference)):
+            reference_spans=_spans(reference)
+            if (error or not reference or not reference_spans or
+                    abs(statistics.median(s['size'] for s in reference_spans)/body_size-1)>skeleton.LADDER_TOL):
                 continue
             bounds=(min(l['bbox'][0] for l in reference),max(l['bbox'][2] for l in reference))
             if bounds[1]-bounds[0]>=raw['width']*.6 and bounds[0]<=center<=bounds[1]:

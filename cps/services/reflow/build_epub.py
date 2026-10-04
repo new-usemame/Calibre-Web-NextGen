@@ -2711,6 +2711,10 @@ def _written_glyph_style(element, parent):
         return False
     labels = ('Original source text; Unicode encoding unavailable. Open original page.',
               'Original source text; transcription uncertain. Open original page.')
+    if element.get('alt') == 'Original printed note layout. Open original page.':
+        if element.get('style') != 'max-width:100%;height:auto':
+            return False
+        labels += ('Original printed note layout. Open original page.',)
     if element.get('alt') not in labels or parent.get('title') != element.get('alt'):
         return False
     page = re.fullmatch(r'original-p(\d{4,})\.xhtml#page', parent.get('href',''))

@@ -23,7 +23,7 @@ def book_for(region):
     style=skeleton.BookStyle(body_size=11)
     return assemble.assemble([skel],style,[raw]),raw
 
-def test_repeated_native_note_columns_keep_original_layout_without_changing_words():
+def test_repeated_native_note_columns_keep_original_layout_without_changing_words(tmp_path):
     region=note_region();before=asdict(region)
     book,raw=book_for(region)
     assert book.conservation.ok
@@ -34,6 +34,20 @@ def test_repeated_native_note_columns_keep_original_layout_without_changing_word
     assert 'Original printed note layout' in html and 'class="source-glyph"' in html and 'glyph_p0000_' in html
     assert 'Fire Sun Jupiter' in note.text
     assert asdict(region)==before
+    import pymupdf,zipfile
+    with pymupdf.open() as doc:
+        page=doc.new_page(width=400,height=600)
+        for ln in region.lines:page.insert_text((ln.x0,ln.bbox[3]),ln.text,fontsize=ln.size)
+        target=tmp_path/'note-layout.epub'
+        build_epub.build(book,str(target),doc=doc,raw_pages={0:raw})
+    assert build_epub.validate(target)==[]
+    with zipfile.ZipFile(target) as z:files={n:z.read(n) for n in z.namelist()}
+    for n,data in list(files.items()):
+        if n.startswith('OEBPS/ch') and n.endswith('.xhtml'):
+            files[n]=data.replace(b'max-width:100%;height:auto',b'height:1em;width:auto;vertical-align:baseline')
+    with zipfile.ZipFile(target,'w') as z:
+        for n,data in files.items():z.writestr(n,data)
+    assert any('styles <img>' in error for error in build_epub.validate(target))
 
 @pytest.mark.parametrize('change',['ordinary','shifted','two_rows','overlapping'])
 def test_unproved_note_columns_do_not_replace_native_prose(change):

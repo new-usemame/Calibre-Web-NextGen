@@ -218,6 +218,72 @@ def test_failed_rating_write_rolls_back_and_leaves_previous_score(ratings_db, mo
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize('failing_query', [1, 2], ids=['personal-read', 'household-read'])
+def test_unavailable_rating_projection_keeps_catalog_readable_and_recovers(ratings_db, failing_query):
+    """Either rating read may fail; neither may erase the page or poison its next request."""
+    from sqlalchemy.exc import OperationalError
+    from cps.api import books
+
+    session, users, stamp, engine, monkeypatch = ratings_db
+    user_id = users[0].id
+    session.add(ub.BookRating(user_id=user_id, book_id=1, rating=8))
+    session.commit()
+    entry = session.query(db.Books).filter_by(id=1).one()
+    monkeypatch.setattr(books, '_real_user_id', lambda: user_id)
+    monkeypatch.setattr(books, '_list_custom_column_data', lambda *_args: ({}, {}))
+    monkeypatch.setattr(books, 'read_statuses_for_books', lambda *_args: {})
+    monkeypatch.setattr(books.user_cover, 'overrides_for_user', lambda *_args: {})
+    monkeypatch.setattr(books, '_visible_shelves_by_book', lambda *_args: {})
+    monkeypatch.setattr(db, '_SQLITE_JSON_CAPABILITY', True)
+    seen = []
+    def fail_read(_conn, _cursor, statement, *_args):
+        if 'FROM book_rating' in statement:
+            seen.append(statement)
+            if len(seen) == failing_query:
+                raise OperationalError(statement, {}, Exception('rating database busy'))
+    event.listen(engine, 'before_cursor_execute', fail_read)
+    app = flask.Flask(__name__)
+    app.add_url_rule('/catalog', view_func=lambda: flask.jsonify(books._rows_to_items([entry])))
+    try:
+        response = app.test_client().get('/catalog')
+        assert response.status_code == 200
+        assert response.json[0]['id'] == 1
+        assert response.json[0]['personal_rating'] is None
+        assert response.json[0]['household_rating'] is None
+        assert len(seen) == failing_query
+    finally:
+        event.remove(engine, 'before_cursor_execute', fail_read)
+    recovered = app.test_client().get('/catalog')
+    assert recovered.status_code == 200
+    assert recovered.json[0]['personal_rating'] == 8
+    assert session.query(ub.BookRating).one().rating == 8
+
+
+@pytest.mark.unit
+def test_failed_rating_load_reports_error_and_rolls_back(ratings_db):
+    """The editor must show load failure rather than present unavailable scores as unrated."""
+    from sqlalchemy.exc import OperationalError
+    from cps.api import book_ratings
+
+    session, users, stamp, engine, monkeypatch = ratings_db
+    monkeypatch.setattr(book_ratings, 'current_user', users[0])
+    monkeypatch.setattr(book_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=lambda *a, **kw: object()))
+    def fail_read(*_args):
+        raise OperationalError('SELECT', {}, Exception('rating database busy'))
+    monkeypatch.setattr(session, 'query', fail_read)
+    from unittest.mock import Mock
+    rollback = Mock(wraps=session.rollback)
+    monkeypatch.setattr(session, 'rollback', rollback)
+    app = flask.Flask(__name__)
+    app.add_url_rule('/books/<int:book_id>/rating', view_func=inspect.unwrap(book_ratings.book_rating))
+    response = app.test_client().get('/books/1/rating')
+    assert response.status_code == 500
+    assert response.json['error']['code'] == 'rating_load_failed'
+    assert response.headers['Cache-Control'] == 'private, no-store'
+    rollback.assert_called_once_with()
+
+
+@pytest.mark.unit
 def test_classic_library_score_is_labelled_fractional_and_account_hideable():
     from pathlib import Path
     from jinja2 import Environment, FileSystemLoader

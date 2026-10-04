@@ -44,7 +44,12 @@ def book_rating(book_id):
     if not book:
         return _error('not_found', 'Book not found', 404)
     if request.method == 'GET':
-        return _response(ratings_for_books(ub.session, uid, [book_id])[book_id])
+        try:
+            return _response(ratings_for_books(ub.session, uid, [book_id])[book_id])
+        except SQLAlchemyError:
+            ub.session.rollback()
+            log.exception('Failed to load personal rating for user %s, book %s', uid, book_id)
+            return _error('rating_load_failed', 'Could not load your rating.', 500)
     score = 0
     if request.method == 'PUT':
         body = request.get_json(silent=True)

@@ -329,6 +329,17 @@ def _visible_shelves_by_book(book_ids):
     }
 
 
+def _optional_ratings_for_books(user_id, book_ids):
+    """Supplemental scores must not prevent reading an otherwise available book."""
+    try:
+        return ratings_for_books(ub.session, user_id, book_ids)
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.warning("Could not load supplemental book ratings", exc_info=True)
+        return {book_id: {"personal_rating": None, "household_rating": None}
+                for book_id in book_ids}
+
+
 def _rows_to_items(entries, hidden_ids=None, custom_values=None):
     """Serialize one list page after resolving its in-progress ids in bulk."""
     entries = list(entries)
@@ -349,7 +360,7 @@ def _rows_to_items(entries, hidden_ids=None, custom_values=None):
     user_id = _real_user_id()
     page_ids = [int(book.id) for book in books]
     favorite_ids = set()
-    page_ratings = ratings_for_books(ub.session, user_id, page_ids)
+    page_ratings = _optional_ratings_for_books(user_id, page_ids)
     if user_id is not None and page_ids:
         try:
             favorite_ids = {int(row[0]) for row in (
@@ -1591,7 +1602,7 @@ def book_detail(book_id):
         cover_override=user_cover.override_for_user(_real_user_id(), book_id),
     )
     body["in_my_library"] = in_my_library
-    body.update(ratings_for_books(ub.session, _real_user_id(), [book_id])[book_id])
+    body.update(_optional_ratings_for_books(_real_user_id(), [book_id])[book_id])
     body["accessible_via_public_shelf"] = accessible_via_public_shelf
     source_formats, target_formats = get_convert_options(book)
     body["convert_options"] = {

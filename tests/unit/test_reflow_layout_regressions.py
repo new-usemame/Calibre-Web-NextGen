@@ -36,9 +36,13 @@ class PipelineFallback(unittest.TestCase):
             stages.append(stage)
             view=json.loads(request['messages'][1]['content'])
             if stage=='proposer':
-                return dict(snapshot=view['snapshot'],groups=[dict(role='paragraph',ranges=[[view['atoms'][0]['id'],view['atoms'][-1]['id']]])],joins=[],continuation=False,boundary_join=None)
+                return dict(contract='layout-range-choices-1',snapshot=view['source_snapshot'],
+                    groups=[dict(role='paragraph',ranges=[[0,len(view['atoms'])-1]])],
+                    joins=[],incoming={'continue':False,'previous':None,'current':None,'hyphen':None},emphasis=[])
             if stage=='reviewer':
-                return dict(snapshot=view['snapshot'],accept=True,continuation_accept=False,problems=[])
+                from cps.services.reflow.layout_ranges import decision_count
+                return dict(snapshot=view['snapshot'],accept=True,continuation_accept=False,
+                    problems=[],decisions='1'*decision_count(view['decisions']))
             if stage=='lexical':
                 self.assertEqual([(r['left_text'],r['right_text']) for r in view],[('anti-','dis-'),('dis-','establishment')])
                 return dict(decisions=[dict(id=r['id'],decision='drop') for r in view])

@@ -548,10 +548,10 @@ class EPUBFixer:
                 declared_encoding = 'utf-16'
 
             if ext == 'css':
-                # CSS encoding declarations use an exact leading byte syntax,
-                # unlike ordinary at-rules: no comments, extra spaces or single
-                # quotes. Keep a declaration coherent with the encoding the
-                # existing decoder/writer selected; other CSS stays unchanged.
+                # Match a tightly spelled leading declaration in the first
+                # 1,024 decoded characters. Existing detection/BOM handling has
+                # already selected the encoding; this is not raw-byte sniffing.
+                # Keep the declaration coherent with that writer encoding.
                 # https://www.w3.org/TR/css-syntax-3/#input-byte-stream
                 declaration = re.match(
                     r'^(\ufeff?@charset ")([\x00-\x21\x23-\x7f]*)(";)', content[:1024]

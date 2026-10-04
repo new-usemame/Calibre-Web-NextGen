@@ -415,6 +415,7 @@ def main():
                     )
                 from acquisition_opds_publication_runtime_probe import run_opds_publication_runtime
                 opds_publication = run_opds_publication_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
+                opds1_entry = run_opds_publication_runtime(root,repo,owner,other_owner,args.fixture,ingest,library,protocol='opds1')
                 from acquisition_bundle_runtime_probe import run_bundle_runtime
                 bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_torrent_metadata_runtime_probe import run_torrent_metadata_runtime
@@ -430,6 +431,7 @@ def main():
                         results=results,
                         bundle=bundle,
                         opds_publication=opds_publication,
+                        opds1_entry=opds1_entry,
                         torrent_metadata=torrent_metadata,
                         http_gets=gets,
                         full_processor_subprocess=True,

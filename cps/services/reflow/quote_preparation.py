@@ -15,7 +15,7 @@ from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import extract,model,layout_quote,ocr,build_epub,enriched_source,heading_units
+from . import extract,model,structural_quote,ocr,build_epub,enriched_source,heading_units
 from .native_resources import Lease, ResourceUnavailable, ResourceStopped
 
 
@@ -68,13 +68,13 @@ class PreparationStore:
                 _executable,version,data=ocr._engine(options.get('ocr_language','eng'))
                 recovery_identity=[ocr.ADAPTER_VERSION,version,data]
             except ocr.OCRUnavailable:recovery_identity=[ocr.ADAPTER_VERSION,'unavailable']
-        context=[fingerprint,options,layout_quote._versions(),
+        context=[fingerprint,options,structural_quote._versions(),
                  build_epub.CONVERTER_VERSION,enriched_source.VERSION,heading_units.VERSION,recovery_identity]
         return hashlib.sha256(json.dumps(context,sort_keys=True).encode()).hexdigest(),fingerprint
 
     @staticmethod
     def _valid_quote(quote,fingerprint):
-        if not isinstance(quote,dict) or quote.get('source_sha256')!=fingerprint or quote.get('version')!=layout_quote.VERSION:
+        if not isinstance(quote,dict) or quote.get('source_sha256')!=fingerprint or quote.get('version')!=structural_quote.VERSION:
             raise ValueError('prepared quote does not match current source')
         data=dict(quote);identity=data.pop('identity',None)
         actual=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False,separators=(',',':'),allow_nan=False).encode()).hexdigest()

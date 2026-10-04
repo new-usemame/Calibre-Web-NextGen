@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Inactive, source-bound wrapper operations; no provider or task activation.
+"""Source-bound heading and quotation choices for uncertain source roles.
 
 Legality is not semantic correctness. Uniform proposals include wrong choices;
 source judgments belong to an independent oracle, never to this adapter.

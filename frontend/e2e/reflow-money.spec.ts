@@ -14,8 +14,8 @@ function assessment(): SourceAssessment {
     instance_budget: { status: 'available', remaining_usd: 2, window_hours: 24 },
     source_sha256: 'a'.repeat(64), consent_contract: 'source-layout-1',
     review: { quality_released: true, route_version: 'test-route', source_revision: 'test-source',
-      provider: 'openai/flex + anthropic', service_tier: 'flex (OpenAI), default (Anthropic)', proposer: 'openai/gpt-6-luna',
-      verifier: 'openai/gpt-6-luna', max_output_tokens: 8192 },
+      provider: 'openai/flex', service_tier: 'flex', proposer: 'openai/gpt-5.6-luna',
+      verifier: 'openai/gpt-5.6-terra', max_output_tokens: 4096 },
     recovery: { ocr_candidates: 0, image_only: 0, damaged: 0, counts_estimated: false, sampled_pages: 60, estimated_seconds: 0,
       engine_available: true, engine_version: 'tesseract 5.3.4', engine_detail: '', language: 'eng',
       dpi: 300, pdf_sha256: 'a'.repeat(16), non_latin_share: 0 } };
@@ -77,8 +77,8 @@ async function stub(page: Page, est = assessment(), jobs: ReflowJob[] = []) {
   await expect(page.getByRole('heading', { name: 'Reflow PDF to EPUB', exact: true })).toBeVisible();
   return { state, errors };
 }
-const paidChoice = (page: Page) => page.getByRole('radio', { name: /^AI page layout/ });
-const consent = (page: Page) => page.getByRole('checkbox', { name: /^I authorize Luna/ });
+const paidChoice = (page: Page) => page.getByRole('radio', { name: /^AI formatting choices/ });
+const consent = (page: Page) => page.getByRole('checkbox', { name: /^I authorize the displayed/ });
 async function preparePaid(page: Page) {
   await paidChoice(page).check();
   await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();

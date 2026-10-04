@@ -30,8 +30,11 @@ class TwoStageClient:
                 'route_version':ROUTE_VERSION,'quality_released':self.enabled}
 
 
-def _stage(client, stage, prepared, request, ledger, cache, pno, records, should_stop):
+def _stage(client, stage, prepared, request, ledger, cache, pno, records, should_stop,
+           request_observer=None):
     wire = client.stages[stage].prepare_request(request, prepared.raster)
+    if request_observer:
+        request_observer(stage, wire, pno)
     token, saved = cache.claim(wire.sha256) if cache else (None, None)
     if saved is not None:
         records.append({'page':pno,'stage':stage,'cached':True,'cost_usd':0,
@@ -79,7 +82,7 @@ def _stage(client, stage, prepared, request, ledger, cache, pno, records, should
 def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                    sample_count=None, progress=None, should_stop=None,
                    recovery_opts=None, prepared_result=None, prepared_observer=None, measure_eligibility=True,
-                   sample_context=False):
+                   sample_context=False, request_observer=None):
     """Read full source context before selecting output/paid pages.
 
     ``prepared_result`` is an explicit local-rig reuse seam, never an API pickle
@@ -158,7 +161,7 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
             counts['unreviewed']+=1;states[pno]={'status':'unreviewed','reason':halted};continue
         try:
             response=_stage(client,'proposer',p,prompts.operation_request(p.model_view()),
-                            ledger,stage_cache,pno,result.stage_records,should_stop)
+                            ledger,stage_cache,pno,result.stage_records,should_stop,request_observer)
             proposal=p.accept(result.book,doc,response,source_page=source)
             if not proposal.selected:
                 counts['proposer_abstained']+=1;states[pno]={'status':'proposer_abstained'};reviewed=True
@@ -166,7 +169,7 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                 counts['proposed_pages']+=1;counts['proposed_operations']+=len(proposal.selected)
                 v=ops.prepare_verification(result.book,doc,proposal,source_page=source)
                 response=_stage(client,'verifier',p,prompts.verification_request(v.model_view()),
-                                ledger,stage_cache,pno,result.stage_records,should_stop)
+                                ledger,stage_cache,pno,result.stage_records,should_stop,request_observer)
                 approved=v.accept(result.book,doc,response,source_page=source)
                 reviewed=True
                 if approved.selected:
@@ -177,6 +180,7 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                     states[pno]={'status':'approved','operations':len(approved.selected)}
                 else:counts['verifier_abstained']+=1;states[pno]={'status':'verifier_abstained'}
             outcome.gate='PASS'
+        except EstimateStale:halted='estimate_stale'
         except shared_budget.BudgetError as exc:halted=exc.code
         except model.CapExceeded:halted='cost_cap'
         except model.AttemptCancelled:halted='cancelled'

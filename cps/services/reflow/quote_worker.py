@@ -13,7 +13,7 @@ def main():
     name='_reflow_source_quote_runtime'
     spec=importlib.util.spec_from_file_location(name,root/'__init__.py',submodule_search_locations=[str(root)])
     module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module)
-    quote=importlib.import_module(name+'.layout_quote')
+    quote=importlib.import_module(name+'.structural_quote')
     import pymupdf
     request=json.load(sys.stdin);control=Path(request['control']);status=Path(request['progress'])
     # The web process names itself: reading getppid() here could already see the

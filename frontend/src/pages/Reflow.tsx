@@ -246,7 +246,7 @@ export function Reflow({ id }: { id: string }) {
           </p>
         )}
         <p className={styles.note}>
-          {t('AI can propose paragraph grouping, reading order and formatting over the preserved source. Checked layouts become the page output; other pages keep the source conversion. Original images, notes and uncertainty evidence remain available.')}
+          {t('The converter preserves source words, reading order, images, notes and uncertainty evidence. Optional AI review chooses between supported heading and quotation formats only where the source role is uncertain.')}
         </p>
       </section>
 
@@ -355,8 +355,8 @@ export function Reflow({ id }: { id: string }) {
             <input type="radio" name="reflow-review" className={styles.radio} checked={paid}
               disabled={!paidAvailable} aria-describedby="reflow-review-availability"
               onChange={() => setReviewMode('source_verified')} />
-            <span className={styles.modeLabel}>{t('AI page layout')}</span>
-            <span className={styles.modeHint}>{t('Luna proposes and reviews page layout over locked source words. Opus checks split-word hyphens. Pages that do not pass the checks keep the source conversion.')}</span>
+            <span className={styles.modeLabel}>{t('AI formatting choices')}</span>
+            <span className={styles.modeHint}>{t('Review uncertain headings and quotations by choosing from source-bound options. Words, reading order and source images remain controlled by the converter. Declined choices keep the source conversion.')}</span>
           </label>
         </div>
         <p className={styles.note} id="reflow-review-availability">
@@ -416,7 +416,7 @@ export function Reflow({ id }: { id: string }) {
             <Fact label={t('Pages with no supported choices')} value={String(selected.noChoices)} />
             <Fact label={t('Full-review reservation ceiling')} value={ledgerUsd(needed)} />
           </dl>
-          <p className={styles.note}>{t('This conservative ceiling includes layout proposals, reviews, reading-order checks and split-word checks without cache reuse. It is not an expected bill or money already held. Your cap limits new requests.')}</p>
+          <p className={styles.note}>{t('This conservative ceiling covers proposals and approvals for uncertain formatting choices without cache reuse. It is not an expected bill or money already held. Your cap limits new requests.')}</p>
           <p className={styles.note}>{t('Eligibility is not an improvement. Unsupported, limited, declined and unreviewed pages keep the source conversion and its uncertainty evidence.')}</p>
         </>}
       </section>
@@ -509,7 +509,7 @@ export function Reflow({ id }: { id: string }) {
           <input type="checkbox" className={styles.check} checked={consent}
             disabled={paid && (!paidAvailable || !quote)} onChange={(e) => setConsent(e.target.checked)} />
           <span>
-            {paid ? t('I authorize Luna layout proposals and reviews, and Opus hyphen checks, through OpenRouter, up to {amount} for this job. Unapproved pages keep the source conversion.', { amount: ledgerUsd(authorised) })
+            {paid ? t('I authorize the displayed proposal and approval models through OpenRouter, up to {amount} for this job. Declined formatting choices keep the source conversion.', { amount: ledgerUsd(authorised) })
               : t('Create this source conversion without model requests or provider charges.')}
           </span>
         </label>

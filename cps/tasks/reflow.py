@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, retention, layout_pipeline, layout_quote, shared_budget, operation_audit, runtime_diagnostics
+    model, ocr, pipeline, publication, report, retention, structural_pipeline, structural_quote, shared_budget, operation_audit, runtime_diagnostics
 
 log = logger.create()
 
@@ -185,10 +185,10 @@ def _clamp_cap(value):
 
 
 def make_client(review_mode):
-    """Only explicit current consent can enable source-bound layout review."""
-    return layout_pipeline.LayoutClient(
+    """Only explicit current consent enables bounded source-format choices."""
+    return structural_pipeline.TwoStageClient(
         (config.resolved_openrouter_key() or None) if review_mode=='source_verified' else None,
-        enabled=review_mode=='source_verified' and layout_pipeline.QUALITY_RELEASED)
+        enabled=review_mode=='source_verified' and structural_pipeline.QUALITY_RELEASED)
 
 
 class TaskReflowPdf(CalibreTask):
@@ -382,19 +382,19 @@ class TaskReflowPdf(CalibreTask):
             "cache_dir": reflow_dir("ocr-cache"),
             "scratch_dir": reflow_dir("ocr-scratch"),
         }
-        from ..services.reflow.layout_quote import consent_observer
+        from ..services.reflow.structural_quote import consent_observer
         quote=getattr(self.options,"consent_quote",None)
         observer=consent_observer(quote,document) if quote is not None else None
         sample=self.options.mode=='sample'
         # A sample reads the front of the book, not all of it (N2): only a paid
         # sample keeps the complete context, because its consent quote was
-        # measured against it (see layout_pipeline.run_layout).
-        result = layout_pipeline.run_layout(document,client=client,ledger=ledger,cache=cache,
+        # measured against it (see structural_pipeline.run_structural).
+        result = structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
                             sample_count=self.options.sample_pages if sample else None,
                             sample_context=sample and observer is None,
                             progress=self._on_progress,should_stop=lambda:self._native_stop(document),
                             recovery_opts=recovery_opts,prepared_observer=observer,
-                            request_observer=(lambda stage,wire,p:layout_quote.assert_request_bound(quote,stage,wire,p)) if quote else None,
+                            request_observer=(lambda stage,wire,p:structural_quote.assert_request_bound(quote,stage,wire,p)) if quote else None,
                             measure_eligibility=self.options.review_mode=="source_verified")
         result.structural["review_mode"]=self.options.review_mode
         # The task/report ledger records the same final user-facing scope.

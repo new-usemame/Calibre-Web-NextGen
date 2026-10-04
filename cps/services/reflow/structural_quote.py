@@ -4,7 +4,32 @@ import json
 
 from . import prompts,structural_ops as ops,structural_pipeline,typed_model,pipeline
 
-VERSION='source-review-quote-1'
+VERSION='source-review-quote-2-rules-first'
+
+
+def _versions():
+    return dict(version=VERSION, source_revision=typed_model.SOURCE_REVISION,
+                route_version=typed_model.ROUTE_VERSION,
+                proposer_prompt=prompts.OPERATION_PROMPT_VERSION,
+                verifier_prompt=prompts.VERIFICATION_PROMPT_VERSION,
+                protocol=ops.PROTOCOL)
+
+
+def assert_request_bound(quote, stage, wire, page):
+    """Stop before a cache claim or paid dispatch outside the consented ceiling."""
+    row=next((p for p in quote.get('pages',[]) if p['page_index0']==page),None)
+    body=dict(quote); identity=body.pop('identity',None)
+    actual=hashlib.sha256(json.dumps(body,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+    context=json.loads(wire.context_json)
+    if (stage not in ('proposer','verifier') or row is None or identity!=actual or
+            any(quote.get(k)!=v for k,v in _versions().items()) or
+            context.get('stage')!=stage or context.get('snapshot_id')!=row['snapshot_id'] or
+            context.get('route_version')!=typed_model.ROUTE_VERSION or
+            wire.bound_usd>row[stage+'_bound_usd'] or
+            wire.prompt_tokens_bound>row[stage+'_prompt_tokens_bound'] or
+            wire.response_token_bound>row[stage+'_response_token_bound'] or
+            (stage=='proposer' and wire.sha256!=row['proposer_request_sha256'])):
+        raise structural_pipeline.EstimateStale('source-choice request exceeds the consented estimate')
 
 
 def maximum_legal_ids(candidates):
@@ -56,9 +81,7 @@ def measure(doc,*,recovery_opts=None,prepared_result=None,progress=None,should_s
     result=structural_pipeline.run_structural(doc,client=None,recovery_opts=recovery_opts,
         prepared_result=prepared_result,progress=progress,should_stop=should_stop,prepared_observer=observe)
     counts=result.structural
-    quote=dict(version=VERSION,source_sha256=result.fingerprint,
-        source_revision=typed_model.SOURCE_REVISION,route_version=typed_model.ROUTE_VERSION,
-        proposer_prompt=prompts.OPERATION_PROMPT_VERSION,verifier_prompt=prompts.VERIFICATION_PROMPT_VERSION,
+    quote=dict(**_versions(),source_sha256=result.fingerprint,
         source_context_pages=len(result.book.pages),first_body_page=pipeline.first_body_page(result.book),
         eligible_pages=counts['eligible'],limited_pages=counts['limited'],unsupported_pages=counts['unsupported'],
         no_choice_pages=counts['no_choices'],pages=pages,coverage=[
@@ -86,10 +109,7 @@ def consent_observer(quote,doc):
     """
     expected={p['page_index0']:p for p in quote.get('pages',[])}
     def observe(book,prepared,source_page):
-        versions={'version':VERSION,'source_revision':typed_model.SOURCE_REVISION,
-                  'route_version':typed_model.ROUTE_VERSION,
-                  'proposer_prompt':prompts.OPERATION_PROMPT_VERSION,
-                  'verifier_prompt':prompts.VERIFICATION_PROMPT_VERSION}
+        versions=_versions()
         if (any(quote.get(k)!=v for k,v in versions.items()) or
                 prepared.pdf_digest!=quote.get('source_sha256') or
                 expected.get(prepared.page)!=measure_page(book,doc,prepared,source_page)):

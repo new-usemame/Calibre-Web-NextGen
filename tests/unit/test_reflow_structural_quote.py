@@ -8,6 +8,30 @@ from cps.services.reflow import prompts,structural_ops as ops,typed_model
 pytestmark=pytest.mark.unit
 
 
+@pytest.mark.parametrize('changed',['price','prompt','response','source','stage'])
+def test_actual_request_must_fit_current_consented_source_and_ceiling(source,changed):
+    import json
+    from dataclasses import replace
+    from cps.services.reflow.structural_quote import measure,assert_request_bound
+    from cps.services.reflow.structural_pipeline import EstimateStale
+    book,doc,_=source
+    from cps.services.reflow import extract
+    from cps.services.reflow.enriched_source import prepare_source_page
+    source_page=prepare_source_page(book,0,{'layer':'native'})
+    p=ops.prepare(book,doc,0,typed_model.SOURCE_REVISION,{'layer':'native'},
+                  source_page=source_page,raw_page=extract.read_page(doc,0))
+    quote=measure(doc,prepared_result=prepared_result(source))
+    wire=typed_model.TypedStageClient('', 'proposer').prepare_request(prompts.operation_request(p.model_view()),p.raster)
+    assert_request_bound(quote,'proposer',wire,0)
+    field={'price':'bound_usd','prompt':'prompt_tokens_bound','response':'response_token_bound'}.get(changed)
+    if field:wire=replace(wire,**{field:getattr(wire,field)+1})
+    else:
+        context=json.loads(wire.context_json)
+        context['snapshot_id' if changed=='source' else 'stage']='foreign'
+        wire=replace(wire,context_json=json.dumps(context))
+    with pytest.raises(EstimateStale):assert_request_bound(quote,'proposer',wire,0)
+
+
 def test_maximum_legal_selection_bounds_every_actual_verifier_request(source):
     from cps.services.reflow.structural_quote import measure_page
     book,doc,_=source;p=prepared(source)

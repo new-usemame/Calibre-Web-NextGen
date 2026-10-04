@@ -61,10 +61,6 @@ INK_EXTENT_SCALE = 1.5
 #: margin sliver in the corpus audit, 28%+ on real line art.
 INK_BLOCK_MIN = 0.03
 
-#: Above this many vector paths a page is a dense table or a traced scan, and its
-#: path boxes are noise rather than diagram evidence.
-MAX_DRAWING_RECTS = 2500
-
 #: The most pixels one render may allocate. The check belongs BEFORE get_pixmap:
 #: a pixmap is the allocation, and measuring after it exists is how a hostile
 #: geometry (a 20000pt page at 1.5x is ~2.7 GB) gets to consume it. 4096x4096 is
@@ -471,8 +467,9 @@ def drawing_rects(page):
     """(count, boxes) of the page's vector paths.
 
     The count alone says a page carries rules or a diagram; the boxes say where.
-    Above ``MAX_DRAWING_RECTS`` the page is a dense table or a traced scan and the
-    boxes would be noise, so the count is kept and the boxes are not."""
+    Dense native diagrams can trace their lettering as thousands of paths.
+    Their count cannot distinguish artwork from a table or a scan; retain the
+    actual geometry so the source-layout stage can make that decision."""
     try:
         drawings = page.get_cdrawings()
     except Exception:
@@ -481,8 +478,7 @@ def drawing_rects(page):
         except Exception:
             return 0, []
     rects = [tuple(d["rect"]) for d in drawings
-             if d.get("rect") is not None] if len(drawings) <= MAX_DRAWING_RECTS \
-        else []
+             if d.get("rect") is not None]
     return len(drawings), rects
 
 

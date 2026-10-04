@@ -3023,8 +3023,8 @@ def _vector_figures(raw):
 
     Charts and geometric figures are drawn, not embedded: extracting only embedded
     images loses them whole. The guards are the v4 tool's, proven on the corpus:
-    enough paths to be a drawing rather than a rule, not so many the page is a
-    dense table or a traced scan, and a cluster of believable area.
+    enough paths to be a drawing rather than a rule and a cluster of believable
+    area. A dense native chart's traced lettering is still source artwork.
     """
     all_rects = raw.drawing_rects
     rects = [r for r in all_rects

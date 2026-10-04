@@ -17,7 +17,7 @@ class WorkflowSession:
         payload=json.loads(kwargs['data']);self.calls.append(payload)
         body=json.loads(payload['messages'][1]['content'][1]['text'])
         response=body['empty_response'].copy()
-        if payload['model'].endswith('luna'):
+        if 'select' in response:
             response['select']=[next(c['candidate_id'] for c in body['source']['candidates'] if c['element_id']=='e0' and c['kind']=='heading')]
         else:response['approve']=body['source']['verification']['proposed_ids'] if self.approve else []
         data=reply(json.dumps(response));data['model']=payload['model']
@@ -38,7 +38,8 @@ def test_real_two_stage_pipeline_only_builds_verifier_decision_and_cache_replays
     result=run_structural(doc,client=client,ledger=ledger,cache=cache,prepared_result=prepared_result(source))
     assert len(session.calls)==2 and ledger.spent()==pytest.approx(2*.000123456789)
     assert result.structural['proposed_operations']==1
-    assert result.structural['requested_models']=={stage.model_id:1 for stage in client.stages.values()}
+    from collections import Counter
+    assert result.structural['requested_models']==dict(Counter(stage.model_id for stage in client.stages.values()))
     assert result.structural['approved_operations']==int(approve)
     target=tmp/'result.epub'
     build_epub.build(book,str(target),doc=doc,page_html=result.page_html,source_pages=result.source_pages,operation_plans=result.operation_plans)
@@ -53,7 +54,11 @@ def test_real_two_stage_pipeline_only_builds_verifier_decision_and_cache_replays
 def test_budget_can_stop_between_stages_without_publishing_proposal(source):
     from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
     book,doc,tmp=source;session=WorkflowSession();client=TwoStageClient('test',enabled=True,session=session)
-    ledger=Ledger(str(tmp/'cap'),cap_usd=.01)
+    from cps.services.reflow.structural_quote import measure
+    quote=measure(doc,prepared_result=prepared_result(source))
+    cap=max(quote['proposer_bound_usd'],.000123456789+quote['verifier_bound_usd']/2)
+    assert cap<.000123456789+quote['verifier_bound_usd']
+    ledger=Ledger(str(tmp/'cap'),cap_usd=cap)
     result=run_structural(doc,client=client,ledger=ledger,cache=pipeline.PageCache(tmp/'cache'),prepared_result=prepared_result(source))
     assert len(session.calls)==1
     assert not result.operation_plans and result.stopped=='cost_cap'
@@ -93,7 +98,8 @@ def test_two_jobs_same_source_cannot_race_into_two_paid_proposals(source):
     book,doc,tmp=source;entered=Event();release=Event()
     class Blocking(WorkflowSession):
         def post(self,*args,**kwargs):
-            if json.loads(kwargs['data'])['model'].endswith('luna'):
+            payload=json.loads(kwargs['data'])
+            if 'select' in json.loads(payload['messages'][1]['content'][1]['text'])['empty_response']:
                 entered.set();assert release.wait(10)
             return super().post(*args,**kwargs)
     first=Blocking();second=WorkflowSession();cache=pipeline.PageCache(tmp/'shared')
@@ -147,7 +153,11 @@ def test_shared_exhaustion_between_stages_keeps_complete_source_and_truthful_rea
     from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
     from cps.services.reflow.shared_budget import Store,SharedLedger
     book,doc,tmp=source;session=WorkflowSession();client=TwoStageClient('test',enabled=True,session=session)
-    ledger=SharedLedger(tmp/'jobs/a/job.jsonl',1,job_id='a',store=Store(tmp,lambda:.01),book_id=1,user_id=1)
+    from cps.services.reflow.structural_quote import measure
+    quote=measure(doc,prepared_result=prepared_result(source))
+    cap=max(quote['proposer_bound_usd'],.000123456789+quote['verifier_bound_usd']/2)
+    assert cap<.000123456789+quote['verifier_bound_usd']
+    ledger=SharedLedger(tmp/'jobs/a/job.jsonl',1,job_id='a',store=Store(tmp,lambda:cap),book_id=1,user_id=1)
     result=run_structural(doc,client=client,ledger=ledger,cache=pipeline.PageCache(tmp/'cache'),prepared_result=prepared_result(source))
     assert len(session.calls)==1 and not result.operation_plans
     assert result.stopped=='instance_budget_exhausted'

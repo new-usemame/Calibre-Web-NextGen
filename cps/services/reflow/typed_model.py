@@ -8,14 +8,16 @@ from dataclasses import dataclass
 
 from . import model
 
-ROUTE_VERSION = 'source-operations-flex-1'
+ROUTE_VERSION = 'source-operations-luna6-flex-2'
 SOURCE_REVISION = 'source-operations-source-regions-10.21'
 MAX_OUTPUT_TOKENS = 4096
 # Build availability still requires credentials, current consent and both spend limits.
 QUALITY_RELEASED = True
 STAGES = {
-    'proposer': model.ModelSpec('openai/gpt-5.6-luna', .10, .60, label='Source proposal'),
-    'verifier': model.ModelSpec('openai/gpt-5.6-terra', 1.0, 6.0, label='Source approval'),
+    # OpenRouter's pinned openai/flex endpoint, observed 2026-10-04. Each
+    # independent stage still rechecks live rate/capacity before reservation.
+    'proposer': model.ModelSpec('openai/gpt-6-luna', .05, .25, label='Source proposal'),
+    'verifier': model.ModelSpec('openai/gpt-6-luna', .05, .25, label='Source approval'),
 }
 
 

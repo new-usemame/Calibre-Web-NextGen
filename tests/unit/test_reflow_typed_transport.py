@@ -24,11 +24,12 @@ def request():
 class Session:
     def __init__(self, data=None, error=None, status=200, route=None):self.data=data;self.error=error;self.status=status;self.calls=[];self.route=route
     def get(self,url,**kwargs):
-        verifier='terra' in url
+        from cps.services.reflow.typed_model import STAGES
+        spec=next(s for s in STAGES.values() if s.model_id in url)
         root={'architecture':{'input_modalities':['image','text']},'endpoints':[{
             'tag':'openai/flex','status':0,'max_prompt_tokens':200000,'max_completion_tokens':8192,
             'supported_parameters':['reasoning','max_tokens'],
-            'pricing':{'prompt':str(1e-6 if verifier else 1e-7),'completion':str(6e-6 if verifier else 6e-7)}}]}
+            'pricing':{'prompt':str(spec.prompt_usd_per_mtok/1e6),'completion':str(spec.completion_usd_per_mtok/1e6)}}]}
         return Session({'data':self.route if self.route is not None else root}).post()
     def post(self,*args,**kwargs):
         self.calls.append(kwargs)
@@ -41,7 +42,8 @@ class Session:
 
 
 def reply(content=None):
-    return {'model':'openai/gpt-5.6-luna','provider':'OpenAI','service_tier':'flex','id':'gen-test',
+    from cps.services.reflow.typed_model import STAGES
+    return {'model':STAGES['proposer'].model_id,'provider':'OpenAI','service_tier':'flex','id':'gen-test',
         'usage':{'prompt_tokens':1000,'completion_tokens':100,'cost':0.000123456789},
         'choices':[{'finish_reason':'stop','message':{'content':content or json.dumps({'protocol':ops.PROTOCOL,'snapshot_id':'a'*64,'select':[]})}}]}
 

@@ -336,14 +336,26 @@ def _sequence_folios(raw_pages, body_size):
     pages with the same page/folio offset and detached bottom-row geometry.
     """
     candidates=[]
+    damaged=[]
+    footer_peers={}
     for raw in raw_pages:
         lines=sorted((line for block in raw.text_blocks for line in block.lines
                       if line.stripped),key=lambda line:line.bbox[1])
         if len(lines)<2:continue
         line=lines[-1]
-        if not re.fullmatch(r"[0-9]{1,5}",line.stripped):continue
+        gap=line.bbox[1]-max(other.bbox[3] for other in lines[:-1])
+        if (line.bbox[1]>=raw.height*.88 and line.size<=body_size*1.02
+                and gap>=line.size*.8):
+            if re.fullmatch(r'[0-9]{1,5}',line.stripped):
+                footer_peers[raw.pno]=(int(line.stripped)-raw.pno,line.bbox[1]/raw.height,line.bbox)
+            elif re.fullmatch(r'[0-9SsOoIl]{1,5}',line.stripped) and any(ch.isdigit() for ch in line.stripped):
+                damaged.append((raw,line))
         if (line.bbox[1]<raw.height*.7 or line.size>body_size*1.02
-                or line.bbox[1]-max(other.bbox[3] for other in lines[:-1])<line.size*1.5):continue
+                or gap<line.size*1.5):continue
+        if not re.fullmatch(r"[0-9]{1,5}",line.stripped):
+            # A damaged folio is retained verbatim. Its furniture role can come
+            # from the surrounding print geometry, never from guessing digits.
+            continue
         candidates.append((raw.pno,int(line.stripped)-raw.pno,
                            line.bbox[1]/raw.height,line.bbox))
     proved={}
@@ -352,6 +364,20 @@ def _sequence_folios(raw_pages, body_size):
         if any(peers[i+2]-peers[i]==2 and peers[i]<=page<=peers[i+2]
                for i in range(len(peers)-2)):
             proved[page]=box
+    numeric=footer_peers
+    widths={raw.pno:raw.width for raw in raw_pages}
+    for raw,line in damaged:
+        peers=[numeric.get(raw.pno+delta) for delta in (-2,-1,1,2)]
+        if any(peer is None for peer in peers):continue
+        offsets={peer[0] for peer in peers}
+        if len(offsets)!=1 or any(abs(peer[1]-line.bbox[1]/raw.height)>.03 for peer in peers):continue
+        # Alternating verso/recto folios may live on opposite sides. The two
+        # observations of this page's parity must share its horizontal home.
+        if any(abs(peer[2][0]/widths[raw.pno+delta]-line.bbox[0]/raw.width)>.05
+               for delta,peer in ((-2,peers[0]),(2,peers[3]))):continue
+        expected=raw.pno+next(iter(offsets))
+        if expected>=0 and len(str(expected))==len(line.stripped):
+            proved[raw.pno]=line.bbox
     return proved
 
 
@@ -1635,10 +1661,42 @@ def _split_off_notes(raw, style, skel):
 
     zone_top = raw.height * FN_ZONE_NUMBERED
     eligible = []
+    def detached_raised(block):
+        # Some scans set notes only slightly smaller than body text. Size alone
+        # cannot distinguish them from a quotation or numbered prose: require
+        # a literal raised opening digit and a separate lower-page territory.
+        if (block.size > style.body_size * .98 or block.bbox[1] < raw.height * .65
+                or not note_evidence.raised_opening(block)):
+            return False
+        preceding = [other.bbox[3] for other in raw.text_blocks
+                     if other is not block and other.bbox[3] <= block.bbox[1]]
+        return bool(preceding and block.bbox[1]-max(preceding) >= style.body_size * 1.2)
+
+    anchors=[block for block in raw.text_blocks if detached_raised(block)]
+    damaged_openings=set()
+    for block in raw.text_blocks:
+        spans=[sp for sp in block.lines[0].spans if sp.text.strip()] if block.lines else []
+        if (len(spans)<2 or block.size>style.body_size*.98
+                or len(spans[0].text.strip())>3 or spans[0].text.strip().isalnum()
+                or spans[0].size>block.size*.85
+                or not spans[1].text.lstrip()[:1].isupper()):continue
+        for anchor in anchors:
+            label=next(sp for sp in anchor.lines[0].spans if sp.text.strip())
+            # Repeated label/word starts below a proven note establish a new
+            # note territory. Its damaged label remains unknown and qualified.
+            if (anchor.bbox[1]<block.bbox[1] and block.bbox[1]-anchor.bbox[3]<=style.body_size*3
+                    and abs(spans[0].bbox[0]-label.bbox[0])<=style.body_size*.5
+                    and 0<=spans[1].bbox[0]-spans[0].bbox[2]<=style.body_size):
+                damaged_openings.add(id(block));break
+
     for blk in raw.text_blocks:
-        if blk.bbox[1] < zone_top or not style.body_size:
+        # A folio below the notes is still page furniture. Giving it to the
+        # note parser first would append a bare final number to the last note.
+        furniture=bool(blk.lines and all(_furniture_reason(ln,raw,style) for ln in blk.lines))
+        if furniture or blk.bbox[1] < zone_top or not style.body_size:
             body.append(blk)
-        elif blk.size > style.body_size * FN_SIZE_RATIO:
+        elif (blk.size > style.body_size * FN_SIZE_RATIO
+                and not detached_raised(blk) and id(blk) not in damaged_openings):
             body.append(blk)
         else:
             eligible.append(blk)
@@ -1685,7 +1743,7 @@ def _split_off_notes(raw, style, skel):
         for blk in eligible[bi + 1:]:
             blk = keep_adjacent_captions(blk, notes[-1].bbox)
             if blk is not None:
-                notes.extend(_notes_in_block(blk, notes))
+                notes.extend(_notes_in_block(blk, notes, distinct_opening=id(blk) in damaged_openings))
 
     if notes:
         numbers = [n.number for n in notes if n.number is not None]
@@ -1710,7 +1768,7 @@ def _opening_strength(line, block_size):
     return "glyph"
 
 
-def _notes_in_block(blk, existing):
+def _notes_in_block(blk, existing, distinct_opening=False):
     """One block can hold several notes; a new one opens with its own small number.
 
     Lines before the first number continue the note that ran over from the block
@@ -1718,6 +1776,10 @@ def _notes_in_block(blk, existing):
     """
     out = []
     current = None
+    if distinct_opening:
+        current=Region(kind='note',lines=[],number=None,bbox=blk.bbox,
+                       uncertain=True,reason='damaged_note_label')
+        out.append(current)
     seen = [r.number for r in existing if r.number is not None]
     for position, ln in enumerate(blk.lines):
         number = _note_number(

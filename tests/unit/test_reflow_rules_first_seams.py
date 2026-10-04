@@ -124,3 +124,91 @@ def test_blank_image_with_printed_caption_still_separates_source_prose():
     pages=build_epub._page_blocks({0:''.join(chapter.blocks),1:'<p>the following body paragraph.</p>'})
     assert build_epub._join_page_turns(pages)==0
     assert 'A separate printed caption.' in ''.join(pages[0]['body'])
+
+
+def _slightly_smaller_note(*, gap=30, raised=True):
+    body = _line('The source sentence is still continuing', 40, 300, 12)
+    y = body.bbox[3]+gap
+    label = extract.Span('1', 6 if raised else 11.5, 'Serif', 0, (40,y,44,y+6))
+    words = extract.Span('See the earlier discussion.',11.5,'Serif',0,(46,y+3,250,y+14.5))
+    note = extract.Line([label, words],(40,y,250,y+14.5))
+    return extract.RawPage(0,300,500,[extract.Block(0,body.bbox,[body]),extract.Block(1,note.bbox,[note])])
+
+
+def test_detached_raised_note_need_not_be_ten_percent_smaller():
+    raw = _slightly_smaller_note()
+    skel = skeleton.page_skeleton(raw,skeleton.BookStyle(body_size=12))
+    assert len(skel.note_regions)==1
+    assert skel.note_regions[0].number==1
+    assert 'See the earlier discussion.' in skel.note_regions[0].text
+    assert not any('See the earlier discussion.' in r.text for r in skel.regions if r.kind=='body')
+
+
+@pytest.mark.parametrize('gap,raised',[(2,True),(30,False)])
+def test_slightly_smaller_numbered_body_needs_detachment_and_raised_marker(gap,raised):
+    raw = _slightly_smaller_note(gap=gap,raised=raised)
+    skel = skeleton.page_skeleton(raw,skeleton.BookStyle(body_size=12))
+    assert not skel.note_regions
+    assert any('See the earlier discussion.' in r.text for r in skel.regions if r.kind=='body')
+
+
+@pytest.mark.parametrize('kind',['sup','mark'])
+def test_leading_note_marker_does_not_split_a_source_sentence(kind):
+    left=assemble.Element('p',runs=[['t','The succession of rulers in time']],bbox=(40,100,260,130))
+    right=assemble.Element('p',runs=[[kind,'1'],['t',' and their corresponding signs.']],bbox=(40,125,260,170))
+    joined=assemble._join_within_page([left,right],set())
+    assert len(joined)==1
+    assert any(run[0]==kind and run[1]=='1' for run in joined[0].runs)
+    assert joined[0].text.endswith('and their corresponding signs.')
+
+
+@pytest.mark.parametrize('completed,marker',[(True,True),(False,False)])
+def test_marker_join_keeps_completed_paragraphs_and_literal_numbered_text(completed,marker):
+    left=assemble.Element('p',runs=[['t','A complete sentence.' if completed else 'An unfinished sentence']],bbox=(40,100,260,130))
+    runs=[['mark','1'],['t',' another source sentence.']] if marker else [['t','1 another source sentence.']]
+    right=assemble.Element('p',runs=runs,bbox=(40,125,260,170))
+    assert len(assemble._join_within_page([left,right],set()))==2
+
+
+def _damaged_folio_pages():
+    raws=[]
+    for p,text in enumerate(('50','51','5S','53','54')):
+        body=_line('A source paragraph continues in its proper order',40,425,12)
+        folio=_line(text,40,450,10);folio.bbox=(40,450,52,460);folio.spans[0].bbox=folio.bbox
+        raws.append(extract.RawPage(p,300,500,[extract.Block(0,body.bbox,[body]),extract.Block(1,folio.bbox,[folio])]))
+    return raws
+
+
+def test_damaged_short_footer_uses_proven_neighbor_geometry_without_repairing_text():
+    raws=_damaged_folio_pages();style=skeleton.book_style(raws)
+    skel=skeleton.page_skeleton(raws[2],style)
+    retained=[r for r in skel.regions if r.kind=='furniture']
+    assert len(retained)==1 and retained[0].text=='5S'
+    book=assemble.assemble([skeleton.page_skeleton(r,style) for r in raws],style,raws)
+    assert book.conservation.ok
+    assert '5S' in build_epub._printed_furniture(book,{p:'ch001.xhtml' for p in book.pages},'en')
+
+
+def test_short_lower_page_text_without_matching_neighbors_remains_body():
+    raws=_damaged_folio_pages();raws[4].blocks[-1].lines[0].spans[0].text='92'
+    style=skeleton.book_style(raws)
+    assert not any(r.kind=='furniture' and r.text=='5S' for r in skeleton.page_skeleton(raws[2],style).regions)
+
+
+def test_damaged_secondary_note_label_keeps_its_own_source_channel():
+    raw=_slightly_smaller_note()
+    first=raw.text_blocks[-1]
+    marker=extract.Span('"',8.5,'Serif',0,(40,370,44,378.5))
+    words=extract.Span(' Another complete printed note.',11.5,'Serif',0,(46,370,250,381.5))
+    line=extract.Line([marker,words],(40,370,250,381.5))
+    raw.blocks.append(extract.Block(2,line.bbox,[line]))
+    folio=_line('2',40,489,8)
+    raw.blocks.append(extract.Block(3,folio.bbox,[folio]))
+    skel=skeleton.page_skeleton(raw,skeleton.BookStyle(body_size=12))
+    assert len(skel.note_regions)==2
+    assert skel.note_regions[0].number==1
+    assert skel.note_regions[1].number is None
+    assert skel.note_regions[1].text=='" Another complete printed note.'
+    assert skel.note_regions[1].uncertain
+    book=assemble.assemble([skel],skeleton.BookStyle(body_size=12),[raw])
+    assert book.conservation.ok

@@ -1050,7 +1050,7 @@ def _join_within_page(elements, vocab):
                     break
             if anchor is not None \
                     and all(not _x_overlaps(element.bbox, box) for box in barriers) \
-                    and continues(anchor.text, element.text):
+                    and continues(anchor.text, _prose_opening(element.runs)):
                 anchor.runs = tidy(stitch_runs(
                     anchor.runs, element.runs, heal=True, vocab=vocab))
                 anchor.pages = sorted(set(anchor.pages + element.pages))
@@ -1066,6 +1066,19 @@ def _join_within_page(elements, vocab):
                 continue
         out.append(element)
     return out
+
+
+def _prose_opening(runs):
+    """A leading superscript is an inline citation, not a paragraph's first word.
+
+    Only factory marker runs are skipped for this decision; they remain in the
+    joined source runs. A literal numbered sentence still starts with its digit.
+    """
+    start = 0
+    while start < len(runs) and (runs[start][0] in ('sup', 'mark')
+            or (runs[start][0] == 't' and not runs[start][1].strip())):
+        start += 1
+    return plain_text(runs[start:]).lstrip()
 
 
 def _copy_element(element):

@@ -24,6 +24,7 @@ import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
@@ -94,6 +95,7 @@ export function Shelf({ id }: { id: string }) {
   const { remove } = useShelfMembership();
   const me = useMe().data;
   const updateProfile = useUpdateProfile();
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
 
   const selectAllBooks = async () => {
     const requestId = ++selectAllRequest.current;
@@ -487,6 +489,7 @@ export function Shelf({ id }: { id: string }) {
                 hideReadingTags={readingTagsHidden}
                 hideShelfTags={shelfBadgesHidden}
                 excludeShelfId={Number(id)}
+                customColumnDefinitions={customColumns}
               />
             ))}
           </div>

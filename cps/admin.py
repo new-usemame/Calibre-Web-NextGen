@@ -34,6 +34,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
+from .unicode_collation import locale_sort_key
 from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
 from . import user_account_data, user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
@@ -782,6 +783,7 @@ def view_configuration(opds_filename_template=None, opds_filename_error=None, dr
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
         .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
         .filter(db.CustomColumns.mark_for_delete == 0).all()
+    # Display-ignore policy hides reader fields, not the administrator's choices.
     sortable_columns = load_eligible_columns() or []
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
@@ -809,7 +811,7 @@ def edit_user_table():
         .join(db.Books) \
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag')) \
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     if config.config_restricted_column:
         try:
             if restricted_column_datatype(config.config_restricted_column) == "bool":
@@ -1187,6 +1189,7 @@ def update_view_configuration():
 
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
+    # Preserve valid choices across temporary hides and invalid ignore patterns.
     persist_configured_columns(
         config,
         request.form.getlist("config_sortable_custom_columns"),

@@ -9,14 +9,15 @@ the legacy UI and the SPA.
 import re
 from datetime import datetime
 
+from ..unicode_collation import locale_sort_key
 from flask import jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy import func
 
 from . import api_v1
-from .books import MAX_SELECT_ALL_BOOKS, SORT_MAP, _rows_to_items, _selection_response
+from .books import (MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response,
+                    _sort_context, _with_sort)
 from .. import calibre_db, config, db
-from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..search import build_adv_search_query
 
@@ -166,9 +167,9 @@ def search_options():
     query builder expects: tags/series by row id, languages by row id (NOT
     lang_code — that's what adv_search_language filters on), formats by code."""
     tags = (calibre_db.session.query(db.Tags)
-            .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all())
+            .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all())
     series = (calibre_db.session.query(db.Series)
-              .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id).all())
+              .order_by(locale_sort_key(db.Series.sort), db.Series.sort, db.Series.id).all())
     languages = (calibre_db.session.query(db.Languages).all())
     formats = (calibre_db.session.query(db.Data.format).distinct().order_by(db.Data.format).all())
 
@@ -203,7 +204,7 @@ def advanced_search():
     if select_all:
         page = 1
         per_page = MAX_SELECT_ALL_BOOKS + 1
-    order = SORT_MAP.get(data.get("sort", "new"), SORT_MAP["new"])
+    sort_context = _sort_context(data.get("sort", "new"))
 
     columns = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
     term = _json_to_term(data, columns)
@@ -212,7 +213,9 @@ def advanced_search():
     # exclude support), so a book on N shelves yields N identical result rows.
     # DISTINCT collapses them — the selected (Books, is_archived, read_status)
     # tuple is identical per book — so total and items agree.
-    query = query.distinct().order_by(*order)
+    if sort_context["join"]:
+        query = query.outerjoin(*sort_context["join"])
+    query = query.distinct().order_by(*sort_context["order"])
 
     total = query.count()
     if select_all:
@@ -231,10 +234,10 @@ def advanced_search():
                     .replace("Read Status = 'False'", "Unread"))
     criteria_str = _humanize_bool_criteria(criteria_str, columns)
 
-    return jsonify({
+    return jsonify(_with_sort({
         "items": _rows_to_items(rows),
         "page": page,
         "per_page": per_page,
         "total": total,
         "criteria": criteria_str,  # human-readable "you searched for…" summary
-    })
+    }, sort_context))

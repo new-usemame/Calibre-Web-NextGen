@@ -25,6 +25,7 @@ def test_serialize_book_list_item_full():
         "in_progress": False,
         "archived": False,
         "hidden": False,
+        "custom_columns": {},
     }
 
 

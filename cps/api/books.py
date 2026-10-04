@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.functions import coalesce
 
 from . import api_v1
-from .serializers import serialize_book_list_item, serialize_book_detail
+from .serializers import serialize_book_list_item, serialize_book_detail, serialize_custom_column_value
 from .. import (
     calibre_db, config, constants, db, ub, isoLanguages, logger, user_library,
 )
@@ -29,6 +29,9 @@ from ..helper import edit_book_read_status, canonical_read_status, \
     book_ids_with_read_status, read_statuses_for_books, set_explicit_book_read_status, \
     get_convert_options, get_kosync_progress_display, hot_books_page
 from ..sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
+from ..sort_orders import RECENT_SORT
+from ..custom_column_sort import (resolve_magic_shelf_sort, custom_sort_options,
+                                  load_configured_columns)
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
@@ -100,6 +103,37 @@ def _original_filename(book_id):
 # read-only API endpoint. Only the ORDER BY is common, and it lives in one place
 # so a sort cannot be correct in one UI and wrong in the other (fork #1331).
 SORT_MAP = BOOK_SORT_ORDERS
+# Download-count ordering runs against app.db and is intentionally unavailable
+# to the metadata.db-backed generic list/filter queries below.
+_COMPATIBLE_BOOK_SORTS = frozenset((set(SORT_MAP) - {"hotasc", "hotdesc"}) | {RECENT_SORT})
+
+
+def _sort_context(requested_sort):
+    """Return validated metadata-db ordering and UI custom-sort options.
+
+    A list request is also valid while no Calibre library session exists (for
+    example, a fresh install). Do not turn that recoverable state into a 500.
+    """
+    columns = load_configured_columns(config)
+    resolved = resolve_magic_shelf_sort(requested_sort, config, columns)
+    effective = requested_sort if requested_sort in _COMPATIBLE_BOOK_SORTS else resolved.key
+    return {
+        "sort": effective,
+        "order": list(resolved.order_by) if resolved.join else _requested_order(effective),
+        "join": resolved.join,
+        "sort_persistable": resolved.persistable,
+        "custom_sort_options": custom_sort_options(config, columns),
+    }
+
+
+def _with_sort(payload, context):
+    # Definitions belong to the page, not every book. Keep them alongside the
+    # sort metadata so every /books collection variant has the same contract.
+    definitions, _values = _list_custom_column_data([])
+    payload.update(sort=context["sort"], sort_persistable=context["sort_persistable"],
+                   custom_sort_options=context["custom_sort_options"],
+                   custom_column_definitions=definitions)
+    return payload
 
 
 def _requested_order(sort_param):
@@ -161,8 +195,43 @@ def _row_read_status(e):
     return getattr(e, "read_status", None)
 
 
+def _list_custom_column_data(entries):
+    """Return selected custom-field definitions and values for one list page.
+
+    Custom-sort configuration is the display allowlist: it contains only live,
+    scalar int/float/datetime fields. Query each selected column once for the
+    page rather than touching a relationship on every book (the latter becomes
+    an N+1 query on a large grid).
+    """
+    try:
+        columns = load_configured_columns(config) or []
+        book_ids = [int(getattr(entry, "Books", entry).id) for entry in entries]
+        values = {book_id: {} for book_id in book_ids}
+        for column in columns:
+            model = db.cc_classes.get(column.id)
+            if model is None or not book_ids:
+                continue
+            rows = (calibre_db.session.query(model)
+                    .filter(model.book.in_(book_ids)).all())
+            for row in rows:
+                value = serialize_custom_column_value(getattr(row, "value", None), column.datatype)
+                values.setdefault(int(row.book), {})[str(column.id)] = [{
+                    "value": value,
+                    "extra": getattr(row, "extra", None),
+                }]
+        definitions = [{
+            "id": column.id,
+            "name": column.name,
+            "datatype": column.datatype,
+        } for column in columns]
+        return definitions, values
+    except (SQLAlchemyError, AttributeError, KeyError, TypeError):
+        log.warning("Custom-column list data unavailable", exc_info=True)
+        return [], {}
+
+
 def _row_to_item(e, in_progress_ids, hidden_ids=None, cover_override=None,
-                 read_status_by_id=None):
+                 read_status_by_id=None, custom_columns=None):
     """Unwrap a SQLAlchemy Row (Books, is_archived, read_status) or plain Books object."""
     book = getattr(e, "Books", e)
     read_status = _row_read_status(e)
@@ -190,6 +259,7 @@ def _row_to_item(e, in_progress_ids, hidden_ids=None, cover_override=None,
         archived=archived,
         hidden=book.id in (hidden_ids or set()),
         cover_override=cover_override,
+        custom_columns=custom_columns,
     )
 
 
@@ -241,9 +311,11 @@ def _visible_shelves_by_book(book_ids):
     }
 
 
-def _rows_to_items(entries, hidden_ids=None):
+def _rows_to_items(entries, hidden_ids=None, custom_values=None):
     """Serialize one list page after resolving its in-progress ids in bulk."""
     entries = list(entries)
+    if custom_values is None:
+        _definitions, custom_values = _list_custom_column_data(entries)
     statuses = [
         (getattr(entry, "Books", entry).id, _row_read_status(entry))
         for entry in entries
@@ -278,6 +350,7 @@ def _rows_to_items(entries, hidden_ids=None):
             entry, in_progress_ids, hidden_ids,
             cover_override=overrides.get(int(book.id)),
             read_status_by_id=status_by_id,
+            custom_columns=(custom_values or {}).get(int(book.id)),
         )
         item["shelves"] = shelves_by_book.get(int(book.id), [])
         item["favorited"] = None if favorite_ids is None else int(book.id) in favorite_ids
@@ -571,24 +644,36 @@ def _classic_advanced_export_query(params):
         term_size = CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_BYTES + 1
     if term_size > CLASSIC_ADV_EXPORT_SNAPSHOT_MAX_BYTES:
         raise BookExportRequestError("invalid_snapshot", "The saved search is too large", 400)
-    sort_key = _export_sort(params.get("sort"))
+    sort_context = _export_sort(params.get("sort"))
     from ..search import build_adv_search_query
     query, _criteria = build_adv_search_query(term)
-    return query.options(
+    return _join_sort(query, sort_context).options(
         selectinload(db.Books.authors), selectinload(db.Books.series),
         selectinload(db.Books.tags), selectinload(db.Books.ratings),
         selectinload(db.Books.data),
-    ).distinct().order_by(*_query_order(sort_key))
+    ).distinct().order_by(*sort_context["order"])
 
 
 def _export_sort(value, *, default="new"):
-    if value is None:
-        return default
+    """Resolve export ordering strictly; never silently replace a chosen sort."""
+    value = default if value is None else value
     if not isinstance(value, str) or len(value) > 32:
         raise BookExportRequestError("invalid_request", "Sort must be a short text value", 400)
-    if value not in SORT_MAP and value != "recent":
+    if value in _COMPATIBLE_BOOK_SORTS:
+        return {"sort": value, "order": _requested_order(value), "join": ()}
+    resolved = resolve_magic_shelf_sort(value, config, load_configured_columns(config))
+    if not resolved.persistable:
+        raise BookExportRequestError(
+            "sort_unavailable", "Custom sort metadata is unavailable. Retry the export.", 503
+        )
+    if resolved.key != value or not resolved.join:
         raise BookExportRequestError("invalid_request", "Unsupported sort order", 400)
-    return value
+    return {"sort": value, "order": list(resolved.order_by), "join": resolved.join}
+
+
+def _join_sort(query, context):
+    """Apply the validated direct join before any count, selection or paging."""
+    return query.outerjoin(*context["join"]) if context["join"] else query
 
 
 def _safe_csv_cell(value):
@@ -732,7 +817,7 @@ def _catalog_export_query(params, *, classic_tag_view=False):
     ):
         raise BookExportRequestError("invalid_request", "show_hidden must be a boolean", 400)
     ids = params.get("book_ids")
-    sort_key = _export_sort(params.get("sort"))
+    sort_context = _export_sort(params.get("sort"))
     if ids is not None:
         if not isinstance(ids, list) or len(ids) > MAX_BOOK_EXPORT_ROWS:
             raise BookExportRequestError("invalid_request", "Book IDs must be a bounded list", 400)
@@ -765,6 +850,7 @@ def _catalog_export_query(params, *, classic_tag_view=False):
         book_ids=ids,
         classic_tag_view=classic_tag_view,
     )
+    query = _join_sort(query, sort_context)
     if ids is not None:
         # The random sample is explicit in the request, but every member is
         # revalidated against the caller's visible, unread catalog. A stale or
@@ -784,7 +870,7 @@ def _catalog_export_query(params, *, classic_tag_view=False):
                 bindparam("discover_sample_order", sample_csv, unique=True), id_token
             ))
     else:
-        query = query.order_by(*_query_order(sort_key))
+        query = query.order_by(*sort_context["order"])
     return query
 
 
@@ -869,12 +955,12 @@ def _advanced_export_query(params):
             raise BookExportRequestError("invalid_request", "Invalid custom-column filter value", 400)
     term = _json_to_term(params, columns)
     query, _criteria = build_adv_search_query(term)
-    sort_key = _export_sort(params.get("sort"))
-    return query.options(
+    sort_context = _export_sort(params.get("sort"))
+    return _join_sort(query, sort_context).options(
         selectinload(db.Books.authors), selectinload(db.Books.series),
         selectinload(db.Books.tags), selectinload(db.Books.ratings),
         selectinload(db.Books.data),
-    ).distinct().order_by(*_query_order(sort_key))
+    ).distinct().order_by(*sort_context["order"])
 
 
 def _manual_shelf_export_query(shelf_id, params):
@@ -977,11 +1063,12 @@ def _global_export_query(params):
     query = query.outerjoin(db.books_series_link, db.Books.id == db.books_series_link.c.book)
     query = query.outerjoin(db.Series).filter(and_(*filters) if filters else True)
     query = query.filter(calibre_db.common_filters(allow_show_global=True))
-    return query.options(
+    sort_context = _export_sort(params.get("sort"))
+    return _join_sort(query, sort_context).options(
         selectinload(db.Books.authors), selectinload(db.Books.series),
         selectinload(db.Books.tags), selectinload(db.Books.ratings),
         selectinload(db.Books.data),
-    ).distinct().order_by(*_query_order(_export_sort(params.get("sort"))))
+    ).distinct().order_by(*sort_context["order"])
 
 
 def _book_export_query(payload):
@@ -1087,7 +1174,9 @@ def list_books():
         "per_page", config.config_books_per_page, type=int
     ))
     sort = request.args.get("sort", "new")
-    order = _requested_order(sort)
+    sort_context = _sort_context(sort)
+    order = sort_context["order"]
+    custom_join = sort_context["join"]
     search = request.args.get("search")
     show_hidden = (request.args.get("show_hidden", "").strip().lower()
                    in ("1", "true", "yes", "on"))
@@ -1126,6 +1215,7 @@ def list_books():
                          "favorites", "rated", "archived") else None),
             show_hidden=show_hidden,
         )
+        query = _join_sort(query, sort_context)
         total = query.with_entities(db.Books.id).order_by(None).distinct().count()
         if select_all:
             ids = [row[0] for row in query.with_entities(db.Books.id)
@@ -1133,12 +1223,12 @@ def list_books():
             return _selection_response(ids, total)
         entries = query.order_by(*order).offset(offset).limit(per_page).all()
         entries = calibre_db.order_authors(entries, list_return=True, combined=True)
-        return jsonify({
+        return jsonify(_with_sort({
             "items": to_items(entries),
             "page": page,
             "per_page": per_page,
             "total": total,
-        })
+        }, sort_context))
 
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
 
@@ -1146,6 +1236,7 @@ def list_books():
     if filter_val == "discover":
         # Random unread books (single page, like the legacy Discover view).
         source_filter, _source_available = discover_source.filter_for(current_user)
+        sort_context["sort"] = "new"
         if not config.config_read_column:
             disc_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
         else:
@@ -1167,17 +1258,19 @@ def list_books():
             # 100,001-row safety probe used by normal full-result selection.
             return _selection_response(entries, len(entries))
         items = to_items(entries)
-        return jsonify({"items": items, "page": 1, "per_page": per_page, "total": len(items)})
+        return jsonify(_with_sort({"items": items, "page": 1, "per_page": per_page,
+                                  "total": len(items)}, sort_context))
 
     if filter_val == "hot":
+        sort_context["sort"] = "new"
         if select_all:
             entries, total = hot_books_page(calibre_db.common_filters(), BOOK_SORT_ORDERS["hotdesc"],
                                             0, per_page, ids_only=True)
             return _selection_response(entries, total)
         entries, total = hot_books_page(calibre_db.common_filters(), BOOK_SORT_ORDERS["hotdesc"],
                                         per_page * (page - 1), per_page)
-        return jsonify({"items": to_items(entries),
-                        "page": page, "per_page": per_page, "total": total})
+        return jsonify(_with_sort({"items": to_items(entries),
+                        "page": page, "per_page": per_page, "total": total}, sort_context))
 
     # --- archived path (two-step: collect ids, then fill_indexpage_with_archived_books) ---
     if filter_val == "archived" and not has_entity_filter:
@@ -1190,16 +1283,16 @@ def list_books():
         series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
         entries, _random, pagination = calibre_db.fill_indexpage_with_archived_books(
             page, db.Books, per_page, archived_filter, order,
-            True, True, config.config_read_column, *series_join, ids_only=select_all,
+            True, True, config.config_read_column, *series_join, *custom_join, ids_only=select_all,
         )
         if select_all:
             return _selection_response(entries, pagination.total_count)
-        return jsonify({
+        return jsonify(_with_sort({
             "items": to_items(entries),
             "page": pagination.page,
             "per_page": pagination.per_page,
             "total": pagination.total_count,
-        })
+        }, sort_context))
 
     # --- discovery views (mirror web.py books_list categories) ---
     if filter_val == "favorites" and not has_entity_filter:
@@ -1207,24 +1300,24 @@ def list_books():
                    .filter(ub.FavoriteBook.user_id == int(current_user.id)).all())]
         entries, _random, pagination = calibre_db.fill_indexpage(
             page, per_page, db.Books, db.Books.id.in_(fav_ids), order,
-            True, config.config_read_column, *series_join, ids_only=select_all)
+            True, config.config_read_column, *series_join, *custom_join, ids_only=select_all)
         if select_all:
             return _selection_response(entries, pagination.total_count)
-        return jsonify({"items": to_items(entries),
+        return jsonify(_with_sort({"items": to_items(entries),
                         "page": pagination.page, "per_page": pagination.per_page,
-                        "total": pagination.total_count})
+                        "total": pagination.total_count}, sort_context))
 
     if filter_val == "rated" and not has_entity_filter:
         # Top-rated: Calibre stores rating 0–10 (half-stars); >9 == 5 stars.
         rated_filter = db.Books.ratings.any(db.Ratings.rating > 9)
         entries, _random, pagination = calibre_db.fill_indexpage(
             page, per_page, db.Books, rated_filter, order,
-            True, config.config_read_column, *series_join, ids_only=select_all)
+            True, config.config_read_column, *series_join, *custom_join, ids_only=select_all)
         if select_all:
             return _selection_response(entries, pagination.total_count)
-        return jsonify({"items": to_items(entries),
+        return jsonify(_with_sort({"items": to_items(entries),
                         "page": pagination.page, "per_page": pagination.per_page,
-                        "total": pagination.total_count})
+                        "total": pagination.total_count}, sort_context))
 
     if filter_val in ("archived", "favorites", "rated") and has_entity_filter:
         offset = (page - 1) * per_page
@@ -1239,6 +1332,7 @@ def list_books():
             filter_val=filter_val,
             show_hidden=show_hidden,
         )
+        query = _join_sort(query, sort_context)
         total = query.with_entities(db.Books.id).order_by(None).distinct().count()
         if select_all:
             ids = [row[0] for row in query.with_entities(db.Books.id)
@@ -1246,8 +1340,8 @@ def list_books():
             return _selection_response(ids, total)
         entries = query.order_by(*order).offset(offset).limit(per_page).all()
         entries = calibre_db.order_authors(entries, list_return=True, combined=True)
-        return jsonify({"items": to_items(entries), "page": page,
-                        "per_page": per_page, "total": total})
+        return jsonify(_with_sort({"items": to_items(entries), "page": page,
+                        "per_page": per_page, "total": total}, sort_context))
 
     # --- entity + read/unread path ---
     entity_filter = _build_entity_filter(author_id, series_id, tag_id, publisher_id, language_code,
@@ -1282,18 +1376,18 @@ def list_books():
         }
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books, db_filter, order,
-        True, config.config_read_column, *series_join,
+        True, config.config_read_column, *series_join, *custom_join,
         ids_only=select_all,
         **listing_options,
     )
     if select_all:
         return _selection_response(entries, pagination.total_count)
-    return jsonify({
+    return jsonify(_with_sort({
         "items": to_items(entries),
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,
-    })
+    }, sort_context))
 
 
 @api_v1.route("/library/global")
@@ -1313,8 +1407,9 @@ def list_global_library():
     per_page = max(1, min(200, request.args.get(
         "per_page", config.config_books_per_page, type=int
     )))
-    sort = request.args.get("sort", "new")
-    order = _requested_order(sort)
+    sort_context = _sort_context(request.args.get("sort", "new"))
+    order = sort_context["order"]
+    custom_join = sort_context["join"]
     term = (request.args.get("search") or "").strip()
     filter_name = request.args.get("filter", "all")
     if filter_name not in ("all", "not_in_my_library"):
@@ -1344,7 +1439,7 @@ def list_global_library():
     )
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books, global_filter, order,
-        True, config.config_read_column, *series_join,
+        True, config.config_read_column, *series_join, *custom_join,
         allow_show_global=True,
     )
     member_ids = set()
@@ -1365,14 +1460,14 @@ def list_global_library():
             not personal_library_mode
             or item["id"] in member_ids
         )
-    return jsonify({
+    return jsonify(_with_sort({
         "items": items,
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,
         "library_mode": user_library.mode_for_user(current_user),
         "filter": filter_name,
-    })
+    }, sort_context))
 
 
 @api_v1.route("/books/<int:book_id>")

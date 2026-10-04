@@ -19,7 +19,7 @@ import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
-import { saveCatalog, loadCatalog } from '../lib/scrollCache';
+import { saveCatalog, loadCatalog, useCatalogCoverSnapshot } from '../lib/scrollCache';
 import { useLibraryRevision } from '../lib/libraryRevision';
 import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
@@ -290,6 +290,25 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   const [page, setPage] = useState(() => snap?.page ?? 1);
   const [allBooks, setAllBooks] = useState<Book[]>(() => snap?.books ?? []);
+  const [coverResetRevision, setCoverResetRevision] = useState(0);
+  const coverSnapshot = useCatalogCoverSnapshot(restoreKey);
+  const previousCoverSnapshot = useRef(coverSnapshot);
+  useEffect(() => {
+    const previous = previousCoverSnapshot.current;
+    previousCoverSnapshot.current = coverSnapshot;
+    if (previous === coverSnapshot) return;
+    if (!coverSnapshot) {
+      // The follow-up cover read failed. Rebuild this affected view rather
+      // than restoring a cover we know was changed but cannot reconcile.
+      setAllBooks([]);
+      setPage(1);
+      setCoverResetRevision((revision) => revision + 1);
+      return;
+    }
+    const covers = new Map(coverSnapshot.map((book) => [book.id, book.cover_url]));
+    setAllBooks((books) => books.map((book) => covers.has(book.id)
+      ? { ...book, cover_url: covers.get(book.id)! } : book));
+  }, [coverSnapshot]);
   const [searchInput, setSearchInput] = useState(() => snap?.searchInput ?? '');
   const [search, setSearch] = useState(() => snap?.search ?? '');
   const [sort, setSort] = useState(() =>
@@ -797,7 +816,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // A successful idempotent bulk action can refetch byte-identical data.
   // React Query keeps that object identity, but the cleared accumulator still
   // needs to consume the newly confirmed result.
-  }, [data, dataUpdatedAt, isPlaceholderData, resetKey]);
+  }, [data, dataUpdatedAt, isPlaceholderData, resetKey, coverResetRevision]);
 
   const total = data?.total ?? 0;
 

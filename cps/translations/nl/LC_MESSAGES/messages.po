@@ -16723,8 +16723,8 @@ msgid "Unsupported pages"
 msgstr "Niet-ondersteunde pagina’s"
 
 #: cps/spa_strings.py
-msgid "Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
-msgstr "Optioneel. Bronconversie vereist geen providersleutel. Indien beschikbaar gebruikt AI-controle van de opmaak Luna-voorstellen en Terra-goedkeuringen via OpenRouter openai/flex, met een kostenraming en expliciete toestemming voor elke taak. De sleutel wordt versleuteld opgeslagen en nooit opnieuw getoond."
+msgid "Optional. Source conversion needs no provider key. When available, AI page layout uses OpenRouter, checks proposed changes against the source, and requires an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
+msgstr "Optioneel. Bronconversie vereist geen providersleutel. Indien beschikbaar gebruikt AI-paginaopmaak OpenRouter, controleert de voorgestelde wijzigingen aan de hand van de bron en vereist een kostenraming en expliciete toestemming voor elke taak. De sleutel wordt versleuteld opgeslagen en nooit opnieuw getoond."
 
 #: cps/spa_strings.py
 msgid "Models requested"
@@ -16901,3 +16901,23 @@ msgstr "De bemonsterde pagina’s zijn niet beoordeeld."
 #: cps/spa_strings.py
 msgid "The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one."
 msgstr "De bemonsterde pagina’s bevatten heel weinig tekst. Dit kan een ijle scan zijn, of twee gedrukte pagina’s die als één zijn gefotografeerd."
+
+#: cps/spa_strings.py
+msgid "AI page layout"
+msgstr "Pagina-indeling met AI"
+
+#: cps/spa_strings.py
+msgid "Luna proposes and reviews page layout over locked source words. Opus checks split-word hyphens. Pages that do not pass the checks keep the source conversion."
+msgstr "Luna stelt de pagina-indeling voor en controleert die, zonder de bronwoorden te wijzigen. Opus controleert afbreekstreepjes. Pagina’s die de controles niet doorstaan, behouden de bronconversie."
+
+#: cps/spa_strings.py
+msgid "I authorize Luna layout proposals and reviews, and Opus hyphen checks, through OpenRouter, up to {amount} for this job. Unapproved pages keep the source conversion."
+msgstr "Ik geef toestemming voor indelingsvoorstellen en controles door Luna en controles van afbreekstreepjes door Opus via OpenRouter, tot {amount} voor deze taak. Niet-goedgekeurde pagina’s behouden de bronconversie."
+
+#: cps/spa_strings.py
+msgid "AI can propose paragraph grouping, reading order and formatting over the preserved source. Checked layouts become the page output; other pages keep the source conversion. Original images, notes and uncertainty evidence remain available."
+msgstr "AI kan alinea-indeling, leesvolgorde en opmaak voorstellen op basis van de behouden bron. Gecontroleerde indelingen worden gebruikt; andere pagina’s behouden de bronconversie. Originele afbeeldingen, noten en bewijs van onzekerheid blijven beschikbaar."
+
+#: cps/spa_strings.py
+msgid "This conservative ceiling includes layout proposals, reviews, reading-order checks and split-word checks without cache reuse. It is not an expected bill or money already held. Your cap limits new requests."
+msgstr "Dit voorzichtige plafond omvat indelingsvoorstellen, beoordelingen en controles van leesvolgorde en afgebroken woorden, zonder hergebruik uit de cache. Het is geen verwachte rekening of reeds gereserveerd bedrag. Uw limiet begrenst nieuwe verzoeken."

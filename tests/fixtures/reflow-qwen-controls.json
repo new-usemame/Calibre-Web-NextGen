@@ -1,0 +1,785 @@
+{
+  "evidence": "PUBLIC UNAUTHENTICATED catalog; synthetic tests only, not new dispatch authority",
+  "models": {
+    "data": [
+      {
+        "id": "qwen/qwen3.8-flash",
+        "canonical_slug": "qwen/qwen3.8-flash-20260826",
+        "hugging_face_id": "Qwen/Qwen3.8-Flash-Next",
+        "name": "Qwen: Qwen3.8 Flash",
+        "created": 1787773060,
+        "description": "Qwen3.8 Flash is a multimodal reasoning model from Alibaba. It is suited for coding assistance, agentic workflows, visual understanding, document and codebase analysis, desktop interaction, chart analysis, and long-video analysis.",
+        "context_length": 1000000,
+        "architecture": {
+          "modality": "text+image+video->text",
+          "input_modalities": [
+            "text",
+            "image",
+            "video"
+          ],
+          "output_modalities": [
+            "text"
+          ],
+          "tokenizer": "Qwen",
+          "instruct_type": null
+        },
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.00000047",
+          "input_cache_read": "0.000000016",
+          "input_cache_write": "0.0000002"
+        },
+        "top_provider": {
+          "context_length": 1000000,
+          "max_completion_tokens": 131072,
+          "is_moderated": false
+        },
+        "per_request_limits": null,
+        "supported_parameters": [
+          "frequency_penalty",
+          "include_reasoning",
+          "logprobs",
+          "max_tokens",
+          "presence_penalty",
+          "reasoning",
+          "response_format",
+          "seed",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tool_choice",
+          "tools",
+          "top_k",
+          "top_logprobs",
+          "top_p"
+        ],
+        "default_parameters": {},
+        "supported_voices": null,
+        "knowledge_cutoff": null,
+        "expiration_date": null,
+        "links": {
+          "details": "/api/v1/models/qwen/qwen3.8-flash-20260826/endpoints"
+        },
+        "reasoning": {
+          "mandatory": false,
+          "default_enabled": true,
+          "supports_max_tokens": true
+        }
+      }
+    ]
+  },
+  "route": {
+    "data": {
+      "id": "qwen/qwen3.8-flash",
+      "name": "Qwen: Qwen3.8 Flash",
+      "created": 1787773060,
+      "description": "Qwen3.8 Flash is a multimodal reasoning model from Alibaba. It is suited for coding assistance, agentic workflows, visual understanding, document and codebase analysis, desktop interaction, chart analysis, and long-video analysis.",
+      "architecture": {
+        "tokenizer": "Qwen",
+        "instruct_type": null,
+        "modality": "text+image+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output_modalities": [
+          "text"
+        ]
+      },
+      "endpoints": [
+        {
+          "name": "Alibaba | qwen/qwen3.8-flash-20260826",
+          "model_id": "qwen/qwen3.8-flash",
+          "model_name": "Qwen: Qwen3.8 Flash",
+          "context_length": 1000000,
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.00000047",
+            "input_cache_read": "0.000000016",
+            "input_cache_write": "0.0000002",
+            "discount": 0
+          },
+          "provider_name": "Alibaba",
+          "tag": "alibaba",
+          "quantization": "unknown",
+          "max_completion_tokens": 131072,
+          "max_prompt_tokens": 983616,
+          "supported_parameters": [
+            "reasoning",
+            "include_reasoning",
+            "max_tokens",
+            "temperature",
+            "top_p",
+            "seed",
+            "presence_penalty",
+            "response_format",
+            "tools",
+            "structured_outputs",
+            "top_k",
+            "frequency_penalty",
+            "stop",
+            "logprobs",
+            "top_logprobs",
+            "tool_choice"
+          ],
+          "supports_tool_choice": {
+            "none": true,
+            "auto": true,
+            "required": false,
+            "function": false
+          },
+          "status": 0,
+          "uptime_last_30m": 98.56812758059017,
+          "uptime_last_5m": 98.88260812409622,
+          "uptime_last_1d": 99.29235003962314,
+          "supports_implicit_caching": true,
+          "native_tools": {},
+          "supports_voice_cloning": false,
+          "supports_multiple_audio_references": false,
+          "supports_image_reference": false,
+          "latency_last_30m": null,
+          "throughput_last_30m": null
+        }
+      ]
+    }
+  },
+  "old_authority": {
+    "envelope": {
+      "protocol": "layout-test-v1",
+      "source_identity": {
+        "pdf": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "page": 0
+      },
+      "prompt_version": "prompt-v1",
+      "context": {
+        "snapshot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Classify source spans."
+        }
+      ],
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "named": {
+      "mimo26-x1": "{\"completion_cap\":128000,\"images\":true,\"output_tokens\":8192,\"provider\":\"Xiaomi\",\"reasoning_effort\":\"enabled\",\"route\":\"xiaomi/fp8\",\"service_tier\":\"\",\"spec\":{\"completion_usd_per_mtok\":0.28,\"label\":\"\",\"model_id\":\"xiaomi/mimo-v2.6-flash\",\"prompt_usd_per_mtok\":0.14,\"supports_images\":true},\"supporting_reasoning_tokens\":16384}",
+      "mimo26-d1": "{\"completion_cap\":128000,\"images\":true,\"output_tokens\":8192,\"provider\":\"Xiaomi\",\"reasoning_effort\":\"disabled\",\"route\":\"xiaomi/fp8\",\"service_tier\":\"\",\"spec\":{\"completion_usd_per_mtok\":0.28,\"label\":\"\",\"model_id\":\"xiaomi/mimo-v2.6-flash\",\"prompt_usd_per_mtok\":0.14,\"supports_images\":true},\"supporting_reasoning_tokens\":0}",
+      "luna6-n1": "{\"completion_cap\":4096,\"images\":true,\"output_tokens\":4096,\"provider\":\"OpenAI\",\"reasoning_effort\":\"none\",\"route\":\"openai/flex\",\"service_tier\":\"flex\",\"spec\":{\"completion_usd_per_mtok\":0.25,\"label\":\"\",\"model_id\":\"openai/gpt-6-luna\",\"prompt_usd_per_mtok\":0.05,\"supports_images\":true},\"supporting_reasoning_tokens\":0}"
+    },
+    "defaults": {
+      "proposer": {
+        "spec": {
+          "model_id": "openai/gpt-6-luna",
+          "prompt_usd_per_mtok": 0.05,
+          "completion_usd_per_mtok": 0.25,
+          "label": "",
+          "supports_images": true
+        },
+        "output_tokens": 8192,
+        "route": "openai/flex",
+        "provider": "OpenAI",
+        "service_tier": "flex",
+        "images": true,
+        "reasoning_effort": "medium",
+        "completion_cap": 128000,
+        "supporting_reasoning_tokens": 16384
+      },
+      "reviewer": {
+        "spec": {
+          "model_id": "openai/gpt-6-luna-pro",
+          "prompt_usd_per_mtok": 0.05,
+          "completion_usd_per_mtok": 0.25,
+          "label": "",
+          "supports_images": true
+        },
+        "output_tokens": 4096,
+        "route": "openai/flex",
+        "provider": "OpenAI",
+        "service_tier": "flex",
+        "images": true,
+        "reasoning_effort": "medium",
+        "completion_cap": 4096,
+        "supporting_reasoning_tokens": 0
+      },
+      "ordering": {
+        "spec": {
+          "model_id": "openai/gpt-6-luna-pro",
+          "prompt_usd_per_mtok": 0.05,
+          "completion_usd_per_mtok": 0.25,
+          "label": "",
+          "supports_images": true
+        },
+        "output_tokens": 4096,
+        "route": "openai/flex",
+        "provider": "OpenAI",
+        "service_tier": "flex",
+        "images": false,
+        "reasoning_effort": "medium",
+        "completion_cap": 128000,
+        "supporting_reasoning_tokens": 0
+      },
+      "lexical": {
+        "spec": {
+          "model_id": "anthropic/claude-opus-5.5",
+          "prompt_usd_per_mtok": 4,
+          "completion_usd_per_mtok": 20,
+          "label": "",
+          "supports_images": true
+        },
+        "output_tokens": 2048,
+        "route": "anthropic",
+        "provider": "Anthropic",
+        "service_tier": "",
+        "images": false,
+        "reasoning_effort": "",
+        "completion_cap": 2048,
+        "supporting_reasoning_tokens": 0
+      }
+    },
+    "rows": [
+      {
+        "selection": null,
+        "versions": {
+          "construction_version": "layout-range-choices-1",
+          "range_source_prompt_sha256": "ee1d0277d23499c7db072bfb83398d879103137bdac137fcef22dc2402ed44a3",
+          "range_layout_prompt_sha256": "610371f2a50c14bbd48c16ef7834261e5af631ec5d0aa523f7b53093bcc768d1",
+          "range_choice_prompt_sha256": "2717ff6ff0973bdd2603e33f7aa3353f9120d8d2526e9b81d26e82a499bed634",
+          "range_review_prompt_sha256": "aa3dddcd396e1de93d206b65003297006af276e6d1779ed302ad0e4446225c6c",
+          "domain_source_prompt_sha256": "5055c75764e83a6dc19f3ff6ee5736c46545644b85d040ca1fe27bbbe83b0168",
+          "domain_layout_prompt_sha256": "610371f2a50c14bbd48c16ef7834261e5af631ec5d0aa523f7b53093bcc768d1",
+          "domain_choice_prompt_sha256": "a00eecba4f1f4ad532852c8383938dbc41d369a6b7487473fc0dd04990e41a38",
+          "domain_review_prompt_sha256": "854dbacd41c7c04a65d865f7030427ce66586c84634deeb87f3230d669ad7a42",
+          "construction_prompt_sha256": "e8d3fca0b0abba62f0f8eeffda4b7cb58ab688d22247bd618d32e6221c9fa30b",
+          "boundary_review_prompt_sha256": "dcc93f6f7a58b8962117c764e5e78b71ff242fb2e37f1a2defc5b47a0c6667a6",
+          "version": "layout-quote-7-ranges",
+          "allocation_version": "layout-answer-allocation-6-ranges",
+          "wire_version": "layout-table-3",
+          "source_revision": "11.0-layout-1",
+          "route_version": "layout-structured-10-ranges",
+          "proposer_prompt": "source-bound-layout-prompt-12-ranges-floating-artwork-paragraph-boundary-v2-all-stages-proposer",
+          "verifier_prompt": "source-bound-layout-prompt-12-ranges-floating-artwork-paragraph-boundary-v2-all-stages-reviewer",
+          "emphasis_version": "layout-emphasis-admission-2-domain",
+          "previous_candidate_prompt_sha256": "d634ed4a51507462415755dd415a3d3fdf72e967ad0f4b151f99a8ceb07c2219",
+          "protocol": "source-bound-layout-1",
+          "prompt_hashes": {
+            "proposer": "29f93cdaa9a7fc87cd01119b9bd8673e1e6f6726a60ea9763d381ca8ed6f828e",
+            "reviewer": "1312e21b00e6a613d682942444175c914509e34315f8b06b268a6e1a41ba6de2",
+            "ordering": "c0b5f60e894511b72f063387a27c7cc1dab5693df4cf3a46bea403781e16e55b",
+            "lexical": "dc4ae736b2849e62e9bdfb8109e5f824910aca2d40cac881a2637eb273caa6d5",
+            "emphasis": "a6a7dd048293e62fe8c9c616a8b1b8a5027ad6ac774d52de554a33d0b2c05f02"
+          },
+          "profiles": {
+            "proposer": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 8192,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": true,
+              "reasoning_effort": "medium",
+              "completion_cap": 128000,
+              "supporting_reasoning_tokens": 16384
+            },
+            "reviewer": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 4096,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": true,
+              "reasoning_effort": "medium",
+              "completion_cap": 4096,
+              "supporting_reasoning_tokens": 0
+            },
+            "ordering": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 4096,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": false,
+              "reasoning_effort": "medium",
+              "completion_cap": 128000,
+              "supporting_reasoning_tokens": 0
+            },
+            "lexical": {
+              "spec": {
+                "model_id": "anthropic/claude-opus-5.5",
+                "prompt_usd_per_mtok": 4,
+                "completion_usd_per_mtok": 20,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 2048,
+              "route": "anthropic",
+              "provider": "Anthropic",
+              "service_tier": "",
+              "images": false,
+              "reasoning_effort": "",
+              "completion_cap": 2048,
+              "supporting_reasoning_tokens": 0
+            }
+          },
+          "reservation_rates": {
+            "proposer": [
+              0.1,
+              0.375
+            ],
+            "reviewer": [
+              0.1,
+              0.375
+            ],
+            "ordering": [
+              0.1,
+              0.375
+            ],
+            "lexical": [
+              4,
+              20
+            ]
+          },
+          "admission": {
+            "max_text_bytes": 48000,
+            "max_image_pixels": 4000000,
+            "cache_write_multiplier": 1.25
+          },
+          "hint_quote_version": "layout-hint-quote-1",
+          "hint_projection_version": "layout-advisory-projection-1",
+          "hint_prompt_sha256": "11f4c9def9e2f849082f3cc6e8f6c4c735079bca3887f0e6bee3956e09807092"
+        },
+        "wires": {
+          "proposer": {
+            "payload_json": "{\"max_tokens\":24576,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"proposer\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"medium\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "947c8ab43c01165eef623b9451671e98a60ae10a006b99831ee298be3be420c0",
+            "bound_usd": 0.0094295,
+            "prompt_tokens_bound": 1708,
+            "response_token_bound": 24576,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":24576,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"medium\",\"request_sha256\":\"947c8ab43c01165eef623b9451671e98a60ae10a006b99831ee298be3be420c0\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"proposer\",\"supporting_reasoning_tokens\":16384,\"visible_answer_tokens\":8192,\"wire_version\":\"layout-table-3\"}"
+          },
+          "reviewer": {
+            "payload_json": "{\"max_tokens\":4096,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"reviewer\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"medium\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "96ad636bfbf0f4b394246bb06e64d3688545263e9b61b4aae67b942e0b054b13",
+            "bound_usd": 0.0017495,
+            "prompt_tokens_bound": 1708,
+            "response_token_bound": 4096,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":4096,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"medium\",\"request_sha256\":\"96ad636bfbf0f4b394246bb06e64d3688545263e9b61b4aae67b942e0b054b13\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"reviewer\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":4096,\"wire_version\":\"layout-table-3\"}"
+          },
+          "ordering": {
+            "payload_json": "{\"max_tokens\":4096,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"ordering\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"medium\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "457bf113aa975b9b1f4f8c818d78acdcc76eb87e83f3e91f9369e2fd31bc47d1",
+            "bound_usd": 0.0017495,
+            "prompt_tokens_bound": 1708,
+            "response_token_bound": 4096,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":4096,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"medium\",\"request_sha256\":\"457bf113aa975b9b1f4f8c818d78acdcc76eb87e83f3e91f9369e2fd31bc47d1\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"ordering\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":4096,\"wire_version\":\"layout-table-3\"}"
+          },
+          "lexical": {
+            "payload_json": "{\"max_tokens\":2048,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"lexical\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"anthropic/claude-opus-5.5\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":20,\"prompt\":4},\"order\":[\"anthropic\"],\"require_parameters\":true},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"usage\":{\"include\":true}}",
+            "sha256": "9084c8c2659f9352bce8ade2a722c190d57a8651c9c6969b5a038ec1759ba7f9",
+            "bound_usd": 0.049495,
+            "prompt_tokens_bound": 1707,
+            "response_token_bound": 2048,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":2048,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"\",\"request_sha256\":\"9084c8c2659f9352bce8ade2a722c190d57a8651c9c6969b5a038ec1759ba7f9\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"lexical\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":2048,\"wire_version\":\"layout-table-3\"}"
+          }
+        }
+      },
+      {
+        "selection": {
+          "proposer": "mimo26-x1",
+          "reviewer": "luna6-n1"
+        },
+        "versions": {
+          "construction_version": "layout-range-choices-1",
+          "range_source_prompt_sha256": "ee1d0277d23499c7db072bfb83398d879103137bdac137fcef22dc2402ed44a3",
+          "range_layout_prompt_sha256": "610371f2a50c14bbd48c16ef7834261e5af631ec5d0aa523f7b53093bcc768d1",
+          "range_choice_prompt_sha256": "2717ff6ff0973bdd2603e33f7aa3353f9120d8d2526e9b81d26e82a499bed634",
+          "range_review_prompt_sha256": "aa3dddcd396e1de93d206b65003297006af276e6d1779ed302ad0e4446225c6c",
+          "domain_source_prompt_sha256": "5055c75764e83a6dc19f3ff6ee5736c46545644b85d040ca1fe27bbbe83b0168",
+          "domain_layout_prompt_sha256": "610371f2a50c14bbd48c16ef7834261e5af631ec5d0aa523f7b53093bcc768d1",
+          "domain_choice_prompt_sha256": "a00eecba4f1f4ad532852c8383938dbc41d369a6b7487473fc0dd04990e41a38",
+          "domain_review_prompt_sha256": "854dbacd41c7c04a65d865f7030427ce66586c84634deeb87f3230d669ad7a42",
+          "construction_prompt_sha256": "e8d3fca0b0abba62f0f8eeffda4b7cb58ab688d22247bd618d32e6221c9fa30b",
+          "boundary_review_prompt_sha256": "dcc93f6f7a58b8962117c764e5e78b71ff242fb2e37f1a2defc5b47a0c6667a6",
+          "version": "layout-quote-10-ranges-profile",
+          "allocation_version": "layout-answer-allocation-6-ranges",
+          "wire_version": "layout-table-3",
+          "source_revision": "11.0-layout-1",
+          "route_version": "layout-structured-13-ranges-profile",
+          "proposer_prompt": "source-bound-layout-prompt-12-ranges-floating-artwork-paragraph-boundary-v2-all-stages-proposer",
+          "verifier_prompt": "source-bound-layout-prompt-12-ranges-floating-artwork-paragraph-boundary-v2-all-stages-reviewer",
+          "emphasis_version": "layout-emphasis-admission-2-domain",
+          "previous_candidate_prompt_sha256": "d634ed4a51507462415755dd415a3d3fdf72e967ad0f4b151f99a8ceb07c2219",
+          "protocol": "source-bound-layout-1",
+          "prompt_hashes": {
+            "proposer": "29f93cdaa9a7fc87cd01119b9bd8673e1e6f6726a60ea9763d381ca8ed6f828e",
+            "reviewer": "1312e21b00e6a613d682942444175c914509e34315f8b06b268a6e1a41ba6de2",
+            "ordering": "c0b5f60e894511b72f063387a27c7cc1dab5693df4cf3a46bea403781e16e55b",
+            "lexical": "dc4ae736b2849e62e9bdfb8109e5f824910aca2d40cac881a2637eb273caa6d5",
+            "emphasis": "a6a7dd048293e62fe8c9c616a8b1b8a5027ad6ac774d52de554a33d0b2c05f02"
+          },
+          "profiles": {
+            "proposer": {
+              "spec": {
+                "model_id": "xiaomi/mimo-v2.6-flash",
+                "prompt_usd_per_mtok": 0.14,
+                "completion_usd_per_mtok": 0.28,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 8192,
+              "route": "xiaomi/fp8",
+              "provider": "Xiaomi",
+              "service_tier": "",
+              "images": true,
+              "reasoning_effort": "enabled",
+              "completion_cap": 128000,
+              "supporting_reasoning_tokens": 16384
+            },
+            "reviewer": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 4096,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": true,
+              "reasoning_effort": "none",
+              "completion_cap": 4096,
+              "supporting_reasoning_tokens": 0
+            },
+            "ordering": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 4096,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": false,
+              "reasoning_effort": "medium",
+              "completion_cap": 128000,
+              "supporting_reasoning_tokens": 0
+            },
+            "lexical": {
+              "spec": {
+                "model_id": "anthropic/claude-opus-5.5",
+                "prompt_usd_per_mtok": 4,
+                "completion_usd_per_mtok": 20,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 2048,
+              "route": "anthropic",
+              "provider": "Anthropic",
+              "service_tier": "",
+              "images": false,
+              "reasoning_effort": "",
+              "completion_cap": 2048,
+              "supporting_reasoning_tokens": 0
+            }
+          },
+          "reservation_rates": {
+            "proposer": [
+              0.14,
+              0.28
+            ],
+            "reviewer": [
+              0.1,
+              0.375
+            ],
+            "ordering": [
+              0.1,
+              0.375
+            ],
+            "lexical": [
+              4,
+              20
+            ]
+          },
+          "admission": {
+            "max_text_bytes": 48000,
+            "max_image_pixels": 4000000,
+            "cache_write_multiplier": 1.25
+          },
+          "hint_quote_version": "layout-hint-quote-1",
+          "hint_projection_version": "layout-advisory-projection-1",
+          "hint_prompt_sha256": "11f4c9def9e2f849082f3cc6e8f6c4c735079bca3887f0e6bee3956e09807092",
+          "profile_selection": {
+            "proposer": "mimo26-x1",
+            "reviewer": "luna6-n1"
+          },
+          "route_versions": {
+            "proposer": "layout-structured-13-ranges-profile",
+            "reviewer": "layout-structured-13-ranges-profile",
+            "ordering": "layout-structured-10-ranges",
+            "lexical": "layout-structured-10-ranges"
+          }
+        },
+        "wires": {
+          "proposer": {
+            "payload_json": "{\"max_tokens\":24576,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"profile_id\\\":\\\"mimo26-x1\\\",\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-13-ranges-profile\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"proposer\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"xiaomi/mimo-v2.6-flash\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.28,\"prompt\":0.14},\"order\":[\"xiaomi/fp8\"],\"require_parameters\":true},\"reasoning\":{\"enabled\":true},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"usage\":{\"include\":true}}",
+            "sha256": "d96352c4bd33e1a6a45f09f63c7f4e4846ab73d99b8478f23275a4cfd568718f",
+            "bound_usd": 0.007186655000000001,
+            "prompt_tokens_bound": 1745,
+            "response_token_bound": 24576,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":24576,\"profile\":{\"completion_cap\":128000,\"images\":true,\"output_tokens\":8192,\"provider\":\"Xiaomi\",\"reasoning_effort\":\"enabled\",\"route\":\"xiaomi/fp8\",\"service_tier\":\"\",\"spec\":{\"completion_usd_per_mtok\":0.28,\"label\":\"\",\"model_id\":\"xiaomi/mimo-v2.6-flash\",\"prompt_usd_per_mtok\":0.14,\"supports_images\":true},\"supporting_reasoning_tokens\":16384},\"profile_id\":\"mimo26-x1\",\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"enabled\",\"request_sha256\":\"d96352c4bd33e1a6a45f09f63c7f4e4846ab73d99b8478f23275a4cfd568718f\",\"reservation_rates\":[0.14,0.28],\"route_version\":\"layout-structured-13-ranges-profile\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"proposer\",\"supporting_reasoning_tokens\":16384,\"visible_answer_tokens\":8192,\"wire_version\":\"layout-table-3\"}"
+          },
+          "reviewer": {
+            "payload_json": "{\"max_tokens\":4096,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"profile_id\\\":\\\"luna6-n1\\\",\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-13-ranges-profile\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"reviewer\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"none\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "48202a8440eeff3e8ede7541f2073f128adb4126bf4e6f05dcb8dc9d96260e77",
+            "bound_usd": 0.001754,
+            "prompt_tokens_bound": 1744,
+            "response_token_bound": 4096,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":4096,\"profile\":{\"completion_cap\":4096,\"images\":true,\"output_tokens\":4096,\"provider\":\"OpenAI\",\"reasoning_effort\":\"none\",\"route\":\"openai/flex\",\"service_tier\":\"flex\",\"spec\":{\"completion_usd_per_mtok\":0.25,\"label\":\"\",\"model_id\":\"openai/gpt-6-luna\",\"prompt_usd_per_mtok\":0.05,\"supports_images\":true},\"supporting_reasoning_tokens\":0},\"profile_id\":\"luna6-n1\",\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"none\",\"request_sha256\":\"48202a8440eeff3e8ede7541f2073f128adb4126bf4e6f05dcb8dc9d96260e77\",\"reservation_rates\":[0.1,0.375],\"route_version\":\"layout-structured-13-ranges-profile\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"reviewer\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":4096,\"wire_version\":\"layout-table-3\"}"
+          },
+          "ordering": {
+            "payload_json": "{\"max_tokens\":4096,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"ordering\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"medium\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "457bf113aa975b9b1f4f8c818d78acdcc76eb87e83f3e91f9369e2fd31bc47d1",
+            "bound_usd": 0.0017495,
+            "prompt_tokens_bound": 1708,
+            "response_token_bound": 4096,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":4096,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"medium\",\"request_sha256\":\"457bf113aa975b9b1f4f8c818d78acdcc76eb87e83f3e91f9369e2fd31bc47d1\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"ordering\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":4096,\"wire_version\":\"layout-table-3\"}"
+          },
+          "lexical": {
+            "payload_json": "{\"max_tokens\":2048,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"lexical\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"anthropic/claude-opus-5.5\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":20,\"prompt\":4},\"order\":[\"anthropic\"],\"require_parameters\":true},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"usage\":{\"include\":true}}",
+            "sha256": "9084c8c2659f9352bce8ade2a722c190d57a8651c9c6969b5a038ec1759ba7f9",
+            "bound_usd": 0.049495,
+            "prompt_tokens_bound": 1707,
+            "response_token_bound": 2048,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":2048,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"\",\"request_sha256\":\"9084c8c2659f9352bce8ade2a722c190d57a8651c9c6969b5a038ec1759ba7f9\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"lexical\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":2048,\"wire_version\":\"layout-table-3\"}"
+          }
+        }
+      },
+      {
+        "selection": {
+          "proposer": "mimo26-d1",
+          "reviewer": "luna6-n1"
+        },
+        "versions": {
+          "construction_version": "layout-range-choices-1",
+          "range_source_prompt_sha256": "ee1d0277d23499c7db072bfb83398d879103137bdac137fcef22dc2402ed44a3",
+          "range_layout_prompt_sha256": "610371f2a50c14bbd48c16ef7834261e5af631ec5d0aa523f7b53093bcc768d1",
+          "range_choice_prompt_sha256": "2717ff6ff0973bdd2603e33f7aa3353f9120d8d2526e9b81d26e82a499bed634",
+          "range_review_prompt_sha256": "aa3dddcd396e1de93d206b65003297006af276e6d1779ed302ad0e4446225c6c",
+          "domain_source_prompt_sha256": "5055c75764e83a6dc19f3ff6ee5736c46545644b85d040ca1fe27bbbe83b0168",
+          "domain_layout_prompt_sha256": "610371f2a50c14bbd48c16ef7834261e5af631ec5d0aa523f7b53093bcc768d1",
+          "domain_choice_prompt_sha256": "a00eecba4f1f4ad532852c8383938dbc41d369a6b7487473fc0dd04990e41a38",
+          "domain_review_prompt_sha256": "854dbacd41c7c04a65d865f7030427ce66586c84634deeb87f3230d669ad7a42",
+          "construction_prompt_sha256": "e8d3fca0b0abba62f0f8eeffda4b7cb58ab688d22247bd618d32e6221c9fa30b",
+          "boundary_review_prompt_sha256": "dcc93f6f7a58b8962117c764e5e78b71ff242fb2e37f1a2defc5b47a0c6667a6",
+          "version": "layout-quote-10-ranges-profile",
+          "allocation_version": "layout-answer-allocation-6-ranges",
+          "wire_version": "layout-table-3",
+          "source_revision": "11.0-layout-1",
+          "route_version": "layout-structured-13-ranges-profile",
+          "proposer_prompt": "source-bound-layout-prompt-12-ranges-floating-artwork-paragraph-boundary-v2-all-stages-proposer",
+          "verifier_prompt": "source-bound-layout-prompt-12-ranges-floating-artwork-paragraph-boundary-v2-all-stages-reviewer",
+          "emphasis_version": "layout-emphasis-admission-2-domain",
+          "previous_candidate_prompt_sha256": "d634ed4a51507462415755dd415a3d3fdf72e967ad0f4b151f99a8ceb07c2219",
+          "protocol": "source-bound-layout-1",
+          "prompt_hashes": {
+            "proposer": "29f93cdaa9a7fc87cd01119b9bd8673e1e6f6726a60ea9763d381ca8ed6f828e",
+            "reviewer": "1312e21b00e6a613d682942444175c914509e34315f8b06b268a6e1a41ba6de2",
+            "ordering": "c0b5f60e894511b72f063387a27c7cc1dab5693df4cf3a46bea403781e16e55b",
+            "lexical": "dc4ae736b2849e62e9bdfb8109e5f824910aca2d40cac881a2637eb273caa6d5",
+            "emphasis": "a6a7dd048293e62fe8c9c616a8b1b8a5027ad6ac774d52de554a33d0b2c05f02"
+          },
+          "profiles": {
+            "proposer": {
+              "spec": {
+                "model_id": "xiaomi/mimo-v2.6-flash",
+                "prompt_usd_per_mtok": 0.14,
+                "completion_usd_per_mtok": 0.28,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 8192,
+              "route": "xiaomi/fp8",
+              "provider": "Xiaomi",
+              "service_tier": "",
+              "images": true,
+              "reasoning_effort": "disabled",
+              "completion_cap": 128000,
+              "supporting_reasoning_tokens": 0
+            },
+            "reviewer": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 4096,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": true,
+              "reasoning_effort": "none",
+              "completion_cap": 4096,
+              "supporting_reasoning_tokens": 0
+            },
+            "ordering": {
+              "spec": {
+                "model_id": "openai/gpt-6-luna",
+                "prompt_usd_per_mtok": 0.05,
+                "completion_usd_per_mtok": 0.25,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 4096,
+              "route": "openai/flex",
+              "provider": "OpenAI",
+              "service_tier": "flex",
+              "images": false,
+              "reasoning_effort": "medium",
+              "completion_cap": 128000,
+              "supporting_reasoning_tokens": 0
+            },
+            "lexical": {
+              "spec": {
+                "model_id": "anthropic/claude-opus-5.5",
+                "prompt_usd_per_mtok": 4,
+                "completion_usd_per_mtok": 20,
+                "label": "",
+                "supports_images": true
+              },
+              "output_tokens": 2048,
+              "route": "anthropic",
+              "provider": "Anthropic",
+              "service_tier": "",
+              "images": false,
+              "reasoning_effort": "",
+              "completion_cap": 2048,
+              "supporting_reasoning_tokens": 0
+            }
+          },
+          "reservation_rates": {
+            "proposer": [
+              0.14,
+              0.28
+            ],
+            "reviewer": [
+              0.1,
+              0.375
+            ],
+            "ordering": [
+              0.1,
+              0.375
+            ],
+            "lexical": [
+              4,
+              20
+            ]
+          },
+          "admission": {
+            "max_text_bytes": 48000,
+            "max_image_pixels": 4000000,
+            "cache_write_multiplier": 1.25
+          },
+          "hint_quote_version": "layout-hint-quote-1",
+          "hint_projection_version": "layout-advisory-projection-1",
+          "hint_prompt_sha256": "11f4c9def9e2f849082f3cc6e8f6c4c735079bca3887f0e6bee3956e09807092",
+          "profile_selection": {
+            "proposer": "mimo26-d1",
+            "reviewer": "luna6-n1"
+          },
+          "route_versions": {
+            "proposer": "layout-structured-13-ranges-profile",
+            "reviewer": "layout-structured-13-ranges-profile",
+            "ordering": "layout-structured-10-ranges",
+            "lexical": "layout-structured-10-ranges"
+          }
+        },
+        "wires": {
+          "proposer": {
+            "payload_json": "{\"max_tokens\":8192,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"profile_id\\\":\\\"mimo26-d1\\\",\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-13-ranges-profile\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"proposer\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"xiaomi/mimo-v2.6-flash\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.28,\"prompt\":0.14},\"order\":[\"xiaomi/fp8\"],\"require_parameters\":true},\"reasoning\":{\"enabled\":false},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"usage\":{\"include\":true}}",
+            "sha256": "a9dace041d226d528595d4dc91a5cace4a76f90ba1ede0dafa8161bb6d40918b",
+            "bound_usd": 0.0025991350000000002,
+            "prompt_tokens_bound": 1745,
+            "response_token_bound": 8192,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":8192,\"profile\":{\"completion_cap\":128000,\"images\":true,\"output_tokens\":8192,\"provider\":\"Xiaomi\",\"reasoning_effort\":\"disabled\",\"route\":\"xiaomi/fp8\",\"service_tier\":\"\",\"spec\":{\"completion_usd_per_mtok\":0.28,\"label\":\"\",\"model_id\":\"xiaomi/mimo-v2.6-flash\",\"prompt_usd_per_mtok\":0.14,\"supports_images\":true},\"supporting_reasoning_tokens\":0},\"profile_id\":\"mimo26-d1\",\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"disabled\",\"request_sha256\":\"a9dace041d226d528595d4dc91a5cace4a76f90ba1ede0dafa8161bb6d40918b\",\"reservation_rates\":[0.14,0.28],\"route_version\":\"layout-structured-13-ranges-profile\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"proposer\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":8192,\"wire_version\":\"layout-table-3\"}"
+          },
+          "reviewer": {
+            "payload_json": "{\"max_tokens\":4096,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"profile_id\\\":\\\"luna6-n1\\\",\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-13-ranges-profile\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"reviewer\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"none\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "48202a8440eeff3e8ede7541f2073f128adb4126bf4e6f05dcb8dc9d96260e77",
+            "bound_usd": 0.001754,
+            "prompt_tokens_bound": 1744,
+            "response_token_bound": 4096,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":4096,\"profile\":{\"completion_cap\":4096,\"images\":true,\"output_tokens\":4096,\"provider\":\"OpenAI\",\"reasoning_effort\":\"none\",\"route\":\"openai/flex\",\"service_tier\":\"flex\",\"spec\":{\"completion_usd_per_mtok\":0.25,\"label\":\"\",\"model_id\":\"openai/gpt-6-luna\",\"prompt_usd_per_mtok\":0.05,\"supports_images\":true},\"supporting_reasoning_tokens\":0},\"profile_id\":\"luna6-n1\",\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"none\",\"request_sha256\":\"48202a8440eeff3e8ede7541f2073f128adb4126bf4e6f05dcb8dc9d96260e77\",\"reservation_rates\":[0.1,0.375],\"route_version\":\"layout-structured-13-ranges-profile\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"reviewer\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":4096,\"wire_version\":\"layout-table-3\"}"
+          },
+          "ordering": {
+            "payload_json": "{\"max_tokens\":4096,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"ordering\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"openai/gpt-6-luna\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":0.375,\"prompt\":0.1},\"order\":[\"openai/flex\"],\"require_parameters\":true},\"reasoning\":{\"effort\":\"medium\"},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service_tier\":\"flex\",\"usage\":{\"include\":true}}",
+            "sha256": "457bf113aa975b9b1f4f8c818d78acdcc76eb87e83f3e91f9369e2fd31bc47d1",
+            "bound_usd": 0.0017495,
+            "prompt_tokens_bound": 1708,
+            "response_token_bound": 4096,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":4096,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"medium\",\"request_sha256\":\"457bf113aa975b9b1f4f8c818d78acdcc76eb87e83f3e91f9369e2fd31bc47d1\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"ordering\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":4096,\"wire_version\":\"layout-table-3\"}"
+          },
+          "lexical": {
+            "payload_json": "{\"max_tokens\":2048,\"messages\":[{\"content\":\"Classify source spans.\",\"role\":\"user\"},{\"content\":\"{\\\"allocation_version\\\":\\\"layout-answer-allocation-6-ranges\\\",\\\"context\\\":{\\\"snapshot_id\\\":\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\\"},\\\"prompt_version\\\":\\\"prompt-v1\\\",\\\"protocol\\\":\\\"layout-test-v1\\\",\\\"raster_sha256\\\":null,\\\"route_version\\\":\\\"layout-structured-10-ranges\\\",\\\"source_identity\\\":{\\\"page\\\":0,\\\"pdf\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"},\\\"stage\\\":\\\"lexical\\\",\\\"wire_version\\\":\\\"layout-table-3\\\"}\",\"role\":\"system\"}],\"model\":\"anthropic/claude-opus-5.5\",\"provider\":{\"allow_fallbacks\":false,\"max_price\":{\"completion\":20,\"prompt\":4},\"order\":[\"anthropic\"],\"require_parameters\":true},\"response_format\":{\"json_schema\":{\"name\":\"layout_response\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"usage\":{\"include\":true}}",
+            "sha256": "9084c8c2659f9352bce8ade2a722c190d57a8651c9c6969b5a038ec1759ba7f9",
+            "bound_usd": 0.049495,
+            "prompt_tokens_bound": 1707,
+            "response_token_bound": 2048,
+            "prompt_version": "prompt-v1",
+            "context_json": "{\"allocation_version\":\"layout-answer-allocation-6-ranges\",\"completion_tokens\":2048,\"protocol\":\"layout-test-v1\",\"raster_sha256\":null,\"reasoning_effort\":\"\",\"request_sha256\":\"9084c8c2659f9352bce8ade2a722c190d57a8651c9c6969b5a038ec1759ba7f9\",\"route_version\":\"layout-structured-10-ranges\",\"snapshot_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_identity\":{\"page\":0,\"pdf\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"stage\":\"lexical\",\"supporting_reasoning_tokens\":0,\"visible_answer_tokens\":2048,\"wire_version\":\"layout-table-3\"}"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -54,6 +54,7 @@ def serve(parent, cache_root, control):
     faulthandler.enable(all_threads=True)
     root = Path.cwd(); doc = None; sequence = 0; fingerprint = None; operation_book = None
     audit_pages = {}
+    layout_authority = None
     def stop(): return os.getppid() != parent
     def emit(row):
         control.write(json.dumps(dict(seq=sequence, **row), separators=(',', ':')) + '\n')
@@ -87,8 +88,8 @@ def serve(parent, cache_root, control):
                     if doc is None or extract.document_fingerprint(root / 'source.pdf') != fingerprint:
                         raise ValueError('source identity changed')
                     if op == 'prepare':
-                        audit_pages.clear(); operation_book = None
-                        allowed = {'page_numbers', 'require_figure_caption', 'recovery_opts'}
+                        audit_pages.clear(); operation_book = None; layout_authority = None
+                        allowed = {'page_numbers', 'require_figure_caption', 'recovery_opts', 'visual_results'}
                         if set(args) - allowed: raise ValueError('prepare fields')
                         opts = args.setdefault('recovery_opts', {})
                         if set(opts) - {'mode', 'language', 'dpi'}: raise ValueError('recovery fields')
@@ -96,6 +97,25 @@ def serve(parent, cache_root, control):
                         opts.update(cache_dir=str(Path(cache_root) / 'ocr-cache') if cache_root else str(root / 'ocr-cache'),
                                     scratch_dir=str(root / 'ocr-scratch'))
                         value = pipeline.run(doc, client=None, progress=progress, should_stop=stop, **args)
+                        from .layout_native import SourceAuthority
+                        layout_authority = SourceAuthority(value)
+                    elif op == 'readings_prepare':
+                        from . import source_readings
+                        if layout_authority is None or set(args)!={'book_digest','page','source_identity','raw_digest','selectors','synthetic'}:
+                            raise ValueError('readings require current native preparation')
+                        if args['book_digest']!=layout_authority.digest:raise ValueError('reading book differs')
+                        pno=args['page'];canonical=layout_authority.source(pno);raw=layout_authority.raws[pno]
+                        from .structural_ops import _digest
+                        from dataclasses import asdict
+                        if canonical.identity!=args['source_identity'] or _digest(asdict(raw))!=args['raw_digest']:
+                            raise ValueError('reading source differs')
+                        value=source_readings._inputs(layout_authority.result.book,doc,canonical,raw,args['selectors'],args['synthetic'])
+                    elif op == 'layout_prepare':
+                        if layout_authority is None:raise ValueError('layout requires native source preparation')
+                        value = layout_authority.prepare(doc,args)
+                    elif op == 'layout_figures':
+                        if layout_authority is None:raise ValueError('layout requires native source preparation')
+                        value = layout_authority.figure_failures(doc,args,should_stop=stop)
                     elif op == 'operations':
                         allowed = {'book', 'pno', 'revision', 'source_layer', 'seed', 'max_candidates', 'max_context_chars', 'raw_page', 'source_bound'}
                         if set(args) - allowed: raise ValueError('operation fields')
@@ -149,10 +169,19 @@ def serve(parent, cache_root, control):
                         value = source_assessment.survey(doc)
                     elif op == 'build':
                         allowed = {'book', 'page_html', 'metadata', 'report_html', 'sidecar', 'identifier',
-                                   'source_pages', 'operation_plans', 'recovery'}
+                                   'source_pages', 'operation_plans', 'recovery', 'layout_plans', 'raw_pages'}
                         if set(args) - allowed: raise ValueError('build fields')
                         book = args.pop('book'); recovery = args.pop('recovery')
-                        canonical = sources(book, args.get('source_pages'))
+                        region_bound = bool(getattr(book, 'source_region_protection', {})) or bool(
+                            layout_authority is not None and getattr(
+                                layout_authority.result.book, 'source_region_protection', {}))
+                        reading_bound=any(s.report().get('source_readings') for s in (args.get('source_pages') or {}).values())
+                        if args.get('layout_plans') or region_bound or reading_bound:
+                            if layout_authority is None:raise ValueError('layout publication requires native source preparation')
+                            book,canonical,raws = layout_authority.publication(book,args.get('source_pages'),args.get('layout_plans') or (),args.get('page_html'),doc=doc)
+                            args['raw_pages'] = raws
+                        else:
+                            canonical = sources(book, args.get('source_pages'))
                         args['source_pages'] = canonical
                         args['operation_plans'] = [replace(plan, prepared=replace(plan.prepared,
                             source_page=canonical.get(plan.prepared.page))) for plan in args.get('operation_plans') or ()]

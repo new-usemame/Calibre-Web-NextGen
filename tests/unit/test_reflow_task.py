@@ -106,6 +106,82 @@ def rig(tmp_path, monkeypatch):
                            folder=folder, root=str(tmp_path / "reflow"))
 
 
+class _LayoutSession:
+    """Inert provider boundary; real layout wire, ledger, native child and compiler."""
+    def __init__(self, decision='approve', error=None, malformed=False):
+        from tests.unit.test_reflow_layout_transport import Session
+        self.transport = Session()
+        self.transport.route.update(context_length=1050000, max_prompt_tokens=922000)
+        self.transport.data['usage']['cost'] = .000123456789
+        self.decision = decision
+        self.error = error
+        self.malformed = malformed
+        self.calls = []
+        self.proposals = {}
+
+    def get(self, *args, **kwargs):
+        return self.transport.get(*args, **kwargs)
+
+    @staticmethod
+    def proposal(view):
+        # Preserve all immutable atoms. The fixture's explicitly displayed quote
+        # becomes a quote group; protected source blocks remain indivisible.
+        protected = {b['range'][0] for b in view['protected_blocks']}
+        groups = []
+        pending = []
+        role = 'paragraph'
+        def flush():
+            if pending:
+                groups.append(dict(role=role, ranges=[[pending[0], pending[-1]]]))
+                pending.clear()
+        for atom in view['atoms']:
+            if atom['id'] in protected:
+                flush()
+                groups.append(dict(role='source', ranges=[[atom['id'], atom['id']]]))
+                role = 'paragraph'
+                continue
+            if atom['text'].startswith('"'):
+                flush()
+                role = 'quote'
+            pending.append(atom['id'])
+            if role == 'quote' and atom['text'].endswith('"'):
+                flush()
+                role = 'paragraph'
+        flush()
+        from tests.unit.test_reflow_boundary_construction import construction_from_groups,selector
+        response=construction_from_groups(view,groups)
+        if view.get('previous') and view['atoms']:
+            response['continuation_evidence']=dict(previous=[view['previous']['atoms'][-1]['id'],None],
+                current=selector(view,view['atoms'][0]['id']))
+        return response
+
+    def post(self, *args, **kwargs):
+        import json
+        wire = json.loads(kwargs['data'])
+        identity = json.loads(wire['messages'][1]['content'])
+        view = json.loads(wire['messages'][2]['content'])
+        self.calls.append(wire)
+        if self.error:
+            raise self.error
+        if self.malformed or (self.decision == 'partial' and identity['stage'] == 'proposer' and self.proposals):
+            content = 'invalid layout response'
+        elif identity['stage'] == 'proposer':
+            response = self.proposal(view)
+            self.proposals[view['snapshot']] = response
+            content = json.dumps(response)
+        else:
+            assert identity['stage'] == 'reviewer', 'fixture unexpectedly requires batch review'
+            response = dict(snapshot=view['snapshot'], accept=self.decision != 'decline',
+                continuation_accept=False, problems=['quote_scope'] if self.decision == 'decline' else [])
+            response['decisions']={d['id']:True for d in view['decisions']}
+            if self.decision == 'stale':
+                response['snapshot'] = '0'*64
+            content = json.dumps(response)
+        self.transport.data['model'] = wire['model']
+        self.transport.data['choices'][0]['message']['content'] = content
+        return self.transport.post(*args, **kwargs)
+
+
 def _run(rig, **options):
     options.setdefault("review_mode","source_verified")
     task = rig.mod.TaskReflowPdf(5, 7, options)
@@ -307,10 +383,9 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
 
 
 def test_a_conversion_with_rejected_model_answers_does_not_say_it_finished(rig, monkeypatch):
-    from cps.services.reflow.structural_pipeline import TwoStageClient
-    from tests.unit.test_reflow_typed_transport import Session,reply
-    session=Session(reply('not a protocol response'))
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
+    from cps.services.reflow.layout_pipeline import LayoutClient
+    session=_LayoutSession(malformed=True)
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:LayoutClient('inert',enabled=True,session=session))
     task=_run(rig,mode='full',cost_cap_usd=1)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
     assert session.calls, _ledger_rows(rig)
@@ -391,16 +466,16 @@ def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(
     """client → ledger → pipeline → job row: reconciliation is the durable debit,
     the page record references the same attempt, and a reload counts the charge
     once -- never zero, never twice."""
-    import json
-    from cps.services.reflow.structural_pipeline import TwoStageClient
-    from tests.unit.test_reflow_typed_transport import Session,reply
-    class Answered(Session):
-        def post(self,*args,**kwargs):
-            payload=json.loads(kwargs['data'])
-            body=json.loads(payload['messages'][1]['content'][1]['text'])
-            self.data=reply(json.dumps(body['empty_response']))
-            return super().post(*args,**kwargs)
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=Answered()))
+    from cps.services.reflow.layout_pipeline import LayoutClient
+    # Keep this successful-billing fixture within the explicit 48KB prompt
+    # admission. Large previous-page context is a separate refusal scenario.
+    doc = F.new_doc()
+    for index in range(3):
+        page = doc.new_page(width=500, height=700)
+        page.insert_text((50,100), 'Original source words on page %s remain complete.' % index, fontsize=12)
+    doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
+    session = _LayoutSession()
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:LayoutClient('inert',enabled=True,session=session))
     task = _run(rig, mode="full", cost_cap_usd=1.0)
 
     assert task.stat == STAT_FINISH_SUCCESS, task.error
@@ -409,11 +484,11 @@ def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(
     entries = ledger_mod.Ledger(path, cap_usd=1.0).entries()
     reconciled = [e for e in entries
                   if e.get("kind") == "reservation" and e.get("event") == "reconciled"]
-    assert reconciled, "every answered attempt reconciled durably"
+    assert len(reconciled)==len(session.calls)==6, "all three page proposals and reviews reconciled durably"
     assert row["spend_usd"] == pytest.approx(sum(e["cost_usd"] for e in reconciled))
     assert row["pending_usd"] == 0.0
     assert all("cost_usd" not in e for e in entries if e.get("kind")=="typed_stage")
-    assert row["status"] == "done"
+    assert row["status"] == "done", row["structural"]
 
 
 def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
@@ -423,10 +498,9 @@ def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
     with the unresolved amount held rather than reported as spent or as zero."""
     import requests
 
-    from cps.services.reflow.structural_pipeline import TwoStageClient
-    from tests.unit.test_reflow_typed_transport import Session
-    session=Session(error=requests.ReadTimeout('lost answer'))
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
+    from cps.services.reflow.layout_pipeline import LayoutClient
+    session=_LayoutSession(error=requests.ReadTimeout('lost answer'))
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:LayoutClient('inert',enabled=True,session=session))
     task = _run(rig, mode="full", cost_cap_usd=1.0)
 
     assert task.stat == STAT_FINISH_SUCCESS, task.error
@@ -435,6 +509,10 @@ def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
     assert row["status"] == "billing_unknown"
     assert row["pending_usd"] > 0
     assert row["spend_usd"] == 0.0, "nothing was confirmed"
+    assert len(session.calls)==1, "unknown billing must not retry or buy another page"
+    audit = ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),cap_usd=1)
+    pending = [r for r in audit.entries('reservation') if r['event']=='pending']
+    assert len(pending)==1 and row['pending_usd']==pending[0]['bound_usd']
 
 
 def test_a_job_that_failed_says_so_rather_than_disappearing(rig):
@@ -725,15 +803,15 @@ def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, mon
 
 def test_actual_task_prepares_full_source_for_sample_and_files_exact_hash(rig,monkeypatch):
     import hashlib
-    from cps.services.reflow import structural_pipeline
+    from cps.services.reflow import layout_pipeline
     observed={}
-    real=structural_pipeline.run_structural
+    real=layout_pipeline.run_layout
     def run(*args,**kwargs):
         result=real(*args,**kwargs)
         observed.update(source_pages=set(result.book.pages),output_pages=set(result.page_html),
-                        evidence=set(result.source_pages),plans=result.operation_plans)
+                        evidence=set(result.source_pages),plans=result.layout_plans)
         return result
-    monkeypatch.setattr(structural_pipeline,'run_structural',run)
+    monkeypatch.setattr(layout_pipeline,'run_layout',run)
     task=_run(rig,mode='sample',sample_pages=1,cost_cap_usd=1)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
     assert len(observed['source_pages'])==3
@@ -748,7 +826,7 @@ def test_actual_task_prepares_full_source_for_sample_and_files_exact_hash(rig,mo
 
 
 def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key(rig,monkeypatch):
-    monkeypatch.setattr(rig.mod.typed_model,'QUALITY_RELEASED',False)
+    monkeypatch.setattr(rig.mod.layout_pipeline,'QUALITY_RELEASED',False)
     import requests
     monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
     def forbidden(*args,**kwargs):raise AssertionError('quality-gated task attempted network')
@@ -766,7 +844,6 @@ def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key
 def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(rig,monkeypatch,decision):
     approve=decision in ('approve','audit_failure','partial')
     import json,zipfile
-    from tests.unit.test_reflow_typed_transport import Session,reply
     doc=F.new_doc();page=doc.new_page(width=500,height=700)
     page.insert_text((80,100),'"Original displayed words remain exactly as printed."',fontsize=12)
     for y in (180,195,210):page.insert_text((50,y),'Ordinary body context supports the source display.',fontsize=12)
@@ -775,25 +852,10 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
         page.insert_text((80,100),'"Another displayed quotation remains complete on its source page."',fontsize=12)
         for y in (180,195,210):page.insert_text((50,y),'Ordinary context also supports this displayed source.',fontsize=12)
     doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
-    class Answering:
-        def __init__(self):self.calls=[]
-        def get(self,url,**kw):return Session().get(url,**kw)
-        def post(self,*args,**kwargs):
-            payload=json.loads(kwargs['data']);self.calls.append(payload)
-            if decision=='partial' and len(self.calls)>2:
-                data=reply('invalid response');data['model']=payload['model'];return Session(data).post()
-            body=json.loads(payload['messages'][1]['content'][1]['text'])
-            response=body['empty_response'].copy()
-            if payload['model'].endswith('luna'):
-                response['select']=[next(c['candidate_id'] for c in body['source']['candidates'] if c['kind']=='quote')]
-            else:
-                response['approve']=body['source']['verification']['proposed_ids'] if decision!='decline' else []
-                if decision=='stale':response['snapshot_id']='0'*64
-            data=reply(json.dumps(response));data['model']=payload['model']
-            return Session(data).post()
-    session=Answering()
-    # Exercise the actual enabled product default and task factory. Only the
-    # HTTP boundary is inert; neither the release flag nor client is replaced.
+    session=_LayoutSession(decision=decision)
+    # Deliberately enable only this test's current product factory. The release
+    # gate remains closed in production; all HTTP is handled by the inert boundary.
+    monkeypatch.setattr(rig.mod.layout_pipeline,'QUALITY_RELEASED',True)
     monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
     monkeypatch.setattr(model_mod.requests,'get',session.get)
     monkeypatch.setattr(model_mod.requests,'post',session.post)
@@ -809,14 +871,15 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
     assert task.stat==STAT_FINISH_SUCCESS,task.error
     assert len(session.calls)==(3 if decision=='partial' else 2)
     payload=task.results['report']
-    assert payload['structural']['proposed_operations']==1
-    assert payload['structural']['approved_operations']==int(approve)
-    assert payload['structural']['verifier_abstained']==int(decision=='decline')
-    assert payload['structural']['rejected']==int(decision in ('stale','partial'))
+    assert payload['structural']['proposed_pages']==1
+    assert payload['structural']['approved_pages']==int(approve)
+    proposed = next(iter(session.proposals.values()))
+    assert payload['structural']['approved_operations']==(len(proposed['groups']) if approve else 0)
+    assert payload['structural']['rejected']==int(decision in ('decline','stale','partial'))
     assert payload['spend']['usd']==(0 if decision=='audit_failure' else (3 if decision=='partial' else 2)*.000123456789)
     row=_ledger_rows(rig)[0]
     assert row['spend_usd']==payload['spend']['usd']
-    assert row['structural']['verifier_abstained']==int(decision=='decline')
+    assert row['structural']['approved_pages']==int(approve)
     with zipfile.ZipFile(task.results['path']) as z:
         body=''.join(z.read(n).decode() for n in z.namelist() if '/ch' in n and n.endswith('.xhtml'))
     assert ('<blockquote' in body)==approve
@@ -829,9 +892,11 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
     assert len(audit[1]['operations'])==int(approve)
     if approve:
         operation=audit[0]['operations'][0]
-        assert operation['kind']=='quote' and operation['source_range'][0]==0
+        assert operation['kind']=='layout'
         assert len(operation['selected_text_sha256'])==64
+        assert len(operation['answer_sha256'])==64
         assert len(operation['requests'])==2
+        assert {r['stage'] for r in operation['requests']}=={'proposer','reviewer'}
         assert audit[1]['operations'][0]['status']=='verified'
         assert audit[1]['operations'][0]['epub_entry'].startswith('OEBPS/ch')
     assert audit[2]['sha256']==task.results['sha256']

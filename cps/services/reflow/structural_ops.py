@@ -34,8 +34,12 @@ def _digest(value):
 def _state(book, pno):
     neighbors = {str(n): [asdict(e) for e in book.pages.get(n, [])]
                  for n in (pno - 1, pno, pno + 1)}
-    return {"pages": neighbors, "notes": [asdict(n) for n in book.notes],
+    navigation = [link for link in book.source_navigation
+                  if pno in (link['pno'], link.get('dest_page'))]
+    return {**({"source_navigation": navigation} if navigation else {}),
+            "pages": neighbors, "notes": [asdict(n) for n in book.notes],
             "figures": book.figures, "artwork": book.artwork,
+            "source_region_protection": getattr(book, 'source_region_protection', {}),
             "uncertain_notes": sorted(book.ambiguous_note_numbers(pno))}
 
 

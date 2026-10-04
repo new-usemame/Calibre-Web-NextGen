@@ -233,6 +233,29 @@ class NativeDocument:
         self.operation_book = book
         return replace(result, source_page=source_page)
 
+    def prepare_layout(self, book, pno, source, raw, previous_source=None, previous_raw=None):
+        from . import layout_native, source_inventory, layout_ops
+        args=dict(page=pno,book_digest=layout_native.book_digest(book),source_identity=source.identity,
+            raw_digest=source_inventory.digest(raw),
+            previous_identity=previous_source.identity if previous_source else None,
+            previous_raw_digest=source_inventory.digest(previous_raw) if previous_raw else None)
+        if source.report().get('source_readings'):args['reading_source']=source
+        if previous_source and previous_source.report().get('source_readings'):args['previous_reading_source']=previous_source
+        result=self.call('layout_prepare',args)
+        if type(result) is not layout_ops.PreparedLayout or result.page!=pno or result.pdf_digest!=self.fingerprint:
+            raise ValueError('invalid native prepared layout binding')
+        return result
+
+    def layout_figure_failures(self, book, plans):
+        from . import layout_native
+        result=self.call('layout_figures',dict(book_digest=layout_native.book_digest(book),plans=plans))
+        pages={p.prepared.page for p in plans}
+        if not isinstance(result,dict) or not set(result).issubset(pages) or any(
+                not isinstance(refs,list) or any(not isinstance(src,str) or not src.startswith('images/fig_p')
+                    for src in refs) for refs in result.values()):
+            raise ValueError('invalid native layout figure verdict')
+        return result
+
     def capture_operation_audit(self, result, book_id):
         from . import operation_audit, native_audit
         plans = [p for p in getattr(result, 'operation_plans', ()) if p.selected]

@@ -26,6 +26,9 @@ def capture(result, book_id, document=None):
 
     With a native document, selected image atoms are independently rendered and
     hashed. NativeDocument dispatches this work into its supervised child."""
+    if getattr(result, 'layout_plans', None):
+        from . import layout_audit
+        return layout_audit.capture(result, book_id, document)
     if document is not None and hasattr(document, 'capture_operation_audit'):
         return document.capture_operation_audit(result, book_id)
     if document is not None and not hasattr(document, '__getitem__'):
@@ -140,6 +143,9 @@ def observe(path, rows, matching):
     emitted merely because the model approved them. Text comparisons preserve all
     non-whitespace characters; qualified uncertain markers remain in the EPUB.
     """
+    if rows and all(r.get('kind')=='layout' for r in rows):
+        from . import layout_audit
+        return layout_audit.observe(path, rows, matching)
     wanted = {(r['page_index0'],r['proposed_state']) for r in rows}
     blocks = {}
     with zipfile.ZipFile(path) as archive:

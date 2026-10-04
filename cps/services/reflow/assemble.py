@@ -172,6 +172,8 @@ class Book(object):
     notes: List[Note] = field(default_factory=list)
     repairs: List[Repair] = field(default_factory=list)
     furniture: List[str] = field(default_factory=list)
+    source_inventory: dict = field(default_factory=dict)
+    source_region_protection: dict = field(default_factory=dict)
     pages: dict = field(default_factory=dict)         # pno -> [Element] as printed
     body_boxes: dict = field(default_factory=dict)    # pno -> the page minus its furniture
     title_pages: dict = field(default_factory=dict)   # source page -> printed title label
@@ -217,7 +219,7 @@ class Book(object):
 
     def needs_source_evidence(self, pno):
         return any(link['pno'] == pno and link['kind'] == 1 and link['status'] != 'resolved'
-                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
             any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
@@ -333,10 +335,12 @@ def stitch_runs(prev, nxt, heal=True, vocab=None):
     between the halves (book 562's shape: the space as its own span), and does
     nothing when a non-space run (a note marker) follows the hyphen.
 
-    ``heal`` is False only at a page turn: the source counter never joins a
+    ``heal`` is False at a page turn: the source counter never joins a
     hyphenated word across pages, so the output may not either -- a wrap-break
     and a printed compound cannot be told apart at the turn, and the hyphen the
-    page printed stays (``spear-bearing``, never ``spearbearing``).
+    page printed stays (``spear-bearing``, never ``spearbearing``). Note callers
+    also disable healing when the previous line's hyphen belongs to a protected
+    source span, whose identity would otherwise be lost by text flattening.
     """
     prev = [list(r) for r in prev]
     nxt = [list(r) for r in nxt]
@@ -901,6 +905,7 @@ def note_text(region, repairs=None, pno=None, vocab=None):
     rather than keeping a second, quietly different one.
     """
     runs = []
+    previous_line = None
     for index, line in enumerate(region.lines):
         text = line.stripped
         if index == 0 and region.number is not None:
@@ -908,7 +913,12 @@ def note_text(region, repairs=None, pno=None, vocab=None):
         if not text:
             continue
         piece = [["t", text]]
-        runs = stitch_runs(runs, piece, vocab=vocab) if runs else piece
+        # Flattening a note into text must not make a source-owned hyphen
+        # editable. Use the same raw-span barrier as the source counter;
+        # a separate, unprotected hyphen span remains eligible for healing.
+        runs = stitch_runs(runs, piece, vocab=vocab,
+                           heal=not _pixel_wrap(previous_line)) if runs else piece
+        previous_line = line
     return plain_text(tidy(runs))
 
 
@@ -1042,6 +1052,9 @@ def _join_within_page(elements, vocab):
                 anchor.runs = tidy(stitch_runs(
                     anchor.runs, element.runs, heal=True, vocab=vocab))
                 anchor.pages = sorted(set(anchor.pages + element.pages))
+                # A text join must retain each literal PDF line's ownership.
+                # Native destinations can point to any of these later lines.
+                anchor.line_boxes.extend(element.line_boxes)
                 anchor.punctuation_uncertain |= element.punctuation_uncertain
                 if anchor.punctuation_uncertain:
                     anchor.bbox = (min(anchor.bbox[0], element.bbox[0]),
@@ -1443,8 +1456,31 @@ def _bind_source_navigation(book, raw_pages):
                                                 source_lines)
                     if offset is not None:
                         homes.append((ei, None, offset))
-            if len(homes) != 1:
+            # Notes are a separate source channel, including protected raster
+            # notes. Only their first source line can map to the note's start;
+            # an interior viewport must not silently jump to a different line.
+            note_homes = []
+            for ni, note in enumerate(n for n in book.notes if n.pno == record['dest_page']):
+                box = note.bbox
+                if (box[0] - 1.5 <= line.bbox[0] and line.bbox[2] <= box[2] + 1.5
+                        and abs(line.bbox[1] - box[1]) < 3
+                        and line.bbox[3] <= box[3] + 1.5):
+                    note_homes.append(ni)
+            if len(homes) + len(note_homes) != 1:
                 record['status'] = 'destination_unmapped'
+                record['destination_evidence'] = dict(
+                    line_box=list(line.bbox), line_text=line.stripped,
+                    element_homes=len(homes), note_homes=len(note_homes))
+                book.source_navigation.append(record)
+                continue
+            if note_homes:
+                source_element = book.pages[raw.pno][record['source_element']]
+                if source_element.display_lines or source_element.caption_uncertain:
+                    record['status'] = 'presentation_unmapped'
+                    book.source_navigation.append(record)
+                    continue
+                record.update(dest_note=note_homes[0], dest_element=None,
+                              dest_item=None, dest_offset=0, status='resolved')
                 book.source_navigation.append(record)
                 continue
             record['dest_element'], record['dest_item'], record['dest_offset'] = homes[0]
@@ -1474,6 +1510,8 @@ def _bind_source_navigation(book, raw_pages):
 def assemble(skeletons, style, raw_pages=None):
     """Turn per-page skeletons into one reading order plus its side channels."""
     book = Book(style=style)
+    from . import source_inventory
+    source_catalogs = {raw.pno: source_inventory.catalog(raw) for raw in (raw_pages or [])}
     stitched = 0
     refused = 0
     vocab = book_vocabulary(raw_pages) if raw_pages is not None else None
@@ -1513,6 +1551,10 @@ def assemble(skeletons, style, raw_pages=None):
         book.body_boxes[skel.pno] = skel.body_box()
         elements = [_copy_element(el) for el in elements]
 
+        if skel.pno in source_catalogs:
+            book.source_inventory[skel.pno] = source_inventory.capture(
+                source_catalogs.pop(skel.pno), skel, figure_offset=len(book.figures))
+
         for region in skel.regions:
             if region.kind == "furniture":
                 book.furniture.append(region.text)
@@ -1539,6 +1581,8 @@ def assemble(skeletons, style, raw_pages=None):
                                      "found": region.reason or "embedded"})
                 if source_geometry.get(skel.pno):
                     book.figures[-1]['source_geometry']=dict(source_geometry[skel.pno])
+                if getattr(region, 'visual_evidence', None):
+                    book.figures[-1]['visual_evidence'] = deepcopy(region.visual_evidence)
 
         for position, element in enumerate(elements):
             previous = book.elements[-1] if book.elements else None

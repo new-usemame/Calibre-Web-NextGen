@@ -1,0 +1,2374 @@
+{
+  "models": {
+    "data": [
+      {
+        "id": "openai/gpt-6-luna",
+        "canonical_slug": "openai/gpt-6-luna-20260922",
+        "hugging_face_id": null,
+        "name": "OpenAI: GPT-6 Luna",
+        "created": 1790100786,
+        "description": "GPT-6 Luna is the fast, cost-efficient model in OpenAI's GPT-6 series, positioned below GPT-6 Sol. It is suited for high-volume and latency-sensitive workloads such as chat, classification, and lightweight agentic...",
+        "context_length": 1050000,
+        "architecture": {
+          "modality": "text+image+file->text",
+          "input_modalities": [
+            "file",
+            "image",
+            "text"
+          ],
+          "output_modalities": [
+            "text"
+          ],
+          "tokenizer": "GPT",
+          "instruct_type": null
+        },
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000005",
+          "web_search": "0.01",
+          "input_cache_read": "0.00000001",
+          "input_cache_write": "0.000000125",
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.0000002",
+              "completion": "0.00000075",
+              "input_cache_read": "0.00000002",
+              "input_cache_write": "0.00000025"
+            }
+          ]
+        },
+        "top_provider": {
+          "context_length": 1050000,
+          "max_completion_tokens": 128000,
+          "is_moderated": true
+        },
+        "per_request_limits": null,
+        "supported_parameters": [
+          "include_reasoning",
+          "max_completion_tokens",
+          "max_tokens",
+          "reasoning",
+          "reasoning_effort",
+          "response_format",
+          "seed",
+          "structured_outputs",
+          "tool_choice",
+          "tools",
+          "verbosity"
+        ],
+        "default_parameters": {
+          "temperature": null,
+          "top_p": null,
+          "top_k": null,
+          "frequency_penalty": null,
+          "presence_penalty": null,
+          "repetition_penalty": null
+        },
+        "supported_voices": null,
+        "knowledge_cutoff": null,
+        "expiration_date": null,
+        "links": {
+          "details": "/api/v1/models/openai/gpt-6-luna-20260922/endpoints"
+        },
+        "benchmarks": {
+          "design_arena": [],
+          "artificial_analysis": {
+            "intelligence_index": 38.1,
+            "coding_index": null,
+            "agentic_index": null
+          }
+        },
+        "reasoning": {
+          "mandatory": false,
+          "default_enabled": true,
+          "supported_efforts": [
+            "max",
+            "xhigh",
+            "high",
+            "medium",
+            "low",
+            "none"
+          ],
+          "default_effort": "medium"
+        }
+      },
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "canonical_slug": "anthropic/claude-opus-5.5-20260921",
+        "hugging_face_id": null,
+        "name": "Anthropic: Claude Opus 5.5",
+        "created": 1790094732,
+        "description": "Claude Opus 5.5 is Anthropic's flagship model for demanding reasoning, coding, and long-horizon agentic work, succeeding Claude Opus 5. It is particularly strong at multi-step changes in large codebases, code...",
+        "context_length": 1000000,
+        "architecture": {
+          "modality": "text+image+file->text",
+          "input_modalities": [
+            "text",
+            "image",
+            "file"
+          ],
+          "output_modalities": [
+            "text"
+          ],
+          "tokenizer": "Claude",
+          "instruct_type": null
+        },
+        "pricing": {
+          "prompt": "0.000004",
+          "completion": "0.00002",
+          "web_search": "0.01",
+          "input_cache_read": "0.0000002",
+          "input_cache_write": "0.000005",
+          "input_cache_write_1h": "0.000008"
+        },
+        "top_provider": {
+          "context_length": 1000000,
+          "max_completion_tokens": 128000,
+          "is_moderated": true
+        },
+        "per_request_limits": null,
+        "supported_parameters": [
+          "include_reasoning",
+          "max_completion_tokens",
+          "max_tokens",
+          "reasoning",
+          "reasoning_effort",
+          "response_format",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tool_choice",
+          "tools",
+          "verbosity"
+        ],
+        "default_parameters": {},
+        "supported_voices": null,
+        "knowledge_cutoff": null,
+        "expiration_date": null,
+        "links": {
+          "details": "/api/v1/models/anthropic/claude-opus-5.5-20260921/endpoints"
+        },
+        "benchmarks": {
+          "design_arena": [
+            {
+              "arena": "agents",
+              "category": "mobileapps",
+              "elo": 1329,
+              "win_rate": 64.4,
+              "rank": 2
+            },
+            {
+              "arena": "models",
+              "category": "3d",
+              "elo": 1457,
+              "win_rate": 73.2,
+              "rank": 1
+            },
+            {
+              "arena": "models",
+              "category": "codecategories",
+              "elo": 1393,
+              "win_rate": 64.6,
+              "rank": 1
+            },
+            {
+              "arena": "models",
+              "category": "dataviz",
+              "elo": 1382,
+              "win_rate": 65.3,
+              "rank": 1
+            },
+            {
+              "arena": "models",
+              "category": "gamedev",
+              "elo": 1484,
+              "win_rate": 74.3,
+              "rank": 1
+            },
+            {
+              "arena": "models",
+              "category": "svg",
+              "elo": 1339,
+              "win_rate": 49,
+              "rank": 1
+            },
+            {
+              "arena": "models",
+              "category": "uicomponent",
+              "elo": 1372,
+              "win_rate": 61.4,
+              "rank": 1
+            },
+            {
+              "arena": "models",
+              "category": "website",
+              "elo": 1344,
+              "win_rate": 58,
+              "rank": 2
+            }
+          ],
+          "artificial_analysis": {
+            "intelligence_index": 57.6,
+            "coding_index": null,
+            "agentic_index": null
+          }
+        },
+        "reasoning": {
+          "mandatory": true,
+          "supported_efforts": [
+            "max",
+            "xhigh",
+            "high",
+            "medium",
+            "low"
+          ],
+          "default_effort": "high"
+        }
+      },
+      {
+        "id": "xiaomi/mimo-v2.6-flash",
+        "canonical_slug": "xiaomi/mimo-v2.6-flash-20260921",
+        "hugging_face_id": "XiaomiMiMo/MiMo-V2.6-Flash-RL",
+        "name": "Xiaomi: MiMo-V2.6-Flash",
+        "created": 1790021264,
+        "description": "MiMo-V2.6-Flash is an open-source foundation model developed by Xiaomi. Built on a Mixture-of-Experts architecture with 309B total parameters and 15B activated per token, it employs a hybrid attention mechanism for...",
+        "context_length": 1050000,
+        "architecture": {
+          "modality": "text+image+audio+video->text",
+          "input_modalities": [
+            "text",
+            "image",
+            "video",
+            "audio"
+          ],
+          "output_modalities": [
+            "text"
+          ],
+          "tokenizer": "Other",
+          "instruct_type": null
+        },
+        "pricing": {
+          "prompt": "0.00000014",
+          "completion": "0.00000028",
+          "input_cache_read": "0.0000000028"
+        },
+        "top_provider": {
+          "context_length": 1048576,
+          "max_completion_tokens": 131072,
+          "is_moderated": false
+        },
+        "per_request_limits": null,
+        "supported_parameters": [
+          "frequency_penalty",
+          "include_reasoning",
+          "logit_bias",
+          "max_tokens",
+          "min_p",
+          "presence_penalty",
+          "reasoning",
+          "repetition_penalty",
+          "response_format",
+          "seed",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tool_choice",
+          "tools",
+          "top_k",
+          "top_p"
+        ],
+        "default_parameters": {
+          "temperature": 1,
+          "top_p": 0.95,
+          "frequency_penalty": 0
+        },
+        "supported_voices": null,
+        "knowledge_cutoff": null,
+        "expiration_date": null,
+        "links": {
+          "details": "/api/v1/models/xiaomi/mimo-v2.6-flash-20260921/endpoints"
+        },
+        "benchmarks": {
+          "design_arena": [],
+          "artificial_analysis": {
+            "intelligence_index": 37.9,
+            "coding_index": null,
+            "agentic_index": null
+          }
+        },
+        "reasoning": {
+          "mandatory": false
+        }
+      }
+    ]
+  },
+  "routes": {
+    "xiaomi/mimo-v2.6-flash": {
+      "data": {
+        "id": "xiaomi/mimo-v2.6-flash",
+        "name": "Xiaomi: MiMo-V2.6-Flash",
+        "created": 1790021264,
+        "description": "MiMo-V2.6-Flash is an open-source foundation model developed by Xiaomi. Built on a Mixture-of-Experts architecture with 309B total parameters and 15B activated per token, it employs a hybrid attention mechanism for...",
+        "architecture": {
+          "tokenizer": "Other",
+          "instruct_type": null,
+          "modality": "text+image+audio+video->text",
+          "input_modalities": [
+            "text",
+            "image",
+            "video",
+            "audio"
+          ],
+          "output_modalities": [
+            "text"
+          ]
+        },
+        "endpoints": [
+          {
+            "name": "Darkbloom | xiaomi/mimo-v2.6-flash-20260921",
+            "model_id": "xiaomi/mimo-v2.6-flash",
+            "model_name": "Xiaomi: MiMo-V2.6-Flash",
+            "context_length": 1048576,
+            "pricing": {
+              "prompt": "0.00000007",
+              "completion": "0.00000028",
+              "input_cache_read": "0.000000002",
+              "discount": 0
+            },
+            "provider_name": "Darkbloom",
+            "tag": "darkbloom/fp4",
+            "quantization": "fp4",
+            "max_completion_tokens": 131072,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "temperature",
+              "top_p",
+              "top_k",
+              "frequency_penalty",
+              "presence_penalty",
+              "repetition_penalty",
+              "stop",
+              "seed",
+              "max_tokens",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 98.93175074183976,
+            "uptime_last_5m": 99.2094861660079,
+            "uptime_last_1d": 99.6589601595934,
+            "supports_implicit_caching": false,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2935.5,
+              "p75": 5040.25,
+              "p90": 7722.4000000000015,
+              "p99": 18039.389999999985
+            },
+            "throughput_last_30m": {
+              "p50": 13,
+              "p75": 19,
+              "p90": 24,
+              "p99": 36.38999999999987
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2935.5,
+                  "p75": 5040.25,
+                  "p90": 7722.4000000000015,
+                  "p99": 18039.389999999985
+                },
+                "throughput": {
+                  "p50": 13,
+                  "p75": 19,
+                  "p90": 24,
+                  "p99": 36.38999999999987
+                },
+                "request_count": 1662
+              }
+            }
+          },
+          {
+            "name": "GMICloud | xiaomi/mimo-v2.6-flash-20260921",
+            "model_id": "xiaomi/mimo-v2.6-flash",
+            "model_name": "Xiaomi: MiMo-V2.6-Flash",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.000000133",
+              "completion": "0.000000266",
+              "input_cache_read": "0.00000000285",
+              "discount": 0.05
+            },
+            "provider_name": "GMICloud",
+            "tag": "gmicloud/bf16",
+            "quantization": "bf16",
+            "max_completion_tokens": 945000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "temperature",
+              "top_p",
+              "seed",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice"
+            ],
+            "supports_tool_choice": {
+              "none": false,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": -2,
+            "uptime_last_30m": 87.42402992052361,
+            "uptime_last_5m": 76.47058823529412,
+            "uptime_last_1d": 88.93283666510447,
+            "supports_implicit_caching": false,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4082,
+              "p75": 5367.75,
+              "p90": 7011.900000000001,
+              "p99": 9773.089999999997
+            },
+            "throughput_last_30m": {
+              "p50": 2,
+              "p75": 3,
+              "p90": 3,
+              "p99": 36
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4082,
+                  "p75": 5367.75,
+                  "p90": 7011.900000000001,
+                  "p99": 9773.089999999997
+                },
+                "throughput": {
+                  "p50": 2,
+                  "p75": 3,
+                  "p90": 3,
+                  "p99": 36
+                },
+                "request_count": 7482
+              }
+            }
+          },
+          {
+            "name": "Novita | xiaomi/mimo-v2.6-flash-20260921",
+            "model_id": "xiaomi/mimo-v2.6-flash",
+            "model_name": "Xiaomi: MiMo-V2.6-Flash",
+            "context_length": 1048576,
+            "pricing": {
+              "prompt": "0.00000014",
+              "completion": "0.00000028",
+              "input_cache_read": "0.0000000028",
+              "discount": 0
+            },
+            "provider_name": "Novita",
+            "tag": "novita/fp8",
+            "quantization": "fp8",
+            "max_completion_tokens": 131072,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "temperature",
+              "top_p",
+              "stop",
+              "frequency_penalty",
+              "presence_penalty",
+              "seed",
+              "top_k",
+              "repetition_penalty",
+              "response_format",
+              "tools",
+              "tool_choice"
+            ],
+            "supports_tool_choice": {
+              "none": false,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 96.36266381385397,
+            "uptime_last_5m": 94.18960244648318,
+            "uptime_last_1d": 96.2111781416579,
+            "supports_implicit_caching": false,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4144,
+              "p75": 7273.5,
+              "p90": 13107.399999999996,
+              "p99": 38925.94000000005
+            },
+            "throughput_last_30m": {
+              "p50": 29,
+              "p75": 44,
+              "p90": 63,
+              "p99": 101.86000000000013
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4144,
+                  "p75": 7273.5,
+                  "p90": 13107.399999999996,
+                  "p99": 38925.94000000005
+                },
+                "throughput": {
+                  "p50": 29,
+                  "p75": 44,
+                  "p90": 63,
+                  "p99": 101.86000000000013
+                },
+                "request_count": 3615
+              }
+            }
+          },
+          {
+            "name": "DeepInfra | xiaomi/mimo-v2.6-flash-20260921",
+            "model_id": "xiaomi/mimo-v2.6-flash",
+            "model_name": "Xiaomi: MiMo-V2.6-Flash",
+            "context_length": 1048576,
+            "pricing": {
+              "prompt": "0.00000014",
+              "completion": "0.00000028",
+              "input_cache_read": "0.0000000028",
+              "discount": 0
+            },
+            "provider_name": "DeepInfra",
+            "tag": "deepinfra/fp8",
+            "quantization": "fp8",
+            "max_completion_tokens": 943718,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "temperature",
+              "top_p",
+              "stop",
+              "frequency_penalty",
+              "presence_penalty",
+              "repetition_penalty",
+              "top_k",
+              "seed",
+              "min_p",
+              "logit_bias",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 98.1763826606876,
+            "uptime_last_5m": 99.34533551554829,
+            "uptime_last_1d": 99.166530897668,
+            "supports_implicit_caching": false,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 1722.5,
+              "p75": 2920,
+              "p90": 4914.900000000003,
+              "p99": 31072.31000000001
+            },
+            "throughput_last_30m": {
+              "p50": 35,
+              "p75": 49,
+              "p90": 66,
+              "p99": 101
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 1722.5,
+                  "p75": 2920,
+                  "p90": 4914.900000000003,
+                  "p99": 31072.31000000001
+                },
+                "throughput": {
+                  "p50": 35,
+                  "p75": 49,
+                  "p90": 66,
+                  "p99": 101
+                },
+                "request_count": 6730
+              }
+            }
+          },
+          {
+            "name": "Xiaomi | xiaomi/mimo-v2.6-flash-20260921",
+            "model_id": "xiaomi/mimo-v2.6-flash",
+            "model_name": "Xiaomi: MiMo-V2.6-Flash",
+            "context_length": 1048576,
+            "pricing": {
+              "prompt": "0.00000014",
+              "completion": "0.00000028",
+              "input_cache_read": "0.0000000028",
+              "discount": 0
+            },
+            "provider_name": "Xiaomi",
+            "tag": "xiaomi/fp8",
+            "quantization": "fp8",
+            "max_completion_tokens": 131072,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "temperature",
+              "top_p",
+              "stop",
+              "response_format",
+              "tools",
+              "tool_choice",
+              "frequency_penalty",
+              "presence_penalty",
+              "structured_outputs"
+            ],
+            "supports_tool_choice": {
+              "none": false,
+              "auto": true,
+              "required": true,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 99.08078645823964,
+            "uptime_last_5m": 97.36713798147245,
+            "uptime_last_1d": 98.6273274642176,
+            "supports_implicit_caching": false,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4152,
+              "p75": 7173,
+              "p90": 13621.100000000006,
+              "p99": 37655.72000000003
+            },
+            "throughput_last_30m": {
+              "p50": 36,
+              "p75": 49,
+              "p90": 62,
+              "p99": 96
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4152,
+                  "p75": 7173,
+                  "p90": 13621.100000000006,
+                  "p99": 37655.72000000003
+                },
+                "throughput": {
+                  "p50": 36,
+                  "p75": 49,
+                  "p90": 62,
+                  "p99": 96
+                },
+                "request_count": 298058
+              }
+            }
+          },
+          {
+            "name": "Venice | xiaomi/mimo-v2.6-flash-20260921",
+            "model_id": "xiaomi/mimo-v2.6-flash",
+            "model_name": "Xiaomi: MiMo-V2.6-Flash",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000000175",
+              "completion": "0.00000035",
+              "input_cache_read": "0.00000000375",
+              "discount": 0
+            },
+            "provider_name": "Venice",
+            "tag": "venice/fp8",
+            "quantization": "fp8",
+            "max_completion_tokens": 131072,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "temperature",
+              "top_p",
+              "stop",
+              "frequency_penalty",
+              "presence_penalty",
+              "top_k",
+              "structured_outputs",
+              "tools",
+              "tool_choice"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 97.12643678160919,
+            "uptime_last_5m": 98.36065573770492,
+            "uptime_last_1d": 98.41629291963827,
+            "supports_implicit_caching": false,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2143,
+              "p75": 3571.5,
+              "p90": 6096.800000000001,
+              "p99": 27622.680000000004
+            },
+            "throughput_last_30m": {
+              "p50": 28,
+              "p75": 39,
+              "p90": 50,
+              "p99": 74.21000000000004
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2143,
+                  "p75": 3571.5,
+                  "p90": 6096.800000000001,
+                  "p99": 27622.680000000004
+                },
+                "throughput": {
+                  "p50": 28,
+                  "p75": 39,
+                  "p90": 50,
+                  "p99": 74.21000000000004
+                },
+                "request_count": 1180
+              }
+            }
+          }
+        ]
+      }
+    },
+    "openai/gpt-6-luna": {
+      "data": {
+        "id": "openai/gpt-6-luna",
+        "name": "OpenAI: GPT-6 Luna",
+        "created": 1790100786,
+        "description": "GPT-6 Luna is the fast, cost-efficient model in OpenAI's GPT-6 series, positioned below GPT-6 Sol. It is suited for high-volume and latency-sensitive workloads such as chat, classification, and lightweight agentic...",
+        "architecture": {
+          "tokenizer": "GPT",
+          "instruct_type": null,
+          "modality": "text+image+file->text",
+          "input_modalities": [
+            "file",
+            "image",
+            "text"
+          ],
+          "output_modalities": [
+            "text"
+          ]
+        },
+        "endpoints": [
+          {
+            "name": "OpenAI | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.00000005",
+              "completion": "0.00000025",
+              "web_search": "0.01",
+              "input_cache_read": "0.000000005",
+              "input_cache_write": "0.0000000625",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.0000001",
+                  "completion": "0.000000375",
+                  "input_cache_read": "0.00000001",
+                  "input_cache_write": "0.000000125"
+                }
+              ]
+            },
+            "provider_name": "OpenAI",
+            "tag": "openai/flex",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": 922000,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "seed",
+              "max_tokens",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 99.9967685645964,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.97802493206393,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search"
+              },
+              "openrouter:apply_patch": {
+                "type": "apply_patch"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 1555.5,
+              "p75": 2885.25,
+              "p90": 5209.900000000001,
+              "p99": 24651.72000000006
+            },
+            "throughput_last_30m": {
+              "p50": 92,
+              "p75": 124,
+              "p90": 156,
+              "p99": 214
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 1555.5,
+                  "p75": 2885.25,
+                  "p90": 5209.900000000001,
+                  "p99": 24651.72000000006
+                },
+                "throughput": {
+                  "p50": 92,
+                  "p75": 124,
+                  "p90": 156,
+                  "p99": 214
+                },
+                "request_count": 160895
+              }
+            }
+          },
+          {
+            "name": "OpenAI | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.0000001",
+              "completion": "0.0000005",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000001",
+              "input_cache_write": "0.000000125",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.0000002",
+                  "completion": "0.00000075",
+                  "input_cache_read": "0.00000002",
+                  "input_cache_write": "0.00000025"
+                }
+              ]
+            },
+            "provider_name": "OpenAI",
+            "tag": "openai",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": 922000,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "seed",
+              "max_tokens",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 99.9607405468669,
+            "uptime_last_5m": 99.9912117528159,
+            "uptime_last_1d": 99.97426027521506,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search"
+              },
+              "openrouter:apply_patch": {
+                "type": "apply_patch"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2438,
+              "p75": 3984.75,
+              "p90": 7207.400000000009,
+              "p99": 37497.250000000095
+            },
+            "throughput_last_30m": {
+              "p50": 66,
+              "p75": 89,
+              "p90": 109,
+              "p99": 148
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2438,
+                  "p75": 3984.75,
+                  "p90": 7207.400000000009,
+                  "p99": 37497.250000000095
+                },
+                "throughput": {
+                  "p50": 66,
+                  "p75": 89,
+                  "p90": 109,
+                  "p99": 148
+                },
+                "request_count": 455558
+              }
+            }
+          },
+          {
+            "name": "Azure | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.0000001",
+              "completion": "0.0000005",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000001",
+              "input_cache_write": "0.000000125",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.0000002",
+                  "completion": "0.00000075",
+                  "input_cache_read": "0.00000002",
+                  "input_cache_write": "0.00000025"
+                }
+              ]
+            },
+            "provider_name": "Azure",
+            "tag": "azure",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": 922000,
+            "supported_parameters": [
+              "max_completion_tokens",
+              "reasoning",
+              "include_reasoning",
+              "seed",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 99.99185516150051,
+            "uptime_last_5m": 99.98583870282518,
+            "uptime_last_1d": 99.98990627078965,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search"
+              },
+              "openrouter:apply_patch": {
+                "type": "apply_patch"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 3308.5,
+              "p75": 5637.25,
+              "p90": 10004.300000000005,
+              "p99": 25727.260000000002
+            },
+            "throughput_last_30m": {
+              "p50": 75,
+              "p75": 126,
+              "p90": 158,
+              "p99": 216.09000000000015
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 3308.5,
+                  "p75": 5637.25,
+                  "p90": 10004.300000000005,
+                  "p99": 25727.260000000002
+                },
+                "throughput": {
+                  "p50": 75,
+                  "p75": 126,
+                  "p90": 158,
+                  "p99": 216.09000000000015
+                },
+                "request_count": 102699
+              }
+            }
+          },
+          {
+            "name": "Azure | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.00000011",
+              "completion": "0.00000055",
+              "web_search": "0.01",
+              "input_cache_read": "0.000000011",
+              "input_cache_write": "0.0000001375",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.00000022",
+                  "completion": "0.000000825",
+                  "input_cache_read": "0.000000022",
+                  "input_cache_write": "0.000000275"
+                }
+              ]
+            },
+            "provider_name": "Azure",
+            "tag": "azure/us",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_completion_tokens",
+              "reasoning",
+              "include_reasoning",
+              "seed",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 96.97370596990244,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search"
+              },
+              "openrouter:apply_patch": {
+                "type": "apply_patch"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 1255,
+              "p75": 1632.25,
+              "p90": 2559,
+              "p99": 10372.959999999988
+            },
+            "throughput_last_30m": {
+              "p50": 37,
+              "p75": 67,
+              "p90": 159,
+              "p99": 238
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 1255,
+                  "p75": 1632.25,
+                  "p90": 2559,
+                  "p99": 10372.959999999988
+                },
+                "throughput": {
+                  "p50": 37,
+                  "p75": 67,
+                  "p90": 159,
+                  "p99": 238
+                },
+                "request_count": 7840
+              }
+            }
+          },
+          {
+            "name": "Azure | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.00000011",
+              "completion": "0.00000055",
+              "web_search": "0.01",
+              "input_cache_read": "0.000000011",
+              "input_cache_write": "0.0000001375",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.00000022",
+                  "completion": "0.000000825",
+                  "input_cache_read": "0.000000022",
+                  "input_cache_write": "0.000000275"
+                }
+              ]
+            },
+            "provider_name": "Azure",
+            "tag": "azure/eu",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_completion_tokens",
+              "reasoning",
+              "include_reasoning",
+              "seed",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.99158806177726,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search"
+              },
+              "openrouter:apply_patch": {
+                "type": "apply_patch"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2489,
+              "p75": 4237.25,
+              "p90": 6879,
+              "p99": 16373.130000000016
+            },
+            "throughput_last_30m": {
+              "p50": 74,
+              "p75": 130,
+              "p90": 164,
+              "p99": 238
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2489,
+                  "p75": 4237.25,
+                  "p90": 6879,
+                  "p99": 16373.130000000016
+                },
+                "throughput": {
+                  "p50": 74,
+                  "p75": 130,
+                  "p90": 164,
+                  "p99": 238
+                },
+                "request_count": 4032
+              }
+            }
+          },
+          {
+            "name": "Amazon Bedrock | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.00000011",
+              "completion": "0.00000055",
+              "web_search": "0.01",
+              "input_cache_read": "0.000000011",
+              "input_cache_write": "0.0000001375",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.00000022",
+                  "completion": "0.000000825",
+                  "input_cache_read": "0.000000022",
+                  "input_cache_write": "0.000000275"
+                }
+              ]
+            },
+            "provider_name": "Amazon Bedrock",
+            "tag": "amazon-bedrock/us-east-1",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": 922000,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "tools",
+              "tool_choice",
+              "response_format",
+              "structured_outputs",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": null,
+            "uptime_last_1d": 99.55261114717375,
+            "supports_implicit_caching": true,
+            "native_tools": {},
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 3596,
+              "p75": 7297,
+              "p90": 19135.800000000003,
+              "p99": 64912.33999999999
+            },
+            "throughput_last_30m": {
+              "p50": 99,
+              "p75": 130,
+              "p90": 147,
+              "p99": 174.26
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 3596,
+                  "p75": 7297,
+                  "p90": 19135.800000000003,
+                  "p99": 64912.33999999999
+                },
+                "throughput": {
+                  "p50": 99,
+                  "p75": 130,
+                  "p90": 147,
+                  "p99": 174.26
+                },
+                "request_count": 1675
+              }
+            }
+          },
+          {
+            "name": "OpenAI | openai/gpt-6-luna-20260922",
+            "model_id": "openai/gpt-6-luna",
+            "model_name": "OpenAI: GPT-6 Luna",
+            "context_length": 1050000,
+            "pricing": {
+              "prompt": "0.0000002",
+              "completion": "0.000001",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000002",
+              "input_cache_write": "0.00000025",
+              "discount": 0,
+              "overrides": [
+                {
+                  "min_prompt_tokens": 272000,
+                  "prompt": "0.0000004",
+                  "completion": "0.0000015",
+                  "input_cache_read": "0.00000004",
+                  "input_cache_write": "0.0000005"
+                }
+              ]
+            },
+            "provider_name": "OpenAI",
+            "tag": "openai/fast",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": 922000,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "seed",
+              "max_tokens",
+              "response_format",
+              "structured_outputs",
+              "tools",
+              "tool_choice",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": true,
+              "function": true
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.97495941223413,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search"
+              },
+              "openrouter:apply_patch": {
+                "type": "apply_patch"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2028,
+              "p75": 3010,
+              "p90": 4472,
+              "p99": 10880.260000000002
+            },
+            "throughput_last_30m": {
+              "p50": 120,
+              "p75": 150,
+              "p90": 175,
+              "p99": 210.09000000000015
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2028,
+                  "p75": 3010,
+                  "p90": 4472,
+                  "p99": 10880.260000000002
+                },
+                "throughput": {
+                  "p50": 120,
+                  "p75": 150,
+                  "p90": 175,
+                  "p99": 210.09000000000015
+                },
+                "request_count": 13942
+              }
+            }
+          }
+        ]
+      }
+    },
+    "anthropic/claude-opus-5.5": {
+      "data": {
+        "id": "anthropic/claude-opus-5.5",
+        "name": "Anthropic: Claude Opus 5.5",
+        "created": 1790094732,
+        "description": "Claude Opus 5.5 is Anthropic's flagship model for demanding reasoning, coding, and long-horizon agentic work, succeeding Claude Opus 5. It is particularly strong at multi-step changes in large codebases, code...",
+        "architecture": {
+          "tokenizer": "Claude",
+          "instruct_type": null,
+          "modality": "text+image+file->text",
+          "input_modalities": [
+            "text",
+            "image",
+            "file"
+          ],
+          "output_modalities": [
+            "text"
+          ]
+        },
+        "endpoints": [
+          {
+            "name": "Amazon Bedrock | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000004",
+              "completion": "0.00002",
+              "web_search": "0.01",
+              "input_cache_read": "0.0000002",
+              "input_cache_write": "0.000005",
+              "input_cache_write_1h": "0.000008",
+              "discount": 0
+            },
+            "provider_name": "Amazon Bedrock",
+            "tag": "amazon-bedrock",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "stop",
+              "tool_choice",
+              "tools",
+              "response_format",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 99.82609535771219,
+            "uptime_last_5m": 99.72948602344455,
+            "uptime_last_1d": 99.8073229484013,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4389,
+              "p75": 5822.5,
+              "p90": 12499.400000000003,
+              "p99": 24617.920000000013
+            },
+            "throughput_last_30m": {
+              "p50": 62,
+              "p75": 76,
+              "p90": 88,
+              "p99": 105
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4389,
+                  "p75": 5822.5,
+                  "p90": 12499.400000000003,
+                  "p99": 24617.920000000013
+                },
+                "throughput": {
+                  "p50": 62,
+                  "p75": 76,
+                  "p90": 88,
+                  "p99": 105
+                },
+                "request_count": 23545
+              }
+            }
+          },
+          {
+            "name": "Azure | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000004",
+              "completion": "0.00002",
+              "web_search": "0.01",
+              "input_cache_read": "0.0000002",
+              "input_cache_write": "0.000005",
+              "input_cache_write_1h": "0.000008",
+              "discount": 0
+            },
+            "provider_name": "Azure",
+            "tag": "azure/global",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "structured_outputs",
+              "max_tokens",
+              "temperature",
+              "max_completion_tokens",
+              "tools",
+              "tool_choice",
+              "response_format",
+              "verbosity",
+              "stop",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": null,
+            "uptime_last_1d": 99.99340238833541,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4419,
+              "p75": 5086.5,
+              "p90": 5573.5,
+              "p99": 7591.040000000001
+            },
+            "throughput_last_30m": {
+              "p50": 60,
+              "p75": 78.75,
+              "p90": 86,
+              "p99": 107.31
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4419,
+                  "p75": 5086.5,
+                  "p90": 5573.5,
+                  "p99": 7591.040000000001
+                },
+                "throughput": {
+                  "p50": 60,
+                  "p75": 78.75,
+                  "p90": 86,
+                  "p99": 107.31
+                },
+                "request_count": 270
+              }
+            }
+          },
+          {
+            "name": "Google | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000004",
+              "completion": "0.00002",
+              "web_search": "0.01",
+              "input_cache_read": "0.0000002",
+              "input_cache_write": "0.000005",
+              "input_cache_write_1h": "0.000008",
+              "discount": 0
+            },
+            "provider_name": "Google",
+            "tag": "google-vertex/global",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_tokens",
+              "stop",
+              "reasoning",
+              "include_reasoning",
+              "tool_choice",
+              "tools",
+              "response_format",
+              "verbosity",
+              "structured_outputs",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.96247360061439,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 3794,
+              "p75": 7559.5,
+              "p90": 14653.400000000009,
+              "p99": 22947.300000000003
+            },
+            "throughput_last_30m": {
+              "p50": 84,
+              "p75": 102,
+              "p90": 118,
+              "p99": 140
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 3794,
+                  "p75": 7559.5,
+                  "p90": 14653.400000000009,
+                  "p99": 22947.300000000003
+                },
+                "throughput": {
+                  "p50": 84,
+                  "p75": 102,
+                  "p90": 118,
+                  "p99": 140
+                },
+                "request_count": 3663
+              }
+            }
+          },
+          {
+            "name": "Claude Platform on AWS | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000004",
+              "completion": "0.00002",
+              "web_search": "0.01",
+              "input_cache_read": "0.0000002",
+              "input_cache_write": "0.000005",
+              "input_cache_write_1h": "0.000008",
+              "discount": 0
+            },
+            "provider_name": "Claude Platform on AWS",
+            "tag": "claude-on-aws",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_tokens",
+              "stop",
+              "reasoning",
+              "include_reasoning",
+              "tool_choice",
+              "tools",
+              "structured_outputs",
+              "response_format",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 99.95897665398672,
+            "uptime_last_5m": 99.85974754558204,
+            "uptime_last_1d": 99.94246336572388,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search_20260209"
+              },
+              "openrouter:web_fetch": {
+                "type": "web_fetch_20260209"
+              },
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              },
+              "openrouter:advisor": {
+                "type": "advisor_20260301"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4946,
+              "p75": 6195.75,
+              "p90": 8317,
+              "p99": 30873.980000000018
+            },
+            "throughput_last_30m": {
+              "p50": 60,
+              "p75": 79,
+              "p90": 94,
+              "p99": 122
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4946,
+                  "p75": 6195.75,
+                  "p90": 8317,
+                  "p99": 30873.980000000018
+                },
+                "throughput": {
+                  "p50": 60,
+                  "p75": 79,
+                  "p90": 94,
+                  "p99": 122
+                },
+                "request_count": 26794
+              }
+            }
+          },
+          {
+            "name": "Anthropic | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000004",
+              "completion": "0.00002",
+              "web_search": "0.01",
+              "input_cache_read": "0.0000002",
+              "input_cache_write": "0.000005",
+              "input_cache_write_1h": "0.000008",
+              "discount": 0
+            },
+            "provider_name": "Anthropic",
+            "tag": "anthropic",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_tokens",
+              "stop",
+              "reasoning",
+              "include_reasoning",
+              "tool_choice",
+              "tools",
+              "structured_outputs",
+              "response_format",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 99.93212285762769,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.93936523924421,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search_20260209"
+              },
+              "openrouter:web_fetch": {
+                "type": "web_fetch_20260209"
+              },
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              },
+              "openrouter:advisor": {
+                "type": "advisor_20260301"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4736.5,
+              "p75": 6404.25,
+              "p90": 9375.900000000001,
+              "p99": 32995.93000000001
+            },
+            "throughput_last_30m": {
+              "p50": 67,
+              "p75": 85,
+              "p90": 100,
+              "p99": 127
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4736.5,
+                  "p75": 6404.25,
+                  "p90": 9375.900000000001,
+                  "p99": 32995.93000000001
+                },
+                "throughput": {
+                  "p50": 67,
+                  "p75": 85,
+                  "p90": 100,
+                  "p99": 127
+                },
+                "request_count": 14138
+              }
+            }
+          },
+          {
+            "name": "Amazon Bedrock | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.0000044",
+              "completion": "0.000022",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000022",
+              "input_cache_write": "0.0000055",
+              "input_cache_write_1h": "0.0000088",
+              "discount": 0
+            },
+            "provider_name": "Amazon Bedrock",
+            "tag": "amazon-bedrock/eu-west-1",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "stop",
+              "tool_choice",
+              "tools",
+              "response_format",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.9656986050766,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 3671.5,
+              "p75": 4614.25,
+              "p90": 5368.700000000001,
+              "p99": 11668.45
+            },
+            "throughput_last_30m": {
+              "p50": 68,
+              "p75": 80,
+              "p90": 92.60000000000002,
+              "p99": 116.29000000000002
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 3671.5,
+                  "p75": 4614.25,
+                  "p90": 5368.700000000001,
+                  "p99": 11668.45
+                },
+                "throughput": {
+                  "p50": 68,
+                  "p75": 80,
+                  "p90": 92.60000000000002,
+                  "p99": 116.29000000000002
+                },
+                "request_count": 258
+              }
+            }
+          },
+          {
+            "name": "Amazon Bedrock | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.0000044",
+              "completion": "0.000022",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000022",
+              "input_cache_write": "0.0000055",
+              "input_cache_write_1h": "0.0000088",
+              "discount": 0
+            },
+            "provider_name": "Amazon Bedrock",
+            "tag": "amazon-bedrock/us-east-1",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "max_tokens",
+              "stop",
+              "tool_choice",
+              "tools",
+              "response_format",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": null,
+            "uptime_last_1d": 99.860302677532,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4236,
+              "p75": 4871.75,
+              "p90": 5913.5,
+              "p99": 12271.250000000007
+            },
+            "throughput_last_30m": {
+              "p50": 65,
+              "p75": 78,
+              "p90": 88,
+              "p99": 106.55000000000001
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4236,
+                  "p75": 4871.75,
+                  "p90": 5913.5,
+                  "p99": 12271.250000000007
+                },
+                "throughput": {
+                  "p50": 65,
+                  "p75": 78,
+                  "p90": 88,
+                  "p99": 106.55000000000001
+                },
+                "request_count": 146
+              }
+            }
+          },
+          {
+            "name": "Azure | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.0000044",
+              "completion": "0.000022",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000022",
+              "input_cache_write": "0.0000055",
+              "input_cache_write_1h": "0.0000088",
+              "discount": 0
+            },
+            "provider_name": "Azure",
+            "tag": "azure/us",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "reasoning",
+              "include_reasoning",
+              "structured_outputs",
+              "max_tokens",
+              "temperature",
+              "max_completion_tokens",
+              "tools",
+              "tool_choice",
+              "response_format",
+              "verbosity",
+              "stop",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": null,
+            "uptime_last_5m": null,
+            "uptime_last_1d": null,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 1432.5,
+              "p75": 1907.25,
+              "p90": 2561.1000000000004,
+              "p99": 2953.4099999999994
+            },
+            "throughput_last_30m": {
+              "p50": 13.5,
+              "p75": 17,
+              "p90": 22.4,
+              "p99": 25.639999999999993
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 1432.5,
+                  "p75": 1907.25,
+                  "p90": 2561.1000000000004,
+                  "p99": 2953.4099999999994
+                },
+                "throughput": {
+                  "p50": 13.5,
+                  "p75": 17,
+                  "p90": 22.4,
+                  "p99": 25.639999999999993
+                },
+                "request_count": 4
+              }
+            }
+          },
+          {
+            "name": "Google | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.0000044",
+              "completion": "0.000022",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000022",
+              "input_cache_write": "0.0000055",
+              "input_cache_write_1h": "0.0000088",
+              "discount": 0
+            },
+            "provider_name": "Google",
+            "tag": "google-vertex/us",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_tokens",
+              "stop",
+              "reasoning",
+              "include_reasoning",
+              "tool_choice",
+              "tools",
+              "response_format",
+              "verbosity",
+              "structured_outputs",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": null,
+            "uptime_last_5m": null,
+            "uptime_last_1d": 100,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 4547,
+              "p75": 4952.5,
+              "p90": 5195.799999999999,
+              "p99": 5341.78
+            },
+            "throughput_last_30m": {
+              "p50": 40.5,
+              "p75": 45.25,
+              "p90": 48.1,
+              "p99": 49.81
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 4547,
+                  "p75": 4952.5,
+                  "p90": 5195.799999999999,
+                  "p99": 5341.78
+                },
+                "throughput": {
+                  "p50": 40.5,
+                  "p75": 45.25,
+                  "p90": 48.1,
+                  "p99": 49.81
+                },
+                "request_count": 2
+              }
+            }
+          },
+          {
+            "name": "Google | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.0000044",
+              "completion": "0.000022",
+              "web_search": "0.01",
+              "input_cache_read": "0.00000022",
+              "input_cache_write": "0.0000055",
+              "input_cache_write_1h": "0.0000088",
+              "discount": 0
+            },
+            "provider_name": "Google",
+            "tag": "google-vertex/europe",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_tokens",
+              "stop",
+              "reasoning",
+              "include_reasoning",
+              "tool_choice",
+              "tools",
+              "response_format",
+              "verbosity",
+              "structured_outputs",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.77936014441882,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2923,
+              "p75": 3607,
+              "p90": 4425.400000000003,
+              "p99": 16160.260000000004
+            },
+            "throughput_last_30m": {
+              "p50": 84,
+              "p75": 97.5,
+              "p90": 111.40000000000003,
+              "p99": 128
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2923,
+                  "p75": 3607,
+                  "p90": 4425.400000000003,
+                  "p99": 16160.260000000004
+                },
+                "throughput": {
+                  "p50": 84,
+                  "p75": 97.5,
+                  "p90": 111.40000000000003,
+                  "p99": 128
+                },
+                "request_count": 239
+              }
+            }
+          },
+          {
+            "name": "Anthropic | anthropic/claude-opus-5.5-20260921",
+            "model_id": "anthropic/claude-opus-5.5",
+            "model_name": "Anthropic: Claude Opus 5.5",
+            "context_length": 1000000,
+            "pricing": {
+              "prompt": "0.000008",
+              "completion": "0.00004",
+              "web_search": "0.01",
+              "input_cache_read": "0.0000004",
+              "input_cache_write": "0.00001",
+              "input_cache_write_1h": "0.000016",
+              "discount": 0
+            },
+            "provider_name": "Anthropic",
+            "tag": "anthropic/fast",
+            "quantization": "unknown",
+            "max_completion_tokens": 128000,
+            "max_prompt_tokens": null,
+            "supported_parameters": [
+              "max_tokens",
+              "stop",
+              "reasoning",
+              "include_reasoning",
+              "tool_choice",
+              "tools",
+              "structured_outputs",
+              "response_format",
+              "verbosity",
+              "reasoning_effort"
+            ],
+            "supports_tool_choice": {
+              "none": true,
+              "auto": true,
+              "required": false,
+              "function": false
+            },
+            "status": 0,
+            "uptime_last_30m": 100,
+            "uptime_last_5m": 100,
+            "uptime_last_1d": 99.98395035309223,
+            "supports_implicit_caching": false,
+            "native_tools": {
+              "openrouter:web_search": {
+                "type": "web_search_20260209"
+              },
+              "openrouter:web_fetch": {
+                "type": "web_fetch_20260209"
+              },
+              "openrouter:bash": {
+                "type": "bash_20250124"
+              },
+              "openrouter:advisor": {
+                "type": "advisor_20260301"
+              }
+            },
+            "supports_voice_cloning": false,
+            "supports_multiple_audio_references": false,
+            "supports_image_reference": false,
+            "latency_last_30m": {
+              "p50": 2279,
+              "p75": 3926.5,
+              "p90": 6253.1,
+              "p99": 33574.33
+            },
+            "throughput_last_30m": {
+              "p50": 138,
+              "p75": 207,
+              "p90": 249,
+              "p99": 301.3800000000001
+            },
+            "perf_last_30m_by_workload": {
+              "text_generation": {
+                "latency": {
+                  "p50": 2279,
+                  "p75": 3926.5,
+                  "p90": 6253.1,
+                  "p99": 33574.33
+                },
+                "throughput": {
+                  "p50": 138,
+                  "p75": 207,
+                  "p90": 249,
+                  "p99": 301.3800000000001
+                },
+                "request_count": 1582
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "provenance": "Exact V20 authenticated catalogue/endpoint shapes; offline fixture, not dispatch authority"
+}

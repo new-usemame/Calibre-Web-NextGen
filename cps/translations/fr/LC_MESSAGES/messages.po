@@ -17238,8 +17238,8 @@ msgid "Unsupported pages"
 msgstr "Pages non prises en charge"
 
 #: cps/spa_strings.py
-msgid "Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
-msgstr "Facultatif. La conversion du document source ne nécessite pas de clé fournisseur. Lorsqu’elle est disponible, la révision de la mise en forme par IA utilise les propositions de Luna et les approbations de Terra via OpenRouter openai/flex, avec un devis et un consentement explicite pour chaque tâche. La clé est stockée chiffrée et n’est jamais réaffichée."
+msgid "Optional. Source conversion needs no provider key. When available, AI page layout uses OpenRouter, checks proposed changes against the source, and requires an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
+msgstr "Facultatif. La conversion du document source ne nécessite pas de clé fournisseur. Lorsqu’elle est disponible, la mise en page par IA utilise OpenRouter, vérifie les modifications proposées par rapport au document source et nécessite un devis et un consentement explicite pour chaque tâche. La clé est stockée chiffrée et n’est jamais réaffichée."
 
 #: cps/spa_strings.py
 msgid "Models requested"
@@ -17416,3 +17416,23 @@ msgstr "Les pages échantillonnées n’ont pas été évaluées."
 #: cps/spa_strings.py
 msgid "The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one."
 msgstr "Les pages échantillonnées contiennent très peu de texte. Il peut s’agir d’un scan clairsemé ou de deux pages imprimées photographiées ensemble."
+
+#: cps/spa_strings.py
+msgid "AI page layout"
+msgstr "Mise en page par IA"
+
+#: cps/spa_strings.py
+msgid "Luna proposes and reviews page layout over locked source words. Opus checks split-word hyphens. Pages that do not pass the checks keep the source conversion."
+msgstr "Luna propose et vérifie la mise en page en conservant les mots de la source. Opus vérifie les traits d’union des mots coupés. Les pages qui échouent aux vérifications conservent la conversion source."
+
+#: cps/spa_strings.py
+msgid "I authorize Luna layout proposals and reviews, and Opus hyphen checks, through OpenRouter, up to {amount} for this job. Unapproved pages keep the source conversion."
+msgstr "J’autorise les propositions et vérifications de mise en page par Luna et les vérifications des traits d’union par Opus via OpenRouter, jusqu’à {amount} pour cette tâche. Les pages non approuvées conservent la conversion source."
+
+#: cps/spa_strings.py
+msgid "AI can propose paragraph grouping, reading order and formatting over the preserved source. Checked layouts become the page output; other pages keep the source conversion. Original images, notes and uncertainty evidence remain available."
+msgstr "L’IA peut proposer le regroupement des paragraphes, l’ordre de lecture et la mise en forme à partir de la source conservée. Les mises en page vérifiées sont appliquées ; les autres pages conservent la conversion source. Les images originales, les notes et les éléments signalant une incertitude restent accessibles."
+
+#: cps/spa_strings.py
+msgid "This conservative ceiling includes layout proposals, reviews, reading-order checks and split-word checks without cache reuse. It is not an expected bill or money already held. Your cap limits new requests."
+msgstr "Ce plafond prudent comprend les propositions de mise en page, les vérifications, les contrôles de l’ordre de lecture et des mots coupés, sans réutilisation du cache. Ce n’est ni une facture prévue ni un montant déjà réservé. Votre limite plafonne les nouvelles requêtes."

@@ -536,3 +536,23 @@ def test_chart_top_grows_only_to_measured_ink_below_prior_figure():
     raw.blocks = []
     skeleton._complete_captioned_scan_top(raw, skel, Probe())
     assert ordinary.bbox[1] == 45
+
+
+def test_uncertain_band_caption_is_not_drawn_twice_when_inside_chart():
+    # Same source coordinates as a captioned scan: one caption is in its
+    # chart raster; the neighboring chart ends just above its own caption.
+    figure = assemble.Element('fig', pno=0, bbox=(20, 40, 400, 320))
+    caption = assemble.Element('caption', pno=0, bbox=(100, 305, 250, 315),
+        runs=[['t', 'Unverified caption']], caption_uncertain=True)
+    book = assemble.Book(elements=[figure, caption], pages={0: [figure, caption]},
+        figures=[{'pno': 0, 'bbox': figure.bbox, 'found': 'scan_figure_band'}])
+    html = build_epub.page_fragment(book, 0)
+    assert 'fig_p0000_0' in html
+    assert 'original_p0000_caption_0.jpg' not in html
+    assert 'original-p0000.xhtml#caption_0' in html
+    assert 'without searchable text' in html
+    assert 'Unverified caption' not in html
+    # Partial overlap cannot establish that the whole caption is in the raster.
+    figure.bbox = (20, 40, 400, 310)
+    book.figures[0]['bbox'] = figure.bbox
+    assert 'original_p0000_caption_0.jpg' in build_epub.page_fragment(book, 0)

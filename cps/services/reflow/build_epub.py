@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.34"
+CONVERTER_VERSION = "1.35"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -68,6 +68,12 @@ _TOKEN = re.compile(r"<\s*(/?)\s*([A-Za-z][A-Za-z0-9]*)([^>]*?)(/?)\s*>", re.S)
 _SPLIT_HEADING = re.compile(r"^<h([%s])\b" % "".join(str(x) for x in SPLIT_LEVELS), re.I)
 _PARAGRAPH = re.compile(r"^<p[\s>]", re.I)
 _ASIDE = re.compile(r"^<aside[\s>]", re.I)
+# Only the compiler's canonical bound-note DIV joins the note channel. Other
+# native DIVs keep their prior body semantics; source validation happens before
+# this publication classification.
+_BOUND_NOTE_DIV = re.compile(
+    r'^<div\b(?=[^>]*\sid="layout-p[0-9]+-[0-9a-f]{64}-note-a[0-9]+")'
+    r'(?=[^>]*\sclass="footnote")(?=[^>]*\sepub:type="footnote")[^>]*>', re.I)
 _SOURCE_NOTICE = re.compile(r'^<p\b[^>]*\bclass="[^"]*\bsource-evidence-notice\b', re.I)
 _LEADING_NOTICE = re.compile(r'^<(?:p|div)\b[^>]*\bclass="[^"]*\bsource-evidence-notice\b', re.I)
 _INLINE_PAGE_ID = re.compile(r'\bid="pg_(\d{4,})"')
@@ -91,7 +97,9 @@ h1, h2, h3, h4, h5, h6 { text-align: left; page-break-after: avoid; }
 p { margin: 0; text-indent: 1.2em; }
 p.first, h1 + p, h2 + p, h3 + p, blockquote + p { text-indent: 0; }
 blockquote { margin: 1em 2em; font-size: 0.95em; }
-aside.footnote { font-size: 0.85em; margin: 0.4em 0; }
+aside.footnote, div.footnote, aside.source-note-unbound { font-size: 0.85em; margin: 0.4em 0; }
+.reflow-retained-furniture { margin: 1em 0; padding: 0.5em 0; font-size: 0.85em; text-align: left; border-top: 1px solid currentColor; border-bottom: 1px solid currentColor; }
+.reflow-retained-furniture p { text-indent: 0; }
 a.noteref { text-decoration: none; }
 sup.noteref-unresolved { color: inherit; }
 /* A word the scan damaged. The page's own reading is what is printed here; the
@@ -108,6 +116,17 @@ img { max-width: 100%; }
 .source-pages li { display: inline-block; width: 9em; }
 .source-pages a { display: block; padding: 0.35em 0.25em; }
 .source-evidence img { width: 100%; height: auto; }
+"""
+from .source_reading_display import glyph_stylesheet
+STYLESHEET += glyph_stylesheet()+"\n"
+from .glyph_presentation import stylesheet as glyph_presentation_stylesheet
+STYLESHEET += glyph_presentation_stylesheet()
+STYLESHEET += ".source-reading-annotation { font-size:1em; font-style:normal; border-bottom:1px dotted currentColor; }\n"
+STYLESHEET += """\
+.source-control, .source-reading-annotation a { display:inline-block; min-height:1.75em; padding:0.5em 0.7em; line-height:1.5; text-indent:0; text-align:left; border:1px solid currentColor; margin:0.25em 0; }
+.source-inspection-controls { text-align:left; margin:0.5em 0; }
+.source-inspection-controls ol { padding-left:1.5em; }
+.source-inspection-controls a { display:block; }
 """
 
 
@@ -159,12 +178,14 @@ def _caption_keys(elements):
     return keys
 
 
-def _source_caption(pno, key):
-    return ('<span class="reflow-uncertain"><img src="images/original_p%04d_%s.jpg" alt="Original printed caption"/>'
-            '<br/>Caption transcription uncertain; the original printed caption '
-            'is shown as an image, without searchable text. '
+def _source_caption(pno, key, *, within_figure=False):
+    image = ('' if within_figure else
+             '<img src="images/original_p%04d_%s.jpg" alt="Original printed caption"/><br/>' % (pno, key))
+    placement = 'in the figure above' if within_figure else 'as an image'
+    return ('<span class="reflow-uncertain">%sCaption transcription uncertain; '
+            'the original printed caption is shown %s, without searchable text. '
             '<a href="original-p%04d.xhtml#%s">Inspect original printed caption</a>.</span>'
-            % (pno, key, pno, key))
+            % (image, placement, pno, key))
 
 
 def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
@@ -187,6 +208,8 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         element = elements[index]
         index += 1
         if element.kind == "fig":
+            if element_blocks is not None:
+                element_blocks[element_index] = len(blocks)
             caption = ""
             source_caption = ""
             if index < len(elements) and elements[index].kind == "caption":
@@ -194,11 +217,21 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                     _source_nav_marks(navigation,pno,index,None),
                     available, ref_ids, ambiguous)
                 if elements[index].caption_uncertain:
-                    caption = _source_caption(pno, caption_keys[index])
+                    caption_box = elements[index].bbox
+                    figure_box = element.bbox
+                    within_figure = bool(figure_box and caption_box and
+                        figure_box[0] <= caption_box[0] and figure_box[1] <= caption_box[1]
+                        and figure_box[2] >= caption_box[2] and figure_box[3] >= caption_box[3])
+                    caption = _source_caption(pno, caption_keys[index], within_figure=within_figure)
                     source_caption = caption
                 index += 1
             figures = [f for f in book.figures if f["pno"] == pno]
             reason = figures[figure_index].get("found") if figure_index < len(figures) else ""
+            if caption and figure_index < len(figures):
+                from .visual_coverage import VERSION as coverage_version, REGION_VERSION
+                if figures[figure_index].get('visual_evidence', {}).get('version') in (coverage_version, REGION_VERSION):
+                    # Coverage preserves adjacent source captions as well as pixels.
+                    source_caption = caption
             if source_caption and reason in ('sparse_scan_spread_panel',
                     'unrecovered_scan_layer', 'unverified_paired_columns'):
                 caption_box = elements[index-1].bbox
@@ -207,8 +240,12 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                         figure_box[0] <= caption_box[0] and figure_box[1] <= caption_box[1]
                         and figure_box[2] >= caption_box[2] and figure_box[3] >= caption_box[3]):
                     source_caption = ''
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel")
-            if reason == "native_outline_conflict":
+            source_region = reason in ("source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel")
+            if reason == "source_visual_table":
+                caption = ('Original table · Cell text and associations are retained together '
+                           'as source pixels; no searchable table transcription is claimed. '
+                           '<a href="original-p%04d.xhtml#figure_%d">View larger</a>' % (pno, figure_index))
+            elif reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
                            'transcription was inferred. '
@@ -252,7 +289,19 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                            'View larger</a>' % pno)
             if source_caption and source_region:
                 caption = source_caption + ' ' + caption
-            blocks.append(_figure_html(pno, figure_index, caption, source_region=source_region))
+            figure = figures[figure_index] if figure_index < len(figures) else {}
+            if (reason in ('ocr_uncertain_region', 'native_spacing_uncertain') and not figure.get('full_page')
+                    and not figure.get('visual_evidence') and not source_caption
+                    and not (index > element_index + 1)):
+                # This is a display projection of an existing source crop, not
+                # a paragraph decision or a transcription. The model keeps the
+                # complete pixel atom and chooses its role against the raster.
+                image = _figure_html(pno, figure_index, '', source_region=True)
+                image = re.search(r'<img\b[^>]*>', image).group(0)
+                blocks.append('<p><span class="source-raster">' + image + '</span></p>')
+                blocks.append('<p class="source-evidence-notice">' + caption + '</p>')
+            else:
+                blocks.append(_figure_html(pno, figure_index, caption, source_region=source_region))
             figure_index += 1
             continue
         if wrappers and element_index in wrappers:
@@ -312,9 +361,15 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         if element.punctuation_uncertain:
             blocks.append(_punctuation_notice(pno, element_index))
 
-    for note in notes:
-        blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous,
-            [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)]))
+    for note_index, note in enumerate(notes):
+        aside = _aside_html(note, ref_ids, available, str(note.num) in ambiguous,
+            [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)])
+        arrivals = ''.join('<span id="%s"></span>%s' % (link['id'], _pdf_return(link['id']))
+                           for link in navigation if link['dest_page'] == pno
+                           and link.get('dest_note') == note_index)
+        if arrivals:
+            aside = aside.replace('<p>', '<p>' + arrivals, 1)
+        blocks.append(aside)
     if any(r[0]=="glyph" for el in elements for r in el.runs) or any(getattr(n,"glyph_fallback",False) for n in notes):
         blocks.append(_source_check_notice('Words/glyphs uncertain',
             'original-p%04d.xhtml#page' % pno, 'View original page'))
@@ -330,44 +385,118 @@ def _source_nav_marks(navigation, pno, element_index, item_index):
     for link in navigation:
         if link['pno'] == pno and link['source_element'] == element_index \
                 and link['source_item'] == item_index:
+            marks.append((link['source_offset'], 'anchor', _pdf_reference_id(link['id'])))
             marks.append((link['source_offset'], 'open', link['id']))
             marks.append((link['source_offset']+link['source_extent'], 'close', link['id']))
         if link['dest_page'] == pno and link['dest_element'] == element_index \
                 and link['dest_item'] == item_index:
             marks.append((link['dest_offset'], 'anchor', link['id']))
+            marks.append((link['dest_offset'], 'return', link['id']))
     return marks
+
+
+def _pdf_reference_id(ident):
+    return 'pdfref_' + ident.removeprefix('pdfgoto_')
+
+
+def _pdf_return(ident):
+    return ('<a class="pdf-return" href="#%s" aria-label="Return to PDF reference" '
+            'title="Return to PDF reference">↩</a>' % _pdf_reference_id(ident))
 
 
 def _nav_runs_html(runs, marks, available, ref_ids, ambiguous):
     if not marks:
         return _runs_html(runs, available, ref_ids, ambiguous)
+    # Navigation is bound against Element.text (plain_text), while the renderer
+    # retains the original run whitespace. Translate those coordinates instead
+    # of applying normalized offsets to a different character stream.
+    values = [run[1] if run[0] in ('t', 'raised', 'glyph') else '[%s]' % run[1]
+              for run in runs]
+    raw = ''.join(values)
+    characters = [((' ' if len(m.group()) > 1 else m.group()), m.start(), m.end())
+                  for m in re.finditer(r'[^\S\n]{2,}|[\s\S]', raw)]
+    while characters and characters[0][0].isspace():characters.pop(0)
+    while characters and characters[-1][0].isspace():characters.pop()
+    atomic = []
+    position = 0
+    for run, value in zip(runs, values):
+        if run[0] != 't':atomic.append((position, position + len(value)))
+        position += len(value)
+
     events={}
     for offset, kind, ident in marks:
-        events.setdefault(offset, []).append((kind, ident))
-    output=[];position=0
+        if not 0 <= offset <= len(characters):
+            raise ValueError('PDF navigation offset beyond source text')
+        if kind == 'close' and offset:
+            mapped = characters[offset - 1][2]
+        else:
+            mapped = characters[offset][1] if offset < len(characters) else (
+                characters[-1][2] if characters else 0)
+        # Markers and source glyphs are indivisible. A target inside one lands
+        # immediately before it; an authored link covers the whole atom.
+        for start, end in atomic:
+            if start < mapped < end:
+                mapped = end if kind == 'close' else start
+                break
+        events.setdefault(mapped, []).append((kind, ident))
+    output=[];position=0;active=None;opened=None
+
+    def linked(ident):
+        nonlocal opened
+        if opened == ident:return
+        if opened is not None:output.append('</a>')
+        if ident is not None:output.append('<a href="#%s">' % ident)
+        opened = ident
+
     def emit(offset):
+        nonlocal active
         for kind, ident in sorted(events.get(offset, []),
-                                  key=lambda row: {'close':0,'anchor':1,'open':2}[row[0]]):
-            if kind == 'close':output.append('</a>')
-            elif kind == 'anchor':output.append('<span id="%s"></span>' % ident)
-            else:output.append('<a href="#%s">' % ident)
+                                  key=lambda row: {'close':0,'anchor':1,'return':2,'open':3}[row[0]]):
+            if kind == 'close':
+                if active != ident:raise ValueError('Unbalanced PDF navigation range')
+                active = None
+            elif kind == 'return':
+                linked(None)
+                output.append(_pdf_return(ident))
+            elif kind == 'anchor':
+                linked(None)
+                output.append('<span id="%s"></span>' % ident)
+            else:
+                if active is not None:raise ValueError('Overlapping PDF navigation ranges')
+                active = ident
+        if opened != active:linked(None)
     emit(0)
     for run in runs:
         size=(len(run[1]) if run[0] in ('t','raised','glyph')
               else len('[%s]' % run[1]))
-        if run[0] != 't' or not size:
+        if not size:continue
+        if run[0] != 't':
+            note_link = run[0] not in ('t', 'raised', 'glyph') and str(run[1]) in available
+            owns_link = note_link or run[0] == 'glyph'
+            linked(None if owns_link else active)
             output.append(_runs_html([run],available,ref_ids,ambiguous))
+            if owns_link and active is not None:
+                # The note/source image and PDF viewport are distinct actions.
+                # Keep the source atom once, with an adjacent named control for
+                # its PDF destination instead of nesting two anchors.
+                label = ('PDF destination for note %s' % str(run[1]) if note_link
+                         else 'PDF destination for source text')
+                output.append('<a class="source-navigation" href="#%s" '
+                              'aria-label="%s">↗</a>' % (active, escape(label)))
             position+=size;emit(position)
             continue
         run_start=position
         starts=[run_start]+sorted(p for p in events if run_start<p<run_start+size)+[run_start+size]
         for a,b in zip(starts,starts[1:]):
             part=list(run);part[1]=run[1][a-run_start:b-run_start]
+            linked(active)
             output.append(_runs_html([part],available,ref_ids,ambiguous))
             position=b;emit(position)
     if any(offset>position for offset in events):
         raise ValueError('PDF navigation offset beyond source text: %r, length %d, %r' %
                          (marks,position,assemble.plain_text(runs)[:100]))
+    if active is not None:raise ValueError('Unclosed PDF navigation range')
+    linked(None)
     return ''.join(output)
 
 
@@ -524,8 +653,62 @@ def split_blocks(html):
     return [b for b in blocks if b]
 
 
+# Only this post-admission factory shape is generated reading copy. It must not
+# decide source paragraph continuation, source headings or chapter titles.
+_READING_COPY = re.compile(r'<span class="source-reading-annotation" id="reading-return-reading-[a-f0-9]{64}">.*?</span>', re.S)
+
+
+def _reading_copy_parts(fragment):
+    parts=[];clean=[];cursor=0;length=0
+    for match in _READING_COPY.finditer(fragment):
+        clean.append(fragment[cursor:match.start()]);length+=match.start()-cursor
+        parts.append((length,match.group(0)));cursor=match.end()
+    clean.append(fragment[cursor:])
+    return ''.join(clean),parts
+
+
+def _merge_without_reading_copy(merger,left,right,marker,*args):
+    """Existing source-only merge, then restore generated copy by byte offsets.
+
+    The merger only concatenates inner trees and optionally consumes the known
+    trailing hyphen. Whole prefix/suffix equality proves both offset domains;
+    repeated strings never choose a location.
+    """
+    from .structural_ops import ContractError
+    clean_left,left_marks=_reading_copy_parts(left)
+    clean_right,right_marks=_reading_copy_parts(right)
+    result=merger(clean_left,clean_right,marker,*args)
+    opening=_open_tag(clean_left)
+    raw_tail=_inner(clean_left);tail=raw_tail.rstrip()
+    raw_head=_inner(clean_right);head=raw_head.lstrip()
+    closing='</'+re.match(r'<([A-Za-z0-9]+)',opening).group(1)+'>'
+    if not result.startswith(opening) or not result.endswith(head+closing):
+        raise ContractError('source merge frame differs while placing reading copy')
+    tail_start=len(opening);head_start=len(result)-len(closing)-len(head)
+    removed=None
+    if not result[tail_start:].startswith(tail):
+        match=_TRAILING_HYPHEN.search(tail)
+        if match is None:raise ContractError('source merge changed reading-copy coordinates')
+        removed=match.end(1)
+        transformed=_TRAILING_HYPHEN.sub(r"\1\2",tail)
+        if not result[tail_start:].startswith(transformed):
+            raise ContractError('source merge changed more than the admitted hyphen')
+    placed=[]
+    for offset,copy in left_marks:
+        local=min(max(0,offset-len(opening)),len(tail))
+        if removed is not None and local>removed:local-=1
+        placed.append((tail_start+local,copy))
+    trim=len(raw_head)-len(head)
+    for offset,copy in right_marks:
+        local=max(0,offset-len(_open_tag(clean_right))-trim)
+        placed.append((head_start+local,copy))
+    for offset,copy in sorted(placed,key=lambda x:x[0],reverse=True):
+        result=result[:offset]+copy+result[offset:]
+    return result
+
+
 def block_text(block):
-    return re.sub(r"\s+", " ", _TAG.sub(" ", block or "")).strip()
+    return re.sub(r"\s+", " ", _TAG.sub(" ", _READING_COPY.sub("", block or ""))).strip()
 
 
 def _is_paragraph(block):
@@ -533,7 +716,7 @@ def _is_paragraph(block):
 
 
 def _is_aside(block):
-    return bool(_ASIDE.match(block.strip()))
+    return bool(_ASIDE.match(block.strip()) or _BOUND_NOTE_DIV.match(block.strip()))
 
 
 def _inner(block):
@@ -550,6 +733,8 @@ def _open_tag(block):
 
 def merge_paragraphs(left, right, page_marker=""):
     """Join two paragraphs the way the typesetter's page turn joined them."""
+    if _READING_COPY.search(left+right):
+        return _merge_without_reading_copy(merge_paragraphs,left,right,page_marker)
     head = _inner(right).lstrip()
     tail = _inner(left).rstrip()
     plain = block_text(tail)
@@ -790,39 +975,100 @@ def _completed_index_entry_boundary(tail, head):
                 and re.search(r"[A-Za-z]", right[:first.start()]))
 
 
-def _join_page_turns(pages, title_pages=()):
-    """DIAGNOSIS B on the markup: the sentence, not the page, is the unit."""
+def _layout_flow_index(body, last):
+    from xml.etree import ElementTree as ET
+    from . import _layout_flow
+    def notice(fragment):
+        return _layout_flow.is_notice(ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+fragment+'</root>')[0])
+    indices = range(len(body)-1,-1,-1) if last else range(len(body))
+    return next((i for i in indices if not notice(body[i]) and
+        not body[i].startswith('<section class="reflow-retained-furniture"')), None)
+
+
+def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=None, executed=None):
+    """Use checked model seams for model pages, legacy seams for fallback pairs."""
     joined = 0
+    carriers = {}
     for index in range(1, len(pages)):
         previous, current = pages[index - 1], pages[index]
-        if previous['pno'] in title_pages or current['pno'] in title_pages:
+        model_owned = previous["pno"] in layout_pages or current["pno"] in layout_pages
+        decision = (layout_boundaries or {}).get(current["pno"]) if model_owned else None
+        if model_owned and (decision is None or current["pno"] != previous["pno"]+1):
             continue
-        if not previous["body"] or not current["body"]:
+        if not model_owned and (previous['pno'] in title_pages or current['pno'] in title_pages):
             continue
-        # Source warnings belong to their printed page, but a warning emitted
-        # after the final glyph can sit between the halves of one sentence.
-        # Move only trailing notices, and only after continuation is proven.
-        tail_index = len(previous["body"]) - 1
-        while tail_index >= 0 and _SOURCE_NOTICE.match(previous["body"][tail_index]):
-            tail_index -= 1
-        if tail_index < 0:
+        owner = carriers.get(previous['pno'], previous) if model_owned else previous
+        tail_index = _layout_flow_index(owner['body'], True) if model_owned else len(owner['body'])-1
+        head_index = _layout_flow_index(current['body'], False) if model_owned else 0
+        if not model_owned:
+            while tail_index >= 0 and _SOURCE_NOTICE.match(owner['body'][tail_index]):
+                tail_index -= 1
+            # Publication adds source warnings before the actual opening prose.
+            # Keep them visible, but do not mistake them for its first words.
+            while head_index < len(current['body']) and _LEADING_NOTICE.match(current['body'][head_index]):
+                head_index += 1
+        valid = (tail_index is not None and tail_index >= 0 and head_index is not None and
+                 head_index < len(current['body']))
+        if valid:
+            tail, head = owner['body'][tail_index], current['body'][head_index]
+            if model_owned:
+                from . import _layout_flow
+                tag = _layout_flow.CONTINUABLE.get(decision.get('role', 'paragraph'))
+                valid = tag is not None and all(re.match(r'^<' + tag + r'(?:\s|>)', b) for b in (tail, head))
+            else:
+                valid = _is_paragraph(tail) and _is_paragraph(head)
+        if not valid:
+            if model_owned:
+                from .structural_ops import ContractError
+                raise ContractError('emitted layout boundary is not the admitted paragraph seam')
             continue
-        tail, head = previous["body"][tail_index], current["body"][0]
-        if not (_is_paragraph(tail) and _is_paragraph(head)):
+        if not model_owned and (_completed_index_entry_boundary(tail, head) or
+                not assemble.continues(block_text(tail), block_text(head))):
             continue
-        if _completed_index_entry_boundary(tail, head):
-            continue
-        if not assemble.continues(block_text(tail), block_text(head)):
-            continue
-        # A previous-page footnote follows that page's body in the spine. Keep
-        # its page marker after the note instead of moving the marker ahead of it.
-        marker = current["anchor"] if not previous["asides"] else ""
-        previous["body"][tail_index] = merge_paragraphs(
-            tail, current["body"].pop(0), marker)
-        if marker:
-            current["anchor"] = ""
+        move_page_marker = not previous['asides']
+        # Earlier-page notes keep their print-page scope. Source evidence still
+        # needs a target at the passage moved into the preceding paragraph.
+        marker = current['anchor'] if move_page_marker else ''
+        if model_owned:
+            owner['body'][tail_index] = _merge_layout_paragraphs(tail, current['body'].pop(head_index), marker, decision['hyphen'], decision.get('role', 'paragraph'), decision.get('pixel_boundary', False))
+            if _layout_flow_index(current['body'], False) is None:
+                carriers[current['pno']] = owner
+            if executed is not None: executed.add(current['pno'])
+        else:
+            owner['body'][tail_index] = merge_paragraphs(tail, current['body'].pop(head_index), marker)
+        if not move_page_marker:
+            # Return to the joined paragraph, without inserting markup into a
+            # word that straddles the source boundary.
+            merged = owner['body'][tail_index]
+            opening = _open_tag(merged)
+            owner['body'][tail_index] = (opening + '<span id="source_return_%04d"></span>' % current['pno']
+                                        + merged[len(opening):])
+        if move_page_marker: current['anchor'] = ''
         joined += 1
     return joined
+
+
+def _merge_layout_paragraphs(left, right, marker, hyphen, role="paragraph", pixel_boundary=False):
+    """Apply only the recompiled source-bound decision, without spelling rules."""
+    from .structural_ops import ContractError
+    if _READING_COPY.search(left+right):
+        return _merge_without_reading_copy(_merge_layout_paragraphs,left,right,marker,hyphen,role,pixel_boundary)
+    tail, head = _inner(left).rstrip(), _inner(right).lstrip()
+    from . import _layout_flow
+    if pixel_boundary and (hyphen is not None or not (_layout_flow.raster_endpoint(left, True) or _layout_flow.raster_endpoint(right, False))):
+        raise ContractError('emitted protected raster endpoint differs')
+    if hyphen is not None:
+        if hyphen not in ('keep','drop') or not _TRAILING_HYPHEN.search(tail):
+            raise ContractError('emitted layout boundary differs from source hyphen')
+        if hyphen == 'drop': tail = _TRAILING_HYPHEN.sub(r"\1\2", tail)
+        glue = ''
+    else:
+        if block_text(tail).endswith('-') and not pixel_boundary:raise ContractError('unapproved boundary hyphen')
+        glue = ' '
+    from . import _layout_flow
+    tag = _layout_flow.CONTINUABLE.get(role)
+    if tag is None: raise ContractError('unsupported continuation role')
+    return "%s%s%s%s%s</%s>" % (_open_tag(left), tail, glue, marker, head, tag)
 
 
 def _opening_folio_before_heading(blocks):
@@ -955,7 +1201,11 @@ def _chapters(pages, title_pages=None, contents_pages=()):
             for pno in (int(found) for found in _INLINE_PAGE_ID.findall(block)):
                 if pno not in current.pages:
                     current.pages.append(pno)
-        if pending and current is not None:
+        if pending:
+            # Empty opening pages (or a blank after a title) still need a
+            # destination for the source-page map and explicit return links.
+            if current is None:
+                current = start("")
             current.blocks.append(pending)
             if page["pno"] not in current.pages:
                 current.pages.append(page["pno"])
@@ -1019,6 +1269,17 @@ def _page_homes(chapters):
                     except ValueError:                            # pragma: no cover
                         pass
     return homes
+
+
+def _source_return_targets(chapters):
+    """Resolve moved source passages in their actual emitted chapter."""
+    targets = {}
+    for chapter in chapters:
+        for block in chapter.blocks:
+            for ident in _ID.findall(block):
+                if re.fullmatch(r'source_return_\d+', ident):
+                    targets[int(ident.removeprefix('source_return_'))] = chapter.href + '#' + ident
+    return targets
 
 
 def _bind_links(chapters):
@@ -1217,7 +1478,7 @@ def _scan_key_white_margin_jpeg(doc, pno, bbox):
 
 
 def _figure_images(chapters, doc, book, package, figure_transform=None, owned_images=(),
-                   runtime_progress=None):
+                   runtime_progress=None, required_source_regions=()):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
 
     Each crop goes into ``package`` as it is cut (:class:`_Package`); what comes
@@ -1286,12 +1547,20 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
                 mask.append(transform(pno,note.bbox) if transform else note.bbox)
         if transform is not None:
             bbox = transform(pno, bbox)
+        from .visual_coverage import REGION_VERSION
+        table_source = figure.get('visual_evidence', {}).get('version') == REGION_VERSION
+        # The table gate above separately rebinds its supported reading frame.
+        if src in required_source_regions and not table_source and (geometry or tuple(bbox) != tuple(figure['bbox'])):
+            from .structural_ops import ContractError
+            raise ContractError('source region crop frame changed')
         ink_doc=render_doc
         if figure.get('needs_ink') and geometry.get('space')=='reading':
             ink_doc=SourceDisplay(doc,pno,dict(geometry,layer='ocr')).query_document(isolate=True)
         data = None
         try:
-            if figure.get("needs_ink") and not extract.region_has_ink(
+            # A source-bound unmatched-glyph obligation outranks the optional
+            # artwork threshold: sparse ink still needs its original pixels.
+            if src not in required_source_regions and figure.get("needs_ink") and not extract.region_has_ink(
                     ink_doc, pno, bbox, mask=mask):
                 blanks.append(src)
                 continue
@@ -1304,6 +1573,9 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
             else:
                 data = extract.crop_jpeg(render_doc, pno, bbox)
         except Exception as exc:                                  # pragma: no cover
+            if src in required_source_regions:
+                from .structural_ops import ContractError
+                raise ContractError('source region crop failed') from exc
             log.warning("reflow: figure %s could not be cropped: %s", src, exc)
             if figure.get("needs_ink"):
                 # Fail closed on the visible source, not on silence: when the
@@ -1445,7 +1717,7 @@ def _check_cancelled(should_stop):
 
 def _original_evidence(book, page_html, doc, package, figure_transform=None,
                        should_stop=None, progress=None, source_pages=None,
-                       runtime_progress=None):
+                       runtime_progress=None, reading_contexts=None, raw_pages=None):
     """Package original pixels, never a re-render of the extracted reading.
 
     Detail crops retain adjacent printed context; the full original page lets a
@@ -1457,9 +1729,25 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
     """
     evidence = {}
     recovered = {pno for pno, source in (source_pages or {}).items() if source.report()['uncertain']}
+    readings = {pno:source.report()['source_readings'] for pno,source in (source_pages or {}).items() if source.report().get('source_readings')}
     scanned = {pno for pno, source in (source_pages or {}).items()
                if json.loads(source.provenance_json).get('layer') == 'ocr'}
-    wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered or pno in scanned]
+    wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered or pno in scanned or pno in readings]
+    # Native figures need an inspection route even when their extraction has no
+    # uncertainty flag. Add navigation after layout admission; the model-owned
+    # figure, caption and source words remain unchanged.
+    native_figures = {}
+    inspectable_figures = {}
+    if doc is not None:
+        for pno, html in page_html.items():
+            figures = [(i, f) for i, f in enumerate(f for f in book.figures if f['pno'] == pno)
+                       if f.get('found') != 'embedded_source_mark'
+                       and 'images/fig_p%04d_%d.jpg' % (pno, i) in _IMG_SRC.findall(html)]
+            if figures:
+                inspectable_figures[pno] = figures
+                if pno not in wanted:
+                    native_figures[pno] = figures
+                    wanted.append(pno)
     for index, pno in enumerate(wanted):
         _check_cancelled(should_stop)
         if progress is not None:
@@ -1488,18 +1776,33 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 specs.append(('source_mark_%d' % figure_index,
                               'Original printed lettering and neighboring layout',
                               figure['bbox']))
-        if not specs and pno not in recovered and pno not in scanned and not book.needs_source_evidence(pno):
+        for figure_index, figure in inspectable_figures.get(pno, []):
+            specs.append(('figure_%d' % figure_index,
+                          'Original figure and neighboring context', figure['bbox']))
+        if not specs and pno not in recovered and pno not in scanned and pno not in readings and not book.needs_source_evidence(pno):
             continue
         if doc is None:
             raise ValueError("Original PDF required for uncertain source evidence on page %d" % pno)
         started = time.monotonic()
-        from .source_display import SourceDisplay, inspection_tiles
+        from .source_display import SourceDisplay, inspection_tiles, MAX_INSPECTION_TILES
         provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
         display = SourceDisplay(doc, pno, provenance)
+        def package_source_image(src, data):
+            if pno in native_figures:
+                package.image(src, data, store=True)
+            else:
+                package.image(src, data)
         full = "images/original_p%04d.jpg" % pno
-        package.image(full, display.source_image(scale=1.5, quality=85,
-                                                 lossless_candidate=True))
+        package_source_image(full, display.source_image(scale=1.5, quality=85,
+                                                        lossless_candidate=pno not in native_figures))
         details = []
+        for entry in readings.get(pno,{}).get('entries',[]):
+            src='images/original_p%04d_%s.jpg' % (pno,entry['id'])
+            pixels=display.jpeg(entry['occurrence']['crop_bbox'],scale=3,quality=90)
+            from .source_readings import sha
+            if sha(pixels)!=entry['occurrence']['crop_sha256']:raise ValueError('reading crop changed')
+            package_source_image(src,pixels)
+            details.append(dict(id=entry['id'],label='Source reading: '+entry['original'],src=src,reading=entry,reading_bbox=entry['occurrence']['crop_bbox']))
         page_rect = doc[pno].rect * doc[pno].derotation_matrix
         for key, label, box in specs:
             _check_cancelled(should_stop)
@@ -1520,12 +1823,17 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
-            package.image(src, display.source_image(reading_rect,
-                                                     lossless_candidate=True))
+            package_source_image(src, display.source_image(reading_rect,
+                                                            scale=2 if pno in native_figures else 3,
+                                                            lossless_candidate=pno not in native_figures))
             details.append({"id": key, "label": label, "src": src, "bbox": list(rect),
                             "reading_bbox": list(reading_rect)})
         from .source_display import grid_regions
-        grids = grid_regions(book, doc, pno, provenance, lambda: _check_cancelled(should_stop))
+        # These new native routes inspect an already-owned figure region; they
+        # need no raster grid inference. Preserve that analysis for the existing
+        # uncertain/source-evidence path, without scanning native photographs.
+        grids = ({} if pno in native_figures else
+                 grid_regions(book, doc, pno, provenance, lambda: _check_cancelled(should_stop)))
         for element_index, proof in grids.items():
             if element_index != proof['element_indices'][0]:continue
             key = "layout_%d" % element_index
@@ -1533,15 +1841,20 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             package.image(src, display.source_image(proof['reading_bbox'],
                                                      lossless_candidate=True))
             details.append({"id": key, "label": "Original layout and labels", "src": src, **proof})
-        if provenance.get('layer') == 'ocr' or any(
+        if pno in native_figures or provenance.get('layer') == 'ocr' or any(
                 f.get('found') in ('unrecovered_scan_layer','unverified_scan_layout','unverified_paired_columns') and f.get('pno') == pno
                 for f in book.figures):
-            for tile_index, tile in enumerate(inspection_tiles(display.rect)):
+            regions = ([d['reading_bbox'] for d in details if d['id'].startswith('figure_')]
+                       if pno in native_figures else [display.rect])
+            tiles = [tile for region in regions for tile in inspection_tiles(region)]
+            if len(tiles) > MAX_INSPECTION_TILES:
+                raise ValueError('source inspection exceeds tile count bound')
+            for tile_index, tile in enumerate(tiles):
                 _check_cancelled(should_stop)
                 key = "inspection_%d" % tile_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)
-                package.image(src, display.source_image(tile,
-                                                         lossless_candidate=True))
+                package_source_image(src, display.source_image(tile,
+                                                                lossless_candidate=pno not in native_figures))
                 details.append({"id": key, "label": "Original detail %d (row order)" % (tile_index + 1),
                     "src": src, "reading_bbox": list(tile), "displayed_pdf_bbox": list(display.source_rect(tile))})
         inspection = [d for d in details if d['id'].startswith('inspection_')]
@@ -1551,16 +1864,24 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 detail['inspection_ids'] = [d['id'] for d in inspection
                     if not (region & extract.pymupdf.Rect(d['reading_bbox'])).is_empty]
         evidence[pno] = {"page": pno, "href": "original-p%04d.xhtml" % pno,
+                         "presentation_version": "source-inspection-access-1",
                          "full": full, "details": details,
                          "orientation": display.angle, "source_rotation": doc[pno].rotation,
                          "reading_rect": list(display.rect),
                          "ambiguous_notes": sorted(ambiguous),
                          "bytes": package.images[package.aliases.get(full,full)] + sum(package.images[package.aliases.get(d["src"],d["src"])] for d in details),
                          "render_seconds": round(time.monotonic() - started, 4)}
+        if pno in readings:evidence[pno]['source_readings']=readings[pno]
         if pno in recovered:
             evidence[pno]['source_uncertainty'] = source_pages[pno].report()
         html = page_html[pno]
         href = evidence[pno]["href"]
+        for figure_index, _ in inspectable_figures.get(pno, []):
+            src = 'images/fig_p%04d_%d.jpg' % (pno, figure_index)
+            pattern = r'<img\b[^>]*\bsrc="' + re.escape(src) + r'"[^>]*/>'
+            html = re.sub(pattern, lambda m: '<a href="%s#figure_%d" '
+                          'aria-label="Inspect original figure and page details">%s</a>' %
+                          (href, figure_index, m.group(0)), html)
         if ambiguous:
             link = '<a href="%s#notes">Original printed notes and context</a>' % href
             html = ('<div class="source-evidence-notice"><p>Some note labels or associations '
@@ -1569,7 +1890,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             def note_link(match):
                 ident = _ID.search(match.group("attrs"))
                 if ident and ident.group(1).removeprefix("fn_") in ambiguous:
-                    return '<aside%s>%s<p>%s</p></aside>' % (
+                    return '<aside%s>%s<p class="source-evidence-notice">%s</p></aside>' % (
                         match.group("attrs"), match.group("inner"), link)
                 return match.group(0)
             html = _NOTE_ASIDE.sub(note_link, html)
@@ -1580,6 +1901,10 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             if ambiguous:
                 notices.append('<p class="source-evidence-notice">Some note labels or associations '
                                'are uncertain. %s.</p>' % link)
+            if pno in readings:
+                target=readings[pno]['entries'][0]['id']
+                notice=_source_check_notice('Alternative source readings; original text retained', '%s#%s' % (href,target), 'Inspect all proposed readings', uncertain=True)
+                notices.append(notice);html=notice+'\n'+html
             if pno in recovered:
                 notice = _source_check_notice('OCR uncertain',
                     '%s#page' % href, 'View original page', uncertain=True)
@@ -1602,6 +1927,22 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                           '<figcaption><a href="%s#%s">Inspect original layout and page details</a></figcaption></figure>'
                           '<p class="source-evidence-notice">OCR transcription. Read the original above for the layout and labels.</p>' % (src, href, key))
                 html = html.replace(block, prefix + block, 1)
+        if pno in readings:
+            from . import source_reading_display
+            context = (reading_contexts or {}).get(pno, {})
+            html, placement = source_reading_display.render(book, doc,
+                source_pages[pno], context['raw'], html,
+                plan=context.get('plan'), previous_source=context.get('previous_source'),
+                previous_raw=context.get('previous_raw'))
+            evidence[pno]['reading_display'] = placement
+            states = {r['id']:r for r in placement['entries']}
+            for entry in readings[pno]['entries']:
+                entry.update(states[entry['id']])
+        if source_pages and pno in source_pages:
+            from . import glyph_presentation
+            html, glyph_audit = glyph_presentation.render(book, doc, source_pages[pno],
+                (raw_pages or {}).get(pno), html, package)
+            if glyph_audit['entries']:evidence[pno]['glyph_presentation'] = glyph_audit
         page_html[pno] = html
         if progress is not None:
             progress(index + 1, len(wanted))
@@ -1609,9 +1950,23 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
     return evidence
 
 
-def _original_document(record, home, language):
+def _inspection_controls(record, ids):
+    """Only existing, bound source details supply these navigation choices."""
+    details = {d['id']:d for d in record['details']}
+    if not ids:
+        return ''
+    if len(ids) != len(set(ids)) or any(key not in details or not key.startswith('inspection_') for key in ids):
+        raise ValueError('source inspection route is not a bound detail')
+    return ('<nav class="source-inspection-controls" aria-label="Larger original details">'
+            '<p>Read larger original details in row order. These are overlapping source crops; no note identity is inferred.</p><ol>'
+            + ''.join('<li><a class="source-control" href="#%s">%s</a></li>' %
+                (key, escape(details[key]['label'])) for key in ids) + '</ol></nav>')
+
+
+def _original_document(record, home, language, return_target=None, reading_returns=None):
     pno = record["page"]
-    back = '<p><a href="%s#pg_%04d">Return to reflowed PDF page %d</a></p>' % (home, pno, pno + 1)
+    target = return_target or '%s#pg_%04d' % (home, pno)
+    back = '<p><a class="source-control" href=%s>Return to reflowed PDF page %d</a></p>' % (quoteattr(target), pno + 1)
     # A fragment jump must land before the return link. On paginated readers a
     # target on the image section skips all earlier siblings, including the only
     # return on an ordinary original page. Keep a route at entry and after the
@@ -1621,8 +1976,8 @@ def _original_document(record, home, language):
             'from the transcription. The details below preserve printed context.</p>'
             % (pno + 1, back))
     if record["details"]:
-        body += '<nav aria-label="Original source details"><h2>Inspect original details</h2><ol>'
-        body += ''.join('<li><a href="#%s">%s</a></li>' % (d['id'], escape(d['label'])) for d in record['details'])
+        body += '<nav class="source-inspection-controls" aria-label="Original source details"><h2>Inspect original details</h2><ol>'
+        body += ''.join('<li><a class="source-control" href="#%s">%s</a></li>' % (d['id'], escape(d['label'])) for d in record['details'])
         body += '</ol></nav>'
     body += ('<section class="source-evidence"><h2>Complete original page</h2>'
              '<img src="%s" alt="Complete original PDF page %d"/></section>'
@@ -1636,14 +1991,34 @@ def _original_document(record, home, language):
             elif index in report.get('qualified_caption_record_indices',[]):state='covered by the caption uncertainty notice'
             body += '<li>%s (%s)</li>' % (escape(item['token']), state)
         body += '</ul></section>'
+    inspection = [d['id'] for d in record['details'] if d['id'].startswith('inspection_')]
     for detail in record["details"]:
-        links = '<p>Inspect overlapping original details: ' + ' · '.join(
-            '<a href="#%s">%s</a>' % (key, escape(next(d['label'] for d in record['details'] if d['id'] == key)))
-            for key in detail.get('inspection_ids', [])) + '</p>' if detail.get('inspection_ids') else ''
-        anchor = ' id="%s"' % detail['id']
-        section_id, heading_id = ('', anchor) if detail['id'].startswith('inspection_') else (anchor, '')
-        body += ('<section class="source-evidence"%s><h2%s>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
-                 % (section_id, heading_id, escape(detail["label"]), back, detail["src"],
+        links = _inspection_controls(record, detail.get('inspection_ids', []))
+        if detail['id'] in inspection:
+            index = inspection.index(detail['id'])
+            neighbors = [(inspection[index-1], 'Previous original detail')] if index else []
+            if index+1 < len(inspection):
+                neighbors.append((inspection[index+1], 'Next original detail'))
+            links += '<nav class="source-inspection-controls" aria-label="Original detail sequence">' + ''.join(
+                '<a class="source-control" href="#%s">%s</a>' % (key, label) for key,label in neighbors) + '</nav>'
+        if detail.get('reading'):
+            entry=detail['reading'];occurrence=entry['occurrence']
+            label='Synthetic recognition fixture; not a qualified reading. ' if entry['synthetic'] else 'Independently reviewed proposed reading; original retained. '
+            disclosure='<p>'+escape(label)+'Original: '+escape(entry['original'])+'.</p>'
+            for alternative in entry['alternatives']:
+                disclosure+='<p>Proposed reading: '+escape(alternative['text'])+' (confidence %.1f%%).</p>' % (100*alternative['confidence'])
+            if not entry['alternatives']:disclosure+='<p>Uncertain reading; no alternative proposed.</p>'
+            disclosure+='<p>This proposal applies to the pictured source occurrence. The reading text stays unchanged; no note association is inferred.</p>'
+            if not entry.get('inline_placed'):
+                disclosure += '<p>Inline reading unavailable: %s. Retained in this source detail only.</p>' % escape(entry.get('reason', 'placement_not_proved'))
+            elif entry.get('return_id'):
+                target = (reading_returns or {}).get(entry['return_id'])
+                if not target:raise ValueError('reading annotation return target missing')
+                disclosure += '<p><a class="source-control" href=%s>Return to this reading annotation</a></p>' % quoteattr(target)
+            links=disclosure+links
+        # A visible heading gives paginated readers a stable detail landing point.
+        body += ('<section class="source-evidence"><h2 id="%s">%s</h2>%s%s<img src="%s" alt="%s"/>%s</section>'
+                 % (detail['id'], escape(detail["label"]), back, links, detail["src"],
                     escape(detail["label"]), links + back))
     body += back
     return _document("Original PDF page %d" % (pno + 1), body, language)
@@ -1652,7 +2027,7 @@ def _original_document(record, home, language):
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None, figure_transform=None,
           should_stop=None, evidence_progress=None, operation_plans=(), source_pages=None,
-          runtime_progress=None):
+          runtime_progress=None, layout_plans=(), raw_pages=None):
     """Write one EPUB 3 and say what went into it.
 
     ``report_html`` is called last, with the document each page marker landed in and
@@ -1661,11 +2036,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     """
     from .native_ipc import NativeDocument
     if isinstance(doc, NativeDocument):
+        layout_arguments = dict(layout_plans=layout_plans, raw_pages=raw_pages) if layout_plans else {}
         return doc.build(book, out_path, page_html=page_html, metadata=metadata,
             report_html=report_html, sidecar=sidecar, identifier=identifier,
             figure_transform=figure_transform, should_stop=should_stop,
             evidence_progress=evidence_progress, operation_plans=operation_plans,
-            source_pages=source_pages, runtime_progress=runtime_progress)
+            source_pages=source_pages, runtime_progress=runtime_progress,
+            **layout_arguments)
     metadata = dict(metadata or {})
     language = metadata.get("language") or "en"
     source_pages = dict(source_pages or {})
@@ -1674,9 +2051,17 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         if not isinstance(source, SourcePage) or source.page != pno:
             raise ValueError('canonical source pages required')
         source.validate(book)
+        if source.report().get('source_readings'):
+            from . import source_readings,enriched_source
+            if doc is None:raise ValueError('reading evidence requires original PDF')
+            base=enriched_source.prepare_source_page(book,pno,json.loads(source.provenance_json),json.loads(source.records_json))
+            source_readings.replay(book,doc,base,(raw_pages or {}).get(pno) or extract.read_page(doc,pno),source)
     canonical = lambda pno: source_pages[pno].html if pno in source_pages else page_fragment(book, pno)
     if page_html is None:
         page_html = {pno: canonical(pno) for pno in sorted(book.pages)}
+    if layout_plans and not set(page_html).issubset(source_pages):
+        from .structural_ops import ContractError
+        raise ContractError('layout publication requires factory source for every output and fallback page')
     current_page_html = dict(page_html) if operation_plans else {}
     # Source evidence also governs direct builder callers. Do this before XML
     # character filtering, so no raw source character is reintroduced afterward.
@@ -1709,6 +2094,15 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             page_html[pno] = (source_pages[pno].render(book, wrappers) if pno in source_pages
                               else page_fragment(book, pno, wrappers=wrappers))
         generated_pages[pno]=page_html[pno]
+    from . import layout_build
+    compiled_layouts = layout_build.compile_pages(book, doc, layout_plans,
+        source_pages, dict(raw_pages or {}), page_html, seen_pages)
+    for pno, compiled in compiled_layouts.items():
+        page_html[pno] = compiled.page_html
+        generated_pages[pno] = compiled.page_html
+    layout_boundaries = layout_build.boundaries(book, doc, layout_plans, source_pages, dict(raw_pages or {}))
+    from . import transcript_regions
+    required_source_regions = transcript_regions.required_images(book, page_html, doc)
     page_html, unrepresentable = _readable_characters(page_html)
     generated_pages, _ = _readable_characters(generated_pages)
     # Normalize BEFORE the boundary, once: entity resolution and loose-character
@@ -1731,21 +2125,47 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         package_glyphs(book,page_html,doc,package,should_stop)
         if runtime_progress is not None:
             runtime_progress({"kind": "phase", "phase": "source_evidence"})
+        reading_contexts = {}
+        plans_by_page = {plan.prepared.page:plan for plan in layout_plans}
+        for pno, source in source_pages.items():
+            if source.report().get('source_readings'):
+                plan = plans_by_page.get(pno)
+                reading_contexts[pno] = dict(raw=(raw_pages or {}).get(pno) or extract.read_page(doc,pno), plan=plan)
+                if plan and json.loads(plan.prepared.contract_json).get('previous'):
+                    reading_contexts[pno].update(previous_source=source_pages[pno-1], previous_raw=raw_pages[pno-1])
         evidence = _original_evidence(book, page_html, doc, package, figure_transform,
                                       should_stop, evidence_progress, source_pages,
-                                      runtime_progress)
+                                      runtime_progress, reading_contexts, raw_pages)
 
         pages = _page_blocks(page_html)
-        joins = _join_page_turns(pages, book.title_pages)
+        executed_layout_boundaries = set()
+        joins = _join_page_turns(pages, book.title_pages, compiled_layouts, layout_boundaries, executed_layout_boundaries)
         contents_pages = _source_contents_pages(pages, doc)
         chapters = _chapters(pages, book.title_pages, contents_pages)
+        chapter_images = {src for chapter in chapters for src in _IMG_SRC.findall('\n'.join(chapter.blocks))}
+        if not set(required_source_regions) <= chapter_images:
+            from .structural_ops import ContractError
+            raise ContractError('source region image absent from publication')
+        protected_layout_targets = {target for pno,c in compiled_layouts.items() for target in _HREF.findall(_scope_ids(c.page_html,pno))}
         dropped = _bind_links(chapters)
+        if protected_layout_targets.intersection(dropped):
+            from .structural_ops import ContractError
+            raise ContractError('protected layout link target is absent from publication')
         if runtime_progress is not None:
             runtime_progress({"kind": "phase", "phase": "figure_crops"})
         missing, blanks = _figure_images(chapters, doc, book, package,
                                          figure_transform=figure_transform,
                                          owned_images=set(package.images)|set(package.aliases),
-                                         runtime_progress=runtime_progress)
+                                         runtime_progress=runtime_progress,
+                                         required_source_regions=required_source_regions)
+        if set(required_source_regions).intersection(missing + blanks) or not all(
+                package.aliases.get(src, src) in package.images for src in required_source_regions):
+            from .structural_ops import ContractError
+            raise ContractError('source region image could not be packaged')
+        protected_layout_images = {src for c in compiled_layouts.values() for src in _IMG_SRC.findall(c.page_html)}
+        if protected_layout_images.intersection(missing + blanks):
+            from .structural_ops import ContractError
+            raise ContractError('protected layout resource could not be packaged')
         _drop_images(chapters, missing + blanks)
         images = package.images
         for chapter in chapters:
@@ -1765,6 +2185,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         spine = []
         documents = {}
         page_homes = _page_homes(chapters)
+        source_returns = _source_return_targets(chapters)
 
         losses = _losses(dropped, missing)
         if refused:
@@ -1827,9 +2248,17 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             spine.append("source-pages")
             entries.append((SOURCE_INDEX_HREF, "Source PDF pages"))
 
+        reading_returns = {}
+        for chapter in chapters:
+            for block in chapter.blocks:
+                for ident in _ID.findall(block):
+                    if ident.startswith('reading-return-reading-'):
+                        if ident in reading_returns:raise ValueError('duplicate reading annotation return target')
+                        reading_returns[ident] = chapter.href+'#'+ident
         for pno, record in sorted(evidence.items()):
             ident = "original-p%04d" % pno
-            documents[record["href"]] = _original_document(record, page_homes[pno], language)
+            documents[record["href"]] = _original_document(record, page_homes[pno], language,
+                                                          source_returns.get(pno), reading_returns)
             manifest.append({"id": ident, "href": record["href"], "type": "application/xhtml+xml"})
             spine.append(ident)
 
@@ -1837,12 +2266,26 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             manifest.append({"id": "img%03d" % index, "href": src, "type": package.media_types[src]})
 
         payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
+        if compiled_layouts:
+            payload['layout_operations'] = layout_build.report(compiled_layouts)
+            bound_notes = payload['layout_operations'].get('note_bindings_applied', 0)
+            if bound_notes:
+                # Checked note targets are ordinary source atoms, never the
+                # opaque numbered Book.notes containers. Equal printed labels
+                # on distinct source notes do not identify the same note.
+                payload['notes_source'] = sum(1 for n in book.notes if n.num is not None)
+                payload['notes_bound'] = bound_notes
+                payload['notes'] = payload['notes_source'] + bound_notes
+            payload['layout_operations']['boundaries'] = [dict(right_page=pno, **layout_boundaries[pno]) for pno in sorted(executed_layout_boundaries)]
         if source_pages:
             payload['source_enrichment'] = {str(pno): dict(source.report(), identity=source.identity,
                 provenance=json.loads(source.provenance_json), raw_records=json.loads(source.records_json))
                 for pno, source in source_pages.items() if pno in page_html}
         if evidence:
             payload["source_evidence"] = list(evidence.values())
+            if reading_contexts:
+                payload['generated_evidence_semantics'] = ('source-reading-annotation is generated original/alternative disclosure, '
+                    'excluded from source conservation; canonical source, original glyph resources and note associations are unchanged')
         payload = _resource_aliases(payload,package.aliases)
         if unrepresentable:
             payload["unrepresentable_characters"] = unrepresentable
@@ -1978,7 +2421,7 @@ class _Package(object):
             self.abandon()
             raise
 
-    def image(self, href, data):
+    def image(self, href, data, *, store=False):
         requested=href
         png=data.startswith(b'\x89PNG\r\n\x1a\n')
         if png and href.endswith('.jpg'):
@@ -1987,7 +2430,16 @@ class _Package(object):
             # A dictionary kept the last of two renders under one name; an archive
             # would keep both, and a reader could open either.
             raise ValueError("the image %s was rendered twice" % href)
-        self._zf.writestr(posixpath.join(OEBPS, href), data)
+        if store:
+            # These native-figure source assets are already JPEG/PNG encoded.
+            # DEFLATE reserves a multi-megabyte workspace for each tile even
+            # when it saves almost no archive bytes, obscuring the renderer's
+            # one-image-at-a-time memory bound.
+            info = zipfile.ZipInfo(posixpath.join(OEBPS, href))
+            info.compress_type = zipfile.ZIP_STORED
+            self._zf.writestr(info, data)
+        else:
+            self._zf.writestr(posixpath.join(OEBPS, href), data)
         self.images[href] = len(data)
         self.media_types[href] = 'image/png' if png else 'image/jpeg'
         if requested!=href:self.aliases[requested]=href
@@ -2007,7 +2459,9 @@ class _Package(object):
         zf.writestr("%s/content.opf" % OEBPS, parts["opf"])
         zf.writestr("%s/nav.xhtml" % OEBPS, parts["nav"])
         zf.writestr("%s/toc.ncx" % OEBPS, parts["ncx"])
-        zf.writestr("%s/style.css" % OEBPS, STYLESHEET)
+        from .glyph_presentation import metric_stylesheet
+        zf.writestr("%s/style.css" % OEBPS, STYLESHEET +
+                    metric_stylesheet(parts['sidecar'].get('source_evidence', [])))
         for href, text in parts["documents"].items():
             zf.writestr(posixpath.join(OEBPS, href), text)
         zf.close()

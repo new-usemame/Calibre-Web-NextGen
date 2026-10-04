@@ -12,6 +12,21 @@ from cps.services.reflow import assemble, build_epub
 pytestmark = pytest.mark.unit
 
 
+def test_empty_front_pages_and_page_after_title_keep_destinations():
+    pages = build_epub._page_blocks({
+        0: '', 1: '', 2: '<h1>Title</h1>', 3: '',
+        4: '<h1>Chapter</h1><p>First paragraph.</p>',
+    })
+    chapters = build_epub._chapters(pages, title_pages={2: 'Title'})
+    homes = build_epub._page_homes(chapters)
+    assert set(homes) == set(range(5))
+    blocks = [block for chapter in chapters for block in chapter.blocks]
+    for pno in range(5):
+        assert blocks.count(build_epub.page_anchor(pno)) == 1
+    assert blocks.index(build_epub.page_anchor(1)) < blocks.index('<h1>Title</h1>')
+    assert blocks.index(build_epub.page_anchor(3)) < blocks.index('<h1>Chapter</h1>')
+
+
 def _source_book(numbered_rows=True, chapter_after_rows=False):
     doc = pymupdf.open()
     dedication = doc.new_page(width=450, height=670)

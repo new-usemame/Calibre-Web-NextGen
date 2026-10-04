@@ -9,7 +9,7 @@ import difflib
 import re
 from dataclasses import replace
 
-VERSION = 'native-transcript-agreement-1'
+VERSION = 'native-transcript-agreement-2'
 _LIGATURES = {'ﬁ':'fi','ﬂ':'fl','ﬀ':'ff','ﬃ':'ffi','ﬄ':'ffl'}
 
 
@@ -83,4 +83,5 @@ def corroborate(raw, recognition, confidence_floor=85):
             for span in line.spans:span.char_boxes=()
     return replace(raw,blocks=blocks,transcript_unverified=bool(unmatched)),dict(version=VERSION,words=word_count,
         unmatched_words=len(unmatched),
+        unmatched_pdf_boxes=[list(word.pdf_bbox) for word in unmatched],
         uncertain_words=uncertain_count,uncertain_lines=region_count,lines=len(lines))

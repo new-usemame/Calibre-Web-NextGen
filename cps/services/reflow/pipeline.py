@@ -304,13 +304,15 @@ def survey(doc, sample=SURVEY_PAGES):
 
 def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
         progress=None, should_stop=None, require_figure_caption=True,
-        recovery_opts=None):
+        recovery_opts=None, visual_results=None):
     """Convert one document. Returns what happened as well as what was produced."""
     from .native_ipc import NativeDocument
     if isinstance(doc, NativeDocument):
         if client is not None: raise ValueError('native preparation cannot dispatch models')
+        visual_args = {'visual_results': visual_results} if visual_results else {}
         return doc.prepare_result(page_numbers=page_numbers,
-            require_figure_caption=require_figure_caption, recovery_opts=recovery_opts)
+            require_figure_caption=require_figure_caption, recovery_opts=recovery_opts,
+            **visual_args)
     report = _reporter(progress)
     result = ReflowResult()
 
@@ -340,6 +342,10 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
         raw_pages = result.recovery.pages
 
     result.raw_pages = raw_pages
+    if visual_results is not None and (not isinstance(visual_results, dict) or
+            any(type(pno) is not int for pno in visual_results) or
+            set(visual_results) - {raw.pno for raw in raw_pages}):
+        raise ValueError('visual object pages do not match prepared source')
     report(Progress(stage="skeleton", message="measuring the page geometry"))
     outline = extract.outline(doc)
     style = skeleton.book_style(raw_pages,
@@ -353,17 +359,34 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
             return SourceDisplay(doc,raw.pno,dict(geometry,layer='ocr')).query_document(isolate=True)
         return doc
     skeletons = []
+    region_proofs = {}
     for done, raw in enumerate(raw_pages):
         if should_stop is not None and should_stop():
             raise build_epub.BuildCancelled('Source geometry preparation was cancelled.')
         pixel_doc=pixel_document(raw)
         try:
-            skeletons.append(skeleton.page_skeleton(
-                raw, style, layer_trusted=trusted or (
+            layer_trusted = trusted or (
                     getattr(raw,'source_geometry',{}).get('space')=='reading' and
-                    assess.looks_like_prose(raw.text)),
-                pixel_probe=extract.ScanPixelProbe(pixel_doc,raw.pno,
-                    mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines])))
+                    assess.looks_like_prose(raw.text))
+            probe = extract.ScanPixelProbe(pixel_doc,raw.pno,
+                mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines])
+            candidate = None
+            if result.recovery is not None and raw.transcript_unverified:
+                from dataclasses import asdict
+                from . import transcript_regions
+                candidate = transcript_regions.candidate(raw,
+                    asdict(result.recovery.provenance[raw.pno]), doc, style,
+                    pixel_probe=probe, layer_trusted=layer_trusted)
+            if candidate is not None:
+                measured, proof = candidate
+                skeletons.append(measured); region_proofs[raw.pno] = proof
+            else:
+                visual = None
+                if visual_results and raw.pno in visual_results:
+                    from . import visual_objects
+                    visual = visual_objects.prepare(doc, raw, visual_results[raw.pno])
+                skeletons.append(skeleton.page_skeleton(raw, style,
+                    layer_trusted=layer_trusted, pixel_probe=probe, visual_objects=visual))
         finally:
             if pixel_doc is not doc:pixel_doc.close()
         report(Progress(stage='skeleton',page=done+1,pages=len(raw_pages),
@@ -372,6 +395,9 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
     report(Progress(stage="assemble", message="putting the text back together"))
     book = assemble.assemble(skeletons, style, raw_pages)
     book.source_fingerprint = result.fingerprint
+    for pno, proof in region_proofs.items():
+        transcript_regions.bind(book, pno, proof)
+        result.recovery.provenance[pno].verification['region_disposition'] = proof
     result.book = book
 
     report(Progress(stage="route", message="deciding which pages need a model"))

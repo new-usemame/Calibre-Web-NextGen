@@ -12,10 +12,10 @@ function assessment(): SourceAssessment {
     hard_cap_usd: 5, sample_pages_default: 20, sample_pages_max: 60, sampled: 40, cached: true,
     assessment_scope: 'complete',
     instance_budget: { status: 'available', remaining_usd: 2, window_hours: 24 },
-    source_sha256: 'a'.repeat(64), consent_contract: 'source-review-1',
+    source_sha256: 'a'.repeat(64), consent_contract: 'source-layout-1',
     review: { quality_released: true, route_version: 'test-route', source_revision: 'test-source',
-      provider: 'openai/flex', service_tier: 'flex', proposer: 'openai/gpt-5.6-luna',
-      verifier: 'openai/gpt-5.6-terra', max_output_tokens: 4096 },
+      provider: 'openai/flex + anthropic', service_tier: 'flex (OpenAI), default (Anthropic)', proposer: 'openai/gpt-6-luna',
+      verifier: 'openai/gpt-6-luna', max_output_tokens: 8192 },
     recovery: { ocr_candidates: 0, image_only: 0, damaged: 0, counts_estimated: false, sampled_pages: 60, estimated_seconds: 0,
       engine_available: true, engine_version: 'tesseract 5.3.4', engine_detail: '', language: 'eng',
       dpi: 300, pdf_sha256: 'a'.repeat(16), non_latin_share: 0 } };
@@ -77,7 +77,7 @@ async function stub(page: Page, est = assessment(), jobs: ReflowJob[] = []) {
   await expect(page.getByRole('heading', { name: 'Reflow PDF to EPUB', exact: true })).toBeVisible();
   return { state, errors };
 }
-const paidChoice = (page: Page) => page.getByRole('radio', { name: /^Add AI formatting review/ });
+const paidChoice = (page: Page) => page.getByRole('radio', { name: /^AI page layout/ });
 const consent = (page: Page) => page.getByRole('checkbox', { name: /^I authorize Luna/ });
 async function preparePaid(page: Page) {
   await paidChoice(page).check();
@@ -134,7 +134,7 @@ test('keyless source conversion remains usable and cannot silently become paid r
   await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(1);
   expect(state.starts[0]).toMatchObject({ review_mode: 'deterministic', cost_cap_usd: 0,
-    consent_contract: 'source-review-1', source_sha256: est.source_sha256 });
+    consent_contract: 'source-layout-1', source_sha256: est.source_sha256 });
   expect(state.starts[0]).not.toHaveProperty('model_tier');
   expect(state.preparations).toBe(0);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -202,7 +202,7 @@ test('prepared wire ceiling and cap stay distinct; changing cap or scope resets 
   await page.getByRole('button', { name: 'Convert the book', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(1);
   expect(state.starts[0]).toMatchObject({ review_mode: 'source_verified', cost_cap_usd: .2,
-    preparation_id: 'd'.repeat(32), consent_contract: 'source-review-1' });
+    preparation_id: 'd'.repeat(32), consent_contract: 'source-layout-1' });
   assertNoPageErrors(errors);
 });
 

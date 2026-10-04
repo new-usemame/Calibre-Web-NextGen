@@ -154,6 +154,7 @@ class Region(object):
     initial_join: dict = field(default_factory=dict)
     display_group: dict = field(default_factory=dict)
     list_groups: list = field(default_factory=list)
+    visual_evidence: dict = field(default_factory=dict)
 
     @property
     def text(self):
@@ -835,7 +836,7 @@ def _complete_captioned_scan_top(raw, skel, pixel_probe):
             figure.bbox = (x0,max(top,ink[1]-2),x1,y1)
 
 
-def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
+def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objects=None):
     """Classify one page's regions, recording a reason for every uncertain call.
 
     ``pixel_probe`` answers the questions geometry cannot (an
@@ -1126,6 +1127,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     _preserve_conflicting_outline_heading(raw, style, skel)
     _complete_captioned_scan_top(raw, skel, pixel_probe)
     _coalesce_nested_scan_list_figures(raw, skel)
+    if visual_objects is not None:
+        from .visual_objects import append_regions
+        append_regions(raw, skel, visual_objects, layout)
     skel.regions.sort(key=_region_order)
     _join_numbered_regions(skel)
     skel.title_unit = _sparse_title_unit(raw, skel, style)

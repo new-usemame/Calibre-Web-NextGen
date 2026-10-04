@@ -159,28 +159,21 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     Crash after paid adoption, then retry: neither charge nor approved decision
     can disappear or be replayed, and nothing publishes from the failed child."""
     import json
-    from cps.services.reflow import model, ledger
-    from tests.unit.test_reflow_typed_transport import Session, reply
+    from cps.services.reflow import model, ledger, layout_pipeline
+    from tests.unit.test_reflow_task import _LayoutSession
     with F.new_doc() as pdf:
         page = pdf.new_page(width=500, height=700)
         page.insert_text((80, 100), '"Original displayed words remain exactly as printed."', fontsize=12)
         for y in (180, 195, 210):
             page.insert_text((50, y), 'Ordinary body context supports the source display.', fontsize=12)
         pdf.save(rig.folder / 'Book - Author.pdf')
-    calls = []; parent = os.getpid()
+    provider = _LayoutSession(); calls = provider.calls; parent = os.getpid()
     def answer(*args, **kwargs):
         assert os.getpid() == parent, 'provider dispatch escaped parent'
-        payload = json.loads(kwargs['data']); calls.append(payload)
-        body = json.loads(payload['messages'][1]['content'][1]['text'])
-        response = body['empty_response'].copy()
-        if payload['model'].endswith('luna'):
-            response['select'] = [next(c['candidate_id'] for c in body['source']['candidates'] if c['kind'] == 'quote')]
-        else:
-            response['approve'] = body['source']['verification']['proposed_ids']
-        data = reply(json.dumps(response)); data['model'] = payload['model']
-        return Session(data).post()
+        return provider.post(*args, **kwargs)
+    monkeypatch.setattr(layout_pipeline, 'QUALITY_RELEASED', True)
     monkeypatch.setattr(rig.mod.config, 'resolved_openrouter_key', lambda: 'inert-parent-key')
-    monkeypatch.setattr(model.requests, 'get', Session().get)
+    monkeypatch.setattr(model.requests, 'get', provider.get)
     monkeypatch.setattr(model.requests, 'post', answer)
     previous = rig.folder / 'Book - Author.epub'; previous.write_bytes(b'previous reader artifact')
     rig.formats['EPUB'] = SimpleNamespace(name='Book - Author', format='EPUB')
@@ -233,7 +226,8 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     assert success.stat == STAT_FINISH_SUCCESS, success.error
     assert len(calls) == 2, 'durably answered requests must be cache hits on retry'
     assert success.results['report']['spend']['usd'] == 0
-    assert success.results['report']['structural']['approved_operations'] == 1
+    assert success.results['report']['structural']['approved_pages'] == 1
+    assert success.results['report']['structural']['approved_operations'] > 0
     assert build_epub.validate(success.results['path']) == []
 
 

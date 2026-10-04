@@ -624,8 +624,9 @@ def test_repeated_uncertain_source_images_have_short_local_help_and_one_explanat
     fragment = build_epub.page_fragment(book, 0)
     root = ET.fromstring("<root>" + fragment + "</root>")
     captions = list(root.iter("figcaption"))
-    assert len(captions) == 4
-    for caption in captions[:3]:
+    notices = [n for n in root.iter("p") if n.get("class") == "source-evidence-notice"]
+    assert len(captions) == 1 and len(notices) == 3
+    for caption in notices:
         label = " ".join("".join(caption.itertext()).split())
         assert len(label) < 85, label
         assert "uncertain" in label.lower()
@@ -633,7 +634,7 @@ def test_repeated_uncertain_source_images_have_short_local_help_and_one_explanat
                    for a in caption.iter("a"))
         assert any(a.get("href") == "source-checks.xhtml"
                    for a in caption.iter("a"))
-    assert "Complete printed list" in "".join(captions[3].itertext())
+    assert "Complete printed list" in "".join(captions[0].itertext())
     help_page = ET.fromstring(build_epub._source_checks("en", {0: {}}))
     help_text = " ".join("".join(help_page.itertext()).lower().split())
     assert all(term in help_text for term in ("ocr", "searchable", "font", "detail"))
@@ -860,7 +861,9 @@ def test_a_picture_that_could_not_be_taken_out_of_the_pdf_is_told_to_the_reader(
     finally:
         doc.close()
 
-    assert kept.images == 1 and lost.images == 0, (kept.images, lost.images)
+    with zipfile.ZipFile(kept.path) as archive:
+        assert len([n for n in archive.namelist() if n.startswith('OEBPS/images/fig_p')]) == 1
+    assert kept.images > 1 and lost.images == 0, (kept.images, lost.images)
     assert told["losses"][0] == [], "nothing was dropped and something was reported"
     assert told["losses"][1], "the picture went missing and the report page was not told"
 
@@ -1596,8 +1599,11 @@ def test_a_book_of_plates_is_written_without_holding_its_plates_in_memory(tmp_pa
         doc.close()
 
     with zipfile.ZipFile(built.path) as zf:
-        plates = [i.file_size for i in zf.infolist() if i.filename.startswith("OEBPS/images/")]
-    assert len(plates) == built.images == 16
+        plates = [i.file_size for i in zf.infolist() if i.filename.startswith("OEBPS/images/fig_p")]
+        assert len([i for i in zf.infolist() if i.filename.startswith("OEBPS/images/")]) == built.images
+    assert len(plates) == 16
+    # Inspection images add resources, not permission to retain the book's
+    # original plates in memory. Keep the original sixteen-plate memory bound.
     assert peak < sum(plates) / 2, (peak // 1024, max(plates) // 1024, sum(plates) // 1024)
 
 

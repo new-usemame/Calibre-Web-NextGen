@@ -56,8 +56,12 @@ STOP_REASONS = {
 }
 
 
-def numbers(result, ledger=None, client=None):
-    """Everything the about page says, as data. The JSON twin is this, verbatim."""
+def numbers(result, ledger=None, client=None, *, document=None):
+    """Everything the about page says, as data. The JSON twin is this, verbatim.
+
+    Binding-bearing layout plans require the current document for recompilation;
+    legacy reports need no document and retain their existing source counts.
+    """
     book = result.book
     outcomes = list(result.outcomes.values())
     adopted = [o for o in outcomes if o.source == "model"]
@@ -182,6 +186,14 @@ def numbers(result, ledger=None, client=None):
         payload['model']['approval_prompt_version']=described.get('approval_prompt_version','')
         payload['model']['route_version']=described.get('route_version','')
         payload['model']['quality_released']=described.get('quality_released',False)
+    from . import layout_build
+    note_audit = layout_build.note_report(result, document)
+    if note_audit:
+        bound = note_audit['note_bindings_applied']
+        structure = payload['structure']
+        structure['footnotes_before_layout'] = structure['footnotes']
+        structure['footnotes_bound'] = bound
+        structure['footnotes'] += bound
     payload["unplaced"] = _unplaced(payload, result)
     return payload
 
@@ -410,7 +422,8 @@ def about_page(payload, show_cost=False, links=None, losses=()):
               ('Verifier abstentions',values['verifier_abstained']),('Rejected pages',values['rejected']),
               ('Requests attempted',values['attempted_stages']),('Cached stage results',values['cached_stages'])]
         if values.get('eligibility_measured',True):
-            out.append('<h2>AI formatting review</h2><p>Only approved source-bound heading or quotation formatting is applied. An unchanged page or an abstention is not an improvement. Counts describe mechanical admission, not independent semantic correctness.</p><table><tbody>%s</tbody></table>'
+            description=('The model proposes page grouping, reading order and formatting over locked source words. Only checked and reviewed layouts are applied; other pages retain the source conversion. Counts describe mechanical admission, not independent semantic correctness.' if values.get('layout_primary') else 'Only approved source-bound heading or quotation formatting is applied. An unchanged page or an abstention is not an improvement. Counts describe mechanical admission, not independent semantic correctness.')
+            out.append(('<h2>AI formatting review</h2><p>'+description+'</p><table><tbody>%s</tbody></table>')
                        % ''.join('<tr><td>%s</td><td>%d</td></tr>'%(escape(label),value) for label,value in rows))
             out.append('<p>Models requested by this job: %s.</p>' % escape(', '.join(values.get('requested_models',{})) or 'none'))
         else:
@@ -542,6 +555,9 @@ def _structure_section(payload):
             ("Paragraphs rejoined across a page turn", structure["page_joins"]),
             ("Source-backed text or structure repairs",
              structure["repairs"] + structure.get("markers_recovered", 0))]
+    if structure.get("footnotes_bound"):
+        rows.extend([("Footnotes identified before layout review", structure["footnotes_before_layout"]),
+                     ("Additional footnotes linked by layout review", structure["footnotes_bound"])])
     if structure.get("figures_recovered"):
         rows.append(("Figures cropped from the scanned pages themselves",
                      structure["figures_recovered"]))

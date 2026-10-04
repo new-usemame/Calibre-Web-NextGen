@@ -215,3 +215,60 @@ def test_unique_multiword_source_label_preserves_internal_space():
         book=assemble.deterministic_book(doc)
         assert book.source_navigation[0]['status']=='resolved'
         assert '<a href="#pdfgoto_' in build_epub.page_fragment(book,0)
+
+
+def test_pdf_goto_over_note_keeps_both_destinations_without_nested_anchors():
+    # Navigation offsets use normalized Element.text; rendering keeps raw spaces.
+    runs = [['t', 'Read  this.'], ['sup', '21', 0], ['t', ' Continue.']]
+    start = assemble.plain_text(runs).index('[21]')
+    fragment = build_epub._nav_runs_html(runs,
+        [(start, 'open', 'pdfgoto_note'), (start + 4, 'close', 'pdfgoto_note')],
+        {'21'}, {}, set())
+    root = ET.fromstring('<p xmlns:epub="http://www.idpf.org/2007/ops">' + fragment + '</p>')
+    assert all(not list(a.iter('a'))[1:] for a in root.iter('a'))
+    assert {a.get('href') for a in root.iter('a')} == {'#fn_21', '#pdfgoto_note'}
+    assert len(list(root.iter('sup'))) == 1
+    assert ''.join(root.itertext()).replace('↗', '') == 'Read  this.21 Continue.'
+    native = next(a for a in root.iter('a') if a.get('href') == '#pdfgoto_note')
+    assert native.get('aria-label')
+
+
+def test_pdf_goto_uses_normalized_offsets_without_changing_styled_source_words():
+    runs = [['t', 'Start  '], ['t', 'target', 'italic'], ['t', ' then finish.']]
+    at = assemble.plain_text(runs).index('target')
+    fragment = build_epub._nav_runs_html(runs,
+        [(at, 'open', 'pdfgoto_target'), (at + 6, 'close', 'pdfgoto_target'),
+         (at, 'anchor', 'arrival')], set(), {}, set())
+    root = ET.fromstring('<p>' + fragment + '</p>')
+    link = root.find('a')
+    assert ''.join(link.itertext()) == 'target'
+    assert link.find('em').text == 'target'
+    assert len(root.findall('.//*[@id="arrival"]')) == 1
+    assert ''.join(root.itertext()) == 'Start  target then finish.'
+
+
+def test_goto_target_inside_note_marker_does_not_split_or_nest_the_note():
+    runs = [['t', 'Text'], ['sup', '7', 0], ['t', ' more.']]
+    fragment = build_epub._nav_runs_html(runs,
+        [(4, 'open', 'pdfgoto_target'), (7, 'close', 'pdfgoto_target'),
+         (5, 'anchor', 'arrival')], {'7'}, {}, set())
+    root = ET.fromstring('<p xmlns:epub="http://www.idpf.org/2007/ops">' + fragment + '</p>')
+    assert len(root.findall('.//*[@id="arrival"]')) == 1
+    assert all(not list(a.iter('a'))[1:] for a in root.iter('a'))
+    assert {a.get('href') for a in root.iter('a')} == {'#fn_7', '#pdfgoto_target'}
+
+
+def test_pdf_goto_over_source_glyph_keeps_image_and_both_sibling_actions():
+    from cps.services.reflow import native_text
+    runs = [['t', 'Read '],
+            ['glyph', 'X', native_text.descriptor(0, [10, 10, 20, 20], 10)],
+            ['t', ' next.']]
+    fragment = build_epub._nav_runs_html(runs,
+        [(5, 'open', 'pdfgoto_x'), (6, 'close', 'pdfgoto_x')], set(), {}, set())
+    root = ET.fromstring('<p>' + fragment + '</p>')
+    assert all(not list(a.iter('a'))[1:] for a in root.iter('a'))
+    assert {a.get('href') for a in root.iter('a')} == {
+        '#pdfgoto_x', 'original-p0000.xhtml#page'}
+    assert len(list(root.iter('img'))) == 1
+    assert 'X' not in ''.join(root.itertext())
+    assert next(a for a in root.iter('a') if a.get('href') == '#pdfgoto_x').get('aria-label')

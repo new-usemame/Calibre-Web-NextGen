@@ -54,8 +54,8 @@ from ..constants import REFLOW_DIR
 from ..cw_login import current_user
 from ..services import parallel
 from ..services.reflow import (admission, build_epub, extract,
-                               ledger as ledger_mod, model, ocr, pipeline, retention, structural_quote,
-                               typed_model, quote_preparation, source_assessment)
+                               ledger as ledger_mod, model, ocr, pipeline, retention, layout_pipeline, layout_model,
+                                quote_preparation, source_assessment)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
@@ -371,7 +371,7 @@ def _resource_refusal(exc):
                 'Native capacity is busy, insufficient or unmeasurable. Retry after active work completes or an administrator restores capacity.', 503)
 
 
-CONSENT_CONTRACT='source-review-1'
+CONSENT_CONTRACT='source-layout-1'
 _PREPARATION_STORES={}
 _PREPARATION_LOCK=threading.Lock()
 
@@ -431,10 +431,11 @@ def _estimate_payload(book, source):
         'sampled':int(quote.get('sampled') or 0),'cached':bool(quote.get('cached')),
         'assessment_scope':quote.get('assessment_scope','sample'),
         'limits':{'max_pages':tasks_reflow.max_pages(),'max_pdf_mb':tasks_reflow.max_pdf_mb()},
-        'review':{'quality_released':typed_model.QUALITY_RELEASED,'route_version':typed_model.ROUTE_VERSION,
-            'source_revision':typed_model.SOURCE_REVISION,'provider':'openai/flex','service_tier':'flex',
-            'proposer':typed_model.STAGES['proposer'].model_id,'verifier':typed_model.STAGES['verifier'].model_id,
-            'max_output_tokens':typed_model.MAX_OUTPUT_TOKENS},
+        'review':{'quality_released':layout_pipeline.QUALITY_RELEASED,'route_version':layout_model.ROUTE_VERSION,
+            'source_revision':layout_pipeline.SOURCE_REVISION,'provider':'openai/flex + anthropic','service_tier':'flex (OpenAI), default (Anthropic)',
+            'lexical':layout_model.PROFILES['lexical'].spec.model_id,
+            'proposer':layout_model.PROFILES['proposer'].spec.model_id,'verifier':layout_model.PROFILES['proposer'].spec.model_id,
+            'max_output_tokens':layout_model.PROFILES['proposer'].output_tokens},
         'recovery':{'ocr_candidates':int(quote.get('ocr_candidates') or 0),
             'image_only':int(quote.get('ocr_image_only') or 0),'damaged':int(quote.get('ocr_damaged') or 0),
             'estimated_seconds':quote.get('ocr_estimated_seconds'),
@@ -574,7 +575,7 @@ def reflow_start(book_id):
     except (TypeError,ValueError,OverflowError):return _err('invalid_options','Conversion options are invalid.',400)
     needed=0.0;quote=None
     if options.review_mode=='source_verified':
-        if not typed_model.QUALITY_RELEASED:return _err('review_unavailable','AI formatting review is not available in this build. Source-only conversion is available.',409)
+        if not layout_pipeline.QUALITY_RELEASED:return _err('review_unavailable','AI formatting review is not available in this build. Source-only conversion is available.',409)
         if not config.resolved_openrouter_key():return _err('not_configured','AI review needs a configured provider key. Source-only conversion is available.',400)
         cap=body.get('cost_cap_usd')
         if isinstance(cap,bool) or not isinstance(cap,(int,float)) or not math.isfinite(cap) or not 0<cap<=tasks_reflow.hard_cap_usd():
@@ -586,7 +587,7 @@ def reflow_start(book_id):
         except (KeyError,ValueError):return _err('estimate_stale','Prepare a current estimate for these source recovery settings.',409)
         selected=(range(quote['first_body_page'],min(quote['source_context_pages'],quote['first_body_page']+options.sample_pages))
                   if options.mode=='sample' else range(quote['source_context_pages']))
-        needed=sum(p['proposer_bound_usd']+p['verifier_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected)
+        needed=sum(p['full_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected)
         options.consent_quote=quote
         shared=parallel.run_blocking(tasks_reflow.instance_budget_status)
         if shared['status'] in ('disabled','unavailable'):

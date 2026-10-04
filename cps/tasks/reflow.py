@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model, shared_budget, operation_audit, runtime_diagnostics
+    model, ocr, pipeline, publication, report, retention, layout_pipeline, layout_quote, shared_budget, operation_audit, runtime_diagnostics
 
 log = logger.create()
 
@@ -185,10 +185,10 @@ def _clamp_cap(value):
 
 
 def make_client(review_mode):
-    """Only explicit current two-stage review can enable the conditional route."""
-    return structural_pipeline.TwoStageClient(
+    """Only explicit current consent can enable source-bound layout review."""
+    return layout_pipeline.LayoutClient(
         (config.resolved_openrouter_key() or None) if review_mode=='source_verified' else None,
-        enabled=review_mode=='source_verified' and typed_model.QUALITY_RELEASED)
+        enabled=review_mode=='source_verified' and layout_pipeline.QUALITY_RELEASED)
 
 
 class TaskReflowPdf(CalibreTask):
@@ -382,25 +382,27 @@ class TaskReflowPdf(CalibreTask):
             "cache_dir": reflow_dir("ocr-cache"),
             "scratch_dir": reflow_dir("ocr-scratch"),
         }
-        from ..services.reflow.structural_quote import consent_observer
+        from ..services.reflow.layout_quote import consent_observer
         quote=getattr(self.options,"consent_quote",None)
         observer=consent_observer(quote,document) if quote is not None else None
         sample=self.options.mode=='sample'
         # A sample reads the front of the book, not all of it (N2): only a paid
         # sample keeps the complete context, because its consent quote was
-        # measured against it (see structural_pipeline.run_structural).
-        result = structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
+        # measured against it (see layout_pipeline.run_layout).
+        result = layout_pipeline.run_layout(document,client=client,ledger=ledger,cache=cache,
                             sample_count=self.options.sample_pages if sample else None,
                             sample_context=sample and observer is None,
                             progress=self._on_progress,should_stop=lambda:self._native_stop(document),
-                            recovery_opts=recovery_opts,prepared_observer=observer,measure_eligibility=self.options.review_mode=="source_verified")
+                            recovery_opts=recovery_opts,prepared_observer=observer,
+                            request_observer=(lambda stage,wire,p:layout_quote.assert_request_bound(quote,stage,wire,p)) if quote else None,
+                            measure_eligibility=self.options.review_mode=="source_verified")
         result.structural["review_mode"]=self.options.review_mode
         # The task/report ledger records the same final user-facing scope.
         ledger.record({"kind":"structural_summary","summary":result.structural})
         return result
 
     def _write_epub(self, document, result, ledger, client, book, local_db):
-        payload = report.numbers(result, ledger=ledger, client=client)
+        payload = report.numbers(result, ledger=ledger, client=client, document=document)
         problems = report.check_completion(payload, ledger)
         if problems:
             # G4: the report and the ledger have to agree, and a report nobody can
@@ -444,6 +446,8 @@ class TaskReflowPdf(CalibreTask):
                                          payload, show_cost=self.options.show_cost_in_report),
                                      source_pages=getattr(result,'source_pages',None),
                                      operation_plans=getattr(result,'operation_plans',None),
+                                     layout_plans=getattr(result,'layout_plans',None),
+                                     raw_pages={r.pno:r for r in result.raw_pages},
                                      figure_transform=(result.recovery.figure_rect
                                                        if result.recovery else None),
                                      should_stop=lambda: self._native_stop(document),

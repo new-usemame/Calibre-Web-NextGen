@@ -39,3 +39,12 @@ test('a preparation waiting its turn says how many are ahead, and a timed-out on
   assert.deepEqual(preparationNote(undefined, false, true, false), { kind: 'failed' });
   assert.deepEqual(preparationNote(undefined, false, false, false), { kind: 'none' });
 });
+
+test('layout consent includes ordering and lexical ceilings for the selected pages', () => {
+  const quote = { source_context_pages: 40, first_body_page: 5,
+    pages: [{ page_index0: 5, proposer_bound_usd: .02, verifier_bound_usd: .03, batch_bound_usd: .2, full_bound_usd: .25 },
+      { page_index0: 20, proposer_bound_usd: .02, verifier_bound_usd: .03, batch_bound_usd: .4, full_bound_usd: .45 }],
+    coverage: [] } as unknown as ReviewQuote;
+  assert.equal(selectedReview(quote, 'sample', 5).bound, .25);
+  assert.equal(selectedReview(quote, 'full', 5).bound, .7);
+});

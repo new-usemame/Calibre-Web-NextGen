@@ -1,0 +1,4 @@
+"""Shared presentation policy; independent stages retain their own decisions."""
+
+FLOATING_ARTWORK_VERSION = 'floating-artwork-paragraph-boundary-v2-all-stages'
+FLOATING_ARTWORK_INSTRUCTION = """For reflow, keep a floating illustration together with its complete heading, caption and legend in their internal source order. When bottom-of-page artwork interrupts a main prose paragraph that continues onto the next page, place the entire illustration unit at the preceding paragraph boundary on this page, leaving that unfinished main paragraph last. Do not split prose, merge distinct paragraphs, move artwork across a heading or note association, or change any source word or protected block. This policy permits only this complete-unit placement; unrelated reading order must remain source-supported. Continuation still requires both actual paragraph endpoints and all existing source, preservation and semantic checks."""

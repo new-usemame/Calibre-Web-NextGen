@@ -250,9 +250,13 @@ def test_original_page_fragment_has_return_at_entry_and_after_final_image(detail
         assert {el.get('id') for el in nodes if el.get('id')} == {'page'}
 
 
-def test_inspection_links_land_on_visible_heading_with_complete_detail_and_returns():
+def test_all_detail_links_land_on_visible_heading_with_complete_detail_and_returns():
     details = [
         {'id': 'notes', 'label': 'Printed note context', 'src': 'images/note.png'},
+        {'id': 'figure_0', 'label': 'Original figure', 'src': 'images/figure.png'},
+        {'id': 'caption_1', 'label': 'Original caption', 'src': 'images/caption.png'},
+        {'id': 'title_2', 'label': 'Original title', 'src': 'images/title.png'},
+        {'id': 'layout_3', 'label': 'Original layout', 'src': 'images/layout.png'},
         {'id': 'inspection_0', 'label': 'First original tile', 'src': 'images/tile0.png'},
         {'id': 'inspection_1', 'label': 'Next original tile', 'src': 'images/tile1.png'},
     ]
@@ -261,10 +265,10 @@ def test_inspection_links_land_on_visible_heading_with_complete_detail_and_retur
     ids = [node.get('id') for node in root.iter() if node.get('id')]
     assert len(ids) == len(set(ids))
     links = [node for node in root.iter(XHTML + 'a')
-             if node.get('href', '').startswith('#inspection_')]
-    assert [node.get('href') for node in links] == ['#inspection_0', '#inspection_1']
-    assert [node.text for node in links] == [details[1]['label'], details[2]['label']]
-    for link, detail in zip(links, details[1:]):
+             if node.get('href', '').startswith('#')]
+    assert [node.get('href') for node in links] == ['#' + d['id'] for d in details]
+    assert [node.text for node in links] == [d['label'] for d in details]
+    for link, detail in zip(links, details):
         target = next(node for node in root.iter() if node.get('id') == link.get('href')[1:])
         assert target.tag == XHTML + 'h2' and target.text == detail['label']
         section = next(node for node in root.iter(XHTML + 'section') if target in list(node))
@@ -274,7 +278,6 @@ def test_inspection_links_land_on_visible_heading_with_complete_detail_and_retur
         assert len(returns) == 2
         nodes = list(section.iter())
         assert nodes.index(returns[0]) < nodes.index(next(section.iter(XHTML + 'img'))) < nodes.index(returns[1])
-    assert next(node for node in root.iter() if node.get('id') == 'notes').tag == XHTML + 'section'
 
 
 def test_original_detail_navigation_precedes_full_page_image_and_preserves_entry():
@@ -402,3 +405,104 @@ def test_unmatched_notes_without_damaged_source_group_remain_unqualified():
                        pages={0:[]})
     assert book.ambiguous_note_numbers(0)==set()
     assert '(?)' not in build_epub.page_fragment(book,0)
+
+@pytest.mark.parametrize('notice', [
+    '<p class="source-evidence-notice">OCR uncertain. <a href="original-p0001.xhtml#page">View original page</a></p>',
+    '<div class="source-evidence-notice"><p>Some note labels are uncertain.</p></div>',
+])
+def test_leading_source_notice_preserves_fallback_continuation_and_both_warnings(notice):
+    trailing = '<p class="source-evidence-notice">Check preceding source.</p>'
+    pages = build_epub._page_blocks({0: '<p>The fem-</p>'+trailing,
+                                   1: notice+'<p>inine energy continues.</p>'})
+    assert build_epub._join_page_turns(pages) == 1
+    text = ''.join(block for chapter in build_epub._chapters(pages) for block in chapter.blocks)
+    root = ET.fromstring('<body xmlns:epub="http://www.idpf.org/2007/ops">'+text+'</body>')
+    assert any('The feminine energy continues.' in ''.join(p.itertext()) for p in root.iter('p'))
+    assert text.count(trailing) == text.count(notice) == 1
+    assert root.find('.//*[@id="pg_0001"]') is not None
+
+@pytest.mark.parametrize('opening', [
+    '<p>A separate sentence starts here.</p>',
+    '<h2>A new section</h2><p>inine is only a fragment here.</p>',
+    '<figure><img src="images/figure.jpg"/></figure><p>inine follows a figure.</p>',
+])
+def test_leading_source_notice_does_not_join_across_completed_prose_or_real_structure(opening):
+    notice = '<p class="source-evidence-notice">Check source.</p>'
+    pages = build_epub._page_blocks({0: '<p>A completed sentence.</p>',1: notice+opening})
+    assert build_epub._join_page_turns(pages) == 0
+    assert pages[1]['body'][0] == notice
+
+
+def test_original_return_reaches_joined_source_before_prior_page_notes(tmp_path, monkeypatch):
+    """A source return reaches the moved passage; print markers retain note order."""
+    with pymupdf.open() as doc:
+        for text in ('An unfinished thought', 'continues here.'):
+            doc.new_page(width=400, height=600).insert_text((40, 100), text, fontsize=12)
+        book = assemble.deterministic_book(doc)
+        book.notes.append(assemble.Note(num=1, text='Earlier source note.', pno=0))
+        def original_evidence(book, html, doc, package, *args, **kwargs):
+            image = io.BytesIO()
+            Image.new('RGB', (32, 32), 'white').save(image, format='PNG')
+            package.image('images/original1.png', image.getvalue())
+            return {1: {'page': 1, 'href': 'original-p0001.xhtml',
+                        'full': 'images/original1.png', 'details': []}}
+        monkeypatch.setattr(build_epub, '_original_evidence', original_evidence)
+        target = tmp_path / 'joined-return.epub'
+        build_epub.build(book, str(target), doc=doc)
+    with zipfile.ZipFile(target) as archive:
+        original = ET.fromstring(archive.read('OEBPS/original-p0001.xhtml'))
+        back = next(a for a in original.iter(XHTML + 'a')
+                    if (a.text or '').startswith('Return to reflowed'))
+        filename, ident = back.get('href').split('#')
+        chapter = ET.fromstring(archive.read('OEBPS/' + filename))
+        joined = next(p for p in chapter.iter(XHTML + 'p')
+                      if 'An unfinished thought continues here.' in ''.join(p.itertext()))
+        assert joined.find('.//*[@id="%s"]' % ident) is not None
+        # A separate target must not steal the print-page marker from its notes.
+        assert ident != 'pg_0001'
+        all_nodes = list(chapter.iter())
+        note = next(n for n in all_nodes if n.tag == XHTML + 'aside')
+        marker = next(n for n in all_nodes if n.get('id') == 'pg_0001')
+        assert all_nodes.index(note) < all_nodes.index(marker)
+
+
+def test_native_figure_opens_source_details_with_explicit_return(tmp_path):
+    """An unflagged native table image must still be inspectable on a reader."""
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=500, height=700)
+        for row in range(8):
+            page.insert_text((60, 120 + row * 28), 'Column A     Column B     Column C')
+        box = (45, 95, 455, 355)
+        figure = assemble.Element(kind='fig', pno=0, bbox=box)
+        caption = assemble.Element(kind='caption', pno=0,
+                                   runs=[['t', 'Printed table caption']],
+                                   bbox=(45, 370, 300, 390))
+        book = assemble.Book(elements=[figure, caption], pages={0: [figure, caption]},
+                             figures=[dict(pno=0, bbox=box, full_page=False,
+                                           needs_ink=False, found='embedded')])
+        assert not book.needs_source_evidence(0)
+        target = tmp_path / 'native-figure.epub'
+        result = build_epub.build(book, str(target), doc=doc,
+                                  metadata={'title': 'Native figure', 'language': 'en'})
+    with zipfile.ZipFile(target) as archive:
+        chapters = [ET.fromstring(archive.read(n)) for n in archive.namelist()
+                    if n.startswith('OEBPS/ch') and n.endswith('.xhtml')]
+        links = [a for chapter in chapters for a in chapter.iter(XHTML + 'a')
+                 if any(i.get('src', '').startswith('images/fig_p0000_0')
+                        for i in a.iter(XHTML + 'img'))]
+        assert len(links) == 1, 'The native figure needs a real source-inspection link'
+        name, anchor = links[0].get('href').split('#')
+        original = ET.fromstring(archive.read('OEBPS/' + name))
+        detail = next(n for n in original.iter() if n.get('id') == anchor)
+        assert detail.tag == XHTML + 'h2', 'figure URI must land on its visible heading'
+        owner = next(section for section in original.iter(XHTML + 'section')
+                     if detail in list(section))
+        returns = [a for a in owner.iter(XHTML + 'a')
+                   if 'Return to reflowed PDF page 1' in ''.join(a.itertext())]
+        assert len(returns) == 2
+        for back in returns:
+            home, target_id = back.get('href').split('#')
+            destination = ET.fromstring(archive.read('OEBPS/' + home))
+            assert len([n for n in destination.iter() if n.get('id') == target_id]) == 1
+        assert len([n for n in original.iter() if n.get('id', '').startswith('inspection_')]) >= 2
+        assert sum('Printed table caption' in ''.join(c.itertext()) for c in chapters) == 1

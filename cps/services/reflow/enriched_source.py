@@ -11,13 +11,31 @@ from xml.dom import Node, minidom
 
 from . import annotate
 
-VERSION = 'reflow-enriched-source-7'
+VERSION = 'reflow-enriched-source-9'
 
 # A public content digest detects corruption, but cannot prove who rendered it.
 # Only the factory below issues authority for canonical bytes in this process.
-# Weak keys retain no completed books. A restarted process prepares source once
+# Weak references retain no completed books. A restarted process prepares source once
 # from its current Book/Recovery records; persisted HTML never grants authority.
-_issued = weakref.WeakKeyDictionary()
+class _IdentityWeakRegistry:
+    """Issuance follows object identity; equal independent factory values coexist."""
+    def __init__(self):
+        self._records = {}
+
+    def get(self, source):
+        record = self._records.get(id(source))
+        return record[1] if record is not None and record[0]() is source else None
+
+    def __setitem__(self, source, identity):
+        key = id(source)
+        def discard(reference):
+            current = self._records.get(key)
+            if current is not None and current[0] is reference:
+                self._records.pop(key, None)
+        self._records[key] = (weakref.ref(source, discard), identity)
+
+
+_issued = _IdentityWeakRegistry()
 
 
 def _json(value):
@@ -122,6 +140,8 @@ def prepare_source_page(book, pno, provenance, records=()):
         raise ContractError('Recovery uncertainty records are missing or incomplete')
     mapping = {}
     html = build_epub.page_fragment(book, pno, element_blocks=mapping)
+    from . import transcript_regions
+    transcript_regions.verify_source(book, pno, provenance, html)
     normalized=[record for record in (annotate.uncertain_record(r) for r in raw) if record is not None]
     artwork,qualified=_image_owned_records(book,pno,provenance,normalized)
     excluded=set(artwork+qualified)

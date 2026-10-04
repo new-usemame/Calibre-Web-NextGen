@@ -353,7 +353,7 @@
     <div class="form-group">
       <label for="config_openrouter_key_e">{{_('OpenRouter API Key (Reflow PDF to EPUB)')}}</label>
       <input type="password" class="form-control" id="config_openrouter_key_e" name="config_openrouter_key_e" value="" autocomplete="new-password" placeholder="{% if config.resolved_openrouter_key() %}{{_('A key is saved. Leave blank to keep it.')}}{% else %}{{_('No key saved')}}{% endif %}">
-      <div class="help-block">{{_('Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again.')}}</div>
+      <div class="help-block">{{_('Optional. Source conversion needs no provider key. When available, AI page layout uses OpenRouter, checks proposed changes against the source, and requires an estimate and explicit consent for each job. The key is stored encrypted and is never shown again.')}}</div>
       {% if config.openrouter_key_source() and config.openrouter_key_source() != 'database' %}
       <div class="help-block">{{_('A key is currently coming from the environment (%(source)s); it takes effect only while no key is saved here.', source=config.openrouter_key_source()) }}</div>
       {% endif %}

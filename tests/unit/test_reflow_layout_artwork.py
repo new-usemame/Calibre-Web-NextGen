@@ -22,8 +22,10 @@ columns, ruled tables, blank leaves.
 """
 
 import io
+import posixpath
 import re
 import zipfile
+from xml.etree import ElementTree as ET
 
 import pymupdf
 import pytest
@@ -106,10 +108,36 @@ def _ink_share(jpeg_bytes):
 
 
 def _epub_images(path):
+    """Images actually embedded in the reading chapters, excluding source appendices."""
     with zipfile.ZipFile(str(path)) as zf:
-        return sorted(name for name in zf.namelist()
-                      if "/images/" in name and name.rsplit(".", 1)[-1]
-                      in ("jpg", "jpeg", "png"))
+        images = set()
+        for name in zf.namelist():
+            if not re.fullmatch(r'OEBPS/ch\d+\.xhtml', name):
+                continue
+            for node in ET.fromstring(zf.read(name)).iter('{http://www.w3.org/1999/xhtml}img'):
+                images.add(posixpath.normpath(posixpath.join(posixpath.dirname(name), node.get('src'))))
+        assert images <= set(zf.namelist()), 'a reading image has no packaged resource'
+        return sorted(images)
+
+
+def _assert_caption_detail(path, pno):
+    """The emitted caption link resolves to its unique, nonblank source image."""
+    ns = '{http://www.w3.org/1999/xhtml}'
+    href = 'original-p%04d.xhtml#caption_0' % pno
+    with zipfile.ZipFile(str(path)) as zf:
+        links = [node for name in zf.namelist()
+                 if re.fullmatch(r'OEBPS/ch\d+\.xhtml', name)
+                 for node in ET.fromstring(zf.read(name)).iter(ns + 'a')
+                 if node.get('href') == href]
+        assert len(links) == 1
+        filename, identifier = href.split('#')
+        document = ET.fromstring(zf.read('OEBPS/' + filename))
+        targets = [node for node in document.iter() if node.get('id') == identifier]
+        assert len(targets) == 1
+        section = next(node for node in document.iter(ns + 'section') if targets[0] in node.iter())
+        images = list(section.iter(ns + 'img'))
+        assert len(images) == 1
+        assert _ink_share(zf.read('OEBPS/' + images[0].get('src'))) > 0
 
 
 # ------------------------------------------------------------------ column order
@@ -539,13 +567,20 @@ class TestScanArtwork(object):
         assert "DAY CHART" in " ".join(a["text"] for a in book.artwork)
         assert book.conservation.ok, book.conservation.to_dict()
 
-    def test_the_caption_next_to_the_chart_stays_its_caption(self):
-        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
+    def test_the_caption_next_to_the_chart_stays_its_caption(self, tmp_path):
+        doc = _doc(F.prose_page,
+                   lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
+        try:
+            book = assemble.deterministic_book(doc)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
 
         fragment = build_epub.page_fragment(book, 1)
         assert "<figure>" in fragment
         assert "Figure 7.4 - Sect as a Spectrum" not in fragment
-        assert "original_p0001_caption_0.jpg" in fragment
+        assert "original-p0001.xhtml#caption_0" in fragment
+        _assert_caption_detail(result.path, 1)
         assert "figcaption" in fragment
 
     def test_the_crop_is_the_chart_and_not_the_prose(self):
@@ -578,7 +613,8 @@ class TestScanArtwork(object):
         assert names == ["fig_p0001_0.jpg"], names
         fragment = build_epub.page_fragment(book, 1)
         assert "Chart 45 - John F. Kennedy Jr." not in fragment
-        assert "original_p0001_caption_0.jpg" in fragment
+        assert "original-p0001.xhtml#caption_0" in fragment
+        _assert_caption_detail(result.path, 1)
         assert "figcaption" in fragment
         assert "The native was the son of U.S." in _whole_text(book)
         assert book.conservation.ok, book.conservation.to_dict()
@@ -852,7 +888,7 @@ class TestPlateAndCaptionFidelity:
         assert [ln.text for ln in candidate.caption_lines] == [caption.text,title.text]
         assert [ln.text for _,lines in rest for ln in lines] == [prose.text, explanation.text]
 
-    def test_split_scan_caption_keeps_printed_gap_and_qualifies_transcription(self):
+    def test_split_scan_caption_keeps_printed_gap_and_qualifies_transcription(self, tmp_path):
         caption = _line('figure 9.', 90, 330, 135, 338, 5)
         left = _line('(ANCIENT', 95, 341.3, 140, 347, 5)
         right = _line('modern)', 149, 341, 189, 347, 5.6)
@@ -873,9 +909,15 @@ class TestPlateAndCaptionFidelity:
         book = assemble.assemble([skel],style,[raw])
         html = build_epub.page_fragment(book,0)
         assert 'ANCIENT' not in html and 'modern' not in html
-        assert 'original_p0000_caption_0.jpg' in html
+        assert 'original-p0000.xhtml#caption_0' in html
         assert 'transcription uncertain' in html
         assert book.conservation.ok
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=500, height=700)
+            for line in (caption, left, right):
+                page.insert_text((line.bbox[0], line.spans[0].origin_y), line.text, fontsize=line.spans[0].size)
+            result = _build(book, tmp_path, doc)
+        _assert_caption_detail(result.path, 0)
 
 
     def test_full_italic_caption_stays_with_figure_across_extractor_blocks(self):

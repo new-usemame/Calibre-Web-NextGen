@@ -434,6 +434,8 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
             detailed = extract.read_page(doc, raw.pno, keep_char_boxes=True)
             qualified, evidence = transcript.corroborate(detailed, result, UNCERTAIN_SCORE)
             evidence['recognition_orientation'] = result.orientation_clockwise
+            evidence['source_pdf_sha256'] = fingerprint
+            evidence['page'] = raw.pno
             evidence['recognition_sha256'] = hashlib.sha256(
                 ocr._canonical_result(asdict(replace(result,reused=False)))).hexdigest()
             prov.verification = evidence

@@ -21,7 +21,7 @@ MAX_KEY_ITEMS = 32
 
 @lru_cache(maxsize=1)
 def registry():
-    from . import assemble, assess, extract, pipeline, skeleton, source, structural_ops, enriched_source, build_epub
+    from . import assemble, assess, extract, pipeline, skeleton, source, structural_ops, enriched_source, build_epub, layout_ops
     modules = {
         assemble: ('Element', 'Note', 'Repair', 'ConservationReport', 'Book'),
         assess: ('Assessment', 'PageCensus'),
@@ -29,6 +29,7 @@ def registry():
         pipeline: ('ReflowResult', 'PageOutcome', 'Progress'),
         skeleton: ('BookStyle',), source: ('Recovery', 'PageRecovery'),
         structural_ops: ('Prepared', '_Spec', 'OperationPlan'),
+        layout_ops: ('PreparedLayout','LayoutPlan'),
         enriched_source: ('SourcePage',), build_epub: ('BuildResult',),
     }
     return {name: getattr(module, name) for module, names in modules.items() for name in names}

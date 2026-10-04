@@ -14725,3 +14725,758 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one."
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Interrupted by a restart"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The app restarted before this job recorded completion. Your original PDF "
+"is unchanged. Pages already converted may be reused if you retry. Any "
+"unresolved charges remain recorded for review; a lost response may still "
+"have been charged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A charge could not be confirmed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A sample"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"AI review ended before all eligible pages were reviewed. A completed file"
+" retains the full source conversion and any approved changes. Compatible "
+"responses may be reused; unresolved requests are not retried "
+"automatically."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"AI review is not available in this build. Source conversion remains "
+"available."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"AI review stopped at the {amount} cap. The complete source conversion "
+"remains in the file; approved changes are included and the remaining "
+"pages are unreviewed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"AI review was not requested. Eligibility was not measured; this file uses"
+" source conversion and preserves its uncertainty evidence."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "AI page layout"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"An administrator must install it before text can be recovered, or you can"
+" keep a facsimile of the page images."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"An earlier job left {amount} unconfirmed: a request was sent and its "
+"answer never came back, so the provider may still charge it. It is not "
+"part of this new cap, and starting again does not settle or erase it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "An installed language code, for example eng, deu, fra, ell."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Approval counts describe formatting adopted after source and reviewer "
+"checks, not independent proof of correctness. An abstention or unchanged "
+"page is not an improvement."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Approved operations"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Back to edit"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Build the facsimile EPUB"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Cached stage results"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Configure an OpenRouter key to use optional AI review."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Confirmed spend"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Convert the book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Convert the sample"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Convert the whole book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Convert this PDF to EPUB…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Converting"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Coverage-limited pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Create a source-based EPUB with original evidence for uncertain text. "
+"Optional AI formatting review has its own estimate and consent."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Create this source conversion without model requests or provider charges."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Damaged layer — recovery required"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Download the sample"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Eligibility is not an improvement. Unsupported, limited, declined and "
+"unreviewed pages keep the source conversion and its uncertainty evidence."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Eligible pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Eligible pages in this selection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter a positive cap within the administrator limit."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Every page is a picture of the page with OCR text behind it. The words "
+"are readable, but the structure has to be rebuilt."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"AI can propose paragraph grouping, reading order and formatting over the "
+"preserved source. Checked layouts become the page output; other pages "
+"keep the source conversion. Original images, notes and uncertainty "
+"evidence remain available."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Filed EPUB SHA-256: {hash}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Formatting review"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Full-review reservation ceiling"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "How much to convert"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"I authorize Luna layout proposals and reviews, and Opus hyphen checks, "
+"through OpenRouter, up to {amount} for this job. Unapproved pages keep "
+"the source conversion."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"I understand the unconfirmed {amount} from the earlier job may still be "
+"charged, and it is not covered by this consent."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Job cap"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Keep the page images as they are. This is a facsimile of the book, not "
+"reflowed text."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Language data"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Legacy gate acceptances"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Legacy requests recorded"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Local OCR runs before formatting. Uncertain readings remain disclosed "
+"with original-source access; some readings cannot be marked at an exact "
+"word."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Local time (no OpenRouter credit)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Luna proposes and reviews page layout over locked source words. Opus "
+"checks split-word hyphens. Pages that do not pass the checks keep the "
+"source conversion."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Models requested"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Most of this PDF is not Latin-alphabet text. The selected recognition "
+"language will misread it unless a matching language pack is installed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Native text layer (not proofread)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"No model requests or provider charges. Keep source text, images, "
+"navigation and uncertainty evidence."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No recovery — facsimile only"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Not installed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Nothing to convert"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"One page, downloaded as an EPUB to look at. Nothing is added to your "
+"library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Open admin settings"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Open the book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Optional review uses the two models below, with no automatic alternative "
+"route."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages in the sample"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages in this file"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages left unreviewed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages read with local OCR"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages sent to a model"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages with approved changes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pages with no supported choices"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pictures only — recovery required"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Planned proposer"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Planned reviewer"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Prepare AI estimate"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Prepare a local estimate before consenting to review. This reads complete"
+" source context and may take time, but sends nothing to a model and "
+"reserves no provider credit."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Preparing source context: {page} of {pages}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Proposed operations"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Proposer abstentions"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Provider route"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Queued"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Read pages with no text at all. Existing text layers stay unchanged, "
+"including any extraction errors, with source evidence available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Recognition engine"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Recognition language"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Recover pictures only"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Recover the text"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reflow PDF to EPUB"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rejected pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Replace the EPUB this book already has"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Requests attempted"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reviewer abstentions"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sample EPUB SHA-256: {hash}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Samples are removed {days} days after they are made. Make a new sample to"
+" see it again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source conversion"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Source conversion is available without a provider key. Optional AI "
+"formatting review needs an OpenRouter key."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source conversion ready; AI review limited"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source estimate preparation failed. No model request was sent."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source estimate ready. No credit has been reserved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source pages prepared"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Source preparation stopped at its {minutes}-minute limit so that others "
+"can take a turn. Pages already recognized are kept: prepare again to "
+"continue."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped. No model request was sent."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source recovery"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Source text"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Stop"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Stop after spending"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Stop preparation"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Stopped at the cap"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Stopped before it finished"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The book was converted"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The conversion could not be started."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The model service stopped answering"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The preparation could not be stopped. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The sample starts at the first body page and keeps the full source "
+"context for note and figure associations."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The sample starts at the first body page and reads only the front of the "
+"book, so it stays quick however long the PDF is."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The whole book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"There is no usable text in this PDF, only page images. Text recovery "
+"settings determine how those pages are read; review a sample for "
+"recognition errors."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"There is very little text on each page. This is usually a sparse scan, or"
+" two printed pages photographed as one."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This PDF has a native text layer. Extraction and punctuation may still "
+"differ from the printed page; original-source evidence remains available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This PDF has a text layer, but it is not readable words. It has to be "
+"treated as if there were no text at all."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This PDF has not been assessed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This book has no PDF to convert."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This cap may cover only part of the AI review. The complete source "
+"conversion will still be produced; pages left unreviewed will be counted "
+"explicitly."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This conservative ceiling includes layout proposals, reviews, reading-"
+"order checks and split-word checks without cache reuse. It is not an "
+"expected bill or money already held. Your cap limits new requests."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This keeps the page images as they are — a facsimile of the book, not "
+"reflowed text."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This older job predates the current two-stage review. Its counts are "
+"historical and do not establish current review coverage."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This sample is no longer kept"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This stopped when a request’s answer never came back, so its charge could"
+" not be confirmed either way. Spent below is confirmed; the unconfirmed "
+"amount may still be charged by the provider and stays on record here "
+"until it is resolved. Reloading does not settle or erase it, and no new "
+"job covers it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Uncertain readings recorded"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unconfirmed, may still be charged"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unsupported pages"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Waiting for one earlier source preparation to finish."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Waiting for {count} earlier source preparations to finish."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "What is in this PDF"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator allows at most {amount} for one conversion."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your sample is ready"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "about {seconds}s for {pages} pages"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{pages} pages are only pictures of pages. They are read off the printed "
+"page with local text recognition — a transcription of the source, never a"
+" rewrite."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{pages} pages have a text layer that is not readable words. They are read"
+" off the printed page with local text recognition — a transcription of "
+"the source, never a rewrite."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, added to this book as an EPUB format."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{pages} pages, downloaded as an EPUB to look at. Nothing is added to your"
+" library."
+msgstr ""
+
+#: cps/api/reflow.py
+#, python-format
+msgid ""
+"This PDF is %(size)s MB. Reflow converts PDFs of up to %(limit)s MB; an "
+"administrator can change this limit."
+msgstr ""
+
+#: cps/api/reflow.py
+#, python-format
+msgid ""
+"This PDF has %(pages)s pages. Reflow converts PDFs of up to %(limit)s "
+"pages; an administrator can change this limit."
+msgstr ""
+
+#: cps/api/reflow.py
+msgid ""
+"You already have a source preparation running or waiting. Wait for it to "
+"finish, or stop it, before preparing another."
+msgstr ""
+
+#: cps/api/reflow.py
+msgid "Local source preparation is busy. Try again shortly."
+msgstr ""
+
+#: cps/tasks/reflow.py
+msgid "Reflow: reading the PDF"
+msgstr ""
+
+#: cps/tasks/reflow.py
+msgid "Reflow"
+msgstr ""
+
+#: cps/tasks/reflow.py
+msgid "Settle interrupted conversions and remove expired Reflow files"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "OpenRouter API Key (Reflow PDF to EPUB)"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "A key is saved. Leave blank to keep it."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "No key saved"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Optional. Source conversion needs no provider key. When available, AI page layout uses OpenRouter, checks proposed changes against the source, and requires an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
+msgstr ""
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid ""
+"A key is currently coming from the environment (%(source)s); it takes "
+"effect only while no key is saved here."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Delete the saved key"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum spend per conversion (USD)"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"A hard limit. No conversion may be started with a cost cap above this "
+"figure, and a running conversion stops when it reaches its cap."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum PDF length per conversion (pages)"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum PDF size per conversion (MB)"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"A PDF longer or larger than these limits is refused before it is assessed"
+" or converted, as a sample or as a whole book, so that one book cannot "
+"occupy the server for hours."
+msgstr ""
+

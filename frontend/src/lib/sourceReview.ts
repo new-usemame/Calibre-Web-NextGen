@@ -21,7 +21,7 @@ export interface ReviewQuote {
   eligible_pages: number; limited_pages: number; unsupported_pages: number; no_choice_pages: number;
   full_bound_usd: number; proposer_bound_usd: number; verifier_bound_usd: number;
   confirmed_usd: number; held_usd: number;
-  pages: { page_index0: number; proposer_bound_usd: number; verifier_bound_usd: number }[];
+  pages: { page_index0: number; proposer_bound_usd: number; verifier_bound_usd: number; full_bound_usd?: number; batch_bound_usd?: number }[];
   coverage: { page: number; status: string; reason?: string }[];
 }
 export interface ReviewPreparation {
@@ -75,7 +75,7 @@ export function selectedReview(quote: ReviewQuote | undefined, mode: ReflowMode,
   const rows = quote?.pages.filter((p) => p.page_index0 >= start && p.page_index0 < end) ?? [];
   const coverage = quote?.coverage.filter((p) => p.page >= start && p.page < end) ?? [];
   return { start, end, eligible: rows.length,
-    bound: rows.reduce((sum, p) => sum + p.proposer_bound_usd + p.verifier_bound_usd, 0),
+    bound: rows.reduce((sum, p) => sum + (p.full_bound_usd ?? (p.proposer_bound_usd + p.verifier_bound_usd + (p.batch_bound_usd ?? 0))), 0),
     limited: coverage.filter((p) => p.status === 'limited').length,
     unsupported: coverage.filter((p) => p.status === 'unsupported').length,
     noChoices: coverage.filter((p) => p.status === 'no_choices').length };

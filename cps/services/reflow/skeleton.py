@@ -466,8 +466,16 @@ def _repeated_detached_heads(raw_pages, body_size):
             continue
         for line in row:
             text = line.stripped
+            folios = [peer for peer in row if peer is not line
+                and re.fullmatch(r'\d{1,5}',peer.stripped)
+                and abs(peer.bbox[1]-line.bbox[1]) <= body_size*.35
+                and (peer.bbox[2] < line.bbox[0]-body_size*.4
+                     or peer.bbox[0] > line.bbox[2]+body_size*.4)
+                and peer.size <= body_size*1.2]
+            folio = folios[0] if len(folios)==1 else None
             if (len(text) > BAND_TEXT_MAX or sum(c.isalpha() for c in text) < 6
-                    or line.size > body_size * 1.02 or CAPTION_LINE.match(text)):
+                    or line.size > body_size * (1.2 if folio is not None else 1.02)
+                    or CAPTION_LINE.match(text)):
                 continue
             leading = _LEADING_PRINTED_FOLIO.fullmatch(text)
             trailing = _TRAILING_PRINTED_FOLIO.fullmatch(text)
@@ -475,20 +483,29 @@ def _repeated_detached_heads(raw_pages, body_size):
                 key = (leading[2].casefold(), 'left', int(leading[1])-raw.pno)
             elif trailing:
                 key = (trailing[1].casefold(), 'right', int(trailing[2])-raw.pno)
+            elif folio is not None:
+                # A detached margin row with a progressing separate folio is
+                # independent evidence when scan font-size estimates wobble.
+                key = (text.casefold(), 'separate', int(folio.stripped)-raw.pno)
             else:
                 key = (text.casefold(), None, None)
                 if line.size >= body_size * .98:
                     continue
-            groups[key].append((raw, line))
+            groups[key].append((raw, line, folio if key[1]=='separate' else None))
     proved = defaultdict(list)
     for rows in groups.values():
-        for raw, line in rows:
-            peers = {other.pno for other, candidate in rows
+        for raw, line, folio in rows:
+            peers = {other.pno for other, candidate, _ in rows
                      if abs(candidate.bbox[1]/other.height - line.bbox[1]/raw.height) <= .006
                      and abs(candidate.bbox[0]/other.width - line.bbox[0]/raw.width) <= .035
                      and abs(candidate.size - line.size) <= body_size * .10}
-            if len(peers) >= 3:
+            pages=sorted(peers)
+            progressing=folio is None or any(raw.pno in pages[i:i+3]
+                and pages[i+1]-pages[i]==pages[i+2]-pages[i+1]
+                and pages[i+1]-pages[i] in (1,2) for i in range(len(pages)-2))
+            if len(peers) >= 3 and progressing:
                 proved[raw.pno].append(line.bbox)
+                if folio is not None:proved[raw.pno].append(folio.bbox)
     return dict(proved)
 
 

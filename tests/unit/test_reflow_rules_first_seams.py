@@ -212,3 +212,22 @@ def test_damaged_secondary_note_label_keeps_its_own_source_channel():
     assert skel.note_regions[1].uncertain
     book=assemble.assemble([skel],skeleton.BookStyle(body_size=12),[raw])
     assert book.conservation.ok
+
+@pytest.mark.parametrize('control',[None,'no_folio','wrong_sequence','too_large','not_detached'])
+def test_separate_progressing_folio_proves_a_running_head_despite_scan_size_noise(control):
+    raws=[]
+    for p in range(6):
+        title=_line('Essays on the Source',90,37,11 if control=='too_large' else 9.1)
+        title.bbox=(90,37,220,46.5);title.spans[0].bbox=title.bbox
+        text='159' if control=='wrong_sequence' else str(156+p)
+        folio=_line(text,352,37,8.8);folio.bbox=(352,37,367,46.5);folio.spans[0].bbox=folio.bbox
+        body=_line('The ordinary source paragraph continues in the same source order.',42,49 if control=='not_detached' else 74,8.6)
+        lines=[title,body] if control=='no_folio' else [title,folio,body]
+        raws.append(extract.RawPage(p,415,638,[extract.Block(i,l.bbox,[l]) for i,l in enumerate(lines)]))
+    style=skeleton.book_style(raws)
+    skels=[skeleton.page_skeleton(r,style) for r in raws]
+    book=assemble.assemble(skels,style,raws);assert book.conservation.ok
+    for r,s in zip(raws,skels):
+        furniture=[x.text for x in s.regions if x.kind=='furniture']
+        assert ('Essays on the Source' in furniture) is (control is None)
+        if control is None:assert str(156+r.pno) in furniture

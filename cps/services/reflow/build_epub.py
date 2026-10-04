@@ -1511,6 +1511,27 @@ def _scan_key_white_margin_jpeg(doc, pno, bbox):
     return cropped.tobytes('jpg', jpg_quality=85)
 
 
+
+def _figure_crop_margin(data):
+    """Keep edge ink away from a reader's image boundary, without resampling.
+
+    The original decoded crop remains byte-for-byte inside the white frame.
+    Lossless PNG prevents a second JPEG pass changing table rules or glyph ink.
+    Crops already surrounded by white paper retain their original encoding.
+    """
+    import io
+    from PIL import Image, ImageOps
+    with Image.open(io.BytesIO(data)) as image:
+        ink = image.convert('L').point(lambda value: 255 if value < 240 else 0).getbbox()
+        margin = 8
+        if ink is None or (ink[0] >= margin and ink[1] >= margin and
+                           image.width-ink[2] >= margin and image.height-ink[3] >= margin):
+            return data
+        padded = ImageOps.expand(image.convert('RGB'), border=margin, fill='white')
+        output = io.BytesIO()
+        padded.save(output, format='PNG', optimize=True)
+        return output.getvalue()
+
 def _figure_images(chapters, doc, book, package, figure_transform=None, owned_images=(),
                    runtime_progress=None, required_source_regions=()):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
@@ -1626,7 +1647,7 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
         if data is not None:
             # Outside the crop's failure handling: a crop the archive cannot take
             # is a failed build, never a figure reported lost from the source.
-            package.image(src, data)
+            package.image(src, _figure_crop_margin(data))
     return missing, blanks
 
 

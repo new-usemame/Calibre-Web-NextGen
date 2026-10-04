@@ -462,6 +462,7 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
             subject = _('Send to eReader')
         settings['subject'] = subject
         settings['body'] = get_email_body_text()
+        settings['attachment_name'] = get_send_filename(book, new_book_format)
     else:
         settings = dict()
     link = '<a href="{}">{}</a>'.format(url_for('web.show_book', book_id=book.id), escape(book.title))  # prevent xss
@@ -600,6 +601,24 @@ def get_sendable_book(book_id, user=None):
     )
 
 
+def get_send_filename(book, book_format):
+    """Snapshot the outgoing name independently of the stored source file."""
+    template = getattr(config, "mail_filename_template", "") or ""
+    try:
+        if not template.strip():
+            return None
+        basename = render_opds_filename(
+            template, book, calibre_db.session,
+            unicode_filename=bool(config.config_unicode_filename),
+            ordered_authors=calibre_db.order_authors([book]), sort_names=False,
+        )
+        return basename + "." + book_format.lower()
+    except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+        # A stale or externally edited setting must not prevent book delivery.
+        log.warning("Invalid eReader attachment filename template; retaining library name")
+        return None
+
+
 def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
               subject=None, user=None):
     """Send email with attachments"""
@@ -646,7 +665,8 @@ def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
                 WorkerThread.add(user_id, TaskEmail(subject, book.path, converted_file_name,
                                                     config.get_mail_settings(), email,
                                                     email_text, get_email_body_text(), book.id,
-                                                    cover_user_id=cover_user_id))
+                                                    cover_user_id=cover_user_id,
+                                                    attachment_name=get_send_filename(book, book_format)))
             return None
     return _("The requested file could not be read. Maybe wrong permissions?")
 

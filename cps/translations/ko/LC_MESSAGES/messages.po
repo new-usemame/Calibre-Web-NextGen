@@ -18029,3 +18029,21 @@ msgstr "읽음/읽지 않음 표시"
 #~ "safely be deleted."
 #~ msgstr ""
 #~ "책을 안전하게 삭제하려면 먼저 보관 처리 후 기기 동기화가 필요합니다."
+
+#: cps/spa_strings.py
+msgid "eReader attachment filename template"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Leave blank to keep the existing filename. Example: {series} #{series_index} - {title}. Fields include {title}, {authors}, {series} and {series_index}; the file extension is added automatically."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Use {series:|(|) }{title} to omit the series prefix when no series is set."
+msgstr ""
+
+#: cps/services/mail_filename.py
+msgid "Use a valid attachment filename template with supported metadata fields."
+msgstr ""

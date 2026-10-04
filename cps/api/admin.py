@@ -25,6 +25,7 @@ from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
 from ..admin import _delete_user
 from ..string_helper import strip_whitespaces
 from ..services.opds_filename import validate_template as validate_opds_filename_template
+from ..services.mail_filename import validate_mail_filename_template
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
 # the safe, high-traffic display settings — the deep security config (LDAP,
@@ -305,6 +306,7 @@ def _mail_payload():
         "mail_login": config.mail_login or "",
         "mail_from": config.mail_from or "",
         "mail_size_mb": int((config.mail_size or 0) / 1024 / 1024),
+        "mail_filename_template": getattr(config, "mail_filename_template", "") or "",
         "mail_server_type": config.mail_server_type,
         "has_password": bool(getattr(config, "mail_password_e", None)),
     }
@@ -330,20 +332,30 @@ def admin_update_mail():
     if guard:
         return guard
     data = request.get_json(silent=True) or {}
-    for key in ("mail_server", "mail_from", "mail_login"):
-        if key in data:
-            setattr(config, key, str(data[key] or "").strip())
+    if "mail_filename_template" in data:
+        template = data["mail_filename_template"] if data["mail_filename_template"] is not None else ""
+        try:
+            validate_mail_filename_template(template)
+        except ValueError as error:
+            return _err("invalid_request", str(error), 400)
+    numeric = {}
     for key in ("mail_port", "mail_use_ssl", "mail_server_type"):
         if key in data:
             try:
-                setattr(config, key, int(data[key]))
+                numeric[key] = int(data[key])
             except (TypeError, ValueError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
     if "mail_size_mb" in data:
         try:
-            config.mail_size = int(data["mail_size_mb"]) * 1024 * 1024
+            numeric["mail_size"] = int(data["mail_size_mb"]) * 1024 * 1024
         except (TypeError, ValueError):
             return _err("invalid_request", "mail_size_mb must be a number", 400)
+    # Complete validation before changing the process's shared settings row.
+    for key in ("mail_server", "mail_from", "mail_login", "mail_filename_template"):
+        if key in data:
+            setattr(config, key, str(data[key] or "").strip())
+    for key, value in numeric.items():
+        setattr(config, key, value)
     # Write-only password: only overwrite when the admin actually typed a new one.
     if data.get("mail_password"):
         config.mail_password_e = str(data["mail_password"])

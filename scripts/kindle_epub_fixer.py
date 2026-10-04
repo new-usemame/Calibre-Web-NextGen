@@ -547,6 +547,25 @@ class EPUBFixer:
             if declared_encoding.startswith('utf-16'):
                 declared_encoding = 'utf-16'
 
+            if ext == 'css':
+                # Match a tightly spelled leading declaration in the first
+                # 1,024 decoded characters. Existing detection/BOM handling has
+                # already selected the encoding; this is not raw-byte sniffing.
+                # Keep the declaration coherent with that writer encoding.
+                # https://www.w3.org/TR/css-syntax-3/#input-byte-stream
+                declaration = re.match(
+                    r'^(\ufeff?@charset ")([\x00-\x21\x23-\x7f]*)(";)', content[:1024]
+                )
+                if declaration:
+                    updated = (content[:declaration.start(2)] + declared_encoding
+                               + content[declaration.end(2):])
+                    if updated != content:
+                        self.fixed_problems.append(
+                            f"Updated CSS charset in {filename} to {declared_encoding}"
+                        )
+                    self.files[filename] = updated
+                continue
+
             if ext in ['html', 'htm']:
                 updated = self._update_html_charset(content, declared_encoding)
                 if updated != content:

@@ -856,3 +856,5 @@ For "Original fork patches": the diffs are small and isolated; PR descriptions i
 | [#2421](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2421) | (fork feature request [#1229](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1229)) | Per-account Discover source from the current library, an accessible shelf or smart shelf; shared source filter for New UI, Classic random previews and OPDS. Empty/unavailable sources keep the chooser and fail closed. | TBD | TBD |
 
 | [#2443](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2443) | (fork issue [#1617](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1617)) | Keep unsupported smart-shelf rules visible and removable, preserve stored JSON values and nested groups, and retain rules in empty-filter API responses. | TBD | TBD |
+
+| [#2474](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2474) | (fork audit finding F-e088bf, recorded in #2452) | Synchronize existing leading CSS declarations with the fixer output encoding, preserving stylesheet text, unrelated entries and second-run no-op behavior. | Unreleased | TBD |

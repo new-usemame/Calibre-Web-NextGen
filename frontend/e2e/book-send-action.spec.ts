@@ -18,6 +18,9 @@ async function install(page: Page) {
   const detail = await detailResponse.json();
   expect(detail.formats.length).toBeGreaterThan(0);
   const originalMe = await (await page.request.get('/api/v1/auth/me')).json();
+  const accountResponse = await page.request.get('/api/v1/account');
+  expect(accountResponse.status()).toBe(200);
+  const originalAccount = await accountResponse.json();
   const state = {
     locale: 'en', theme: 'dark', configured: true, download: true, anonymous: false,
     member: true, hasFormats: true, email: 'reader@example.invalid', admin: true, holdSend: false,
@@ -32,10 +35,8 @@ async function install(page: Page) {
     role: { ...originalMe.role, edit: true, admin: state.admin, download: state.download, anonymous: state.anonymous },
     features: { ...originalMe.features, mail_configured: state.configured },
   } }));
-  await page.route('**/api/v1/account', async route => {
-    const response = await route.fetch();
-    await route.fulfill({ response, json: { ...await response.json(), kindle_mail: state.email } });
-  });
+  await page.route('**/api/v1/account', route =>
+    route.fulfill({ json: { ...originalAccount, kindle_mail: state.email } }));
   await page.route(`**/api/v1/books/${id}`, route => route.fulfill({ json: {
     ...detail, in_my_library: state.member, formats: state.hasFormats ? detail.formats : [],
   } }));

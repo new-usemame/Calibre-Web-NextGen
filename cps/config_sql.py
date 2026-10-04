@@ -148,6 +148,8 @@ class _Settings(_Base):
     # the existing 'en' fallback; setting a value pins anon OPDS responses
     # to that locale unless the client overrides via ?lang= or Accept-Language.
     config_opds_default_locale = Column(String(8), default="")
+    # Empty preserves legacy title/first-author naming. Only OPDS uses this.
+    config_opds_filename_template = Column(String(1024), default="")
     config_columns_to_ignore = Column(String)
     # Comma-separated Calibre custom-column IDs selected by an administrator.
     # Request-time use is revalidated against the live Calibre schema.
@@ -293,6 +295,14 @@ class _Settings(_Base):
     config_limiter_uri = Column(String, default="")
     config_limiter_options = Column(String, default="")
     config_check_extensions = Column(Boolean, default=True)
+
+    config_calibre_server_enabled = Column(Boolean, default=False)
+    config_calibre_server_port = Column(Integer, default=8080)
+    config_calibre_server_listen = Column(String, default="127.0.0.1")
+    config_calibre_server_anonymous_writes = Column(Boolean, default=False)
+    config_calibre_server_trusted_ips = Column(String, default="")
+    config_calibre_server_username = Column(String, default="")
+    config_calibre_server_password_e = Column(String)
 
     def __repr__(self):
         return self.__class__.__name__
@@ -764,6 +774,19 @@ class ConfigSQL(object):
                         setattr(self, k, "")
                 else:
                     setattr(self, k, v)
+
+        env_port = os.environ.get("CALIBRE_SERVER_PORT")
+        env_username = os.environ.get("CALIBRE_SERVER_USERNAME")
+        env_password = os.environ.get("CALIBRE_SERVER_PASSWORD")
+        if env_port and env_port.isdigit() and 1 <= int(env_port) <= 65535:
+            self.config_calibre_server_port = int(env_port)
+        if env_username:
+            self.config_calibre_server_username = env_username
+        if env_password:
+            self.config_calibre_server_password_e = env_password
+        self.config_calibre_server_env = {"port": bool(env_port),
+                                          "username": bool(env_username),
+                                          "password": bool(env_password)}
 
         # Fork issue #312: the prior force-reset-to-/dev/stdout block
         # silently broke admin → View Logs for every install — the on-disk

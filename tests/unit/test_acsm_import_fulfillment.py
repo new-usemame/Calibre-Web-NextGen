@@ -26,6 +26,7 @@ def test_acsm_uses_import_fulfillment_independent_of_converter_flags(
 from pathlib import Path
 import json
 import subprocess
+import sys
 import types
 import zipfile
 import ingest_processor
@@ -63,6 +64,109 @@ def _processor(monkeypatch, tmp_path):
     monkeypatch.setattr(processor, 'backup', lambda path, backup_type: processor.backed_up.append((path, backup_type)) or True)
     monkeypatch.setattr(ingest_processor, 'conversion_budget_remaining', lambda: 5)
     return processor
+
+
+def _acsm_import_process_probe(tmp_path, failure_name):
+    """Drive real main/fulfillment/recovery; only the external hook/import are seams."""
+    from calibre_ticket_fulfillment import file_digest, load_result, persist_result
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        processor = _processor(monkeypatch, tmp_path)
+        ticket = Path(processor.filepath)
+        manifest = Path(str(ticket) + '.cwa.json')
+        manifest.write_text('{"action":"import","original_filename":"owned.acsm"}')
+        original = ticket.read_bytes(), manifest.read_bytes()
+        processor.ingest_ignored_formats = []
+        processor.cwa_settings = {'ingest_timeout_minutes': 1}
+        monkeypatch.setattr(processor, 'is_file_in_use', lambda: True)
+        monkeypatch.setattr(processor, 'set_library_permissions', lambda: None)
+        monkeypatch.setattr(processor, 'delete_current_file', ticket.unlink)
+        monkeypatch.setattr(ingest_processor, 'NewBookProcessor', lambda path: processor)
+        monkeypatch.setattr(ingest_processor, 'initialize_runtime', lambda: True)
+        monkeypatch.setattr(ingest_processor, '_acquire_process_lock_or_exit', lambda: None)
+        # Reach contention at import, after fulfillment has durably completed.
+        monkeypatch.setattr(ingest_processor, 'check_maintenance', lambda: None)
+        hooks = []
+
+        def fulfill(cmd, **kwargs):
+            destination = Path(cmd[cmd.index('--destination') + 1])
+            destination.mkdir(parents=True)
+            book = _epub(destination / 'ticket.epub')
+            hooks.append(str(book))
+            return 'CWNG_FULFILLMENT_RESULT=' + json.dumps(persist_result(
+                destination, file_digest(ticket), book))
+
+        monkeypatch.setattr(ingest_processor, '_run_converter_streaming', fulfill)
+        failures = {
+            'busy': ingest_processor.LibraryBusyError,
+            'timeout': TimeoutError,
+            'permission': PermissionError,
+            'retry': ingest_processor.RetryIngestSourceError,
+            'unexpected': RuntimeError,
+            'terminal': ingest_processor.PreserveIngestSourceError,
+        }
+
+        def failed_import(path, **kwargs):
+            assert kwargs == {'identity_path': str(ticket)}
+            assert Path(path).read_bytes().startswith(b'PK')
+            raise failures[failure_name]('owned import failure')
+
+        monkeypatch.setattr(processor, 'add_book_to_library', failed_import)
+        first_status = ingest_processor.main(str(ticket))
+        digest = file_digest(ticket)
+        destination = tmp_path / 'processed_books' / 'acsm_fulfilled' / digest
+        recovered = load_result(destination, digest)
+        fulfilled = Path(recovered['path']).read_bytes()
+        retained = ticket.read_bytes(), manifest.read_bytes()
+        assert retained == original
+        assert not Path(processor.tmp_conversion_dir).exists()
+
+        def completed_import(path, **kwargs):
+            assert kwargs == {'identity_path': str(ticket)}
+            assert Path(path).read_bytes() == fulfilled
+            processor.last_added_book_ids = [7]
+
+        monkeypatch.setattr(processor, 'add_book_to_library', completed_import)
+        Path(processor.tmp_conversion_dir).mkdir()
+        recovered_status = ingest_processor.main(str(ticket))
+        (tmp_path / 'observed.json').write_text(json.dumps({
+            'first_status': first_status,
+            'recovered_status': recovered_status,
+            'fulfillment_calls': len(hooks),
+            'ticket_retained_after_failure': retained == original,
+            'ticket_removed_after_success': not ticket.exists(),
+            'journal_removed_after_success': not destination.exists(),
+        }))
+        return first_status
+
+
+@pytest.mark.parametrize('failure_name,expected_status,classification', [
+    ('busy', 2, 'BUSY'), ('timeout', 2, 'BUSY'), ('permission', 2, 'BUSY'),
+    ('retry', 1, 'RETRY'), ('unexpected', 1, 'RETRY'), ('terminal', 3, 'TERMINAL'),
+])
+def test_acsm_import_process_status_preserves_recovery_and_busy_retry_signal(
+    tmp_path, failure_name, expected_status, classification,
+):
+    """The service needs exit 2 for timed retries, without spending a ticket twice."""
+    repo = Path(__file__).resolve().parents[2]
+    worker = (
+        'import sys; from pathlib import Path; '
+        'sys.path[:0] = [sys.argv[1], str(Path(sys.argv[1]) / "scripts")]; '
+        'from tests.unit.test_acsm_import_fulfillment import _acsm_import_process_probe; '
+        'sys.exit(_acsm_import_process_probe(Path(sys.argv[2]), sys.argv[3]))'
+    )
+    result = subprocess.run(
+        [sys.executable, '-c', worker, str(repo), str(tmp_path), failure_name],
+        capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == expected_status, result.stdout + result.stderr
+    observed = json.loads((tmp_path / 'observed.json').read_text())
+    assert observed == {
+        'first_status': expected_status, 'recovered_status': 0,
+        'fulfillment_calls': 1, 'ticket_retained_after_failure': True,
+        'ticket_removed_after_success': True, 'journal_removed_after_success': True,
+    }
+    assert f'[ingest-processor] {classification}:' in result.stdout
 
 
 @pytest.mark.parametrize('auto_convert,target,conversion_success', [

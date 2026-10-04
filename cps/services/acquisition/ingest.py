@@ -80,6 +80,11 @@ def read_result(metadata_db, source_sha256, library_dir):
                                     tuple(result["book_ids"]), result["disposition"])
             if outcome.source_sha256 != source_sha256:
                 raise IngestIntentError("Invalid acquisition provenance")
+            if (outcome.disposition == "existing_retained"
+                    and result.get("artifact_identity_version") != 1):
+                # Do not let early processor recovery bypass the helper's
+                # reinspection of legacy metadata-only retention results.
+                return None
             library_root = Path(library_dir).resolve(strict=True)
             book_format = result.get("format")
             if not isinstance(book_format, str) or not re.fullmatch(r"[A-Za-z0-9]{1,16}", book_format):

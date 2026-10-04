@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Shield, Trash2, Mail, UserPlus, Settings, Lock, RefreshCw, KeyRound, Info, AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 import {
@@ -384,6 +384,8 @@ function AdminConfigForm() {
   const update = useUpdateAdminConfig();
   const [form, setForm] = useState<Record<string, string | number>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [filenameError, setFilenameError] = useState<string | null>(null);
+  const filenameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!cfg) return;
@@ -398,6 +400,7 @@ function AdminConfigForm() {
       config_default_ui_font_body: cfg.config_default_ui_font_body,
       config_default_ui_font_display: cfg.config_default_ui_font_display,
       config_server_announcement: cfg.config_server_announcement,
+      config_opds_filename_template: cfg.config_opds_filename_template,
     });
   }, [cfg]);
 
@@ -407,9 +410,20 @@ function AdminConfigForm() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
+    setFilenameError(null);
     update.mutate(form, {
       onSuccess: () => setMsg({ ok: true, text: t('Settings saved.') }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
+      onError: (err) => {
+        if (err instanceof ApiError && err.detail?.code === 'invalid_opds_filename_template') {
+          setFilenameError(err.message);
+          requestAnimationFrame(() => {
+            filenameInput.current?.focus({ preventScroll: true });
+            filenameInput.current?.scrollIntoView({ block: 'center' });
+          });
+        } else {
+          setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') });
+        }
+      },
     });
   };
 
@@ -486,6 +500,27 @@ function AdminConfigForm() {
           </p>
         </label>
       </div>
+      <div className={styles.field}>
+        <label htmlFor="opds-filename-template">{t('OPDS download filename template')}</label>
+        <input id="opds-filename-template" ref={filenameInput} value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
+          placeholder="{author_sort} - {title} ({id})"
+          aria-invalid={filenameError ? true : undefined}
+          aria-describedby={`opds-filename-help${filenameError ? ' opds-filename-error' : ''}`}
+          onChange={(e) => { set('config_opds_filename_template', e.target.value); setFilenameError(null); }} />
+        {filenameError && <p id="opds-filename-error" className={styles.fieldError} role="alert">{filenameError}</p>}
+        <p id="opds-filename-help" className={styles.fieldHint}>
+          {t('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}
+          {' '}{t('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}
+        </p>
+      </div>
+      <details>
+        <summary>{t('Filename template fields and examples')}</summary>
+        <p><code>{'{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {#custom_field}'}</code></p>
+        <p>{t('First character:')} <code>{'{author_sort[0]}'}</code>.{' '}
+          {t('Padded series number:')} <code>{'{series_index:0>3s}'}</code>.</p>
+        <p>{t('Example:')} <code>{'{series:|| - }{series_index:0>3s|| - }{title}'}</code></p>
+        <p>{t('In KOReader, enable Use server filenames for the OPDS catalog.')}</p>
+      </details>
       <label className={styles.field}>
         <span>{t('Server announcement (shown to all users)')}</span>
         <input value={String(form.config_server_announcement ?? '')}

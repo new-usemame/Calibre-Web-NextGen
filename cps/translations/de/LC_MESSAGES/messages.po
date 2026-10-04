@@ -220,6 +220,11 @@ msgid "Settings DB is not Writeable"
 msgstr "Einstellungsdatenbank ist nicht schreibbar"
 
 #: cps/admin.py
+#, python-format
+msgid "Invalid OPDS filename template: %(error)s"
+msgstr ""
+
+#: cps/admin.py
 msgid ""
 "Cannot select this Boolean column until incompatible global and user "
 "restrictions are corrected or cleared."
@@ -241,6 +246,14 @@ msgid "Invalid default display font option"
 msgstr ""
 
 #: cps/admin.py
+msgid "Invalid Read Column"
+msgstr "Ungültige Gelesen Spalte"
+
+#: cps/admin.py
+msgid "Invalid Restricted Column"
+msgstr "Ungültiger Spaltenname für Einschränkung"
+
+#: cps/admin.py
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
@@ -249,14 +262,6 @@ msgstr ""
 "der bestehenden Bibliothek ist fehlgeschlagen – Bücher behalten "
 "möglicherweise ihre vorherige Reihenfolge bei, bis Sie es erneut versuchen "
 "oder sie bearbeiten."
-
-#: cps/admin.py
-msgid "Invalid Read Column"
-msgstr "Ungültige Gelesen Spalte"
-
-#: cps/admin.py
-msgid "Invalid Restricted Column"
-msgstr "Ungültiger Spaltenname für Einschränkung"
 
 #: cps/admin.py
 msgid "Calibre-Web NextGen configuration updated"
@@ -713,6 +718,14 @@ msgid "{} User Successfully Imported"
 msgstr "{} Benutzer erfolgreich importiert"
 
 #: cps/admin.py
+msgid "Library maintenance is running; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
+msgid "Disable the Calibre content server before enabling split library mode."
+msgstr ""
+
+#: cps/admin.py
 msgid "Books path not valid"
 msgstr "Bücherpfad ungültig"
 
@@ -723,6 +736,50 @@ msgstr "DB Pfad ist nicht gültig, bitte einen gültigen Pfad angeben"
 #: cps/admin.py
 msgid "DB is not Writeable"
 msgstr "Datenbank ist nicht beschreibbar"
+
+#: cps/admin.py
+msgid ""
+"The managed Calibre content server requires a POSIX platform. Use the Linux "
+"container on Windows."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Please enter a content server username and password, or allow anonymous "
+"writes"
+msgstr ""
+
+#: cps/admin.py
+msgid "Content server port must be a number from 1 to 65535"
+msgstr ""
+
+#: cps/admin.py
+msgid "Content server port must differ from the port this server listens on"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Content server username may only use the letters A-Z, numbers, spaces, "
+"underscores and hyphens"
+msgstr ""
+
+#: cps/admin.py
+msgid "Content server password must use only ASCII (English) characters"
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Invalid content server listen address: %(address)s"
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Invalid content server trusted IP/CIDR entry: %(entry)s"
+msgstr ""
+
+#: cps/admin.py
+msgid "Disable split library mode before enabling the Calibre content server."
+msgstr ""
 
 #: cps/admin.py
 msgid "Keyfile Location is not Valid, Please Enter Correct Path"
@@ -2315,7 +2372,7 @@ msgstr "Regale"
 msgid "Books organized in shelves"
 msgstr "Bücher in Regalen organisiert"
 
-#: cps/opds.py cps/templates/config_view_edit.html
+#: cps/opds.py
 msgid "Magic Shelves"
 msgstr "Magische Regale"
 
@@ -4901,6 +4958,19 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Public"
 msgstr "Öffentlich"
+
+#: cps/spa_strings.py
+msgid "Custom display name"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Custom fields on book cards"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Display name for {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -10953,6 +11023,169 @@ msgstr ""
 msgid "Could not add books to the shelf. Please try again."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "Wartet auf deine Buchauswahl"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Buch angefragt. Ein Administrator muss es genehmigen."
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Buch zu deinen Anfragen hinzugefügt."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Diese Buchauswahl war veraltet. Die Liste wird aktualisiert…"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr ""
+"Anfragen sind pausiert. Du kannst die verfügbaren Bücher weiterhin ansehen."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Dieses Buch konnte nicht angefragt werden. Versuche es erneut."
+
+#: cps/spa_strings.py
+msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+"Die Auswahl war veraltet und die verfügbaren Bücher konnten nicht "
+"aktualisiert werden. Versuche es erneut."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr ""
+"Diese Buchauswahl war veraltet. Die Liste wurde aktualisiert; wähle erneut."
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr ""
+"Die verfügbaren Bücher konnten nicht geladen werden. Versuche es erneut."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} verfügbare Bücher gefunden."
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Wähle ein Buch aus diesem Download"
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Verfügbare Bücher ausblenden"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Weiteres Buch auswählen"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Verfügbare Bücher werden geladen…"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "In diesem Download sind keine Bücher verfügbar."
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Dieses Buch importieren"
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Dieses Buch anfragen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Dieses Buch importieren: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Dieses Buch anfragen: {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} Bytes"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Angefragt"
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+"Das ausgewählte Buch ist nicht mehr im abgeschlossenen Download. Stelle vor "
+"einem erneuten Versuch die Originaldatei wieder her."
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+"Das Buch oder der abgeschlossene Download hat sich geändert. Stelle vor "
+"einem erneuten Versuch die Originaldateien wieder her."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
+"Der abgeschlossene Download überschreitet die sicheren Dateigrenzen. Wähle "
+"eine kleinere Veröffentlichung."
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr ""
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Warte"
@@ -11438,6 +11671,39 @@ msgstr ""
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr "Keine gültige gmail.json Datei mit OAuth informationen gefunden"
+
+#: cps/services/opds_filename.py
+msgid "Conditional text needs both prefix and suffix separators."
+msgstr ""
+
+#: cps/services/opds_filename.py
+msgid "Nested fields are not supported in conditional text."
+msgstr ""
+
+#: cps/services/opds_filename.py
+msgid "Use a text template of at most 1024 characters."
+msgstr ""
+
+#: cps/services/opds_filename.py
+msgid "Unmatched braces in the OPDS filename template."
+msgstr ""
+
+#: cps/services/opds_filename.py
+#, python-format
+msgid "Unknown or unsupported OPDS filename field: %(field)s"
+msgstr ""
+
+#: cps/services/opds_filename.py
+msgid "Conversions such as !r are not supported in OPDS filenames."
+msgstr ""
+
+#: cps/services/opds_filename.py
+msgid "Use string padding such as 0>3s, with a maximum width of 128."
+msgstr ""
+
+#: cps/services/opds_filename.py
+msgid "Use explicit alignment for zero padding, such as 0>3s."
+msgstr ""
 
 #: cps/tasks/annotation_sync.py
 msgid "Syncing annotations to reading services"
@@ -13053,6 +13319,65 @@ msgid "Only used when fill style is 'Solid: custom color'. Format: #RRGGBB."
 msgstr ""
 
 #: cps/templates/config_edit.html
+msgid "Enable Calibre Content Server"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Content Server Port"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Content Server Listen Address"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"127.0.0.1 keeps the content server reachable only from this machine. Enter "
+"0.0.0.0 to expose it on the network, which is required to reach it from "
+"another container or host."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Allow Anonymous Writes (no username or password required)"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"Without a username and password, anyone who can reach the listen address can "
+"read the whole library. Behind Docker port mapping or a reverse proxy on "
+"this machine, every client appears to come from the same address, so "
+"allowing that address lets everyone write."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"Addresses Allowed to Write Without a Password (Comma Separated IPs/CIDRs)"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"Leave empty to allow unauthenticated writes only from this machine. Every "
+"address listed here can add, edit and delete books in the library without "
+"any credentials, so keep it as narrow as possible."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Content Server Username"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Content Server Password"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Reset Password"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "The content server stays stopped until a new password is saved."
+msgstr ""
+
+#: cps/templates/config_edit.html
 msgid "Use Goodreads"
 msgstr "Benutze Goodreads"
 
@@ -13873,6 +14198,10 @@ msgid ""
 "Used for anonymous OPDS feed responses when the client does not send an "
 "Accept-Language header and the request does not include a ?lang= override. "
 "Authenticated users keep their own selected locale."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "OPDS Downloads"
 msgstr ""
 
 #: cps/templates/config_view_edit.html

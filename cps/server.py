@@ -288,6 +288,8 @@ class WebServer(object):
             return True
 
         log.info("Performing restart of Calibre-Web NextGen")
+        from . import content_server
+        content_server.stop_before_app_exit()
         args = self._get_args_for_reloading()
         os.execv(args[0].lstrip('"').rstrip('"'), args)
 

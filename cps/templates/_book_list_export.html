@@ -8,7 +8,7 @@
 {% elif page in ['author', 'series', 'publisher', 'category', 'language', 'ratings', 'formats'] and id is defined and id|string != '-1' %}
   {% set export.source = 'classic_catalog' if page == 'category' else 'catalog' %}
   {% set key = {'author':'author','series':'series','publisher':'publisher','category':'tag','language':'language','ratings':'rating','formats':'format'}[page] %}
-  {% set _ = export.params.update({key: id}) %}
+  {% set export_params_updated = export.params.update({key: id}) %}
 {% elif page == 'shelf' and shelf is defined %}
   {% set export.source = 'shelf' %}{% set export.id = shelf.id %}
   {# Classic sort actions materialize BookShelf.order before rendering. #}

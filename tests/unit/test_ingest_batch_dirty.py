@@ -45,6 +45,7 @@ def test_successful_import_marks_batch_dirty_without_hot_loop_http_calls(monkeyp
     monkeypatch.setenv("CWA_INGEST_BATCH_DIRTY_FILE", str(tmp_path / "batch_dirty"))
     monkeypatch.setenv("CWA_INGEST_BATCH_ACTIVE_FILE", str(tmp_path / "batch_active"))
     monkeypatch.setenv("CWA_METADATA_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("CALIBRE_DBPATH", str(tmp_path / "app.db"))
 
     import ingest_processor
 
@@ -55,11 +56,17 @@ def test_successful_import_marks_batch_dirty_without_hot_loop_http_calls(monkeyp
     requests_mock = mock.Mock()
     monkeypatch.setattr(ingest_processor, "requests", requests_mock)
 
+    def transaction(*_args):
+        from calibre_library_target import ownership
+        assert ownership.busy(str(tmp_path), "maintenance"), (
+            "raw Calibre import must exclude a managed server cache for its complete transaction")
+        return {"status": "imported", "book_ids": [7]}
+
     with mock.patch.object(processor, "_content_marker_book_ids", return_value=[]), \
         mock.patch.object(
             processor,
             "_run_calibre_transaction",
-            return_value={"status": "imported", "book_ids": [7]},
+            side_effect=transaction,
         ) as transaction_mock, \
         mock.patch.object(ingest_processor, "gdrive_sync_if_enabled"), \
         mock.patch.object(processor, "fetch_metadata_if_enabled"), \

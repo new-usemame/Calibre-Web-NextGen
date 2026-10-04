@@ -408,10 +408,13 @@ def build_adv_search_query(term):
 
 
 def render_adv_search_results(term, offset=None, order=None, limit=None):
+    from .web import _sort_join
     sort = order[0] if order else [db.Books.sort]
     pagination = None
 
     q, search_term = build_adv_search_query(term)
+    if _sort_join(order):
+        q = q.outerjoin(*_sort_join(order))
     q = q.order_by(*sort)
     flask_session['query'] = json.dumps(term)
     # The export action must represent this rendered result set even after a
@@ -480,8 +483,10 @@ def render_prepare_search_form(cc):
 
 
 def render_search_results(term, offset=None, order=None, limit=None):
+    from .web import _sort_join
     if term:
-        join = db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series
+        join = (db.books_series_link, db.Books.id == db.books_series_link.c.book,
+                db.Series, *_sort_join(order))
         entries, result_count, pagination = calibre_db.get_search_results(term,
                                                                           config,
                                                                           offset,

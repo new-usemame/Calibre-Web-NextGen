@@ -31,7 +31,7 @@ from flask_babel import get_locale
 from .cw_login import current_user
 from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from werkzeug.datastructures import Headers
 from werkzeug.http import parse_options_header
 from werkzeug.security import generate_password_hash
@@ -59,6 +59,7 @@ from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
 from .services.conversion_capabilities import get_conversion_capabilities
+from .services.opds_filename import render_filename as render_opds_filename
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -3373,7 +3374,8 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
-def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False):
+def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,
+                      filename_template=None):
     book_format = book_format.split(".")[0]
     # Try filtered view first to respect user restrictions.
     # allow_show_hidden=True: a user's own hidden book is still downloadable
@@ -3473,8 +3475,22 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             log.error(f"Failed to log download stats: {e}")
 
     file_name = book.title
-    if len(book.authors) > 0:
-        file_name = file_name + ' - ' + book.authors[0].name
+    first_author = next((author for author in book.authors if author is not None), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + (first_author.name or '')
+    if isinstance(filename_template, str):
+        filename_template = strip_whitespaces(filename_template)
+    if filename_template:
+        try:
+            file_name = render_opds_filename(
+                filename_template, book, calibre_db.session,
+                title_regex=config.config_title_regex,
+                unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
+            )
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+            # A corrupt or manually changed setting must not prevent downloads.
+            log.warning("Invalid OPDS filename template; using the default filename")
     file_name = get_valid_filename(file_name, replace_whitespace=False)
     headers = Headers()
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")

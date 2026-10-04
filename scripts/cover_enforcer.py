@@ -12,6 +12,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+from calibre_library_target import library_target, calibredb_command, operation, offline_library_access
 import sys
 import tempfile
 import time
@@ -336,11 +337,14 @@ class Book:
                 # Creating it here costs nothing and keeps the export from failing on a
                 # fresh volume.
                 os.makedirs(metadata_temp_dir, exist_ok=True)
-                result = subprocess.run(
-                    ["calibredb", "export", "--with-library", self.calibre_library, "--to-dir", metadata_temp_dir, self.book_id],
-                    env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60
-                )
-                
+                with operation(timeout=60):
+                    target = library_target(self.calibre_library)
+                    result = subprocess.run(
+                        calibredb_command(["calibredb", "export", "--to-dir", metadata_temp_dir, self.book_id] + target.args, target),
+                        env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60,
+                        input=target.stdin
+                    )
+
                 if result.returncode == 0:
                     temp_files = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(metadata_temp_dir) for f in filenames]
                     opf_files = [f for f in temp_files if f.endswith('.opf')]
@@ -797,12 +801,12 @@ class Enforcer:
         When the admin has opted in, one is designed from the book's own title
         and author first, and enforcement then embeds it like any other cover.
 
-        Best-effort: a failure here leaves the book exactly as it was and
-        enforcement carries on. An existing cover.jpg is never overwritten.
+        Best-effort: enforcement carries on after a failure. A failed flag
+        commit removes only this call's unchanged generated file, allowing a
+        later explicit enabled pass to generate again.
+        An existing cover.jpg is never overwritten.
         """
         cover_path = os.path.join(book_dir, "cover.jpg")
-        if os.path.exists(cover_path):
-            return False
         try:
             app_paths.ensure_app_root_on_sys_path()
             from cps.services import cover_generator
@@ -816,32 +820,40 @@ class Enforcer:
             book_id = (list(re.findall(r"\(\d*\)", book_dir))[-1])[1:-1]
             metadata_db = os.path.join(
                 (self.split_library or {}).get("db_path", self.calibre_library), "metadata.db")
-            with sqlite3.connect(metadata_db, timeout=60) as connection:
-                row = connection.execute(
-                    "SELECT title, has_cover, series_index FROM books WHERE id = ?",
-                    (int(book_id),)).fetchone()
-                if not row or row[1]:
-                    return False
-                title, _has_cover, series_index = row
-                authors = [name for (name,) in connection.execute(
-                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
-                    "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
-                series_row = connection.execute(
-                    "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
-                    "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
-            written = cover_generator.generate_cover_file(
-                cover_path,
-                cover_generator.BookCoverMeta(
-                    title=title or "", authors=authors,
-                    series=series_row[0] if series_row else None,
-                    series_index=series_index,
-                ),
-                preset=settings.default_preset,
-            )
-            if not written:
+            if os.path.lexists(cover_path):
                 return False
-            with sqlite3.connect(metadata_db, timeout=60) as connection:
-                connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+            with sqlite3.connect(Path(metadata_db).resolve().as_uri() + "?mode=ro", uri=True, timeout=60) as connection:
+                row = connection.execute("SELECT has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+                if not row or row[0]:
+                    return False
+            with offline_library_access(), operation():
+                with sqlite3.connect(metadata_db, timeout=60) as connection:
+                    row = connection.execute(
+                        "SELECT title, has_cover, series_index FROM books WHERE id = ?",
+                        (int(book_id),)).fetchone()
+                    if not row or row[1] or os.path.lexists(cover_path):
+                        return False
+                    title, _has_cover, series_index = row
+                    authors = [name for (name,) in connection.execute(
+                        "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
+                        "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
+                    series_row = connection.execute(
+                        "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
+                        "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
+                created = []
+                written = cover_generator.generate_cover_file(
+                    cover_path,
+                    cover_generator.BookCoverMeta(
+                        title=title or "", authors=authors,
+                        series=series_row[0] if series_row else None,
+                        series_index=series_index,
+                    ),
+                    preset=settings.default_preset, on_created=created.append,
+                )
+                if not written:
+                    return False
+                cover_generator.commit_generated_cover_flag(
+                    metadata_db, book_id, cover_path, created[0] if created else None, timeout=60)
             print(f"[cover-metadata-enforcer] INFO: Designed a cover for book {book_id} "
                   f"({settings.default_preset}) — it had none.", flush=True)
             return True
@@ -1205,7 +1217,11 @@ class Enforcer:
 
     def print_library_list(self) -> None:
         """Uses the calibredb command line utility to list the books in the library"""
-        subprocess.run(["calibredb", "list", "--with-library", self.calibre_library], env=self.calibre_env, check=True)
+        with operation():
+            target = library_target(self.calibre_library)
+            subprocess.run(calibredb_command(["calibredb", "list"] + target.args, target), env=self.calibre_env, check=True,
+                           input=target.stdin, text=target.stdin is not None)
+
 
 
     def delete_log(self, auto=True, log_path="None"):

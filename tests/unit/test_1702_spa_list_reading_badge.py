@@ -349,7 +349,7 @@ def test_advanced_search_items_expose_in_progress(readbook_db):
     with app.test_request_context(
         "/api/v1/search/advanced", method="POST", json={"title": "Book"}
     ):
-        with patch.object(search_mod, "current_user", user), patch.object(
+        with patch.object(
             books_mod, "current_user", user
         ), patch.object(
             search_mod.config, "config_books_per_page", 60, create=True

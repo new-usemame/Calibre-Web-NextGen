@@ -133,6 +133,50 @@ export function useUpdateNamedPreferences() {
   });
 }
 
+export interface CatalogCustomFieldsUpdate {
+  expected_user_id: number;
+  known_custom_column_ids: number[];
+  custom_column_ids: number[];
+  custom_column_labels: Record<string, string>;
+}
+
+/** Persist the selected scalar Calibre fields and their display labels. */
+export function useUpdateCatalogCustomFields() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // Each request writes the complete selection, so concurrent clicks must be
+    // serialized; otherwise an older snapshot may arrive last and erase a
+    // newer checkbox choice.
+    scope: { id: 'catalog-custom-fields' },
+    mutationFn: (update: CatalogCustomFieldsUpdate) => {
+      const currentId = queryClient.getQueryData<Me | null>(['me'])?.id;
+      if (currentId !== update.expected_user_id) {
+        throw new Error('Account changed before custom fields could be saved');
+      }
+      return apiPost<{
+        custom_field_ids: number[]; custom_field_labels: Record<string, string>;
+      }>('/api/v1/account/catalog-custom-fields', update);
+    },
+    onError: (error, update) => {
+      const ownerChanged = queryClient.getQueryData<Me | null>(['me'])?.id !== update.expected_user_id;
+      if (ownerChanged || (error instanceof ApiError && (error.status === 400 || error.status === 409))) {
+        void queryClient.invalidateQueries({ queryKey: ['me'] });
+        void queryClient.invalidateQueries({ queryKey: ['books'] });
+        void queryClient.invalidateQueries({ queryKey: ['adv-search'] });
+      }
+    },
+    onMutate: (update: CatalogCustomFieldsUpdate) => ({ userId: update.expected_user_id }),
+    onSuccess: (data, _update, savedFor) => {
+      queryClient.setQueryData<Me | null>(['me'], (current) => current && current.id === savedFor?.userId ? {
+        ...current,
+        catalog: { ...current.catalog, default_filter: current.catalog?.default_filter ?? null,
+          custom_field_ids: data.custom_field_ids,
+          custom_field_labels: data.custom_field_labels },
+      } : current);
+    },
+  });
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -885,6 +929,7 @@ export interface AdminConfig {
   config_default_ui_font_body: string;
   config_default_ui_font_display: string;
   config_server_announcement: string;
+  config_opds_filename_template: string;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
 }
@@ -1782,7 +1827,8 @@ export function useShelfMembership() {
 
 // ── Magic shelves (smart collections) ────────────────────────────────────────
 
-export interface MagicRule { id: string; operator: string; value: string | string[] }
+export type MagicRuleValue = string | number | boolean | null | MagicRuleValue[] | { [key: string]: MagicRuleValue };
+export interface MagicRule { id: string; operator: string; value: MagicRuleValue }
 export interface MagicRuleSet { condition: 'AND' | 'OR'; rules: MagicRuleNode[] }
 /** A rule set may nest groups: the classic builder's "Add group" writes them. */
 export type MagicRuleNode = MagicRule | MagicRuleSet;

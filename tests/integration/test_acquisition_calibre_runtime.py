@@ -55,8 +55,15 @@ def test_real_acquisition_retention_reinspection_and_durable_receipt(
     assert proof["helper"]["retained"]["disposition"] == "existing_retained"
     assert proof["helper"]["removed_reacquire"]["status"] == "imported"
     assert (
-        proof["helper"]["replacement_reinspect"]["disposition"] == "existing_retained"
+        proof["helper"]["replacement_reinspect"]["disposition"] == "imported"
     )
+    assert proof["helper"]["distinct"]["disposition"] == "imported"
+    assert proof["helper"]["annotations_preserved"]
+    assert [case["existing_language"] for case in proof["languages"]] == [["eng"], []]
+    assert all(case["annotations_preserved"] for case in proof["languages"])
+    assert proof["boundary"]["helper_and_receipt_agree"]
+    assert proof["boundary"]["external_bytes_unchanged"]
+    assert proof["boundary"]["annotations_preserved"]
     assert proof["helper"]["forged_identifier_ignored"]["book_ids"] != [1]
     assert proof["receipt"]["real_ub_schema"]
     assert proof["receipt"]["receipt_failure_rolled_back_membership"]
@@ -75,6 +82,10 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         / "tests/integration/acquisition_full_runtime_probe.py": "/tmp/acquisition_full_runtime_probe.py",
         ROOT
         / "tests/integration/acquisition_calibre_runtime_probe.py": "/tmp/acquisition_calibre_runtime_probe.py",
+        ROOT
+        / "tests/integration/acquisition_bundle_runtime_probe.py": "/tmp/acquisition_bundle_runtime_probe.py",
+        ROOT
+        / "tests/integration/acquisition_torrent_metadata_runtime_probe.py": "/tmp/acquisition_torrent_metadata_runtime_probe.py",
         ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
     }
@@ -120,3 +131,14 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     ]
     assert proof["results"][0]["receipt_retry"]
     assert all(case["source_and_private_cleanup"] for case in proof["results"])
+    bundle = proof["bundle"]
+    assert bundle["remote_submissions"] == 1 and bundle["source_files_unchanged"]
+    assert bundle["waiting_not_polled"] and bundle["private_manifests"] and bundle["real_sab_http"]
+    assert len(bundle["outcomes"]) == 3
+    assert bundle["outcomes"][0]["book_ids"] != bundle["outcomes"][1]["book_ids"]
+    assert bundle["outcomes"][2]["book_ids"] == bundle["outcomes"][0]["book_ids"]
+    metadata = proof["torrent_metadata"]
+    assert metadata["loopback_transmission_rpc"] and metadata["full_processor_subprocess"]
+    assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]
+    assert all(case["exact_descriptor_submitted"] and case["source_files_unchanged"]
+        and case["remote_submissions"] == 1 for case in metadata["outcomes"])

@@ -412,21 +412,15 @@
   border-color: var(--accent);
 }
 
-/* On narrow screens the wrapping toolbar can land the gear at the LEFT edge,
-   and the right-aligned 220px menu anchored to the 38px button then extends
-   offscreen (fork #628). Anchor the menu to the toolbar itself instead: it
-   drops below the whole toolbar, aligned to its right edge — always onscreen
-   regardless of where the gear wrapped. */
-@media (max-width: 520px) {
-  .toolbar { position: relative; }
-  .settingsWrap { position: static; }
-}
+/* Measured viewport clamping keeps the panel near its gear after wrapping. */
 
 .settingsMenu {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   min-width: 220px;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -465,6 +459,20 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .settingsItem:hover { background: var(--surface-3); }
+.customFieldSetting { padding: 0 var(--sp-2) var(--sp-2); }
+.customFieldSetting .settingsItem { padding-inline: 0; }
+.customFieldLabel {
+  width: 100%;
+  min-height: 32px;
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--text);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.customFieldLabel:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .settingsCheck {
   width: 16px;
   height: 16px;

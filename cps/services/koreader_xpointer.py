@@ -373,6 +373,46 @@ def solid_index_of_xpointer(epub_path, xpointer: str) -> Optional[tuple[str, int
     return _resolve(epub_path, run)
 
 
+def spine_reading_texts(epub_path) -> Optional[tuple]:
+    """``(member, text, solid_at)`` for every spine item in reading order, or None.
+
+    ``text`` is the item's <body> text as a reader sees it: every text node in
+    document order, with a space where a block element or ``<br>`` starts or
+    ends, so the words of adjacent paragraphs never run together.
+    ``solid_at[i]`` is the offset in ``text`` of the ``i``-th non-whitespace
+    character, the same count ``spine_solid_texts`` and
+    ``solid_index_of_xpointer`` use, so a solid index names a place in
+    ``text``.
+    """
+    def walk(el, parts):
+        for child in _raw_children(el):
+            if isinstance(child, str):
+                parts.append(child)
+            elif isinstance(child.tag, str):
+                boundary = _local(child) in _BLOCK_ELEMENTS or _local(child) == "br"
+                if boundary:
+                    parts.append(" ")
+                walk(child, parts)
+                if boundary:
+                    parts.append(" ")
+
+    def run(book):
+        out = []
+        for item in book.items:
+            chapter = _parsed_chapter(book, item)
+            if chapter is None:
+                return None
+            parts = []
+            walk(chapter.body, parts)
+            text = "".join(parts)
+            solid_at = [i for i, char in enumerate(text) if char not in _XML_SPACE]
+            if len(solid_at) != len(_solid(chapter).text):
+                return None  # the two walks disagree; no index is trustworthy
+            out.append((item.member, text, solid_at))
+        return tuple(out)
+    return _resolve(epub_path, run)
+
+
 # ---------------------------------------------------------------------------
 # Book loading
 # ---------------------------------------------------------------------------

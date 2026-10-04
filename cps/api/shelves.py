@@ -16,7 +16,7 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
 from .serializers import serialize_shelf
-from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
 from ..services import ereader_scope
@@ -150,8 +150,10 @@ def shelf_detail(shelf_id):
         return _selection_response(entries, pagination.total_count)
 
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))
+    custom_column_definitions, _custom_values = _list_custom_column_data([])
     body.update({
         "items": _rows_to_items(entries),
+        "custom_column_definitions": custom_column_definitions,
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,

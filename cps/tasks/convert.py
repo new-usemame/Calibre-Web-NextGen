@@ -19,9 +19,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask_babel import lazy_gettext as N_
 
 from cps.services.worker import CalibreTask
+from cps import content_server
+from ..calibre_library_target import calibredb_command
 from cps import db
 from cps import ub
-from cps import logger, config
+from cps import logger, config, constants
 from cps.subproc_wrapper import process_open, stream_process_output
 from flask_babel import gettext as _
 from cps.file_helper import get_temp_dir
@@ -401,7 +403,6 @@ class TaskConvert(CalibreTask):
         try:
             # path_tmp_opf = self._embed_metadata()
             if config.config_embed_metadata:
-                quotes = [5]
                 tmp_dir = get_temp_dir()
                 calibredb_binarypath = os.path.join(config.config_binariesdir, SUPPORTED_CALIBRE_BINARIES["calibredb"])
                 my_env = os.environ.copy()
@@ -411,11 +412,13 @@ class TaskConvert(CalibreTask):
                 else:
                     library_path = config.config_calibre_dir
 
-                opf_command = [calibredb_binarypath, 'show_metadata', '--as-opf', str(self.book_id),
-                               '--with-library', library_path]
-                p = process_open(opf_command, quotes, my_env, newlines=False)
-                lines = list()
-                calibre_traceback = stream_process_output(p, lines.append)
+                with content_server.ownership.operation(constants.CONFIG_DIR):
+                    target = content_server.library_target()
+                    opf_command = ([calibredb_binarypath, 'show_metadata', '--as-opf', str(self.book_id)]
+                                   + (target.args or ['--with-library', library_path]))
+                    p = process_open(calibredb_command(opf_command, target), env=my_env, newlines=False, stdin_payload=target.stdin)
+                    lines = list()
+                    calibre_traceback = stream_process_output(p, lines.append)
                 check = p.returncode
                 if check == 0:
                     path_tmp_opf = os.path.join(tmp_dir, "metadata_" + str(uuid4()) + ".opf")

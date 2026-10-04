@@ -428,6 +428,19 @@ def acquisition_job(job_id):
     with runtime.open_repository(ub.app_DB_path) as repo: return jsonify(_job(repo,repo.get_job(_owner(),job_id)))
 
 
+@api_v1.route('/acquisition/jobs/<job_id>/books',methods=['GET','POST'])
+@_endpoint()
+def acquisition_bundle_books(job_id):
+    if request.method == 'POST' and not worker_available()['available']:
+        return _error('acquisition_unavailable',503)
+    with runtime.open_repository(ub.app_DB_path) as repo:
+        if request.method == 'GET':
+            return jsonify(repo.bundle_choices(_owner(),job_id))
+        body = _json({'generation','candidate_id'})
+        job = admission.select_artifact(repo,_owner(),job_id,body.get('generation'),body.get('candidate_id'))
+        return jsonify(_job(repo,job)),202
+
+
 @api_v1.route('/acquisition/jobs/<job_id>/cancel',methods=['POST'])
 @_endpoint()
 def acquisition_cancel(job_id):

@@ -35,6 +35,7 @@ import { useAnnouncer } from '../lib/a11y/announcer';
 import { EmptyState } from '../components/EmptyState';
 import { SectionError } from '../components/SectionError';
 import { SpinnerCentered } from '../components/Spinner';
+import { AcquisitionBundleChoices } from '../components/AcquisitionBundleChoices';
 import styles from './FindBooks.module.css';
 import { AcquisitionSearch } from './AcquisitionSearch';
 
@@ -54,6 +55,7 @@ function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'act
     }
     switch (job.state) {
       case 'awaiting_approval': return { label: t('Waiting for approval'), tone: 'muted' as const };
+      case 'awaiting_selection': return { label: t('Waiting for you to choose a book'), tone: 'muted' as const };
       case 'queued': return { label: t('Queued'), tone: 'active' as const };
       case 'resolving': return { label: t('Contacting the source'), tone: 'active' as const };
       case 'downloading': return { label: t('Downloading'), tone: 'active' as const };
@@ -597,6 +599,12 @@ export function FindBooks() {
                       </button>
                     )}
                   </div>
+                  <AcquisitionBundleChoices
+                    job={job}
+                    ownerId={me?.id}
+                    canAcquire={canAcquire}
+                    requestsPaused={!runtime?.available}
+                  />
                 </li>
               );
             })}

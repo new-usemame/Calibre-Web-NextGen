@@ -20,6 +20,7 @@ from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, LargeBinary
 from sqlalchemy.exc import IntegrityError
 
 from .secrets import SealedValue
+from .bundle_storage import BundleChoicesMixin
 
 
 class StorageError(ValueError):
@@ -72,6 +73,7 @@ class Tables:
     offers: Table = field(repr=False)
     jobs: Table = field(repr=False)
     receipts: Table = field(repr=False)
+    manifests: Table = field(repr=False)
 
 
 def _sealed_columns(prefix):
@@ -87,7 +89,7 @@ def define_tables(metadata):
     integration must bind account validation/deletion to ub; tests do not
     create a parallel user model to pretend that integration is complete.
     """
-    names = ("acquisition_connection", "acquisition_offer", "acquisition_job", "acquisition_import_receipt")
+    names = ("acquisition_connection", "acquisition_offer", "acquisition_job", "acquisition_import_receipt", "acquisition_bundle_manifest")
     existing = [metadata.tables.get(name) for name in names]
     if any(table is not None for table in existing):
         if not all(table is not None for table in existing):
@@ -115,6 +117,9 @@ def define_tables(metadata):
         Column("external_id", String(128)), Column("submission_started", Float),
         Column("submission_key", String(32)), Column("submission_invalid", Boolean),
         Column("release_key", String(64)),
+        Column("download_release_key", String(64)),
+        Column("bundle_parent_id", String(36)),
+        Column("selected_artifact_id", String(64)),
         Column("add_to_my_library", Boolean, nullable=False), Column("cancel_requested", Boolean, nullable=False),
         Column("lease_token", String(64)), Column("lease_expires", Float),
         Column("next_attempt_at", Float, nullable=False, index=True), Column("claim_count", Integer, nullable=False),
@@ -132,7 +137,11 @@ def define_tables(metadata):
         Column("source_sha256", String(64), nullable=False), Column("imported_sha256", String(64), nullable=False),
         Column("book_ids_json", Text, nullable=False), Column("disposition", String(32), nullable=False),
         Column("proof_hash", String(64), nullable=False), Column("created_at", Float, nullable=False))
-    return Tables(connections, offers, jobs, receipts)
+    manifests = Table(names[4], metadata,
+        Column("job_id", String(36), ForeignKey(names[2] + ".id"), primary_key=True),
+        Column("generation", String(64), nullable=False), *_sealed_columns("payload"),
+        Column("created_at", Float, nullable=False))
+    return Tables(connections, offers, jobs, receipts, manifests)
 
 
 @dataclass(frozen=True)
@@ -156,6 +165,8 @@ class Job:
     error_code: str | None
     claim_count: int
     title: str | None = None
+    bundle_parent_id: str | None = None
+    bundle_selectable: bool = False
 
 
 @dataclass(frozen=True)
@@ -228,7 +239,9 @@ def _sealed(row, prefix):
 
 def _job(row):
     return Job(*(row[key] for key in ("id", "owner_id", "offer_id", "connection_id", "state",
-                                     "add_to_my_library", "cancel_requested", "error_code", "claim_count", "title")))
+                                     "add_to_my_library", "cancel_requested", "error_code", "claim_count", "title", "bundle_parent_id")),
+               bundle_selectable=bool(row["bundle_parent_id"] == row["id"] and (
+                   row["selected_artifact_id"] is not None or not row["cancel_requested"] and row["state"] not in ('cancelled','rejected'))))
 
 
 def _serialize_write(conn):
@@ -239,7 +252,7 @@ def _serialize_write(conn):
         conn.exec_driver_sql('BEGIN IMMEDIATE')
 
 
-class Repository:
+class Repository(BundleChoicesMixin):
     def __init__(self, engine, tables, secret_box, *, clock=time.time):
         self.engine, self.tables, self.box, self.clock = engine, tables, secret_box, clock
 
@@ -501,7 +514,8 @@ class Repository:
                            importing_since=None, error_code=None, created_at=now, updated_at=now,
                            client_id=payload.get('client_id') if release_key else None,
                            client_revision=payload.get('client_revision') if release_key else None,
-                           release_key=release_key, external_id=None, submission_started=None)
+                           release_key=release_key, external_id=None, submission_started=None,
+                           download_release_key=None, bundle_parent_id=None, selected_artifact_id=None)
                 conn.execute(table.insert().values(**row))
                 return _job(row)
         except IntegrityError:
@@ -560,7 +574,7 @@ class Repository:
                 raise NotFound("Job is unavailable")
             if row["state"] == "cancelled":
                 return
-            if row["state"] not in ("awaiting_approval", "queued", "resolving", "downloading", "staged"):
+            if row["state"] not in ("awaiting_approval", "awaiting_selection", "queued", "resolving", "downloading", "staged"):
                 raise Conflict("Job can no longer be cancelled")
             active = row["lease_token"] and row["lease_expires"] > now
             result = conn.execute(table.update().where(table.c.id == job_id,
@@ -764,7 +778,7 @@ class Repository:
                 raise Conflict("Submission is unavailable")
             if row['submission_started'] is not None:
                 return False
-            previous = conn.execute(select(table).where(table.c.release_key == row['release_key'],
+            previous = conn.execute(select(table).where(func.coalesce(table.c.download_release_key, table.c.release_key) == (row['download_release_key'] or row['release_key']),
                 table.c.client_id == row['client_id'], table.c.client_revision == row['client_revision'],
                 table.c.submission_started.is_not(None),
                 table.c.submission_invalid.is_not(True)).order_by(table.c.submission_started).limit(1)).mappings().first()
@@ -780,7 +794,7 @@ class Repository:
     def _same_submission(self, row):
         table = self.tables.jobs
         identity = table.c.submission_key == row['submission_key'] if row['submission_key'] else table.c.submission_started == row['submission_started']
-        return and_(table.c.release_key == row['release_key'], table.c.client_id == row['client_id'],
+        return and_(func.coalesce(table.c.download_release_key, table.c.release_key) == (row['download_release_key'] or row['release_key']), table.c.client_id == row['client_id'],
                     table.c.client_revision == row['client_revision'], identity)
 
     def clear_rejected_submission(self, job_id, token, *, error_code='client_error'):

@@ -5,11 +5,14 @@ from dataclasses import replace
 import json
 from pathlib import PurePosixPath
 import re
+import stat
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from .catalog import connection_config as transport_config, policy
 from .http import TransportError, run_transfer
-from .sabnzbd import SABClient, ClientError, _safe_root, completed_book, validate_nzb
+from .sabnzbd import (MAX_COMPLETED_BOOKS, MAX_COMPLETED_BYTES, MAX_COMPLETED_ENTRIES,
+    SABClient, ClientError, _safe_root, _validate_reported_path,
+    completed_books, validate_nzb)
 from .torrent import validate_torrent, validate_magnet
 
 CLIENT_KINDS = ('sabnzbd', 'nzbget', 'qbittorrent', 'transmission')
@@ -58,22 +61,61 @@ def path_matches(config, path):
     except ValueError: raise ClientError('client_path_mapping_mismatch') from None
 
 
-def torrent_book(config, directory, files, *, max_bytes=100*1024*1024):
-    """Use only the torrent's reported files, never scan a shared save folder."""
-    candidates = []
+def torrent_books(config, directory, files, *, max_bytes=100*1024*1024):
+    """Enumerate supported files from this torrent's reported file list only."""
     if not isinstance(directory, str) or not directory.startswith('/') or '\\' in directory or '..' in PurePosixPath(directory).parts:
         raise ClientError('unsafe_completed_path')
-    for row in rows(files):
+    reported_files = rows(files)
+    if len(reported_files) > MAX_COMPLETED_ENTRIES:
+        raise ClientError('completed_files_limit')
+    by_name = {}
+    for row in reported_files:
         name = row.get('name')
         if not isinstance(name, str) or not name or any(c in name for c in '\\\x00') or name.startswith('/') or any(p in ('', '.', '..') for p in name.split('/')):
             raise ClientError('unsafe_completed_path')
         remote = str(PurePosixPath(directory) / name)
         # Check containment of every file, including non-book companions.
         path_matches(config, remote)
+        _validate_reported_path(config, remote)
         if PurePosixPath(name).suffix.lower() in ('.epub', '.pdf'):
-            candidates.append(remote)
-    if len(candidates) != 1: raise ClientError('multiple_books' if candidates else 'no_usable_book')
-    return completed_book(config, candidates[0], max_bytes=max_bytes, files_only=True)
+            # A duplicated torrent file record still identifies only one local
+            # candidate. Conflicting advertised sizes make that identity unsafe.
+            advertised = row.get('size', row.get('length'))
+            if advertised is not None and (type(advertised) is not int or advertised < 0):
+                raise ClientError('invalid_client_response')
+            if name in by_name and by_name[name] != advertised:
+                raise ClientError('invalid_client_response')
+            by_name[name] = advertised
+
+    candidates = []
+    advertised_bytes = 0
+    for name, advertised in by_name.items():
+        remote = str(PurePosixPath(directory) / name)
+        if advertised is not None:
+            advertised_bytes += advertised
+        candidates.extend(completed_books(config, remote, max_bytes=max_bytes, files_only=True))
+    if len(candidates) > MAX_COMPLETED_BOOKS:
+        raise ClientError('completed_books_limit')
+    actual_bytes = 0
+    for path, _ in candidates:
+        try:
+            info = path.lstat()
+        except OSError:
+            raise ClientError('unsafe_completed_path') from None
+        if not stat.S_ISREG(info.st_mode) or path.resolve() != path:
+            raise ClientError('unsafe_completed_path')
+        actual_bytes += info.st_size
+    if advertised_bytes > MAX_COMPLETED_BYTES or actual_bytes > MAX_COMPLETED_BYTES:
+        raise ClientError('completed_size_limit')
+    return tuple(sorted(candidates, key=lambda item: item[0].as_posix()))
+
+
+def torrent_book(config, directory, files, *, max_bytes=100*1024*1024):
+    """Choose the sole supported torrent result for existing callers."""
+    candidates = torrent_books(config, directory, files, max_bytes=max_bytes)
+    if len(candidates) != 1:
+        raise ClientError('multiple_books' if candidates else 'no_usable_book')
+    return candidates[0]
 
 
 class NZBGetClient:

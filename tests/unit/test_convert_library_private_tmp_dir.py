@@ -8,6 +8,7 @@ Convert Library emptied it after every book, with separate locks, so a run
 during an ingest could delete the book the other was converting.
 """
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -35,7 +36,7 @@ def test_private_tmp_dir_sits_beside_the_shared_one(tmp_path, monkeypatch):
 
     assert private.is_dir()
     assert private.parent == tmp_path
-    assert private.name.startswith(convert_library.PRIVATE_TMP_PREFIX)
+    assert private.name.startswith(f"{convert_library.PRIVATE_TMP_PREFIX}{os.getpid()}_")
     assert registered and registered[0][1] == str(private), "the dir is removed when the run exits"
 
     # what the ingest processor does at the end of every run
@@ -67,3 +68,37 @@ def test_works_when_ingest_has_already_removed_the_shared_dir(tmp_path, monkeypa
 
     assert private.is_dir()
     assert private.parent == shared.parent
+
+
+def test_private_tmp_dir_falls_back_when_the_parent_is_not_writable(tmp_path, monkeypatch):
+    """A tmp conversion dir mounted at /cwa-tmp has "/" as its parent, which isn't writable."""
+    monkeypatch.setattr(convert_library.atexit, "register", lambda *a: None)
+    system_tmp = tmp_path / "systmp"
+    system_tmp.mkdir()
+    monkeypatch.setattr(convert_library.tempfile, "gettempdir", lambda: str(system_tmp))
+    real_mkdtemp = convert_library.tempfile.mkdtemp
+    beside = tmp_path / "locked"
+    beside.mkdir()
+
+    def mkdtemp(prefix=None, dir=None):
+        if dir == str(beside):
+            raise PermissionError(13, "Permission denied", dir)
+        return real_mkdtemp(prefix=prefix, dir=dir)
+
+    monkeypatch.setattr(convert_library.tempfile, "mkdtemp", mkdtemp)
+    private = Path(convert_library.make_private_tmp_dir(str(beside / "shared") + "/"))
+    assert private.is_dir()
+    assert private.parent == system_tmp
+
+
+def test_private_tmp_dir_falls_back_when_the_parent_cannot_be_created(tmp_path, monkeypatch):
+    """CWA_TMP_CONVERSION_DIR can be any path; if its parent can't be made, use the system temp dir."""
+    monkeypatch.setattr(convert_library.atexit, "register", lambda *a: None)
+    system_tmp = tmp_path / "systmp"
+    system_tmp.mkdir()
+    monkeypatch.setattr(convert_library.tempfile, "gettempdir", lambda: str(system_tmp))
+    blocker = tmp_path / "a-file"
+    blocker.write_text("x", encoding="utf-8")       # a file where the parent directory should be
+    private = Path(convert_library.make_private_tmp_dir(str(blocker / "shared") + "/"))
+    assert private.is_dir()
+    assert private.parent == system_tmp

@@ -99,21 +99,40 @@ _current_child = None
 # The ingest processor rmtree()s the shared one after every run and Convert Library
 # emptied it after every book, and the two have separate locks, so a run during an
 # ingest could delete the file the other was converting. Keep this prefix in sync
-# with remove_convert_library_tmp_dirs() in cps/cwa_functions.py.
+# with remove_convert_library_tmp_dirs() in cps/cwa_functions.py, including the
+# "<prefix><pid>_" naming.
 PRIVATE_TMP_PREFIX = ".cwa_convert_library_"
 
 
-def make_private_tmp_dir(shared_tmp_dir):
-    """Create this run's working directory beside the shared one and return it with a trailing slash.
+def private_tmp_parents(shared_tmp_dir):
+    """Where the working directory may live: beside the shared one, else the system temp dir."""
+    beside = os.path.dirname(shared_tmp_dir.rstrip("/")) or "."
+    return [beside, tempfile.gettempdir()]
 
-    Leftovers from runs that were killed are removed first. That is safe because the
-    caller holds the convert_library lock, so no other run is using them.
+
+def make_private_tmp_dir(shared_tmp_dir):
+    """Create this run's working directory and return it with a trailing slash.
+
+    It goes beside the shared one, creating that parent if needed
+    (CWA_TMP_CONVERSION_DIR can be any path). If the parent can't be created or
+    written to (a tmp conversion dir mounted at /cwa-tmp has "/" as its parent), it
+    goes in the system temp dir instead. The name carries this process's PID so
+    Cancel can remove exactly this run's directory. Leftovers from runs that were
+    killed are removed first. That is safe because the caller holds the
+    convert_library lock, so no other run is using them.
     """
-    parent = os.path.dirname(shared_tmp_dir.rstrip("/")) or "."
-    os.makedirs(parent, exist_ok=True)
-    for leftover in Path(parent).glob(PRIVATE_TMP_PREFIX + "*"):
-        shutil.rmtree(leftover, ignore_errors=True)
-    path = tempfile.mkdtemp(prefix=PRIVATE_TMP_PREFIX, dir=parent)
+    parents = private_tmp_parents(shared_tmp_dir)
+    for parent in dict.fromkeys(parents):
+        for leftover in Path(parent).glob(PRIVATE_TMP_PREFIX + "*"):
+            shutil.rmtree(leftover, ignore_errors=True)
+    prefix = f"{PRIVATE_TMP_PREFIX}{os.getpid()}_"
+    try:
+        os.makedirs(parents[0], exist_ok=True)
+        path = tempfile.mkdtemp(prefix=prefix, dir=parents[0])
+    except OSError as error:
+        print_and_log(f"[convert-library]: Could not create a working directory in {parents[0]} ({error}), "
+                      f"using {parents[1]} instead")
+        path = tempfile.mkdtemp(prefix=prefix, dir=parents[1])
     atexit.register(shutil.rmtree, path, True)
     return path + "/"
 

@@ -218,6 +218,18 @@ def test_other_readers_highlights_reach_the_client_as_their_words(world, client)
     assert _pull(client, quotes=False)["web-1"]["text_quote"] is None
 
 
+def test_an_edit_from_another_device_keeps_the_highlights_creator(world, client):
+    _push(client, [_highlight("hl-1", _quote(60))])
+
+    _push(client, [_highlight("hl-1", _quote(60), note_text="from the tablet",
+                              device_origin_id="tablet-1")],
+          device="WordReader (Tablet)", device_id="tablet-1")
+
+    pulled = _pull(client)["hl-1"]
+    assert pulled["note_text"] == "from the tablet"
+    assert pulled["device_origin_id"] == "phone-1"
+
+
 def test_a_highlight_another_reader_moved_comes_back_as_its_new_words(world, client):
     _push(client, [_highlight("hl-1", _quote(60))])
     moved = _koreader_highlight(world, "hl-1", 62)

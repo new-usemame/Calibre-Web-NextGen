@@ -304,7 +304,9 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row.end_container_child_index = -99
         row.end_offset = int(payload.get("end_offset") or 0)
 
-    if payload.get("device_origin_id"):
+    if payload.get("device_origin_id") and not row.device_origin_id:
+        # Where the highlight was made; another device editing it later does
+        # not become its origin.
         row.device_origin_id = payload.get("device_origin_id")
 
     if payload.get("text_quote") is None and not created and _anchor(row) != anchor_before:

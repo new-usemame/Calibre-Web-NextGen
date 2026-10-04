@@ -744,7 +744,7 @@ def _sort_join(order):
 
 def _category_order(order, *secondary):
     """Keep category grouping for built-ins, but never truncate custom order."""
-    return list(order[0]) if _sort_join(order) else [order[0][0], *secondary]
+    return list(order[0]) if _sort_join(order) or order[1] in ('ratingdesc', 'ratingasc') else [order[0][0], *secondary]
 
 
 def _sortable_custom_columns():
@@ -848,6 +848,8 @@ def render_books_list(data, sort_param, book_id, page):
         return render_series_books(page, book_id, order)
     elif data == "ratings":
         return render_ratings_books(page, book_id, order)
+    elif data == "personalratings":
+        return render_personal_ratings_books(page, book_id, order)
     elif data == "formats":
         return render_formats_books(page, book_id, order)
     elif data == "category":
@@ -917,10 +919,12 @@ def render_books_list(data, sort_param, book_id, page):
 
 
 def render_rated_books(page, book_id, order):
+    from .personal_ratings import personal_score
+    uid = viewer_id(current_user)
     if current_user.check_visibility(constants.SIDEBAR_BEST_RATED):
         entries, random, pagination = calibre_db.fill_indexpage(page, 0,
                                                                 db.Books,
-                                                                db.Books.ratings.any(db.Ratings.rating > 9),
+                                                                personal_score(uid) > 9 if uid is not None else db.Books.ratings.any(db.Ratings.rating > 9),
                                                                 order[0],
                                                                 True, config.config_read_column,
                                                                 db.books_series_link,
@@ -1166,6 +1170,26 @@ def render_series_books(page, book_id, order):
             abort(404)
     return render_title_template('index.html', random=random, pagination=pagination, entries=entries, id=book_id,
                                  title=_("Series: %(serie)s", serie=series_name), page="series", order=order[1])
+
+
+def render_personal_ratings_books(page, book_id, order):
+    from .personal_ratings import personal_score
+    uid = viewer_id(current_user)
+    if uid is None or not current_user.check_visibility(constants.SIDEBAR_RATING):
+        abort(404)
+    try:
+        score = int(book_id)
+    except (TypeError, ValueError):
+        abort(404)
+    if not 0 <= score <= 10:
+        abort(404)
+    entries, random, pagination = calibre_db.fill_indexpage(
+        page, 0, db.Books, personal_score(uid) == score, _category_order(order),
+        True, config.config_read_column, *_sort_join(order))
+    return render_title_template('index.html', random=random, pagination=pagination,
+                                 entries=entries, id=score, page='personalratings',
+                                 title=_("Your rating: %(rating)s stars", rating=score / 2) if score else _('Unrated'),
+                                 order=order[1])
 
 
 def render_ratings_books(page, book_id, order):
@@ -2639,6 +2663,16 @@ def series_list():
 @login_required_if_no_ano
 def ratings_list():
     if current_user.check_visibility(constants.SIDEBAR_RATING):
+        from .personal_ratings import personal_score
+        uid = viewer_id(current_user)
+        if uid is not None:
+            score = personal_score(uid)
+            rows = (calibre_db.session.query(score, func.count(db.Books.id))
+                    .filter(calibre_db.common_filters()).group_by(score).order_by(score.desc()).all())
+            entries = [(db.Category('%g★' % (value / 2) if value else _('Unrated'), str(value)), count)
+                       for value, count in rows]
+            return render_title_template('list.html', entries=entries, folder='web.books_list',
+                                         title=_('Your ratings'), page='ratingslist', data='personalratings', order=0)
         order_dir = current_user.get_view_property('ratings', 'dir')
         order_no = 1 if order_dir != 'desc' else 0
         order = db.Ratings.rating.desc() if order_dir == 'desc' else db.Ratings.rating.asc()
@@ -3655,6 +3689,9 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
             current_user, to_save, "show_original_filename",
             "show_original_filename_present",
         )
+        for rating_preference in ('show_library_rating', 'share_book_ratings'):
+            set_checkbox_preference_from_form(current_user, to_save, rating_preference,
+                                              rating_preference + '_present')
         current_user.hardcover_token = to_save.get("hardcover_token","" ).replace("Bearer ","" ) or None
         # Auto-send and metadata fetch settings
         current_user.auto_send_enabled = to_save.get("auto_send_enabled") == "on"

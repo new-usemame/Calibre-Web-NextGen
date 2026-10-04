@@ -2127,3 +2127,22 @@ _("The completed download exceeds the safe file limits. Choose a smaller release
 _("Unsupported rule")
 _("This rule cannot be edited here. It will be kept unless you remove it.")
 
+
+# #2248 — personal book ratings and explicit household consent.
+_("Could not load your rating.")
+_("Could not save your rating.")
+_("Household average")
+_("Library rating")
+_("Off by default. Only opted-in ratings contribute; individual names are never shown.")
+_("Save rating")
+_("Share my ratings in the household average")
+_("Show library rating")
+_("Show the labelled Calibre score alongside your own rating.")
+_("Unrated")
+_("Your rating")
+_("Your rating saved.")
+_("Your rating, highest first")
+_("Your rating, lowest first")
+_("Your score does not change the Calibre library rating. Sharing is off unless you opt in in your account.")
+_("{rating} out of 5")
+_("Your rating (stars)")

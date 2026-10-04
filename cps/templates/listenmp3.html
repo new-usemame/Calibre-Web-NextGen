@@ -46,20 +46,9 @@
             {% endif %}
           {% endfor %}
         </p>
-      {% if entry.ratings.__len__() > 0 %}
-        <div class="rating">
-        <p>
-          {% for number in range((entry.ratings[0].rating/2)|int(2)) %}
-            <span class="glyphicon glyphicon-star good"></span>
-            {% if loop.last and loop.index < 5 %}
-              {% for numer in range(5 - loop.index) %}
-                <span class="glyphicon glyphicon-star-empty"></span>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-        </p>
-        </div>
-      {% endif %}
+      {% with library_rating=entry.ratings[0].rating if entry.ratings else 0 %}
+          {% include 'library_rating.html' %}
+        {% endwith %}
       {% if entry.series|length > 0 %}
           <p>{{_("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe)}}</p>
 

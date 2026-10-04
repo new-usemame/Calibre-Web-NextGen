@@ -19270,3 +19270,98 @@ msgstr "Mostra sezione Libri letti e Libri da leggere"
 #~ msgstr ""
 #~ "I libri devono essere prima archiviati e il dispositivo sincronizzato "
 #~ "prima che un libro possa essere eliminato in sicurezza."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Could not load your rating."
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Could not save your rating."
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Household average"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Library rating"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Off by default. Only opted-in ratings contribute; individual names are never shown."
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Save rating"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Share my ratings in the household average"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Show library rating"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Show the labelled Calibre score alongside your own rating."
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Unrated"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating saved."
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating, highest first"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating, lowest first"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your score does not change the Calibre library rating. Sharing is off unless you opt in in your account."
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+#, python-brace-format
+msgid "{rating} out of 5"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+#, python-format
+msgid "%(rating)s out of 5"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your ratings"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+#, python-format
+msgid "Your rating: %(rating)s stars"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating (stars)"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating above"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating below"
+msgstr ""
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Calibre library rating (1-10)"
+msgstr ""

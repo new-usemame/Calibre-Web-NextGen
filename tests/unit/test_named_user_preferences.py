@@ -19,6 +19,8 @@ pytestmark = pytest.mark.unit
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 _FRONTEND = _ROOT / "frontend" / "src"
 _UNSET_PREFERENCES = {
+    "show_library_rating": None,
+    "share_book_ratings": None,
     "discover_hidden": None,
     "show_hidden_books": None,
     "card_actions_hidden": None,
@@ -58,6 +60,8 @@ def test_me_serializes_named_preference_and_unset_state():
             "reading_tags_hidden": False,
         },
     }))["preferences"] == {
+        "show_library_rating": None,
+        "share_book_ratings": None,
         "discover_hidden": True,
         "show_hidden_books": False,
         "card_actions_hidden": True,

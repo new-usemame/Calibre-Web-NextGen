@@ -1,0 +1,21 @@
+<section id="personal-rating" aria-labelledby="personal-rating-heading"
+    data-url="{{ url_for('api_v1.book_rating', book_id=entry.id) }}"
+    data-load-error="{{ _('Could not load your rating.') }}"
+    data-save-error="{{ _('Could not save your rating.') }}"
+    data-saved="{{ _('Your rating saved.') }}">
+  <h3 id="personal-rating-heading">{{ _('Your rating') }}</h3>
+  <p id="personal-rating-help">{{ _('Your score does not change the Calibre library rating. Sharing is off unless you opt in in your account.') }}</p>
+  <form id="personal-rating-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="personal-rating-score">{{ _('Your rating') }}</label>
+    <select id="personal-rating-score" aria-describedby="personal-rating-help personal-rating-error" disabled style="min-height:44px;max-width:100%">
+      <option value="0">{{ _('Unrated') }}</option>
+      {% for score in range(1,11) %}<option value="{{ score }}">{{ _('%(rating)s out of 5', rating=score / 2) }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-default" disabled style="min-height:44px">{{ _('Save rating') }}</button>
+  </form>
+  <p id="personal-rating-error" role="alert" hidden></p>
+  <p id="personal-rating-status" role="status" aria-live="polite">{{ _('Loading…') }}</p>
+  <button id="personal-rating-retry" type="button" class="btn btn-default" hidden style="min-height:44px">{{ _('Retry') }}</button>
+  <p id="personal-rating-average" hidden>{{ _('Household average') }}: <span></span>/5</p>
+</section>

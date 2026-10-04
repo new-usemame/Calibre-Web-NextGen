@@ -950,6 +950,26 @@ class UserLibraryBook(Base):
     )
 
 
+class BookRating(Base):
+    """An account's score, independent of Calibre's shared metadata.
+
+    Zero records an explicit clear. Keeping its clock prevents an older score
+    from reappearing when duplicate books are merged.
+    """
+    __tablename__ = 'book_rating'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'),
+                     nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    rating = Column(Integer, nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False,
+                        default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (
+        UniqueConstraint('user_id', 'book_id', name='uq_book_rating_user_book'),
+        CheckConstraint('rating >= 0 AND rating <= 10', name='ck_book_rating_range'),
+    )
+
+
 class BookReview(Base):
     """A private plain-text review/note owned by one account for one book.
 

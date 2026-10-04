@@ -19201,3 +19201,98 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Could not load your rating."
+msgstr "Je beoordeling kan niet worden geladen."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Could not save your rating."
+msgstr "Je beoordeling kan niet worden opgeslagen."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Household average"
+msgstr "Gemiddelde van het huishouden"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Library rating"
+msgstr "Bibliotheekbeoordeling"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Off by default. Only opted-in ratings contribute; individual names are never shown."
+msgstr "Standaard uitgeschakeld. Alleen beoordelingen die met toestemming worden gedeeld tellen mee; namen worden nooit getoond."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Save rating"
+msgstr "Beoordeling opslaan"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Share my ratings in the household average"
+msgstr "Mijn beoordelingen meetellen in het gemiddelde van het huishouden"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Show library rating"
+msgstr "Bibliotheekbeoordeling tonen"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Show the labelled Calibre score alongside your own rating."
+msgstr "De herkenbare Calibre-beoordeling naast je eigen beoordeling tonen."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Unrated"
+msgstr "Niet beoordeeld"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating"
+msgstr "Je beoordeling"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating saved."
+msgstr "Je beoordeling is opgeslagen."
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating, highest first"
+msgstr "Je beoordeling, hoogste eerst"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating, lowest first"
+msgstr "Je beoordeling, laagste eerst"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your score does not change the Calibre library rating. Sharing is off unless you opt in in your account."
+msgstr "Je beoordeling verandert de beoordeling in de Calibre-bibliotheek niet. Delen staat uit totdat je het in je account inschakelt."
+
+#. #2248 personal ratings; explicit account consent.
+#, python-brace-format
+msgid "{rating} out of 5"
+msgstr "{rating} van 5"
+
+#. #2248 personal ratings; explicit account consent.
+#, python-format
+msgid "%(rating)s out of 5"
+msgstr "%(rating)s van 5"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your ratings"
+msgstr "Je beoordelingen"
+
+#. #2248 personal ratings; explicit account consent.
+#, python-format
+msgid "Your rating: %(rating)s stars"
+msgstr "Je beoordeling: %(rating)s sterren"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating (stars)"
+msgstr "Je beoordeling (sterren)"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating above"
+msgstr "Je beoordeling hoger dan"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Your rating below"
+msgstr "Je beoordeling lager dan"
+
+#. #2248 personal ratings; explicit account consent.
+msgid "Calibre library rating (1-10)"
+msgstr "Calibre-bibliotheekbeoordeling (1–10)"

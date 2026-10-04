@@ -133,7 +133,7 @@ def test_list_books_search():
 
     mock_query.assert_called_once_with(
         search="dune", author_id=3, series_id=None, tag_id=None, publisher_id=None,
-        language_code=None, rating_id=None, book_format=None, filter_val="unread",
+        language_code=None, rating_id=None, personal_rating=None, book_format=None, filter_val="unread",
         show_hidden=False,
     )
 

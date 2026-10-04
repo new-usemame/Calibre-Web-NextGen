@@ -114,7 +114,10 @@ def shelf_detail(shelf_id):
     # anonymous guest has no history to sort by and falls back the way every
     # other unsupported sort does here — to the order the owner arranged.
     sort = request.args.get("sort", "stored")
-    if sort == RECENT_SORT:
+    if sort in ('ratingdesc', 'ratingasc'):
+        reader = viewer_id(current_user)
+        order = None if reader is None else book_sort_order(sort, user_id=reader)
+    elif sort == RECENT_SORT:
         reader = viewer_id(current_user)
         order = None if reader is None else recent_sort_order(reader)
     else:

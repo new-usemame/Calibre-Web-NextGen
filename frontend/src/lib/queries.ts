@@ -121,11 +121,14 @@ export function useUpdateNamedPreferences() {
     onError: (_error, _preferences, context) => {
       if (context) queryClient.setQueryData(['me'], context.previous);
     },
-    onSuccess: (data) => {
+    onSuccess: (data, preferences) => {
       queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
         ...current,
         preferences: { ...(current.preferences ?? {}), ...data.preferences },
       } : current);
+      if ('share_book_ratings' in preferences) {
+        void queryClient.invalidateQueries({ queryKey: ['book-rating'] });
+      }
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -363,7 +366,7 @@ export function useBooks(q: BooksQuery) {
   else if (readFilter !== 'all') params.set('filter', readFilter);
   if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
   if (entityKind && entityId !== undefined && entityId !== '') {
-    params.set(entityKind, String(entityId));
+    params.set(entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind, String(entityId));
   }
   const query = useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
@@ -408,7 +411,7 @@ const LIBRARY_VIEW_QUERIES = new Set([
   'discover-strip', 'account', 'me', 'about',
 ]);
 
-async function refreshLibraryViews(qc: QueryClient): Promise<void> {
+export async function refreshLibraryViews(qc: QueryClient): Promise<void> {
   const catalogQuery = (query: { queryKey: readonly unknown[] }) =>
     query.queryKey[0] === 'books' || query.queryKey[0] === 'adv-search';
   // Cancel before changing revision: an old request must not land beside the
@@ -595,10 +598,11 @@ export function useCcBooks(
 /** Fetch an entity-browse list (authors/series/tags/publishers/languages).
  *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
-  return useQuery<EntityList>(createEntityListQueryOptions(
-    plural,
-    () => apiGet<EntityList>(`/api/v1/${plural}`),
-  ));
+  const me = useMe().data;
+  const endpoint = plural === 'ratings' && me && !me.role.anonymous ? 'personal-ratings' : plural;
+  const options = createEntityListQueryOptions(endpoint,
+    () => apiGet<EntityList>(`/api/v1/${endpoint}`));
+  return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
 }
 
 /** The tag a rename collided with, carried on the 409 so the caller can offer

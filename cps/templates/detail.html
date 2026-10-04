@@ -938,30 +938,12 @@
                             <span id="read-status-message" role="status" aria-live="polite"></span>
                         </form>
                         {% endif %}
-                        {% set current_rating = (entry.ratings[0].rating / 2)|int if entry.ratings|length > 0 else 0 %}
-                        <div class="rating" id="detail-rating-block">
-                            {% if current_user.role_edit() %}
-                                <input type="number" name="rating" id="detail-rating" class="rating input-lg"
-                                       data-clearable="" data-book-id="{{ entry.id }}"
-                                       data-update-url="{{ url_for('edit-book.edit_list_book', param='rating') }}"
-                                       data-toast-on="{{ _('Rating updated') }}"
-                                       data-toast-off="{{ _('Rating cleared') }}"
-                                       value="{{ current_rating }}" />
-                            {% else %}
-                                <p>
-                                    {% if current_rating > 0 %}
-                                        {% for number in range(current_rating) %}
-                                            <span class="glyphicon glyphicon-star good"></span>
-                                        {% endfor %}
-                                    {% endif %}
-                                    {% if current_rating < 5 %}
-                                        {% for numer in range(5 - current_rating) %}
-                                            <span class="glyphicon glyphicon-star-empty"></span>
-                                        {% endfor %}
-                                    {% endif %}
-                                </p>
-                            {% endif %}
-                        </div>
+                        {% if current_user.is_authenticated and not current_user.is_anonymous %}
+                            {% include "personal_rating.html" %}
+                        {% endif %}
+                        {% if current_user.get_view_property('preferences', 'show_library_rating') is not sameas false and entry.ratings|length > 0 and entry.ratings[0].rating > 0 %}
+                        <p id="detail-library-rating">{{ _('Library rating') }}: {{ entry.ratings[0].rating / 2 }}/5</p>
+                        {% endif %}
                         {% if entry.series|length > 0 %}
                             <p id="book_of" dir="auto">{{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}</p>
                         {% endif %}
@@ -1311,6 +1293,7 @@
 
 {% block js %}
 <script src="{{ url_for('static', filename='js/book-review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/personal-rating.js') }}"></script>
 
 <script type="text/template" id="template-shelf-add">
     <li>

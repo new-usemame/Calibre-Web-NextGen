@@ -75,6 +75,7 @@
 .field {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: var(--sp-1);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -83,6 +84,8 @@
 .field input,
 .field select,
 .field textarea {
+  min-width: 0;
+  width: 100%;
   background: var(--surface-0, var(--bg));
   border: 1px solid var(--border);
   border-radius: var(--r-md);

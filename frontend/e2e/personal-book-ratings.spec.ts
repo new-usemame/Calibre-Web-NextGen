@@ -56,7 +56,10 @@ test.beforeEach(async ({ browser, baseURL }, info) => {
     expect(theme.ok(), await theme.text()).toBeTruthy();
   }
   const books = await (await pages[0].request.get('/api/v1/books?per_page=2')).json();
-  expect(books.items.length).toBeGreaterThan(0); bookId = books.items[0].id;
+  // Desktop/mobile CI workers can opt in simultaneously. Separate books keep
+  // another case's deliberate sharing out of this case's private-default oracle.
+  const bookIndex = info.project.name === 'mobile' || info.project.name.includes('phone') ? 1 : 0;
+  expect(books.items.length).toBeGreaterThan(bookIndex); bookId = books.items[bookIndex].id;
   libraryRating = (await (await pages[0].request.get(`/api/v1/books/${bookId}`)).json()).rating;
 });
 test.afterEach(async ({ baseURL }) => {

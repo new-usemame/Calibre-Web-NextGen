@@ -1502,15 +1502,46 @@ def _preserve_tracked_native_lines(raw, kept_blocks, skel):
 
 
 def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover, candidates):
+    from .assemble import HYPHENS
     regions = []
     claimed = {id(line) for region in skel.regions
                if region.reason == 'uncertain_aligned_scan_list' or
                   (region.kind=='furniture' and region.reason=='sequence_folio')
                for line in region.lines}
+    eligible = {id(line) for _, lines in kept_blocks for line in lines}
+    blocks = []
     for block in raw.text_blocks:
         lines = [line for line in block.lines if id(line) not in claimed]
         if not lines:
             continue
+        current = replace(block, lines=lines, bbox=_lines_bbox(lines,block.bbox))
+        if blocks:
+            prior = blocks[-1]
+            last, first = prior.lines[-1], lines[0]
+            joined = prior.lines + lines
+            spans = [sp for ln in joined for sp in ln.spans]
+            em = max(1, median(ln.size for ln in joined))
+            # Recognition engines may split one printed paragraph at the word
+            # they doubt. Preserve its complete source pixels, including the
+            # confident half of that same word, without transcribing the crop.
+            if (all(id(ln) in eligible for ln in joined)
+                    and spans and all(sp.font == 'ocr' for sp in spans)
+                    and any(sp.uncertain for sp in spans)
+                    and re.search('[' + HYPHENS + ']$',last.stripped)
+                    and re.match('[a-z]',first.stripped)
+                    and len(last.stripped.split()) >= 8
+                    and len(first.stripped.split()) >= 8
+                    and -.25*em <= first.bbox[1]-last.bbox[3] <= .8*em
+                    and abs(first.x0-prior.lines[0].x0) <= .4*em
+                    and abs(last.bbox[2]-first.bbox[2]) <= .8*em
+                    and abs((last.bbox[3]-last.bbox[1])-
+                            (first.bbox[3]-first.bbox[1])) <= .2*em):
+                blocks[-1] = replace(prior, lines=joined,
+                    bbox=_lines_bbox(joined,prior.bbox))
+                continue
+        blocks.append(current)
+    for block in blocks:
+        lines = block.lines
         spans = [sp for ln in lines for sp in ln.spans]
         if any(getattr(ln,"transcription_uncertain",False) for ln in lines):
             regions.append(replace(block, lines=lines,

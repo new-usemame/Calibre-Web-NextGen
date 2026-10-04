@@ -99,6 +99,10 @@
 .field select:focus-visible,
 .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 
+/* Native WebKit selects inherit preformatted whitespace. Long translated
+   options can widen the page's scroll area even within a constrained control. */
+.field select { white-space: normal; }
+
 .fieldHint { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
 
 .newActions {

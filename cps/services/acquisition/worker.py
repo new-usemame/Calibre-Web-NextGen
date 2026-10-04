@@ -281,6 +281,11 @@ class AcquisitionWorker:
                 if offer['transport'] == 'nzb': validate_nzb(descriptor)
                 elif isinstance(descriptor, str): validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
                 else: validate_torrent(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+            # A read-only client prerequisite must not fence a POST that was
+            # never attempted. qBittorrent resolves hybrid engine identity here.
+            prepare = getattr(client, 'prepare_submission', None)
+            if callable(prepare):
+                prepare(descriptor, checkpoint=checkpoint)
             checkpoint()
             fresh = repo.begin_submission(job.id, token)
             external_id, started, key = repo.submission_identity(job.id, token)

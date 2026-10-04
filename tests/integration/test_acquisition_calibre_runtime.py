@@ -89,6 +89,10 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_torrent_metadata_runtime_probe.py": "/tmp/acquisition_torrent_metadata_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_hybrid_runtime_probe.py": "/tmp/acquisition_hybrid_runtime_probe.py",
+        ROOT
+        / "tests/fixtures/virtual_library_hybrid.py": "/tmp/virtual_library_hybrid.py",
+        ROOT
         / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
         ROOT
         / "tests/fixtures/sample_books/test_minimal_valid.epub": "/tmp/acquisition-full-fixture.epub",
@@ -184,3 +188,16 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]
     assert all(case["exact_descriptor_submitted"] and case["source_files_unchanged"]
         and case["remote_submissions"] == 1 for case in metadata["outcomes"])
+    hybrid = proof['hybrid']
+    assert hybrid['real_loopback_http'] and hybrid['full_processor_subprocess']
+    assert hybrid['peer_download_or_running_released_client'] is False
+    assert len(hybrid['outcomes']) == 5
+    for case in hybrid['outcomes']:
+        assert case['external_id'] == (case['v2_infohash'][:40]
+            if case['engine'] and case['engine'].startswith('2.') else case['v1_infohash'])
+        assert case['remote_submissions'] == 1 and case['exact_descriptor_submitted']
+        assert case['source_files_and_modes_unchanged'] and case['private_receipts']
+        assert case['owned_cleanup'] and case['fresh_worker_reused_submission']
+        assert len(case['receipts']) == (2 if case['multi'] else 1)
+        if case['adapter'] == 'qbittorrent':
+            assert case['build_info_before_submit']

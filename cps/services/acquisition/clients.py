@@ -13,7 +13,7 @@ from .http import TransportError, run_transfer
 from .sabnzbd import (MAX_COMPLETED_BOOKS, MAX_COMPLETED_BYTES, MAX_COMPLETED_ENTRIES,
     SABClient, ClientError, _safe_root, _validate_reported_path,
     completed_books, validate_nzb)
-from .torrent import validate_torrent, validate_magnet
+from .torrent import validate_torrent, validate_magnet, torrent_identities
 
 CLIENT_KINDS = ('sabnzbd', 'nzbget', 'qbittorrent', 'transmission')
 USENET_KINDS = ('sabnzbd', 'nzbget')
@@ -176,6 +176,7 @@ class NZBGetClient:
 class QBitClient:
     def __init__(self, config, *, transfer=run_transfer):
         self.config, self.transfer, self.cookie = config, transfer, None
+        self._prepared_submission = None
 
     def url(self, method, **query):
         parts = urlsplit(self.config['endpoint']); path = parts.path.rstrip('/')
@@ -221,8 +222,30 @@ class QBitClient:
         rows(parsed(self.call('torrents/info', limit='1')))
         return {'title': 'qBittorrent', 'protocol': 'qbittorrent', 'api_version': version, 'browse': False, 'completed_path_readable': True}
 
+    def prepare_submission(self, descriptor, *, checkpoint=lambda: None):
+        """Resolve read-only engine facts before the worker's durable POST fence."""
+        prepared = self._prepared_submission
+        if prepared is not None and type(descriptor) is prepared[0] and descriptor == prepared[1]:
+            return prepared[2]
+        if isinstance(descriptor, str):
+            identity = validate_magnet(descriptor)
+        else:
+            hashes = torrent_identities(descriptor)
+            identity = hashes.v1
+            if hashes.v2 is not None:
+                build = parsed(self.call('app/buildInfo', checkpoint=checkpoint))
+                engine = build.get('libtorrent') if isinstance(build, dict) else None
+                if not isinstance(engine, str) or not re.fullmatch(r'(?:1\.2|2\.0)\.[0-9]{1,3}(?:\.[0-9]{1,3})?', engine):
+                    raise ClientError('unsupported_client_version')
+                # Released LT2 uses get_best(): hybrid IDs are truncated v2.
+                # LT1 uses v1. Resolve this before the fence or any submission.
+                if engine.startswith('2.0.'):
+                    identity = hashes.v2[:40]
+        self._prepared_submission = (type(descriptor), descriptor, identity)
+        return identity
+
     def submit(self, name, descriptor, *, checkpoint=lambda: None):
-        identity = validate_magnet(descriptor) if isinstance(descriptor, str) else validate_torrent(descriptor)
+        identity = self.prepare_submission(descriptor, checkpoint=checkpoint)
         # A pre-existing unrelated torrent cannot be adopted or have its policy changed.
         if rows(parsed(self.call('torrents/info', hashes=identity, checkpoint=checkpoint))): raise ClientError('torrent_already_exists')
         form = {'category': self.config['category'], 'savepath': self.config['remote_path'], 'tags': name, 'autoTMM': 'false'}

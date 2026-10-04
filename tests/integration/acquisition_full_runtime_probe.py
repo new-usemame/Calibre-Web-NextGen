@@ -492,6 +492,8 @@ def main():
                 bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_torrent_metadata_runtime_probe import run_torrent_metadata_runtime
                 torrent_metadata = run_torrent_metadata_runtime(root,repo,owner,args.fixture,ingest,library)
+                from acquisition_hybrid_runtime_probe import run_hybrid_runtime
+                hybrid = run_hybrid_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_mobi_runtime_probe import run_mobi_runtime
                 mobi = run_mobi_runtime(root,repo,owner,other_owner,ingest,library,
                                         mobi_fixture=args.mobi_fixture, mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
@@ -510,6 +512,7 @@ def main():
                         opds_publication=opds_publication,
                         opds1_entry=opds1_entry,
                         torrent_metadata=torrent_metadata,
+                        hybrid=hybrid,
                         mobi=mobi,
                         http_gets=gets,
                         full_processor_subprocess=True,

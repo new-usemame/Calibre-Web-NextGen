@@ -248,3 +248,19 @@ def test_article_and_printed_ordinal_continue_without_furniture_intrusion(left,r
         assert ''.join(root.itertext())==left+' '+right
         assert pages[0]['body'][1]==notice
         assert root.find('.//*[@id="pg_0001"]') is not None
+
+
+def test_printed_superscript_ordinal_can_continue_after_an_article():
+    pages=build_epub._page_blocks({0:'<p>I believe that the</p>',1:'<p>7<sup>th</sup> house is more accurately described.</p>'})
+    assert build_epub.block_text(pages[1]['body'][0]).startswith('7 th house')
+    assert build_epub._join_page_turns(pages)==1
+    root=ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+pages[0]['body'][0]+'</root>')
+    assert ''.join(root.itertext())=='I believe that the 7th house is more accurately described.'
+    assert root.find('.//sup').text=='th'
+
+
+def test_an_article_can_continue_with_a_printed_proper_noun():
+    pages=build_epub._page_blocks({0:'<p>the third place was known to the</p>',1:'<p>Greeks as the house of the Moon Goddess.</p>'})
+    assert build_epub._join_page_turns(pages)==1
+    root=ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+pages[0]['body'][0]+'</root>')
+    assert ''.join(root.itertext())=='the third place was known to the Greeks as the house of the Moon Goddess.'

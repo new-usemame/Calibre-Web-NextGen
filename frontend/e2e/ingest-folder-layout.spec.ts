@@ -11,7 +11,7 @@ for (const theme of ['light', 'dark']) {
     let settings = { target: 'tags', nested: false, custom_columns: [] };
     await page.route('**/api/v1/auth/me', async route => {
       const response = await route.fetch();
-      await route.fulfill({ response, json: { ...await response.json(), locale: 'fr' } });
+      await route.fulfill({ response, json: { ...await response.json(), locale: 'fr', theme } });
     });
     await page.route('**/api/v1/admin/ingest-folder-label-settings', async route => {
       if (route.request().method() === 'PUT') {
@@ -24,7 +24,7 @@ for (const theme of ['light', 'dark']) {
     const width = testInfo.project.use.isMobile ? 375 : 1280;
     await page.setViewportSize({ width, height: width === 375 ? 667 : 800 });
     await page.goto('/app/admin#ingest-folder-labels');
-    await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     const section = page.locator('#ingest-folder-labels');
     const save = section.getByRole('button', { name: 'Enregistrer les paramètres des dossiers d’import', exact: true });
     await expect(save).toBeVisible();
@@ -70,6 +70,7 @@ for (const theme of ['light', 'dark']) {
     const axe = await new AxeBuilder({ page }).include('#library-settings').include('#ingest-folder-labels').analyze();
     expect(axe.violations.filter(item => ['critical', 'serious'].includes(item.impact ?? ''))).toEqual([]);
     await page.screenshot({ path: testInfo.outputPath(`folder-settings-fr-${theme}-${width}.jpg`), type: 'jpeg', quality: 75 });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     assertNoPageErrors(errors);
   });
 }

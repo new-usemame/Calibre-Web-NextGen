@@ -6,6 +6,10 @@ import {assertNoHorizontalOverflow,assertNoPageErrors} from './utils';
 // SMTP destination, password or household setting, and never sends a message.
 for(const theme of ['light','dark']) {
   test(`attachment filename template saves, rejects and resets (${theme})`,async({page})=>{
+    await page.route('**/api/v1/auth/me',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,json:{...await response.json(),theme}});
+    });
     const writes:Record<string,unknown>[]=[];
     let cfg={mail_server:'smtp.example.invalid',mail_port:25,mail_use_ssl:0,
       mail_login:'',mail_from:'library@example.invalid',mail_size_mb:25,
@@ -28,7 +32,7 @@ for(const theme of ['light','dark']) {
       else errors.push('console.error: '+text);
     }});
     await page.goto('/app/admin#email-settings');
-    await page.evaluate(value=>document.documentElement.setAttribute('data-theme',value),theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
     const form=page.locator('#email-settings');
     const template=form.getByRole('textbox',{name:'eReader attachment filename template',exact:true});
     await expect(template).toBeVisible();await expect(template).toHaveValue('');
@@ -39,7 +43,7 @@ for(const theme of ['light','dark']) {
     expect(writes[0].mail_filename_template).toBe('{series} #{series_index} - {title}');
     expect(writes[0]).not.toHaveProperty('mail_password');
     await page.reload();await expect(template).toHaveValue('{series} #{series_index} - {title}');
-    await page.evaluate(value=>document.documentElement.setAttribute('data-theme',value),theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
     await template.fill('{title.__class__}');
     const rejection=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/mailsettings'
       && response.request().method()==='POST'
@@ -62,5 +66,6 @@ for(const theme of ['light','dark']) {
     expect(writes.filter(write=>write.mail_filename_template==='{title.__class__}')).toHaveLength(1);
     expect(rejectedConsole.length).toBeLessThanOrEqual(1);
     assertNoPageErrors(errors);
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
   });
 }

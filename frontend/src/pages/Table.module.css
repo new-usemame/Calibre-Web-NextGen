@@ -1,13 +1,18 @@
 .container { padding: var(--sp-5) var(--sp-5); }
 
-.header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.header { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.bulkActive { padding-bottom: calc(var(--bulk-bar-h, 80px) + 2 * var(--sp-5)); }
+.selectionCol { width: 48px; }
+.selectionCol input { width: 24px; height: 24px; accent-color: var(--accent); cursor: pointer; }
+.table .selectedRow, .table .selectedRow:hover { background: var(--surface-2); }
+.selectionError { color: var(--danger); margin-bottom: var(--sp-3); }
 .title { font-family: var(--font-display); font-size: var(--fs-xl); color: var(--text); }
 .count { color: var(--text-muted); font-size: var(--fs-sm); }
 
 .colWrap { position: relative; margin-left: auto; }
 .colBtn {
   display: inline-flex; align-items: center; gap: var(--sp-2);
-  font-size: var(--fs-sm); color: var(--text-muted);
+  font-size: var(--fs-sm); color: var(--text-muted); min-height: 32px;
   border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
 }
 .colBtn:hover { color: var(--text); }

@@ -7,7 +7,7 @@ from collections import Counter
 
 from . import assemble,extract,skeleton
 
-VERSION='source-heading-evidence-6'
+VERSION='source-heading-evidence-7'
 BOX_TOLERANCE=.02  # two units of serialized source-coordinate precision
 ALIGNMENT_EM=.5
 ISOLATION_LEADING=.5
@@ -109,7 +109,8 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
     for index,element in enumerate(elements):
         proof={'version':VERSION,'supported':False,'reason':'missing_source_geometry','source_line_boxes':[]}
         result[index]=proof
-        if any(run[0]=="glyph" for run in element.runs):
+        if any(run[0]=="glyph" and (not isinstance(run[2],dict) or
+                run[2].get('reason')!='transcript') for run in element.runs):
             proof["reason"]="unmapped_native_glyphs";continue
         if raw is None or raw.get('pno')!=pno or layer not in ('native','ocr'):continue
         # Native rotated pages retain unrotated spans but displayed dimensions
@@ -216,6 +217,33 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
         aligned=all(abs((line['bbox'][0]+line['bbox'][2])/2-(left+right)/2)<=ALIGNMENT_EM*body_size
                     and line['bbox'][0]>=left+ALIGNMENT_EM*body_size
                     and line['bbox'][2]<=right-ALIGNMENT_EM*body_size for line in mapped)
+        # An inset display beside a title is not the full body column. A wider
+        # current canonical paragraph can retain the printed center, provided
+        # its raw lines match exactly and belong to this same reading column.
+        references=[]
+        for other in elements:
+            if (other is element or other.kind!='p' or other.table_row
+                    or (other.band,other.column)!=(element.band,element.column)):
+                continue
+            reference,error=_map(other,lines)
+            if error or not reference or not all(same_size(s) for s in _spans(reference)):
+                continue
+            bounds=(min(l['bbox'][0] for l in reference),max(l['bbox'][2] for l in reference))
+            if bounds[1]-bounds[0]>=raw['width']*.6 and bounds[0]<=center<=bounds[1]:
+                references.append(bounds)
+        if references:
+            widest=max(b-a for a,b in references)
+            broad=[b for b in references if widest-(b[1]-b[0])<=ALIGNMENT_EM*body_size]
+            centers=[(a+b)/2 for a,b in broad]
+            if max(centers)-min(centers)<=ALIGNMENT_EM*body_size:
+                reference=max(broad,key=lambda b:b[1]-b[0])
+                full_center=sum(reference)/2
+                centered=all(abs((l['bbox'][0]+l['bbox'][2])/2-full_center)<=ALIGNMENT_EM*body_size
+                    and l['bbox'][0]>=reference[0]+ALIGNMENT_EM*body_size
+                    and l['bbox'][2]<=reference[1]-ALIGNMENT_EM*body_size for l in mapped)
+                if centered:
+                    aligned=True
+                    proof['center_reference_bounds']=list(reference)
         containing=[block for block in raw.get('blocks',[]) if any(line in mapped for line in block.get('lines',[]))]
         complete_raw_unit=bool(containing) and all(all(line in mapped for line in block.get('lines',[])) for block in containing)
         proof['complete_raw_unit']=complete_raw_unit

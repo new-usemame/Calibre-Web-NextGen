@@ -1,1277 +1,154 @@
-name: Test Suite
-
-on:
-  push:
-    # Only fire on direct pushes to main/dev (auto-merge to main, hotfixes).
-    # PR branches get CI via the `pull_request:` trigger below — listing both
-    # `branches: ['**']` here AND `pull_request:` causes dual-trigger CI runs
-    # on the same SHA, which doubles the surface for the xdist worker-IPC
-    # hang documented in notes/xdist-worker-ipc-hang-followup-2026-05-21.md.
-    branches: [main, dev]
-    # Version tags run the SPA e2e release gate (the e2e-tests job pulls the
-    # tag's GHCR image once it publishes). Without this, the job's tag
-    # condition is dead code — `branches:` alone filters out tag events.
-    tags: ['v*']
-  pull_request:
-    branches: [main, dev]  # Run Job 1 on PRs to main/dev
-  workflow_dispatch:  # Manual trigger button in Actions tab
-    inputs:
-      run_integration:
-        description: 'Run integration tests'
-        required: false
-        type: boolean
-        default: false
-      run_e2e:
-        description: 'Run E2E tests'
-        required: false
-        type: boolean
-        default: false
-
-# Cancel in-progress runs when new commit pushed
+name: Test Suite — private gevent diagnostic
+'on':
+  workflow_dispatch: {}
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # On a PR branch only the newest head matters, so a new push cancels the
-  # running verification. On main every landed commit must be verified:
-  # cancelling there let ~80% of main's runs die before dispatch under a high
-  # merge rate while Build & Push - Dev published those same commits
-  # (F-493b49). Runs on main queue behind each other instead.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
+  group: private-gevent-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
 jobs:
-  # Regenerate on PRs and after every merge. Drift is visible in the summary
-  # and downloadable artifacts, without requiring contributors to commit JSON.
-  impact-map:
-    name: Impact Map (regeneration + currency)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code and recall history
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-
-      - name: Regenerate impact map and report currency
-        run: |
-          python3 scripts/impact_map.py refresh \
-            --output-dir "$RUNNER_TEMP/impact-map" \
-            --summary "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload regenerated map, recall, and currency
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: impact-map-${{ github.sha }}
-          path: ${{ runner.temp }}/impact-map/
-          if-no-files-found: error
-          retention-days: 14
-
-  # ============================================================================
-  # JOB 1: Fast Tests (Smoke + Unit)
-  # Runs on: Every push, every PR
-  # Duration: a few minutes (~4 on a healthy runner, plus the npm install)
-  # Purpose: Catch basic errors immediately
-  # ============================================================================
   fast-tests:
-    name: Fast Tests (Smoke + Unit)
+    name: Original full Fast with private observer
     runs-on: ubuntu-latest
-    # Bounds hangs in the SETUP steps, which the test step's own
-    # timeout-minutes cannot reach. This job runs two networked installs (apt
-    # and npm) before pytest starts; without a job-level cap a stall in either
-    # runs to GitHub's 6-hour default. Twice observed stalling in the apt step.
     timeout-minutes: 25
     env:
       PYTHONDONTWRITEBYTECODE: '1'
-    
+      CWNG_GEVENT_DIAGNOSTIC_DIR: ${{ runner.temp }}/cwng-gevent-diagnostic
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          # Changelog integrity compares every canonical-era release tag. A
-          # shallow checkout would silently fall back to only the committed
-          # What's New ledger and exercise less history than normal CI can.
-          fetch-depth: 0
+    - name: Checkout exact failed product846a
+      uses: actions/checkout@v7
+      with:
+        ref: 846aa4b0e537e7cd9f1f8691547299f11a598dfa
+        path: product
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Checkout separate diagnostic source
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        path: diagnostic
+        persist-credentials: false
+    - name: Remove Python bytecode and pycache
+      run: 'echo "Removing any leftover .pyc and pycache"
 
-      - name: Remove Python bytecode and pycache
-        run: |
-          echo "Removing any leftover .pyc and pycache"
-          find . -name '__pycache__' -type d -print -exec rm -rf {} +
-          find . -name '*.pyc' -type f -print -delete
-      
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: 'pip'
+        find . -name ''__pycache__'' -type d -print -exec rm -rf {} +
 
-      # The frontend's unit suites are Node programs run from pytest
-      # (tests/unit/test_frontend_unit_suites_run.py). Without a pinned node the
-      # runner's default decides whether they execute at all, and a suite that
-      # silently stops running is the hole this job exists to close.
-      - name: Set up Node 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+        find . -name ''*.pyc'' -type f -print -delete
 
-      - name: Install frontend dependencies (npm ci)
-        working-directory: frontend
-        run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
+        '
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.13'
+        cache: pip
+        cache-dependency-path: product/pyproject.toml
+    - name: Set up Node 22
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: product/frontend/package-lock.json
+    - name: Install frontend dependencies (npm ci)
+      working-directory: product/frontend
+      run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
+    - name: Install system dependencies
+      run: 'sudo apt-get update
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          # lua5.4 runs the cwngsync KOReader plugin's own test suites. They are
-          # pure logic with no KOReader imports and had no CI runner until now,
-          # so the plugin's sync-safety logic was gated by nothing (#920).
-          sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext lua5.4
+        # lua5.4 runs the cwngsync KOReader plugin''s own test suites. They are
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[dev]'
+        # pure logic with no KOReader imports and had no CI runner until now,
 
-      - name: Create test environment structure
-        run: |
-          sudo mkdir -p /config /books/import /books/ingest /config/processed_books
-          sudo chmod -R 777 /config /books
-          touch /config/epub-fixer.log
-          touch /config/converter.log
-          touch /config/cwa.db
-      
-      - name: Run smoke and unit tests
-        # Last-resort kill; --timeout below is the real gate. 15, not 10: by
-        # 2026-09-24 a healthy run of this step took 8.4-8.7 min on main, and a
-        # PR whose tests had all passed was killed at the 10-min wall. Still
-        # inside the job's 25-min cap with the installs that precede it.
-        timeout-minutes: 15
-        env:
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
-        run: |
-          # --timeout=120 + --timeout-method=thread converts hung tests into named
-          # test failures instead of opaque step-level timeouts. Without
-          # this, a stuck test on one xdist worker only manifests as a step timeout
-          # with no indication of which test or worker stalled.
-          #
-          # --dist=loadfile pins all tests in a file to a single worker. This
-          # eliminates the work-stealing race that's been hanging fast-tests
-          # runs (one of two parallel triggers stalls at ~9 minutes with no
-          # currently-executing test for pytest-timeout to interrupt). See
-          # notes/xdist-worker-ipc-hang-followup-2026-05-21.md for diagnostic
-          # log signature + hypothesis. Fewer worker handoffs ≈ fewer races.
-          #
-          # faulthandler_timeout (INI option, set via -o — there is no CLI
-          # flag): last line of defense for whole-process freezes (e.g. the
-          # GIL↔sqlite-mutex AB-BA deadlock, see
-          # notes/fix-udf-gil-deadlock-DESIGN.md). faulthandler's watchdog
-          # writes every thread's stack WITHOUT needing the GIL, so a freeze
-          # that starves pytest-timeout still produces named stacks in the
-          # log instead of a silent step-timeout wall. 90 < the 120s
-          # pytest-timeout on purpose: a hung test logs stacks first, then
-          # pytest-timeout attempts the interrupt.
-          pytest -m "smoke or unit" \
-            -n auto \
-            --dist=loadfile \
-            --maxfail=3 \
-            -v \
-            -rs \
-            --tb=short \
-            --timeout=120 \
-            --timeout-method=thread \
-            -o faulthandler_timeout=90 \
-            --cov=cps \
-            --cov-report=xml \
-            --cov-report=term-missing
+        # so the plugin''s sync-safety logic was gated by nothing (#920).
 
-      # Tests that live under tests/unit/ but declare a non-fast lane. The
-      # marker expression above deselects them, and the Integration job selects
-      # by PATH (tests/docker/ tests/integration/), so before this step they ran
-      # in NEITHER job -- see tests/unit/test_ci_test_lanes.py, which fails if
-      # any opt-out becomes unreachable again.
-      #
-      # Deliberately NO -n: the one file here is marked `integration` precisely
-      # to stay out of the xdist pool, because cps.progress_syncing.models
-      # imports cps.db and cps.ub at module level and hangs in a worker
-      # subprocess (notes/xdist-worker-ipc-hang-followup-2026-05-21.md). Running
-      # it with -n would reintroduce the hang this classification exists to
-      # avoid. It is sub-second, so a serial step costs nothing.
-      - name: Run non-xdist unit tests (lane opt-outs)
-        run: |
-          pytest tests/unit -m "integration" \
-            -v \
-            -rs \
-            --tb=short \
-            --timeout=120 \
-            --timeout-method=thread
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        if: always()
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: fast-tests
-          fail_ci_if_error: false
-      
-      - name: Comment PR with results
-        uses: actions/github-script@v9
-        if: github.event_name == 'pull_request' && failure()
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ **Fast tests failed!** Please check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) and fix before merging.'
-            })
+        sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext lua5.4
 
-  # ============================================================================
-  # JOB 1b: Frontend Build (SPA bundle)
-  # Runs on: Every push, every PR
-  # Duration: ~1 minute
-  # Purpose: Fast TypeScript + Vite build feedback for the React SPA, so a
-  # broken bundle surfaces immediately instead of only inside the ~15-min
-  # Docker integration build. Mirrors the Dockerfile `frontend-build` stage.
-  # ============================================================================
-  frontend-build:
-    name: Frontend Build (SPA bundle)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+        '
+    - name: Install dependencies
+      run: 'python -m pip install --upgrade pip
 
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+        python -m pip install -e ''.[dev]''
 
-      - name: Install dependencies (npm ci)
-        working-directory: frontend
-        run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
+        '
+    - name: Create test environment structure
+      run: 'sudo mkdir -p /config /books/import /books/ingest /config/processed_books
 
-      - name: Build SPA (tsc -b && vite build)
-        working-directory: frontend
-        run: npm run build
+        sudo chmod -R 777 /config /books
 
-      - name: Assert bundle emitted to cps/static/app
-        run: |
-          test -f cps/static/app/index.html || { echo "::error::SPA bundle missing index.html"; exit 1; }
-          test -d cps/static/app/assets || { echo "::error::SPA bundle missing assets/"; exit 1; }
-          echo "✅ SPA bundle present at cps/static/app"
+        touch /config/epub-fixer.log
 
-  # ============================================================================
-  # JOB 2: Integration Tests (Docker)
-  # Runs on: Merge to main/dev, manual trigger
-  # Duration: ~15-20 minutes
-  # Purpose: Validate real-world behavior in Docker container
-  # ============================================================================
-  integration-tests:
-    name: Integration Tests (Docker)
-    runs-on: ubuntu-latest
+        touch /config/converter.log
+
+        touch /config/cwa.db
+
+        '
+    - name: Freeze actual product/diagnostic runtime context
+      run: 'python "$GITHUB_WORKSPACE/diagnostic/scripts/cwng_gevent_diagnostic_context.py"
+
+        '
+    - name: Run smoke and unit tests
+      timeout-minutes: 15
+      env:
+        PYTHONPATH: ${{ github.workspace }}/product:${{ github.workspace }}/product/scripts:${{ github.workspace
+          }}/diagnostic/scripts
+      run: "set +e\n# --timeout=120 + --timeout-method=thread converts hung tests into named\n# test failures instead\
+        \ of opaque step-level timeouts. Without\n# this, a stuck test on one xdist worker only manifests as a step\
+        \ timeout\n# with no indication of which test or worker stalled.\n#\n# --dist=loadfile pins all tests in\
+        \ a file to a single worker. This\n# eliminates the work-stealing race that's been hanging fast-tests\n\
+        # runs (one of two parallel triggers stalls at ~9 minutes with no\n# currently-executing test for pytest-timeout\
+        \ to interrupt). See\n# notes/xdist-worker-ipc-hang-followup-2026-05-21.md for diagnostic\n# log signature\
+        \ + hypothesis. Fewer worker handoffs ≈ fewer races.\n#\n# faulthandler_timeout (INI option, set via -o\
+        \ — there is no CLI\n# flag): last line of defense for whole-process freezes (e.g. the\n# GIL↔sqlite-mutex\
+        \ AB-BA deadlock, see\n# notes/fix-udf-gil-deadlock-DESIGN.md). faulthandler's watchdog\n# writes every\
+        \ thread's stack WITHOUT needing the GIL, so a freeze\n# that starves pytest-timeout still produces named\
+        \ stacks in the\n# log instead of a silent step-timeout wall. 90 < the 120s\n# pytest-timeout on purpose:\
+        \ a hung test logs stacks first, then\n# pytest-timeout attempts the interrupt.\npytest -m \"smoke or unit\"\
+        \ \\\n  -n auto \\\n  --dist=loadfile \\\n  --maxfail=3 \\\n  -v \\\n  -rs \\\n  --tb=short \\\n  --timeout=120\
+        \ \\\n  --timeout-method=thread \\\n  -o faulthandler_timeout=90 \\\n  --cov=cps \\\n  --cov-report=xml\
+        \ \\\n  --cov-report=term-missing \\\n  -p cwng_gevent_diagnostic_observer\nresult=$?\nmkdir -p \"$CWNG_GEVENT_DIAGNOSTIC_DIR\"\
+        \nprintf \"%s\\n\" \"$result\" > \"$CWNG_GEVENT_DIAGNOSTIC_DIR/original-full-pytest-exit.txt\"\nprintf \"\
+        actual_exit=%s\\n\" \"$result\" >> \"$GITHUB_OUTPUT\"\nexit \"$result\"\n"
+      id: original_full_fast
+    - name: Run non-xdist unit tests (lane opt-outs)
+      run: "pytest tests/unit -m \"integration\" \\\n  -v \\\n  -rs \\\n  --tb=short \\\n  --timeout=120 \\\n  --timeout-method=thread\n"
+    - name: Real stdlib sensitivity control after full suite
+      if: always()
+      timeout-minutes: 2
+      env:
+        PYTHONPATH: ${{ github.workspace }}/product:${{ github.workspace }}/product/scripts
+      run: python "$GITHUB_WORKSPACE/diagnostic/scripts/cwng_gevent_diagnostic_control_parent.py"
+    - name: Record authoritative original outcome
+      if: always()
+      env:
+        ORIGINAL_STEP_OUTCOME: ${{ steps.original_full_fast.outcome }}
+        ORIGINAL_FULL_EXIT: ${{ steps.original_full_fast.outputs.actual_exit }}
+      run: 'python - <<''PYCODE''
+
+        import json,os
+
+        from pathlib import Path
+
+        p=Path(os.environ[''CWNG_GEVENT_DIAGNOSTIC_DIR'']);p.mkdir(parents=True,exist_ok=True)
+
+        (p/''authoritative-original-outcome.json'').write_text(json.dumps({''step_outcome'':os.environ[''ORIGINAL_STEP_OUTCOME''],''full_pytest_exit'':os.environ[''ORIGINAL_FULL_EXIT'']
+        or ''MISSING: abrupt loss/setup/step timeout'',''rule'':''Control/artifact steps never replace original
+        full suite outcome''},indent=2))
+
+        PYCODE
+
+        '
+    - name: Grade diagnostic evidence separately from original suite
+      if: always()
+      run: python "$GITHUB_WORKSPACE/diagnostic/scripts/cwng_gevent_diagnostic_validate.py"
+    - name: Upload bounded diagnostic and partial worker evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: gevent-full-fast-diagnostic-${{ github.sha }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/cwng-gevent-diagnostic/
+        if-no-files-found: warn
+        retention-days: 7
     permissions:
       contents: read
-      packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
-    # `changed_paths` supplies the `build` output below. It is PR-only, so
-    # every condition here is written to survive it being skipped.
-    needs: [changed_paths]
-    # Tier-2 auto-merge requires Integration Tests as a hard gate — small
-    # code changes still need to clear the actual ingest/Calibre flow.
-    # We keep the broad-PR exemption: tier-1 (.po / *.md) PRs and PRs
-    # without a tier label don't pay the 15-minute integration cost.
-    # On main / dev pushes the job stays advisory so flaky-network failures
-    # don't block downstream auto-revert decisions. On tier-2 PRs the job
-    # is mandatory.
-    #
-    # ...and so is it on build-definition PRs from this repo. Gating on the
-    # tier label alone meant the Dockerfile — which pins the
-    # Calibre/Python/kepubify versions the runtime is assembled from — was
-    # exempt from the only job that builds it. A community PR bumping
-    # Calibre 9.1.0 → 9.11.0 (#1261) reported a green Test Suite Summary
-    # with the image never built. Running the job is not enough on its own:
-    # left advisory, a failed build would still not block the merge.
-    #
-    # Fork PRs run the job but stay ADVISORY. #1263 answered the open question
-    # — a fork's read-only GITHUB_TOKEN cannot pull the private pbs-cache
-    # mirror; the login step succeeds and the manifest HEAD still 403s — and
-    # the build-args below now route fork builds to the credential-free
-    # upstream source so they get past it. They stay advisory for one more
-    # step because that path is the release CDN whose intermittent 404s are
-    # the whole reason the mirror exists: hard-gating now would trade a
-    # guaranteed 403 block for an occasional flake block, on exactly the
-    # community PRs this is meant to unblock. Promote to a hard gate (drop the
-    # `head.repo.fork != true` clause) once fork runs have shown they build
-    # reliably.
-    continue-on-error: ${{ !(contains(github.event.pull_request.labels.*.name, 'safe-tier-2') || (needs.changed_paths.outputs.build == 'true' && github.event.pull_request.head.repo.fork != true)) }}
-    # Run on:
-    # - merge to main / dev (advisory)
-    # - manual dispatch with flag
-    # - any PR labeled safe-tier-2 (gating)
-    # - any PR touching the build definition (gating)
-    #
-    # `always()` is load-bearing: changed_paths does not run for pushes or
-    # tags, and a skipped dependency would otherwise skip this job on main
-    # too — silently deleting the integration coverage auto-revert reads.
-    if: |
-      always() && (
-      github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/dev' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_integration) ||
-      (github.event_name == 'pull_request' && (
-        contains(github.event.pull_request.labels.*.name, 'safe-tier-2') ||
-        needs.changed_paths.outputs.build == 'true'
-      ))
-      )
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-      
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR (pbs-cache mirror pull)
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          # GH_PAT (read:packages) so BuildKit can COPY --from our private
-          # pbs-cache mirror; falls back to GITHUB_TOKEN where the PAT
-          # secret isn't in scope.
-          password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[dev]'
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: false
-          load: true
-          tags: crocodilestick/calibre-web-automated:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
-          # than the release CDN, which intermittently 404s the Actions egress.
-          # Contributors build without it and fall back to the CDN (see Dockerfile).
-          #
-          # Fork PRs take that same contributor fallback. The mirror package is
-          # private and a fork's GITHUB_TOKEN is read-only and scoped to the
-          # fork, so `packages: read` does not reach it: the GHCR login above
-          # succeeds and the manifest HEAD still 403s, failing the build at the
-          # Python base image before the Dockerfile is read (#1263). Everything
-          # else — pushes, tags, workflow_dispatch, same-repo PRs — has no
-          # `pull_request` payload or `fork == false`, so it still resolves to
-          # `ghcr`. Pinned byte-for-byte by tests/unit/test_dockerfile_contributor_build.py.
-          build-args: |
-            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
-
-      - name: Set test UID/GID
-        run: |
-          echo "CWA_TEST_PUID=$(id -u)" >> "$GITHUB_ENV"
-          echo "CWA_TEST_PGID=$(id -g)" >> "$GITHUB_ENV"
-      
-      - name: Run Docker integration tests
-        run: |
-          # CRITICAL: No -n flag! Docker tests must run sequentially
-          pytest tests/docker/ tests/integration/ \
-            -v \
-            -rs \
-            --tb=long \
-            --durations=10 \
-            --junitxml=integration-results.xml
-        env:
-          CWA_TEST_PORT: "8083"  # CI uses production default port
-          CWA_TEST_IMAGE: "crocodilestick/calibre-web-automated:latest"
-        timeout-minutes: 30  # Kill if stuck
-      
-      - name: Upload test results
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: integration-test-results
-          path: |
-            integration-results.xml
-            tests/logs/
-            tests/tmp/
-          retention-days: 7
-      
-      - name: Notify on failure
-        uses: sarisia/actions-status-discord@v1
-        if: failure() && env.DISCORD_WEBHOOK != ''
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: "❌ Integration tests failed on ${{ github.ref_name }}"
-          description: |
-            **Commit**: ${{ github.sha }}
-            **Author**: ${{ github.actor }}
-            **Branch**: ${{ github.ref_name }}
-            
-            [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          color: 0xFF0000
-          username: GitHub Actions
-
-  # ============================================================================
-  # JOB 2b: Which parts of the tree did this PR touch?
-  # Runs on: pull requests only. Duration: ~20s.
-  # Purpose: let the SPA e2e job gate frontend PRs without charging a .po-only
-  #   or docs-only PR half an hour for a suite that cannot tell it anything.
-  #   Deliberately plain checkout + git rather than a paths-filter action —
-  #   this repo does not take new third-party dependencies for convenience.
-  # ============================================================================
-  changed_paths:
-    name: Detect changed paths
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    timeout-minutes: 5
-    outputs:
-      frontend: ${{ steps.detect.outputs.frontend }}
-      build: ${{ steps.detect.outputs.build }}
-      concurrency: ${{ steps.detect.outputs.concurrency }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Reject changelog structure lost by a stale PR branch
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python3 scripts/check_changelog_diff.py "$BASE_SHA" "$HEAD_SHA"
-
-      - name: Detect
-        id: detect
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          # Three-dot: what this branch changed relative to the merge base, so a
-          # busy main does not make every PR look like it touched everything.
-          files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
-          echo "$files"
-          # A PR cannot certify that its own gate is unnecessary by narrowing
-          # this script. Execute the base commit's classifier against the base
-          # tree. The introducing PR has no trusted base implementation, so it
-          # fails closed into every expensive gate instead of self-certifying.
-          classifier_ref="$BASE_SHA"
-          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py" \
-            || ! git cat-file -e "$classifier_ref:.dockerignore"; then
-            echo "::warning::Base has no trusted classifier policy; enabling every path-derived gate"
-            printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          classifier_root="$RUNNER_TEMP/base-path-classifier"
-          mkdir -p "$classifier_root"
-          git archive "$classifier_ref" cps .dockerignore scripts/ci_path_classification.py \
-            | tar -x -C "$classifier_root"
-          printf '%s\n' "$files" \
-            | python3 "$classifier_root/scripts/ci_path_classification.py" \
-                --repo-root "$classifier_root" --github-output "$GITHUB_OUTPUT"
-
-  # ============================================================================
-  # JOB 3: E2E Tests (Full Stack)
-  # Runs on: Manual trigger, all release tags (v3.2.0, v3.2.0-rc1, etc.)
-  # Duration: ~30-45 minutes
-  # Purpose: Validate complete user workflows
-  # NOTE: Tests run AFTER tag creation. Check results before publishing release!
-  # ============================================================================
-  e2e-tests:
-    name: E2E Tests (SPA)
-    runs-on: ubuntu-latest
-    # `always()` matters: changed_paths only runs on PRs, and without it a
-    # skipped dependency would drag the tag and dispatch runs down with it —
-    # silently turning the release gate off, which is the exact class of
-    # failure this whole change exists to remove.
-    needs: [changed_paths, integration-tests]
-    # Release gate + manual dispatch. The SPA e2e matrix (Layer 2 of the
-    # verification system, frontend/e2e/) is the "earn the release" gate;
-    # /CWNG_verify runs the same harness on-demand in dev. Tag runs test the
-    # tag's own GHCR image (requires `on.push.tags` above — a `branches:`-only
-    # push trigger never delivers tag events). The dev-branch condition is an
-    # explicit fail-fast tripwire: the dev-image workflow does not build dev
-    # pushes, so this job names that unsupported pairing instead of waiting for
-    # a sha tag no producer will publish.
-    # GATING (promoted 2026-07-31, #1130). This was advisory on every PR, and
-    # the promotion condition written here — "once several tag runs are green"
-    # — has been met: the harness step is green on 9 consecutive runs that
-    # actually executed it, including the v4.1.25 and v4.1.26 tag runs, with no
-    # failure in the last 60 workflow runs. While it was advisory, 19 specs
-    # failed on every run for weeks and nobody read them, because a red job
-    # still reported `success` to the summary. That made Layer 2 of the
-    # verification system decorative rather than protective.
-    #
-    # PRs touching frontend/** now run too (#953). They cannot be handled the
-    # same way: the resolver below tests a PUBLISHED image, and a pull request
-    # has none. Running the suite against :dev on a PR would test main's build
-    # regardless of what the PR did to the SPA — green either way, and worse
-    # than skipping because it would look like a gate.
-    #
-    # Frontend-only PRs take the API from :dev and overlay the PR's OWN SPA
-    # bundle into the container. Backend/build PRs wait for integration-tests,
-    # then load their own full image from the same GHA layer cache; otherwise a
-    # branch API change would be tested against main's Python code.
-    if: |
-      always() && (
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.ref == 'refs/heads/dev' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_e2e) ||
-      (github.event_name == 'pull_request' && (
-        needs.changed_paths.outputs.frontend == 'true' ||
-        (needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true)
-      ))
-      )
-    # Main/PR dev-image producers may consume their full 5m classify + 15m
-    # mirror + 60m architecture + 15m manifest budgets. Their resolver is
-    # bounded to those 95m and exits as soon as the exact run/job fails. Release
-    # tags retain their independent 120m artifact wait. Leave at least 60m for
-    # setup and Playwright's two retries of a roughly 15m suite.
-    #
-    # Advisory ONLY for fork PRs now. A fork's runner gets no repo secrets, and
-    # the resolve/pull/overlay path above has never been exercised from one —
-    # #1274, the only recent fork PR, touched no frontend files and skipped
-    # this job. Hard-gating an unmeasured infrastructure path would block
-    # community PRs for a reason unrelated to their change, which is the same
-    # trade integration-tests documents. Forks still RUN the suite and the
-    # result is still surfaced; only the block is deferred. Promote (drop the
-    # fork clause) once a real fork run shows the path works.
-    continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
-    timeout-minutes: 180
-    permissions:
-      actions: read    # inspect the exact Build & Push producer before another poll
-      contents: read
-      packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - name: Refuse unsupported dev-branch image wait
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-        run: |
-          echo "::error::Automatic dev-branch E2E has no matching dev-image producer."
-          echo "Run the dev-image workflow for this commit, then dispatch Test Suite with run_e2e=true."
-          exit 1
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Set up Docker Buildx
-        if: >-
-          github.event_name == 'pull_request' &&
-          needs.changed_paths.outputs.build == 'true' &&
-          needs.changed_paths.outputs.concurrency != 'true'
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR (app image and pbs-cache mirror)
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          # Backend PRs COPY from the same private pbs-cache package as the
-          # integration build. Use its proven read:packages credential path;
-          # GITHUB_TOKEN remains the fallback when GH_PAT is out of scope.
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-
-      # A static SPA overlay is sound only when the PR did not change the API.
-      # For backend/build PRs, changed_paths already made integration-tests build
-      # this exact tree; reuse its GHA cache and load a full-stack image so e2e
-      # cannot silently exercise main's Python code under the branch's UI.
-      - name: Build full-stack PR image
-        if: >-
-          github.event_name == 'pull_request' &&
-          needs.changed_paths.outputs.build == 'true' &&
-          needs.changed_paths.outputs.concurrency != 'true'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: false
-          load: true
-          tags: cwng-e2e-head:local
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
-
-      - name: Resolve image to test
-        id: img
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          image="ghcr.io/new-usemame/calibre-web-nextgen"
-          producer_args=()
-          if [[ "${{ github.event_name }}" == "pull_request" \
-                  && "${{ needs.changed_paths.outputs.build }}" == "true" \
-                  && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
-            # Non-concurrency backend PRs already built their checked-out full
-            # stack above. Do not replace it with :dev or wait for a sha tag
-            # whose producer only owns the concurrency-shaped lane.
-            echo "image=cwng-e2e-head:local" >> "$GITHUB_OUTPUT"
-            exit 0
-          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            tag="$GITHUB_REF_NAME"
-            attempts=240
-          elif [[ "${{ github.event_name }}" == "pull_request" \
-                  && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
-            # Frontend-only PRs (including forks) still overlay their own SPA on
-            # the currently published backend. Freeze that backend to a digest
-            # immediately; capability probes own routes it may not have.
-            tag=dev
-            attempts=1
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Manual runs are an assertion that the operator has already
-            # dispatched the dev build for this ref. Waiting two hours cannot
-            # create a tag whose producer was never started.
-            tag="sha-$SUBJECT_SHA"
-            attempts=1
-          else
-            # Main pushes and concurrency-shaped same-repo PRs are paired with
-            # docker-image-build-dev.yml. Wait only while that exact run is
-            # live, and no longer than its 95-minute job budget. No :dev
-            # fallback is allowed: an absent subject cannot earn a verdict.
-            tag="sha-$SUBJECT_SHA"
-            attempts=191
-            producer_args=(
-              "${{ github.repository }}"
-              "$SUBJECT_SHA"
-              "${{ github.event_name }}"
-              "${{ github.api_url }}"
-            )
-          fi
-          resolved="$(bash scripts/resolve-e2e-image.sh \
-            "$image" "$tag" "$attempts" 30 "${producer_args[@]}")"
-          echo "image=$resolved" >> "$GITHUB_OUTPUT"
-
-      - name: Start container (SPA enabled)
-        env:
-          IMAGE: ${{ steps.img.outputs.image }}
-        run: |
-          echo "Testing immutable image: $IMAGE"
-          # Backend PR images are built and loaded locally in this job. Registry
-          # artifacts remain digest-pinned by the resolver and must be pulled.
-          if ! docker image inspect "$IMAGE" >/dev/null 2>&1 && ! docker pull "$IMAGE"; then
-            echo "::error::$IMAGE resolved but could not be pulled"
-            exit 1
-          fi
-          mkdir -p /tmp/cwn/config /tmp/cwn/ingest
-          docker run -d --name cwn-e2e \
-            -e PUID=1000 -e PGID=1000 -e TZ=UTC -e CWNG_SPA=1 \
-            -p 8083:8083 \
-            -v /tmp/cwn/config:/config \
-            -v /tmp/cwn/ingest:/cwa-book-ingest \
-            "$IMAGE"
-          echo "Waiting for the app to answer..."
-          timeout 240 bash -c 'until curl -fsS http://localhost:8083/ -o /dev/null; do sleep 5; done'
-
-      - name: Seed books and wait for ingest
-        run: |
-          # Drop public-domain EPUBs into the ingest folder; auto-ingest imports
-          # them. The container's init chowns the bind-mounted /cwa-book-ingest
-          # to uid 1000, so the runner can't write to it from the host. Use
-          # `docker cp` (root inside the container) and hand each file to uid
-          # 1000, which the ingest service needs to process and then remove it.
-          #
-          # THREE books, not one. A single-book library silently failed 24 specs
-          # on every run of this job — "the catalog fixture needs at least two
-          # books" — and because the job is advisory, nobody ever read it. A
-          # release gate that cannot tell a real failure from a fixture that was
-          # never big enough is not a gate. pride_and_prejudice.epub is left out
-          # deliberately: at 24 MB it dominates ingest time for no extra
-          # coverage.
-          #
-          # The last two are the #1303 pair: a 2 KB right-to-left spine and its
-          # matched left-to-right control (the control asserts that only RTL
-          # books swap, so it needs a deterministic book of its own).
-          # reader-rtl.spec.ts skips itself when either is missing, so this seed
-          # — and the count check below — is what keeps it a real gate rather
-          # than a silent pass.
-          # This seed intermittently imported 0 of 5, which reds the gate on
-          # diffs that cannot reach ingest at all. The cause is a startup race,
-          # not the copy mechanism: the previous step waits only for the web app
-          # to answer HTTP, but s6 brings cwa-ingest-service up after it, and
-          # inotifywait reports only events that happen once its watches exist.
-          # cwa-ingest-service/run has no startup scan of the folder, so a book
-          # that lands in that gap is never seen -- watches established, no
-          # ingest activity, 0 of 5. Nothing retries it, because from the
-          # service's point of view nothing ever happened.
-          #
-          # So: wait for the watcher, then keep nudging whatever it still
-          # missed. Ingest deletes each file once it has imported it, so a book
-          # still sitting in the folder is by definition one the watcher never
-          # picked up -- renaming it away and back fires a fresh event for it.
-          # That second half is what makes this deterministic rather than a
-          # narrower race: it recovers a lost event whatever the reason for it.
-          echo "Waiting for the ingest watcher to establish its watches..."
-          timeout 180 bash -c 'until docker logs cwn-e2e 2>&1 | grep -q "\[cwa-ingest-service\] Watching folder:"; do sleep 2; done' \
-            || echo "::warning::ingest watcher banner never appeared; relying on the re-nudge below"
-          sleep 5
-          docker exec -u 0 cwn-e2e mkdir -p /tmp/seed
-          for book in alice_in_wonderland christmas_carol metamorphosis test_rtl_vertical test_ltr_horizontal; do
-            docker cp "tests/fixtures/sample_books/${book}.epub" \
-              "cwn-e2e:/tmp/seed/${book}.epub"
-            docker exec -u 0 cwn-e2e chown 1000:1000 "/tmp/seed/${book}.epub"
-            docker exec -u 0 cwn-e2e mv "/tmp/seed/${book}.epub" \
-              "/cwa-book-ingest/${book}.epub"
-          done
-          echo "Polling for the imported book via the API..."
-          jar=$(mktemp); total=0
-          for i in $(seq 1 60); do
-            csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])' 2>/dev/null || true)
-            [ -n "$csrf" ] && curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
-              -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-              -d '{"username":"admin","password":"admin123"}' -o /dev/null || true
-            total=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?limit=1' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("total",0))' 2>/dev/null || echo 0)
-            echo "  attempt $i: books total=$total"
-            # Wait for ALL of them: breaking at the first import is what left
-            # the library at one book while the step reported success.
-            [ "${total:-0}" -ge 5 ] && break
-            # Ingest removes each file once it has imported it, so anything
-            # still sitting in the folder is a book the watcher never saw.
-            # Rename it away and back to fire a fresh event. The intermediate
-            # name is deliberately not a book extension, so only the move back
-            # is acted on. Every 30s, so a lost event costs a little time
-            # rather than the whole run.
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "  re-nudging books the watcher has not picked up yet"
-              docker exec -u 0 cwn-e2e sh -c \
-                'for f in /cwa-book-ingest/*.epub; do [ -e "$f" ] || continue; mv "$f" "$f.renudge" && mv "$f.renudge" "$f"; done' || true
-            fi
-            sleep 5
-          done
-          if [ "${total:-0}" -lt 5 ]; then
-            echo "::error::ingest imported only ${total:-0} of 5 seed books — dumping ingest logs"
-            docker logs cwn-e2e 2>&1 | grep -iE 'ingest|convert|import|error|watch' | tail -40 || true
-            exit 1
-          fi
-
-      - name: Seed PDF and comic books (spec fixtures)
-        run: |
-          # reader-pdf-viewer.spec.ts needs a book with a PDF format, and the
-          # ingest seed above is EPUB-only — so the spec found no PDF and failed
-          # on the fixture rather than on anything real, exactly the #1130 shape
-          # the shelves seed below exists to prevent.
-          #
-          # calibredb writes the format straight into the library. Ingest is the
-          # wrong instrument here: it converts on the way in, so dropping a PDF
-          # in that folder is not a reliable way to end up with a PDF format.
-          #
-          # The fixture is three pages deliberately. #1584's symptom was "only
-          # the first page is visible", which a one-page PDF cannot detect.
-          docker cp tests/fixtures/sample_books/three_page_sample.pdf \
-            cwn-e2e:/tmp/three_page_sample.pdf
-          added=$(docker exec cwn-e2e calibredb add /tmp/three_page_sample.pdf \
-            --with-library /calibre-library | tee /dev/stderr \
-            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
-          [ -n "$added" ] || { echo "::error::calibredb add reported no book id"; exit 1; }
-          # Backdate it, because a new book is a NEW book: the default sort is
-          # newest-first, and several specs walk the library from the top to find
-          # something readable. Landing a PDF at position one displaced that and
-          # made reader-phase1 time out — a fixture breaking specs it has nothing
-          # to do with, which is the trap the book-lane convention exists to
-          # avoid. Oldest keeps it out of everyone's way; the PDF spec finds it
-          # by format, not by position.
-          docker exec cwn-e2e calibredb set_metadata \
-            --field timestamp:2001-01-01T00:00:00+00:00 "$added" \
-            --with-library /calibre-library >/dev/null
-
-          # viewer-download-roles.spec.ts exercises the real comic metadata and
-          # page-byte endpoints. A hardcoded id once hid that the harness did not
-          # seed any comic at all; add a deterministic one-page CBZ and let the
-          # spec discover its generated id through the API.
-          docker cp tests/fixtures/sample_books/role_matrix_comic.cbz \
-            cwn-e2e:/tmp/role_matrix_comic.cbz
-          comic_added=$(docker exec cwn-e2e calibredb add /tmp/role_matrix_comic.cbz \
-            --with-library /calibre-library | tee /dev/stderr \
-            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
-          [ -n "$comic_added" ] || { echo "::error::calibredb add reported no comic book id"; exit 1; }
-          docker exec cwn-e2e calibredb set_metadata \
-            --field timestamp:2001-01-02T00:00:00+00:00 "$comic_added" \
-            --with-library /calibre-library >/dev/null
-
-          jar=$(mktemp)
-          csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
-            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-            -d '{"username":"admin","password":"admin123"}' -o /dev/null
-          # Assert through the same endpoint the spec reads, so a book that was
-          # added but is invisible to the API fails here and not as a spec.
-          pdfs=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=200' \
-            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower()=="pdf" for f in b.get("formats",[]))))')
-          echo "books with a PDF format: $pdfs"
-          [ "${pdfs:-0}" -ge 1 ] || { echo "::error::no PDF-format book after seeding"; exit 1; }
-          comics=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=200' \
-            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower() in ("cbz","cbr","cbt") for f in b.get("formats",[]))))')
-          echo "books with a comic format: $comics"
-          [ "${comics:-0}" -ge 1 ] || { echo "::error::no comic-format book after seeding"; exit 1; }
-
-      - name: Seed twenty-book shelf-drag fixture
-        run: |
-          # #946 drags twenty distinct real books and checks persisted membership.
-          # The normal five EPUBs plus PDF/comic supply only seven. Small EPUBs
-          # keep that real-write invariant runnable without large ingest inputs.
-          python3 - <<'PY'
-          import importlib.util
-          from pathlib import Path
-          spec = importlib.util.spec_from_file_location("synthetic", "tests/fixtures/generate_synthetic.py")
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          module.create_minimal_epub(Path("/tmp/shelf-drag-fixture.epub"))
-          PY
-          docker cp /tmp/shelf-drag-fixture.epub cwn-e2e:/tmp/shelf-drag-fixture.epub
-          for number in $(seq 1 13); do
-            added=$(docker exec cwn-e2e calibredb add /tmp/shelf-drag-fixture.epub \
-              --title "Shelf drag fixture $number" --authors "CWA Shelf Drag Suite" --duplicates \
-              --with-library /calibre-library | tee /dev/stderr \
-              | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
-            [ -n "$added" ] || { echo "::error::shelf-drag fixture $number was not added"; exit 1; }
-            # Keep the established reader/RTL/PDF fixtures first in newest sort.
-            docker exec cwn-e2e calibredb set_metadata \
-              --field timestamp:2000-01-01T00:00:00+00:00 "$added" \
-              --with-library /calibre-library >/dev/null
-          done
-          jar=$(mktemp)
-          csrf=$(curl -fsS -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          curl -fsS -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
-            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-            -d '{"username":"admin","password":"admin123"}' -o /dev/null
-          count=$(curl -fsS -b "$jar" 'http://localhost:8083/api/v1/books?per_page=20&sort=new' \
-            | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["items"]))')
-          [ "$count" -eq 20 ] || { echo "::error::shelf-drag fixture exposes only $count of 20 books"; exit 1; }
-          rm -f "$jar" /tmp/shelf-drag-fixture.epub
-
-      - name: Seed shelves and series
-        run: |
-          # The library the harness gets had three books and NO shelves, so
-          # every spec asserting shelf grouping failed on the fixture rather
-          # than on anything real (#1130). Reuse the session the ingest poll
-          # above already logged in with.
-          #
-          # Verification fixture only: these shelves exist so the sidebar has
-          # something to group. Nothing here changes product behaviour, and the
-          # e2e job stays advisory on PRs.
-          jar=$(mktemp)
-          csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
-            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-            -d '{"username":"admin","password":"admin123"}' -o /dev/null
-          csrf=$(curl -s -b "$jar" -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          for shelf in "Reading now" "To read"; do
-            code=$(curl -s -o /tmp/shelf.json -w '%{http_code}' \
-              -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/shelves \
-              -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-              -d "{\"name\": \"$shelf\"}")
-            echo "  create shelf '$shelf' -> $code"
-            # 409 is fine (already there); anything else is a broken fixture and
-            # should fail loudly rather than resurface as confusing spec failures.
-            if [ "$code" != "201" ] && [ "$code" != "409" ]; then
-              echo "::error::could not create shelf '$shelf' (HTTP $code)"; cat /tmp/shelf.json; exit 1
-            fi
-          done
-          total=$(curl -s -b "$jar" http://localhost:8083/api/v1/shelves \
-            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(len(d.get("items",d if isinstance(d,list) else [])))' 2>/dev/null || echo 0)
-          echo "shelves now: $total"
-          [ "${total:-0}" -ge 1 ] || { echo "::error::no shelves after seeding"; exit 1; }
-
-          # Give two books a series. Without one, no book CARD renders a series
-          # line — and the card series line is where #1135's contrast failure
-          # lives, so the a11y gate could only catch that class of bug by luck
-          # of fixture. A gate that depends on the seed happening to contain the
-          # right shape of data is not a gate.
-          csrf=$(curl -s -b "$jar" -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          ids=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=2' \
-            | python3 -c 'import sys,json;print(" ".join(str(b["id"]) for b in json.load(sys.stdin)["items"]))')
-          idx=1
-          for bid in $ids; do
-            code=$(curl -s -o /tmp/md.json -w '%{http_code}' \
-              -b "$jar" -c "$jar" -X POST "http://localhost:8083/api/v1/books/$bid/metadata" \
-              -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-              -d "{\"series\": \"E2E Fixture Series\", \"series_index\": $idx}")
-            echo "  book $bid series -> $code"
-            if [ "$code" != "200" ]; then
-              echo "::error::could not set series on book $bid (HTTP $code)"; cat /tmp/md.json; exit 1
-            fi
-            idx=$((idx + 1))
-          done
-          series_count=$(curl -s -b "$jar" http://localhost:8083/api/v1/series \
-            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(len(d.get("items",[])))' 2>/dev/null || echo 0)
-          echo "series now: $series_count"
-          [ "${series_count:-0}" -ge 1 ] || { echo "::error::no series after seeding"; exit 1; }
-
-      - name: Enable magic-link login (spec fixture)
-        run: |
-          # login-redirect.spec.ts drives a REAL magic-link flow: it POSTs
-          # /api/v1/auth/magic-link/start logged-out and asserts the response is
-          # 2xx. That endpoint is gated on the admin toggle config_remote_login,
-          # which is `default=False` in cps/config_sql.py — so a fresh container
-          # answers 403 magic_link_disabled and the spec fails on the FIXTURE,
-          # not on the product. It failed that way on every branch, including a
-          # CHANGELOG-only one, which is how a permanently-red advisory gate got
-          # normalised. Same class as the missing shelves (#1130) and the missing
-          # series above: a gate that depends on the seed happening to contain
-          # the right shape of data is not a gate.
-          #
-          # sp2-display-options.spec.ts does not need this — it mocks
-          # /auth/config at the network layer and never reaches the endpoint.
-          jar=$(mktemp)
-          csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
-            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-            -d '{"username":"admin","password":"admin123"}' -o /dev/null
-          csrf=$(curl -s -b "$jar" -c "$jar" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          code=$(curl -s -o /tmp/sec.json -w '%{http_code}' \
-            -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/admin/security \
-            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
-            -d '{"remote_login": true}')
-          echo "  enable remote_login -> $code"
-          if [ "$code" != "200" ]; then
-            echo "::error::could not enable remote_login (HTTP $code)"; cat /tmp/sec.json; exit 1
-          fi
-          enabled=$(curl -s -b "$jar" http://localhost:8083/api/v1/admin/security \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin).get("remote_login"))')
-          echo "remote_login now: $enabled"
-          [ "$enabled" = "True" ] || { echo "::error::remote_login still $enabled after seeding"; exit 1; }
-
-          # Assert the thing the spec actually depends on, from a LOGGED-OUT
-          # session, so a future regression fails loudly here instead of
-          # resurfacing as a confusing spec failure 15 minutes later.
-          anon=$(mktemp)
-          acsrf=$(curl -s -c "$anon" http://localhost:8083/api/v1/auth/csrf \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
-          code=$(curl -s -o /tmp/ml.json -w '%{http_code}' \
-            -b "$anon" -c "$anon" -X POST http://localhost:8083/api/v1/auth/magic-link/start \
-            -H 'Content-Type: application/json' -H "X-CSRFToken: $acsrf")
-          echo "  anonymous magic-link/start -> $code"
-          if [ "$code" != "200" ]; then
-            echo "::error::magic-link/start returns $code for a logged-out client — login-redirect.spec.ts cannot pass"
-            cat /tmp/ml.json; exit 1
-          fi
-          python3 -c 'import json,sys; d=json.load(open("/tmp/ml.json")); sys.exit(0 if d.get("verify_url") else 1)' \
-            || { echo "::error::magic-link/start returned 200 with no verify_url"; cat /tmp/ml.json; exit 1; }
-
-      - name: Resolve Playwright browser version
-        id: playwright-version
-        working-directory: frontend
-        run: |
-          version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
-
-      # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
-      # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for
-      # 193s (>3m) with both caches warm. Ten minutes per step gives >17x/28x
-      # median headroom and >3x that observed stall floor, while still failing
-      # a real setup hang far before the job's 180m guard.
-      - name: Install frontend dependencies (npm ci)
-        timeout-minutes: 10
-        working-directory: frontend
-        run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
-
-      - name: Install Playwright browsers
-        timeout-minutes: 10
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium webkit
-
-      # Frontend-only PRs intentionally reuse a digest-pinned :dev backend to
-      # avoid a full multi-arch build for a static-bundle change. Overlay their
-      # own bundle/templates. Main and concurrency-shaped PRs already boot the
-      # triggering commit's sha-tagged image and must remain byte-for-byte that
-      # artifact; overlaying them would weaken the image identity proof.
-      - name: Overlay the SPA bundle under test into the container
-        if: >-
-          github.event_name == 'pull_request' &&
-          needs.changed_paths.outputs.build != 'true' &&
-          needs.changed_paths.outputs.concurrency != 'true'
-        working-directory: frontend
-        run: |
-          npm run build          # writes ../cps/static/app
-          docker cp ../cps/static/app/. cwn-e2e:/app/calibre-web-automated/cps/static/app/
-          # Jinja templates too. Not every user-facing surface is React: the PDF
-          # reader is a server-rendered pdf.js page the SPA embeds, so a fix that
-          # spans both (#1584) had its SPA half tested here and its template half
-          # silently skipped — the spec guarding it would have failed against the
-          # `:dev` template while passing on the merged result, which teaches the
-          # next author to delete the guard. Templates are read per render and
-          # are not restart-gated, same as the bundle above.
-          docker cp ../cps/templates/. cwn-e2e:/app/calibre-web-automated/cps/templates/
-          # The bundle is static; no restart needed. Confirm the shell still
-          # answers so a broken overlay fails here rather than as 30 confusing
-          # spec failures. /login is Jinja-rendered, so it also catches a template
-          # that references something this `:dev` backend does not have — the one
-          # real hazard of overlaying templates onto an older API.
-          curl -fsS http://localhost:8083/app/ -o /dev/null
-          curl -fsS http://localhost:8083/login -o /dev/null
-          echo "PR bundle + templates in place"
-
-      - name: Run SPA e2e harness
-        working-directory: frontend
-        env:
-          CI: 'true'
-          E2E_BASE_URL: http://localhost:8083
-        run: npm run test:e2e
-
-      # Server-state specs (e.g. the My Library admin intro card) flip settings
-      # for EVERY account at once, so they cannot interleave with the parallel
-      # lanes above — the broad projects always testIgnore them. This separate
-      # invocation is what serializes them after the main run.
-      - name: Run server-state e2e lane
-        working-directory: frontend
-        env:
-          CI: 'true'
-          E2E_BASE_URL: http://localhost:8083
-          E2E_SERVER_STATE: '1'
-        run: npx playwright test --project=server-state-chromium
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: playwright-report
-          path: |
-            frontend/e2e/.report
-            frontend/e2e/.results
-          # Both paths are dot-directories, and upload-artifact skips hidden
-          # files by default — so this step ran on every failed e2e job and
-          # uploaded nothing ("No files were found with the provided path"),
-          # leaving no HTML report, screenshot, trace or video to debug from.
-          # Without this flag the gate can fail but never say why.
-          include-hidden-files: true
-          retention-days: 14
-
-      - name: Dump container logs
-        if: always()
-        run: docker logs cwn-e2e > cwn-e2e-logs.txt 2>&1 || true
-
-      - name: Upload container logs
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: cwn-e2e-logs
-          path: cwn-e2e-logs.txt
-          retention-days: 14
-
-      - name: Notify on failure
-        uses: sarisia/actions-status-discord@v1
-        if: failure() && startsWith(github.ref, 'refs/tags/v') && env.DISCORD_WEBHOOK != ''
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: "⛔ SPA e2e failed for ${{ github.ref_name }}"
-          description: |
-            **DO NOT RELEASE** until fixed!
-            **Tag**: ${{ github.ref_name }} · **Commit**: ${{ github.sha }}
-            [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          color: 0xFF0000
-          username: GitHub Actions
-
-      - name: Cleanup
-        if: always()
-        run: docker rm -f cwn-e2e || true
-
-  # ============================================================================
-  # Required Summary Job
-  # Enforces the completed hard gates for branch protection
-  # ============================================================================
-  test-summary:
-    name: Test Suite Summary
-    runs-on: ubuntu-latest
-    needs: [fast-tests, frontend-build, impact-map, integration-tests, e2e-tests, changed_paths]
-    if: always()
-
-    # The unified gate that branch protection requires. auto-merge.yml
-    # leans on this job being strict-for-tier-2 instead of polling
-    # Integration Tests itself: when this summary is green, GitHub
-    # auto-merge fires.
-    steps:
-      - name: Check test results
-        env:
-          # contains() evaluates to a 'true' / 'false' string; we pass
-          # it through env to keep the shell predicate readable.
-          IS_TIER2_PR: ${{ contains(github.event.pull_request.labels.*.name, 'safe-tier-2') }}
-          # Build-definition PRs (Dockerfile / requirements / root/ / the
-          # integration harness itself) gate on Integration Tests exactly like
-          # tier-2 PRs. Without this the job runs, goes red, and the summary
-          # still reports success — a gate that reports its own failure as a
-          # pass. Mirrors the job's own continue-on-error: fork PRs are
-          # excluded while the mirror-access question is open (#1263), so the
-          # two cannot disagree about what is being gated.
-          IS_BUILD_PR: ${{ needs.changed_paths.outputs.build == 'true' && github.event.pull_request.head.repo.fork != true }}
-          # Frontend PRs gate on the SPA e2e suite the same way (#1130). The
-          # fork carve-out mirrors the e2e job's own continue-on-error, so the
-          # two cannot disagree about what is being gated.
-          IS_FRONTEND_PR: ${{ needs.changed_paths.outputs.frontend == 'true' && github.event.pull_request.head.repo.fork != true }}
-          # Concurrency/engine-shaped PRs are a hard full-stack gate. Their E2E
-          # job waits for the PR head's own sha-tagged image before starting.
-          IS_CONCURRENCY_PR: ${{ needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true }}
-          # Every push to main runs and gates on the SPA e2e suite. Keep this
-          # event-scoped so workflow_dispatch continues to honor run_e2e.
-          IS_MAIN_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: |
-          echo "Fast Tests:        ${{ needs.fast-tests.result }}"
-          echo "Frontend Build:    ${{ needs.frontend-build.result }}"
-          echo "Impact map:        ${{ needs.impact-map.result }}"
-          echo "Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "E2E Tests:         ${{ needs.e2e-tests.result }}"
-          echo "Is tier-2 PR:      $IS_TIER2_PR"
-          echo "Is build PR:       $IS_BUILD_PR"
-          echo "Is frontend PR:    $IS_FRONTEND_PR"
-          echo "Is concurrency PR: $IS_CONCURRENCY_PR"
-          echo "Is main push:      $IS_MAIN_PUSH"
-
-          # A required summary must positively prove that every hard-gated lane
-          # completed. Reject skipped/cancelled as well as failure; otherwise a
-          # later broken job condition silently turns coverage off while this
-          # required check stays green.
-          #
-          # `fast-tests`, `frontend-build`, and `impact-map` carry no `if:`, so they run on
-          # EVERY trigger of this workflow. Any result other than success means
-          # the lane vouched for nothing, and neither can this summary.
-          #
-          # `cancelled` is the state that actually bites, and it is not
-          # hypothetical: a job killed by its own `timeout-minutes` is reported
-          # as **cancelled**, never as `failure`. OBSERVED 2026-08-18 on #1725 —
-          # the `Install system dependencies` apt step stalled for 24m46s, the
-          # job's 25-minute cap fired, `Fast Tests` came back `cancelled`, and
-          # this summary exited 0 having executed no tests at all. This
-          # strictness already existed but was scoped to IS_MAIN_PUSH, so it
-          # never covered the pull-request path — which is where every merge is
-          # gated. Scoping a gate to the rarer event is how it goes unnoticed.
-          if [[ "${{ needs.fast-tests.result }}" != "success" ]]; then
-            echo "❌ Fast tests did not succeed"
-            echo "   Actual result: ${{ needs.fast-tests.result }}"
-            exit 1
-          fi
-
-          # The SPA bundle is a hard gate: a broken TypeScript/Vite build ships
-          # an empty/broken frontend, so it blocks the merge like fast-tests.
-          if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
-            echo "❌ Frontend build did not succeed"
-            echo "   Actual result: ${{ needs.frontend-build.result }}"
-            exit 1
-          fi
-
-          # Staleness is a successful refresh. Generation/evidence errors,
-          # cancellation, or a skipped job cannot vouch for a usable map.
-          if [[ "${{ needs.impact-map.result }}" != "success" ]]; then
-            echo "❌ Impact map did not succeed"
-            echo "   Actual result: ${{ needs.impact-map.result }}"
-            exit 1
-          fi
-
-          if [[ "$IS_MAIN_PUSH" == "true" ]]; then
-            if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
-              echo "❌ SPA e2e suite did not succeed on a push to main"
-              echo "   Actual result: ${{ needs.e2e-tests.result }}"
-              exit 1
-            fi
-          fi
-
-          # Both path-derived gates read changed_paths outputs: IS_BUILD_PR
-          # (integration) and IS_FRONTEND_PR (SPA e2e). If that job fails its
-          # outputs come back empty, every dependent job's `if:` evaluates
-          # false, both gates read as "not applicable", and this summary goes
-          # green having gated nothing — the same class of silent-off failure
-          # #1130 is about, one level up. Fail loudly instead of inferring
-          # "nothing changed" from "we could not tell what changed".
-          if [[ "${{ github.event_name }}" == "pull_request" \
-                && "${{ needs.changed_paths.result }}" != "success" ]]; then
-            echo "❌ Detect changed paths did not succeed — the build and SPA"
-            echo "   e2e gates are both derived from its outputs, so neither"
-            echo "   can be trusted on this run."
-            echo "   Actual result: ${{ needs.changed_paths.result }}"
-            exit 1
-          fi
-
-          # Integration Tests is a hard gate for safe-tier-2 PRs (the
-          # whole point of the tier — small code change must clear the
-          # actual ingest / Calibre flow). For tier-1 PRs and pushes to
-          # main/dev the suite is advisory (continue-on-error in the
-          # job definition keeps it from blocking auto-revert decisions).
-          if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
-            if [[ "$IS_TIER2_PR" == "true" ]]; then
-              echo "❌ Integration tests failed on safe-tier-2 PR — auto-merge gate"
-              exit 1
-            fi
-            if [[ "$IS_BUILD_PR" == "true" ]]; then
-              echo "❌ Integration tests failed on a build-definition PR — the image"
-              echo "   this PR changes could not be built or could not pass the"
-              echo "   ingest/Calibre flow. This is a hard gate."
-              exit 1
-            fi
-            echo "⚠️ Integration tests failed (advisory; not a tier-2 or build PR)"
-          fi
-
-          # The SPA e2e matrix is a hard gate for frontend PRs from this repo
-          # (#1130). Warning-and-continuing is how a red suite kept satisfying
-          # merge-gate condition (a): this summary is the single required
-          # check, and auto-merge.yml fires on it, so "just warn" meant the
-          # gate reported its own failure as a pass. Main pushes are also a
-          # hard gate here: branch protection reads this summary, so relying
-          # only on the failed e2e job would still let the required check pass.
-          # Tag and dev runs stay advisory in the summary; the e2e job itself
-          # remains non-advisory there.
-          if [[ "${{ needs.e2e-tests.result }}" == "failure" ]]; then
-            if [[ "$IS_FRONTEND_PR" == "true" ]]; then
-              echo "❌ SPA e2e suite failed on a frontend PR — this is a hard gate."
-              echo "   The specs assert the behaviour this PR changes. Read the"
-              echo "   uploaded Playwright report before touching the gate."
-              exit 1
-            fi
-            echo "⛔ E2E tests failed - do not release! (advisory; not a frontend PR)"
-          fi
-
-          # A concurrency-shaped PR is meaningful only if the full-stack lane
-          # positively completed against its own commit image. Failure,
-          # cancellation, or a skipped job all mean no trustworthy verdict.
-          if [[ "$IS_CONCURRENCY_PR" == "true" \
-                && "${{ needs.e2e-tests.result }}" != "success" ]]; then
-            echo "❌ Full-stack E2E did not succeed on a concurrency-shaped PR."
-            echo "   Actual result: ${{ needs.e2e-tests.result }}"
-            exit 1
-          fi
-
-          echo "✅ Test suite completed"
+    defaults:
+      run:
+        working-directory: product

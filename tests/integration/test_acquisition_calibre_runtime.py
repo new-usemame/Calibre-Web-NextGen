@@ -124,13 +124,21 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         "/duplicate.epub",
         "/convert.epub",
         "/direct.pdf",
+        "/repacked.epub",
+        "/catalog",
+        "/repacked.epub",
     ]
     assert [case["format"] for case in proof["results"]] == [
         "epub",
         "epub",
         "kepub",
         "pdf",
+        "epub",
     ]
+    repacked = proof["results"][4]
+    assert repacked["receipt_retry"] and repacked["book_ids"] == proof["results"][0]["book_ids"]
+    assert repacked["source_sha256"] != repacked["imported_sha256"] == proof["results"][0]["imported_sha256"]
+    assert all(proof["repackaging"][key] for key in ("zip_only_equal", "original_bytes_and_annotations", "app_reading_state", "receipt_retry_no_reimport", "other_owner_membership", "distinct_owned_receipts"))
     assert proof["results"][0]["receipt_retry"]
     assert all(case["source_and_private_cleanup"] for case in proof["results"])
     bundle = proof["bundle"]

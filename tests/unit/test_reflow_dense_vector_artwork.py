@@ -31,7 +31,10 @@ def test_dense_native_vector_chart_survives_extraction_and_publication(tmp_path,
         assert result.book.conservation.ok
         figures=[f for f in result.book.figures if f['pno']==0]
         assert len(figures)==1
-        assert 120<figures[0]['bbox'][0]<140 and 240<figures[0]['bbox'][2]<280
+        assert 100<figures[0]['bbox'][0]<=127 and 273<=figures[0]['bbox'][2]<300
+        ink=extract.ScanPixelProbe(doc,0,mask=[ln.bbox for block in raw.text_blocks for ln in block.lines]).ink_bounds((0,0,400,300))
+        box=figures[0]['bbox']
+        assert box[0]<=ink[0] and box[1]<=ink[1] and box[2]>=ink[2] and box[3]>=ink[3]
         target=tmp_path/'dense-chart.epub';build_epub.build(result.book,str(target),doc=doc,raw_pages={0:raw})
     assert build_epub.validate(target)==[]
     with zipfile.ZipFile(target) as z:

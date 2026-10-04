@@ -477,8 +477,20 @@ def drawing_rects(page):
             drawings = page.get_drawings()
         except Exception:
             return 0, []
-    rects = [tuple(d["rect"]) for d in drawings
-             if d.get("rect") is not None]
+    # Path rectangles describe centre lines. Dense traced artwork also needs
+    # the original painted extent: thick strokes can extend beyond every path.
+    paint = page.get_bboxlog() if len(drawings) > 2500 else ()
+    rects = []
+    for drawing in drawings:
+        if drawing.get("rect") is None:
+            continue
+        rect = pymupdf.Rect(drawing["rect"])
+        seqno = drawing.get("seqno")
+        if isinstance(seqno, int) and 0 <= seqno < len(paint):
+            kind, box = paint[seqno][:2]
+            if kind in ('stroke-path', 'fill-path'):
+                rect |= pymupdf.Rect(box)
+        rects.append(tuple(rect))
     return len(drawings), rects
 
 

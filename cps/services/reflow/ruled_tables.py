@@ -6,7 +6,7 @@ semantics or authorize a transcription, reordered words, or guessed headers.
 from statistics import median
 from . import extract
 
-VERSION='source-ruled-table-2'
+VERSION='source-ruled-table-3'
 
 
 def _rows(lines):
@@ -55,9 +55,11 @@ def regions(raw,kept,probe,candidates):
         if not upper or not lower:continue
         top,bottom=max(upper),min(lower)
         if box[1]-top>4*em or bottom-box[3]>4*em:continue
-        # A rule crossing a source row cannot supply an outer boundary by
-        # silently dropping its tail or treating that tail as unrelated prose.
-        if any(box[1]<y<box[3] for y in rules):continue
+        # Interior grid rules separate rows. A rule crossing actual cell text
+        # cannot establish that separation; outer rules still enclose every row.
+        if any(box[1] < y < box[3] and
+               any(line.bbox[1] < y < line.bbox[3] for line in cells)
+               for y in rules):continue
         edges=[probe.ink_bounds((left,y-1,right,y+1)) for y in (top,bottom)]
         if not all(edges):continue
         x0=min(edge[0] for edge in edges);x1=max(edge[2] for edge in edges)

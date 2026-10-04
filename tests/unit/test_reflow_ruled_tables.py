@@ -18,13 +18,17 @@ def source(tmp_path,kind='table'):
         if kind!='no_rules':
             page.draw_line((45,130),(420,130))
             page.draw_line((45,205 if kind!='crossed_boundary' else 173),(420,205 if kind!='crossed_boundary' else 173))
+        if kind in ('grid','ink_crossing'):
+            for x in (45,180,300,420):page.draw_line((x,130),(x,205))
+            for y in (154,170):page.draw_line((45,y),(420,y))
+            if kind=='ink_crossing':page.draw_line((45,179),(420,179))
         doc.save(path)
     doc=pymupdf.open(path);raw=extract.read_page(doc,0)
     probe=extract.ScanPixelProbe(doc,0,mask=[l.bbox for b in raw.text_blocks for l in b.lines])
     return doc,raw,probe
 
 
-@pytest.mark.parametrize('kind',['table','multiline'])
+@pytest.mark.parametrize('kind',['table','multiline','grid'])
 def test_sparse_ruled_table_keeps_all_columns_and_rows_in_one_source_crop(tmp_path,kind):
     doc,raw,probe=source(tmp_path,kind)
     style=skeleton.book_style([raw]);skel=skeleton.page_skeleton(raw,style,pixel_probe=probe)
@@ -41,7 +45,7 @@ def test_sparse_ruled_table_keeps_all_columns_and_rows_in_one_source_crop(tmp_pa
     doc.close()
 
 
-@pytest.mark.parametrize('kind',['no_rules','single_row','crossed_boundary','unmapped_cell'])
+@pytest.mark.parametrize('kind',['no_rules','single_row','crossed_boundary','unmapped_cell','ink_crossing'])
 def test_unsupported_sparse_layout_is_not_claimed_as_a_complete_source_table(tmp_path,kind):
     doc,raw,probe=source(tmp_path,kind)
     skel=skeleton.page_skeleton(raw,skeleton.book_style([raw]),pixel_probe=probe)

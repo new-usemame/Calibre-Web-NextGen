@@ -5,6 +5,7 @@
 """Coverage must match real pytest selections and reject partial collection."""
 
 from pathlib import Path
+import json
 import os
 import re
 import signal
@@ -74,6 +75,39 @@ def test_partial_collection_is_rejected_instead_of_returning_nodeids(tree, monke
     monkeypatch.setattr(lanes, "REPO", tree)
     with pytest.raises(AssertionError, match="CI lane collection failed"):
         lanes._collect_nodeids(["tests"])
+
+
+def test_high_numbered_parent_pipe_still_collects_complete_inventory(tree):
+    """A busy worker's real inherited FD can exceed select's fixed bitmap."""
+    source_root = Path(__file__).resolve().parents[2]
+    code = (
+        "import fcntl,json,os,resource,sys\n"
+        "soft,hard=resource.getrlimit(resource.RLIMIT_NOFILE)\n"
+        "if soft < 2048: resource.setrlimit(resource.RLIMIT_NOFILE,(2048,hard))\n"
+        f"sys.path.insert(0,{str(source_root)!r})\n"
+        "from tests import ci_lane_collection as collection\n"
+        "original_pipe=os.pipe\n"
+        "high=[]\n"
+        "def parent_pipe():\n"
+        " reader,writer=original_pipe()\n"
+        " if not high:\n"
+        "  new=fcntl.fcntl(reader,fcntl.F_DUPFD,1024)\n"
+        "  os.close(reader)\n"
+        "  reader=new\n"
+        "  high.append(reader)\n"
+        " return reader,writer\n"
+        "collection.os.pipe=parent_pipe\n"
+        f"result=collection.collect_ci_coverage({str(tree)!r},[(['tests'],None)])\n"
+        "assert high[0] >= 1024\n"
+        "print(json.dumps({'pipe':high[0],'all':result['all'],'selected':result['selected']}))\n"
+    )
+    child = subprocess.run([sys.executable, "-c", code], cwd=tree,
+                           capture_output=True, text=True, timeout=30)
+    assert child.returncode == 0, child.stdout + child.stderr
+    actual = json.loads(child.stdout)
+    assert actual["pipe"] >= 1024
+    assert len(actual["all"]) == 5
+    assert set(actual["selected"][0]) == set(actual["all"])
 
 
 @pytest.mark.parametrize("paths,marker", [

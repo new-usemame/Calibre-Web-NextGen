@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import select
+import selectors
 import time
 
 
@@ -58,10 +58,14 @@ def _guardian(root, request, report, parent_pipe):
     )
     completion = {"collector_pid": process.pid, "cleanup_complete": False}
     try:
-        while process.poll() is None and not stopping:
-            if select.select([parent_pipe], [], [], 0.1)[0]:
-                if not os.read(parent_pipe, 1):
-                    stopping = True
+        # A busy worker can inherit descriptors beyond select's fixed bitmap.
+        # Keep registration inside the cleanup boundary, including allocation faults.
+        with selectors.DefaultSelector() as parent_events:
+            parent_events.register(parent_pipe, selectors.EVENT_READ)
+            while process.poll() is None and not stopping:
+                if parent_events.select(0.1):
+                    if not os.read(parent_pipe, 1):
+                        stopping = True
         completion["parent_gone_or_interrupted"] = stopping
         completion["collector_exit"] = process.returncode
     finally:

@@ -242,13 +242,15 @@ class CatalogService:
             if (link.templated or any(relation in RELATIONS or relation == 'sample'
                     or relation.startswith(ACQUISITION) for relation in relations)):
                 return False
+            if catalog.is_publication_document and ('self' in relations
+                    or urldefrag(link.href)[0] == urldefrag(catalog.source_url)[0]):
+                return False
             if link.media_type in CATALOG_TYPES:
                 return True
             # Publication acquisition links can initiate loans/purchases. Only
             # explicit metadata self/alternate links become detail reads.
             return (link.media_type == PUBLICATION_TYPE and bool(relations)
                     and relations <= {'self', 'alternate'}
-                    and not (catalog.is_publication_document and 'self' in relations)
                     and urldefrag(link.href)[0] != urldefrag(catalog.source_url)[0])
         def navigation(links, fallback_title=''):
             return [{'title': link.title or fallback_title, 'relations': list(link.relations),

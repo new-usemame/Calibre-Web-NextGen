@@ -144,6 +144,13 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert detail["no_loan_or_purchase_get"] and detail["original_edition_preserved"]
     assert detail["source_unchanged"] and detail["private_cleanup"] and detail["full_processor_subprocess"]
     assert detail["saved_display_locale"] == "fr_CA" and detail["edition_language"] == "en"
+    entry = proof["opds1_entry"]
+    assert entry["protocol"] == "opds1" and entry["displayed_title"] == "Original OPDS1 entry edition"
+    assert entry["explicit_detail_read"] and entry["cross_account_read_refused"]
+    assert entry["no_loan_or_purchase_get"] and entry["original_edition_preserved"]
+    assert entry["source_unchanged"] and entry["private_cleanup"] and entry["full_processor_subprocess"]
+    assert entry["source_sha256"] == entry["imported_sha256"] and entry["edition_language"] == "en"
+    assert entry["book_ids"] != detail["book_ids"]
     metadata = proof["torrent_metadata"]
     assert metadata["loopback_transmission_rpc"] and metadata["full_processor_subprocess"]
     assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]

@@ -1,6 +1,6 @@
 # Pure-v2 torrent file verification
 
-This slice extends the reviewed BEP52 file-tree and piece-layer validator to original pure-v2 metainfo. A pure-v2 file reports no v1 identity and the exact SHA-256 of its original info dictionary. qBittorrent with libtorrent 2.0 uses its native truncated-v2 torrent ID consistently. The supported libtorrent 1.2 and Transmission configurations refuse before upload or a durable worker submission attempt. Pure-v2/btmh magnets remain unsupported.
+This slice extends the reviewed BEP52 file-tree and piece-layer validator to original pure-v2 metainfo. A pure-v2 file reports no v1 identity and the exact SHA-256 of its original info dictionary. qBittorrent with libtorrent 2.0 uses its native truncated-v2 torrent ID consistently. The supported libtorrent 1.2 and Transmission configurations refuse before upload or a durable worker submission attempt. Direct single-topic pure-v2 magnets are covered separately by [the magnet verification contract](virtual-library-v2-magnets.md); the evidence below concerns torrent files.
 
 ## Observed bounded checks
 

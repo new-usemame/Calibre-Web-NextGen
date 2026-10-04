@@ -95,6 +95,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_torrent_v2_runtime_probe.py": "/tmp/acquisition_torrent_v2_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_v2_magnet_runtime_probe.py": "/tmp/acquisition_v2_magnet_runtime_probe.py",
+        ROOT
         / "tests/fixtures/virtual_library_hybrid.py": "/tmp/virtual_library_hybrid.py",
         ROOT
         / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
@@ -126,7 +128,7 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=1200,
     )
     assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
     records = [
@@ -254,3 +256,39 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
 
     assert [c['adapter'] for c in pure_v2['collision_retries']] == ['qbittorrent', 'transmission']
     assert all(c['no_submission_attempt_issued'] and c['submission_key'] is None and c['submission_invalid'] is None and c['remote_submissions_before_retry'] == 0 and c['submission_started'] is None and c['external_id'] is None and c['original_client_files_and_modes_preserved'] for c in pure_v2['collision_retries'])
+
+    magnets = proof['v2_magnets']
+    assert magnets['real_loopback_http'] and magnets['full_processor_subprocess']
+    assert magnets['production_catalog_and_choice_get_routes']
+    assert magnets['public_source_probe_rejects_loopback']
+    assert magnets['peer_download_or_running_released_client'] is False
+    assert magnets['original_epub_and_reading_state_preserved']
+    assert magnets['prior_seed_checks'] == pure_v2['prior_seed_checks']
+    assert [case['shape'] for case in magnets['outcomes']] == [
+        'single', 'multi', 'layered', 'trackerless', 'lt1-retry', 'unknown-retry', 'old-api-retry',
+        'collision-retry', 'pending-restart', 'missing-full-restart',
+        'unavailable-restart', 'same-short-different-full', 'lost-ack-tag-recovery']
+    for case in magnets['outcomes']:
+        assert case['v1_infohash'] is None
+        assert len(case['v2_infohash']) == 64 and case['external_id'] == case['v2_infohash'][:40]
+        assert case['remote_submissions'] == 1 and case['descriptor_gets'] == 0
+        assert all(case[key] for key in ('exact_original_uri_url_form', 'full_metadata_before_publication',
+            'fresh_worker_reused_submission', 'source_files_and_modes_unchanged',
+            'private_receipts', 'owned_cleanup', 'seeding_controls_unchanged'))
+        assert len(case['receipts']) == (2 if case['shape'] == 'multi' else 1)
+        assert all(receipt['actual_format'] == 'EPUB' and receipt['source_sha256'] == receipt['imported_sha256']
+                   for receipt in case['receipts'])
+        assert case['piece_layer_count'] == (1 if case['shape'] == 'layered' else 0)
+        if case['shape'] in ('pending-restart', 'missing-full-restart', 'unavailable-restart',
+                            'same-short-different-full', 'lost-ack-tag-recovery'):
+            assert case['accepted_fence_retained']
+    assert magnets['outcomes'][0]['receipt_fault_recovery']
+    assert all(magnets['outcomes'][1][key] for key in ('mixed_bundle_explicit_selection',
+        'synthetic_padding_reported', 'synthetic_padding_excluded_from_choices'))
+    assert [case['shape'] for case in magnets['refusals']] == ['lt1-retry', 'unknown-retry', 'old-api-retry', 'transmission-refusal']
+    assert all(case['error_code'] == 'unsupported_client_version' and case['torrent_adds'] == 0
+               and case['fence'] == [None, None, None, None] for case in magnets['refusals'])
+    assert len(magnets['collision_retries']) == 1
+    assert magnets['collision_retries'][0]['fence'] == [None, None, None, None]
+    assert magnets['collision_retries'][0]['torrent_adds'] == 0
+    assert magnets['collision_retries'][0]['source_unchanged']

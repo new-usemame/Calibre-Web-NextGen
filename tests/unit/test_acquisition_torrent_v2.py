@@ -155,7 +155,7 @@ def test_original_pure_v2_still_requires_exact_bencode_framing(mutation):
         parser().torrent_identities(raw)
 
 
-def test_pure_v2_keeps_tracker_authority_secrets_and_magnet_boundaries():
+def test_pure_v2_keeps_tracker_authority_secrets_and_dual_topic_refusal():
     raw = bencode(pure_v2())
     with pytest.raises(parser().TransportError, match='untrusted_torrent_tracker'):
         parser().torrent_identities(raw, tracker_origins=[])
@@ -164,4 +164,5 @@ def test_pure_v2_keeps_tracker_authority_secrets_and_magnet_boundaries():
     with pytest.raises(parser().TransportError, match='untrusted_torrent_tracker'):
         parser().torrent_identities(bencode(descriptor), secret='private-token')
     with pytest.raises(parser().TransportError, match='invalid_magnet'):
-        parser().validate_magnet('magnet:?xt=urn:btmh:1220' + 'a' * 64)
+        parser().validate_magnet('magnet:?xt=urn:btmh:1220' + 'a' * 64
+                                 + '&xt=urn:btih:' + 'b' * 40)

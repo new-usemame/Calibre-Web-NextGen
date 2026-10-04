@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Bounded v1/v2 metainfo and v1 magnets; never fetch a supplied URL."""
+"""Bounded v1/v2 metainfo and single-topic magnets; never fetch a supplied URL."""
 import base64
 import hashlib
 import re
@@ -37,8 +37,9 @@ def tracker(value, allowed, secret):
         raise TransportError('untrusted_torrent_tracker')
 
 
-def validate_magnet(value, *, tracker_origins=None, secret=None):
-    if not isinstance(value, str) or len(value) > 8192 or any(ord(c) <= 32 for c in value):
+def magnet_identities(value, *, tracker_origins=None, secret=None):
+    """Keep a full requested digest distinct from a client's shortened ID."""
+    if not isinstance(value, str) or len(value) > 8192 or any(ord(c) <= 32 or ord(c) == 127 for c in value):
         raise TransportError('invalid_magnet')
     parsed = urlsplit(value)
     pairs = parse_qsl(parsed.query, keep_blank_values=True)
@@ -46,13 +47,26 @@ def validate_magnet(value, *, tracker_origins=None, secret=None):
         raise TransportError('invalid_magnet')
     for key, url in pairs:
         if key == 'tr': tracker(url, tracker_origins, secret)
-    hashes = [v[9:] for k, v in pairs if k == 'xt' and v.startswith('urn:btih:')]
-    if len(hashes) != 1 or sum(k == 'xt' for k, _ in pairs) != 1:
+    topics = [v for k, v in pairs if k == 'xt']
+    # Co-presence cannot establish that two topics describe the same hybrid.
+    if len(topics) != 1:
         raise TransportError('invalid_magnet')
-    value_hash = hashes[0]
-    if re.fullmatch('[0-9a-fA-F]{40}', value_hash): return value_hash.lower()
-    if re.fullmatch('[A-Z2-7a-z]{32}', value_hash): return base64.b32decode(value_hash.upper()).hex()
+    topic = topics[0]
+    if topic.startswith('urn:btih:'):
+        value_hash = topic[9:]
+        if re.fullmatch('[0-9a-fA-F]{40}', value_hash):
+            return TorrentIdentities(value_hash.lower())
+        if re.fullmatch('[A-Z2-7a-z]{32}', value_hash):
+            return TorrentIdentities(base64.b32decode(value_hash.upper()).hex())
+    if re.fullmatch('urn:btmh:1220[0-9a-fA-F]{64}', topic):
+        return TorrentIdentities(None, topic[13:].lower())
     raise TransportError('invalid_magnet')
+
+
+def validate_magnet(value, *, tracker_origins=None, secret=None):
+    """Legacy scalar validation; full expected identity uses magnet_identities."""
+    hashes = magnet_identities(value, tracker_origins=tracker_origins, secret=secret)
+    return hashes.v1 or hashes.v2[:40]
 
 
 def file_metadata(row, *, single=False):

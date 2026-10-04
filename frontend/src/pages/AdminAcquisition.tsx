@@ -44,7 +44,7 @@ function errorCode(error: unknown): string | undefined {
 
 const EMPTY_CONNECTION: AcquisitionConnectionInput & { label: string } = {
   label: '', endpoint: '', auth_kind: 'none', username: '', secret: '',
-  allow_private_network: false, category: '7020', client_id: '', preset: 'newznab',
+  allow_private_network: false, allow_mobi: false, category: '7020', client_id: '', preset: 'newznab',
   remote_path: '', local_path: '', download_origins: [],
 };
 
@@ -141,6 +141,7 @@ export function AdminAcquisition() {
         value.allow_private_network = draft.allow_private_network;
       }
       if (!editing || draft.secret) value.secret = (adapter === 'opds' || adapter === 'transmission') && draft.auth_kind === 'none' ? '' : draft.secret;
+      if (adapter === 'opds') value.allow_mobi = draft.allow_mobi === true;
       if (adapter === 'newznab') Object.assign(value, { category: draft.category, client_id: draft.client_id, preset: draft.preset, download_origins: downloadOrigins.split(',').map((item) => item.trim()).filter(Boolean), tracker_origins: trackerOrigins.split(',').map((item) => item.trim()).filter(Boolean) });
       if (isClient) Object.assign(value, { category: draft.category, remote_path: draft.remote_path, local_path: draft.local_path });
       if (editing) await editAcquisitionConnection(editing, draft.label.trim(), value, loadedPolicy?.revision);
@@ -654,6 +655,18 @@ export function AdminAcquisition() {
               </span>
             </span>
           </label>
+          {adapter === 'opds' && <label className={styles.switchRow}>
+            <input type="checkbox" aria-label={t('Allow direct DRM-free MOBI 6 books')}
+              aria-describedby={`${formId}-mobi-hint`}
+              checked={draft.allow_mobi === true}
+              onChange={(event) => setDraft({ ...draft, allow_mobi: event.target.checked })} />
+            <span>
+              <span className={styles.switchLabel}>{t('Allow direct DRM-free MOBI 6 books')}</span>
+              <span id={`${formId}-mobi-hint`} className={styles.hint}>
+                {t('Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients still accept EPUB and PDF only.')}
+              </span>
+            </span>
+          </label>}
           {isClient && <p className={styles.hint}>{t('CWNG copies a completed EPUB or PDF from this mapping. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label.')}</p>}
           {formError && <p id={`${formId}-error`} className={styles.bad} role="alert">{formError}</p>}
           <p className={styles.hint}>

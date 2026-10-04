@@ -19,6 +19,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--fixture", type=Path, required=True)
     p.add_argument("--public-fixture", type=Path)
+    p.add_argument("--mobi-fixture", type=Path, default=APP / 'tests/fixtures/sample_books/test_original_direct.mobi')
+    p.add_argument("--mobi-uncompressed-fixture", type=Path, default=APP / 'tests/fixtures/sample_books/test_original_direct_uncompressed.mobi')
     args = p.parse_args()
     with tempfile.TemporaryDirectory(prefix="cwng-full-acquisition-") as temp:
         root = Path(temp)
@@ -470,6 +472,9 @@ def main():
                 bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_torrent_metadata_runtime_probe import run_torrent_metadata_runtime
                 torrent_metadata = run_torrent_metadata_runtime(root,repo,owner,args.fixture,ingest,library)
+                from acquisition_mobi_runtime_probe import run_mobi_runtime
+                mobi = run_mobi_runtime(root,repo,owner,other_owner,ingest,library,
+                                        mobi_fixture=args.mobi_fixture, mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
                 with sqlite3.connect(root / "app.db") as c:
                     for table, rows in reader_state.items():
                         assert c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
@@ -484,6 +489,7 @@ def main():
                         opds_publication=opds_publication,
                         opds1_entry=opds1_entry,
                         torrent_metadata=torrent_metadata,
+                        mobi=mobi,
                         http_gets=gets,
                         full_processor_subprocess=True,
                         network="isolated loopback only",

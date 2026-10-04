@@ -454,6 +454,88 @@ def continues(prev_text, next_text):
     return next_text[:1].islower() or next_text[:1] in ",;"
 
 
+def source_note_context_figures(book, pno):
+    """Footer gap images whose mapped text belongs only to source notes.
+
+    Retain the complete image as note context. This neither deletes its pixels
+    nor treats an actual figure, caption, or body-owned line as a footnote.
+    """
+    from . import source_inventory
+    inventory=book.source_inventory.get(pno)
+    if inventory is None:return set()
+    source_inventory.validate(inventory)
+    regions={r['id']:r for r in inventory['regions']}
+    owners={r['line_id']:r for r in inventory['ownership']}
+    elements=book.pages.get(pno,[]);proved=set()
+    body=[r for r in inventory['regions'] if r['suggested_kind'] in ('body','heading','list')]
+    for index,element in enumerate(elements):
+        if element.kind!='fig' or not element.bbox:continue
+        if index+1<len(elements) and elements[index+1].kind=='caption':continue
+        box=tuple(element.bbox)
+        figures=[f for f in book.figures if f['pno']==pno and tuple(f['bbox'])==box]
+        if (len(figures)!=1 or figures[0].get('found')!='scan_figure_band'
+                or figures[0].get('full_page') or not figures[0].get('needs_ink')):continue
+        if not body or any((r['bbox'][1]+r['bbox'][3])/2>=box[1] for r in body):continue
+        assets=[a for a in inventory['assets'] if tuple(a['bbox'])==box]
+        if len(assets)!=1 or assets[0]['covered_line_ids']:continue
+        mapped=[]
+        for row in inventory['lines']:
+            b=row['source'].bbox;x=(b[0]+b[2])/2;y=(b[1]+b[3])/2
+            if box[0]<=x<=box[2] and box[1]<=y<=box[3]:
+                owner=owners[row['id']]
+                region=regions.get(owner['owner_id'],{})
+                mapped.append(region.get('suggested_kind') if owner['representation']=='text' else None)
+        if 'note' in mapped and all(kind in ('note','furniture') for kind in mapped):proved.add(index)
+    return proved
+
+
+def parenthetical_page_seams(book, raw_pages):
+    """Current source proves a lowercase parenthetical at the body margin.
+
+    This extends only publication page turns. Generic paragraph inference keeps
+    its existing punctuation rule; an inset aside or missing raw mapping cannot
+    earn a join. Native spellings and all punctuation remain unchanged.
+    """
+    from statistics import median
+    from . import heading_evidence as geometry, quote_evidence, source_inventory
+    proved=set()
+    for pno, elements in book.pages.items():
+        previous=book.pages.get(pno-1,[])
+        if not elements or not previous or pno not in raw_pages or pno-1 not in raw_pages:continue
+        footer=source_note_context_figures(book,pno-1)
+        previous=[e for i,e in enumerate(previous) if i not in footer]
+        if not previous:continue
+        left,right=previous[-1],elements[0]
+        if (left.kind!='p' or right.kind!='p' or left.table_row or right.table_row
+                or left.column!=right.column or not left.text.strip() or SENT_END.search(left.text)):continue
+        text=right.text.lstrip()
+        if not text.startswith('(') or not text[1:].lstrip()[:1].islower():continue
+        # Unreliable terminal punctuation cannot establish an unfinished tail.
+        tail=next((r for r in reversed(left.runs) if str(r[1]).strip()),None)
+        if tail and tail[0]=='glyph':continue
+        endpoints=[]
+        for page,element,last in ((pno-1,left,True),(pno,right,False)):
+            raw=raw_pages[page];inventory=book.source_inventory.get(page)
+            if inventory is None:break
+            source_inventory.validate(inventory,raw)
+            lines=[line for block in raw.to_dict()['blocks'] if block.get('kind','text')=='text'
+                   for line in block.get('lines',[]) if geometry._valid(line.get('bbox')) and line.get('spans')]
+            mapped,_,error=quote_evidence._source_lines(element,lines)
+            if error or not mapped:break
+            sizes=[s['size'] for s in geometry._spans(mapped) if s['size']>0]
+            if not sizes:break
+            em=median(sizes)
+            body=[line for line in lines if line['bbox'][2]-line['bbox'][0]>=raw.width*.5 and
+                  geometry._spans([line]) and abs(median(s['size'] for s in geometry._spans([line]))/em-1)<=.15]
+            if not body:break
+            margin=min(line['bbox'][0] for line in body)
+            endpoint=mapped[-1 if last else 0]
+            if abs(endpoint['bbox'][0]-margin)>em*.5:break
+            endpoints.append(em)
+        if len(endpoints)==2 and abs(endpoints[0]/endpoints[1]-1)<=.15:proved.add(pno)
+    return proved
+
+
 # ------------------------------------------------------------------- marker binding
 
 def resolve_marker(digits, page_notes, claimed, following_text):

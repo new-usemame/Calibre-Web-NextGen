@@ -200,6 +200,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     blocks = []
     figure_index = 0
     caption_keys = _caption_keys(elements)
+    note_context_figures = assemble.source_note_context_figures(book, pno)
     navigation = [link for link in book.source_navigation
                   if link['status'] == 'resolved' and
                   (link['pno'] == pno or link['dest_page'] == pno)]
@@ -303,7 +304,10 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 blocks.append('<p><span class="source-raster">' + image + '</span></p>')
                 blocks.append('<p class="source-evidence-notice">' + caption + '</p>')
             else:
-                blocks.append(_figure_html(pno, figure_index, caption, source_region=source_region))
+                image = _figure_html(pno, figure_index, caption, source_region=source_region)
+                if element_index in note_context_figures:
+                    image = '<aside class="source-note-context">' + image + '</aside>'
+                blocks.append(image)
             figure_index += 1
             continue
         if wrappers and element_index in wrappers:
@@ -1042,7 +1046,7 @@ def _raster_pair_matches(left,right,pair):
 
 
 def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=None, executed=None,
-                     words=None, compounds=(), raster_wraps=None):
+                     words=None, compounds=(), raster_wraps=None, parenthetical_seams=()):
     """Use checked model seams for model pages, legacy seams for fallback pairs."""
     joined = 0
     carriers = {}
@@ -1083,7 +1087,7 @@ def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=N
             continue
         raster_wrap=not model_owned and _raster_pair_matches(tail,head,(raster_wraps or {}).get(current['pno']))
         if not model_owned and not raster_wrap and (_completed_index_entry_boundary(tail, head) or
-                not assemble.continues(block_text(tail), block_text(head))):
+                not (assemble.continues(block_text(tail), block_text(head)) or current["pno"] in parenthetical_seams)):
             continue
         move_page_marker = not previous['asides']
         # Earlier-page notes keep their print-page scope. Source evidence still
@@ -2279,9 +2283,12 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
 
         pages = _page_blocks(page_html)
         executed_layout_boundaries = set()
+        parenthetical_seams = (assemble.parenthetical_page_seams(book, raw_pages or {})
+            if doc is not None and book.source_fingerprint==extract.document_fingerprint(doc) and not doc.is_dirty else set())
         joins = _join_page_turns(pages, book.title_pages, compiled_layouts, layout_boundaries, executed_layout_boundaries,
             words=getattr(book, 'page_wrap_words', None) or None,
-            compounds=getattr(book, 'page_wrap_compounds', ()), raster_wraps=_raster_wraps(book))
+            compounds=getattr(book, 'page_wrap_compounds', ()), raster_wraps=_raster_wraps(book),
+            parenthetical_seams=parenthetical_seams)
         contents_pages = _source_contents_pages(pages, doc)
         chapters = _chapters(pages, book.title_pages, contents_pages)
         chapter_images = {src for chapter in chapters for src in _IMG_SRC.findall('\n'.join(chapter.blocks))}
@@ -2414,6 +2421,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             payload['source_enrichment'] = {str(pno): dict(source.report(), identity=source.identity,
                 provenance=json.loads(source.provenance_json), raw_records=json.loads(source.records_json))
                 for pno, source in source_pages.items() if pno in page_html}
+        if parenthetical_seams:payload['source_parenthetical_page_seams_eligible'] = sorted(parenthetical_seams)
         if paragraph_evidence:
             payload['paragraph_presentation'] = list(paragraph_evidence.values())
         if evidence:

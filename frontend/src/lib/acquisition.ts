@@ -42,7 +42,7 @@ export interface AcquisitionInstanceState {
 }
 
 export interface AcquisitionOffer {
-  format: 'EPUB' | 'PDF' | 'NZB' | 'Torrent';
+  format: 'EPUB' | 'PDF' | 'MOBI' | 'NZB' | 'Torrent';
   label: string | null;
   /** Stable per-file display identity — a React key, never an authorization. */
   identity: string;
@@ -118,7 +118,7 @@ export interface AcquisitionBundleCandidate {
   /** Opaque, owner-bound candidate identity. Never a path or authorization by itself. */
   id: string;
   name: string;
-  format: 'EPUB' | 'PDF';
+  format: 'EPUB' | 'PDF' | 'MOBI';
   size: number;
   job_id?: string;
   state?: string;

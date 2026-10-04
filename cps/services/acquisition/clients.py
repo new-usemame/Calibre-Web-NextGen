@@ -11,7 +11,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 from .catalog import connection_config as transport_config, policy
 from .http import TransportError, run_transfer
 from .sabnzbd import (MAX_COMPLETED_BOOKS, MAX_COMPLETED_BYTES, MAX_COMPLETED_ENTRIES,
-    SABClient, ClientError, _safe_root, _validate_reported_path,
+    BOOK_SUFFIXES, SABClient, ClientError, _safe_root, _validate_reported_path,
     completed_books, validate_nzb)
 from .torrent import validate_torrent, validate_magnet, torrent_identities
 
@@ -68,6 +68,7 @@ def torrent_books(config, directory, files, *, max_bytes=100*1024*1024):
     reported_files = rows(files)
     if len(reported_files) > MAX_COMPLETED_ENTRIES:
         raise ClientError('completed_files_limit')
+    supported_suffixes = BOOK_SUFFIXES + (('.mobi',) if config.get('allow_mobi') is True else ())
     by_name = {}
     for row in reported_files:
         name = row.get('name')
@@ -77,7 +78,7 @@ def torrent_books(config, directory, files, *, max_bytes=100*1024*1024):
         # Check containment of every file, including non-book companions.
         path_matches(config, remote)
         _validate_reported_path(config, remote)
-        if PurePosixPath(name).suffix.lower() in ('.epub', '.pdf'):
+        if PurePosixPath(name).suffix.lower() in supported_suffixes:
             # A duplicated torrent file record still identifies only one local
             # candidate. Conflicting advertised sizes make that identity unsafe.
             advertised = row.get('size', row.get('length'))

@@ -99,7 +99,7 @@ for (const theme of ['light', 'dark']) {
     await expect(action).toHaveAttribute('aria-expanded', 'true');
     const panel = page.locator('#book-send-ereader');
     await expect(panel).toBeVisible();
-    await expect(panel.getByLabel('Recipient(s)', { exact: true })).toHaveValue(rig.state.email);
+    await expect(panel.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toHaveValue(rig.state.email);
     expect(rig.writes).toEqual([]);
     await panel.getByLabel('Convert before sending').check();
     await panel.getByRole('button', { name: 'Send', exact: true }).click();
@@ -114,7 +114,7 @@ for (const theme of ['light', 'dark']) {
     await expect(panel).toBeVisible();
     expect(rig.writes).toHaveLength(1);
     expect(rig.targets).toEqual([`/api/v1/books/${rig.id}/send`]);
-    await panel.getByLabel('Recipient(s)', {exact: true}).focus();
+    await panel.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ }).focus();
     await page.keyboard.press('Escape');
     await expect(panel).toHaveCount(0);
     await expect(action).toBeFocused();
@@ -148,7 +148,7 @@ test('send action follows delivery eligibility and permits an explicit recipient
   await expect(action).toBeVisible();
   await action.click();
   const panel = page.locator('#book-send-ereader');
-  await panel.getByLabel('Recipient(s)', { exact: true }).fill('manual-reader@example.invalid');
+  await panel.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ }).fill('manual-reader@example.invalid');
   await panel.getByRole('button', { name: 'Send', exact: true }).click();
   await expect.poll(() => rig.writes).toEqual([{ format: rig.format, convert: false, emails: 'manual-reader@example.invalid' }]);
 });
@@ -162,15 +162,15 @@ test('mounted send form drops revoked eligibility and cached administrator recip
   rig.state.admin = false;
   await refreshIdentityWithoutLeavingBook(page);
   await expect(page.getByTestId('send-other-ereaders')).toHaveCount(0);
-  await expect(page.getByLabel('Recipient(s)', {exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toBeVisible();
   rig.state.download = false;
   await refreshIdentityWithoutLeavingBook(page);
-  await expect(page.getByLabel('Recipient(s)', {exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toHaveCount(0);
   rig.state.download = true;
   await refreshIdentityWithoutLeavingBook(page);
   const action = page.getByTestId('book-actions').getByRole('button', {name:'Send to e-reader', exact:true});
   await expect(action).toHaveAttribute('aria-expanded','false');
-  await expect(page.getByLabel('Recipient(s)', {exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toHaveCount(0);
   expect(rig.writes).toEqual([]);
 });
 
@@ -183,15 +183,15 @@ test('mounted send draft and pending response stay with their original book', as
   await navigateMountedBook(page, rig.id, rig.title);
   await page.getByTestId('book-actions-menu').click();
   await page.getByRole('menuitem', {name:'Send to e-reader', exact:true}).click();
-  await page.getByLabel('Recipient(s)', {exact:true}).fill('draft-for-first-book@example.invalid');
+  await page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ }).fill('draft-for-first-book@example.invalid');
   rig.state.holdSend = true;
   await page.getByRole('button', {name:'Send', exact:true}).click();
   await expect.poll(() => rig.writes).toHaveLength(1);
   await navigateMountedBook(page, rig.otherId, rig.otherTitle);
-  await expect(page.getByLabel('Recipient(s)', {exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toHaveCount(0);
   const action = page.getByTestId('book-actions').getByRole('button', {name:'Send to e-reader', exact:true});
   await action.click();
-  await expect(page.getByLabel('Recipient(s)', {exact:true})).toHaveValue(rig.state.email);
+  await expect(page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toHaveValue(rig.state.email);
   await rig.completePending();
   await expect(page.getByRole('button', {name:'Send', exact:true})).toBeEnabled();
   await expect(page.getByText('The previous book was queued.', {exact:true})).toHaveCount(0);

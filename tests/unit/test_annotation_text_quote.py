@@ -247,6 +247,17 @@ def test_a_quote_sent_for_another_readers_highlight_never_moves_it(world, client
     assert _web_reader_status(world, "web-1")[1] == "ok"
 
 
+def test_a_quote_echoed_with_another_readers_anchor_is_not_kept_as_its_words(world, client):
+    _push(client, [_koreader_highlight(world, "kr-1", 40)], document=world.digest,
+          device="KindleBasic5", device_id="kindle-1")
+    echoed = dict(_pull(client)["kr-1"], text_quote=_quote(82), note_text="noted")
+
+    _push(client, [echoed])
+
+    assert text_anchor.fold(_pull(client)["kr-1"]["text_quote"]["exact"]) == \
+        text_anchor.fold(_quote(40)["exact"])
+
+
 def test_an_anchor_into_another_copy_of_the_book_gives_no_words(world, client):
     highlight = _koreader_highlight(world, "kr-elsewhere", 40)
     highlight["highlighted_text"] = "words this place does not hold"

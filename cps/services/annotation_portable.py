@@ -276,7 +276,9 @@ def apply_portable(payload, *, user_id, book, session, commit,
             row.start_xpointer = start_xpointer
             row.end_xpointer = end_xpointer if isinstance(end_xpointer, str) else None
 
-    if payload.get("text_quote") is not None:
+    # A quote is how its own client names a highlight; on another reader's row
+    # it would be served in place of the words that row's anchor holds.
+    if payload.get("text_quote") is not None and row.source == "textquote":
         from .text_anchor import parse_quote
         quote = parse_quote(payload.get("text_quote"))
         if quote is not None:

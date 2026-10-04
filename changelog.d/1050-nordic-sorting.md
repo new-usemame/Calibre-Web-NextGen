@@ -1,0 +1,2 @@
+### Fixed
+- **Nordic readers see their own alphabet in catalog sorts and letter filters.** Swedish/Finnish Å, Ä and Ö and Danish/Norwegian Æ, Ø and Å appear after Z across the New UI, Classic catalog/table and OPDS. Sorting follows each reader's language even on reused database connections. OPDS letter pages also stop repeating their boundary entry. Other languages keep the existing accent and non-Latin policies. Requested by @chloeroform in #521 and tracked in #1050.

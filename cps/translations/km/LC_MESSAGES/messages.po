@@ -8117,6 +8117,10 @@ msgid "Reader settings saved."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr ""
 

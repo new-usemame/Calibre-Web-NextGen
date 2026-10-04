@@ -8087,6 +8087,10 @@ msgid "Reader settings saved."
 msgstr "閱讀器設定已儲存。"
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "閱讀外觀"
 

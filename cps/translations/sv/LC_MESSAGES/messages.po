@@ -8387,6 +8387,10 @@ msgid "Reader settings saved."
 msgstr "Läsarinställningarna har sparats."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr "Läsapp"
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Läsutseende"
 

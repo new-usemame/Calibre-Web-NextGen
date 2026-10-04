@@ -8632,6 +8632,10 @@ msgid "Reader settings saved."
 msgstr "Paramètres de lecture enregistrés."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr "Application de lecture"
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Apparence de lecture"
 

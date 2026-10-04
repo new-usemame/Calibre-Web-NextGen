@@ -8290,6 +8290,10 @@ msgid "Reader settings saved."
 msgstr "Ustawienia czytnika zapisane."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Wygląd czytania"
 

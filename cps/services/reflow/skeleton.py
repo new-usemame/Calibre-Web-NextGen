@@ -1085,6 +1085,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
     kept_blocks, candidates, captioned_artwork, note_regions = _complete_captioned_scan_diagrams(
         raw, kept_blocks, candidates, style, pixel_probe, note_regions)
     skel.regions.extend(captioned_artwork)
+    from . import ruled_tables
+    kept_blocks, candidates, table_regions = ruled_tables.regions(raw, kept_blocks, pixel_probe, candidates)
+    skel.regions.extend(table_regions)
     if unverified_columns:
         # One owner for intersecting source regions; never repeat a figure below
         # a new table crop or leave its final source row outside the crop.

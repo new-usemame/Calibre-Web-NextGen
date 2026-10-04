@@ -141,7 +141,9 @@ def magic_shelf_books(shelf_id):
     if query_filter is None:
         if select_all:
             return _selection_response([], 0)
-        return jsonify({**shelf_item, "items": [], "page": 1,
+        return jsonify({**shelf_item,
+                        "rules": shelf.rules or {"condition": "AND", "rules": []},
+                        "items": [], "page": 1,
                         "per_page": per_page, "total": 0,
                         "sort": resolved_sort.key,
                         "sort_persistable": resolved_sort.persistable,

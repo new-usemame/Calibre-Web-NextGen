@@ -15,6 +15,7 @@
  *  as an `error_code` on a `failed` job, never to the state column. */
 export type AcquisitionJobState =
   | 'awaiting_approval'
+  | 'awaiting_selection'
   | 'queued'
   | 'resolving'
   | 'downloading'
@@ -48,5 +49,5 @@ export function isAcquisitionPending(state: string): boolean {
  *  `publishing`/`importing` the bytes are already being handed to the library
  *  and the server refuses to stop it. */
 export const ACQUISITION_CANCELLABLE_STATES: ReadonlySet<string> = new Set<AcquisitionJobState>([
-  'awaiting_approval', 'queued', 'resolving', 'downloading', 'staged',
+  'awaiting_approval', 'awaiting_selection', 'queued', 'resolving', 'downloading', 'staged',
 ]);

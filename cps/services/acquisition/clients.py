@@ -5,12 +5,15 @@ from dataclasses import replace
 import json
 from pathlib import PurePosixPath
 import re
+import stat
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from .catalog import connection_config as transport_config, policy
 from .http import TransportError, run_transfer
-from .sabnzbd import SABClient, ClientError, _safe_root, completed_book, validate_nzb
-from .torrent import validate_torrent, validate_magnet
+from .sabnzbd import (MAX_COMPLETED_BOOKS, MAX_COMPLETED_BYTES, MAX_COMPLETED_ENTRIES,
+    BOOK_SUFFIXES, SABClient, ClientError, _safe_root, _validate_reported_path,
+    completed_books, validate_nzb)
+from .torrent import validate_torrent, validate_magnet, torrent_identities
 
 CLIENT_KINDS = ('sabnzbd', 'nzbget', 'qbittorrent', 'transmission')
 USENET_KINDS = ('sabnzbd', 'nzbget')
@@ -58,22 +61,62 @@ def path_matches(config, path):
     except ValueError: raise ClientError('client_path_mapping_mismatch') from None
 
 
-def torrent_book(config, directory, files, *, max_bytes=100*1024*1024):
-    """Use only the torrent's reported files, never scan a shared save folder."""
-    candidates = []
+def torrent_books(config, directory, files, *, max_bytes=100*1024*1024):
+    """Enumerate supported files from this torrent's reported file list only."""
     if not isinstance(directory, str) or not directory.startswith('/') or '\\' in directory or '..' in PurePosixPath(directory).parts:
         raise ClientError('unsafe_completed_path')
-    for row in rows(files):
+    reported_files = rows(files)
+    if len(reported_files) > MAX_COMPLETED_ENTRIES:
+        raise ClientError('completed_files_limit')
+    supported_suffixes = BOOK_SUFFIXES + (('.mobi',) if config.get('allow_mobi') is True else ())
+    by_name = {}
+    for row in reported_files:
         name = row.get('name')
         if not isinstance(name, str) or not name or any(c in name for c in '\\\x00') or name.startswith('/') or any(p in ('', '.', '..') for p in name.split('/')):
             raise ClientError('unsafe_completed_path')
         remote = str(PurePosixPath(directory) / name)
         # Check containment of every file, including non-book companions.
         path_matches(config, remote)
-        if PurePosixPath(name).suffix.lower() in ('.epub', '.pdf'):
-            candidates.append(remote)
-    if len(candidates) != 1: raise ClientError('multiple_books' if candidates else 'no_usable_book')
-    return completed_book(config, candidates[0], max_bytes=max_bytes, files_only=True)
+        _validate_reported_path(config, remote)
+        if PurePosixPath(name).suffix.lower() in supported_suffixes:
+            # A duplicated torrent file record still identifies only one local
+            # candidate. Conflicting advertised sizes make that identity unsafe.
+            advertised = row.get('size', row.get('length'))
+            if advertised is not None and (type(advertised) is not int or advertised < 0):
+                raise ClientError('invalid_client_response')
+            if name in by_name and by_name[name] != advertised:
+                raise ClientError('invalid_client_response')
+            by_name[name] = advertised
+
+    candidates = []
+    advertised_bytes = 0
+    for name, advertised in by_name.items():
+        remote = str(PurePosixPath(directory) / name)
+        if advertised is not None:
+            advertised_bytes += advertised
+        candidates.extend(completed_books(config, remote, max_bytes=max_bytes, files_only=True))
+    if len(candidates) > MAX_COMPLETED_BOOKS:
+        raise ClientError('completed_books_limit')
+    actual_bytes = 0
+    for path, _ in candidates:
+        try:
+            info = path.lstat()
+        except OSError:
+            raise ClientError('unsafe_completed_path') from None
+        if not stat.S_ISREG(info.st_mode) or path.resolve() != path:
+            raise ClientError('unsafe_completed_path')
+        actual_bytes += info.st_size
+    if advertised_bytes > MAX_COMPLETED_BYTES or actual_bytes > MAX_COMPLETED_BYTES:
+        raise ClientError('completed_size_limit')
+    return tuple(sorted(candidates, key=lambda item: item[0].as_posix()))
+
+
+def torrent_book(config, directory, files, *, max_bytes=100*1024*1024):
+    """Choose the sole supported torrent result for existing callers."""
+    candidates = torrent_books(config, directory, files, max_bytes=max_bytes)
+    if len(candidates) != 1:
+        raise ClientError('multiple_books' if candidates else 'no_usable_book')
+    return candidates[0]
 
 
 class NZBGetClient:
@@ -134,6 +177,7 @@ class NZBGetClient:
 class QBitClient:
     def __init__(self, config, *, transfer=run_transfer):
         self.config, self.transfer, self.cookie = config, transfer, None
+        self._prepared_submission = None
 
     def url(self, method, **query):
         parts = urlsplit(self.config['endpoint']); path = parts.path.rstrip('/')
@@ -179,10 +223,42 @@ class QBitClient:
         rows(parsed(self.call('torrents/info', limit='1')))
         return {'title': 'qBittorrent', 'protocol': 'qbittorrent', 'api_version': version, 'browse': False, 'completed_path_readable': True}
 
-    def submit(self, name, descriptor, *, checkpoint=lambda: None):
-        identity = validate_magnet(descriptor) if isinstance(descriptor, str) else validate_torrent(descriptor)
+    def prepare_submission(self, descriptor, *, checkpoint=lambda: None):
+        """Resolve read-only engine facts before the worker's durable POST fence."""
+        prepared = self._prepared_submission
+        if prepared is not None and type(descriptor) is prepared[0] and descriptor == prepared[1]:
+            return prepared[2]
+        if isinstance(descriptor, str):
+            identity = validate_magnet(descriptor)
+        else:
+            hashes = torrent_identities(descriptor)
+            identity = hashes.v1
+            if hashes.v2 is not None:
+                build = parsed(self.call('app/buildInfo', checkpoint=checkpoint))
+                engine = build.get('libtorrent') if isinstance(build, dict) else None
+                if not isinstance(engine, str) or not re.fullmatch(r'(?:1\.2|2\.0)\.[0-9]{1,3}(?:\.[0-9]{1,3})?', engine):
+                    raise ClientError('unsupported_client_version')
+                # Released LT2 uses get_best(): hybrid IDs are truncated v2.
+                # LT1 uses v1. Resolve this before the fence or any submission.
+                if engine.startswith('2.0.'):
+                    identity = hashes.v2[:40]
+                elif identity is None:
+                    raise ClientError('unsupported_client_version')
+        self._prepared_submission = (type(descriptor), descriptor, identity)
+        return identity
+
+    def submit_fenced(self, descriptor, before_submit, *, checkpoint=lambda: None):
+        return self.submit(None, descriptor, checkpoint=checkpoint, before_submit=before_submit)
+
+    def submit(self, name, descriptor, *, checkpoint=lambda: None, before_submit=None):
+        identity = self.prepare_submission(descriptor, checkpoint=checkpoint)
         # A pre-existing unrelated torrent cannot be adopted or have its policy changed.
         if rows(parsed(self.call('torrents/info', hashes=identity, checkpoint=checkpoint))): raise ClientError('torrent_already_exists')
+        # Read-only collision checks precede the worker's durable POST fence.
+        # A shared attempt adopted at this boundary must never be submitted again.
+        if before_submit is not None:
+            name = before_submit()
+            if name is None: return None
         form = {'category': self.config['category'], 'savepath': self.config['remote_path'], 'tags': name, 'autoTMM': 'false'}
         if isinstance(descriptor, str): form['urls'] = descriptor
         result = self.call('torrents/add', form=form, upload=None if isinstance(descriptor, str) else (name+'.torrent', descriptor), checkpoint=checkpoint)
@@ -244,10 +320,26 @@ class TransmissionClient:
         _safe_root(self.config)
         return {'title': 'Transmission', 'protocol': 'transmission', 'api_version': version, 'browse': False, 'completed_path_readable': True}
 
-    def submit(self, name, descriptor, *, checkpoint=lambda: None):
-        identity = validate_magnet(descriptor) if isinstance(descriptor, str) else validate_torrent(descriptor)
+    def prepare_submission(self, descriptor, *, checkpoint=lambda: None):
+        if isinstance(descriptor, str):
+            return validate_magnet(descriptor)
+        identity = torrent_identities(descriptor).v1
+        # The supported Transmission releases cannot ingest a pure-v2 file.
+        # Refuse before the worker records an irreversible submission attempt.
+        if identity is None:
+            raise ClientError('unsupported_client_version')
+        return identity
+
+    def submit_fenced(self, descriptor, before_submit, *, checkpoint=lambda: None):
+        return self.submit(None, descriptor, checkpoint=checkpoint, before_submit=before_submit)
+
+    def submit(self, name, descriptor, *, checkpoint=lambda: None, before_submit=None):
+        identity = self.prepare_submission(descriptor, checkpoint=checkpoint)
         existing = self.call('torrent-get', {'ids': [identity], 'fields': ['hashString']}, checkpoint=checkpoint)
         if rows(existing.get('torrents')): raise ClientError('torrent_already_exists')
+        if before_submit is not None:
+            name = before_submit()
+            if name is None: return None
         arguments = {'download-dir': self.config['remote_path'], 'labels': [self.config['category'], name], 'paused': False}
         arguments['filename' if isinstance(descriptor, str) else 'metainfo'] = descriptor if isinstance(descriptor, str) else base64.b64encode(descriptor).decode()
         result = self.call('torrent-add', arguments, checkpoint=checkpoint)

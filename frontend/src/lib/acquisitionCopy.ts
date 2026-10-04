@@ -57,6 +57,13 @@ export function useAcquisitionErrorText(): (code: string) => string {
       case 'client_job_missing': return t('This job is no longer in the download client queue or history. It will not be submitted again automatically.');
       case 'submission_ambiguous': return t('The submission could not be confirmed. Check the download client queue and history before trying again; CWNG will not blindly send a duplicate.');
       case 'no_usable_book': return t('The completed download contains no usable EPUB or PDF.');
+      case 'artifact_unavailable': return t('The chosen book is no longer in the completed download. Restore its original file before trying again.');
+      case 'artifact_changed':
+      case 'completed_file_changed': return t('The book or completed download changed. Restore its original files before trying again.');
+      case 'completed_files_limit':
+      case 'completed_books_limit':
+      case 'completed_size_limit':
+      case 'bundle_files_limit': return t('The completed download exceeds the safe file limits. Choose a smaller release.');
       case 'multiple_books': return t('The completed download contains multiple books. A single-book release is required.');
       case 'unsafe_completed_path': return t('The completed download is outside its mapped folder or uses an unsafe file path.');
       case 'credentials_redirected': return t('A download redirect tried to send a credential to another origin and was blocked.');

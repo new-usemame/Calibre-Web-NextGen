@@ -1,6 +1,6 @@
 # Book sources (Beta)
 
-Find books connects an administrator's catalogs to CWNG's library. Accounts with access can browse a connected catalog, choose an available EPUB/PDF, NZB or torrent release, and request its import. Indexer releases download through a connected SABnzbd, NZBGet, qBittorrent or Transmission client. The file goes through CWNG's existing ingest and configured processing before appearing in the Global Library. Accounts using My Library can also add the resulting book to their own selection.
+Find books connects an administrator's catalogs to CWNG's library. Accounts with access can browse a connected catalog, choose an available direct EPUB/PDF or opted-in DRM-free MOBI 6 book, NZB or torrent release, and request its import. Indexer releases download through a connected SABnzbd, NZBGet, qBittorrent or Transmission client. The file goes through CWNG's existing ingest and configured processing before appearing in the Global Library. Accounts using My Library can also add the resulting book to their own selection.
 
 This feature is off by default. Existing accounts and library selections do not gain acquisition permissions automatically.
 
@@ -40,9 +40,9 @@ A result's navigation or next page opens that exact page in individual catalog b
 | Capability | Current support |
 | --- | --- |
 | Catalogs | OPDS 1 Atom and OPDS 2 JSON; Newznab/Torznab search, including Prowlarr and Jackett presets |
-| Browsing | Catalog navigation, groups, facets and pagination |
+| Browsing | Catalog navigation, groups, facets, pagination and explicitly opened OPDS 1 complete entries and OPDS 2 publication details |
 | Search | Individual or shared keyword search using advertised OpenSearch descriptions, supported OPDS 2 templates and Newznab/Torznab book search |
-| Files | Direct EPUB/PDF links, NZB releases and v1 torrent files/magnets containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
+| Files | Direct EPUB/PDF and explicitly enabled DRM-free MOBI 6 links, NZB releases, v1 torrent files/magnets, reviewed hybrid files and pure-v2 files on qBittorrent with libtorrent 2.0, containing completed EPUB/PDF or explicitly enabled DRM-free MOBI 6 books, intersected with allowed upload formats |
 | Download client | SABnzbd/NZBGet after successful postprocessing; qBittorrent/Transmission after every file finishes downloading |
 | Authentication | None, HTTP Basic, or Bearer credentials scoped to configured origins |
 | Local services | Explicit administrator configuration of private origins and network ranges |
@@ -51,6 +51,12 @@ A result's navigation or next page opens that exact page in individual catalog b
 A catalog may list books without a supported direct file. Purchase, borrowing, DRM, previews, HTML landing pages and indirect acquisition flows are not presented as downloadable files. Inline catalog artwork is optional and is not downloaded.
 
 Anna's Archive is outside this Beta. Shelfmark is deferred because this slice has no inexpensive completion contract that attributes its result to a CWNG request. Torrent results require qBittorrent or Transmission; Usenet clients accept NZB results. The framework separates catalog discovery, file transport and library ingestion so additional protocol adapters can reuse the same permission, request and import boundaries.
+
+OPDS 1 partial catalog entries may advertise an alternate complete-entry document. Open that detail explicitly to see its metadata and supported direct files. Complete entries retain the same transport, account-bound selections, approval and import policy as ordinary feeds; they do not follow their own self-links.
+
+OPDS 2 metadata may supply publication titles and contributor names in several languages. CWNG chooses the saved account locale, trying the exact tag, a matching regional variant and language parents, then English or a stable alphabetical fallback. Every supplied variant is validated. This changes display text only: the edition’s declared languages, identifiers, downloaded bytes and import identity stay unchanged.
+
+A summary can advertise a `self` or `alternate` link of type `application/opds-publication+json`. Open that link explicitly to read its details and see any supported direct EPUB/PDF offer. CWNG does not fetch details eagerly or turn buy, borrow, subscribe, sample, preview, indirect or templated offers into downloads or automatic detail reads. A detail document’s own self-link is suppressed. The same connection transport policy and owner-bound opaque selections apply. See [OPDS metadata and detail verification](verification/virtual-library-opds-publications.md).
 
 ## Connect an existing Usenet stack
 
@@ -61,7 +67,7 @@ Anna's Archive is outside this Beta. Shelfmark is deferred because this slice ha
 5. For services on your private network, enable the local-network setting. When Prowlarr redirects NZB downloads to another local indexer, add that destination's exact origin under **Additional local download origins**. Each destination must be explicit. Source credentials do not follow a redirect to another origin.
 6. Test the indexer, then switch it on. The test verifies advertised search and category support and performs an authenticated search. A granted account can now select it in **Find books**, search, and request an NZB release.
 
-These presets use the same protocol; they do not create an indexer or NNTP provider inside Prowlarr, Jackett, or SAB. Configure those services yourself and use sources you are authorized to access. SAB performs downloading and any repair/unpacking already configured there. CWNG does not unpack archives or execute scripts from releases. Completed folders must contain exactly one usable EPUB/PDF, so multi-book bundles require separate handling.
+These presets use the same protocol; they do not create an indexer or NNTP provider inside Prowlarr, Jackett, or SAB. Configure those services yourself and use sources you are authorized to access. SAB performs downloading and any repair/unpacking already configured there. CWNG does not unpack archives or execute scripts from releases. Single-book completions import automatically; completed multi-book bundles wait for your explicit choice as described below.
 
 SAB receives the NZB bytes, not an indexer URL or its credentials. CWNG stores the remote job identity before continuing and reconciles it after a restart. A lost submit response is handled conservatively: retry looks for the exact owned job and does not blindly submit again. If its acceptance cannot be established, it reports uncertain submission for administrator investigation. Keep the remote queue/history entry until CWNG has completed import. A download still unfinished after seven days fails with a waiting-limit message, releasing the connection for administration. It is not automatically resubmitted. A manual retry after SAB reports a definite failed download creates a new durable attempt; an uncertain submission retains its identity. Definite submission rejection also resolves requests that adopted that attempt.
 
@@ -79,9 +85,19 @@ Usenet results can use SABnzbd or NZBGet. Torznab results can use qBittorrent or
 
 This authority controls tracker URLs in submitted descriptors. It does not sandbox the download client's subsequent peer, DHT or DNS networking. Configure the client's own networking and firewall for the sources you trust. A trackerless magnet may depend on the client's existing peer-discovery configuration.
 
-Only v1 info hashes are supported; pure v2/hybrid descriptors with unsupported fields, multi-book bundles, traversal, symlinks and unreported paths are rejected. A multi-file torrent can contain one EPUB/PDF with non-book companions. CWNG checks aggregate completion **and every reported file**, including companions: entering a seeding state from a partial download is insufficient. It copies only the reported regular book file. It never moves/deletes client files or jobs, sets seed ratios/time limits, or stops seeding. Cancelling a CWNG request affects its import, not the client download.
+V1 torrent files and magnets, plus self-consistent BEP52 hybrid and pure-v2 files, are supported within the client compatibility below. A hybrid must describe the same safe files, lengths and ordering in both views, with exact piece-alignment padding and valid SHA-256 piece-layer roots. CWNG preserves its original descriptor bytes. qBittorrent requires a reported libtorrent 1.2 or 2.0 engine: 1.2 uses the v1 identity, while 2.0 uses the truncated v2 identity used by its WebUI. An unknown engine fails before submission and can be retried after the client is made compatible. Pure-v2 files have no v1 identity and require qBittorrent with libtorrent 2.0; CWNG uses the same truncated v2 identity without inventing a v1 hash. qBittorrent with libtorrent 1.2 and the supported Transmission releases refuse pure-v2 files before a download submission or durable submission attempt. A failed qBittorrent request can be retried safely after the engine becomes compatible. Transmission keeps the v1 identity for v1 and hybrid files. Pure-v2/btmh magnets, unsupported extensions, traversal, symlinks and unreported paths remain rejected. A multi-file torrent can contain EPUB/PDF books, or ordinary DRM-free MOBI 6 when enabled for that client, with non-book companions. CWNG checks aggregate completion **and every reported file**, including companions: entering a seeding state from a partial download is insufficient. It copies only the chosen reported regular book file. It never moves/deletes client files or jobs, sets seed ratios/time limits, or stops seeding. Cancelling a CWNG request affects its import, not the client download.
+
+Reviewed [BEP47 file metadata](https://www.bittorrent.org/beps/bep_0047.html) is accepted: optional 20-byte per-file SHA1 hints, and hidden/executable (`h`/`x`) attributes on a single file. Existing multi-file padding is counted in the piece total, but a torrent must contain positive non-padding payload. CWNG requires the piece-hash count to match the total byte length and accepts only integer `private` flags of 0 or 1. It sends the original descriptor unchanged, preserving its v1 hash and private flag. File SHA1 hints do not determine book identity or import receipts; those use the actual selected bytes and SHA-256. Source permissions and executable attributes are not copied to the imported file, and CWNG does not execute downloaded content. Single-file padding, symlinks and other unsupported file/network extensions remain refused.
 
 A missing queue/history entry, client error, unusable book or seven-day waiting limit produces an explicit failed request. No automatic resubmission occurs. Manual Retry reconciles a failed torrent by its original hash and owned tag/labels; repair it in the client first. A definite failed Usenet download gets a fresh durable attempt. Uncertain submission keeps its identity. Duplicate requests share the owned remote attempt across accounts while retaining private request histories and normal ingest receipts. A torrent already present outside that owned attempt is refused.
+
+### Completed MOBI books
+
+For SABnzbd, NZBGet, qBittorrent or Transmission, edit that connection and select **Allow completed DRM-free MOBI 6 books**. It is off by default and applies only to that client. The server's allowed upload formats must also include MOBI. This setting is separate from the direct-MOBI option on an OPDS catalog.
+
+CWNG copies contained, completed ordinary DRM-free MOBI 6 books through the normal ingest and conversion settings. Encryption, KF8/unsupported variants and malformed files are refused before publication. A mixed EPUB/PDF/MOBI completion asks you to choose a book; its displayed format and resulting receipt reflect the selected source and actual stored format. Without conversion, a newly retained MOBI can be downloaded but has no web-reader action. Existing equivalent content may retain its already stored format, which the receipt reports. Client files, permissions, jobs and seeding controls remain unchanged.
+
+Current account, source/client revision and format permissions are rechecked before private publication, including a recovered staged MOBI. Once a durable import capability has been issued, the existing receipt-reconciliation rules apply. See [the completed-client MOBI verification record](verification/virtual-library-client-mobi.md).
 
 ### API compatibility
 
@@ -95,6 +111,18 @@ These are deliberate protocol bounds, not an assertion that every version has be
 
 The fixtures are in `tests/fixtures/acquisition-clients.json`. See [the client verification record](verification/virtual-library-clients.md) for released primary references and the isolated real-client proof.
 
+## Choose books from a completed download
+
+A completed owned Usenet or torrent download with one usable EPUB/PDF imports automatically. If it contains several books, its request waits for you to **choose a book from this download**. The list shows filenames, formats and sizes. Choose one explicitly; CWNG copies that file through the normal import pipeline and records its own receipt.
+
+Use **Choose another book** on the original request to import another file from the same download, including after the first book has imported. Each selected book has an independent request, approval decision and receipt. Additional choices follow the account's current approval policy. Cancelling or rejecting a selected book leaves the other choices available; cancelling before any book is selected closes that bundle request. Repeating a choice returns its existing request, including a cancelled or rejected request.
+
+All choices reuse the original owned client download, including choices by other permitted accounts. Each account has its own private candidate list and request history. CWNG does not alter client files or seeding. Only a completed import receipt provides an **Open book** link.
+
+The list snapshots the completed files. Before copying a chosen book, CWNG checks that its path, size and bytes still match that snapshot. Missing, replaced, changed or unsafe files fail explicitly; CWNG never substitutes another book. Restore the original files before retrying. New contents under an already imported release need a separately identified fresh release; there is no automatic replacement of the saved choices.
+
+Enumeration is bounded to 1,000 entries and 20 usable books, at most 100MiB per book and 512MiB in total. Larger or unsafe downloads fail with a useful error. No archives are extracted. Administrators can pause new choices while users continue to read their lists.
+
 ## Edit or remove connections
 
 Changing the endpoint to a different origin requires explicitly re-entering the credential; a stored key cannot silently move to another server.
@@ -103,11 +131,13 @@ Changing the endpoint to a different origin requires explicitly re-entering the 
 
 ## Requests and existing books
 
-Requests belong to the account that created them. Requests for the same indexer release resolve to one request per account. Separate accounts retain private request histories while reusing the same client download. A rejected or cancelled release remains in that account’s history; another click returns that request rather than bypassing the earlier decision. Repeating the same submission after an uncertain response returns the original request. Accounts cannot use another account's catalog selections or inspect its requests.
+Requests belong to the account that created them. Catalog requests for the same indexer release resolve to one original request per account; explicitly chosen books from that release get their own artifact requests. Separate accounts retain private request histories while reusing the same client download. A rejected or cancelled release remains in that account’s history; another click returns that request rather than bypassing the earlier decision. Repeating the same submission after an uncertain response returns the original request. Accounts cannot use another account's catalog selections or inspect its requests.
 
 Imported means that CWNG has recorded the actual library book IDs and completed its import receipt. A download finishing alone does not mean the book is available. The book links still follow normal library visibility rules.
 
-Acquisition reuses an existing same-format record only when its file bytes match the selected artifact after import processing. Matching title, author, language or ISBN alone does not establish that it is the same edition. Different files create separate library records, even when ordinary ingest is configured to overwrite duplicates. Existing files, highlights and reading positions remain attached to their original books. Exact copies reuse an existing record, and the receipt identifies the bytes actually stored. This conservative rule may create separate records for differently packaged copies of the same edition.
+Acquisition first looks for an existing same-format record whose bytes match the selected artifact after import processing. For EPUB only, it can also retain a metadata-matched record when every regular file inside both packages has the exact same path and uncompressed bytes. Changes to ZIP compression, member order, timestamps, comments or empty directory records do not create a new edition. Changes to text, language metadata, fonts, rights files or any other resource do. Matching title, author, language or ISBN alone does not establish edition identity.
+
+Existing files, highlights and reading positions remain attached to their original books. When CWNG retains an existing EPUB, **Open book** points to that original record; the receipt keeps the new downloaded-source hash and the hash of the actual original archive retained in the library. Different resources, unsupported packaging or exhausted comparison limits create a separate record, even when ordinary ingest is configured to overwrite duplicates. PDF and other formats continue to require exact file bytes. A further EPUB-only fallback accepts serialization changes to an ordinary single-rootfile `META-INF/container.xml` locator, such as namespace prefixes, attribute order or whitespace, while keeping every other resource exact. Extensions, multiple rootfiles, processing instructions, ambiguous locators and signed packages do not get this fallback. The comparison never rewrites either archive or normalizes publication metadata or content. See [EPUB packaging identity and limits](verification/virtual-library-epub-repackaging.md).
 
 New imports and in-progress recovery reinspect older metadata-only retention results before completing an import. Already-completed requests keep their historical receipt and are not automatically reimported. The existing duplicate-request rules still apply.
 
@@ -136,3 +166,15 @@ NZBGet's released queue/history RPCs do not support pagination or ID filters. Qu
 Torrent copies wait for a settled client state and for the reported final file to appear. A final-directory move can therefore defer an import without issuing a second download. A missing file remains subject to the same seven-day deadline; unsafe paths, symlinks and non-file results are refused. HTTP descriptor redirects ending in a magnet are resolved without fetching the magnet; its v1 hash, tracker origins and credential safety are validated before any submission.
 
 Tracker origins must be configured explicitly; an empty list deliberately trusts no tracker URLs. Magnet trackers are checked during discovery. HTTP `.torrent` links are checked when their bounded descriptor is fetched for a request, so discovery does not fetch every result or spend provider quotas. Unknown metainfo extensions remain unsupported pending a reviewed fixture: accepting them blindly could introduce network or file semantics not covered by the v1 checks.
+
+For an application downgrade, pause acquisition and settle or cancel outstanding bundle work first. Older workers do not understand selected-artifact jobs; do not resume them with unfinished bundle work. Keep the additive columns and manifest table intact. Upgrading preserves the existing permission migration marker and grants.
+
+## Optional direct MOBI 6 books
+
+Each OPDS connection starts with **Allow direct DRM-free MOBI 6 books** off. Edit that catalog in **Book sources** to enable it, save, test and enable the connection again. The server’s allowed upload formats must also include MOBI. Existing catalogs do not gain MOBI acquisition automatically. Disabling the catalog choice or narrowing the upload-format policy prevents new requests and is rechecked for queued work.
+
+Normal ingest conversion settings still apply. A new MOBI import converted to EPUB can use the web reader. With conversion disabled, a new MOBI import keeps its MOBI format and can be downloaded; the web reader does not open MOBI. **Open book** goes to the resulting library record, whose available formats govern reading. An exact source already imported can retain its verified original record and format; changing conversion settings does not replace that record. Matching title and author alone do not overwrite another edition. Receipts retain the requested source hash and the hash of the actual stored artifact.
+
+Ordinary MOBI 6 is supported through advertised direct catalog links (`application/x-mobipocket-ebook`) and completed NZB/torrent bundles when the matching connection option and current server formats allow it. The download-client option also starts off. Encrypted MOBI, KF8/AZW3 or hybrid books, HUFF/CDIC compression, PalmDOC-only PRC and other variants remain unsupported. Admission checks bounded Palm database/header framing and encryption flags; actual Calibre processing establishes the import. This does not remove DRM or promise that a header-valid malformed book will convert successfully.
+
+The preflight uses at most 10,000 ordered records and a 2 MiB first record; it checks declared text size up to 200 MiB, contained title/EXTH records and PalmDOC compression 1/2. The direct download and administrator byte quota remain additional limits. These conservative resource caps can refuse unusual books even when another reader supports them. See [verification scope](verification/virtual-library-direct-mobi.md).

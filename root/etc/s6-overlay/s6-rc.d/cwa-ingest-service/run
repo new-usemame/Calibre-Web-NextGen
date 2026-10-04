@@ -456,6 +456,31 @@ is_recent_duplicate_event() {
 run_processor_with_timeout() {
         local safety_timeout="$1"
         local filepath="$2"
+        local readiness_timeout="${3:-$(( safety_timeout / 3 ))}"
+        local budget_helper="${CWA_INGEST_BUDGET_HELPER:-/app/calibre-web-automated/scripts/ingest_budget.py}"
+        local selected_budget
+        local helper_exit=0
+        # Both fresh events and retries use this one budget selection. Keep
+        # the DB setting and the processor's file-stability wait unchanged.
+        if [ "$safety_timeout" -gt 0 ] 2>/dev/null; then
+                if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
+                        selected_budget=$(python3 "$budget_helper" "$safety_timeout" "$filepath" "$readiness_timeout") || helper_exit=$?
+                else
+                        selected_budget=$(cwa-as-abc python3 "$budget_helper" "$safety_timeout" "$filepath" "$readiness_timeout") || helper_exit=$?
+                fi
+                if [ "$helper_exit" -eq 75 ]; then
+                        echo "[cwa-ingest-service] PDF did not become ready within the configured wait; retaining for retry: $filepath" >&2
+                        return 2
+                fi
+                if [ "$helper_exit" -eq 0 ] && [ -n "$selected_budget" ] && \
+                        [ "$selected_budget" = "$(non_negative_integer_or_default "$selected_budget" invalid)" ] && \
+                        [ "${#selected_budget}" -le 10 ] && [ "$selected_budget" -ge "$safety_timeout" ]; then
+                        safety_timeout="$selected_budget"
+                else
+                        echo "[cwa-ingest-service] WARN: page-budget helper failed; keeping base budget ${safety_timeout}s" >&2
+                fi
+        fi
+        echo "[cwa-ingest-service] Selected safety timeout: ${safety_timeout}s (base $1s) for $filepath"
         # Give the processor its own conversion deadline just inside the hard
         # one, so a slow conversion ends as a normal Python failure -- which
         # imports the original instead of losing it (#1094) -- rather than as
@@ -487,9 +512,9 @@ run_processor_with_timeout() {
         # is for test environments where the harness already manages
         # the uid context (and the binary may not exist in /app/...).
         if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
-                timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
+                CWA_INGEST_READINESS_TIMEOUT_SECONDS="$readiness_timeout" timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
         else
-                timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
+                CWA_INGEST_READINESS_TIMEOUT_SECONDS="$readiness_timeout" timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
         fi
 }
 
@@ -713,7 +738,9 @@ process_retry_queue() {
                                 processing_marker=$(processing_marker_for_path "$queued_file")
                                 mkdir -p "$PROCESSING_DIR"
                                 : > "$processing_marker"
-                                run_processor_with_timeout "$safety_timeout" "$queued_file" < /dev/null
+                                # Busy retries probe once so one open writer
+                                # cannot repeatedly monopolize this worker.
+                                run_processor_with_timeout "$safety_timeout" "$queued_file" 0 < /dev/null
                                 local retry_exit=$?
                                 rm -f "$processing_marker" 2>/dev/null || true
 
@@ -922,7 +949,7 @@ handle_event() {
         processing_marker=$(processing_marker_for_path "$filepath")
 
         echo "[cwa-ingest-service] New file detected - $filepath - Starting Ingest Processor..."
-        echo "[cwa-ingest-service] Configured timeout: ${configured_timeout}s, Safety timeout: ${safety_timeout}s"
+        echo "[cwa-ingest-service] File-stability timeout: ${configured_timeout}s, Base safety timeout: ${safety_timeout}s"
         echo "processing:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
 
         # Use safety timeout as last resort - processor should handle its own timeout internally
@@ -934,9 +961,9 @@ handle_event() {
         rm -f "$processing_marker" 2>/dev/null || true
 
         if [ $exit_code -eq 124 ]; then
-                echo "[cwa-ingest-service] SAFETY TIMEOUT: $filepath took longer than safety timeout of ${safety_timeout} seconds"
-                echo "[cwa-ingest-service] This is the only limit on conversion time - a large or image-heavy book can legitimately need longer."
-                echo "[cwa-ingest-service] Raise 'Ingest Timeout' in CWA Settings to increase it (safety timeout is 3x that value)."
+                echo "[cwa-ingest-service] SAFETY TIMEOUT: $filepath exceeded the selected safety timeout logged above"
+                echo "[cwa-ingest-service] The processor normally ends conversion earlier to leave time for importing the original."
+                echo "[cwa-ingest-service] Raise 'Ingest Timeout' in CWA Settings to increase the base budget; PDFs above 500 pages receive an automatic extension."
                 echo "safety_timeout:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
                 # Move problematic file to failed backup with timestamp
                 if [ -d "/config/processed_books/failed" ]; then

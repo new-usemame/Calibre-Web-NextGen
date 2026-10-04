@@ -14,6 +14,7 @@ from .. import config, constants, limiter, ub
 from ..cw_login import current_user
 from ..services.acquisition import admission, runtime
 from ..services.acquisition.catalog import CatalogService, CatalogError, connection_config
+from ..services.acquisition.contracts import DIRECT_FORMATS, MOBI_MEDIA_TYPE
 from ..services.acquisition.http import TransportError, origin
 from ..services.acquisition.opds import CatalogParseError
 from ..services.acquisition.newznab import IndexerError, IndexerService, connection_config as indexer_config
@@ -394,16 +395,23 @@ def acquisition_catalog():
     if set(request.args)-{'connection','selection','q'}: raise admission.AdmissionError('invalid_request')
     database,owner,connection_id=ub.app_DB_path,_owner(),request.args.get('connection')
     selection,query=request.args.get('selection'),request.args.get('q')
+    # Capture account presentation state before leaving the request context.
+    language = getattr(current_user, 'locale', None) or 'en'
     def browse():
         with runtime.open_repository(database) as repo:
             row = _require_connection(repo,connection_id,catalog=True)
-            service = IndexerService(repo) if row.adapter == 'newznab' else CatalogService(repo)
+            service = IndexerService(repo) if row.adapter == 'newznab' else CatalogService(repo, preferred_language=language)
             result=service.browse(owner,connection_id,selection=selection,query=query)
             allowed=admission.configured_media_types(repo.engine)
-            formats={name for name,media in (('EPUB','application/epub+zip'),('PDF','application/pdf')) if media in allowed}
+            formats={description[0] for media,description in DIRECT_FORMATS.items() if media in allowed}
+            client_formats=bool(formats & {'EPUB','PDF'})
+            if row.adapter == 'newznab' and 'MOBI' in formats:
+                source_config = repo.connection_config(connection_id).config
+                client_formats = client_formats or MOBI_MEDIA_TYPE in admission.allowed_client_media_types(
+                    repo, source_config.get('client_id'), allowed_media_types=allowed)
             for section in [result]+result.get('groups',[]):
                 for publication in section.get('publications',[]):
-                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') in ('NZB', 'Torrent') and formats]
+                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') in ('NZB', 'Torrent') and client_formats]
             return result
     return jsonify(_run_private_blocking(browse))
 
@@ -426,6 +434,19 @@ def acquisition_jobs():
 @_endpoint()
 def acquisition_job(job_id):
     with runtime.open_repository(ub.app_DB_path) as repo: return jsonify(_job(repo,repo.get_job(_owner(),job_id)))
+
+
+@api_v1.route('/acquisition/jobs/<job_id>/books',methods=['GET','POST'])
+@_endpoint()
+def acquisition_bundle_books(job_id):
+    if request.method == 'POST' and not worker_available()['available']:
+        return _error('acquisition_unavailable',503)
+    with runtime.open_repository(ub.app_DB_path) as repo:
+        if request.method == 'GET':
+            return jsonify(repo.bundle_choices(_owner(),job_id))
+        body = _json({'generation','candidate_id'})
+        job = admission.select_artifact(repo,_owner(),job_id,body.get('generation'),body.get('candidate_id'))
+        return jsonify(_job(repo,job)),202
 
 
 @api_v1.route('/acquisition/jobs/<job_id>/cancel',methods=['POST'])

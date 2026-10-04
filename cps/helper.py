@@ -3293,7 +3293,7 @@ def check_unrar(unrar_location):
 
 def check_architecture():
     arch = platform.machine()
-    if arch not in ['x86_64', 'aarch64']:
+    if arch.lower() not in ['x86_64', 'aarch64', 'amd64', 'arm64']:
         return _("Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is optimized for x86_64 and aarch64.", arch=arch)
     return None
 

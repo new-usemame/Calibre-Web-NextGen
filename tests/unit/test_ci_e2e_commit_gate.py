@@ -39,6 +39,7 @@ PRODUCER_CHECKER = REPO / "scripts" / "check-e2e-image-producer.py"
         "cps/annotations.py",
         "cps/web.py",
         "cps/api/shelves.py",
+        "cps/services/acquisition/bundle_files.py",
     ],
 )
 def test_named_engine_and_concurrency_surfaces_trigger_e2e(path):

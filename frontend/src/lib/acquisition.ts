@@ -42,7 +42,7 @@ export interface AcquisitionInstanceState {
 }
 
 export interface AcquisitionOffer {
-  format: 'EPUB' | 'PDF' | 'NZB' | 'Torrent';
+  format: 'EPUB' | 'PDF' | 'MOBI' | 'NZB' | 'Torrent';
   label: string | null;
   /** Stable per-file display identity — a React key, never an authorization. */
   identity: string;
@@ -107,7 +107,26 @@ export interface AcquisitionJob {
   error_code: string | null;
   claim_count: number;
   title: string | null;
+  /** Present on a bundle's original job and any selected sibling jobs. */
+  bundle_parent_id?: string | null;
+  /** True only while this job is the original anchor and can accept choices. */
+  bundle_selectable?: boolean;
   result?: AcquisitionReceipt;
+}
+
+export interface AcquisitionBundleCandidate {
+  /** Opaque, owner-bound candidate identity. Never a path or authorization by itself. */
+  id: string;
+  name: string;
+  format: 'EPUB' | 'PDF' | 'MOBI';
+  size: number;
+  job_id?: string;
+  state?: string;
+}
+
+export interface AcquisitionBundleChoices {
+  generation: string;
+  candidates: AcquisitionBundleCandidate[];
 }
 
 export interface AcquisitionBootstrap {
@@ -142,6 +161,7 @@ export interface AcquisitionConnectionInput {
    *  server expands it to the allowed ranges and scopes it to this catalog's
    *  origin; loopback, link-local and cloud metadata stay denied either way. */
   allow_private_network?: boolean;
+  allow_mobi?: boolean;
   download_origins?: string[];
   tracker_origins?: string[];
   category?: string;
@@ -174,6 +194,17 @@ export function getAcquisitionCatalog(
 
 export function getAcquisitionJobs(): Promise<{ jobs: AcquisitionJob[] }> {
   return apiGet<{ jobs: AcquisitionJob[] }>(`${BASE}/acquisition/jobs`);
+}
+
+export function getAcquisitionBundleChoices(jobId: string): Promise<AcquisitionBundleChoices> {
+  return apiGet<AcquisitionBundleChoices>(`${BASE}/acquisition/jobs/${encodeURIComponent(jobId)}/books`);
+}
+
+export function selectAcquisitionBundleBook(
+  jobId: string,
+  body: { generation: string; candidate_id: string },
+): Promise<AcquisitionJob> {
+  return apiPost<AcquisitionJob>(`${BASE}/acquisition/jobs/${encodeURIComponent(jobId)}/books`, body);
 }
 
 /** `idempotency_key` is unique per (owner, key), so a double-click or a retried

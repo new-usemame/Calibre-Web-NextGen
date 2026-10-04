@@ -231,3 +231,20 @@ def test_separate_progressing_folio_proves_a_running_head_despite_scan_size_nois
         furniture=[x.text for x in s.regions if x.kind=='furniture']
         assert ('Essays on the Source' in furniture) is (control is None)
         if control is None:assert str(156+r.pno) in furniture
+
+@pytest.mark.parametrize('left,right,expected',[
+    ('I believe that the','7th house is more accurately described.',1),
+    ('This was a','21st century account.',1),
+    ('The source sentence ends.','7th house is more accurately described.',0),
+    ('The next source section','7th house is more accurately described.',0),
+    ('I believe that the','7th House',0),
+])
+def test_article_and_printed_ordinal_continue_without_furniture_intrusion(left,right,expected):
+    notice='<p class="source-evidence-notice">Open original page.</p>'
+    pages=build_epub._page_blocks({0:'<p>'+left+'</p>'+notice,1:'<p>'+right+'</p>'})
+    assert build_epub._join_page_turns(pages)==expected
+    if expected:
+        root=ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">'+pages[0]['body'][0]+'</root>')
+        assert ''.join(root.itertext())==left+' '+right
+        assert pages[0]['body'][1]==notice
+        assert root.find('.//*[@id="pg_0001"]') is not None

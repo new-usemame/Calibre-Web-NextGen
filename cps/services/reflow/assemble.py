@@ -457,7 +457,9 @@ def continues(prev_text, next_text):
         return False
     if SENT_END.search(prev_text):
         return False
-    return next_text[:1].islower() or next_text[:1] in ",;"
+    ordinal_noun = (re.search(r'\b(?:a|an|the)\s*$', prev_text)
+                    and re.match(r'[1-9][0-9]*(?:st|nd|rd|th)\s+[a-z]', next_text))
+    return bool(next_text[:1].islower() or next_text[:1] in ",;" or ordinal_noun)
 
 
 def source_note_context_figures(book, pno):

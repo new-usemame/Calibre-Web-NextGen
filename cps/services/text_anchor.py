@@ -143,13 +143,30 @@ def _folded(path: str, _mtime_ns: int, _size: int) -> Optional[_Folded]:
     return _Folded(spine) if spine else None
 
 
-def _book(epub_path) -> Optional[_Folded]:
+@lru_cache(maxsize=8)
+def _reading(path: str, _mtime_ns: int, _size: int) -> Optional[tuple]:
+    return kx.spine_reading_texts(path)
+
+
+def _stat_key(epub_path):
     try:
         path = os.fspath(epub_path)
         stat = os.stat(path)
     except (OSError, TypeError):
         return None
-    return _folded(path, stat.st_mtime_ns, stat.st_size)
+    return path, stat.st_mtime_ns, stat.st_size
+
+
+def _book(epub_path) -> Optional[_Folded]:
+    key = _stat_key(epub_path)
+    return _folded(*key) if key else None
+
+
+def _reading_texts(epub_path) -> Optional[tuple]:
+    """``kx.spine_reading_texts``, read once per file version: a pull names
+    every highlight of a book by its words."""
+    key = _stat_key(epub_path)
+    return _reading(*key) if key else None
 
 
 _HIT_LIMIT = 64
@@ -330,7 +347,7 @@ def quote_at(epub_path, start_xpointer: str, end_xpointer: str,
     if span is None:
         return None
     member, i, j = span
-    texts = kx.spine_reading_texts(epub_path)
+    texts = _reading_texts(epub_path)
     if not texts:
         return None
     found = [m for m, (name, _t, _s) in enumerate(texts) if name == member]
@@ -372,7 +389,7 @@ def anchor_at(epub_path, xpointer: str, words: int = ANCHOR_WORDS) -> Optional[d
     if point is None:
         return None
     member, index = point
-    texts = kx.spine_reading_texts(epub_path)
+    texts = _reading_texts(epub_path)
     if not texts:
         return None
     found = [m for m, (name, _t, _s) in enumerate(texts) if name == member]

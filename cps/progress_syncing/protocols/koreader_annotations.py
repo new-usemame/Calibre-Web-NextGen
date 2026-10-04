@@ -221,7 +221,8 @@ def apply_push(annotations, *, user, book, session, commit,
     summary = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0}
     if not isinstance(annotations, list):
         return summary
-    placed = _place_quotes(annotations, epub_path)
+    placed = _place_quotes(annotations, epub_path,
+                           _anchored_elsewhere(annotations, user=user, book=book, session=session))
     if placed is not None:
         annotations, summary["resolved"], summary["unresolved"] = placed
     for payload in annotations:
@@ -259,7 +260,32 @@ def _has_native_anchor(payload) -> bool:
     return bool(payload.get("start_xpointer") or payload.get("start_kobospan"))
 
 
-def _place_quotes(annotations, epub_path):
+def _anchored_elsewhere(annotations, *, user, book, session) -> set:
+    """Ids of quoted rows another reader already anchors: never re-placed.
+
+    A client may send back a quote for another reader's highlight (an edited
+    note). Placing it would replace that reader's own anchor -- a web CFI, a
+    KoboSpan -- with the client's idea of the words.
+    """
+    ids = {
+        payload.get("annotation_id") for payload in annotations
+        if isinstance(payload, dict) and payload.get("text_quote") is not None
+        and isinstance(payload.get("annotation_id"), str)
+    }
+    if not ids:
+        return set()
+    rows = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user.id, ub.Annotation.book_id == book.id,
+        ub.Annotation.annotation_id.in_(sorted(ids)),
+        ub.Annotation.source != "textquote",
+    ).all()
+    return {
+        row.annotation_id for row in rows
+        if row.start_xpointer or row.start_container_path or row.cfi_range
+    }
+
+
+def _place_quotes(annotations, epub_path, anchored=frozenset()):
     """Pushed annotations with each text quote placed, or None if none quote.
 
     Returns ``(annotations, resolved_ids, unresolved_ids)``. A quote found in
@@ -267,7 +293,8 @@ def _place_quotes(annotations, epub_path):
     consumes, with the book's own words as ``highlighted_text`` (what KOReader
     compares before drawing); one not found is kept as the row's only anchor
     (``position_type`` 'text_quote') rather than guessed at or dropped. A
-    payload that already carries a native anchor is left as sent.
+    payload that already carries a native anchor is left as sent, and a quote
+    for a row another reader anchors (``anchored``) is dropped, the row kept.
     """
     from ...services import text_anchor
     from ...services.parallel import run_blocking
@@ -279,6 +306,13 @@ def _place_quotes(annotations, epub_path):
     ]
     if not quoted:
         return None
+    out, resolved, unresolved = list(annotations), [], []
+    for i in [i for i in quoted if annotations[i].get("annotation_id") in anchored]:
+        out[i] = {k: v for k, v in annotations[i].items()
+                  if k not in ("text_quote", "percentage", "position_type",
+                               "highlighted_text")}
+        resolved.append(out[i].get("annotation_id"))
+        quoted.remove(i)
 
     def place_all():
         found = {}
@@ -296,8 +330,7 @@ def _place_quotes(annotations, epub_path):
                 found[i] = None
         return found
 
-    found = run_blocking(place_all)
-    out, resolved, unresolved = list(annotations), [], []
+    found = run_blocking(place_all) if quoted else {}
     for i in quoted:
         payload = dict(annotations[i])
         quote = text_anchor.parse_quote(payload["text_quote"])

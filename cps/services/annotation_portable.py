@@ -93,6 +93,11 @@ def _stored_quote(row) -> Optional[dict]:
         return None
 
 
+def _anchor(row) -> tuple:
+    return (row.start_xpointer, row.end_xpointer, row.start_container_path,
+            row.start_offset, row.end_container_path, row.end_offset)
+
+
 def _iso(value):
     if value is None:
         return None
@@ -240,6 +245,8 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row.device_origin_id, bool(row.hidden), row.text_quote,
     )
 
+    anchor_before = _anchor(row)
+
     # Content fields (only overwrite when present in the payload).
     if "highlighted_text" in payload:
         row.highlighted_text = payload.get("highlighted_text")
@@ -280,7 +287,8 @@ def apply_portable(payload, *, user_id, book, session, commit,
             # erase the place an earlier push found.
             if (payload.get("position_type") == "text_quote"
                     and row.position_type in (None, "text_quote")
-                    and not row.start_xpointer and not row.start_container_path):
+                    and not row.start_xpointer and not row.start_container_path
+                    and not row.cfi_range):
                 row.position_type = "text_quote"
 
     # Position — build the Kobo-native selector form from the KoboSpan anchor.
@@ -296,6 +304,11 @@ def apply_portable(payload, *, user_id, book, session, commit,
 
     if payload.get("device_origin_id"):
         row.device_origin_id = payload.get("device_origin_id")
+
+    if payload.get("text_quote") is None and not created and _anchor(row) != anchor_before:
+        # The stored quote named the old place. Served after another reader
+        # moved the highlight, it would be sent back and move it back.
+        row.text_quote = None
 
     if hidden_requested and hidden_permitted:
         row.hidden = True

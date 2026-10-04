@@ -218,6 +218,35 @@ def test_other_readers_highlights_reach_the_client_as_their_words(world, client)
     assert _pull(client, quotes=False)["web-1"]["text_quote"] is None
 
 
+def test_a_highlight_another_reader_moved_comes_back_as_its_new_words(world, client):
+    _push(client, [_highlight("hl-1", _quote(60))])
+    moved = _koreader_highlight(world, "hl-1", 62)
+
+    _push(client, [moved], document=world.digest, device="KindleBasic5",
+          device_id="kindle-1")
+
+    quote = _pull(client)["hl-1"]["text_quote"]
+    assert text_anchor.fold(quote["exact"]) == text_anchor.fold(moved["highlighted_text"])
+
+
+@pytest.mark.parametrize("position_type", ["cfi", None])
+def test_a_quote_sent_for_another_readers_highlight_never_moves_it(world, client, position_type):
+    _web_highlight(world, "web-1", 80)
+    row = _row(world, "web-1")
+    row.position_type = position_type  # None: a row from before position types
+    world.session.commit()
+    before = (row.position_type, row.cfi_range, row.highlighted_text, row.start_xpointer)
+
+    for elsewhere in (_quote(82), {"exact": "words no edition of this novel holds"}):
+        result = _push(client, [_highlight("web-1", elsewhere, note_text="noted")])
+        assert result["resolved"] == ["web-1"] and result["unresolved"] == []
+
+    row = _row(world, "web-1")
+    assert (row.position_type, row.cfi_range, row.highlighted_text, row.start_xpointer) == before
+    assert row.note_text == "noted"
+    assert _web_reader_status(world, "web-1")[1] == "ok"
+
+
 def test_an_anchor_into_another_copy_of_the_book_gives_no_words(world, client):
     highlight = _koreader_highlight(world, "kr-elsewhere", 40)
     highlight["highlighted_text"] = "words this place does not hold"

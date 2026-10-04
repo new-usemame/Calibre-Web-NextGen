@@ -148,7 +148,12 @@ moves when the server only re-derives an anchor, so it is not an edit clock. Tom
   quote is stored as `position_type: text_quote`, with `exact` as its text. That is an explicit
   gap (P6 of ANNOTATION-SYNC-PRINCIPLES): the web reader reports it as unresolved, and nothing
   guesses. A later push that cannot be placed never erases an anchor an earlier push found. The
-  quote itself is kept in `annotation.text_quote` as JSON.
+  quote itself is kept in `annotation.text_quote` as JSON. The stored quote names the place it was
+  pushed for. When another reader moves the highlight, the stored quote is cleared, and pulls derive
+  the new words. Otherwise the client would send back the old words and move the highlight back.
+- **Other readers' rows stay theirs.** A quote pushed for a row of another source that already has
+  an anchor (a CFI, a KoboSpan or an XPointer pair) is dropped, and the row's anchor and words are
+  kept. Note and colour edits still apply, and the id is reported as `resolved`.
 - **Naming on pull.** `quote_at` reads the words of a range.
   - A KOReader row uses its XPointer pair in the library EPUB.
   - A web-reader row uses its CFI, when that CFI is against the EPUB.
@@ -174,3 +179,8 @@ moves when the server only re-derives an anchor, so it is not an edit clock. Tom
   reader draws it. Both keep it and round-trip it.
 - Unanchored notes (`position_type: unanchored`) carry no quote. The client skips them for now.
 - A quote whose words cross two spine items has no single XPointer range and stays unplaced.
+- Delete authority is declared by the pushing client (`delete_source`), not derived from its login.
+  It protects one reader's rows from another reader's sync logic, not from the account itself,
+  which can delete all of its own annotations anyway. An unknown `delete_source` on a push that
+  names no deletes falls back to KOReader's, as before, so inline `hidden` on a client's own rows
+  is then refused.

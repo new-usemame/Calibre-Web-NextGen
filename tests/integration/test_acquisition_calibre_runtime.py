@@ -83,11 +83,17 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_mobi_runtime_probe.py": "/tmp/acquisition_mobi_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_client_mobi_runtime_probe.py": "/tmp/acquisition_client_mobi_runtime_probe.py",
+        ROOT
         / "tests/integration/acquisition_calibre_runtime_probe.py": "/tmp/acquisition_calibre_runtime_probe.py",
         ROOT
         / "tests/integration/acquisition_bundle_runtime_probe.py": "/tmp/acquisition_bundle_runtime_probe.py",
         ROOT
         / "tests/integration/acquisition_torrent_metadata_runtime_probe.py": "/tmp/acquisition_torrent_metadata_runtime_probe.py",
+        ROOT
+        / "tests/integration/acquisition_hybrid_runtime_probe.py": "/tmp/acquisition_hybrid_runtime_probe.py",
+        ROOT
+        / "tests/fixtures/virtual_library_hybrid.py": "/tmp/virtual_library_hybrid.py",
         ROOT
         / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
         ROOT
@@ -160,6 +166,23 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert mobi['results'][1]['owner'] != mobi['results'][2]['owner']
     assert mobi['results'][1]['source_sha256'] == mobi['results'][1]['imported_sha256']
     assert mobi['results'][0]['source_sha256'] != mobi['results'][0]['imported_sha256']
+    client_mobi = proof['client_mobi']
+    assert client_mobi['real_loopback_http'] and client_mobi['full_processor_subprocess']
+    assert client_mobi['current_global_format_cap']
+    assert client_mobi['original_epub_and_reading_state_preserved']
+    assert client_mobi['peer_download_or_running_released_client'] is False
+    assert {(case['adapter'], case['conversion']) for case in client_mobi['outcomes']} == {
+        (adapter, conversion) for adapter in ('sabnzbd', 'nzbget', 'qbittorrent', 'transmission')
+        for conversion in (True, False)}
+    assert any(case['staged_recovery'] for case in client_mobi['outcomes'])
+    assert any(case['receipt_fault_recovery'] for case in client_mobi['outcomes'])
+    for case in client_mobi['outcomes']:
+        assert case['actual_format'] == ('EPUB' if case['conversion'] else 'MOBI')
+        assert case['remote_submissions'] == case['descriptor_gets'] == 1
+        assert all(case[key] for key in ('mixed_bundle_explicit_selection', 'source_files_and_modes_unchanged',
+                                       'private_receipt', 'owned_cleanup', 'seeding_controls_unchanged'))
+        if not case['conversion']:
+            assert case['source_sha256'] == case['imported_sha256']
     assert all(case["source_and_private_cleanup"] for case in proof["results"])
     bundle = proof["bundle"]
     assert bundle["remote_submissions"] == 1 and bundle["source_files_unchanged"]
@@ -184,3 +207,16 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert [case["case"] for case in metadata["outcomes"]] == ["single", "multi"]
     assert all(case["exact_descriptor_submitted"] and case["source_files_unchanged"]
         and case["remote_submissions"] == 1 for case in metadata["outcomes"])
+    hybrid = proof['hybrid']
+    assert hybrid['real_loopback_http'] and hybrid['full_processor_subprocess']
+    assert hybrid['peer_download_or_running_released_client'] is False
+    assert len(hybrid['outcomes']) == 5
+    for case in hybrid['outcomes']:
+        assert case['external_id'] == (case['v2_infohash'][:40]
+            if case['engine'] and case['engine'].startswith('2.') else case['v1_infohash'])
+        assert case['remote_submissions'] == 1 and case['exact_descriptor_submitted']
+        assert case['source_files_and_modes_unchanged'] and case['private_receipts']
+        assert case['owned_cleanup'] and case['fresh_worker_reused_submission']
+        assert len(case['receipts']) == (2 if case['multi'] else 1)
+        if case['adapter'] == 'qbittorrent':
+            assert case['build_info_before_submit']

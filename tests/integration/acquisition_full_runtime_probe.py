@@ -492,13 +492,22 @@ def main():
                 bundle = run_bundle_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_torrent_metadata_runtime_probe import run_torrent_metadata_runtime
                 torrent_metadata = run_torrent_metadata_runtime(root,repo,owner,args.fixture,ingest,library)
+                from acquisition_hybrid_runtime_probe import run_hybrid_runtime
+                hybrid = run_hybrid_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_mobi_runtime_probe import run_mobi_runtime
                 mobi = run_mobi_runtime(root,repo,owner,other_owner,ingest,library,
                                         mobi_fixture=args.mobi_fixture, mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
+                from acquisition_client_mobi_runtime_probe import run_client_mobi_runtime
+                client_mobi = run_client_mobi_runtime(root,repo,owner,other_owner,args.fixture,ingest,library,
+                                                    mobi_fixture=args.mobi_fixture,
+                                                    mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
+                assert digest(library_format(library, first_id)) == first_hash
+                assert annotations(library, first_id) == calibre_annotations
                 with sqlite3.connect(root / "app.db") as c:
                     for table, rows in reader_state.items():
                         assert c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
                             (owner,first_id)).fetchall() == rows
+                client_mobi['original_epub_and_reading_state_preserved'] = True
             print(
                 "CWNG_ACQUISITION_FULL_RUNTIME="
                 + json.dumps(
@@ -510,7 +519,9 @@ def main():
                         opds_publication=opds_publication,
                         opds1_entry=opds1_entry,
                         torrent_metadata=torrent_metadata,
+                        hybrid=hybrid,
                         mobi=mobi,
+                        client_mobi=client_mobi,
                         http_gets=gets,
                         full_processor_subprocess=True,
                         network="isolated loopback only",

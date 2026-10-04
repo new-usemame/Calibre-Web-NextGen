@@ -6,6 +6,7 @@ import os
 import secrets
 import unicodedata
 
+from .contracts import DIRECT_FORMATS
 from .sabnzbd import ClientError, _safe_root, open_completed_file
 
 
@@ -33,6 +34,6 @@ def fingerprint_candidates(config, books, box, job_id, checkpoint, *, max_bytes)
         sha = value.hexdigest()
         identity = box.display_identity(json.dumps(['bundle-candidate-v1', job_id, relative, sha]))
         name = ''.join(' ' if unicodedata.category(c) in ('Cc', 'Cf') else c for c in path.name).strip()[:240]
-        candidates.append(dict(id=identity, name=name or ('PDF' if media == 'application/pdf' else 'EPUB'),
+        candidates.append(dict(id=identity, name=name or DIRECT_FORMATS[media][0],
             relative_path=relative, media_type=media, size=count, sha256=sha))
     return dict(generation=secrets.token_hex(16), candidates=candidates)

@@ -87,7 +87,8 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
     try {
       await page.goto('/app');
       await expect(target(page)).toBeVisible();
-      const count = await grid(page).count();
+      const count = (page.viewportSize()?.width ?? 1280) < 600 ? 4 : 14;
+      await expect(grid(page)).toHaveCount(count);
       if (scenario !== 'failed read after page-one return') {
         await page.getByRole('button', { name: 'Load more', exact: true }).click();
         await expect(grid(page)).toHaveCount(count * 2);

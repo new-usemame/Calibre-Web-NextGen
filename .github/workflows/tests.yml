@@ -13,8 +13,13 @@ jobs:
     timeout-minutes: 25
     env:
       PYTHONDONTWRITEBYTECODE: '1'
-      CWNG_GEVENT_DIAGNOSTIC_DIR: ${{ runner.temp }}/cwng-gevent-diagnostic
     steps:
+    - name: Initialize private runner artifact location
+      working-directory: ${{ github.workspace }}
+      run: |
+        diagnostic_dir="$RUNNER_TEMP/cwng-gevent-diagnostic"
+        mkdir -p "$diagnostic_dir"
+        printf 'CWNG_GEVENT_DIAGNOSTIC_DIR=%s\n' "$diagnostic_dir" >> "$GITHUB_ENV"
     - name: Checkout exact failed product846a
       uses: actions/checkout@v7
       with:

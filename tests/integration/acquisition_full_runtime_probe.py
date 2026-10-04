@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from acquisition_calibre_runtime_probe import ebook, digest, library_format, annotations, count_books, APP
@@ -127,6 +128,7 @@ def main():
         assert r.returncode == 0
         files["/direct.pdf"] = pdf
         files["/repacked.epub"] = root / "repacked.epub"
+        files["/container.epub"] = root / "container.epub"
         if args.public_fixture:
             files["/public.epub"] = args.public_fixture
         gets = []
@@ -223,20 +225,33 @@ def main():
                     ("convert", "kepub", 0, False),
                     ("direct", "pdf", 0, False),
                     ("repacked", "epub", 0, True),
+                    ("container", "epub", 0, True),
                 ]
                 if args.public_fixture:
                     cases.append(("public", "epub", 1, False))
                 for name, target, fixer, fail_receipt in cases:
                     suffix = "pdf" if name == "direct" else "epub"
                     url = "/" + name + "." + suffix
-                    if name == "repacked":
+                    if name in ("repacked", "container"):
                         with zipfile.ZipFile(library_format(library, first_id)) as original, zipfile.ZipFile(files[url], "w") as repacked:
                             names = ["mimetype"] + sorted((item for item in original.namelist() if item != "mimetype"), reverse=True)
                             for member in names:
                                 info = zipfile.ZipInfo(member, (2026, 10, 3, 0, 0, 0))
                                 info.compress_type = zipfile.ZIP_STORED if member == "mimetype" else zipfile.ZIP_DEFLATED
-                                repacked.writestr(info, original.read(member))
+                                payload = original.read(member)
+                                if name == "container" and member == "META-INF/container.xml":
+                                    # Legal original locator; change serialization, not its attributes.
+                                    tree = ET.fromstring(payload)
+                                    ET.indent(tree)
+                                    ET.register_namespace("ocf", "urn:oasis:names:tc:opendocument:xmlns:container")
+                                    payload = ET.tostring(tree, encoding="utf-8", xml_declaration=True)
+                                    assert payload != original.read(member)
+                                repacked.writestr(info, payload)
                             repacked.comment = b"Same retained resources; new ZIP packaging."
+                        with zipfile.ZipFile(library_format(library, first_id)) as before, zipfile.ZipFile(files[url]) as after:
+                            assert set(before.namelist()) == set(after.namelist())
+                            changed_members = [member for member in before.namelist() if before.read(member) != after.read(member)]
+                            assert changed_members == (["META-INF/container.xml"] if name == "container" else [])
                         assert digest(files[url]) != first_hash
 
                     db = CWA_DB()
@@ -361,6 +376,7 @@ def main():
                                 "convert": 3,
                                 "direct": 4,
                                 "repacked": 4,
+                                "container": 4,
                                 "public": 5,
                             }[name]
                         )
@@ -416,13 +432,13 @@ def main():
                             text = b"".join(book.read(path) for path in book.namelist()
                                             if path.endswith((".xhtml", ".html")))
                         assert b"Owned duplicate source" in text
-                    if name == "repacked":
+                    if name in ("repacked", "container"):
                         assert ids == [first_id] and receipt[1] == first_hash
                         assert count_books(library) == 4
                         assert annotations(library, first_id) == calibre_annotations
                         with sqlite3.connect(library / "metadata.db") as c:
                             provenance = json.loads(c.execute("SELECT result_json FROM cwng_acquisition_ingest_result WHERE source_sha256=?", (source_hash,)).fetchone()[0])
-                        assert provenance["artifact_identity_version"] == 2 and provenance["disposition"] == "existing_retained"
+                        assert provenance["artifact_identity_version"] == (3 if name == "container" else 2) and provenance["disposition"] == "existing_retained"
                         with sqlite3.connect(root / "app.db") as c:
                             for table, rows in reader_state.items():
                                 assert c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?", (owner, first_id)).fetchall() == rows
@@ -444,27 +460,31 @@ def main():
                             source_and_private_cleanup=True,
                         )
                     )
-                other_page = service.browse(other_owner, connection.id)
-                other_offer = next(pub["offers"][0]["offer_id"] for pub in other_page["publications"] if pub["title"] == "/repacked.epub")
-                other_job = service.request(other_owner, connection.id, other_offer, "full-repacked-other", requires_approval=False, add_to_my_library=True)
-                worker.run_once()
-                assert repo.get_job(other_owner, other_job.id).state == "importing"
-                published = next(ingest.glob("*.epub"))
-                sidecar = Path(str(published) + ".cwa.json")
-                before_other = count_books(library)
-                r = process()
-                assert r.returncode == 0 and not published.exists() and not sidecar.exists()
-                assert repo.get_job(other_owner, other_job.id).state == "imported"
-                with sqlite3.connect(root / "app.db") as c:
-                    other_receipt = c.execute("SELECT source_sha256,imported_sha256,book_ids_json FROM acquisition_import_receipt WHERE job_id=?", (other_job.id,)).fetchone()
-                    assert c.execute("SELECT user_id,book_id FROM user_library_book WHERE user_id=?", (other_owner,)).fetchall() == [(other_owner, first_id)]
-                assert other_receipt[:2] == (digest(files["/repacked.epub"]), first_hash) and json.loads(other_receipt[2]) == [first_id]
-                assert count_books(library) == before_other and annotations(library, first_id) == calibre_annotations
-                worker.cleanup_completed()
-                assert not (root / "acquisition-staging" / other_job.id).exists()
-                repackaging = dict(retained_book_id=first_id, source_sha256=other_receipt[0], imported_sha256=first_hash,
-                                   zip_only_equal=True, original_bytes_and_annotations=True, app_reading_state=True,
-                                   receipt_retry_no_reimport=True, other_owner_membership=True, distinct_owned_receipts=True)
+                identities = {}
+                for resource_url, identity_version in (("/repacked.epub", 2), ("/container.epub", 3)):
+                    other_page = service.browse(other_owner, connection.id)
+                    other_offer = next(pub["offers"][0]["offer_id"] for pub in other_page["publications"] if pub["title"] == resource_url)
+                    other_job = service.request(other_owner, connection.id, other_offer, "full-other-" + str(identity_version), requires_approval=False, add_to_my_library=True)
+                    worker.run_once()
+                    assert repo.get_job(other_owner, other_job.id).state == "importing"
+                    published = next(ingest.glob("*.epub"))
+                    sidecar = Path(str(published) + ".cwa.json")
+                    before_other = count_books(library)
+                    r = process()
+                    assert r.returncode == 0 and not published.exists() and not sidecar.exists()
+                    assert repo.get_job(other_owner, other_job.id).state == "imported"
+                    with sqlite3.connect(root / "app.db") as c:
+                        other_receipt = c.execute("SELECT source_sha256,imported_sha256,book_ids_json FROM acquisition_import_receipt WHERE job_id=?", (other_job.id,)).fetchone()
+                        assert c.execute("SELECT user_id,book_id FROM user_library_book WHERE user_id=?", (other_owner,)).fetchall() == [(other_owner, first_id)]
+                    assert other_receipt[:2] == (digest(files[resource_url]), first_hash) and json.loads(other_receipt[2]) == [first_id]
+                    assert count_books(library) == before_other and annotations(library, first_id) == calibre_annotations
+                    worker.cleanup_completed()
+                    assert not (root / "acquisition-staging" / other_job.id).exists()
+                    identities[identity_version] = dict(retained_book_id=first_id, source_sha256=other_receipt[0], imported_sha256=first_hash,
+                                       identity_version=identity_version, resources_preserved=True, original_bytes_and_annotations=True, app_reading_state=True,
+                                       receipt_retry_no_reimport=True, other_owner_membership=True, distinct_owned_receipts=True)
+                repackaging = dict(identities[2], zip_only_equal=True)
+                container_serialization = dict(identities[3], ordinary_locator_only=True)
                 from acquisition_opds_publication_runtime_probe import run_opds_publication_runtime
                 opds_publication = run_opds_publication_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 opds1_entry = run_opds_publication_runtime(root,repo,owner,other_owner,args.fixture,ingest,library,protocol='opds1')
@@ -486,6 +506,7 @@ def main():
                         results=results,
                         bundle=bundle,
                         repackaging=repackaging,
+                        container_serialization=container_serialization,
                         opds_publication=opds_publication,
                         opds1_entry=opds1_entry,
                         torrent_metadata=torrent_metadata,

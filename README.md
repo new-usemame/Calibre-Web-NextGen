@@ -459,7 +459,7 @@ The compatibility flags below do not make simultaneous Mac and Linux-container
 access safe. In a finite Docker Desktop bind-mount test, an exclusive byte-range
 lock held on either side blocked another process on the same side but did not
 block the opposite side. A separate concurrent library-write test produced a
-malformed database even with both flags enabled and DELETE journal mode. Use
+malformed database even with both flags enabled and library DELETE journal mode. Use
 exclusive access rather than relying on a lock wait across this boundary.
 
 For deployments where desktop and server processes share working filesystem
@@ -473,7 +473,7 @@ between requests:
 
 By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
 
-Changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
+On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
 
 Trade-offs:
 - Each web request pays a small extra overhead to open and close the database connection.

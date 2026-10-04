@@ -11,3 +11,5 @@ When the opened sinks differ, both receive records. If stdout has no usable file
 Explicit `/dev/stdout` and `/dev/stderr` log settings remain stream-only. Application logging retains the existing 5MiB rollover threshold and five backups. Other code that writes directly to an inherited stdout descriptor is outside this logging configuration; after rollover that descriptor still points to the original inode.
 
 If rotation fails, the handler reports the error on stderr and attempts to append the record without rotating. A shared stdout descriptor also provides a fallback if a partially completed rotation leaves no writable active path. The file can grow beyond the rollover limit until the service can rename and create files in its log directory; correct the directory permissions or descriptor-based log path to restore rotation.
+
+Access logs use the same rotation-failure append policy and can exceed their normal 2MiB limit and three backups until the log directory permissions or path are corrected.

@@ -15,6 +15,11 @@ from .catalog import connection_config as transport_config, policy
 from .http import TransportError, run_transfer
 from .newznab import xml_document
 
+MAX_COMPLETED_ENTRIES = 1000
+MAX_COMPLETED_BOOKS = 20
+MAX_COMPLETED_BYTES = 512 * 1024 * 1024
+BOOK_SUFFIXES = ('.epub', '.pdf')
+
 
 class ClientError(TransportError):
     pass
@@ -46,7 +51,7 @@ def _safe_root(config):
     return root
 
 
-def completed_book(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=False):
+def _completed_path(config, storage):
     root = _safe_root(config)
     if not isinstance(storage, str) or not storage.startswith('/') or '\\' in storage or '\x00' in storage or '..' in PurePosixPath(storage).parts:
         raise ClientError('unsafe_completed_path')
@@ -59,35 +64,108 @@ def completed_book(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=F
     folder = root.joinpath(*relative.parts)
     if folder.resolve() != folder:
         raise ClientError('unsafe_completed_path')
+    return root, folder
+
+
+def _validate_reported_path(config, storage):
+    """Validate an individually reported path without scanning its neighbors."""
+    root, path = _completed_path(config, storage)
+    try:
+        path.relative_to(root)
+        # Existing ancestors must be real directories. A missing companion is
+        # harmless here; a candidate is required to exist by completed_books.
+        current = root
+        for part in path.relative_to(root).parts[:-1]:
+            current = current / part
+            try:
+                info = current.lstat()
+            except FileNotFoundError:
+                return path
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or current.resolve() != current:
+                raise ClientError('unsafe_completed_path')
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            return path
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or path.resolve() != path:
+            raise ClientError('unsafe_completed_path')
+    except (OSError, ValueError):
+        raise ClientError('unsafe_completed_path') from None
+    return path
+
+
+def completed_books(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=False):
+    """Enumerate supported regular books from one owned completion path.
+
+    Directory walks are limited and inspect every entry before returning, so
+    an unsafe companion cannot be hidden behind an earlier usable book.
+    """
+    root, folder = _completed_path(config, storage)
     # A reported file is the owned result, even directly in a category folder.
     # Scanning its parent could select or reject unrelated sibling downloads.
-    if folder.is_file():
-        if folder.suffix.lower() not in ('.epub', '.pdf') or not 0 < folder.stat().st_size <= max_bytes:
-            raise ClientError('no_usable_book')
+    try:
+        info = folder.lstat()
+    except FileNotFoundError:
+        if files_only:
+            raise
+        info = None
+    if info is not None and stat.S_ISREG(info.st_mode):
+        if folder.suffix.lower() not in BOOK_SUFFIXES or not 0 < info.st_size <= max_bytes:
+            return ()
         media = 'application/epub+zip' if folder.suffix.lower() == '.epub' else 'application/pdf'
-        return folder, media
-    if files_only and not folder.exists():
+        return ((folder, media),)
+    if info is not None and (stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode)):
+        raise ClientError('unsafe_completed_path')
+    if files_only and info is None:
         raise FileNotFoundError('Reported completed file is not yet present')
-    if files_only or not folder.is_dir() or folder == root:
+    if files_only or info is None or folder == root:
         raise ClientError('unsafe_completed_path')
     candidates = []
     count = 0
-    for directory, directories, files in os.walk(folder, followlinks=False):
+    too_many_books = False
+    too_many_bytes = False
+    actual_bytes = 0
+
+    def fail_walk(error):
+        raise error
+
+    for directory, directories, files in os.walk(folder, followlinks=False, onerror=fail_walk):
+        directories.sort()
+        files.sort()
         for name in directories + files:
             path = Path(directory) / name
             count += 1
             if count > 1000:
                 raise ClientError('completed_files_limit')
-            if path.is_symlink() or path.resolve() != path:
+            try:
+                info = path.lstat()
+            except OSError:
+                raise ClientError('unsafe_completed_path') from None
+            if stat.S_ISLNK(info.st_mode) or path.resolve() != path:
                 raise ClientError('unsafe_completed_path')
-            if path.suffix.lower() not in ('.epub', '.pdf') or name in directories:
+            if name in directories:
+                if not stat.S_ISDIR(info.st_mode):
+                    raise ClientError('unsafe_completed_path')
                 continue
-            if not stat.S_ISREG(path.stat().st_mode):
+            if not stat.S_ISREG(info.st_mode):
                 raise ClientError('unsafe_completed_path')
+            if path.suffix.lower() not in BOOK_SUFFIXES or not 0 < info.st_size <= max_bytes:
+                continue
             media = 'application/epub+zip' if path.suffix.lower() == '.epub' else 'application/pdf'
-            if not 0 < path.stat().st_size <= max_bytes:
-                continue
             candidates.append((path, media))
+            too_many_books |= len(candidates) > MAX_COMPLETED_BOOKS
+            actual_bytes += info.st_size
+            too_many_bytes |= actual_bytes > MAX_COMPLETED_BYTES
+    if too_many_books:
+        raise ClientError('completed_books_limit')
+    if too_many_bytes:
+        raise ClientError('completed_size_limit')
+    return tuple(sorted(candidates, key=lambda item: item[0].relative_to(root).as_posix()))
+
+
+def completed_book(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=False):
+    """Choose the sole supported result, preserving the existing client API."""
+    candidates = completed_books(config, storage, max_bytes=max_bytes, files_only=files_only)
     if len(candidates) != 1:
         raise ClientError('multiple_books' if candidates else 'no_usable_book')
     return candidates[0]

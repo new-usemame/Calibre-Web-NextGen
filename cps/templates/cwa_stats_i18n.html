@@ -1,0 +1,73 @@
+{# Presentation helpers shared by all Classic statistics tabs. Raw event/category
+   names remain stable keys; translate only their labels. #}
+<script>
+const statsLocale = {{ (stats_locale or 'en') | tojson }}.replace(/_/g, '-');
+function statsEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
+function statsFormat(message, values) {
+    return message.replace(/%\((\w+)\)s/g, (placeholder, key) => String(values[key] ?? placeholder));
+}
+const statsLabels = {
+    'LOGIN': {{ _('Logins') | tojson }},
+    'LOGIN_FAILED': {{ _('Failed Login Attempts') | tojson }},
+    'LOGOUT': {{ _('Logouts') | tojson }},
+    'READ': {{ _('Reading') | tojson }},
+    'DOWNLOAD': {{ _('Downloads') | tojson }},
+    'EMAIL': {{ _('Email Deliveries') | tojson }},
+    'SEARCH': {{ _('Searches') | tojson }},
+    'UPLOAD': {{ _('Uploads') | tojson }},
+    'KOBO_SYNC': {{ _('Kobo Syncs') | tojson }},
+    'OPDS_ACCESS': {{ _('OPDS Accesses') | tojson }},
+    'SHELF_ADD': {{ _('Added to Shelf') | tojson }},
+    'SHELF_REMOVE': {{ _('Removed from Shelf') | tojson }},
+    'SHELF_VIEW': {{ _('Shelf Views') | tojson }},
+    'MAGIC_SHELF_VIEW': {{ _('Magic Shelf Views') | tojson }},
+    'Kobo Sync': {{ _('Kobo Sync') | tojson }},
+    'OPDS Feed': {{ _('OPDS Feed') | tojson }},
+    'Email Delivery': {{ _('Email Delivery') | tojson }},
+    'Web UI': {{ _('Web UI') | tojson }},
+    'Kobo': 'Kobo', 'OPDS': 'OPDS',
+    'Email': {{ _('Email') | tojson }},
+    'Downloads': {{ _('Downloads') | tojson }},
+    'Reading': {{ _('Reading') | tojson }},
+    'Search': {{ _('Search') | tojson }},
+    'Authentication': {{ _('Authentication') | tojson }},
+    'Other': {{ _('Other') | tojson }},
+    'desktop': {{ _('Desktop') | tojson }},
+    'mobile': {{ _('Mobile') | tojson }},
+    'tablet': {{ _('Tablet') | tojson }},
+    'unknown': {{ _('Unknown') | tojson }},
+    'search': {{ _('Search') | tojson }},
+    'book_detail': {{ _('Book Detail') | tojson }},
+    'series': {{ _('Series Page') | tojson }},
+    'author': {{ _('Author Page') | tojson }},
+    'browse': {{ _('Browse') | tojson }},
+    'shelf': {{ _('Shelf') | tojson }},
+    'category': {{ _('Category') | tojson }},
+    'direct': {{ _('Direct Link') | tojson }}
+};
+function statsLabel(key) {
+    return Object.prototype.hasOwnProperty.call(statsLabels, key) ? statsLabels[key] : String(key);
+}
+function statsFormatLabel(key) {
+    return key === 'UNKNOWN' || key === 'Unknown' ? {{ _('Unknown') | tojson }} : String(key);
+}
+// SQLite heatmaps use Sunday=0. Keep the coordinates while localizing labels.
+const statsWeekdays = Array.from({length: 7}, (_, day) =>
+    new Intl.DateTimeFormat(statsLocale, {weekday: 'short', timeZone: 'UTC'})
+        .format(new Date(Date.UTC(2023, 0, 1 + day))));
+function statsDate(value, options = {month: 'short', day: 'numeric'}) {
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const date = new Date(dateOnly ? value + 'T00:00:00' : value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString(statsLocale, options);
+}
+function statsPieTooltip(params) {
+    return `${statsEscape(statsLabel(params.name))}: ${statsEscape(params.value)} (${statsEscape(params.percent)}%)`;
+}
+function statsPieLabel(params) {
+    return `${statsLabel(params.name)}\n${params.percent}%`;
+}
+</script>

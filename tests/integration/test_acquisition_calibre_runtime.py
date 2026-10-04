@@ -129,14 +129,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert len(records) == 1, result.stdout
     proof = json.loads(records[0])
     assert proof["http_gets"] == [
-        "/catalog",
-        "/patch.epub",
-        "/duplicate.epub",
-        "/convert.epub",
-        "/direct.pdf",
-        "/repacked.epub",
-        "/catalog",
-        "/repacked.epub",
+        "/catalog", "/patch.epub", "/duplicate.epub", "/convert.epub", "/direct.pdf",
+        "/repacked.epub", "/container.epub", "/catalog", "/repacked.epub", "/catalog", "/container.epub",
     ]
     assert [case["format"] for case in proof["results"]] == [
         "epub",
@@ -144,11 +138,18 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         "kepub",
         "pdf",
         "epub",
+        "epub",
     ]
     repacked = proof["results"][4]
     assert repacked["receipt_retry"] and repacked["book_ids"] == proof["results"][0]["book_ids"]
     assert repacked["source_sha256"] != repacked["imported_sha256"] == proof["results"][0]["imported_sha256"]
     assert all(proof["repackaging"][key] for key in ("zip_only_equal", "original_bytes_and_annotations", "app_reading_state", "receipt_retry_no_reimport", "other_owner_membership", "distinct_owned_receipts"))
+    locator = proof["results"][5]
+    assert locator["receipt_retry"] and locator["book_ids"] == proof["results"][0]["book_ids"]
+    assert locator["source_sha256"] != locator["imported_sha256"] == proof["results"][0]["imported_sha256"]
+    assert proof["container_serialization"]["identity_version"] == 3
+    assert all(proof["container_serialization"][key] for key in ("ordinary_locator_only", "resources_preserved",
+        "original_bytes_and_annotations", "app_reading_state", "receipt_retry_no_reimport", "other_owner_membership", "distinct_owned_receipts"))
     assert proof["results"][0]["receipt_retry"]
     mobi = proof['mobi']
     assert all(mobi[key] for key in ('receipt_fault_recovery', 'owned_cleanup', 'cross_owner_refused',

@@ -1182,6 +1182,51 @@ def _runover_note(elements, book, skel):
     return Note(num=None, text=tail.text, pno=skel.pno)
 
 
+def _recover_detached_note_tail(skel, book):
+    """Keep a qualified footer continuation out of an unfinished body display.
+
+    A terminal source image cannot prove sentence-ending punctuation. Geometry
+    must independently place the lowercase tail above an admitted note, below
+    a detached body, in the smaller note type. The label is never inferred and
+    the retained image/text remain qualified. Run before paragraph joining and
+    source-inventory capture, including pages ending in a raster folio.
+    """
+    if not book.notes or not skel.note_regions:
+        return
+    previous=book.notes[-1]
+    if previous.pno!=skel.pno-1:
+        return
+    terminal=next((r for r in reversed(previous.glyph_runs) if str(r[1]).strip()),None)
+    if not (terminal and terminal[0]=='glyph' and isinstance(terminal[2],dict)
+            and terminal[2].get('reason')=='transcript'):
+        return
+    following=min(skel.note_regions,key=lambda r:r.bbox[1])
+    # A raised opening label may overlap the last continuation line's descent.
+    # Its body text, rather than that label's top, establishes the boundary.
+    note_top=min((sp.bbox[1] for ln in following.lines for sp in ln.spans
+        if sp.text.strip() and not re.fullmatch(r'\d{1,3}',sp.text.strip())),
+        default=following.bbox[1])
+    candidates=[r for r in skel.regions if r.kind=='body' and r.lines
+        and r.bbox[1]>=skel.height*.65 and r.bbox[3]<=note_top+book.style.body_size*.25
+        and all(0<ln.size<=book.style.body_size*.98 for ln in r.lines)
+        and r.text.lstrip()[:1].islower()]
+    if len(candidates)!=1:
+        return
+    tail=candidates[0]
+    em=max(ln.size for ln in tail.lines)
+    above=[r for r in skel.regions if r.kind in ('body','heading') and r is not tail
+        and r.bbox[3]<=tail.bbox[1] and _x_overlaps(r.bbox,tail.bbox)]
+    if not above or tail.bbox[1]-max(r.bbox[3] for r in above)<2*em:
+        return
+    if (abs(tail.bbox[0]-following.bbox[0])>em*.5
+            or note_top-tail.bbox[3]>3*em):
+        return
+    tail.kind='note'
+    tail.number=None
+    tail.uncertain=True
+    tail.reason='qualified_detached_note_continuation'
+
+
 def page_source_text(book, pno):
     """The page as it was printed: what the model is shown, and what its answer is
     measured against. Furniture is already gone; the notes come after the body, the
@@ -1556,6 +1601,7 @@ def assemble(skeletons, style, raw_pages=None):
     raw_by_page = {raw.pno: raw for raw in (raw_pages or [])}
     for skel in skeletons:
         _recover_ruled_continuation(skel, raw_by_page.get(skel.pno), book)
+        _recover_detached_note_tail(skel, book)
         page_reasons = list(skel.reasons)
         elements, claimed = _page_elements(skel, book.repairs, page_reasons,
                                            vocab=vocab)

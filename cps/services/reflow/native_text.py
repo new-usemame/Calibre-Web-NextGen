@@ -185,7 +185,7 @@ def _whole_source_words(spans):
 def descriptor(pno, bbox, size, font='', raised=False, reason='encoding'):
     return {'page': pno, 'bbox': [round(v, 4) for v in bbox],
             'size': round(size, 4), 'font': font, 'raised': bool(raised),
-            **({'reason':'transcript'} if reason=='transcript' else {})}
+            **({'reason':reason} if reason in ('transcript','layout') else {})}
 
 
 def image_name(record):
@@ -398,11 +398,17 @@ def note_glyph_runs(region, text, pno):
     return [run for run in runs if run[1]]
 
 
+def note_descriptor(note):
+    return descriptor(note.pno,note.bbox,0,'note',
+                      reason='layout' if getattr(note,'source_layout',False) else 'encoding')
+
+
 def glyph_html(record, block=False):
     """Printed evidence stays inline; the link explains unavailable text encoding."""
     from html import escape
     style='max-width:100%;height:auto' if block else 'height:1em;width:auto;vertical-align:baseline'
     label=('Original source text; transcription uncertain. Open original page.' if record.get('reason')=='transcript' else 'Original source text; Unicode encoding unavailable. Open original page.')
+    if record.get('reason')=='layout':label='Original printed note layout. Open original page.'
     html = ('<a class="source-glyph" href="original-p%04d.xhtml#page" title="%s">'
             '<img src="%s" alt="%s" style="%s"/></a>' %
             (record['page'],escape(label,quote=True),image_name(record),escape(label,quote=True),style))
@@ -418,13 +424,13 @@ def package_glyphs(book,page_html,doc,package,should_stop=None):
             for run in element.runs:
                 if run[0]=='glyph':records[image_name(run[2])]=run[2]
     for note in book.notes:
-        if note.pno in page_html and getattr(note,'glyph_fallback',False):
+        if note.pno in page_html and note.uses_source_image:
             if getattr(note, 'glyph_runs', None):
                 for run in note.glyph_runs:
                     if run[0] == 'glyph':
                         records[image_name(run[2])] = run[2]
             else:
-                record=descriptor(note.pno,note.bbox,0,'note');records[image_name(record)]=record
+                record=note_descriptor(note);records[image_name(record)]=record
     if records and doc is None:raise ValueError('Original PDF required for unmapped source glyphs')
     display=None
     for name,record in sorted(records.items(),key=lambda item:item[1]['page']):

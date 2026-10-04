@@ -124,12 +124,18 @@ class Note(object):
     continued_from: Optional[tuple] = None
     glyph_fallback: bool = False
     glyph_runs: list = field(default_factory=list)
+    source_layout: bool = False
+
+    @property
+    def uses_source_image(self):
+        return self.glyph_fallback or getattr(self,"source_layout",False)
 
     def to_dict(self):
         return {"num": self.num, "text": self.text, "pno": self.pno,
                 "marked": self.marked, "uncertain": self.uncertain, "bbox": self.bbox,
                 "glyph_fallback": self.glyph_fallback, "glyph_runs": self.glyph_runs,
-                "continued_from": self.continued_from}
+                "continued_from": self.continued_from,
+                **({"source_layout":True} if getattr(self,"source_layout",False) else {})}
 
 
 @dataclass
@@ -221,7 +227,7 @@ class Book(object):
 
     def needs_source_evidence(self, pno):
         return any(link['pno'] == pno and link['kind'] == 1 and link['status'] != 'resolved'
-                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel") for f in self.figures) or any(n.pno == pno and n.uses_source_image for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
             any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
@@ -1670,6 +1676,26 @@ def _bind_source_navigation(book, raw_pages):
                 left['status'] = right['status'] = 'ambiguous_source_overlap'
 
 
+def _native_note_grid(region):
+    """Three repeated sparse columns prove associations that prose cannot keep."""
+    from statistics import median
+    from .ruled_tables import _rows
+    rows = [sorted(cells,key=lambda line:line.bbox[0]) for _,cells,_ in _rows(
+        [line for line in region.lines if line.stripped and line.size>0])]
+    dense = [row for row in rows if len(row)>=3]
+    if len(dense)<3 or len({len(row) for row in dense})!=1:
+        return False
+    em=median(line.size for row in dense for line in row)
+    if any(len(line.stripped.split())>4 for row in dense for line in row):
+        return False
+    if any(b.bbox[0]-a.bbox[2]<.75*em for row in dense for a,b in zip(row,row[1:])):
+        return False
+    if any(max(row[col].bbox[0] for row in dense)-min(row[col].bbox[0] for row in dense)>.5*em
+           for col in range(len(dense[0]))):
+        return False
+    return all(b[0].bbox[1]-a[0].bbox[1]<=3*em for a,b in zip(dense,dense[1:]))
+
+
 def assemble(skeletons, style, raw_pages=None):
     """Turn per-page skeletons into one reading order plus its side channels."""
     book = Book(style=style)
@@ -1735,8 +1761,9 @@ def assemble(skeletons, style, raw_pages=None):
                                        uncertain=bool(region.uncertain),
                                        bbox=region.bbox,
                                        continued_from=region.continued_from,
+                                       source_layout=not skel.is_scan and _native_note_grid(region),
                                        glyph_fallback=any((not skel.is_scan and getattr(sp,"encoding_unresolved",False)) or getattr(sp,"transcription_uncertain",False) for ln in region.lines for sp in ln.spans)))
-                if book.notes[-1].glyph_fallback:
+                if book.notes[-1].glyph_fallback and not book.notes[-1].source_layout:
                     from .native_text import note_glyph_runs
                     book.notes[-1].glyph_runs = note_glyph_runs(region, book.notes[-1].text, skel.pno)
             elif region.kind == "artwork":

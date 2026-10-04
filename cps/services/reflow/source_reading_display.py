@@ -39,7 +39,7 @@ class _Unplaced(ValueError):
 
 
 def _glyphs(book, page):
-    from .native_text import image_name, descriptor
+    from .native_text import image_name, descriptor, note_descriptor
     records = {}
     runs = [r for e in book.pages[page] for r in e.runs]
     runs += [r for n in book.notes if n.pno == page for r in getattr(n, 'glyph_runs', ())]
@@ -49,8 +49,8 @@ def _glyphs(book, page):
             _need(name not in records or records[name] == str(run[1]), 'ambiguous_glyph_codepoints')
             records[name] = str(run[1])
     for note in book.notes:
-        if note.pno == page and note.glyph_fallback and not note.glyph_runs:
-            name = image_name(descriptor(page,note.bbox,0,'note'))
+        if note.pno == page and note.uses_source_image and not note.glyph_runs:
+            name = image_name(note_descriptor(note))
             _need(name not in records or records[name] == note.text, 'ambiguous_glyph_codepoints')
             records[name] = note.text
     return records

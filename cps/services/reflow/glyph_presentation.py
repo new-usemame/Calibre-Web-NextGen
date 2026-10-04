@@ -141,8 +141,8 @@ def render(book, doc, source, raw, fragment, package):
     records={}
     runs=[r for e in book.pages[source.page] for r in e.runs]
     runs += [r for n in book.notes if n.pno==source.page for r in n.glyph_runs]
-    runs += [['glyph',n.text,native_text.descriptor(n.pno,n.bbox,0,'note')]
-             for n in book.notes if n.pno==source.page and n.glyph_fallback and not n.glyph_runs]
+    runs += [['glyph',n.text,native_text.note_descriptor(n)]
+             for n in book.notes if n.pno==source.page and n.uses_source_image and not n.glyph_runs]
     for run in runs:
         if run[0]=='glyph':
             name=native_text.image_name(run[2]);records.setdefault(name,[]).append(run)

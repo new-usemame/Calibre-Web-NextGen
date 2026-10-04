@@ -576,10 +576,10 @@ def _runs_html(runs, available, ref_ids, ambiguous=()):
 
 def _aside_html(note, ref_ids, available, ambiguous=False, continuations=()):
     body = escape(note.text)
-    if getattr(note,"glyph_fallback",False):
-        from .native_text import glyph_html, descriptor
+    if note.uses_source_image:
+        from .native_text import glyph_html, note_descriptor
         body = (_runs_html(note.glyph_runs, set(), {}) if getattr(note,"glyph_runs",None)
-                else glyph_html(descriptor(note.pno,note.bbox,0,"note"),block=True))
+                else glyph_html(note_descriptor(note),block=True))
     if note.num is None:
         origin = getattr(note, "continued_from", None)
         if origin is not None:

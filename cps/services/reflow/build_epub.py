@@ -2043,6 +2043,11 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             for entry in readings[pno]['entries']:
                 entry.update(states[entry['id']])
         if source_pages and pno in source_pages:
+            from . import paragraph_presentation
+            html, inset_audit = paragraph_presentation.render(book, doc, source_pages[pno],
+                (raw_pages or {}).get(pno), html,
+                excluded={i for proof in grids.values() for i in proof['element_indices']})
+            if inset_audit['entries']:evidence[pno]['paragraph_presentation'] = inset_audit
             from . import glyph_presentation
             html, glyph_audit = glyph_presentation.render(book, doc, source_pages[pno],
                 (raw_pages or {}).get(pno), html, package)
@@ -2240,6 +2245,18 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         evidence = _original_evidence(book, page_html, doc, package, figure_transform,
                                       should_stop, evidence_progress, source_pages,
                                       runtime_progress, reading_contexts, raw_pages)
+        # Ordinary native pages need the same measured insets without paying
+        # the cost of original-page raster evidence they do not otherwise need.
+        from . import paragraph_presentation
+        paragraph_evidence = {pno:dict(page=pno,paragraph_presentation=record['paragraph_presentation'])
+                              for pno,record in evidence.items() if 'paragraph_presentation' in record}
+        for pno, source in source_pages.items():
+            if pno in evidence or pno in compiled_layouts:continue
+            _check_cancelled(should_stop)
+            page_html[pno], inset_audit = paragraph_presentation.render(book, doc, source,
+                (raw_pages or {}).get(pno), page_html[pno])
+            if inset_audit['entries']:
+                paragraph_evidence[pno] = dict(page=pno,paragraph_presentation=inset_audit)
 
         if runtime_progress is not None:
             runtime_progress({"kind": "phase", "phase": "figure_crops"})
@@ -2397,6 +2414,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             payload['source_enrichment'] = {str(pno): dict(source.report(), identity=source.identity,
                 provenance=json.loads(source.provenance_json), raw_records=json.loads(source.records_json))
                 for pno, source in source_pages.items() if pno in page_html}
+        if paragraph_evidence:
+            payload['paragraph_presentation'] = list(paragraph_evidence.values())
         if evidence:
             payload["source_evidence"] = list(evidence.values())
             if reading_contexts:
@@ -2576,8 +2595,10 @@ class _Package(object):
         zf.writestr("%s/nav.xhtml" % OEBPS, parts["nav"])
         zf.writestr("%s/toc.ncx" % OEBPS, parts["ncx"])
         from .glyph_presentation import metric_stylesheet
+        from .paragraph_presentation import stylesheet as inset_stylesheet
         zf.writestr("%s/style.css" % OEBPS, STYLESHEET +
-                    metric_stylesheet(parts['sidecar'].get('source_evidence', [])))
+                    metric_stylesheet(parts['sidecar'].get('source_evidence', [])) +
+                    inset_stylesheet(parts['sidecar'].get('paragraph_presentation', [])))
         for href, text in parts["documents"].items():
             zf.writestr(posixpath.join(OEBPS, href), text)
         zf.close()

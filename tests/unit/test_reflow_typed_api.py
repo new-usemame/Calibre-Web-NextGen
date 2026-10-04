@@ -9,7 +9,7 @@ pytestmark=pytest.mark.unit
 
 def consent(mod,pdf_on_disk,**values):
     source=os.path.join(pdf_on_disk['library'],'Author/Book (5)',pdf_on_disk['name']+'.pdf')
-    return dict(consent=True,consent_contract='source-review-1',source_sha256=mod.extract.document_fingerprint(source),
+    return dict(consent=True,consent_contract='source-layout-1',source_sha256=mod.extract.document_fingerprint(source),
                 review_mode='deterministic',mode='sample',**values)
 
 
@@ -56,7 +56,7 @@ def test_current_source_identity_is_required_even_for_free_conversion(mod,monkey
 
 
 def test_optional_review_cannot_bypass_the_quality_gate(mod,monkeypatch,pdf_on_disk):
-    monkeypatch.setattr(mod.typed_model,'QUALITY_RELEASED',False)
+    monkeypatch.setattr(mod.layout_pipeline,'QUALITY_RELEASED',False)
     _wire(mod,monkeypatch,pdf_on_disk)
     body=consent(mod,pdf_on_disk);body.update(review_mode='source_verified',cost_cap_usd=1)
     response,added=_start(mod,body)
@@ -66,7 +66,7 @@ def test_optional_review_cannot_bypass_the_quality_gate(mod,monkeypatch,pdf_on_d
 
 def test_invalid_or_missing_prepared_identity_cannot_start_paid_review(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk)
-    monkeypatch.setattr(mod.typed_model,'QUALITY_RELEASED',True)
+    monkeypatch.setattr(mod.layout_pipeline,'QUALITY_RELEASED',True)
     for identity in (None,{},[],123,'not-an-identity'):
         body=consent(mod,pdf_on_disk);body.update(review_mode='source_verified',cost_cap_usd=1,preparation_id=identity)
         response,added=_start(mod,body)

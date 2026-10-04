@@ -126,7 +126,9 @@ class _LayoutSession:
     def proposal(view):
         # Preserve all immutable atoms. The fixture's explicitly displayed quote
         # becomes a quote group; protected source blocks remain indivisible.
-        protected = {b['range'][0] for b in view['protected_blocks']}
+        from cps.services.reflow import layout_domain
+        source = layout_domain.expand_source(view)
+        protected = {b['range'][0] for b in source['protected_blocks']}
         groups = []
         pending = []
         role = 'paragraph'
@@ -134,7 +136,7 @@ class _LayoutSession:
             if pending:
                 groups.append(dict(role=role, ranges=[[pending[0], pending[-1]]]))
                 pending.clear()
-        for atom in view['atoms']:
+        for atom in source['atoms']:
             if atom['id'] in protected:
                 flush()
                 groups.append(dict(role='source', ranges=[[atom['id'], atom['id']]]))
@@ -148,18 +150,16 @@ class _LayoutSession:
                 flush()
                 role = 'paragraph'
         flush()
-        from tests.unit.test_reflow_boundary_construction import construction_from_groups,selector
-        response=construction_from_groups(view,groups)
-        if view.get('previous') and view['atoms']:
-            response['continuation_evidence']=dict(previous=[view['previous']['atoms'][-1]['id'],None],
-                current=selector(view,view['atoms'][0]['id']))
-        return response
+        return dict(contract='layout-range-choices-1', snapshot=view['source_snapshot'],
+            groups=[dict(role=g['role'],ranges=[[int(first[1:]),int(last[1:])] for first,last in g['ranges']]) for g in groups],
+            joins=[],incoming={'continue':False,'previous':None,'current':None,'hyphen':None},emphasis=[])
 
     def post(self, *args, **kwargs):
         import json
         wire = json.loads(kwargs['data'])
         identity = json.loads(wire['messages'][1]['content'])
-        view = json.loads(wire['messages'][2]['content'])
+        from cps.services.reflow import layout_wire, layout_ranges
+        view = layout_wire.source_view(wire['messages'][:-1])
         self.calls.append(wire)
         if self.error:
             raise self.error
@@ -167,19 +167,28 @@ class _LayoutSession:
             content = 'invalid layout response'
         elif identity['stage'] == 'proposer':
             response = self.proposal(view)
-            self.proposals[view['snapshot']] = response
+            self.proposals[view['source_snapshot']] = response
             content = json.dumps(response)
         else:
             assert identity['stage'] == 'reviewer', 'fixture unexpectedly requires batch review'
             response = dict(snapshot=view['snapshot'], accept=self.decision != 'decline',
                 continuation_accept=False, problems=['quote_scope'] if self.decision == 'decline' else [])
-            response['decisions']={d['id']:True for d in view['decisions']}
+            response['decisions']=('1' if self.decision != 'decline' else '0')*layout_ranges.decision_count(view['decisions'])
             if self.decision == 'stale':
                 response['snapshot'] = '0'*64
             content = json.dumps(response)
         self.transport.data['model'] = wire['model']
         self.transport.data['choices'][0]['message']['content'] = content
         return self.transport.post(*args, **kwargs)
+
+
+def _small_review_pdf(rig):
+    """Keep failure-path fixtures below the real bounded request admission."""
+    doc = F.new_doc()
+    for index in range(3):
+        page = doc.new_page(width=500, height=700)
+        page.insert_text((50,100), 'Original source words on page %s remain complete.' % index, fontsize=12)
+    doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
 
 
 def _run(rig, **options):
@@ -384,6 +393,7 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
 
 def test_a_conversion_with_rejected_model_answers_does_not_say_it_finished(rig, monkeypatch):
     from cps.services.reflow.layout_pipeline import LayoutClient
+    _small_review_pdf(rig)
     session=_LayoutSession(malformed=True)
     monkeypatch.setattr(rig.mod,'make_client',lambda tier:LayoutClient('inert',enabled=True,session=session))
     task=_run(rig,mode='full',cost_cap_usd=1)
@@ -469,11 +479,7 @@ def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(
     from cps.services.reflow.layout_pipeline import LayoutClient
     # Keep this successful-billing fixture within the explicit 48KB prompt
     # admission. Large previous-page context is a separate refusal scenario.
-    doc = F.new_doc()
-    for index in range(3):
-        page = doc.new_page(width=500, height=700)
-        page.insert_text((50,100), 'Original source words on page %s remain complete.' % index, fontsize=12)
-    doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
+    _small_review_pdf(rig)
     session = _LayoutSession()
     monkeypatch.setattr(rig.mod,'make_client',lambda tier:LayoutClient('inert',enabled=True,session=session))
     task = _run(rig, mode="full", cost_cap_usd=1.0)
@@ -499,6 +505,7 @@ def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
     import requests
 
     from cps.services.reflow.layout_pipeline import LayoutClient
+    _small_review_pdf(rig)
     session=_LayoutSession(error=requests.ReadTimeout('lost answer'))
     monkeypatch.setattr(rig.mod,'make_client',lambda tier:LayoutClient('inert',enabled=True,session=session))
     task = _run(rig, mode="full", cost_cap_usd=1.0)

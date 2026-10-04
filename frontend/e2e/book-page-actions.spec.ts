@@ -138,7 +138,8 @@ test('the personal-library action row leads with editing and keeps private remov
   await expect(actions.getByRole('link', { name: 'Read now' })).toBeVisible();
 
   // This is the task order, not just a set-membership assertion: the primary
-  // reading action is followed by the metadata editor and shelf chooser, then two
+  // reading action is followed by the e-reader send action, metadata editor and
+  // shelf chooser, then two
   // compact personal actions. The spacer leaves Settings at the far edge.
   const visibleActions = await actions.locator('a, button').evaluateAll((nodes) =>
     nodes
@@ -152,8 +153,8 @@ test('the personal-library action row leads with editing and keeps private remov
         icon: node.querySelector('svg')?.getAttribute('class') ?? '',
       })),
   );
-  expect(visibleActions.slice(0, 6).map((action) => action.name)).toEqual([
-    'Read now', 'Edit metadata', 'Add to shelf',
+  expect(visibleActions.slice(0, 7).map((action) => action.name)).toEqual([
+    'Read now', 'Send to e-reader', 'Edit metadata', 'Add to shelf',
     expect.stringMatching(/^(Add to favorites|Remove from favorites)$/),
     'Remove from my library', 'Settings',
   ]);

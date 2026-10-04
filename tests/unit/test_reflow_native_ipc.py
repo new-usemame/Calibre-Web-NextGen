@@ -159,19 +159,19 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     Crash after paid adoption, then retry: neither charge nor approved decision
     can disappear or be replayed, and nothing publishes from the failed child."""
     import json
-    from cps.services.reflow import model, ledger, layout_pipeline
-    from tests.unit.test_reflow_task import _LayoutSession
+    from cps.services.reflow import model, ledger, structural_pipeline
+    from tests.unit.test_reflow_task import _ChoicesSession
     with F.new_doc() as pdf:
         page = pdf.new_page(width=500, height=700)
         page.insert_text((80, 100), '"Original displayed words remain exactly as printed."', fontsize=12)
         for y in (180, 195, 210):
             page.insert_text((50, y), 'Ordinary body context supports the source display.', fontsize=12)
         pdf.save(rig.folder / 'Book - Author.pdf')
-    provider = _LayoutSession(); calls = provider.calls; parent = os.getpid()
+    provider = _ChoicesSession(); calls = provider.calls; parent = os.getpid()
     def answer(*args, **kwargs):
         assert os.getpid() == parent, 'provider dispatch escaped parent'
         return provider.post(*args, **kwargs)
-    monkeypatch.setattr(layout_pipeline, 'QUALITY_RELEASED', True)
+    monkeypatch.setattr(structural_pipeline, 'QUALITY_RELEASED', True)
     monkeypatch.setattr(rig.mod.config, 'resolved_openrouter_key', lambda: 'inert-parent-key')
     monkeypatch.setattr(model.requests, 'get', provider.get)
     monkeypatch.setattr(model.requests, 'post', answer)

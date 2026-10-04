@@ -11822,6 +11822,11 @@ msgstr "Конвертация библиотеки успешно заплан�
 msgid "Error scheduling Convert Library"
 msgstr "Ошибка планирования конвертации библиотеки"
 
+#: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
+#: cps/templates/cwa_epub_fixer.html
+msgid "Lost contact with the server, retrying..."
+msgstr "Связь с сервером потеряна, повторная попытка..."
+
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
 "This service rewrites the covers and metadata stored inside the ebook files "
@@ -11870,10 +11875,6 @@ msgid ""
 msgstr ""
 "Нет текущих или предыдущих запусков для отображения. Нажмите кнопку "
 "\"Старт\" выше, чтобы начать."
-
-#: cps/templates/cwa_cover_enforcer.html
-msgid "Lost contact with the server, retrying..."
-msgstr "Связь с сервером потеряна, повторная попытка..."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "The request failed."

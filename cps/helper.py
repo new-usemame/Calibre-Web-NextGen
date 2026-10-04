@@ -549,16 +549,17 @@ def check_send_to_ereader(entry):
         return None
 
 
+# The formats read_book() renders in the browser, most preferred first. Both read
+# entry points open the first of these a book has: the detail page's "Read now"
+# (entry.reader_list[0]) and caliBlur's grid read action (the reader_formats filter).
+READER_FORMATS = ('epub', 'kepub', 'pdf', 'txt', 'cbz', 'cbr', 'cbt', 'djvu', 'djv')
+
+
 # Check if a reader is existing for any of the book formats, if not, return empty list, otherwise return
 # list with supported formats
 def check_read_formats(entry):
-    extensions_reader = {'TXT', 'PDF', 'EPUB', 'KEPUB', 'CBZ', 'CBT', 'CBR', 'DJVU', 'DJV'}
-    book_formats = list()
-    if len(entry.data):
-        for ele in iter(entry.data):
-            if ele.format.upper() in extensions_reader:
-                book_formats.append(ele.format.lower())
-    return book_formats
+    available = {ele.format.lower() for ele in entry.data}
+    return [book_format for book_format in READER_FORMATS if book_format in available]
 
 
 # Files are processed in the following order/priority:

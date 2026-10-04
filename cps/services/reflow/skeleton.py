@@ -2228,12 +2228,44 @@ def _numbered_source_groups(lines):
     return groups
 
 
+def _source_reference_groups(lines):
+    """Keep aligned printed dot-leader/reference entries as separate items."""
+    if not lines:
+        return []
+    ending = re.compile(r'\.{3,}\s*(?:\d+(?:\s*[,\u2013-]\s*\d+)*|[ivxlcdm]+)\s*$', re.I)
+    groups = []; pending = []
+    for line in lines:
+        pending.append(line)
+        if ending.search(line.stripped):
+            groups.append(pending); pending = []
+    if pending or len(groups) < 2:
+        return []
+    sizes = [line.size for line in lines if line.size > 0]
+    if not sizes:
+        return []
+    em = median(sizes)
+    if (em <= 0 or max(g[0].x0 for g in groups)-min(g[0].x0 for g in groups) > .5*em
+            or max(g[-1].bbox[2] for g in groups)-min(g[-1].bbox[2] for g in groups) > .75*em):
+        return []
+    for group in groups:
+        for prior, line in zip(group, group[1:]):
+            if (line.x0 < group[0].x0+.4*em
+                    or not -.2*em <= line.bbox[1]-prior.bbox[3] <= 1.6*em):
+                return []
+    return groups
+
+
 def _classify_body(lines, blk, style, skel, band=0, column=0):
     """Split a block into headings and prose, honouring run-in sub-headings."""
     groups=_numbered_source_groups(lines)
     if groups:
         skel.regions.append(Region(kind='list',lines=list(lines),list_groups=groups,
             bbox=_lines_bbox(lines,blk.bbox),band=band,column=column,reason='numbered_source_list'))
+        return
+    groups = _source_reference_groups(lines)
+    if groups:
+        skel.regions.append(Region(kind='list', lines=list(lines), list_groups=groups,
+            bbox=_lines_bbox(lines, blk.bbox), band=band, column=column, reason='source_reference_list'))
         return
     if lines and CAPTION_LINE.match(lines[0].stripped):
         skel.regions.append(Region(kind="caption",lines=list(lines),
@@ -2273,6 +2305,11 @@ def _classify_body(lines, blk, style, skel, band=0, column=0):
         skel.reasons.append("large_type_not_a_heading")
 
     if not lines:
+        return
+    groups = _source_reference_groups(lines)
+    if groups:
+        skel.regions.append(Region(kind='list', lines=list(lines), list_groups=groups,
+            bbox=_lines_bbox(lines, blk.bbox), band=band, column=column, reason='source_reference_list'))
         return
     kind = "caption" if CAPTION_LINE.match(lines[0].stripped) else "body"
     skel.regions.append(Region(kind=kind, lines=list(lines),

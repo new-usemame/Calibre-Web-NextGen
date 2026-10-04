@@ -1,6 +1,6 @@
 import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import {assertNoHorizontalOverflow,collectPageErrors,assertNoPageErrors} from './utils';
+import {assertNoHorizontalOverflow,assertNoPageErrors} from './utils';
 
 // Actual Admin form with isolated mail-setting transport. Never changes a real
 // SMTP destination, password or household setting, and never sends a message.
@@ -19,7 +19,14 @@ for(const theme of ['light','dark']) {
       }
       return route.fulfill({json:cfg});
     });
-    const errors=collectPageErrors(page);
+    const errors:string[]=[];const rejectedConsole:{text:string,url:string}[]=[];
+    page.on('pageerror',error=>errors.push('pageerror: '+error.message));
+    page.on('console',message=>{if(message.type()==='error') {
+      const text=message.text(),url=message.location().url;
+      if(text.includes('400 (Bad Request)') && url.endsWith('/api/v1/admin/mailsettings'))
+        rejectedConsole.push({text,url});
+      else errors.push('console.error: '+text);
+    }});
     await page.goto('/app/admin#email-settings');
     await page.evaluate(value=>document.documentElement.setAttribute('data-theme',value),theme);
     const form=page.locator('#email-settings');
@@ -33,7 +40,11 @@ for(const theme of ['light','dark']) {
     expect(writes[0]).not.toHaveProperty('mail_password');
     await page.reload();await expect(template).toHaveValue('{series} #{series_index} - {title}');
     await page.evaluate(value=>document.documentElement.setAttribute('data-theme',value),theme);
-    await template.fill('{title.__class__}');await template.press('Enter');
+    await template.fill('{title.__class__}');
+    const rejection=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/mailsettings'
+      && response.request().method()==='POST'
+      && response.request().postDataJSON().mail_filename_template==='{title.__class__}');
+    await template.press('Enter');expect((await rejection).status()).toBe(400);
     await expect(form.getByRole('status')).toHaveText('Use a valid attachment filename template with supported metadata fields.');
     await expect(template).toHaveValue('{title.__class__}');
     expect(cfg.mail_filename_template).toBe('{series} #{series_index} - {title}');
@@ -46,6 +57,10 @@ for(const theme of ['light','dark']) {
     await page.keyboard.press('Enter');await expect(form.getByRole('status')).toHaveText('Email settings saved.');
     await expect.poll(()=>cfg.mail_filename_template).toBe('');
     await page.reload();await expect(template).toHaveValue('');
+    // Chromium reports the intentionally asserted failed fetch in the console;
+    // keep all other page/console errors and reject duplicate mail rejections.
+    expect(writes.filter(write=>write.mail_filename_template==='{title.__class__}')).toHaveLength(1);
+    expect(rejectedConsole.length).toBeLessThanOrEqual(1);
     assertNoPageErrors(errors);
   });
 }

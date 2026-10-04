@@ -11,6 +11,53 @@ from dataclasses import replace
 
 VERSION = 'native-transcript-agreement-2'
 _LIGATURES = {'ﬁ':'fi','ﬂ':'fl','ﬀ':'ff','ﬃ':'ffi','ﬄ':'ffl'}
+CONSISTENCY_VERSION = 'native-transcript-consistency-1'
+
+
+def consistent_uncertainty(pages, provenance):
+    """Repeated independent disagreement earns conservative pixel fallback.
+
+    Agreement at one occurrence cannot overrule a majority of disputed
+    occurrences on at least two printed pages. Only the exact same native
+    token and font qualify. No alternate recognition is adopted as source text.
+    """
+    from collections import defaultdict
+    occurrences=defaultdict(list)
+    def key(span):
+        tokens=list(re.finditer(r'[^\W_]+(?:[\'’][^\W_]+)*',span.text))
+        if len(tokens)!=1 or len(tokens[0].group())<3:return None
+        return span.font,tokens[0].group()
+    eligible=set()
+    for raw in pages:
+        prov=provenance.get(raw.pno)
+        if (prov is None or prov.layer!='native' or prov.verification.get('version')!=VERSION
+                or not (raw.text_layer_invisible or raw.text_layer_overpainted)):continue
+        eligible.add(raw.pno)
+        for block in raw.text_blocks:
+            for line in block.lines:
+                if line.transcription_uncertain:continue
+                for span in line.spans:
+                    token=key(span)
+                    if token is not None:occurrences[token].append((raw.pno,span.transcription_uncertain))
+    disputed={token for token,rows in occurrences.items()
+        if sum(flag for _,flag in rows)*2>len(rows) and len({p for p,flag in rows if flag})>=2}
+    if not disputed:return pages,{}
+    result=[];audit={}
+    for raw in pages:
+        count=0
+        def qualify(span):
+            nonlocal count
+            if not span.transcription_uncertain and key(span) in disputed:
+                count+=1
+                return replace(span,transcription_uncertain=True)
+            return span
+        blocks=[replace(block,lines=[replace(line,spans=[qualify(s) for s in line.spans])
+                if not line.transcription_uncertain else line for line in block.lines])
+                for block in raw.blocks] if raw.pno in eligible else raw.blocks
+        result.append(replace(raw,blocks=blocks) if count else raw)
+        if count:audit[raw.pno]=dict(version=CONSISTENCY_VERSION,new_pixel_words=count,
+            evidence='majority_disputed_exact_native_token_and_font_on_two_distinct_pages')
+    return result,audit
 
 
 def _canonical(text):

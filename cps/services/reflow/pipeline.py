@@ -340,6 +340,11 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
                 message="page %d of %d recognized" % (done, total))),
             should_stop=should_stop, **opts)
         raw_pages = result.recovery.pages
+        from . import transcript
+        raw_pages, consistency = transcript.consistent_uncertainty(raw_pages, result.recovery.provenance)
+        result.recovery.pages = raw_pages
+        for pno, evidence in consistency.items():
+            result.recovery.provenance[pno].verification['consistency'] = evidence
 
     result.raw_pages = raw_pages
     if visual_results is not None and (not isinstance(visual_results, dict) or

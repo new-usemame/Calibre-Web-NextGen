@@ -99,3 +99,78 @@ Metamorphosis, 116 Kindle page positions, xpointer → anchor → xpointer:
 - `?position_kinds=anchor` without `percentage` is the old locator-only request, so the
   percentage-only rows (a web or Kobo place) are not served to it. Ask for
   `locator,percentage,anchor`.
+
+---
+
+# Annotations as text quotes (highlights, notes, bookmarks)
+
+The same idea for `/kosync/syncs/annotations`. A word-based client cannot name a highlight by
+XPointer, CFI or KoboSpan, but it can name its words. It sends a **text quote** (W3C
+TextQuoteSelector's `exact`, `prefix`, `suffix`), and the server places it in the library EPUB.
+
+## Contract (additive; KOReader's plugin sees no change)
+
+Advertised as `annotations_text_quote` in `GET /kosync/users/auth`.
+
+`PUT /kosync/syncs/annotations`. Each entry in `annotations` may carry:
+- `source: "textquote"`, the provenance of this client kind;
+- `type`: `highlight`, or `dogear` for a bookmark (a point at one word);
+- `text_quote: {exact, prefix, suffix}`. `exact` is at most 4000 characters, the context at most
+  600 characters a side, and `exact` must fold to something non-empty;
+- `percentage`, a fraction from 0 to 1. It only chooses between repeats, as for positions.
+
+`document` may be a decimal Calibre book id, which resolves only to a book the user may see.
+`delete_source: "textquote"` names this client as the deleter. A push may delete only rows of its
+own source, named in `deleted` or sent inline as `hidden: true`. A push without `delete_source`
+is KOReader's, as before. The response adds `resolved` and `unresolved`, the quoted
+`annotation_id`s by outcome.
+
+`GET /kosync/syncs/annotations/<digest or book id>?text_quote=1`. Every row carries `text_quote`:
+- the stored quote, for a row the client sent itself;
+- otherwise one derived from the row's anchor;
+- `null` when there is none.
+
+Rows carry `content_revision` and `server_modified_at`. Both advance on every content change,
+from any writer, including device pushes, which did not advance them before. `last_synced` also
+moves when the server only re-derives an anchor, so it is not an edit clock. Tombstones
+(`hidden: true`) from every source are served, as before.
+
+## How it works
+
+- **Placing.** `text_anchor.place_quote` uses the same fold and the same needle and repeat rules
+  as `place`, then makes a range. The start is the first character's XPointer. The end is just
+  past the last character, the same convention as CFI-derived XPointers. The book's text between
+  the two must fold equal to `exact`. A quote ending inside a ligature is refused rather than
+  widened.
+- **Storing.** A placed quote is stored as `position_type: koreader_xpointer` with
+  `highlighted_text` set to the book's own words. KOReader compares those words before drawing.
+  The web reader converts the pair through the existing `_compute_koreader_cfi`. An unplaced
+  quote is stored as `position_type: text_quote`, with `exact` as its text. That is an explicit
+  gap (P6 of ANNOTATION-SYNC-PRINCIPLES): the web reader reports it as unresolved, and nothing
+  guesses. A later push that cannot be placed never erases an anchor an earlier push found. The
+  quote itself is kept in `annotation.text_quote` as JSON.
+- **Naming on pull.** `quote_at` reads the words of a range.
+  - A KOReader row uses its XPointer pair in the library EPUB.
+  - A web-reader row uses its CFI, when that CFI is against the EPUB.
+  - A Kobo row uses its start span, through `kepub_alignment.span_text_range`, because the KEPUB
+    and the EPUB hold the same text. The highlighted words must start in that span exactly once.
+    The Kobo's character offset counts a DOM this server does not rebuild.
+
+  A derived quote is served only when it folds equal to the row's `highlighted_text`. An anchor
+  into another copy of the book therefore gives no quote rather than wrong words. Derivation runs
+  only on `?text_quote=1`, off the request greenlet. Quotes stored by the client itself are always
+  served.
+- **Access.** Placing and naming read the book's text. They need the viewer or download role and
+  visibility (`kosync._readable_epub`), as anchors do. Without that right a quote is stored
+  unplaced and pulls carry no derived quotes.
+
+## Known limits (deliberately deferred)
+
+- Native Kobo (Nickel) sync draws only KoboSpan rows. A placed quote, like any KOReader highlight,
+  is not converted to spans for Nickel. `kepub_alignment.xpointer_to_span` exists, and wiring it
+  into the Kobo annotation serve path is a follow-up that serves both sources.
+- A Kobo dogear has no text, so it reaches the client without words. A client bookmark
+  (`dogear`) is a point, so neither KOReader (whose plugin draws only rows with text) nor the web
+  reader draws it. Both keep it and round-trip it.
+- Unanchored notes (`position_type: unanchored`) carry no quote. The client skips them for now.
+- A quote whose words cross two spine items has no single XPointer range and stays unplaced.

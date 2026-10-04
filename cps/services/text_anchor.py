@@ -33,7 +33,7 @@ from __future__ import annotations
 import os
 import unicodedata
 from array import array
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from functools import lru_cache
 from typing import Optional
 
@@ -282,6 +282,31 @@ def place_quote(epub_path, quote: dict, percentage: Optional[float] = None):
     at = _find(book, prefix, exact, suffix, percentage)
     if at is None:
         return None
+    found = _range(epub_path, book, at, exact)
+    return (*found, at / len(book.text) * 100.0) if found else None
+
+
+def place_in_text_range(epub_path, text_range, text: str):
+    """``(start, end, passage)`` of ``text`` starting inside ``text_range``, or None.
+
+    ``text_range`` is ``(start, end)`` in the book's non-whitespace characters
+    laid end to end (``kepub_alignment.span_text_range``): a device that named
+    the span a highlight starts in, and its words, but no position this
+    server can read inside the span. ``text`` must start there exactly once.
+    """
+    book = _book(epub_path)
+    needle = fold(text or "")
+    if book is None or not needle or not text_range:
+        return None
+    low, high = (bisect_left(book.origin, i) for i in text_range)
+    at = book.text.find(needle, low)
+    if not low <= at < high or low <= book.text.find(needle, at + 1) < high:
+        return None
+    return _range(epub_path, book, at, needle)
+
+
+def _range(epub_path, book: _Folded, at: int, exact: str):
+    """``(start, end, passage)`` around folded ``exact`` found at ``at``, or None."""
     (m, i), (m_last, j) = book.source(at), book.source(at + len(exact) - 1)
     if m != m_last:
         return None
@@ -295,7 +320,7 @@ def place_quote(epub_path, quote: dict, percentage: Optional[float] = None):
     # ligature) would frame more than its words: refuse rather than widen.
     if passage is None or fold(passage) != exact:
         return None
-    return start, end, passage, at / len(book.text) * 100.0
+    return start, end, passage
 
 
 def quote_at(epub_path, start_xpointer: str, end_xpointer: str,

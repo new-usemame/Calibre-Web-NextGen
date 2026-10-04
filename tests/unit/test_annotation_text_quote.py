@@ -360,3 +360,69 @@ def test_a_stored_quote_is_served_as_sent(world, client):
 
     assert json.loads(_row(world, "hl-1").text_quote) == quote
     assert _pull(client, quotes=False)["hl-1"]["text_quote"] == quote
+
+
+def test_a_quote_ending_inside_a_ligature_is_not_widened_to_the_whole_character(tmp_path):
+    from tests.unit.test_koreader_xpointer import _html_book
+    epub = _html_book(tmp_path, ["<p>The committee reached its ﬁnal decision late that night.</p>"])
+    # Folded, U+FB01 is "fi": a quote may end on its "f", which no range can
+    # hold without also holding the "i".
+    cut = {"prefix": "The committee reached its", "exact": "f", "suffix": "inal decision late"}
+    whole = {"prefix": "The committee reached its", "exact": "ﬁnal",
+             "suffix": "decision late that night."}
+
+    assert text_anchor.place_quote(epub, cut) is None
+    start, end, passage, _ = text_anchor.place_quote(epub, whole)
+    assert passage == "ﬁnal"
+
+
+@pytest.fixture
+def kobo_book(tmp_path, monkeypatch):
+    """Alice as the library holds it: the EPUB and the KEPUB a Kobo reads."""
+    import shutil
+    from types import SimpleNamespace
+    from cps import config
+    fixtures = __import__("pathlib").Path(__file__).parent.parent / "fixtures" / "koreader_xpointer"
+    folder = tmp_path / "Lewis Carroll" / "Alice (11)"
+    folder.mkdir(parents=True)
+    shutil.copy(fixtures / "alice-pg11.epub", folder / "alice.epub")
+    shutil.copy(fixtures / "alice-pg11.kepub.epub", folder / "alice.kepub")
+    monkeypatch.setattr(config, "get_book_path", lambda: str(tmp_path))
+    spans = json.loads((fixtures / "alice-pg11.kobo-spans.json").read_text())
+    book = SimpleNamespace(id=11, path="Lewis Carroll/Alice (11)", data=[
+        SimpleNamespace(format="EPUB", name="alice"), SimpleNamespace(format="KEPUB", name="alice")])
+    first = {}
+    for s in spans:  # span ids restart in every document; the title's comes first
+        first.setdefault(s["span"], s)
+    return SimpleNamespace(book=book, epub=str(folder / "alice.epub"), span=first)
+
+
+def _kobo_row(span, text_):
+    return ub.Annotation(annotation_id="kobo-1", source="kobo", highlighted_text=text_,
+                         content_id="uuid!!" + span["source"],
+                         start_container_path="span#" + span["span"],
+                         end_container_path="span#" + span["span"], hidden=False)
+
+
+def test_a_kobo_highlight_reaches_the_client_as_its_words(kobo_book):
+    span = kobo_book.span["kobo.8.1"]  # the title, "Alice’s Adventures in Wonderland"
+    row = _kobo_row(span, "Alice’s Adventures in Wonderland")
+    wire = {}
+
+    annotation_routes._add_text_quotes([row], [wire], kobo_book.book)
+
+    quote = wire["text_quote"]
+    assert text_anchor.fold(quote["exact"]) == text_anchor.fold(row.highlighted_text)
+    assert quote["suffix"].startswith("by Lewis Carroll")
+    start, end, _passage, _ = text_anchor.place_quote(kobo_book.epub, quote)
+    assert kx.passage_between(kobo_book.epub, start, end) == "Alice’s Adventures in Wonderland"
+
+
+def test_a_kobo_highlight_whose_words_do_not_start_in_its_span_gives_no_words(kobo_book):
+    span = kobo_book.span["kobo.8.1"]
+    wire = {}
+
+    annotation_routes._add_text_quotes(
+        [_kobo_row(span, "Down the Rabbit-Hole")], [wire], kobo_book.book)
+
+    assert "text_quote" not in wire

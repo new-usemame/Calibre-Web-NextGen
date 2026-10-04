@@ -115,36 +115,42 @@ def build_pull_payload(user_id: int, book_id: int, session, *,
 def _add_text_quotes(rows, annotations, book) -> None:
     """Name each pulled highlight by its words, for clients that hold no DOM.
 
-    A row keeps the quote its own client sent. Any other row is converted
-    from its anchor in the file that anchor is expressed against (the EPUB,
-    or the KEPUB for a Kobo highlight -- the two hold the same words), and
-    only when the words found there are the row's ``highlighted_text``: an
-    anchor from another copy of the book gives no quote, never other words.
+    A row keeps the quote its own client sent. Any other row is named from
+    its anchor in the library EPUB -- a Kobo highlight through the KEPUB's
+    text, which is the EPUB's (``kepub_alignment``) -- and only when the words
+    found there are the row's ``highlighted_text``: an anchor from another
+    copy of the book gives no quote, never other words.
     """
-    from ...annotations import (_book_format_path, _cfi_source_path,
-                                _compute_annotation_cfi, _has_native_kobo_anchor,
-                                _resolve_epub_path)
+    from ...annotations import _book_format_path, _cfi_source_path
+    from ...services import kepub_alignment
     from ...services import koreader_xpointer as kx
     from ...services import text_anchor
+    from ...services.kobo_position import _extract_kobospan_id
 
     epub = _book_format_path(book, "EPUB")
+    if not epub:
+        return
+    kepub = _book_format_path(book, "KEPUB")
     for row, wire in zip(rows, annotations):
         if row.hidden or wire.get("text_quote") or not row.highlighted_text:
             continue
         try:
-            path, pair = None, None
+            pair = None
+            span = _extract_kobospan_id(row.start_container_path or "")
             if row.position_type == "koreader_xpointer" and row.start_xpointer and row.end_xpointer:
-                path, pair = epub, (row.start_xpointer, row.end_xpointer)
-            elif _has_native_kobo_anchor(row):
-                path = _resolve_epub_path(book)
-                cfi = _compute_annotation_cfi(row, book)
-                pair = kx.cfi_range_to_xpointers(path, cfi) if path and cfi else None
-            elif row.cfi_range:
-                path = _cfi_source_path(row, book)
-                pair = kx.cfi_range_to_xpointers(path, row.cfi_range) if path else None
-            if not path or not pair:
+                pair = (row.start_xpointer, row.end_xpointer)
+            elif span and kepub and "!!" in (row.content_id or ""):
+                # The Kobo's offset counts characters of a DOM this server does
+                # not rebuild, so the words place the highlight inside the span.
+                text_range = kepub_alignment.span_text_range(
+                    epub, kepub, row.content_id.split("!!", 1)[1], span)
+                placed = text_anchor.place_in_text_range(epub, text_range, row.highlighted_text)
+                pair = placed[:2] if placed else None
+            elif row.cfi_range and _cfi_source_path(row, book) == epub:
+                pair = kx.cfi_range_to_xpointers(epub, row.cfi_range)
+            if not pair:
                 continue
-            quote = text_anchor.quote_at(path, *pair)
+            quote = text_anchor.quote_at(epub, *pair)
         except Exception:  # pragma: no cover - a derived quote is optional
             log.warning("Annotation pull: could not name %s by its words",
                         row.annotation_id, exc_info=True)

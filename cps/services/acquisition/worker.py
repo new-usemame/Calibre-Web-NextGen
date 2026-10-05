@@ -304,7 +304,7 @@ class AcquisitionWorker:
         direct_magnet = offer['transport'] == 'torrent' and offer['href'].startswith('magnet:')
         if direct_magnet:
             # The private durable offer, never a refetched mutable source or a
-            # shortened external ID, is the expected full identity on every
+            # shortened external ID, carries both original full hashes on every
             # poll/restart/shared-attempt adoption, even after an uncertain add.
             hashes = magnet_identities(offer['href'], tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             prepare = getattr(client, 'prepare_submission', None)
@@ -335,7 +335,7 @@ class AcquisitionWorker:
                 if offer['transport'] == 'nzb': validate_nzb(descriptor)
                 elif isinstance(descriptor, str):
                     hashes = magnet_identities(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
-                    # No durable original topic authority exists for a mutable
+                    # No durable original full-topic/pair authority exists for a mutable
                     # HTTP redirect. Preserve the established v1 redirect flow.
                     if hashes.v2 is not None:
                         raise ClientError('unsupported_magnet_redirect')

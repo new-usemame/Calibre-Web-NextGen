@@ -3965,7 +3965,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -9239,7 +9240,8 @@ msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/search_form.html
 msgid "Tags"
 msgstr "Tag"
 
@@ -12405,6 +12407,11 @@ msgid "Upload Format"
 msgstr "Format Unggahan"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+#, fuzzy
+msgid " Exchange author & title"
+msgstr "Tukar penulis dan judul"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "ID Seri"
 
@@ -12521,11 +12528,6 @@ msgstr "Tidak ada hasil yang ditemukan! Silakan coba kata kunci lain."
 #: cps/templates/book_table.html cps/templates/user_table.html
 msgid "This Field is Required"
 msgstr "Isian Ini Diperlukan"
-
-#: cps/templates/book_table.html
-#, fuzzy
-msgid " Exchange author & title"
-msgstr "Tukar penulis dan judul"
 
 #: cps/templates/book_table.html
 #, fuzzy

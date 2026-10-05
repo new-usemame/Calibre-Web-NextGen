@@ -1584,10 +1584,10 @@ def _opf(metadata, manifest, spine, identifier, modified, nonlinear=()):
 def _scan_key_white_margin_jpeg(doc, pno, bbox):
     """Remove only side columns proved pure white in the emitted source raster.
 
-    The source-owned figure remains the full page. A symbol OCR did not bound
+    The source-owned region remains intact. A symbol OCR did not bound
     can be anywhere on it; the same pixmap supplies the proof and the JPEG, so
     cached OCR geometry and a separate approximate ink query have no authority
-    to cut it. Unknown colors or a failed render keep the complete page.
+    to cut it. Unknown colors or a failed render keep the complete region.
     """
     from PIL import Image, ImageChops
     clip = extract.pymupdf.Rect(*bbox)

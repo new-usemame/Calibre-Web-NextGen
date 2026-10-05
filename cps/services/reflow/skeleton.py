@@ -1188,6 +1188,18 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
         skel.reasons.append('uncertain_scan_key_panel')
         return skel
 
+    from . import scan_keys
+    captioned_keys = scan_keys.panels(raw, pixel_probe)
+    if captioned_keys:
+        for box, lines, reason, column in captioned_keys:
+            skel.regions.append(Region(kind='artwork', lines=lines, bbox=box,
+                                       reason=reason, column=column))
+            skel.regions.append(Region(kind='figure', bbox=box,
+                                       reason=reason, column=column))
+        skel.reasons.append('captioned_scan_keys')
+        skel.regions.sort(key=_region_order)
+        return skel
+
     panels = _sparse_scan_spread_panels(raw)
     if panels:
         for panel_index, (box, lines) in enumerate(panels):

@@ -1,0 +1,3 @@
+### Fixed
+
+- **Automatic metadata fetch on ingest no longer fails on books whose rating your library already uses (#2435, @Godferdom).** When a provider returned a rating, the fetch tried to add a second copy of that rating value, the save failed with `UNIQUE constraint failed: ratings.rating`, and every provider after it failed too, so the new book got no metadata at all. The fetch now reuses the existing rating, and one provider's failed save no longer breaks the ones after it. With Smart Metadata Application off, changing one book's rating also no longer changes the rating of every other book that had the same value.

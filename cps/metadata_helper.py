@@ -131,6 +131,9 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                     
             except Exception as e:
                 log.warning(f"Error fetching metadata from provider {provider_id}: {e}")
+                # Each provider must start on a usable session: one that failed
+                # mid-flush would otherwise fail every provider after it (#2435).
+                calibre_db_instance.session.rollback()
                 continue
                 
         calibre_db_instance.session.close()
@@ -154,6 +157,9 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         bool: True if metadata was successfully applied
     """
     cover_stage = None
+    # Read before any flush can fail: afterwards the session refuses to load
+    # expired attributes until it is rolled back.
+    book_id = getattr(book, 'id', 'unknown')
     previous_cover_metadata = (
         getattr(book, 'has_cover', 0),
         getattr(book, 'last_modified', None),
@@ -300,13 +306,12 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             not (use_smart_application and book.ratings)):
             try:
                 rating_value = float(metadata.rating)
-                if 0 <= rating_value <= 10:  # Calibre uses 0-10 scale
-                    if book.ratings:
-                        book.ratings[0].rating = int(rating_value * 2)  # Convert to Calibre's 0-10 scale
-                    else:
-                        rating = db.Ratings(rating=int(rating_value * 2))
-                        calibre_db_instance.session.add(rating)
-                        book.ratings = [rating]
+                # MetaRecord.rating is 0-5 stars; calibre stores half-stars, 0-10.
+                if 0 < rating_value <= 5:
+                    # ratings is a shared lookup table (one row per value), so link
+                    # the book to the row for its value rather than inserting a
+                    # duplicate or rewriting a row other books point at (#2435).
+                    book.ratings = [_rating_row(calibre_db_instance.session, int(rating_value * 2))]
                     updated = True
             except (ValueError, TypeError):
                 pass
@@ -406,12 +411,21 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         return updated
         
     except Exception as e:
-        log.error(f"Error applying metadata to book {getattr(book, 'id', 'unknown')}: {e}")
+        calibre_db_instance.session.rollback()
+        log.error(f"Error applying metadata to book {book_id}: {e}")
         if cover_stage is not None:
             cover_stage.discard()
-        calibre_db_instance.session.rollback()
         book.has_cover, book.last_modified = previous_cover_metadata
         return False
+
+
+def _rating_row(session, value):
+    """Return the shared ``ratings`` row for ``value``, creating it if the library has none."""
+    rating = session.query(db.Ratings).filter(db.Ratings.rating == value).first()
+    if rating is None:
+        rating = db.Ratings(rating=value)
+        session.add(rating)
+    return rating
 
 
 def _apply_cover_from_metadata(book, metadata):

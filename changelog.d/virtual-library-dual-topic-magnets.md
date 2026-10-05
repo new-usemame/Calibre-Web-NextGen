@@ -1,0 +1,3 @@
+### Added
+
+- **Direct paired-topic hybrid magnets can import books through qualified qBittorrent with libtorrent 2.0.** CWNG preserves the exact original URI and checks usable client metadata plus both full original v1 and v2 hashes before inspecting completed files. Restart, uncertain acknowledgement and shared-request recovery retain the same attempt and pair. Existing torrents under either original identity refuse before submission. Incompatible clients refuse before submission and can be retried after an upgrade. Repeated/extra topics and HTTP links redirecting to this new form remain unsupported.

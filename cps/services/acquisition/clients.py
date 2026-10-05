@@ -178,7 +178,7 @@ class QBitClient:
     def __init__(self, config, *, transfer=run_transfer):
         self.config, self.transfer, self.cookie = config, transfer, None
         self._prepared_submission = None
-        self._expected_magnet_v2 = None
+        self._expected_magnet = None
 
     def url(self, method, **query):
         parts = urlsplit(self.config['endpoint']); path = parts.path.rstrip('/')
@@ -240,14 +240,16 @@ class QBitClient:
             # LT1 uses v1. Resolve this before the fence or any submission.
             if engine.startswith('2.0.'):
                 identity = hashes.v2[:40]
-            elif identity is None:
+            elif identity is None or isinstance(descriptor, str):
+                # A paired magnet still needs LT2: a usable v1 topic alone
+                # cannot qualify the full pair/metadata properties contract.
                 raise ClientError('unsupported_client_version')
             if isinstance(descriptor, str):
                 # has_metadata first appears in released WebUI API 2.11.2.
                 version = self.call('app/webapiVersion', checkpoint=checkpoint).body.decode('ascii', errors='replace').strip()
                 if not re.fullmatch(r'2\.[0-9]{1,2}\.[0-9]{1,3}', version) or not (2,11,2) <= tuple(map(int, version.split('.'))) <= (2,15,1):
                     raise ClientError('unsupported_client_version')
-        self._expected_magnet_v2 = hashes.v2 if isinstance(descriptor, str) else None
+        self._expected_magnet = hashes if isinstance(descriptor, str) and hashes.v2 is not None else None
         self._prepared_submission = (type(descriptor), descriptor, identity)
         return identity
 
@@ -256,9 +258,14 @@ class QBitClient:
 
     def submit(self, name, descriptor, *, checkpoint=lambda: None, before_submit=None):
         identity = self.prepare_submission(descriptor, checkpoint=checkpoint)
-        # A pre-existing unrelated torrent cannot be adopted or have its policy changed.
-        if rows(parsed(self.call('torrents/info', hashes=identity, checkpoint=checkpoint))): raise ClientError('torrent_already_exists')
-        if self._expected_magnet_v2 is not None:
+        # A dual magnet's unverified v1 topic can identify an existing v1-only
+        # torrent even when its shortened v2 ID is absent. Refuse either before
+        # add can merge trackers into that unrelated torrent.
+        collision_ids = identity
+        if self._expected_magnet is not None and self._expected_magnet.v1 not in (None, identity):
+            collision_ids += '|' + self._expected_magnet.v1
+        if rows(parsed(self.call('torrents/info', hashes=collision_ids, checkpoint=checkpoint))): raise ClientError('torrent_already_exists')
+        if self._expected_magnet is not None:
             # Recheck after collision lookup rather than trust cached engine/API
             # facts across a daemon restart. The external API is not atomic.
             self.prepare_submission(descriptor, checkpoint=checkpoint, refresh=True)
@@ -292,9 +299,9 @@ class QBitClient:
         if row.get('category') != self.config['category'] or name not in [v.strip() for v in str(row.get('tags', '')).split(',')]: raise ClientError('client_job_mismatch')
         identity = row.get('hash')
         if not isinstance(identity, str) or not re.fullmatch('[0-9a-f]{40}', identity): raise ClientError('invalid_client_response')
-        expected = self._expected_magnet_v2
+        expected = self._expected_magnet
         if expected is not None:
-            if identity != expected[:40]:
+            if identity != expected.v2[:40]:
                 raise ClientError('client_job_mismatch')
             properties = parsed(self.call('torrents/properties', hash=identity, checkpoint=checkpoint))
             if not isinstance(properties, dict):
@@ -309,13 +316,20 @@ class QBitClient:
                 raise ClientError('invalid_client_response')
             if property_id != identity:
                 raise ClientError('client_job_mismatch')
-            observed = properties.get('infohash_v2')
-            if observed is not None and observed != '' and (not isinstance(observed, str)
-                    or not re.fullmatch('[0-9a-fA-F]{64}', observed)):
-                raise ClientError('invalid_client_response')
-            if observed and observed.lower() != expected:
-                raise ClientError('client_job_mismatch')
-            if has_metadata is not True or not observed:
+            complete_identity = True
+            for field, digest, width in (('infohash_v2', expected.v2, 64),
+                                         ('infohash_v1', expected.v1, 40)):
+                if digest is None:
+                    continue
+                observed = properties.get(field)
+                if observed is not None and observed != '' and (not isinstance(observed, str)
+                        or not re.fullmatch('[0-9a-fA-F]{%d}' % width, observed)):
+                    raise ClientError('invalid_client_response')
+                if observed and observed.lower() != digest:
+                    raise ClientError('client_job_mismatch')
+                if not observed:
+                    complete_identity = False
+            if has_metadata is not True or not complete_identity:
                 return {'nzo_id': identity, 'status': 'Downloading'}
         files = rows(parsed(self.call('torrents/files', hash=identity, checkpoint=checkpoint)))
         complete = row.get('state') in ('uploading', 'stalledUP', 'queuedUP', 'pausedUP', 'stoppedUP', 'forcedUP') and row.get('progress') == 1 and row.get('amount_left') == 0 and files and all(f.get('progress') == 1 for f in files)
@@ -355,10 +369,10 @@ class TransmissionClient:
 
     def prepare_submission(self, descriptor, *, checkpoint=lambda: None):
         if isinstance(descriptor, str):
-            identity = magnet_identities(descriptor).v1
-            if identity is None:
+            hashes = magnet_identities(descriptor)
+            if hashes.v2 is not None:
                 raise ClientError('unsupported_client_version')
-            return identity
+            return hashes.v1
         identity = torrent_identities(descriptor).v1
         # The supported Transmission releases cannot ingest a pure-v2 file.
         # Refuse before the worker records an irreversible submission attempt.

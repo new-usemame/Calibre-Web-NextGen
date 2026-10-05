@@ -2267,15 +2267,14 @@ msgstr "Giá sách"
 msgid "Books organized in shelves"
 msgstr "Sách tổ chức theo giá sách"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "Đồng bộ những giá sách đã chọn với Kobo"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Giá sách thông minh"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Sách tổ chức theo giá sách"
+msgid "Books organized in smart shelves"
+msgstr "Sách được sắp xếp trong giá sách thông minh"
 
 #: cps/opds.py
 #, fuzzy
@@ -3375,11 +3374,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3650,9 +3649,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Tạo giá sách thông minh"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6469,9 +6468,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Sửa giá sách thông minh"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9035,10 +9034,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10267,7 +10262,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11107,14 +11102,13 @@ msgid "Hidden Books"
 msgstr "Sách ẩn"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "Lỗi tải xuống ảnh bìa"
+msgid "Error loading smart shelf"
+msgstr "Lỗi khi tải giá sách thông minh"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr ""
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Giá sách thông minh — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11160,11 +11154,6 @@ msgstr ""
 msgid "Error creating shelf"
 msgstr "Lỗi tải xuống ảnh bìa"
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "Tạo một giá sách"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11177,11 +11166,6 @@ msgstr ""
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "Lỗi tải xuống ảnh bìa"
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "Chỉnh sửa giá sách"
 
 #: cps/web.py
 #, fuzzy
@@ -11454,18 +11438,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Đồng bộ giá sách thông minh với máy đọc sách (Kobo và KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Đồng bộ giá sách thông minh với Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"Đồng bộ giá sách thông minh bị tắt toàn cục. Bật “%(setting)s” trong Cài đặt "
+"CWA để giá sách này đến được máy đọc sách của bạn."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15079,26 +15069,17 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Khi bật, giá sách thông minh được đánh dấu sẽ đến Kobo dưới dạng bộ sưu tập. "
+"Cũng cần bật đồng bộ Kobo trong Cấu hình cơ bản."
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Đồng bộ những giá sách đã chọn với Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
+msgid "KOReader also receives marked smart shelves in its library."
 msgstr ""
+"KOReader cũng nhận giá sách thông minh được đánh dấu trong thư viện của mình."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15564,8 +15545,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Lượt xem giá sách thông minh"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16438,10 +16419,6 @@ msgstr "Nhập tên domain"
 msgid "Denied Domains (Blacklist)"
 msgstr "Domain bị từ chối (Blacklist)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr ""
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16639,8 +16616,9 @@ msgid "Mobile Notice"
 msgstr ""
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
+msgid "Smart shelf editing works best on desktop or tablet devices."
 msgstr ""
+"Chỉnh sửa giá sách thông minh phù hợp nhất trên máy tính hoặc máy tính bảng."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16896,10 +16874,6 @@ msgid "Create Shelf"
 msgstr "Tạo một giá sách"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr ""
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Chi tiết sách"
 
@@ -17086,12 +17060,38 @@ msgid "Download Access Log"
 msgstr "Tải xuống log truy cập"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Giá sách thông minh là gì?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Giá sách thông minh tự động tập hợp sách theo quy tắc."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr ""
+"Giá sách thông minh được gọi là “Magic Shelves” trong các phiên bản cũ."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr ""
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Trước tiên hãy bật “%(setting)s” trong Cài đặt CWA. Cho đến lúc đó, ô chọn "
+"này không có tác dụng và giá sách sẽ không đến máy đọc sách của bạn."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Hiển thị giá sách thông minh này trong nguồn OPDS của tôi"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -18007,13 +18007,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "Đồng bộ những giá sách đã chọn với Kobo"
+msgid "Smart shelves order"
+msgstr "Thứ tự giá sách thông minh"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Chọn thứ tự giá sách thông minh trong thanh bên."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18061,8 +18060,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr ""
+msgid "Smart shelves visibility"
+msgstr "Hiển thị giá sách thông minh"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18256,6 +18255,34 @@ msgstr "Đồng bộ những giá sách đã chọn với Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Hiển thị đã đọc và chưa đọc"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "Đồng bộ những giá sách đã chọn với Kobo"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Sách tổ chức theo giá sách"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Lỗi tải xuống ảnh bìa"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Tạo một giá sách"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Chỉnh sửa giá sách"
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Đồng bộ những giá sách đã chọn với Kobo"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Đồng bộ những giá sách đã chọn với Kobo"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Sách sắp xếp theo thể loại"

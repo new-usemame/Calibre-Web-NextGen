@@ -2398,13 +2398,14 @@ msgstr "Scaffali"
 msgid "Books organized in shelves"
 msgstr "Libri organizzati in scaffali"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "Scaffali magici"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Scaffali intelligenti"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
-msgstr "Libri organizzati in scaffali magici"
+msgid "Books organized in smart shelves"
+msgstr "Libri organizzati in scaffali intelligenti"
 
 #: cps/opds.py
 msgid "description"
@@ -3610,11 +3611,11 @@ msgstr "Applica a {n} libri"
 msgid "Match condition"
 msgstr "Criterio di corrispondenza"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Campo regola"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Operatore regola"
 
@@ -3887,7 +3888,7 @@ msgstr "Aggiornamento della copertina non riuscito."
 msgid "Cover updated."
 msgstr "Copertina aggiornata."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Crea scaffale intelligente"
 
@@ -6760,7 +6761,7 @@ msgstr "Modifica scaffali pubblici"
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Modifica lo scaffale intelligente"
 
@@ -9396,10 +9397,6 @@ msgid "Smart shelf not found."
 msgstr "Scaffale intelligente non trovato."
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Scaffali intelligenti"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10691,7 +10688,7 @@ msgstr "tipologia (isbn, amazon, doi…)"
 msgid "unknown"
 msgstr "sconosciuto"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "valore"
 
@@ -11533,13 +11530,13 @@ msgid "Hidden Books"
 msgstr "Libri nascosti"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Errore nel caricamento dello scaffale magico"
+msgid "Error loading smart shelf"
+msgstr "Errore nel caricamento dello scaffale intelligente"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Scaffame Magico&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Scaffale intelligente — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11582,10 +11579,6 @@ msgstr "Nome dello scaffale troppo lungo (massimo 100 caratteri)"
 msgid "Error creating shelf"
 msgstr "Errore nella creazione dello scaffale"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Crea Scaffale Magico"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11597,10 +11590,6 @@ msgstr "Autorizzazione negata per modificare lo stato pubblico"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Errore nell'aggiornamento dello scaffale"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Modifica lo Scaffale Magico"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11880,21 +11869,26 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
 msgstr ""
+"Sincronizza gli scaffali intelligenti con gli e-reader (Kobo e KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Sincronizza gli scaffali intelligenti con Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
-"La sincronizzazione Kobo per gli Scaffali Magici è disabilitata a livello "
-"globale — Questo scaffale non raggiungerà il tuo Kobo finché non abiliti "
-"\"Sincronizza Scaffali magici su Kobo\" nelle Impostazioni CWA."
+"La sincronizzazione degli scaffali intelligenti è disabilitata globalmente. "
+"Abilita “%(setting)s” nelle impostazioni CWA affinché questo scaffale "
+"raggiunga i tuoi e-reader."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15813,28 +15807,18 @@ msgstr ""
 "selezionata non siano complete."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Se abilitati, gli scaffali intelligenti contrassegnati arrivano sul Kobo "
+"come raccolte. Abilita anche Kobo Sync nella configurazione di base."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Sincronizza gli scaffali magici con Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
+msgid "KOReader also receives marked smart shelves in its library."
 msgstr ""
-"Quando attivo, I tuoi scaffali magici verranno sincronizzati sul tuo "
-"dispositivo Kobo come raccolte. Nota: è necessario abilitare anche la "
-"sincronizzazione Kobo nelle Impostazioni di base."
+"KOReader riceve anche gli scaffali intelligenti contrassegnati nella sua "
+"biblioteca."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -16373,8 +16357,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Visualizzazioni degli scaffali intelligenti"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -17264,10 +17248,6 @@ msgstr "Inserisci nome del dominio"
 msgid "Denied Domains (Blacklist)"
 msgstr "Domini non consentiti (lista nera)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Magico)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -17466,10 +17446,9 @@ msgid "Mobile Notice"
 msgstr "Avviso per dispositivi mobili"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
+msgid "Smart shelf editing works best on desktop or tablet devices."
 msgstr ""
-"La modifica degli scaffali magici funziona meglio su dispositivi desktop o "
-"tablet."
+"La modifica degli scaffali intelligenti funziona meglio su computer o tablet."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17742,10 +17721,6 @@ msgid "Create Shelf"
 msgstr "Crea scaffale"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Scaffali Magici ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Dettagli del libro"
 
@@ -17924,6 +17899,21 @@ msgid "Download Access Log"
 msgstr "Scarica il log di accesso"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Che cosa sono gli scaffali intelligenti?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr ""
+"Gli scaffali intelligenti raccolgono automaticamente libri tramite regole."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr ""
+"Gli scaffali intelligenti si chiamavano “Magic Shelves” nelle versioni "
+"precedenti."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Template di sistema"
 
@@ -17931,6 +17921,19 @@ msgstr "Template di sistema"
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 "Questa è un modello di scaffale preconfigurato. Puoi modificarlo liberamente."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Abilita prima “%(setting)s” nelle impostazioni CWA. Fino ad allora, questa "
+"casella non ha effetto e lo scaffale non raggiungerà il tuo e-reader."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Mostra questo scaffale intelligente nel mio catalogo OPDS"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -18874,13 +18877,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Configura le azioni consentite per questo utente."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Ordinamento degli Scaffali Magici"
+msgid "Smart shelves order"
+msgstr "Ordine degli scaffali intelligenti"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
-"Scegli come ordinare i tuoi scaffali intelligenti nella barra laterale."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Scegli l’ordine dei tuoi scaffali intelligenti nella barra laterale."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18929,8 +18931,8 @@ msgstr ""
 "impostata su Manuale."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Visibilità Scaffali Magici"
+msgid "Smart shelves visibility"
+msgstr "Visibilità degli scaffali intelligenti"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -19124,6 +19126,65 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Scaffali magici"
+
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Libri organizzati in scaffali magici"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Errore nel caricamento dello scaffale magico"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Scaffame Magico&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Crea Scaffale Magico"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Modifica lo Scaffale Magico"
+
+#~ msgid ""
+#~ "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
+#~ "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "La sincronizzazione Kobo per gli Scaffali Magici è disabilitata a livello "
+#~ "globale — Questo scaffale non raggiungerà il tuo Kobo finché non abiliti "
+#~ "\"Sincronizza Scaffali magici su Kobo\" nelle Impostazioni CWA."
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Sincronizza gli scaffali magici con Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Quando attivo, I tuoi scaffali magici verranno sincronizzati sul tuo "
+#~ "dispositivo Kobo come raccolte. Nota: è necessario abilitare anche la "
+#~ "sincronizzazione Kobo nelle Impostazioni di base."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Magico)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "La modifica degli scaffali magici funziona meglio su dispositivi desktop "
+#~ "o tablet."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Scaffali Magici ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Ordinamento degli Scaffali Magici"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr ""
+#~ "Scegli come ordinare i tuoi scaffali intelligenti nella barra laterale."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Visibilità Scaffali Magici"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Libri ordinati per categoria"

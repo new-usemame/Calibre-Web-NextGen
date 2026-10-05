@@ -2356,14 +2356,14 @@ msgstr "Polcok"
 msgid "Books organized in shelves"
 msgstr "Könyvek sorozat szerint rendezve"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "Varázspolcok"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Intelligens polcok"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Könyvek sorozat szerint rendezve"
+msgid "Books organized in smart shelves"
+msgstr "Intelligens polcokra rendezett könyvek"
 
 #: cps/opds.py
 msgid "description"
@@ -3460,11 +3460,11 @@ msgstr ""
 msgid "Match condition"
 msgstr "Egyezési feltétel"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Szabály mezője"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Szabály operátora"
 
@@ -3735,7 +3735,7 @@ msgstr ""
 msgid "Cover updated."
 msgstr "Borító frissítve."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Intelligens polc létrehozása"
 
@@ -6568,7 +6568,7 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Intelligens polc szerkesztése"
 
@@ -9152,10 +9152,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Intelligens polcok"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10424,7 +10420,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "érték"
 
@@ -11280,13 +11276,13 @@ msgid "Hidden Books"
 msgstr "Rejtett könyvek"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Hiba varázspolc betöltése közben"
+msgid "Error loading smart shelf"
+msgstr "Hiba az intelligens polc betöltésekor"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Varázspolc&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Intelligens polc — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11329,10 +11325,6 @@ msgstr "Polc név túl hosszú (max. 100 karakter)"
 msgid "Error creating shelf"
 msgstr "Hiba polc létrehozásakor"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Varázspolc létrehozása"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11344,10 +11336,6 @@ msgstr "Nincs jogosultsága megváltoztatni a publikus státuszt"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Hiba polc frissítésekor"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Varázspolc szerkesztése"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11623,18 +11611,26 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
 msgstr ""
+"Intelligens polcok szinkronizálása e-könyv-olvasókra (Kobo és KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Intelligens polcok szinkronizálása Kobóra"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"Az intelligens polcok szinkronizálása globálisan le van tiltva. Engedélyezze "
+"a „%(setting)s” beállítást a CWA-beállításokban, hogy ez a polc eljusson az "
+"e-könyv-olvasókra."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15338,28 +15334,16 @@ msgstr ""
 "eltérő nyelvet használ, aminek a fordítási állapota nem teljes."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Bekapcsoláskor a megjelölt intelligens polcok gyűjteményként kerülnek a "
+"Kobóra. Az alapbeállításokban a Kobo-szinkronizálást is engedélyezni kell."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Kiválasztott varázspolcok szinkronizációja Kobo eszközzel"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"Aktiválás esetén a Magic Shelves gyűjteményekként szinkronizálódnak a Kobo "
-"eszközödre. Megjegyzés: a Kobo Sync-et is engedélyezned kell az Alap "
-"konfigurációban."
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "A KOReader könyvtára is megkapja a megjelölt intelligens polcokat."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15868,8 +15852,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Intelligens polcok megtekintései"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16745,10 +16729,6 @@ msgstr "Tartomány megadása"
 msgid "Denied Domains (Blacklist)"
 msgstr "Elutasított domainek (tiltólista)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Varázs)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16944,9 +16924,9 @@ msgid "Mobile Notice"
 msgstr "Mobil értesítés"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
+msgid "Smart shelf editing works best on desktop or tablet devices."
 msgstr ""
-"A Magic shelf szerkesztése asztali gépen vagy tableten működik a legjobban."
+"Az intelligens polcokat asztali gépen vagy táblagépen a legjobb szerkeszteni."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17196,10 +17176,6 @@ msgid "Create Shelf"
 msgstr "Polc készítése"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Varázspolcok ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Könyv részletei"
 
@@ -17386,12 +17362,38 @@ msgid "Download Access Log"
 msgstr "Elárési napló letöltése"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Mik azok az intelligens polcok?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr ""
+"Az intelligens polcok szabályok alapján automatikusan gyűjtik a könyveket."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Az intelligens polcok neve a régebbi verziókban „Magic Shelves” volt."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Rendszer sablon"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr "Ez egy előre beállított sablonpolc. Szabadon szerkeszthető."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Először engedélyezze a „%(setting)s” beállítást a CWA-beállításokban. Addig "
+"ez a jelölőnégyzet hatástalan, és a polc nem jut el az e-könyv-olvasóra."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Ez az intelligens polc jelenjen meg az OPDS-hírcsatornámban"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -18314,12 +18316,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Állítsa be milyen műveleteket hajthat végre ez a felhasználó."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Varázspolc rendezés"
+msgid "Smart shelves order"
+msgstr "Intelligens polcok sorrendje"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "Válassza ki a varázspolcok rendezését az oldalsávban."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Válassza ki az intelligens polcok sorrendjét az oldalsávban."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18368,8 +18370,8 @@ msgstr ""
 "állítva."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Varázspolc láthatóság"
+msgid "Smart shelves visibility"
+msgstr "Intelligens polcok láthatósága"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18565,6 +18567,57 @@ msgstr "Kiválasztott polcok szinkronizációja Kobo eszközzel"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Olvasott/olvasatlan mutatása"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Varázspolcok"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Könyvek sorozat szerint rendezve"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Hiba varázspolc betöltése közben"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Varázspolc&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Varázspolc létrehozása"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Varázspolc szerkesztése"
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Kiválasztott varázspolcok szinkronizációja Kobo eszközzel"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Aktiválás esetén a Magic Shelves gyűjteményekként szinkronizálódnak a "
+#~ "Kobo eszközödre. Megjegyzés: a Kobo Sync-et is engedélyezned kell az Alap "
+#~ "konfigurációban."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Varázs)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "A Magic shelf szerkesztése asztali gépen vagy tableten működik a "
+#~ "legjobban."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Varázspolcok ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Varázspolc rendezés"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "Válassza ki a varázspolcok rendezését az oldalsávban."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Varázspolc láthatóság"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Könyvek címke szerint rendezve"

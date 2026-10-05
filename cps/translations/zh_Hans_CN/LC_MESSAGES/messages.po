@@ -2277,15 +2277,14 @@ msgstr "书架列表"
 msgid "Books organized in shelves"
 msgstr "书架上的书"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "同步所选书架到 Kobo"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "智能书架"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "书架上的书"
+msgid "Books organized in smart shelves"
+msgstr "整理在智能书架中的书籍"
 
 #: cps/opds.py
 #, fuzzy
@@ -3378,11 +3377,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3653,9 +3652,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "创建智能书架"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6472,9 +6471,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "编辑智能书架"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9038,10 +9037,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10270,7 +10265,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11108,14 +11103,13 @@ msgid "Hidden Books"
 msgstr "隐藏书籍"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "删除书架时出错"
+msgid "Error loading smart shelf"
+msgstr "加载智能书架时出错"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "魔法书架&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "智能书架 — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11162,11 +11156,6 @@ msgstr "书架名称过长（最多 100 个字符）"
 msgid "Error creating shelf"
 msgstr "删除书架时出错"
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "创建书架"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11179,11 +11168,6 @@ msgstr "拒绝更改公开状态的权限"
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "删除书架时出错"
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "编辑书架"
 
 #: cps/web.py
 #, fuzzy
@@ -11454,18 +11438,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "将智能书架同步到电子阅读器（Kobo 和 KOReader）"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "将智能书架同步到 Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"智能书架同步已在全局设置中禁用。请在 CWA 设置中启用“%(setting)s”，使此书架能"
+"够同步到您的电子阅读器。"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15142,28 +15132,15 @@ msgid ""
 msgstr "当禁用时，如果您选择的语言的翻译不完整，您将不再收到 Web UI 中的通知。"
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"启用后，标记的智能书架将作为合集同步到 Kobo。还需在基本配置中启用 Kobo 同步。"
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "同步所选书架到 Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"激活后，您的魔法书架将作为收藏同步到您的 Kobo 设备。注意：您还必须在“基本配"
-"置”中启用 Kobo 同步。"
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader 的书库也会收到标记的智能书架。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15648,8 +15625,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "智能书架浏览次数"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16525,10 +16502,6 @@ msgstr "输入域名"
 msgid "Denied Domains (Blacklist)"
 msgstr "禁止注册的域名（黑名单）"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(魔法)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16725,8 +16698,8 @@ msgid "Mobile Notice"
 msgstr "移动端提示"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr "在桌面或平板设备上编辑魔法书架效果最佳。"
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "在电脑或平板设备上编辑智能书架效果最佳。"
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16983,10 +16956,6 @@ msgid "Create Shelf"
 msgstr "创建书架"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "魔法书架 ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "书籍详情"
 
@@ -17176,12 +17145,37 @@ msgid "Download Access Log"
 msgstr "下载访问日志"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "什么是智能书架？"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "智能书架根据规则自动收集书籍。"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "在旧版本中，智能书架称为“Magic Shelves”。"
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "系统模板"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr "这是一个预配置的模板书架。您可以自由编辑它。"
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"请先在 CWA 设置中启用“%(setting)s”。在此之前，此复选框不会生效，书架也不会同"
+"步到您的电子阅读器。"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "在我的 OPDS 目录中显示此智能书架"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -18096,13 +18090,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "配置允许此用户执行哪些操作。"
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "同步所选书架到 Kobo"
+msgid "Smart shelves order"
+msgstr "智能书架顺序"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "选择您的魔法书架在侧边栏中的排序方式。"
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "选择智能书架在侧边栏中的顺序。"
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18150,8 +18143,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr "仅当排序模式设置为手动时，才会使用手动顺序。"
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "魔法书架可见性"
+msgid "Smart shelves visibility"
+msgstr "智能书架可见性"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18343,6 +18336,60 @@ msgstr "同步所选书架到 Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "显示已读、未读栏目"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "同步所选书架到 Kobo"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "书架上的书"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "删除书架时出错"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "魔法书架&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "创建书架"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "编辑书架"
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "同步所选书架到 Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "激活后，您的魔法书架将作为收藏同步到您的 Kobo 设备。注意：您还必须在“基本"
+#~ "配置”中启用 Kobo 同步。"
+
+#~ msgid "(Magic)"
+#~ msgstr "(魔法)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr "在桌面或平板设备上编辑魔法书架效果最佳。"
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "魔法书架 ✨"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "同步所选书架到 Kobo"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "选择您的魔法书架在侧边栏中的排序方式。"
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "魔法书架可见性"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "书籍按分类排序"

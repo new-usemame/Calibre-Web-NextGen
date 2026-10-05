@@ -2403,13 +2403,14 @@ msgstr "Полки"
 msgid "Books organized in shelves"
 msgstr "Книги, расставленные на полках"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "Умные полки"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Смарт-полки"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
-msgstr "Книги, расставленные на умных полках"
+msgid "Books organized in smart shelves"
+msgstr "Книги на смарт-полках"
 
 #: cps/opds.py
 msgid "description"
@@ -3592,11 +3593,11 @@ msgstr "Применить к {n} книгам"
 msgid "Match condition"
 msgstr "Условие совпадения"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Поле правила"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Оператор правила"
 
@@ -3869,9 +3870,9 @@ msgstr "Сбой обновления обложки."
 msgid "Cover updated."
 msgstr "Обложка обновлена."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr "Создать умную полку"
+msgstr "Создать смарт-полку"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6755,7 +6756,7 @@ msgstr "Редактировать общедоступные полки"
 msgid "Edit shared library cover"
 msgstr "Редактировать общую обложку библиотеки"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Редактировать смарт-полку"
 
@@ -9418,10 +9419,6 @@ msgid "Smart shelf not found."
 msgstr "Смарт-полка не найдена."
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Смарт-полки"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10735,7 +10732,7 @@ msgstr "тип (isbn, amazon, doi...)"
 msgid "unknown"
 msgstr "неизвестно"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "значение"
 
@@ -11579,13 +11576,13 @@ msgid "Hidden Books"
 msgstr "Скрытые книги"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Ошибка загрузки умной полки"
+msgid "Error loading smart shelf"
+msgstr "Ошибка загрузки смарт-полки"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Умная полка&nbsp;&nbsp;&nbsp;-&nbsp;&nbsp;&nbsp;%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Смарт-полка — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11628,10 +11625,6 @@ msgstr "Название полки слишком длинное (макс. 100
 msgid "Error creating shelf"
 msgstr "Ошибка создания полки"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Создать умную полку"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11643,10 +11636,6 @@ msgstr "Отказано в доступе к изменению публичн�
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Ошибка обновления полки"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Редактировать умную полку"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11928,24 +11917,24 @@ msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 "Подключитесь к Wi-Fi и откройте её из вашей библиотеки: она скачается сама."
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
-"Синхронизация читалок для умных полок глобально отключена — эта полка не "
-"попадёт на ваши читалки, пока в настройках CWA не будет включена опция "
-"«Синхронизировать умные полки с читалками (Kobo и KOReader)»."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Синхронизировать смарт-полки с электронными книгами (Kobo и KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Синхронизировать смарт-полки с Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
-"Синхронизация умных полок с Kobo глобально отключена - эта полка не попадёт "
-"на ваш Kobo, пока в настройках CWA не будет включена опция «Синхронизировать "
-"умные полки с Kobo»."
+"Синхронизация смарт-полок отключена глобально. Включите «%(setting)s» в "
+"настройках CWA, чтобы эта полка появилась на ваших электронных книгах."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15834,31 +15823,16 @@ msgstr ""
 "для выбранного языка неполные."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr "Синхронизировать умные полки с читалками (Kobo и KOReader)"
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
-"Когда активно, умные полки, отмеченные для синхронизации с читалками, "
-"попадают на ваш Kobo как коллекции, а в библиотеку KOReader — как полки. Для "
-"Kobo также требуется включить Kobo Sync в основных настройках."
+"Когда функция включена, отмеченные смарт-полки передаются на Kobo как "
+"коллекции. Также включите синхронизацию Kobo в основных настройках."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Синхронизировать умные полки с Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"Когда функция активна, ваши умные полки (Magic Shelves) будут "
-"синхронизироваться с устройством Kobo как коллекции. Примечание: вы также "
-"должны включить синхронизацию Kobo в основных настройках."
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader также получает отмеченные смарт-полки в своей библиотеке."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -16388,8 +16362,8 @@ msgid "Shelf Views"
 msgstr "Просмотры полок"
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr "Просмотры умных полок"
+msgid "Smart Shelf Views"
+msgstr "Просмотры смарт-полок"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -17278,10 +17252,6 @@ msgstr "Введите доменное имя"
 msgid "Denied Domains (Blacklist)"
 msgstr "Запрещённые домены (чёрный список)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Умные)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -17477,9 +17447,8 @@ msgid "Mobile Notice"
 msgstr "Уведомление для мобильных устройств"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
-"Редактирование умных полок лучше всего работает на компьютерах или планшетах."
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Смарт-полки удобнее редактировать на компьютере или планшете."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17751,10 +17720,6 @@ msgid "Create Shelf"
 msgstr "Создать полку"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Умные полки ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Подробнее о книге"
 
@@ -17933,6 +17898,18 @@ msgid "Download Access Log"
 msgstr "Скачать журнал доступа"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Что такое смарт-полки?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Смарт-полки автоматически собирают книги по правилам."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "В старых версиях смарт-полки назывались «Magic Shelves»."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Системный шаблон"
 
@@ -17941,6 +17918,19 @@ msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 "Это предварительно настроенный шаблон полки. Вы можете свободно его "
 "редактировать."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Сначала включите «%(setting)s» в настройках CWA. До этого флажок не "
+"действует и полка не появится на вашей электронной книге."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Показывать эту смарт-полку в моей ленте OPDS"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -18885,12 +18875,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Настройте, какие действия разрешены этому пользователю."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Порядок умных полок"
+msgid "Smart shelves order"
+msgstr "Порядок смарт-полок"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "Выберите порядок расположения ваших умных полок на боковой панели."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Выберите порядок смарт-полок на боковой панели."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18939,8 +18929,8 @@ msgstr ""
 "на «Вручную»."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Видимость умных полок"
+msgid "Smart shelves visibility"
+msgstr "Видимость смарт-полок"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -19134,6 +19124,88 @@ msgstr "Показывать выбранные полки в OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Умные полки"
+
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Книги, расставленные на умных полках"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Ошибка загрузки умной полки"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Умная полка&nbsp;&nbsp;&nbsp;-&nbsp;&nbsp;&nbsp;%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Создать умную полку"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Редактировать умную полку"
+
+#~ msgid ""
+#~ "E-reader sync for Magic Shelves is disabled globally — this shelf won't "
+#~ "reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
+#~ "KOReader)' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "Синхронизация читалок для умных полок глобально отключена — эта полка не "
+#~ "попадёт на ваши читалки, пока в настройках CWA не будет включена опция "
+#~ "«Синхронизировать умные полки с читалками (Kobo и KOReader)»."
+
+#~ msgid ""
+#~ "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
+#~ "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "Синхронизация умных полок с Kobo глобально отключена - эта полка не "
+#~ "попадёт на ваш Kobo, пока в настройках CWA не будет включена опция "
+#~ "«Синхронизировать умные полки с Kobo»."
+
+#~ msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
+#~ msgstr "Синхронизировать умные полки с читалками (Kobo и KOReader)"
+
+#~ msgid ""
+#~ "When active, Magic Shelves marked for e-reader sync reach your Kobo as "
+#~ "collections and your KOReader library as shelves. Kobo also needs Kobo "
+#~ "Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Когда активно, умные полки, отмеченные для синхронизации с читалками, "
+#~ "попадают на ваш Kobo как коллекции, а в библиотеку KOReader — как полки. "
+#~ "Для Kobo также требуется включить Kobo Sync в основных настройках."
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Синхронизировать умные полки с Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Когда функция активна, ваши умные полки (Magic Shelves) будут "
+#~ "синхронизироваться с устройством Kobo как коллекции. Примечание: вы также "
+#~ "должны включить синхронизацию Kobo в основных настройках."
+
+#~ msgid "Magic Shelf Views"
+#~ msgstr "Просмотры умных полок"
+
+#~ msgid "(Magic)"
+#~ msgstr "(Умные)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "Редактирование умных полок лучше всего работает на компьютерах или "
+#~ "планшетах."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Умные полки ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Порядок умных полок"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "Выберите порядок расположения ваших умных полок на боковой панели."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Видимость умных полок"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Книги, упорядоченные по категории"

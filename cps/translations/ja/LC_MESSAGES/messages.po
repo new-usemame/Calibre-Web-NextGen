@@ -2330,15 +2330,14 @@ msgstr "本棚"
 msgid "Books organized in shelves"
 msgstr "本棚に整理された本"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "Magic Shelves ✨"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "スマート本棚"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "本棚に整理された本"
+msgid "Books organized in smart shelves"
+msgstr "スマート本棚に整理された本"
 
 #: cps/opds.py
 #, fuzzy
@@ -3441,11 +3440,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3716,9 +3715,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "スマート本棚を作成"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6535,9 +6534,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "スマート本棚を編集"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9101,10 +9100,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10333,7 +10328,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11179,14 +11174,13 @@ msgid "Hidden Books"
 msgstr "非表示の本"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "Magic Shelfの読み込みエラー"
+msgid "Error loading smart shelf"
+msgstr "スマート本棚の読み込みに失敗しました"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "スマート本棚 — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11232,11 +11226,6 @@ msgstr "シェルフ名が長すぎます（最大100文字）"
 msgid "Error creating shelf"
 msgstr "本棚の削除中にエラーが発生しました"
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "Magic Shelfを作成"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11249,11 +11238,6 @@ msgstr "公開ステータスを変更する権限がありません"
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "本棚の削除中にエラーが発生しました"
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "Magic Shelfを編集"
 
 #: cps/web.py
 #, fuzzy
@@ -11530,18 +11514,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "スマート本棚を電子書籍リーダーに同期（KoboとKOReader）"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "スマート本棚をKoboに同期"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"スマート本棚の同期は全体設定で無効になっています。この本棚を電子書籍リーダー"
+"に届けるには、CWA設定で「%(setting)s」を有効にしてください。"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15207,28 +15197,16 @@ msgstr ""
 "受け取らなくなります。"
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"有効にすると、同期対象のスマート本棚がKoboにコレクションとして届きます。基本"
+"設定でKobo同期も有効にしてください。"
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Magic ShelvesをKoboと同期"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"有効にすると、Magic ShelvesがKoboデバイスにコレクションとして同期されます。注"
-"意：基本設定でKobo同期も有効にする必要があります。"
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReaderのライブラリにも同期対象のスマート本棚が届きます。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15723,8 +15701,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "スマート本棚の閲覧数"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16604,10 +16582,6 @@ msgstr "ドメイン名を入力"
 msgid "Denied Domains (Blacklist)"
 msgstr "拒否するドメイン名 (ブラックリスト)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Magic)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16810,9 +16784,8 @@ msgid "Mobile Notice"
 msgstr "モバイルに関する注意"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
-"Magic Shelfの編集はデスクトップまたはタブレットデバイスで最適に動作します。"
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "スマート本棚の編集にはパソコンまたはタブレットが適しています。"
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17068,10 +17041,6 @@ msgid "Create Shelf"
 msgstr "本棚を作成する"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Magic Shelves ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "本の詳細"
 
@@ -17261,6 +17230,19 @@ msgid "Download Access Log"
 msgstr "アクセスログをダウンロード"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "スマート本棚とは？"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "スマート本棚はルールに従って本を自動的に集めます。"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr ""
+"以前のバージョンではスマート本棚は「Magic Shelves」と呼ばれていました。"
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "システムテンプレート"
 
@@ -17268,6 +17250,19 @@ msgstr "システムテンプレート"
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 "これはあらかじめ設定済みのテンプレートシェルフです。自由に編集できます。"
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"まずCWA設定で「%(setting)s」を有効にしてください。それまではこのチェックボッ"
+"クスは機能せず、本棚は電子書籍リーダーに届きません。"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "このスマート本棚を自分のOPDSフィードに表示"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -18197,13 +18192,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "このユーザーに許可するアクションを設定します。"
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "Magic Shelvesの並び替え"
+msgid "Smart shelves order"
+msgstr "スマート本棚の順序"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "サイドバーでのMagic Shelvesの並び順を選択します。"
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "サイドバーでのスマート本棚の順序を選択します。"
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18251,8 +18245,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr "手動順序は並び順モードが「手動」に設定されている場合のみ使用されます。"
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Magic Shelvesの表示"
+msgid "Smart shelves visibility"
+msgstr "スマート本棚の表示設定"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18446,6 +18440,62 @@ msgstr "選択した本棚をKoboと同期"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "既読/未読セクションを表示"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "Magic Shelves ✨"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "本棚に整理された本"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Magic Shelfの読み込みエラー"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Magic Shelfを作成"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Magic Shelfを編集"
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Magic ShelvesをKoboと同期"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "有効にすると、Magic ShelvesがKoboデバイスにコレクションとして同期されま"
+#~ "す。注意：基本設定でKobo同期も有効にする必要があります。"
+
+#~ msgid "(Magic)"
+#~ msgstr "(Magic)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "Magic Shelfの編集はデスクトップまたはタブレットデバイスで最適に動作しま"
+#~ "す。"
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Magic Shelves ✨"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Magic Shelvesの並び替え"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "サイドバーでのMagic Shelvesの並び順を選択します。"
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Magic Shelvesの表示"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "カテゴリ順"

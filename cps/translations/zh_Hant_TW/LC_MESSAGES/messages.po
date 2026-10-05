@@ -2240,13 +2240,14 @@ msgstr "書架列表"
 msgid "Books organized in shelves"
 msgstr "書架上的書"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "魔法書架"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "智慧書架"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
-msgstr "魔法書架上的書"
+msgid "Books organized in smart shelves"
+msgstr "整理在智慧書架中的書籍"
 
 #: cps/opds.py
 msgid "description"
@@ -3339,11 +3340,11 @@ msgstr "套用 {n} 書籍"
 msgid "Match condition"
 msgstr "匹配條件"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "規則欄位"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "規則運算"
 
@@ -3614,7 +3615,7 @@ msgstr "封面上傳失敗"
 msgid "Cover updated."
 msgstr "封面上傳成功"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "建立智慧書架"
 
@@ -6435,7 +6436,7 @@ msgstr "編輯公開書架"
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "編輯智慧書架"
 
@@ -9001,10 +9002,6 @@ msgid "Smart shelf not found."
 msgstr "找不到智慧書架。"
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "智慧書架"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10237,7 +10234,7 @@ msgstr "類型（isbn、amazon、doi…）"
 msgid "unknown"
 msgstr "未知"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "值"
 
@@ -11073,14 +11070,13 @@ msgid "Hidden Books"
 msgstr "隱藏書籍"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "下載封面時出錯"
+msgid "Error loading smart shelf"
+msgstr "載入智慧書架時發生錯誤"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "智慧書架&nbsp;&nbsp;&nbsp—&nbsp;&nbsp;&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "智慧書架 — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11125,11 +11121,6 @@ msgstr "書架名稱太長（最多 100 個字元）"
 msgid "Error creating shelf"
 msgstr "下載封面時出錯"
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "創建書架"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11142,11 +11133,6 @@ msgstr "無權變更公開狀態"
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "下載封面時出錯"
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "編輯書架"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11421,18 +11407,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "將智慧書架同步到電子閱讀器（Kobo 和 KOReader）"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "將智慧書架同步到 Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"智慧書架同步已在全域設定中停用。請在 CWA 設定中啟用「%(setting)s」，使此書架"
+"能夠同步到您的電子閱讀器。"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15010,26 +15002,15 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"啟用後，標記的智慧書架將作為收藏同步到 Kobo。還需在基本設定中啟用 Kobo 同步。"
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "同步所選書架到 Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader 的書庫也會收到標記的智慧書架。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15494,8 +15475,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "智慧書架瀏覽次數"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16358,10 +16339,6 @@ msgstr "輸入網域名"
 msgid "Denied Domains (Blacklist)"
 msgstr "禁止註冊的網域名（黑名單）"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "（魔術）"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16546,8 +16523,8 @@ msgid "Mobile Notice"
 msgstr "行動裝置通知"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr "智慧書架編輯在桌面或平板裝置上效果最佳。"
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "在電腦或平板裝置上編輯智慧書架效果最佳。"
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16795,10 +16772,6 @@ msgid "Create Shelf"
 msgstr "創建書架"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "智慧書架 ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "書籍詳情"
 
@@ -16979,12 +16952,37 @@ msgid "Download Access Log"
 msgstr "下載訪問日誌"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "什麼是智慧書架？"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "智慧書架根據規則自動收集書籍。"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "在舊版本中，智慧書架稱為「Magic Shelves」。"
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "系統範本"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr "這是預設的範本書架。您可以自由編輯。"
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"請先在 CWA 設定中啟用「%(setting)s」。在此之前，此核取方塊不會生效，書架也不"
+"會同步到您的電子閱讀器。"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "在我的 OPDS 目錄中顯示此智慧書架"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -17871,13 +17869,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "設定此使用者允許執行的操作。"
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "同步所選書架到 Kobo"
+msgid "Smart shelves order"
+msgstr "智慧書架順序"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "選擇智慧書架在側邊欄中的排序方式。"
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "選擇智慧書架在側邊欄中的順序。"
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -17924,7 +17921,7 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr "手動排序僅在排序模式設為手動時使用。"
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
+msgid "Smart shelves visibility"
 msgstr "智慧書架可見性"
 
 #: cps/templates/user_edit.html
@@ -18117,6 +18114,51 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "魔法書架"
+
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "魔法書架上的書"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "下載封面時出錯"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "智慧書架&nbsp;&nbsp;&nbsp—&nbsp;&nbsp;&nbsp%(icon)s %(name)s"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "創建書架"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "編輯書架"
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "同步所選書架到 Kobo"
+
+#~ msgid "(Magic)"
+#~ msgstr "（魔術）"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr "智慧書架編輯在桌面或平板裝置上效果最佳。"
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "智慧書架 ✨"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "同步所選書架到 Kobo"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "選擇智慧書架在側邊欄中的排序方式。"
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "智慧書架可見性"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "書籍按分類排序"

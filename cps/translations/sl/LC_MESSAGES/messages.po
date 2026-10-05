@@ -2372,15 +2372,14 @@ msgstr "Police"
 msgid "Books organized in shelves"
 msgstr "Knjige, urejene po policah"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "Čarobne police ✨"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Pametne police"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Knjige, urejene po policah"
+msgid "Books organized in smart shelves"
+msgstr "Knjige, urejene v pametne police"
 
 #: cps/opds.py
 #, fuzzy
@@ -3473,11 +3472,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3748,9 +3747,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Ustvari pametno polico"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6567,9 +6566,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Uredi pametno polico"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9133,10 +9132,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10365,7 +10360,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11207,14 +11202,13 @@ msgid "Hidden Books"
 msgstr "Skrita knjiga"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "Napaka pri brisanju police"
+msgid "Error loading smart shelf"
+msgstr "Napaka pri nalaganju pametne police"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Čarobna polica&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Pametna polica — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11261,11 +11255,6 @@ msgstr "Ime police je predolgo (največ 100 znakov)"
 msgid "Error creating shelf"
 msgstr "Napaka pri brisanju police"
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "Ustvari polico"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11278,11 +11267,6 @@ msgstr "Dovoljenje za spreminjanje javnega statusa je zavrnjeno"
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "Napaka pri brisanju police"
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "Urejanje police"
 
 #: cps/web.py
 #, fuzzy
@@ -11560,18 +11544,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Sinhroniziraj pametne police z e-bralniki (Kobo in KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Sinhroniziraj pametne police s Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"Sinhronizacija pametnih polic je globalno onemogočena. V nastavitvah CWA "
+"omogočite »%(setting)s«, da ta polica prispe na vaše e-bralnike."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15287,28 +15277,16 @@ msgstr ""
 "uporabljate jezik, ki ni angleščina, in prevodi za ta jezik niso popolni."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Ko je omogočeno, označene pametne police prispejo na Kobo kot zbirke. V "
+"osnovnih nastavitvah omogočite tudi sinhronizacijo Kobo."
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Usklajevanje izbrane police s Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"Ko je aktivno, bodo vaše Čarobne police sinhronizirane z vašo napravo Kobo "
-"kot zbirke. Opomba: Omogočiti morate tudi Kobo Sync v Osnovnih nastavitvah."
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader prav tako prejme označene pametne police v svoji knjižnici."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15815,8 +15793,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Ogledi pametnih polic"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16705,10 +16683,6 @@ msgstr "Vnesi ime domene"
 msgid "Denied Domains (Blacklist)"
 msgstr "Zavrnjene domene (črni seznam)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Čarobno)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16910,10 +16884,8 @@ msgid "Mobile Notice"
 msgstr "Obvestilo za mobilne naprave"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
-"Urejanje čarobnih polic najbolje deluje na namiznih ali tabličnih "
-"računalnikih."
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Pametne police je najbolje urejati na računalniku ali tablici."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17170,10 +17142,6 @@ msgid "Create Shelf"
 msgstr "Ustvari polico"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Čarobne police ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Podrobnosti o knjigi"
 
@@ -17364,6 +17332,18 @@ msgid "Download Access Log"
 msgstr "Prenos dnevnika dostopa"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Kaj so pametne police?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Pametne police samodejno zbirajo knjige po pravilih."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Pametne police so se v starejših različicah imenovale »Magic Shelves«."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Sistemska predloga"
 
@@ -17371,6 +17351,19 @@ msgstr "Sistemska predloga"
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 "To je vnaprej konfigurirana predloga police. Lahko jo poljubno urejate."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Najprej v nastavitvah CWA omogočite »%(setting)s«. Do takrat to potrditveno "
+"polje nima učinka in polica ne bo prispela na e-bralnik."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Prikaži to pametno polico v mojem viru OPDS"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -18298,13 +18291,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Nastavite, katera dejanja sme izvajati ta uporabnik."
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "Čarobne police ✨"
+msgid "Smart shelves order"
+msgstr "Vrstni red pametnih polic"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Izberite vrstni red pametnih polic v stranski vrstici."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18353,8 +18345,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Vidnost čarobnih polic"
+msgid "Smart shelves visibility"
+msgstr "Vidnost pametnih polic"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18548,6 +18540,60 @@ msgstr "Usklajevanje izbrane police s Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Prikaži razdelek Prebrano/neprebrano"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "Čarobne police ✨"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Knjige, urejene po policah"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Napaka pri brisanju police"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Čarobna polica&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Ustvari polico"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Urejanje police"
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Usklajevanje izbrane police s Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Ko je aktivno, bodo vaše Čarobne police sinhronizirane z vašo napravo "
+#~ "Kobo kot zbirke. Opomba: Omogočiti morate tudi Kobo Sync v Osnovnih "
+#~ "nastavitvah."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Čarobno)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "Urejanje čarobnih polic najbolje deluje na namiznih ali tabličnih "
+#~ "računalnikih."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Čarobne police ✨"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Čarobne police ✨"
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Vidnost čarobnih polic"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Knjige, razvrščene po kategorijah"

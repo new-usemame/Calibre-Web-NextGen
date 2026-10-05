@@ -2366,12 +2366,13 @@ msgstr "Hyllor"
 msgid "Books organized in shelves"
 msgstr "Böcker organiserade i hyllor"
 
-#: cps/opds.py
-msgid "Magic Shelves"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
 msgstr "Smarta hyllor"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
+msgid "Books organized in smart shelves"
 msgstr "Böcker ordnade i smarta hyllor"
 
 #: cps/opds.py
@@ -3554,11 +3555,11 @@ msgstr "Tillämpa på {n} böcker"
 msgid "Match condition"
 msgstr "Matchningsvillkor"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Regelfält"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Regeloperator"
 
@@ -3831,7 +3832,7 @@ msgstr "Uppdatering av omslag misslyckades."
 msgid "Cover updated."
 msgstr "Omslaget har uppdaterats."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Skapa smart hylla"
 
@@ -6699,7 +6700,7 @@ msgstr "Redigera offentliga hyllor"
 msgid "Edit shared library cover"
 msgstr "Redigera bibliotekets delade omslag"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Redigera smart hylla"
 
@@ -9322,10 +9323,6 @@ msgid "Smart shelf not found."
 msgstr "Den smarta hyllan hittades inte."
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Smarta hyllor"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10609,7 +10606,7 @@ msgstr "typ (isbn, amazon, doi…)"
 msgid "unknown"
 msgstr "okänd"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "värde"
 
@@ -11451,13 +11448,13 @@ msgid "Hidden Books"
 msgstr "Dolda böcker"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Fel när den smarta hyllan lästes in"
+msgid "Error loading smart shelf"
+msgstr "Fel vid inläsning av smart hylla"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Magisk hylla&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Smart hylla — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11500,10 +11497,6 @@ msgstr "Hyllnamnet är för långt (högst 100 tecken)"
 msgid "Error creating shelf"
 msgstr "Fel när hyllan skapades"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Skapa smart hylla"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11515,10 +11508,6 @@ msgstr "Behörighet saknas för att ändra offentlig status"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Fel när hyllan uppdaterades"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Redigera smart hylla"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11791,21 +11780,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synkronisera smarta hyllor till läsplattor (Kobo och KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Synkronisera smarta hyllor till Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
-"Kobo-synkronisering för Magiska hyllor är inaktiverad globalt — den här "
-"hyllan når inte din Kobo förrän ”Synkronisera Magiska hyllor till Kobo” har "
-"aktiverats i CWA-inställningarna."
+"Synkronisering av smarta hyllor är inaktiverad globalt. Aktivera "
+"”%(setting)s” i CWA-inställningarna så att denna hylla når dina läsplattor."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15646,28 +15638,16 @@ msgstr ""
 "språk inte är kompletta."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"När detta är aktiverat kommer markerade smarta hyllor till Kobo som "
+"samlingar. Aktivera även Kobo-synkronisering i grundkonfigurationen."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Synkronisera Magiska hyllor till Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"När detta är aktivt synkroniseras dina Magiska hyllor till Kobo-enheten som "
-"samlingar. Obs: Du måste även aktivera Kobo-synkronisering i Grundläggande "
-"konfiguration."
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader får också markerade smarta hyllor i sitt bibliotek."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -16187,8 +16167,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Visningar av smarta hyllor"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -17068,10 +17048,6 @@ msgstr "Ange domännamn"
 msgid "Denied Domains (Blacklist)"
 msgstr "Avvisade domäner för registrering"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Magisk)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -17268,10 +17244,8 @@ msgid "Mobile Notice"
 msgstr "Mobilnotis"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
-"Redigering av magiska hyllor fungerar bäst på stationära datorer eller "
-"surfplattor."
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Smarta hyllor redigeras bäst på en dator eller surfplatta."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17540,10 +17514,6 @@ msgid "Create Shelf"
 msgstr "Skapa hylla"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Magiska hyllor ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Bokdetaljer"
 
@@ -17723,12 +17693,37 @@ msgid "Download Access Log"
 msgstr "Hämta åtkomstlogg"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Vad är smarta hyllor?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Smarta hyllor samlar böcker automatiskt med regler."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Smarta hyllor hette ”Magic Shelves” i äldre versioner."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Systemmall"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr "Det här är en förkonfigurerad mallhylla. Du kan redigera den fritt."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Aktivera först ”%(setting)s” i CWA-inställningarna. Tills dess har denna "
+"kryssruta ingen effekt och hyllan når inte din läsplatta."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Visa denna smarta hylla i mitt OPDS-flöde"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -18658,12 +18653,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Ställ in vilka åtgärder användaren har behörighet att utföra."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Ordning för magiska hyllor"
+msgid "Smart shelves order"
+msgstr "Ordning för smarta hyllor"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "Välj hur dina magiska hyllor ska ordnas i sidopanelen."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Välj ordningen för dina smarta hyllor i sidofältet."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18711,8 +18706,8 @@ msgstr ""
 "Manuell ordning används endast när sorteringsläget är inställt på Manuellt."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Synlighet för magiska hyllor"
+msgid "Smart shelves visibility"
+msgstr "Synlighet för smarta hyllor"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18905,6 +18900,64 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Smarta hyllor"
+
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Böcker ordnade i smarta hyllor"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Fel när den smarta hyllan lästes in"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Magisk hylla&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Skapa smart hylla"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Redigera smart hylla"
+
+#~ msgid ""
+#~ "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
+#~ "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "Kobo-synkronisering för Magiska hyllor är inaktiverad globalt — den här "
+#~ "hyllan når inte din Kobo förrän ”Synkronisera Magiska hyllor till Kobo” "
+#~ "har aktiverats i CWA-inställningarna."
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Synkronisera Magiska hyllor till Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "När detta är aktivt synkroniseras dina Magiska hyllor till Kobo-enheten "
+#~ "som samlingar. Obs: Du måste även aktivera Kobo-synkronisering i "
+#~ "Grundläggande konfiguration."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Magisk)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "Redigering av magiska hyllor fungerar bäst på stationära datorer eller "
+#~ "surfplattor."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Magiska hyllor ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Ordning för magiska hyllor"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "Välj hur dina magiska hyllor ska ordnas i sidopanelen."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Synlighet för magiska hyllor"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Böcker ordnade efter kategori"

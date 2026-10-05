@@ -2389,13 +2389,14 @@ msgstr "Półki"
 msgid "Books organized in shelves"
 msgstr "Książki ułożone na półkach"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "Magiczne Półki"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Inteligentne półki"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
-msgstr "Książki uporządkowane na magicznych półkach"
+msgid "Books organized in smart shelves"
+msgstr "Książki uporządkowane na inteligentnych półkach"
 
 #: cps/opds.py
 msgid "description"
@@ -3495,11 +3496,11 @@ msgstr "Zastosuj do książek: {n}"
 msgid "Match condition"
 msgstr "Warunek dopasowania"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Pole reguły"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Operator reguły"
 
@@ -3771,7 +3772,7 @@ msgstr "Aktualizacja okładki nie powiodła się."
 msgid "Cover updated."
 msgstr "Okładka zaktualizowana."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Utwórz inteligentną półkę"
 
@@ -6628,7 +6629,7 @@ msgstr "Edytuj publiczne półki"
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Edytuj inteligentną półkę"
 
@@ -9213,10 +9214,6 @@ msgid "Smart shelf not found."
 msgstr "Nie znaleziono inteligentnej półki."
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Inteligentne półki"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10454,7 +10451,7 @@ msgstr "typ (isbn, amazon, doi…)"
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "wartość"
 
@@ -11295,13 +11292,13 @@ msgid "Hidden Books"
 msgstr "Ukryte książki"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Błąd podczas wczytywania magicznej półki"
+msgid "Error loading smart shelf"
+msgstr "Błąd wczytywania inteligentnej półki"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Magiczna półka&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Inteligentna półka — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11344,10 +11341,6 @@ msgstr "Nazwa półki jest zbyt długa (maks. 100 znaków)"
 msgid "Error creating shelf"
 msgstr "Błąd podczas tworzenia półki"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Utwórz magiczną półkę"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11359,10 +11352,6 @@ msgstr "Brak uprawnień do zmiany statusu publicznego"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Błąd podczas aktualizowania półki"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Edytuj magiczną półkę"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11638,21 +11627,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synchronizuj inteligentne półki z czytnikami (Kobo i KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Synchronizuj inteligentne półki z Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
-"Synchronizacja Magicznych Półek z Kobo jest globalnie wyłączona — ta półka "
-"nie dotrze do Twojego Kobo, dopóki opcja \"Synchronizuj Magiczne Półki z "
-"Kobo\" nie zostanie włączona w Ustawieniach CWA."
+"Synchronizacja inteligentnych półek jest globalnie wyłączona. Włącz "
+"„%(setting)s” w ustawieniach CWA, aby ta półka trafiła na czytniki."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15466,28 +15458,17 @@ msgstr ""
 "wybranego języka nie są kompletne."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Po włączeniu oznaczone inteligentne półki trafiają na Kobo jako kolekcje. "
+"Włącz też synchronizację Kobo w konfiguracji podstawowej."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Synchronizuj Magiczne Półki z Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
+msgid "KOReader also receives marked smart shelves in its library."
 msgstr ""
-"Gdy aktywne, Twoje Magiczne Półki będą synchronizowane z urządzeniem Kobo "
-"jako kolekcje. Uwaga: musisz również włączyć synchronizację Kobo w "
-"Podstawowej konfiguracji."
+"KOReader również otrzymuje oznaczone inteligentne półki w swojej bibliotece."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -16007,8 +15988,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Wyświetlenia inteligentnych półek"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16891,10 +16872,6 @@ msgstr "Podaj nazwę domeny"
 msgid "Denied Domains (Blacklist)"
 msgstr "Domeny zabronione (czarna lista)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Magiczna)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -17093,8 +17070,8 @@ msgid "Mobile Notice"
 msgstr "Powiadomienie mobilne"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr "Edycja Magicznej Półki działa najlepiej na komputerach i tabletach."
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Inteligentne półki najlepiej edytować na komputerze lub tablecie."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17345,10 +17322,6 @@ msgid "Create Shelf"
 msgstr "Utwórz półkę"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Magiczne Półki ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Szczegóły książki"
 
@@ -17528,6 +17501,18 @@ msgid "Download Access Log"
 msgstr "Pobierz log dostępu"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Czym są inteligentne półki?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Inteligentne półki automatycznie zbierają książki według reguł."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "W starszych wersjach inteligentne półki nazywały się „Magic Shelves”."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Szablon systemowy"
 
@@ -17536,6 +17521,19 @@ msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 "To jest wstępnie skonfigurowana półka szablonowa. Możesz ją dowolnie "
 "edytować."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Najpierw włącz „%(setting)s” w ustawieniach CWA. Do tego czasu to pole nie "
+"działa, a półka nie trafi na czytnik."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Udostępnij tę inteligentną półkę w moim kanale OPDS"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -18464,12 +18462,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Skonfiguruj, jakie czynności ten użytkownik może wykonywać."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Kolejność Magicznych Półek"
+msgid "Smart shelves order"
+msgstr "Kolejność inteligentnych półek"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "Wybierz, jak Twoje Magiczne Półki są sortowane w panelu bocznym."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Wybierz kolejność inteligentnych półek na pasku bocznym."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18518,8 +18516,8 @@ msgstr ""
 "ustawiony na Ręczny."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Widoczność Magicznych Półek"
+msgid "Smart shelves visibility"
+msgstr "Widoczność inteligentnych półek"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18712,6 +18710,62 @@ msgstr "Udostępniaj wybrane półki przez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Magiczne Półki"
+
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Książki uporządkowane na magicznych półkach"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Błąd podczas wczytywania magicznej półki"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Magiczna półka&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Utwórz magiczną półkę"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Edytuj magiczną półkę"
+
+#~ msgid ""
+#~ "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
+#~ "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "Synchronizacja Magicznych Półek z Kobo jest globalnie wyłączona — ta "
+#~ "półka nie dotrze do Twojego Kobo, dopóki opcja \"Synchronizuj Magiczne "
+#~ "Półki z Kobo\" nie zostanie włączona w Ustawieniach CWA."
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Synchronizuj Magiczne Półki z Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Gdy aktywne, Twoje Magiczne Półki będą synchronizowane z urządzeniem Kobo "
+#~ "jako kolekcje. Uwaga: musisz również włączyć synchronizację Kobo w "
+#~ "Podstawowej konfiguracji."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Magiczna)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr "Edycja Magicznej Półki działa najlepiej na komputerach i tabletach."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Magiczne Półki ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Kolejność Magicznych Półek"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "Wybierz, jak Twoje Magiczne Półki są sortowane w panelu bocznym."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Widoczność Magicznych Półek"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Książki sortowane według kategorii"

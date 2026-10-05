@@ -2347,15 +2347,14 @@ msgstr "Boekenplanken"
 msgid "Books organized in shelves"
 msgstr "Boeken georganiseerd op boekenplanken"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Slimme boekenplanken"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Boeken georganiseerd op boekenplanken"
+msgid "Books organized in smart shelves"
+msgstr "Boeken ingedeeld in slimme boekenplanken"
 
 #: cps/opds.py
 msgid "description"
@@ -3547,11 +3546,11 @@ msgstr "Toepassen op {n} boeken"
 msgid "Match condition"
 msgstr "Voorwaarde voor overeenkomst"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Regelveld"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Regeloperator"
 
@@ -3826,7 +3825,7 @@ msgstr "Bijwerken van omslag mislukt."
 msgid "Cover updated."
 msgstr "Omslag bijgewerkt."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Slimme boekenplank aanmaken"
 
@@ -6749,7 +6748,7 @@ msgstr "Openbare boekenplanken bewerken"
 msgid "Edit shared library cover"
 msgstr "Gedeelde bibliotheekomslag bewerken"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Slimme boekenplank bewerken"
 
@@ -9436,10 +9435,6 @@ msgid "Smart shelf not found."
 msgstr "Slimme boekenplank niet gevonden."
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Slimme boekenplanken"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10829,7 +10824,7 @@ msgstr "type (isbn, amazon, doi…)"
 msgid "unknown"
 msgstr "onbekend"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "waarde"
 
@@ -11723,14 +11718,13 @@ msgid "Hidden Books"
 msgstr "Verborgen boek"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "Fout bij verwijderen boekenplank!"
+msgid "Error loading smart shelf"
+msgstr "Fout bij het laden van de slimme boekenplank"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr ""
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Slimme boekenplank — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11775,10 +11769,6 @@ msgstr ""
 msgid "Error creating shelf"
 msgstr "Fout bij aanmaken boekenplank"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Magische boekenplank maken"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr "Alleen de eigenaar kan Kobo-synchronisatie wijzigen"
@@ -11790,11 +11780,6 @@ msgstr ""
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Fout bij bijwerken boekenplank"
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "Pas een boekenplank aan"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -12079,22 +12064,25 @@ msgstr ""
 "Maak verbinding met wifi en open het vanuit je bibliotheek: het wordt "
 "vanzelf gedownload."
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
-"E-reader-synchronisatie voor magische boekenplanken is voor de hele server "
-"uitgeschakeld — deze boekenplank bereikt je e-readers pas als ‘Magische "
-"boekenplanken synchroniseren met e-readers (Kobo en KOReader)’ is "
-"ingeschakeld in de CWA-instellingen."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Slimme boekenplanken synchroniseren met e-readers (Kobo en KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Slimme boekenplanken synchroniseren met Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"Synchronisatie van slimme boekenplanken is globaal uitgeschakeld. Schakel "
+"“%(setting)s” in bij CWA-instellingen zodat deze boekenplank uw e-readers "
+"bereikt."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15744,32 +15732,18 @@ msgid ""
 "language are not complete."
 msgstr ""
 
-# KOReader: the magic shelf sync setting names e-readers
-#: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr "Magische boekenplanken synchroniseren met e-readers (Kobo en KOReader)"
-
 #: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
-"Als dit aan staat, komen magische boekenplanken die voor e-reader-"
-"synchronisatie zijn gemarkeerd als collecties op je Kobo en als "
-"boekenplanken in je KOReader-bibliotheek. Voor Kobo moet ook Kobo Sync aan "
-"staan in de basisconfiguratie."
+"Als dit is ingeschakeld, verschijnen gemarkeerde slimme boekenplanken als "
+"collecties op uw Kobo. Schakel ook Kobo Sync in bij de basisconfiguratie."
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
+msgid "KOReader also receives marked smart shelves in its library."
 msgstr ""
+"KOReader ontvangt gemarkeerde slimme boekenplanken ook in zijn bibliotheek."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -16245,8 +16219,8 @@ msgid "Shelf Views"
 msgstr "Plankweergaven"
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr "Weergaven van slimme planken"
+msgid "Smart Shelf Views"
+msgstr "Weergaven van slimme boekenplanken"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -17119,10 +17093,6 @@ msgstr "Voer domeinnaam in"
 msgid "Denied Domains (Blacklist)"
 msgstr "Geweigerde domeinen voor registratie"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr ""
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -17320,8 +17290,9 @@ msgid "Mobile Notice"
 msgstr ""
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
+msgid "Smart shelf editing works best on desktop or tablet devices."
 msgstr ""
+"Slimme boekenplanken bewerken werkt het best op een computer of tablet."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17578,10 +17549,6 @@ msgid "Create Shelf"
 msgstr "Boekenplank maken"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr ""
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Boekgegevens"
 
@@ -17767,12 +17734,37 @@ msgid "Download Access Log"
 msgstr "Download toegangslog"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Wat zijn slimme boekenplanken?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Slimme boekenplanken verzamelen boeken automatisch met regels."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Slimme boekenplanken heetten in oudere versies “Magic Shelves”."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr ""
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Schakel eerst “%(setting)s” in bij CWA-instellingen. Tot die tijd heeft dit "
+"selectievakje geen effect en bereikt de boekenplank uw e-reader niet."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Deze slimme boekenplank in mijn OPDS-feed tonen"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -18676,13 +18668,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
+msgid "Smart shelves order"
+msgstr "Volgorde van slimme boekenplanken"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Kies de volgorde van uw slimme boekenplanken in de zijbalk."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18730,8 +18721,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr ""
+msgid "Smart shelves visibility"
+msgstr "Zichtbaarheid van slimme boekenplanken"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18928,6 +18919,61 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Boeken georganiseerd op boekenplanken"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Fout bij verwijderen boekenplank!"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Magische boekenplank maken"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Pas een boekenplank aan"
+
+#~ msgid ""
+#~ "E-reader sync for Magic Shelves is disabled globally — this shelf won't "
+#~ "reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
+#~ "KOReader)' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "E-reader-synchronisatie voor magische boekenplanken is voor de hele "
+#~ "server uitgeschakeld — deze boekenplank bereikt je e-readers pas als "
+#~ "‘Magische boekenplanken synchroniseren met e-readers (Kobo en KOReader)’ "
+#~ "is ingeschakeld in de CWA-instellingen."
+
+# KOReader: the magic shelf sync setting names e-readers
+#~ msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
+#~ msgstr ""
+#~ "Magische boekenplanken synchroniseren met e-readers (Kobo en KOReader)"
+
+#~ msgid ""
+#~ "When active, Magic Shelves marked for e-reader sync reach your Kobo as "
+#~ "collections and your KOReader library as shelves. Kobo also needs Kobo "
+#~ "Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Als dit aan staat, komen magische boekenplanken die voor e-reader-"
+#~ "synchronisatie zijn gemarkeerd als collecties op je Kobo en als "
+#~ "boekenplanken in je KOReader-bibliotheek. Voor Kobo moet ook Kobo Sync "
+#~ "aan staan in de basisconfiguratie."
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
+
+#~ msgid "Magic Shelf Views"
+#~ msgstr "Weergaven van slimme planken"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Boeken gesorteerd op categorie"

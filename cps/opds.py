@@ -278,8 +278,8 @@ OPDS_ROOT_ENTRY_DEFS = {
     },
     'magic_shelves': {
         'endpoint': 'opds.feed_magic_shelfindex',
-        'title': N_('Magic Shelves'),
-        'description': N_('Books organized in magic shelves'),
+        'title': N_('Smart shelves'),
+        'description': N_('Books organized in smart shelves'),
         'visible': lambda user, allow_anonymous: user.is_authenticated or allow_anonymous,
     },
 }

@@ -61,7 +61,8 @@ def _scan_spread(page, head, *, height=6, gap=12, body_height=12):
         for row in range(6):
             y = 20+height+gap+row*body_height
             box = (x, y, x+335, y+body_height)
-            lines.append(extract.Line([extract.Span('Ordinary source prose continues across the spread.',
+            text = 'Ordinary source prose continues across the spread' + ('.' if row==5 else '')
+            lines.append(extract.Line([extract.Span(text,
                          11, 'OCR', 0, box)], box))
     raw = extract.RawPage(page, 842, 595, [extract.Block(0,(35,20,785,130),lines)])
     raw.text_layer_invisible = True
@@ -112,6 +113,58 @@ def test_badly_damaged_head_requires_five_local_placements_and_repeated_label_te
     # Repetition far away does not establish this page's local template.
     for raw in raws[1:]:raw.pno += 20
     assert 0 not in skeleton.book_style(raws).scan_spread_head_boxes
+
+
+@pytest.mark.parametrize('long_rows',[False,True])
+def test_repeated_column_labels_stay_attached_to_short_table_rows(long_rows):
+    # Independent review reproduced a loss of context which token counts miss.
+    left = ['Planets','Planerz','Planeta','Planetr','Planety']
+    right = ['Houses','Houzes','Housey','Housen','Houser']
+    raws = []
+    for i in range(5):
+        lines = []
+        for x,text in ((35,left[i]),(660,right[i])):
+            box = (x,20,x+125,26)
+            lines.append(extract.Line([extract.Span(text,6,'OCR',0,box)],box))
+        for row in range(6):
+            texts = ((35,'Mars %d in Aries'%(row+1)),(450,'%dth house: action'%(row+1)))
+            if long_rows:
+                texts = ((35,'Mars is the planetary symbol used for dynamic action.'),
+                         (450,'This house describes a separate area of human experience.'))
+            for x,text in texts:
+                box = (x,38+row*12,x+335,50+row*12)
+                lines.append(extract.Line([extract.Span(text,11,'OCR',0,box)],box))
+        raws.append(extract.RawPage(i,842,595,[extract.Block(0,(35,20,785,128),lines)],
+                    images=[extract.Image((0,0,842,595),1.0)]))
+    style = skeleton.book_style(raws)
+    assert not style.scan_spread_head_boxes
+    skels = [skeleton.page_skeleton(raw,style) for raw in raws]
+    for raw,skel in zip(raws,skels):
+        labels = {id(line) for line in raw.blocks[0].lines[:2]}
+        assert not any(region.kind=='furniture' and any(id(line) in labels for line in region.lines)
+                       for region in skel.regions)
+    book = assemble.assemble(skels,style,raw_pages=raws)
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
+def test_staggered_spread_heads_retain_left_then_right_source_order():
+    from dataclasses import replace
+    raws = [_scan_spread(i,'THE REAL ASTROLOGY') for i in range(3)]
+    for raw in raws:
+        line = raw.blocks[0].lines[7]
+        box = (line.bbox[0],19.75,line.bbox[2],25.75)
+        raw.blocks[0].lines[7] = replace(line,bbox=box,
+             spans=[replace(span,bbox=box) for span in line.spans])
+    style = skeleton.book_style(raws)
+    skels = [skeleton.page_skeleton(raw,style) for raw in raws]
+    for skel in skels:
+        heads = [region for region in skel.regions if region.reason=='repeated_scan_spread_head']
+        assert [region.bbox[0] for region in heads] == [35,450]
+    book = assemble.assemble(skels,style,raw_pages=raws)
+    assert book.conservation.ok, book.conservation.to_dict()
+    for inventory in book.source_inventory.values():
+        heads = [region for region in inventory['regions'] if region['reason']=='repeated_scan_spread_head']
+        assert [region['bbox'][0] for region in heads] == [35,450]
 
 
 @pytest.mark.parametrize('kind', ['body-sized', 'touching', 'unrelated', 'single-page', 'native'])

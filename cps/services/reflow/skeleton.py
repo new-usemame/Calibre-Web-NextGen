@@ -525,7 +525,11 @@ def _repeated_scan_spread_heads(raw_pages):
             continue
         lines = [line for block in raw.text_blocks for line in block.lines if line.stripped]
         wide = [line for line in lines if raw.width*.25 <= line.bbox[2]-line.bbox[0] <= raw.width*.45
-                and line.bbox[3] > raw.height*.05 and line.bbox[1] < raw.height*.85]
+                and line.bbox[3] > raw.height*.05 and line.bbox[1] < raw.height*.85
+                # A wide OCR box alone is not prose: column labels must stay
+                # with short table/list rows even when their boxes span a panel.
+                and len(line.stripped.split()) >= 6
+                and len(re.findall(r'\b\d+(?:st|nd|rd|th)?\b',line.stripped)) < 3]
         panels = [[line for line in wide if (line.bbox[0]+line.bbox[2])/2 < raw.width*.5],
                   [line for line in wide if (line.bbox[0]+line.bbox[2])/2 > raw.width*.5]]
         if any(len(panel) < 4 for panel in panels):
@@ -536,6 +540,19 @@ def _repeated_scan_spread_heads(raw_pages):
             continue
         for side, panel in enumerate(panels):
             height = median(line.bbox[3]-line.bbox[1] for line in panel)
+            panel_ids = {id(line) for line in panel}
+            wrapped = 0
+            for block in raw.text_blocks:
+                paragraph = sorted((line for line in block.lines if id(line) in panel_ids),
+                                   key=lambda line: line.bbox[1])
+                wrapped += sum(0 < following.bbox[1]-prior.bbox[1] <= height*1.15
+                    and abs(prior.bbox[0]-following.bbox[0]) <= raw.width*.02
+                    and not prior.stripped.endswith(('.',':',';','!','?','”','’','"'))
+                    for prior,following in zip(paragraph,paragraph[1:]))
+            # Long descriptions in separate table/list rows also have wide
+            # boxes. Demand source-measured paragraph wraps, not just words.
+            if wrapped < 3:
+                continue
             x0, x1 = min(line.bbox[0] for line in panel), max(line.bbox[2] for line in panel)
             members = [line for line in lines if (line.bbox[2] <= gutter[0] if side==0 else line.bbox[0] >= gutter[1])]
             if not members or height <= 0:
@@ -1101,7 +1118,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
             reason = None if id(ln) in opening_owned else _furniture_reason(ln, raw, style, top_y)
             if reason:
                 skel.regions.append(Region(kind="furniture", lines=[ln], reason=reason,
-                                           bbox=ln.bbox))
+                                           bbox=ln.bbox, column=(int((ln.bbox[0]+ln.bbox[2])/2 > raw.width*.5)
+                                               if reason=='repeated_scan_spread_head' else 0)))
             else:
                 kept.append(ln)
         if kept:

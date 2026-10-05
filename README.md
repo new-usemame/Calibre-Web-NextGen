@@ -449,20 +449,35 @@ Tested and supported. Ingest is a few seconds slower; everything else behaves th
 
 ### Calibre desktop coexistence
 
-If you want to open the same library in calibre desktop while calibre-web-nextgen is running, set both:
+**Docker Desktop on macOS: give native Mac Calibre exclusive access to a
+host-bind-mounted library.** Stop the calibre-web-nextgen container before
+opening that library in Mac Calibre, and fully quit Mac Calibre before starting
+the container again. This also applies to native Mac `calibredb` commands.
+Stopping ingest alone leaves other application and metadata writers active.
+
+The compatibility flags below do not make simultaneous Mac and Linux-container
+access safe. In a finite Docker Desktop bind-mount test, an exclusive byte-range
+lock held on either side blocked another process on the same side but did not
+block the opposite side. A separate concurrent library-write test produced a
+malformed database even with both flags enabled and library DELETE journal mode. Use
+exclusive access rather than relying on a lock wait across this boundary.
+
+For deployments where desktop and server processes share working filesystem
+locks, set both flags to release the web application's database connection
+between requests:
 
 ```yaml
 - NETWORK_SHARE_MODE=true
 - DESKTOP_COMPAT_MODE=true
 ```
 
-By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. That blocks calibre desktop from opening the library — on calibre 9.9.0 + macOS it crashes without an error dialog. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the file lock is released between web requests, letting calibre desktop open the database in the gaps.
+By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
 
-Changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
+On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
 
 Trade-offs:
 - Each web request pays a small extra overhead to open and close the database connection.
-- If calibre desktop is actively writing when a web request comes in, the request waits up to 60 seconds for the lock. Heavy simultaneous use can slow the web UI.
+- Where filesystem locks are shared correctly, a web request can wait up to 60 seconds for an active desktop writer. Heavy simultaneous use can slow the web UI.
 - Designed for home-server use where calibre desktop is opened occasionally for bulk edits, not for concurrent heavy use of both.
 
 ### Calibre plugins (DeDRM and others)

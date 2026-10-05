@@ -20,9 +20,16 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
   const icon = icons.nth(differentIcon);
   await expect(icon).toBeVisible();
   const chosenIcon = await icon.getAttribute('data-icon');
+  const form = page.locator('#magic-shelf-form');
+  await form.evaluate(element => {
+    element.setAttribute('data-keyboard-submits', '0');
+    element.addEventListener('submit', () =>
+      element.setAttribute('data-keyboard-submits', String(Number(element.getAttribute('data-keyboard-submits')) + 1)));
+  });
   await icon.focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#shelf-icon')).toHaveValue(chosenIcon!);
+  await expect(form).toHaveAttribute('data-keyboard-submits', '0');
   await expect(page).toHaveURL(/\/magicshelf$/);
   await expect(page.getByText('What are smart shelves?', { exact: true })).toBeVisible();
   await page.getByText('What are smart shelves?', { exact: true }).click();

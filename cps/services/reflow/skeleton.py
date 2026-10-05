@@ -1321,6 +1321,11 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
         candidates = _vector_figures(raw)
     else:
         candidates = []
+    from . import figure_titles
+    kept_blocks, embedded, titled_figures, title_artwork = figure_titles.regions(
+        raw, kept_blocks, embedded, candidates, style, pixel_probe)
+    candidates.extend(titled_figures)
+    skel.regions.extend(title_artwork)
     from . import scan_grids
     kept_blocks, candidates, grid_artwork, note_regions = scan_grids.regions(
         raw, kept_blocks, pixel_probe, candidates, note_regions)
@@ -1360,6 +1365,10 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
         kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates,
                                                       style, raw=raw, pixel_probe=pixel_probe)
         skel.regions.extend(artwork)
+        for owner, figure in zip(title_artwork, titled_figures):
+            # A below-figure caption may extend the crop. The title's immutable
+            # source occurrence still belongs to that exact final image region.
+            owner.bbox=figure.bbox
 
     # Preserve source-established columns before uncertain prose becomes images;
     # the remaining confident words alone may no longer prove the reading order.

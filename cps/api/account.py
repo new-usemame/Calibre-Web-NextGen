@@ -170,7 +170,7 @@ def update_profile():
                 return _err("invalid_request", "Email can't be empty", 400)
             if new_email != current_user.email:
                 # check_email raises if the address is already taken
-                current_user.email = check_email(new_email)
+                current_user.email = check_email(new_email, current_user.id)
         if "kindle_mail" in data:
             current_user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "kindle_mail_subject" in data:

@@ -1975,17 +1975,32 @@ def uniq(inpt):
     return output
 
 
-def check_email(email):
+def _taken_by_another_user(column, value, user_id):
+    # Uniqueness is case-insensitive, so the account being edited must not count
+    # as a clash with itself: renaming "myname" to "MyName" is not a collision.
+    query = ub.session.query(ub.User.id).filter(func.lower(column) == value.lower())
+    if user_id is not None:
+        query = query.filter(ub.User.id != user_id)
+    return query.first() is not None
+
+
+def check_email(email, user_id=None):
+    """Return the normalized address, or raise if another account already uses it.
+
+    Pass ``user_id`` when changing an existing account's address."""
     email = valid_email(email)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.email) == email.lower()).first():
+    if _taken_by_another_user(ub.User.email, email, user_id):
         log.error("Found an existing account for this Email address")
         raise Exception(_("Found an existing account for this Email address"))
     return email
 
 
-def check_username(username):
+def check_username(username, user_id=None):
+    """Return the stripped name, or raise if another account already uses it.
+
+    Pass ``user_id`` when renaming an existing account."""
     username = strip_whitespaces(username)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).scalar():
+    if _taken_by_another_user(ub.User.name, username, user_id):
         log.error("This username is already taken")
         raise Exception(_("This username is already taken"))
     return username

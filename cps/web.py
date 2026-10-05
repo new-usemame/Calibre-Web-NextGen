@@ -3617,11 +3617,11 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
         if not new_email:
             raise Exception(_("Email can't be empty and has to be a valid Email"))
         if new_email != current_user.email:
-            current_user.email = check_email(new_email)
+            current_user.email = check_email(new_email, current_user.id)
         if current_user.role_admin():
             if to_save.get("name", current_user.name) != current_user.name:
                 # Query username, if not existing, change
-                current_user.name = check_username(to_save.get("name"))
+                current_user.name = check_username(to_save.get("name"), current_user.id)
         current_user.random_books = 1 if to_save.get("show_random") == "on" else 0
         current_user.default_language = to_save.get("default_language", "all")
         # Per-custom-column sidebar visibility (independent of the built-in

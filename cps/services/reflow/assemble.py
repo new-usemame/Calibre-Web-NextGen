@@ -1132,7 +1132,7 @@ def _x_overlaps(a, b):
     return a[0] < b[2] and b[0] < a[2]
 
 
-def _join_within_page(elements, vocab):
+def _join_within_page(elements, vocab, raw_page=None):
     """The page as it reads, not as the printer's blocks broke it.
 
     The stream below has always joined paragraphs across regions; the page the
@@ -1147,6 +1147,7 @@ def _join_within_page(elements, vocab):
     left).
     """
     out = []
+    from .quote_evidence import source_fragment_continues
     for element in elements:
         if element.kind == "p" and not element.table_row:
             anchor = None
@@ -1163,7 +1164,9 @@ def _join_within_page(elements, vocab):
                     and all(not _x_overlaps(element.bbox, box) for box in barriers) \
                     and (continues(anchor.text, _prose_opening(element.runs))
                          or _same_print_line(anchor, element)
-                         or _same_page_parenthetical(anchor, element)):
+                         or _same_page_parenthetical(anchor, element)
+                         or (anchor is out[-1] and source_fragment_continues(
+                             anchor,element,raw_page,elements))):
                 anchor.runs = tidy(stitch_runs(
                     anchor.runs, element.runs, heal=True, vocab=vocab))
                 anchor.pages = sorted(set(anchor.pages + element.pages))
@@ -1178,7 +1181,22 @@ def _join_within_page(elements, vocab):
                                    max(anchor.bbox[3], element.bbox[3]))
                 continue
         out.append(element)
-    return out
+    # A source fragment may itself arrive as several line-sized Elements.
+    # Recheck only the bounded native display proof after those ordinary line
+    # joins finish; the closing delimiter may now be available for the first
+    # time. Generic paragraph inference is not repeated here.
+    complete=[]
+    for element in out:
+        anchor=complete[-1] if complete else None
+        if anchor is not None and source_fragment_continues(anchor,element,raw_page,out):
+            anchor.runs=tidy(stitch_runs(anchor.runs,element.runs,heal=False,vocab=vocab))
+            anchor.pages=sorted(set(anchor.pages+element.pages))
+            anchor.line_boxes.extend(element.line_boxes)
+            anchor.bbox=(min(anchor.bbox[0],element.bbox[0]),min(anchor.bbox[1],element.bbox[1]),
+                         max(anchor.bbox[2],element.bbox[2]),max(anchor.bbox[3],element.bbox[3]))
+            anchor.punctuation_uncertain |= element.punctuation_uncertain
+        else:complete.append(element)
+    return complete
 
 
 def _prose_opening(runs):
@@ -1784,7 +1802,7 @@ def assemble(skeletons, style, raw_pages=None):
         # the wraps the printer broke at a column or region edge are joined before
         # either view is taken. Joining mutates runs, so the stream gets its own
         # copies.
-        elements = _join_within_page(elements, vocab)
+        elements = _join_within_page(elements, vocab, raw_by_page.get(skel.pno))
         book.pages[skel.pno] = elements
         if skel.title_unit:
             first = next((el for el in elements if el.kind in ('p', 'h') and el.text.strip()), None)

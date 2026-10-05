@@ -8,7 +8,7 @@ import re
 import statistics
 from . import assemble,extract,note_evidence,heading_evidence as geometry
 
-VERSION='source-quote-units-8'
+VERSION='source-quote-units-9'
 
 
 def _normal_positions(text):
@@ -83,6 +83,69 @@ def _italic(line):
     spans=[s for s in line['spans'] if s.get('text','').strip()]
     return bool(spans) and all(s.get('flags',0)&extract.FLAG_ITALIC or
         'italic' in s.get('font','').lower() or 'oblique' in s.get('font','').lower() for s in spans)
+
+
+def source_fragment_continues(left, right, raw_page, elements):
+    """A native delimited display split at ordinary printed line leading.
+
+    This joins existing paragraph fragments, never assigns quote semantics or
+    clears uncertainty. Missing source ownership and OCR typography abstain.
+    """
+    if (raw_page is None or left.kind!='p' or right.kind!='p'
+            or left.table_row or right.table_row or left.column!=right.column
+            or left.pno!=right.pno or left.pno!=raw_page.pno
+            or getattr(raw_page,'transcript_unverified',False)
+            or left.display_group or right.display_group
+            or any(run[0]=='glyph' for element in (left,right) for run in element.runs)):
+        return False
+    a=''.join(str(run[1]) for run in left.runs).strip()
+    b=''.join(str(run[1]) for run in right.runs).strip()
+    for opening,closing in [('"','"'),('“','”')]:
+        if not a.startswith(opening):continue
+        if opening==closing:
+            complete=a.count(opening)==1 and b.count(closing)==1
+        else:
+            complete=(a.count(opening)==1 and closing not in a
+                      and opening not in b and b.count(closing)==1)
+        if complete and re.fullmatch(r'[\s.,;:!?\d]*',b.split(closing)[-1]):break
+    else:return False
+    if assemble.SENT_END.search(a) or not a[-1:].isalnum():return False
+    raw=raw_page.to_dict()
+    lines=[line for block in raw['blocks'] if block.get('kind','text')=='text'
+           for line in block.get('lines',[]) if geometry._valid(line.get('bbox')) and line.get('spans')]
+    first,_,error=_source_lines(left,lines)
+    if error or not first:return False
+    following,_,error=_source_lines(right,lines)
+    if error or not following:return False
+    chosen=first+following
+    spans=geometry._spans(chosen)
+    if (not spans or any(span.get('font')=='ocr' for span in spans)
+            or any(line in first for line in following)):
+        return False
+    containing=[block for block in raw['blocks'] if any(line in chosen for line in block.get('lines',[]))]
+    if any(any(line not in chosen for line in block.get('lines',[])) for block in containing):return False
+    sizes=[span['size'] for span in spans if span.get('text','').strip() and span.get('size',0)>0]
+    if not sizes:return False
+    em=statistics.median(sizes)
+    boxes=[line['bbox'] for line in chosen]
+    left_edge=min(box[0] for box in boxes)
+    if any(abs(box[0]-left_edge)>.5*em for box in boxes):return False
+    heights=[box[3]-box[1] for box in boxes]
+    steps=[y[1]-x[1] for x,y in zip(boxes,boxes[1:])]
+    if (not steps or min(steps)<=0 or max(steps)>1.7*statistics.median(heights)
+            or any(y[1]<x[3]-.25*em for x,y in zip(boxes,boxes[1:]))):return False
+    # A nearby wider body paragraph establishes this as a distinct inset
+    # display, rather than two coincidentally adjacent ordinary paragraphs.
+    for reference in elements:
+        if (reference is left or reference is right or reference.kind!='p'
+                or reference.table_row or reference.column!=left.column):continue
+        mapped,_,error=_source_lines(reference,lines)
+        if error or len(mapped)<1:continue
+        refbox=reference.bbox
+        if not geometry._valid(refbox) or refbox[0]+em>left_edge or refbox[2]<=left_edge+em:continue
+        gap=min(abs(boxes[0][1]-refbox[3]),abs(refbox[1]-boxes[-1][3]))
+        if (refbox[3]<=boxes[0][1] or refbox[1]>=boxes[-1][3]) and .5*em<=gap<=5*em:return True
+    return False
 
 
 def _same_page_continuation(elements,index,mapped,lines):

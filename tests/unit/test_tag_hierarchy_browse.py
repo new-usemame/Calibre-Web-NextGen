@@ -164,7 +164,7 @@ def test_only_explicit_builtin_preference_enables_tree(library_client, preferenc
     assert payload["items"] == []
     # Flat libraries retain the established endpoint and literal stored names.
     flat = client.get("/api/v1/tags").get_json()["items"]
-    assert next(node for node in flat if node["id"] == 2)["name"] == "Horror.Gothic"
+    assert next(node for node in flat if node["id"] == 2)["name"] == "Horror.Gothic.Southern Gothic"
 
 
 def test_flat_tree_probe_does_not_require_enumerating_book_tag_membership(library_client):

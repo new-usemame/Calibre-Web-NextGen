@@ -477,7 +477,8 @@ def _repeated_detached_heads(raw_pages, body_size):
                 and abs(peer.bbox[1]-line.bbox[1]) <= body_size*.35
                 and (peer.bbox[2] < line.bbox[0]-body_size*.4
                      or peer.bbox[0] > line.bbox[2]+body_size*.4)
-                and peer.size <= body_size*1.2]
+                and peer.size <= body_size*(1.3 if raw.width<raw.height*1.2
+                    and line.bbox[3]<=raw.height*.12 else 1.2)]
             folio = folios[0] if len(folios)==1 else None
             if (len(text) > BAND_TEXT_MAX or sum(c.isalpha() for c in text) < (3 if footer is not None else 6)
                     or line.size > body_size * (1.5 if footer is not None else 1.2 if folio is not None else 1.02)
@@ -501,10 +502,21 @@ def _repeated_detached_heads(raw_pages, body_size):
                     continue
             groups[key].append((raw, line, folio if key[1]=='separate' else footer if key[1]=='footer' else None))
     proved = defaultdict(list)
-    for rows in groups.values():
+    for key,rows in groups.items():
         for raw, line, folio in rows:
-            peers = {other.pno for other, candidate, _ in rows
-                     if abs(candidate.bbox[1]/other.height - line.bbox[1]/raw.height) <= .006
+            paired=(key[1]=='separate' and raw.width<raw.height*1.2
+                    and line.bbox[3]<=raw.height*.12 and len(line.stripped.split())>=3
+                    and sum(c.isalpha() for c in line.stripped)>=12)
+            letters=re.sub(r'[^a-z]','',line.stripped.casefold())
+            candidates=list(rows)
+            if paired:
+                for other_key,other_rows in groups.items():
+                    if other_key!=key and other_key[1:] == key[1:] and SequenceMatcher(
+                            None,letters,re.sub(r'[^a-z]','',other_key[0]),autojunk=False).ratio()>=.92:
+                        candidates.extend(other_rows)
+            peers = {other.pno for other, candidate, _ in candidates
+                     if (not paired or (abs(other.pno-raw.pno)<=8 and candidate.bbox[3]<=other.height*.12))
+                     and abs(candidate.bbox[1]/other.height - line.bbox[1]/raw.height) <= (.012 if paired else .006)
                      and abs(candidate.bbox[0]/other.width - line.bbox[0]/raw.width) <= .035
                      and abs(candidate.size - line.size) <= body_size * .10}
             pages=sorted(peers)

@@ -550,3 +550,26 @@ def test_capitalized_article_at_page_turn_retains_source_marker_and_note_channel
     assert ''.join(root.itertext())=='The source continues. The Moon remains in the source paragraph.'
     assert root.find('.//*[@id="pg_0001"]') is not None
     assert pages[0]['body'][1]==notice
+
+
+@pytest.mark.parametrize('control',[None,'wrong_sequence','no_folio','body_heading','changed_title'])
+def test_paired_folio_proves_a_portrait_head_with_minor_scan_letter_and_position_noise(control):
+    raws=[]
+    for i in range(3):
+        pno=87+2*i;y=(58,53,59)[i] if control!='body_heading' else 91
+        text=('The Houses: Temples of the Sky','The Houses: Temples of che Sky','The Houses: Temples of the Sky')[i]
+        if control=='changed_title' and i==1:text='Another different source heading'
+        title=_line(text,127+(i%2)*5,y,9.6);title.bbox=(127+(i%2)*5,y,252+(i%2)*5,y+12);title.spans[0].bbox=title.bbox
+        folio=_line(str(64 if control=='wrong_sequence' else 64+2*i),91,y+1,10.6 if i==1 else 9.6)
+        folio.bbox=(91,y+1,105,y+13);folio.spans[0].bbox=folio.bbox
+        body=_line('Ordinary source prose continues into this body paragraph.',91,y+33,8.6)
+        lines=[title,body] if control=='no_folio' else [title,folio,body]
+        raws.append(extract.RawPage(pno,450.72,669.12,[extract.Block(0,(91,y,330,y+42),lines)]))
+    style=skeleton.book_style(raws)
+    book=assemble.assemble([skeleton.page_skeleton(raw,style) for raw in raws],style,raw_pages=raws)
+    assert book.conservation.ok
+    if control is None:
+        assert len(book.furniture)==6
+        assert all(not any('Houses' in element.text for element in elements) for elements in book.pages.values())
+    else:
+        assert not book.furniture

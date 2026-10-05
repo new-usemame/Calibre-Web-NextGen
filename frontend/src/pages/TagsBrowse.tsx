@@ -63,7 +63,7 @@ export function TagsBrowse() {
     enabled: !flat,
   });
   if (flat || tree.data?.hierarchical === false) return <BrowseList plural="tags" title="Tags" />;
-  return <main className={styles.container}>
+  return <div className={styles.container}>
     <h1>{t('Tags')}</h1>
     <p><Link href="/tags?view=flat">{t('All tags')}</Link></p>
     {tree.isPending ? <SpinnerCentered /> : tree.isError
@@ -75,7 +75,7 @@ export function TagsBrowse() {
             {tree.data?.items.map(node => <Node key={JSON.stringify([node.path, node.id])} node={node} />)}
           </ul>
         </>}
-  </main>;
+  </div>;
 }
 
 export function TagGroup() {

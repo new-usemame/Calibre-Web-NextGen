@@ -1448,11 +1448,11 @@ def _printed_furniture(book, page_homes, language, evidence=None):
         details = {detail['id']: detail for detail in source.get('details', [])}
         for index, region in enumerate(inventory.get('regions', [])):
             if region['suggested_kind'] != 'furniture':continue
-            if region['reason'] == 'repeated_scan_spread_head':
+            if region['reason'] in ('repeated_scan_spread_head','repeated_portrait_head'):
                 key = 'furniture_%d' % index
                 detail = details.get(key)
                 if not detail or not source.get('href'):
-                    raise ValueError('Original scan running-head pixels are required')
+                    raise ValueError('Original running-head pixels are required')
                 furniture.append('<figure><a href="%s#%s"><img src="%s" '
                     'alt="Original printed running head"/></a><figcaption>'
                     '<a href="%s#%s">View larger</a></figcaption></figure>' %
@@ -1892,7 +1892,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
     wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered or pno in scanned or pno in readings]
     for pno, inventory in getattr(book, 'source_inventory', {}).items():
         if pno in page_html and pno not in wanted and any(
-                region['suggested_kind']=='furniture' and region['reason']=='repeated_scan_spread_head'
+                region['suggested_kind']=='furniture' and region['reason'] in ('repeated_scan_spread_head','repeated_portrait_head')
                 for region in inventory.get('regions', [])):
             wanted.append(pno)
     # Native figures need an inspection route even when their extraction has no
@@ -1919,7 +1919,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                               "ordinal": index + 1, "total": len(wanted)})
         specs = []
         for region_index, region in enumerate(getattr(book, 'source_inventory', {}).get(pno, {}).get('regions', [])):
-            if region['suggested_kind']=='furniture' and region['reason']=='repeated_scan_spread_head':
+            if region['suggested_kind']=='furniture' and region['reason'] in ('repeated_scan_spread_head','repeated_portrait_head'):
                 specs.append(('furniture_%d' % region_index, 'Original printed running head', region['bbox']))
         ambiguous = book.ambiguous_note_numbers(pno)
         if ambiguous:

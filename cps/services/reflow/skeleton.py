@@ -251,6 +251,7 @@ class BookStyle(object):
     folio_boxes: dict = field(default_factory=dict)
     local_running_boxes: dict = field(default_factory=dict)
     repeated_head_boxes: dict = field(default_factory=dict)
+    portrait_head_boxes: dict = field(default_factory=dict)
     scan_spread_head_boxes: dict = field(default_factory=dict)
     scan_table_label_boxes: dict = field(default_factory=dict)
 
@@ -526,6 +527,10 @@ def _repeated_detached_heads(raw_pages, body_size):
             if len(peers) >= 3 and progressing:
                 proved[raw.pno].append(line.bbox)
                 if folio is not None:proved[raw.pno].append(folio.bbox)
+    from .portrait_heads import boxes as portrait_head_boxes
+    for pno, boxes in portrait_head_boxes(raw_pages,body_size).items():
+        for box in boxes:
+            if box not in proved[pno]:proved[pno].append(box)
     return dict(proved)
 
 
@@ -745,11 +750,13 @@ def book_style(raw_pages, outline=None):
 
     table_labels = {}
     spread_heads = _repeated_scan_spread_heads(raw_pages,table_labels=table_labels)
+    from .portrait_heads import boxes as portrait_head_boxes
     return BookStyle(body_size=body_size, ladder=ladder, band_hits=dict(bands),
                      page_count=len(raw_pages), outline=list(outline or []),
                      folio_boxes=_sequence_folios(raw_pages,body_size),
                      local_running_boxes=_local_running_folios(raw_pages,body_size),
                      repeated_head_boxes=_repeated_detached_heads(raw_pages,body_size),
+                     portrait_head_boxes=portrait_head_boxes(raw_pages,body_size),
                      scan_spread_head_boxes=spread_heads, scan_table_label_boxes=table_labels)
 
 
@@ -2320,6 +2327,8 @@ def _furniture_reason(line, raw, style, top_y=None):
         return 'repeated_scan_spread_head'
     if line.bbox in getattr(style, 'scan_table_label_boxes', {}).get(raw.pno, ()):
         return None
+    if line.bbox in getattr(style, 'portrait_head_boxes', {}).get(raw.pno, ()):
+        return 'repeated_portrait_head'
     if getattr(style,"folio_boxes",{}).get(raw.pno) == line.bbox:
         return "folio_sequence"
     if getattr(style,"local_running_boxes",{}).get(raw.pno) == line.bbox:

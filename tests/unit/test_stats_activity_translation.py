@@ -241,3 +241,22 @@ document.getElementById('demo-consistency').textContent = JSON.stringify([demo.t
     assert total == search['total_searches']
     assert 0 <= search['successful_searches'] <= total
     assert search['success_rate'] == pytest.approx(round(100 * search['successful_searches'] / total, 1))
+
+
+def test_smart_shelf_event_caption_preserves_metric_identity(tmp_path):
+    dashboard = {key: [] for key in (
+        "timeline", "top_users", "top_books", "recent_searches",
+        "format_distribution", "event_breakdown")}
+    dashboard["totals"] = {"total_events": 7}
+    dashboard["event_breakdown"] = [["MAGIC_SHELF_VIEW", 7]]
+    html = _render(tmp_path, locale="en", dashboard_stats=dashboard)
+    result = _execute(html, """
+        currentData = realData;
+        eventsChart = echarts.init(document.getElementById('events-chart'));
+        updateEventsChart();
+        document.getElementById('smart-event-caption').textContent =
+            __charts['events-chart'].legend.formatter('MAGIC_SHELF_VIEW');
+    """)
+    assert result["nodes"]["smart-event-caption"]["textContent"] == "Smart Shelf Views"
+    assert result["charts"]["events-chart"]["series"][0]["data"] == [
+        {"name": "MAGIC_SHELF_VIEW", "value": 7}]

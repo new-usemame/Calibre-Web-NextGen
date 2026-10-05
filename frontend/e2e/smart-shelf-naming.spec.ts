@@ -16,6 +16,10 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
   await page.getByRole('combobox', { name: 'Rule operator', exact: true }).selectOption('contains');
   const value = page.getByRole('textbox', { name: 'Title: value', exact: true });
   await expect(value).toBeVisible();
+  await field.selectOption('author');
+  await expect(page.getByRole('textbox', { name: 'Author: value', exact: true })).toBeVisible();
+  await field.selectOption('title');
+  await page.getByRole('combobox', { name: 'Rule operator', exact: true }).selectOption('contains');
   await value.fill('Native');
   const initialIcon = await page.locator('#shelf-icon').inputValue();
   const icons = page.locator('#icon-picker-grid button');

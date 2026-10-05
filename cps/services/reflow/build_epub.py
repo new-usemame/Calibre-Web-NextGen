@@ -198,6 +198,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     available = {str(n.num) for n in notes if n.num is not None} - ambiguous
     ref_ids = {}
     blocks = []
+    body_returns = []
     figure_index = 0
     caption_keys = _caption_keys(elements)
     note_context_figures = assemble.source_note_context_figures(book, pno)
@@ -313,7 +314,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 blocks.append(image)
             if caption_index is not None:
                 controls = _native_return_controls(navigation,pno,element_index=caption_index)
-                if controls:blocks.append(controls)
+                if controls:body_returns.append(controls)
             figure_index += 1
             continue
         if wrappers and element_index in wrappers:
@@ -371,9 +372,12 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         else:
             blocks.append("<p>%s</p>" % inner)
         controls = _native_return_controls(navigation,pno,element_index=element_index)
-        if controls:blocks.append(controls)
+        if controls:body_returns.append(controls)
         if element.punctuation_uncertain:
             blocks.append(_punctuation_notice(pno, element_index))
+
+    if body_returns:
+        blocks.append('<aside class="source-native-returns">'+''.join(body_returns)+'</aside>')
 
     for note_index, note in enumerate(notes):
         aside = _aside_html(note, ref_ids, available, str(note.num) in ambiguous,
@@ -412,7 +416,7 @@ def _source_nav_marks(navigation, pno, element_index, item_index):
 
 
 def _native_return_controls(navigation,pno,*,element_index=None,note_index=None):
-    """Visible generated actions follow their source block, never its words."""
+    """Visible generated actions stay outside source prose and note text."""
     ids=[]
     for link in navigation:
         if link['dest_page']!=pno:continue
@@ -1112,7 +1116,8 @@ def _join_page_turns(pages, title_pages=(), layout_pages=(), layout_boundaries=N
         if not model_owned and not raster_wrap and (_completed_index_entry_boundary(tail, head) or
                 not (assemble.continues(block_text(tail), block_text(head)) or current["pno"] in parenthetical_seams)):
             continue
-        move_page_marker = not previous['asides']
+        move_page_marker = not any(not block.startswith('<aside class="source-native-returns">')
+                                   for block in previous['asides'])
         # Earlier-page notes keep their print-page scope. Source evidence still
         # needs a target at the passage moved into the preceding paragraph.
         marker = current['anchor'] if move_page_marker else ''

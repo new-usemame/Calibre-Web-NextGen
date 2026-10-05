@@ -169,3 +169,44 @@ def test_native_note_returns_are_separate_from_original_note_text():
     returns=root.findall('.//a[@class="pdf-return"]')
     assert len(returns)==1
     assert all(parents[control].get('class')=='source-evidence-notice' for control in returns)
+
+
+def test_native_body_returns_follow_page_prose_without_interrupting_adjacent_passages():
+    with _document() as doc:
+        book=assemble.deterministic_book(doc)
+        book.pages[0].append(assemble.Element(kind='p',pno=0,
+            runs=[['t','The next source paragraph follows the quotation.']]))
+        root=tree(build_epub.page_fragment(book,0));children=list(root)
+        source=[n for n in children if n.tag=='p' and n.get('class') is None]
+        assert len(source)>=2
+        left,right=children.index(source[-2]),children.index(source[-1])
+        assert right==left+1,'generated Returns must not separate neighboring source passages'
+        returns=root.findall('.//a[@class="pdf-return"]');assert returns
+        parents={child:parent for parent in root.iter() for child in parent}
+        for back in returns:
+            group=parents[parents[back]]
+            assert group.tag=='aside' and group.get('class')=='source-native-returns'
+            assert children.index(group)>right
+            ident=back.get('href')[1:]
+            origin=tree(build_epub.page_fragment(book,2));assert origin.find('.//*[@id="'+ident+'"]') is not None
+
+
+@pytest.mark.parametrize('printed_note',[False,True])
+def test_body_return_aside_keeps_continuation_page_marker_at_its_source_seam(printed_note):
+    action='<aside class="source-native-returns"><p class="source-evidence-notice">'+build_epub._pdf_return('pdfgoto_p0002_x9')+'</p></aside>'
+    note='<aside epub:type="footnote" id="fn_1"><p>A printed note.</p></aside>' if printed_note else ''
+    pages=build_epub._page_blocks({0:'<p>The original sentence continues</p>'+action+note,
+                                  1:'<p>across its page boundary.</p><p>A distinct following paragraph.</p>'})
+    assert build_epub._join_page_turns(pages)==1
+    root=tree(''.join(block for chapter in build_epub._chapters(pages) for block in chapter.blocks))
+    joined=next(p for p in root.findall('.//p') if ''.join(p.itertext()).startswith('The original sentence'))
+    marker=root.find('.//*[@id="pg_0001"]');assert marker is not None
+    if printed_note:
+        # The prior printed note still keeps its original page-scoped marker.
+        assert joined.find('.//*[@id="source_return_0001"]') is not None
+        assert joined.find('.//*[@id="pg_0001"]') is None
+        nodes=list(root.iter());assert nodes.index(root.find('.//*[@id="fn_p0000_1"]'))<nodes.index(marker)
+    else:
+        assert joined.find('.//*[@id="pg_0001"]') is marker
+        assert marker.tail.startswith('across its page boundary.')
+    assert len(root.findall('.//a[@class="pdf-return"]'))==1

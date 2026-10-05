@@ -8,6 +8,22 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
   await page.goto('/magicshelf');
   await expect(page.getByRole('heading', { name: 'Create smart shelf', exact: true })).toBeVisible();
   await expect(page.locator('#nav_createmagicshelf')).toHaveText('Create smart shelf');
+  const field = page.getByRole('combobox', { name: 'Rule field', exact: true });
+  await expect(field).toBeVisible();
+  await field.selectOption('title');
+  await expect(page.getByRole('combobox', { name: 'Rule operator', exact: true })).toBeVisible();
+  const initialIcon = await page.locator('#shelf-icon').inputValue();
+  const icons = page.locator('#icon-picker-grid button');
+  const differentIcon = await icons.evaluateAll((buttons, initial) =>
+    buttons.findIndex(button => button.getAttribute('data-icon') !== initial), initialIcon);
+  expect(differentIcon, 'keyboard selection must change the initial icon').toBeGreaterThanOrEqual(0);
+  const icon = icons.nth(differentIcon);
+  await expect(icon).toBeVisible();
+  const chosenIcon = await icon.getAttribute('data-icon');
+  await icon.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#shelf-icon')).toHaveValue(chosenIcon!);
+  await expect(page).toHaveURL(/\/magicshelf$/);
   await expect(page.getByText('What are smart shelves?', { exact: true })).toBeVisible();
   await page.getByText('What are smart shelves?', { exact: true }).click();
   await expect(page.getByText('Smart shelves were called Magic Shelves in older versions.', { exact: true })).toBeVisible();

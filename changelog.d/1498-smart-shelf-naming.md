@@ -1,6 +1,6 @@
 ### Fixed
 
-- **Smart shelves keep the same name across both interfaces, OPDS, statistics and sync settings.** Classic uses the existing localized Smart shelves term, matching the New UI. A short note explains the older Magic Shelves name; saved rules, API routes, statistics event keys and sync settings retain their identifiers. Updated labels and help ship with all 28 translations. Reported by Aoife in #1498.
+- **Smart shelves keep the same name across both interfaces, OPDS, statistics and sync settings.** Classic uses the existing localized Smart shelves term, matching the New UI. A short note explains the older Magic Shelves name; saved rules, API routes, statistics event keys and sync settings retain their identifiers. Updated labels and help ship with all 28 translations. Reported by Aoife in #1498. Classic rule selectors have accessible names, and quick-pick icons work with the keyboard. Password-strength messages fall back to a shipped locale without requesting missing language files.
 
 ### Security
 

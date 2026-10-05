@@ -419,9 +419,9 @@ div.help-panel > .panel-body {
                                    placeholder="Search quick-pick icons...">
                             <div class="icon-picker-grid" id="icon-picker-grid">
                                 {% for icon in allowed_icons %}
-                                <div class="icon-option" data-icon="{{ icon }}" title="{{ icon }}">
+                                <button type="button" class="icon-option" data-icon="{{ icon }}" title="{{ icon }}">
                                     {{ icon }}
-                                </div>
+                                </button>
                                 {% endfor %}
                             </div>
                         </div>
@@ -601,7 +601,12 @@ $(function() {
     // QueryBuilder's bundled renderer ignores labels on custom operator
     // objects. Replace only raw, untranslated IDs; built-in regional labels
     // remain untouched.
-    $('#builder').on('afterCreateRuleOperators.queryBuilder', function() {
+    // Name QueryBuilder's generated controls before its first rule is rendered.
+    $('#builder').on('afterCreateRuleFilters.queryBuilder', function(event, rule) {
+        rule.$el.find('.rule-filter-container select').attr('aria-label', {{_('Rule field')|tojson}});
+    });
+    $('#builder').on('afterCreateRuleOperators.queryBuilder', function(event, rule) {
+        rule.$el.find('.rule-operator-container select').attr('aria-label', {{_('Rule operator')|tojson}});
         $(this).find('.rule-operator-container option').each(function() {
             var type = $(this).val();
             if ($(this).text().trim() === type && operatorLabels[type]) {

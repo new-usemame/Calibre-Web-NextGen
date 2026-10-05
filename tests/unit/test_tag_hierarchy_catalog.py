@@ -70,7 +70,7 @@ def group_client(monkeypatch):
         monkeypatch.setattr(module, "current_user", viewer, raising=False)
     for key, value in {"config_read_column": 0, "config_restricted_column": 0,
                        "config_columns_to_ignore": "", "config_allow_reverse_proxy_header_login": False,
-                       "config_anonbrowse": 0}.items():
+                       "config_anonbrowse": 0, "config_books_per_page": 24}.items():
         monkeypatch.setattr(config, key, value, raising=False)
     app = flask.Flask(__name__)
     Babel(app)

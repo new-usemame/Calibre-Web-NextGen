@@ -1736,6 +1736,7 @@ def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover,
                                    bbox=_lines_bbox(lines,block.bbox)))
     if not regions:
         return kept_blocks, note_regions
+    note_owned = {id(line) for region in note_regions for line in region.lines}
     owned = {id(ln) for block in regions for ln in block.lines}
     kept_blocks = [(b, [ln for ln in lines if id(ln) not in owned])
                    for b, lines in kept_blocks]
@@ -1748,11 +1749,14 @@ def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover,
             region.caption_lines = [ln for ln in region.caption_lines if id(ln) not in owned]
         collection[:] = [r for r in collection if r.lines or r.kind == "figure"]
     for block in regions:
-        skel.regions.append(Region(kind="artwork", lines=list(block.lines),
-            bbox=block.bbox, reason="ocr_uncertain_region"))
         carriers = [r for r in skel.regions + candidates if r.kind == "figure"
                     and r.bbox[0] <= block.bbox[0] and r.bbox[1] <= block.bbox[1]
                     and r.bbox[2] >= block.bbox[2] and r.bbox[3] >= block.bbox[3]]
+        note_context = (raw.is_page_scan and cover is None and not carriers
+                        and all(id(line) in note_owned for line in block.lines))
+        art = Region(kind="artwork", lines=list(block.lines),
+                     bbox=block.bbox, reason="ocr_uncertain_region")
+        skel.regions.append(art)
         if carriers:
             for region in carriers:
                 region.reason = "ocr_uncertain_region"
@@ -1762,8 +1766,34 @@ def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover,
             pad = max(1.0, min(6.0, median(ln.size for ln in block.lines) * 0.3))
             box = (max(0.0, block.bbox[0] - pad), max(0.0, block.bbox[1] - pad),
                    min(raw.width, block.bbox[2] + pad), min(raw.height, block.bbox[3] + pad))
+            if note_context:
+                proposed=list(box)
+                current_ids={id(line) for line in block.lines}
+                for other in raw.text_blocks:
+                    for line in other.lines:
+                        if id(line) in current_ids:continue
+                        b=line.bbox
+                        if not (b[0]<proposed[2] and proposed[0]<b[2]
+                                and b[1]<proposed[3] and proposed[1]<b[3]):continue
+                        # Only wholly detached source lines can bound padding.
+                        # A collision with the note's own box is not resolvable.
+                        above=block.bbox[1]-b[3]
+                        below=b[1]-block.bbox[3]
+                        if above>=1:
+                            proposed[1]=max(proposed[1],(b[3]+block.bbox[1])/2)
+                        elif below>=1:
+                            proposed[3]=min(proposed[3],(block.bbox[3]+b[1])/2)
+                        else:note_context=False
+                if note_context:box=tuple(proposed)
+            reason = 'ocr_uncertain_note' if note_context else 'ocr_uncertain_region'
+            if note_context:
+                # The already measured note keeps its opaque role. The exact
+                # artwork/asset pair permits current inventory ownership; no
+                # recognized digit or year becomes an admitted note reading.
+                art.bbox = box
+                art.reason = reason
             skel.regions.append(Region(kind="figure", bbox=box,
-                reason="ocr_uncertain_region"))
+                reason=reason))
         else:
             for region in skel.regions:
                 if region.kind == "figure" and region.image is cover:

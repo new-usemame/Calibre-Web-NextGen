@@ -227,7 +227,7 @@ class Book(object):
 
     def needs_source_evidence(self, pno):
         return any(link['pno'] == pno and link['kind'] == 1 and link['status'] != 'resolved'
-                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("source_scan_grid", "source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel") for f in self.figures) or any(n.pno == pno and n.uses_source_image for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_note", "source_scan_grid", "source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel") for f in self.figures) or any(n.pno == pno and n.uses_source_image for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
             any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
@@ -484,6 +484,24 @@ def source_note_context_figures(book, pno):
         if index+1<len(elements) and elements[index+1].kind=='caption':continue
         box=tuple(element.bbox)
         figures=[f for f in book.figures if f['pno']==pno and tuple(f['bbox'])==box]
+        if len(figures)==1 and figures[0].get('found')=='ocr_uncertain_note':
+            assets=[a for a in inventory['assets'] if tuple(a['bbox'])==box]
+            if len(assets)!=1 or figures[0].get('full_page'):continue
+            asset=assets[0];ids=set(asset['covered_line_ids'])
+            art=[r for r in inventory['regions'] if r['suggested_kind']=='artwork'
+                 and r['reason']=='ocr_uncertain_note' and tuple(r['bbox'])==box]
+            if len(art)!=1 or not ids or set(art[0]['line_ids'])!=ids:continue
+            # A padded note crop cannot acquire nearby body text or another
+            # asset merely because its original line owned a note role.
+            touched=set()
+            for row in inventory['lines']:
+                b=row['source'].bbox
+                if b[0]<box[2] and box[0]<b[2] and b[1]<box[3] and box[1]<b[3]:
+                    if not (box[0]<=b[0] and box[1]<=b[1] and b[2]<=box[2] and b[3]<=box[3]):break
+                    touched.add(row['id'])
+            else:
+                if touched==ids:proved.add(index)
+            continue
         if (len(figures)!=1 or figures[0].get('found')!='scan_figure_band'
                 or figures[0].get('full_page') or not figures[0].get('needs_ink')):continue
         if not body or any((r['bbox'][1]+r['bbox'][3])/2>=box[1] for r in body):continue

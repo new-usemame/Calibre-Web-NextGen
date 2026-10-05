@@ -172,26 +172,32 @@ def test_rotated_cropped_pdf_maps_back_to_unrotated_page_coordinates(metadata_ro
 
 
 @pytest.mark.skipif(os.name != 'posix', reason='POSIX process containment contract')
-@pytest.mark.parametrize('finish', ['timeout', 'cancel', 'normal'])
+@pytest.mark.parametrize('finish', ['timeout', 'cancel', 'cancel_slow_start', 'normal'])
 def test_engine_descendants_stop_with_the_owned_invocation(tmp_path, finish):
     heartbeat = tmp_path / 'heartbeat'
     pidfile = tmp_path / 'child.pid'
     child_code = ("import sys,time; f=open(sys.argv[1], 'wb', buffering=0); "
                   "exec('while True:\\n f.write(b\"x\"); time.sleep(.02)')")
     parent_code = ("import subprocess,sys,time; from pathlib import Path; "
+                   "time.sleep(1) if sys.argv[3]=='cancel_slow_start' else None; "
                    f"child=subprocess.Popen([sys.executable,'-c',{child_code!r},sys.argv[1]]); "
                    "Path(sys.argv[2]).write_text(str(child.pid)); "
                    "time.sleep(.3 if sys.argv[3]=='normal' else 30)")
-    stop = (lambda: heartbeat.exists()) if finish == 'cancel' else None
+    cancellation=finish in ('cancel','cancel_slow_start')
+    stop = (lambda: heartbeat.exists()) if cancellation else None
     try:
         args = [sys.executable, '-c', parent_code, str(heartbeat), str(pidfile), finish]
         if finish == 'normal':
             status, _, _ = ocr._invoke(args, tmp_path, timeout=2, should_stop=stop)
             assert status == 0
         else:
-            expected = ocr.OCRCancelled if finish == 'cancel' else ocr.OCRFailed
+            expected = ocr.OCRCancelled if cancellation else ocr.OCRFailed
             with pytest.raises(expected):
-                ocr._invoke(args, tmp_path, timeout=.7, should_stop=stop)
+                # Cancellation is requested by an observed child heartbeat.
+                # Allow process startup before that request; the timeout case
+                # still exercises the strict deadline and both prove cleanup.
+                ocr._invoke(args, tmp_path, timeout=10 if cancellation else .7,
+                            should_stop=stop)
         assert heartbeat.exists(), 'the descendant must have actually started'
         size = heartbeat.stat().st_size
         time.sleep(.2)

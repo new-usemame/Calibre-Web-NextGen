@@ -18322,9 +18322,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "ឋានានុក្រមស្លាកមិនអាចប្រើបានជាបណ្តោះអាសន្ន។ សូមព្យាយាមម្តងទៀត។"
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "សៀវភៅទាំងអស់ក្នុងប្រភេទនេះ"
+msgid "All books in this tag group"
+msgstr "សៀវភៅទាំងអស់ក្នុងក្រុមស្លាកនេះ"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "ផ្លូវរុករក"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "ជ្រើសរើសក្រុមស្លាក ដើម្បីរកមើលសៀវភៅក្នុងក្រុមនោះ និងស្លាករងរបស់វា។"
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "ស្លាករង"

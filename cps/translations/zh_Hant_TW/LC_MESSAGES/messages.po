@@ -18471,9 +18471,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "標籤階層暫時無法使用。請重試。"
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "此分類中的所有書籍"
+msgid "All books in this tag group"
+msgstr "此標籤群組中的所有書籍"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "導覽路徑"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "選擇一個標籤群組，瀏覽該群組及其子標籤中的書籍。"
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "子標籤"

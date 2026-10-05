@@ -19312,9 +19312,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "Hierarchia štítkov je dočasne nedostupná. Skúste to znova."
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "Všetky knihy v tejto kategórii"
+msgid "All books in this tag group"
+msgstr "Všetky knihy v tejto skupine značiek"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "Drobečková navigácia"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Vyberte skupinu značiek a prezerajte knihy z tejto skupiny a jej podradených značiek."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Podradené značky"

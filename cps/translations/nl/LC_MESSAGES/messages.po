@@ -19988,9 +19988,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "De labelhiërarchie is tijdelijk niet beschikbaar. Probeer het opnieuw."
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "Alle boeken in deze categorie"
+msgid "All books in this tag group"
+msgstr "Alle boeken in deze labelgroep"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "Kruimelpad"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Kies een labelgroep om boeken uit die groep en de onderliggende labels te bekijken."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Onderliggende labels"

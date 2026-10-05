@@ -70,7 +70,7 @@ export function TagsBrowse() {
       ? <SectionError message={t('Could not load tags. Please try again.')}
           onRetry={() => void tree.refetch()} retrying={tree.isFetching} />
       : <>
-          <p>{t('Select a category to see the books assigned to it and all of its sub-categories.')}</p>
+          <p>{t('Choose a tag group to browse books from it and its subtags.')}</p>
           <ul role="list" className={styles.tree}>
             {tree.data?.items.map(node => <Node key={JSON.stringify([node.path, node.id])} node={node} />)}
           </ul>

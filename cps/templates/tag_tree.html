@@ -32,7 +32,7 @@
 {% block body %}
 <h1>{{ _('Tags') }}</h1>
 <p><a href="{{ url_for('web.category_list', view='flat') }}">{{ _('All tags') }}</a></p>
-<p>{{ _('Select a category to see the books assigned to it and all of its sub-categories.') }}</p>
+<p>{{ _('Choose a tag group to browse books from it and its subtags.') }}</p>
 <div data-tag-tree>{{ nodes(entries) }}</div>
 {% if no_tag_count %}
 <p><a href="{{ url_for('web.books_list', data='category', book_id=-1, sort_param='stored') }}">{{ _('None') }} <span class="badge">{{ no_tag_count }}</span></a></p>

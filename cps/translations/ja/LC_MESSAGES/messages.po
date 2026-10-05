@@ -19079,9 +19079,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "タグの階層は一時的に利用できません。もう一度お試しください。"
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "このカテゴリのすべての本"
+msgid "All books in this tag group"
+msgstr "このタググループのすべての本"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "パンくずリスト"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "タググループを選択すると、そのグループとサブタグに含まれる本を閲覧できます。"
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "サブタグ"

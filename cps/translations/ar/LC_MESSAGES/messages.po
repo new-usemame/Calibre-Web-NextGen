@@ -18477,9 +18477,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "التسلسل الهرمي للوسوم غير متاح مؤقتًا. يرجى المحاولة مرة أخرى."
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "كل الكتب في هذه الفئة"
+msgid "All books in this tag group"
+msgstr "كل الكتب في مجموعة العلامات هذه"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "مسار التنقل"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "اختر مجموعة علامات لتصفح كتبها وكتب علاماتها الفرعية."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "العلامات الفرعية"

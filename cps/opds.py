@@ -810,7 +810,7 @@ def _opds_tag_tree():
 def _opds_tag_navigation(nodes, parent=None):
     elements = []
     if parent is not None:
-        elements.append({"name": _("All books in this category"),
+        elements.append({"name": _("All books in this tag group"),
                          "opds_url": url_for('opds.feed_tag_group', path=parent, books=1)})
     for node in nodes:
         target = (url_for('opds.feed_tag_group', path=node['path']) if node['path'] is not None

@@ -194,8 +194,8 @@ def test_opds_parent_acquisition_and_pagination_use_basic_reader(group_client, m
     horror = _atom(client, headers, _entry_link(root, "Horror"))
     gothic = _atom(client, headers, _entry_link(horror, "Gothic"))
     assert [entry.findtext("a:title", namespaces=_ATOM) for entry in gothic.findall("a:entry", _ATOM)] == [
-        "All books in this category", "Southern"]
-    page = _atom(client, headers, _entry_link(gothic, "All books in this category"))
+        "All books in this tag group", "Southern"]
+    page = _atom(client, headers, _entry_link(gothic, "All books in this tag group"))
     titles = []
     for _ in range(3):
         titles += [entry.findtext("a:title", namespaces=_ATOM) for entry in page.findall("a:entry", _ATOM)]

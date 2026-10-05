@@ -18446,9 +18446,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "Hệ thống phân cấp thẻ tạm thời không khả dụng. Vui lòng thử lại."
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "Tất cả sách trong danh mục này"
+msgid "All books in this tag group"
+msgstr "Tất cả sách trong nhóm đánh dấu này"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "Đường dẫn điều hướng"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Chọn một nhóm đánh dấu để duyệt sách trong nhóm và các đánh dấu con của nhóm."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Đánh dấu con"

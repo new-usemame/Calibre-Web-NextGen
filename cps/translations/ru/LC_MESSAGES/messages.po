@@ -20053,9 +20053,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "Иерархия тегов временно недоступна. Попробуйте ещё раз."
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "Все книги в этой категории"
+msgid "All books in this tag group"
+msgstr "Все книги в этой группе тегов"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "Навигационная цепочка"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Выберите группу тегов, чтобы просмотреть книги этой группы и её вложенных тегов."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Вложенные теги"

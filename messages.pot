@@ -17961,9 +17961,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr ""
 
 #: cps/opds.py
-msgid "All books in this category"
+msgid "All books in this tag group"
 msgstr ""
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
+msgstr ""
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr ""
+
+#: cps/templates/index.html
+msgid "Subtags"
 msgstr ""

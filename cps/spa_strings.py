@@ -2137,3 +2137,6 @@ _("Could not load tags. Please try again.")
 
 _("Allow completed DRM-free MOBI 6 books")
 _("Applies only to this download client. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader.")
+
+# Built-in tag hierarchy; generic category wording remains for custom columns.
+_("Choose a tag group to browse books from it and its subtags.")

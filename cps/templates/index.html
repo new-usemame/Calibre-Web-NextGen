@@ -71,7 +71,7 @@
   {% endfor %}
 </nav>
 {% if tag_subcategories %}
-<div><h2>{{ _('Subcategories') }}</h2><ul role="list">
+<div><h2>{{ _('Subtags') }}</h2><ul role="list">
   {% for child in tag_subcategories %}
   <li><a href="{{ url_for('web.tag_group', path=child.path) }}">{{ child.name }} <span class="badge">{{ child.total_count }}</span></a></li>
   {% endfor %}

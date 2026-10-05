@@ -19228,9 +19228,17 @@ msgid "Tag hierarchy temporarily unavailable. Please try again."
 msgstr "La jerarquía de etiquetas no está disponible temporalmente. Inténtalo de nuevo."
 
 #: cps/opds.py
-msgid "All books in this category"
-msgstr "Todos los libros de esta categoría"
+msgid "All books in this tag group"
+msgstr "Todos los libros de este grupo de etiquetas"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
 msgstr "Ruta de navegación"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Elige un grupo de etiquetas para explorar los libros del grupo y de sus subetiquetas."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Subetiquetas"

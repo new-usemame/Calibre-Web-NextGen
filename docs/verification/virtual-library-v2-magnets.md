@@ -5,14 +5,14 @@
 A private source-offered magnet with exactly one `urn:btmh:1220` topic carries
 one full SHA-256 expected identity. Admission keeps the existing 8192-character,
 32-pair, `xt`/`dn`/`tr`, tracker-origin and credential boundaries. Unsupported
-multihash algorithms or lengths, duplicate topics, btih+btmh co-presence, direct
+multihash algorithms or lengths, duplicate topics, direct
 peers and unknown parameters are refused. The original URI is sent unchanged.
 
 qBittorrent must report a libtorrent 2.0 engine and WebUI API 2.11.2–2.15.1
 before the durable submission callback or torrent add. API 2.11.2 is the
 released 5.0.0 boundary for the required `has_metadata` flag; released 4.5.5
 (API 2.8.19) and 4.6.7 (API 2.9.3) lack it. This narrower API qualification
-applies only to direct pure-v2 magnets, preserving ordinary v1 and file behavior. LT1, Transmission and unknown builds refuse without an
+applies to direct magnets carrying a v2 topic, preserving ordinary v1 and file behavior. LT1, Transmission and unknown builds refuse without an
 attempt start, attempt key or external identity. A compatible-engine retry can
 then issue its first submission. Existing read-only collision checks remain
 before the callback; an adopted shared attempt never issues another add.
@@ -44,8 +44,7 @@ jobs and seeding policy remain unchanged.
 
 HTTP links redirecting to a new pure-v2 magnet are refused before a durable
 attempt or submission. This slice has no durable full-topic authority for that
-mutable redirect. Existing HTTP-to-v1-magnet redirects remain supported. Dual
-topics are deferred because their co-presence cannot prove same-hybrid identity.
+mutable redirect. Existing HTTP-to-v1-magnet redirects remain supported. Direct paired topics are covered separately by [paired-topic hybrid verification](virtual-library-dual-topic-magnets.md), which requires both full hashes before files; URI co-presence alone cannot prove same-hybrid identity.
 No schema, dependency, license, runtime service URL or frontend change is needed.
 
 ## Primary protocol evidence

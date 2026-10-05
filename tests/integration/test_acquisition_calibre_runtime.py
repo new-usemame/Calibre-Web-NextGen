@@ -97,6 +97,8 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ROOT
         / "tests/integration/acquisition_v2_magnet_runtime_probe.py": "/tmp/acquisition_v2_magnet_runtime_probe.py",
         ROOT
+        / "tests/integration/acquisition_dual_magnet_runtime_probe.py": "/tmp/acquisition_dual_magnet_runtime_probe.py",
+        ROOT
         / "tests/fixtures/virtual_library_hybrid.py": "/tmp/virtual_library_hybrid.py",
         ROOT
         / "tests/integration/acquisition_opds_publication_runtime_probe.py": "/tmp/acquisition_opds_publication_runtime_probe.py",
@@ -128,6 +130,10 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
         ],
         capture_output=True,
         text=True,
+        # The full matrix includes both original v2 and paired-topic real
+        # processor/Calibre runs. Native execution exceeded the former 300s
+        # bound with the preceding controls still making progress. Keep a
+        # finite complete-runtime bound; individual processor bounds remain.
         timeout=1200,
     )
     assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
@@ -292,3 +298,60 @@ def test_owned_opds_worker_full_processor_conversion_and_receipt(
     assert magnets['collision_retries'][0]['fence'] == [None, None, None, None]
     assert magnets['collision_retries'][0]['torrent_adds'] == 0
     assert magnets['collision_retries'][0]['source_unchanged']
+
+    dual = proof['dual_magnets']
+    assert dual['real_loopback_http'] and dual['full_processor_subprocess']
+    assert dual['production_catalog_and_choice_get_routes'] and dual['public_source_probe_rejects_loopback']
+    assert dual['peer_download_or_running_released_client'] is False
+    assert dual['original_epub_and_reading_state_preserved']
+    assert dual['prior_seed_checks'] == pure_v2['prior_seed_checks']
+    assert [case['shape'] for case in dual['outcomes']] == [
+        'single', 'multi', 'layered', 'trackerless', 'reversed-base32',
+        'lt1-retry', 'unknown-retry', 'old-api-retry', 'collision-retry',
+        'pending-restart', 'missing-v2-restart', 'unavailable-restart',
+        'same-prefix-wrong-v2-recovery', 'lost-ack-tag-recovery', 'missing-v1-restart',
+        'wrong-v1-recovery', 'malformed-v1-recovery', 'malformed-v2-recovery',
+        'nonboolean-metadata-recovery', 'missing-v1-deadline', 'missing-v2-deadline',
+        'collision-lt1-retry', 'collision-old-api-retry']
+    for case in dual['outcomes']:
+        assert len(case['v1_infohash']) == 40 and len(case['v2_infohash']) == 64
+        assert case['external_id'] == case['v2_infohash'][:40]
+        assert case['remote_submissions'] == 1 and case['descriptor_gets'] == 0
+        assert all(case[key] for key in ('exact_original_uri_url_form', 'full_metadata_before_publication',
+            'fresh_worker_reused_submission', 'source_files_and_modes_unchanged',
+            'private_receipts', 'owned_cleanup', 'seeding_controls_unchanged'))
+        assert len(case['receipts']) == (2 if case['shape'] == 'multi' else 1)
+        assert all(receipt['actual_format'] == 'EPUB' and receipt['source_sha256'] == receipt['imported_sha256']
+                   for receipt in case['receipts'])
+        assert case['piece_layer_count'] == (1 if case['shape'] == 'layered' else 0)
+        if case['negative_snapshots']:
+            assert case['accepted_fence_retained']
+            assert all(row['receipt'] is None and row['ingest'] == [] for row in case['negative_snapshots'])
+            assert all(row['fence'] == case['negative_snapshots'][0]['fence'] for row in case['negative_snapshots'])
+        if case['shape'].endswith('-deadline'):
+            assert case['negative_snapshots'][-1]['error'] == 'client_job_stalled'
+    assert dual['outcomes'][0]['receipt_fault_recovery']
+    assert all(dual['outcomes'][1][key] for key in ('mixed_bundle_explicit_selection',
+        'synthetic_padding_reported', 'synthetic_padding_excluded_from_choices'))
+    assert [case['shape'] for case in dual['refusals']] == ['lt1-retry', 'unknown-retry', 'old-api-retry',
+        'transmission-refusal', 'collision-lt1-retry', 'collision-old-api-retry']
+    assert all(case['error_code'] == 'unsupported_client_version' and case['torrent_adds'] == 0
+               and case['fence'] == [None, None, None, None] for case in dual['refusals'])
+    assert len(dual['collision_retries']) == 1
+    assert dual['collision_retries'][0]['fence'] == [None, None, None, None]
+    assert dual['collision_retries'][0]['torrent_adds'] == 0
+    assert dual['collision_retries'][0]['source_unchanged']
+
+    assert [row['control'] for row in dual['outcomes'][0]['authority_controls']] == ['source','client','account','grant','execution']
+    assert all(row['adds'] == row['files'] == row['receipts'] == 0 and row['fence'] == [None,None,None,None]
+               for row in dual['outcomes'][0]['authority_controls'])
+
+    collision_checks = dual['collision_retries'][0]['preflight_checks']
+    assert [row['side'] for row in collision_checks] == ['v2', 'v1']
+    for row in collision_checks:
+        assert row['lookup']['ids'] == [row['expected_hashes']['v2'][:40], row['expected_hashes']['v1']]
+        assert row['lookup']['returned_ids'] == [row['lookup']['ids'][0 if row['side'] == 'v2' else 1]]
+        assert row['job']['state'] == 'failed' and row['job']['error_code'] == 'torrent_already_exists'
+        assert row['fence'] == row['lookup']['fence'] == [None, None, None, None]
+        assert row['torrent_adds'] == row['files'] == 0 and row['ingest'] == [] and row['receipt'] is None
+        assert row['books'] == row['books_initial'] and row['source_unchanged']

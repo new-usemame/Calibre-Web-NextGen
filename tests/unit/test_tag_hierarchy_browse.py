@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import flask
 import pytest
+from flask_babel import Babel
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -67,6 +68,7 @@ def library_client(monkeypatch):
     for module in (api_package, usermanagement):
         monkeypatch.setattr(module, "config", config)
     app = flask.Flask(__name__)
+    Babel(app)
     app.config.update(TESTING=True, SECRET_KEY="test", WTF_CSRF_ENABLED=False)
     app.register_blueprint(api_v1)
     try:

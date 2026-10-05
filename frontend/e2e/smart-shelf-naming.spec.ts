@@ -12,6 +12,9 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
   await expect(field).toBeVisible();
   await field.selectOption('title');
   await expect(page.getByRole('combobox', { name: 'Rule operator', exact: true })).toBeVisible();
+  await page.locator('#shelf-name').fill('Keyboard-only icon selection');
+  await page.getByRole('combobox', { name: 'Rule operator', exact: true }).selectOption('contains');
+  await page.locator('#builder .rule-value-container input').fill('Native');
   const initialIcon = await page.locator('#shelf-icon').inputValue();
   const icons = page.locator('#icon-picker-grid button');
   const differentIcon = await icons.evaluateAll((buttons, initial) =>
@@ -26,6 +29,8 @@ test('Classic creation uses the same smart-shelf name as New UI', async ({ page 
     element.addEventListener('submit', () =>
       element.setAttribute('data-keyboard-submits', String(Number(element.getAttribute('data-keyboard-submits')) + 1)));
   });
+  expect(await form.evaluate(element => (element as HTMLFormElement).checkValidity()),
+    'a valid form makes unintended submission observable').toBe(true);
   await icon.focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#shelf-icon')).toHaveValue(chosenIcon!);

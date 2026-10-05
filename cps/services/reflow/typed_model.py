@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from . import model
 
 ROUTE_VERSION = 'source-operations-luna6-flex-2'
-SOURCE_REVISION = 'source-operations-source-regions-10.48'
+SOURCE_REVISION = 'source-operations-source-regions-10.49'
 MAX_OUTPUT_TOKENS = 4096
 # Build availability still requires credentials, current consent and both spend limits.
 QUALITY_RELEASED = True

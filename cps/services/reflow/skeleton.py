@@ -646,6 +646,52 @@ def _repeated_scan_spread_heads(raw_pages, *, table_labels=None):
             proved[raw.pno].append(line.bbox)
         elif keyed or contradicted:
             vetoes.append((raw,line,letters))
+    # A short chapter can print its running label on only one leaf. The
+    # opposing recurrent head and consecutive outer folios establish the
+    # physical spread template without requiring that unique label to repeat.
+    # Use only the independently proved heads above; new pairs cannot bootstrap
+    # each other. All candidates still have measured wrapped prose and gutters.
+    original={pno:{tuple(box) for box in boxes} for pno,boxes in proved.items()}
+    vetoed={(raw.pno,tuple(line.bbox)) for raw,line,_ in vetoes}
+    paired=[]
+    for row in candidates:
+        raw,line,side,letters,keyed,interior,offset,_=row
+        if keyed or interior or offset is None or (raw.pno,tuple(line.bbox)) in vetoed:continue
+        if not (_LEADING_PRINTED_FOLIO.fullmatch(line.stripped) if side==0
+                else _TRAILING_PRINTED_FOLIO.fullmatch(line.stripped)):continue
+        opposites=[other for other in candidates if other[0].pno==raw.pno
+                   and other[2]!=side and other[6]==offset and not other[4] and not other[5]
+                   and tuple(other[1].bbox) in original.get(raw.pno,set())]
+        if len(opposites)!=1:continue
+        opposite=opposites[0];a,b=line.bbox,opposite[1].bbox
+        if abs((a[1]+a[3]-b[1]-b[3])/2)>.8*max(a[3]-a[1],b[3]-b[1]):continue
+        paired.append((row,opposite))
+    for row,opposite in paired:
+        raw,line,side,letters,keyed,interior,offset,_=row
+        if tuple(line.bbox) in original.get(raw.pno,set()):continue
+        # A same-band title and an outer folio can resemble a unique head.
+        # Only extend the template where this panel actually opens with a
+        # lowercase continuation. A fresh paragraph/chapter stays ambiguous.
+        following=[ln for block in raw.text_blocks for ln in block.lines
+                   if ln.stripped and ln.bbox[1]>=line.bbox[3]
+                   and ((ln.bbox[0]+ln.bbox[2])/2<raw.width*.5 if side==0
+                        else (ln.bbox[0]+ln.bbox[2])/2>raw.width*.5)]
+        if not following or not min(following,key=lambda ln:ln.bbox[1]).stripped[:1].islower():continue
+        peers=[]
+        for candidate,other_head in paired:
+            other,head,panel,_,_,_,other_offset,_=candidate
+            if (panel!=side or other_offset!=offset or abs(other.pno-raw.pno)>8
+                    or SequenceMatcher(None,opposite[3],other_head[3],autojunk=False).ratio()<.55):continue
+            edge=0 if side==0 else 2
+            if (abs(head.bbox[edge]/other.width-line.bbox[edge]/raw.width)>.025
+                    or abs(head.bbox[1]/other.height-line.bbox[1]/raw.height)>.02
+                    or abs((head.bbox[3]-head.bbox[1])/other.height-
+                           (line.bbox[3]-line.bbox[1])/raw.height)>.008):continue
+            peers.append(other.pno)
+        pages=sorted(set(peers))
+        if any(raw.pno in pages[i:i+3] and pages[i+1]-pages[i]==pages[i+2]-pages[i+1]
+               and pages[i+1]-pages[i] in (1,2) for i in range(len(pages)-2)):
+            proved[raw.pno].append(line.bbox)
     if table_labels is not None:
         for raw,line,letters in vetoes:
             for other in raw_pages:

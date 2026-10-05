@@ -614,6 +614,14 @@ $(function() {
             }
         });
     });
+    $('#builder').on('afterCreateRuleInput.queryBuilder', function(event, rule) {
+        var $values = rule.$el.find('.rule-value-container input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), .rule-value-container select, .rule-value-container textarea');
+        $values.each(function(index) {
+            var name = rule.filter.label + ': ' + {{_('value')|tojson}};
+            if ($values.length > 1) name += ' ' + (index + 1);
+            $(this).attr('aria-label', name);
+        });
+    });
 
     var rules = {{ rules_json|safe }};
 

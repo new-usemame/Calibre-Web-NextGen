@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
-"PO-Revision-Date: 2026-09-27 18:39+0300\n"
+"PO-Revision-Date: 2026-10-01 10:09+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -825,8 +825,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -5109,7 +5109,7 @@ msgstr "(заменить обложку)"
 
 #: cps/spa_strings.py
 msgid ", search supported"
-msgstr ""
+msgstr ", поиск поддерживается"
 
 #: cps/spa_strings.py
 msgid "1 annotation assigned to this source"
@@ -5134,7 +5134,7 @@ msgstr "3:4 (стандартный)"
 
 #: cps/spa_strings.py
 msgid "A copy was already in the library; it was kept."
-msgstr ""
+msgstr "Копия уже была в библиотеке; она сохранена."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5147,6 +5147,8 @@ msgid ""
 "A download redirect tried to send a credential to another origin and was "
 "blocked."
 msgstr ""
+"Перенаправление загрузки попыталось отправить учётные данные на другой "
+"источник и было заблокировано."
 
 #: cps/spa_strings.py
 msgid ""
@@ -5162,6 +5164,8 @@ msgstr "Несколько случайных книг из вашей библ�
 msgid ""
 "A new catalog is added switched off. Test it first, then make it available."
 msgstr ""
+"Новый каталог добавляется отключённым. Сначала проверьте его, затем сделайте "
+"доступным."
 
 #: cps/spa_strings.py
 msgid "A note about the book, not tied to a passage"
@@ -5177,11 +5181,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "API endpoint"
-msgstr ""
+msgstr "Endpoint API"
 
 #: cps/spa_strings.py
 msgid "API key"
-msgstr ""
+msgstr "API-ключ"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
@@ -5204,6 +5208,7 @@ msgstr "Учётная запись: {name}"
 msgid ""
 "Acquisition is not ready right now. Ask an administrator to check its status."
 msgstr ""
+"Получение сейчас не готово. Попросите администратора проверить его статус."
 
 #: cps/spa_strings.py
 msgid "Active"
@@ -5211,11 +5216,11 @@ msgstr "Активно"
 
 #: cps/spa_strings.py
 msgid "Add a connection"
-msgstr ""
+msgstr "Добавить подключение"
 
 #: cps/spa_strings.py
 msgid "Add connection"
-msgstr ""
+msgstr "Добавить подключение"
 
 #: cps/spa_strings.py
 msgid "Add group"
@@ -5251,11 +5256,11 @@ msgstr "Добавить в библиотеку"
 
 #: cps/spa_strings.py
 msgid "Added to your activity."
-msgstr ""
+msgstr "Добавлено в вашу активность."
 
 #: cps/spa_strings.py
 msgid "Additional local download origins"
-msgstr ""
+msgstr "Дополнительные локальные источники загрузки"
 
 #: cps/spa_strings.py
 msgid "Admin group"
@@ -5319,7 +5324,7 @@ msgstr "Разрешить удаленный вход (по волшебной 
 
 #: cps/spa_strings.py
 msgid "Allow requests from book sources"
-msgstr ""
+msgstr "Разрешить запросы от источников книг"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Allow sharing your own shelves"
@@ -5335,16 +5340,18 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Also add the book to My Library"
-msgstr ""
+msgstr "Также добавить книгу в раздел «Моя библиотека»"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Also on {names}"
-msgstr ""
+msgstr "Также на {names}"
 
 #: cps/spa_strings.py
 msgid "An administrator has not added a book source, or none is switched on."
 msgstr ""
+"Администратор не добавил ни одного источника книг, или ни один из них не "
+"включён."
 
 #: cps/spa_strings.py
 msgid ""
@@ -5493,7 +5500,7 @@ msgstr "Автоматически создавать пользователей
 
 #: cps/spa_strings.py
 msgid "Available to users"
-msgstr ""
+msgstr "Доступно пользователям"
 
 #: cps/spa_strings.py cps/templates/broadcast_email.html
 #: cps/templates/cwng_feedback_popup.html cps/templates/email_edit.html
@@ -5512,7 +5519,7 @@ msgstr "Вернуться в библиотеку"
 
 #: cps/spa_strings.py
 msgid "Back to top"
-msgstr ""
+msgstr "Наверх"
 
 #: cps/spa_strings.py
 msgid "Background"
@@ -5553,7 +5560,7 @@ msgstr "Жирный"
 
 #: cps/spa_strings.py
 msgid "Book category ID"
-msgstr ""
+msgstr "ID категории книг"
 
 #: cps/spa_strings.py
 msgid "Book default"
@@ -5573,21 +5580,23 @@ msgstr "Порядок книг"
 
 #: cps/spa_strings.py
 msgid "Book sources"
-msgstr ""
+msgstr "Источники книг"
 
 #: cps/spa_strings.py
 msgid "Book sources are off."
-msgstr ""
+msgstr "Источники книг отключены."
 
 #: cps/spa_strings.py
 msgid "Book sources are on."
-msgstr ""
+msgstr "Источники книг включены."
 
 #: cps/spa_strings.py
 msgid ""
 "Book sources could not be reached just now. This is not a change to your "
 "access."
 msgstr ""
+"В данный момент не удалось получить доступ к источникам книг. Это не связано "
+"с изменением вашего доступа."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5651,6 +5660,9 @@ msgid ""
 "Browse the catalogs your administrator has added. A book you pick is "
 "imported into the library here — it is not just downloaded to your device."
 msgstr ""
+"Просматривайте каталоги, добавленные вашим администратором. Выбранная вами "
+"книга импортируется сюда в библиотеку — она не просто скачивается на ваше "
+"устройство."
 
 #: cps/spa_strings.py
 msgid "Browse this catalog"
@@ -5693,6 +5705,8 @@ msgid ""
 "CWNG cannot read the mapped completed folder. Check its mount and "
 "permissions."
 msgstr ""
+"CWNG не может прочитать сопоставленную папку завершённых загрузок. Проверьте "
+"её монтирование и права доступа."
 
 #: cps/spa_strings.py
 msgid ""
@@ -5705,7 +5719,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Can browse and request"
-msgstr ""
+msgstr "Может просматривать и запрашивать"
 
 #: cps/spa_strings.py
 msgid "Can upload books"
@@ -5727,7 +5741,7 @@ msgstr "Отмена"
 
 #: cps/spa_strings.py
 msgid "Cancel editing"
-msgstr ""
+msgstr "Отменить редактирование"
 
 #: cps/spa_strings.py
 msgid "Cancel rename"
@@ -5744,27 +5758,27 @@ msgstr "Отменить задачу «{task}»"
 
 #: cps/spa_strings.py
 msgid "Cancelling…"
-msgstr ""
+msgstr "Отмена…"
 
 #: cps/spa_strings.py
 msgid "Catalog"
-msgstr ""
+msgstr "Каталог"
 
 #: cps/spa_strings.py
 msgid "Catalog address"
-msgstr ""
+msgstr "Адрес каталога"
 
 #: cps/spa_strings.py
 msgid "Catalog pages"
-msgstr ""
+msgstr "Страницы каталога"
 
 #: cps/spa_strings.py
 msgid "Catalog trail"
-msgstr ""
+msgstr "Путь по каталогу"
 
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
-msgstr ""
+msgstr "Каталоги и клиенты загрузки"
 
 #: cps/spa_strings.py
 msgid "Categories"
@@ -5792,7 +5806,7 @@ msgstr "Проверить снова"
 
 #: cps/spa_strings.py
 msgid "Check the address and the sign-in details."
-msgstr ""
+msgstr "Проверьте адрес и данные для входа."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5802,6 +5816,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Проверка…"
+
+#: cps/spa_strings.py
+msgid "Choose a SABnzbd connection"
+msgstr "Выберите подключение SABnzbd"
 
 #: cps/spa_strings.py
 msgid "Choose a cover"
@@ -5898,8 +5916,8 @@ msgid "Compact"
 msgstr "Компактно"
 
 #: cps/spa_strings.py
-msgid "Completed folder as the download client sees it"
-msgstr ""
+msgid "Completed folder as SABnzbd sees it"
+msgstr "Папка завершённых загрузок, как её видит SABnzbd"
 
 #: cps/spa_strings.py
 msgid "Configuration"
@@ -5916,7 +5934,7 @@ msgstr "Подтвердите удаление тега {name}"
 
 #: cps/spa_strings.py
 msgid "Confirm deletion"
-msgstr ""
+msgstr "Подтвердить удаление"
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
@@ -5940,27 +5958,27 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
-msgstr ""
+msgstr "Подключение изменено. Перезагрузите его настройки перед сохранением."
 
 #: cps/spa_strings.py
 msgid "Connection deleted."
-msgstr ""
+msgstr "Подключение удалено."
 
 #: cps/spa_strings.py
 msgid "Connection saved. Test it, then switch it on."
-msgstr ""
+msgstr "Подключение сохранено. Проверьте его, затем включите."
 
 #: cps/spa_strings.py
 msgid "Connection type"
-msgstr ""
+msgstr "Тип подключения"
 
 #: cps/spa_strings.py
 msgid "Connection works."
-msgstr ""
+msgstr "Подключение работает."
 
 #: cps/spa_strings.py
 msgid "Contacting the source"
-msgstr ""
+msgstr "Связь с источником"
 
 #: cps/spa_strings.py
 msgid "Continue"
@@ -6112,7 +6130,7 @@ msgstr "Не удалось загрузить пользователей."
 
 #: cps/spa_strings.py
 msgid "Could not look up who asked"
-msgstr ""
+msgstr "Не удалось определить, кто запросил"
 
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
@@ -6435,6 +6453,8 @@ msgstr ""
 msgid ""
 "Delete this connection and its saved credentials? Request history is kept."
 msgstr ""
+"Удалить это подключение и его сохранённые учётные данные? История запросов "
+"сохраняется."
 
 #: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
@@ -6617,7 +6637,7 @@ msgstr "Скачать"
 
 #: cps/spa_strings.py
 msgid "Download client"
-msgstr ""
+msgstr "Клиент загрузки"
 
 #: cps/spa_strings.py
 msgid "Download ready-made plugin"
@@ -6625,12 +6645,12 @@ msgstr "Скачать готовый плагин"
 
 #: cps/spa_strings.py
 msgid "Download release"
-msgstr ""
+msgstr "Скачать релиз"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Download {format}"
-msgstr ""
+msgstr "Скачать {format}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6643,11 +6663,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Downloaded, waiting to import"
-msgstr ""
+msgstr "Скачано, ожидание импорта"
 
 #: cps/spa_strings.py
 msgid "Downloading"
-msgstr ""
+msgstr "Загрузка"
 
 #: cps/spa_strings.py
 msgid "Drawing the cover…"
@@ -6726,7 +6746,7 @@ msgstr "Редактировать HTML"
 
 #: cps/spa_strings.py
 msgid "Edit connection"
-msgstr ""
+msgstr "Редактировать подключение"
 
 #: cps/spa_strings.py
 msgid "Edit cover"
@@ -6768,7 +6788,7 @@ msgstr "Редактировать название для «{title}»"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Edit {name}"
-msgstr ""
+msgstr "Редактировать {name}"
 
 #: cps/spa_strings.py
 msgid ""
@@ -6822,7 +6842,7 @@ msgstr "Включить синхронизацию читалки"
 
 #: cps/spa_strings.py
 msgid "Enabled"
-msgstr ""
+msgstr "Включено"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
@@ -6915,7 +6935,7 @@ msgstr "Не удалось загрузить."
 
 #: cps/spa_strings.py
 msgid "Feature"
-msgstr ""
+msgstr "Функция"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6943,7 +6963,7 @@ msgstr "Стиль заливки"
 
 #: cps/spa_strings.py
 msgid "Filter"
-msgstr ""
+msgstr "Фильтр"
 
 #: cps/spa_strings.py
 msgid "Filter by device"
@@ -6965,15 +6985,17 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Find books"
-msgstr ""
+msgstr "Найти книги"
 
 #: cps/spa_strings.py
 msgid "Find books is unavailable"
-msgstr ""
+msgstr "Функция «Найти книги» недоступна"
 
 #: cps/spa_strings.py
 msgid "Finish or cancel outstanding requests before editing this connection."
 msgstr ""
+"Завершите или отмените невыполненные запросы перед редактированием этого "
+"подключения."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7131,7 +7153,7 @@ msgstr "Фильтр объектов группы"
 
 #: cps/spa_strings.py
 msgid "Handing over to the library"
-msgstr ""
+msgstr "Передача в библиотеку"
 
 #: cps/spa_strings.py
 msgid "Has pen or drawing notes"
@@ -7280,6 +7302,9 @@ msgid ""
 "exact origin here. Separate origins with commas. Credentials stay scoped to "
 "their original origin."
 msgstr ""
+"Если Prowlarr перенаправляет на другой источник в вашей локальной сети, "
+"укажите его точный источник здесь. Разделяйте источники запятыми. Учётные "
+"данные остаются привязанными к их первоначальному источнику."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7300,11 +7325,11 @@ msgstr "Импортировано как"
 
 #: cps/spa_strings.py
 msgid "Imported into the library"
-msgstr ""
+msgstr "Импортировано в библиотеку"
 
 #: cps/spa_strings.py
 msgid "Importing"
-msgstr ""
+msgstr "Импорт"
 
 #: cps/spa_strings.py
 msgid "In your book"
@@ -7328,7 +7353,7 @@ msgstr "Включено"
 
 #: cps/spa_strings.py
 msgid "Indexer preset"
-msgstr ""
+msgstr "Пресет индексатора"
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
@@ -7374,7 +7399,7 @@ msgstr "Синхронизация KOReader не включена на этом 
 
 #: cps/spa_strings.py
 msgid "Keep connection"
-msgstr ""
+msgstr "Сохранить подключение"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -7474,6 +7499,9 @@ msgid ""
 "Leave the credential blank to keep it. Saving switches the connection off "
 "and expires old selections; test it before enabling it again."
 msgstr ""
+"Оставьте поле учётных данных пустым, чтобы сохранить их. Сохранение "
+"отключает подключение и аннулирует старые выборы; проверьте его, прежде чем "
+"снова включать."
 
 #: cps/spa_strings.py
 msgid "Left"
@@ -7483,17 +7511,22 @@ msgstr "Слева"
 msgid ""
 "Legacy acquisition permissions need review before a catalog can be added."
 msgstr ""
+"Устаревшие права на получение требуют проверки перед добавлением каталога."
 
 #: cps/spa_strings.py
 msgid ""
 "Legacy acquisition permissions need review before a catalog can be made "
 "available."
 msgstr ""
+"Устаревшие права на получение требуют проверки перед тем, как каталог можно "
+"будет сделать доступным."
 
 #: cps/spa_strings.py
 msgid ""
 "Legacy acquisition permissions need review before this can be switched on."
 msgstr ""
+"Устаревшие права на получение требуют проверки перед тем, как это можно "
+"будет включить."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7501,6 +7534,9 @@ msgid ""
 "download client. A requested book is imported into this library through the "
 "normal ingest path, credited to the account that asked for it."
 msgstr ""
+"Позвольте людям запрашивать книги из каталога OPDS или индексатора, "
+"подключённого к SABnzbd. Запрошенная книга импортируется в эту библиотеку "
+"через обычный путь импорта и записывается на аккаунт, который её запросил."
 
 #: cps/spa_strings.py
 msgid "Lettering"
@@ -7602,7 +7638,7 @@ msgstr "Журналы"
 
 #: cps/spa_strings.py
 msgid "Looking up who asked…"
-msgstr ""
+msgstr "Поиск того, кто запросил…"
 
 #: cps/spa_strings.py
 msgid "Looks good"
@@ -7728,7 +7764,7 @@ msgstr "Модель"
 
 #: cps/spa_strings.py
 msgid "More"
-msgstr ""
+msgstr "Ещё"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7846,7 +7882,7 @@ msgstr "Сначала недавно изданные"
 
 #: cps/spa_strings.py
 msgid "Newznab / Torznab indexer"
-msgstr ""
+msgstr "Индексатор Newznab / Torznab"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
@@ -7859,15 +7895,15 @@ msgstr "Следующая страница"
 
 #: cps/spa_strings.py
 msgid "No EPUB or PDF available from this catalog."
-msgstr ""
+msgstr "В этом каталоге нет доступных файлов EPUB или PDF."
 
 #: cps/spa_strings.py
 msgid "No accepted upload format allows EPUB or PDF."
-msgstr ""
+msgstr "Ни один из принятых форматов загрузки не разрешает EPUB или PDF."
 
 #: cps/spa_strings.py
 msgid "No approval needed"
-msgstr ""
+msgstr "Одобрение не требуется"
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -7887,7 +7923,7 @@ msgstr "Нет книг, соответствующих этим критери�
 
 #: cps/spa_strings.py
 msgid "No books on this catalog matched that search."
-msgstr ""
+msgstr "В этом каталоге нет книг, соответствующих этому поиску."
 
 #: cps/spa_strings.py
 msgid "No books were reported in the latest device inventory."
@@ -7902,11 +7938,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No catalogs yet"
-msgstr ""
+msgstr "Пока нет каталогов"
 
 #: cps/spa_strings.py
 msgid "No catalogs yet."
-msgstr ""
+msgstr "Пока нет каталогов."
 
 #: cps/spa_strings.py
 msgid "No contents found."
@@ -8040,7 +8076,7 @@ msgstr "Ещё не настроено"
 
 #: cps/spa_strings.py
 msgid "Not tested in this session."
-msgstr ""
+msgstr "Не проверялось в этой сессии."
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
@@ -8095,7 +8131,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Nothing requested yet."
-msgstr ""
+msgstr "Пока ничего не запрошено."
 
 #: cps/spa_strings.py
 msgid "Nothing to preview yet."
@@ -8107,13 +8143,15 @@ msgstr "Нумерованный список"
 
 #: cps/spa_strings.py
 msgid "OPDS catalog"
-msgstr ""
+msgstr "Каталог OPDS"
 
 #: cps/spa_strings.py
 msgid ""
 "Off by default. Nothing is fetched and no permission changes until you turn "
 "this on."
 msgstr ""
+"Отключено по умолчанию. Ничего не загружается, и никакие права не меняются, "
+"пока вы это не включите."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8143,7 +8181,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "On shelf {name}"
-msgstr ""
+msgstr "На полке {name}"
 
 #: cps/spa_strings.py
 msgid ""
@@ -8475,7 +8513,7 @@ msgstr "Книги в карантине"
 
 #: cps/spa_strings.py
 msgid "Queued"
-msgstr ""
+msgstr "В очереди"
 
 #: cps/spa_strings.py
 msgid "Quote"
@@ -8498,6 +8536,7 @@ msgstr "Рейтинг (звёзды)"
 msgid ""
 "Re-enter the credential when changing the connection to a different server."
 msgstr ""
+"Введите учётные данные повторно при изменении подключения к другому серверу."
 
 #: cps/spa_strings.py
 msgid "Read from here"
@@ -8545,7 +8584,7 @@ msgstr "Позиции чтения"
 
 #: cps/spa_strings.py
 msgid "Ready to run requests."
-msgstr ""
+msgstr "Готово к выполнению запросов."
 
 #: cps/spa_strings.py
 msgid "Ready-made plugin (USB)"
@@ -8577,7 +8616,7 @@ msgstr "Регистрация…"
 
 #: cps/spa_strings.py
 msgid "Reject"
-msgstr ""
+msgstr "Отклонить"
 
 #: cps/spa_strings.py
 msgid "Reload"
@@ -8649,11 +8688,11 @@ msgstr "Удалить правило"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove tag \"{tag}\""
-msgstr ""
+msgstr "Удалить тег «{tag}»"
 
 #: cps/spa_strings.py
 msgid "Remove these"
-msgstr ""
+msgstr "Удалить эти"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8712,49 +8751,49 @@ msgstr "Сообщить об этой проблеме"
 
 #: cps/spa_strings.py
 msgid "Request approved."
-msgstr ""
+msgstr "Запрос одобрен."
 
 #: cps/spa_strings.py
 msgid "Request cancelled"
-msgstr ""
+msgstr "Запрос отменён"
 
 #: cps/spa_strings.py
 msgid "Request rejected"
-msgstr ""
+msgstr "Запрос отклонён"
 
 #: cps/spa_strings.py
 msgid "Request rejected."
-msgstr ""
+msgstr "Запрос отклонён."
 
 #: cps/spa_strings.py
 msgid "Request release"
-msgstr ""
+msgstr "Запросить релиз"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Request {format}"
-msgstr ""
+msgstr "Запросить {format}"
 
 #: cps/spa_strings.py
 msgid "Requested by a removed account"
-msgstr ""
+msgstr "Запрошено удалённым аккаунтом"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Requested by {name}"
-msgstr ""
+msgstr "Запрошено пользователем {name}"
 
 #: cps/spa_strings.py
 msgid "Requested. An administrator has to approve it."
-msgstr ""
+msgstr "Запрошено. Администратор должен одобрить это."
 
 #: cps/spa_strings.py
 msgid "Requests are paused"
-msgstr ""
+msgstr "Запросы приостановлены"
 
 #: cps/spa_strings.py
 msgid "Requests cannot run yet:"
-msgstr ""
+msgstr "Запросы пока не могут выполняться:"
 
 #: cps/spa_strings.py
 msgid "Require group membership"
@@ -8816,7 +8855,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Retrying."
-msgstr ""
+msgstr "Повторная попытка."
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -8848,8 +8887,32 @@ msgid "Run time"
 msgstr "Время выполнения"
 
 #: cps/spa_strings.py
-msgid "SABnzbd download client"
+msgid "SABnzbd category"
+msgstr "Категория SABnzbd"
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not finish this download before the waiting limit. Check its "
+"queue before retrying."
 msgstr ""
+"SABnzbd не завершил эту загрузку до истечения времени ожидания. Проверьте "
+"его очередь перед повторной попыткой."
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not report a completed folder and category that could be "
+"verified."
+msgstr ""
+"SABnzbd не сообщил о папке завершённых загрузок и категории, которые можно "
+"было бы проверить."
+
+#: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr "Клиент загрузки SABnzbd"
+
+#: cps/spa_strings.py
+msgid "SABnzbd reported that this download failed."
+msgstr "SABnzbd сообщил, что эта загрузка завершилась ошибкой."
 
 #: cps/spa_strings.py
 msgid "SMTP server"
@@ -8865,7 +8928,7 @@ msgstr "STARTTLS"
 
 #: cps/spa_strings.py
 msgid "Same completed folder inside CWNG"
-msgstr ""
+msgstr "Та же папка завершённых загрузок внутри CWNG"
 
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/config_db.html
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
@@ -8882,7 +8945,7 @@ msgstr "Сохранить как пресет"
 
 #: cps/spa_strings.py
 msgid "Save connection"
-msgstr ""
+msgstr "Сохранить подключение"
 
 #: cps/spa_strings.py
 msgid "Save email settings"
@@ -8980,7 +9043,7 @@ msgstr "Искать в этой книге"
 
 #: cps/spa_strings.py
 msgid "Search this catalog"
-msgstr ""
+msgstr "Искать в этом каталоге"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -8989,7 +9052,7 @@ msgstr "Поиск по названию, автору…"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Search: {query}"
-msgstr ""
+msgstr "Поиск: {query}"
 
 #: cps/spa_strings.py
 msgid "Searching catalogs…"
@@ -9304,7 +9367,7 @@ msgstr "Показать пароль"
 
 #: cps/spa_strings.py
 msgid "Show shelf tags"
-msgstr ""
+msgstr "Показать теги полки"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9396,7 +9459,7 @@ msgstr "Выйти"
 
 #: cps/spa_strings.py
 msgid "Sign-in"
-msgstr ""
+msgstr "Вход"
 
 #: cps/spa_strings.py
 msgid "Signing in…"
@@ -9576,12 +9639,12 @@ msgstr "Тег"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Tag removed from {n} book(s)."
-msgstr ""
+msgstr "Тег удалён из книг: {n}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Tag removed from {succeeded}; {failed} failed."
-msgstr ""
+msgstr "Тег удалён из: {succeeded}; с ошибкой: {failed}."
 
 #: cps/spa_strings.py
 msgid "Tag-like custom columns defined in the library appear here."
@@ -9620,7 +9683,7 @@ msgstr "Технические подробности"
 
 #: cps/spa_strings.py
 msgid "Test connection"
-msgstr ""
+msgstr "Проверить подключение"
 
 #: cps/spa_strings.py
 msgid "Text templates"
@@ -9632,51 +9695,57 @@ msgstr "По этому URL нет подходящего изображения
 
 #: cps/spa_strings.py
 msgid "That account is no longer allowed to request books."
-msgstr ""
+msgstr "Этому аккаунту больше не разрешено запрашивать книги."
 
 #: cps/spa_strings.py
 msgid ""
 "That address cannot be reached on a local network. Loopback, link-local and "
 "cloud metadata addresses are never allowed."
 msgstr ""
+"Этот адрес недоступен в локальной сети. Адреса loopback, link-local и "
+"метаданные облака никогда не разрешаются."
 
 #: cps/spa_strings.py
 msgid "That catalog no longer exists."
-msgstr ""
+msgstr "Этот каталог больше не существует."
 
 #: cps/spa_strings.py
 msgid "That choice expired. Refresh the page and pick the file again."
-msgstr ""
+msgstr "Этот выбор истёк. Обновите страницу и выберите файл снова."
 
 #: cps/spa_strings.py
 msgid "That page expired. Go back to the top and try again."
-msgstr ""
+msgstr "Эта страница истекла. Вернитесь наверх и попробуйте снова."
 
 #: cps/spa_strings.py
 msgid ""
 "That permission could not be changed. Check that book sources are still "
 "switched on, then try again."
 msgstr ""
+"Это разрешение не удалось изменить. Убедитесь, что источники книг всё ещё "
+"включены, затем попробуйте снова."
 
 #: cps/spa_strings.py
 msgid "That request has already moved on and can no longer be stopped."
 msgstr ""
+"Этот запрос уже перешёл на следующий этап и больше не может быть остановлен."
 
 #: cps/spa_strings.py
 msgid "That request has already moved on."
-msgstr ""
+msgstr "Этот запрос уже перешёл на следующий этап."
 
 #: cps/spa_strings.py
 msgid "That request is no longer in a state that can be retried."
 msgstr ""
+"Этот запрос больше не находится в состоянии, допускающем повторную попытку."
 
 #: cps/spa_strings.py
 msgid "That request is no longer waiting."
-msgstr ""
+msgstr "Этот запрос больше не находится в ожидании."
 
 #: cps/spa_strings.py
 msgid "The Calibre library folder could not be found."
-msgstr ""
+msgstr "Не удалось найти папку библиотеки Calibre."
 
 #: cps/spa_strings.py
 msgid "The KOReader plugin is not part of this installation."
@@ -9684,36 +9753,42 @@ msgstr "Плагин KOReader не является частью этой уст
 
 #: cps/spa_strings.py
 msgid "The acquisition database could not be opened."
-msgstr ""
+msgstr "Не удалось открыть базу данных получения."
 
 #: cps/spa_strings.py
 msgid "The acquisition key is missing."
-msgstr ""
+msgstr "Отсутствует ключ получения."
 
 #: cps/spa_strings.py
 msgid "The acquisition tables are not ready."
-msgstr ""
+msgstr "Таблицы получения не готовы."
 
 #: cps/spa_strings.py
 msgid ""
 "The acquisition tables are not ready. Restart the server, then reload this "
 "page."
 msgstr ""
+"Таблицы получения не готовы. Перезапустите сервер, затем перезагрузите эту "
+"страницу."
 
 #: cps/spa_strings.py
 msgid ""
 "The approval queue could not be loaded, so requests may be waiting unseen."
 msgstr ""
+"Не удалось загрузить очередь на одобрение, поэтому запросы могут ожидать "
+"незамеченными."
 
 #: cps/spa_strings.py
 msgid ""
 "The authors, tags, publishers, and languages you enter will be removed from "
 "each selected book. Books without them are left unchanged."
 msgstr ""
+"Авторы, теги, издатели и языки, которые вы введёте, будут удалены из каждой "
+"выбранной книги. Книги без них останутся без изменений."
 
 #: cps/spa_strings.py
 msgid "The background scheduler is not running."
-msgstr ""
+msgstr "Фоновый планировщик не запущен."
 
 #: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
@@ -9730,43 +9805,50 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The catalog could not be changed."
-msgstr ""
+msgstr "Не удалось изменить каталог."
 
 #: cps/spa_strings.py
 msgid "The catalog could not be read"
-msgstr ""
+msgstr "Не удалось прочитать каталог"
 
 #: cps/spa_strings.py
 msgid "The catalogs could not be loaded."
-msgstr ""
+msgstr "Не удалось загрузить каталоги."
 
 #: cps/spa_strings.py
 msgid ""
 "The completed download contains multiple books. A single-book release is "
 "required."
 msgstr ""
+"Завершённая загрузка содержит несколько книг. Требуется релиз с одной книгой."
 
 #: cps/spa_strings.py
 msgid "The completed download contains no usable EPUB or PDF."
-msgstr ""
+msgstr "Завершённая загрузка не содержит пригодных файлов EPUB или PDF."
 
 #: cps/spa_strings.py
 msgid ""
 "The completed download is outside its mapped folder or uses an unsafe file "
 "path."
 msgstr ""
+"Завершённая загрузка находится вне сопоставленной папки или использует "
+"небезопасный путь к файлу."
 
 #: cps/spa_strings.py
 msgid ""
 "The completed-folder mapping does not cover the configured download client "
 "folder."
 msgstr ""
+"Сопоставление папки завершённых загрузок не охватывает настроенную категорию "
+"SABnzbd."
 
 #: cps/spa_strings.py
 msgid ""
 "The connection could not be deleted. Finish or cancel outstanding requests "
 "first."
 msgstr ""
+"Не удалось удалить подключение. Сначала завершите или отмените невыполненные "
+"запросы."
 
 #: cps/spa_strings.py
 msgid "The connection did not answer with a response we can read."
@@ -9774,11 +9856,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The connection settings could not be loaded."
-msgstr ""
+msgstr "Не удалось загрузить настройки подключения."
 
 #: cps/spa_strings.py
 msgid "The connection test failed."
-msgstr ""
+msgstr "Проверка подключения завершилась ошибкой."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9797,12 +9879,16 @@ msgid ""
 "The download client for this source is unavailable. Ask an administrator to "
 "check it."
 msgstr ""
+"Клиент загрузки для этого источника недоступен. Попросите администратора "
+"проверить его."
 
 #: cps/spa_strings.py
 msgid ""
 "The download client is unavailable or its settings changed. Make a new "
 "selection after an administrator checks it."
 msgstr ""
+"Клиент загрузки недоступен или его настройки изменились. Сделайте новый "
+"выбор после того, как администратор проверит его."
 
 #: cps/spa_strings.py
 msgid "The download client reported that this download failed."
@@ -9814,27 +9900,27 @@ msgstr "Глобальная библиотека"
 
 #: cps/spa_strings.py
 msgid "The indexer did not return a valid NZB descriptor."
-msgstr ""
+msgstr "Индексатор не вернул действительный дескриптор NZB."
 
 #: cps/spa_strings.py
 msgid "The indexer does not advertise a supported keyword search."
-msgstr ""
+msgstr "Индексатор не заявляет о поддержке поиска по ключевым словам."
 
 #: cps/spa_strings.py
 msgid "The indexer does not advertise this book category."
-msgstr ""
+msgstr "Индексатор не заявляет об этой категории книг."
 
 #: cps/spa_strings.py
 msgid "The ingest folder could not be found."
-msgstr ""
+msgstr "Не удалось найти папку для импорта."
 
 #: cps/spa_strings.py
 msgid "The ingest folder is not writable."
-msgstr ""
+msgstr "Папка для импорта недоступна для записи."
 
 #: cps/spa_strings.py
 msgid "The ingest service is not running."
-msgstr ""
+msgstr "Служба импорта не запущена."
 
 #: cps/spa_strings.py
 msgid "The library cover is back for you."
@@ -9842,7 +9928,7 @@ msgstr "Обложка библиотеки возвращена для вас."
 
 #: cps/spa_strings.py
 msgid "The list of people could not be loaded."
-msgstr ""
+msgstr "Не удалось загрузить список людей."
 
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
@@ -9850,23 +9936,24 @@ msgstr "Не удалось изменить пресет. Попробуйте 
 
 #: cps/spa_strings.py
 msgid "The request could not be approved."
-msgstr ""
+msgstr "Не удалось одобрить запрос."
 
 #: cps/spa_strings.py
 msgid "The request could not be made."
-msgstr ""
+msgstr "Не удалось выполнить запрос."
 
 #: cps/spa_strings.py
 msgid "The request could not be rejected. It may have already moved on."
 msgstr ""
+"Не удалось отклонить запрос. Возможно, он уже перешёл на следующий этап."
 
 #: cps/spa_strings.py
 msgid "The request could not be retried."
-msgstr ""
+msgstr "Не удалось повторить запрос."
 
 #: cps/spa_strings.py
 msgid "The request could not be stopped."
-msgstr ""
+msgstr "Не удалось остановить запрос."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "The scan reached its limit. More ISBNs may be present in the file."
@@ -9889,7 +9976,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The setting could not be changed."
-msgstr ""
+msgstr "Не удалось изменить настройку."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
@@ -9913,23 +10000,27 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The source asked us to wait."
-msgstr ""
+msgstr "Источник попросил нас подождать."
 
 #: cps/spa_strings.py
 msgid "The source did not answer with a catalog we can read."
-msgstr ""
+msgstr "Источник не ответил каталогом, который мы можем прочитать."
 
 #: cps/spa_strings.py
 msgid ""
 "The source or download client rejected its credentials. Ask an administrator "
 "to check the credential."
 msgstr ""
+"Источник или клиент загрузки отклонил свой API-ключ. Попросите "
+"администратора проверить учётные данные."
 
 #: cps/spa_strings.py
 msgid ""
 "The source redirected to a network address that this connection does not "
 "allow."
 msgstr ""
+"Источник перенаправил на сетевой адрес, который не разрешён этим "
+"подключением."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9944,38 +10035,44 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The transfer did not complete."
-msgstr ""
+msgstr "Передача не завершилась."
 
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
-msgstr ""
+msgstr "На этом сервере пока нет других аккаунтов."
 
 #: cps/spa_strings.py
 msgid "These results could not be refreshed and may be out of date."
-msgstr ""
+msgstr "Эти результаты не удалось обновить, и они могут быть устаревшими."
 
 #: cps/spa_strings.py
 msgid ""
 "These settings could not be loaded, so nothing on this page can be trusted "
 "yet."
 msgstr ""
+"Эти настройки не удалось загрузить, поэтому ничему на этой странице пока "
+"нельзя доверять."
 
 #: cps/spa_strings.py
 msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr ""
+"Эти настройки не удалось обновить, поэтому отображаемые данные могут быть "
+"устаревшими."
 
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
+"Этот аккаунт не может использовать источники книг, либо эта функция "
+"отключена."
 
 #: cps/spa_strings.py
 msgid "This account is no longer an administrator."
-msgstr ""
+msgstr "Этот аккаунт больше не является администратором."
 
 #: cps/spa_strings.py
 msgid "This book was already imported."
-msgstr ""
+msgstr "Эта книга уже была импортирована."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9985,15 +10082,19 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "This catalog does not offer search."
-msgstr ""
+msgstr "Этот каталог не поддерживает поиск."
+
+#: cps/spa_strings.py
+msgid "This catalog is on my home or local network"
+msgstr "Этот каталог находится в моей домашней или локальной сети"
 
 #: cps/spa_strings.py
 msgid "This catalog page is empty."
-msgstr ""
+msgstr "Эта страница каталога пуста."
 
 #: cps/spa_strings.py
-msgid "This category does not exist in the download client."
-msgstr ""
+msgid "This category does not exist in SABnzbd."
+msgstr "Эта категория не существует в SABnzbd."
 
 #: cps/spa_strings.py
 msgid ""
@@ -10025,6 +10126,8 @@ msgid ""
 "This database carries permissions from the old experimental Store. They need "
 "review before book sources can be switched on."
 msgstr ""
+"Эта база данных содержит права доступа от старого экспериментального Store. "
+"Их необходимо проверить, прежде чем можно будет включить источники книг."
 
 #: cps/spa_strings.py
 msgid "This device has not reported its inventory yet."
@@ -10061,12 +10164,14 @@ msgid ""
 "This is a torrent release. Choose qBittorrent or Transmission for this "
 "indexer. Usenet clients accept NZB releases."
 msgstr ""
+"Это торрент-релиз. Требуется совместимый торрент-клиент; SABnzbd принимает "
+"NZB-релизы."
 
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Это собственный адрес этого компьютера, к которому читалка не может получить "
 "доступ. Выберите «Изменить» и введите адрес, который может использовать "
@@ -10077,6 +10182,8 @@ msgid ""
 "This job is no longer in the download client queue or history. It will not "
 "be submitted again automatically."
 msgstr ""
+"Это задание больше не находится в очереди или истории SABnzbd. Оно не будет "
+"отправлено повторно автоматически."
 
 #: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
@@ -10097,6 +10204,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This page could not be refreshed, so what is shown may be out of date."
 msgstr ""
+"Эту страницу не удалось обновить, поэтому отображаемые данные могут быть "
+"устаревшими."
 
 #: cps/spa_strings.py
 msgid "This page doesn't exist here."
@@ -10104,7 +10213,7 @@ msgstr "Такой страницы не существует."
 
 #: cps/spa_strings.py
 msgid "This page is not available to this account."
-msgstr ""
+msgstr "Эта страница недоступна для этого аккаунта."
 
 #: cps/spa_strings.py
 msgid ""
@@ -10117,6 +10226,7 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
 msgstr ""
+"Адрес загрузки этого релиза не является доверенным для этого подключения."
 
 #: cps/spa_strings.py
 msgid ""
@@ -10129,7 +10239,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
-msgstr ""
+msgstr "Этот запрос требует повторного одобрения администратором."
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
@@ -10177,7 +10287,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Token"
-msgstr ""
+msgstr "Токен"
 
 #: cps/spa_strings.py
 msgid "Token URL"
@@ -10202,6 +10312,7 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Too many open selections. Wait a little, then try again."
 msgstr ""
+"Слишком много открытых выборок. Подождите немного, затем попробуйте снова."
 
 #: cps/spa_strings.py
 msgid "Top Rated"
@@ -10209,7 +10320,7 @@ msgstr "Лучшие по рейтингу"
 
 #: cps/spa_strings.py
 msgid "Top of catalog"
-msgstr ""
+msgstr "Начало каталога"
 
 #: cps/spa_strings.py
 msgid "Transmission download client"
@@ -10233,7 +10344,7 @@ msgstr "Попробовать снова"
 
 #: cps/spa_strings.py
 msgid "Turn the feature on to grant access."
-msgstr ""
+msgstr "Включите эту функцию, чтобы предоставить доступ."
 
 #: cps/spa_strings.py
 msgid ""
@@ -10242,6 +10353,10 @@ msgid ""
 "to this connection only. Loopback, link-local and cloud metadata addresses "
 "are never allowed."
 msgstr ""
+"Включите это для каталога, работающего в вашей собственной сети, например "
+"Calibre или Kavita по адресу 192.168 или 10.x. Это применяется только к "
+"этому каталогу. Адреса loopback, link-local и метаданные облака никогда не "
+"разрешаются."
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -10330,7 +10445,7 @@ msgstr "Без названия"
 
 #: cps/spa_strings.py
 msgid "Untitled catalog"
-msgstr ""
+msgstr "Каталог без названия"
 
 #: cps/spa_strings.py
 msgid "Untitled link"
@@ -10426,7 +10541,7 @@ msgstr "Имя пользователя"
 
 #: cps/spa_strings.py
 msgid "Username and password"
-msgstr ""
+msgstr "Имя пользователя и пароль"
 
 #: cps/spa_strings.py
 msgid "Username claim"
@@ -10481,7 +10596,7 @@ msgstr "Ожидание синхронизации Kobo или KOReader с эт
 
 #: cps/spa_strings.py
 msgid "Waiting for approval"
-msgstr ""
+msgstr "Ожидание одобрения"
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
@@ -10550,7 +10665,7 @@ msgstr "Какие книги синхронизируются?"
 
 #: cps/spa_strings.py
 msgid "Who can use it"
-msgstr ""
+msgstr "Кто может это использовать"
 
 #: cps/spa_strings.py
 msgid "Width (px)"
@@ -10654,11 +10769,11 @@ msgstr "Ваша личная цифровая библиотека"
 
 #: cps/spa_strings.py
 msgid "Your requests"
-msgstr ""
+msgstr "Ваши запросы"
 
 #: cps/spa_strings.py
 msgid "Your requests could not be loaded. They have not been lost."
-msgstr ""
+msgstr "Не удалось загрузить ваши запросы. Они не потеряны."
 
 #: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
@@ -10924,7 +11039,7 @@ msgstr "Подготовлено книг: {seeded} из {total}"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
-msgstr ""
+msgstr "{title} — {protocol}{search}"
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -13840,9 +13955,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -15210,9 +15325,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -15235,9 +15350,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -19731,9 +19846,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

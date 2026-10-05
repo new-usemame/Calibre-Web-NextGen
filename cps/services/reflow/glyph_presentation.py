@@ -1,8 +1,9 @@
 """Complete source ink for a uniquely owned glyph; canonical resources stay sealed.
 
-Text-layer rectangles are not ink extents. Only an opaque native bitonal page
-whose complete rendered samples equal the original bitmap can supply this
-publication projection. No recognition, word repair or layout decision occurs.
+Text-layer rectangles are not ink extents. Complete connected ink comes from
+an exact opaque bitonal page. A terminal-punctuation crop on an opaque scan can
+also use the bounded gaps between uniquely owned neighboring source words.
+No recognition, word repair or layout decision occurs.
 """
 import hashlib
 import io
@@ -15,7 +16,7 @@ from xml.parsers.expat import ExpatError
 from . import extract, native_text, source_inventory
 from .source_display import SourceDisplay
 
-VERSION = 'source-glyph-presentation-3'
+VERSION = 'source-glyph-presentation-4'
 INK_VERSION = 'source-glyph-presentation-1'
 METRIC_VERSION = 'source-glyph-pdf-metrics-1'
 MAX_QUERY_PIXELS = 250_000
@@ -134,6 +135,94 @@ def _complete_ink(image, rect, size, display, other_boxes):
         reading_bbox=[crop[0]/sx,crop[1]/sy,crop[2]/sx,crop[3]/sy])
 
 
+
+def _punctuation_gap(display, raw, line, span, other_boxes):
+    """Retain detached terminal ink only inside a bounded source-word gap.
+
+    The retained punctuation selects this optional source-pixel projection;
+    it supplies no new transcription or authority over a neighboring word.
+    Only upright full-page scan layers with invisible native text are eligible.
+    A complete light frame is required, so touching/unbounded ink fails closed.
+    """
+    from PIL import Image
+    _need(span.transcription_uncertain and not span.encoding_unresolved
+          and not span.punctuation_uncertain and raw.is_page_scan and not raw.source_geometry
+          and len(span.text)<=40 and span.text[-1:]=='.'
+          and span.text[:-1] and all(c.isalpha() or c in "'-’" for c in span.text[:-1]),
+          'native_bitonal_visible_page_unproved')
+    _need(not display.angle and not display.page.rotation,'scan_punctuation_orientation_unproved')
+    images=display.page.get_image_info(xrefs=True)
+    _need(1<=len(images)<=3,'scan_punctuation_bitmap_unproved')
+    for info in images:
+        matrix=extract.pymupdf.Matrix(info['transform'])
+        _need(info.get('xref') and not matrix.b and not matrix.c and matrix.a>0 and matrix.d>0
+              and all(abs(a-b)<=.2 for a,b in zip(info['bbox'],display.rect)),
+              'scan_punctuation_bitmap_unproved')
+    # Scans can have a masked foreground above a background bitmap. Render the
+    # complete original composition; never treat either layer as the word ink.
+    paint=display.page.get_bboxlog()
+    _need(sum(kind=='fill-image' for kind,_ in paint)==len(images)
+          and all(kind in ('fill-image','ignore-text') for kind,_ in paint),
+          'scan_punctuation_visible_layer_unproved')
+    box=span.bbox;size=span.size
+    _need(size>0 and all(math.isfinite(v) for v in (*box,size)),'scan_punctuation_metrics_unproved')
+    neighbors=[s for s in line['source'].spans if s is not span and s.text.strip()]
+    same=lambda s: (abs((s.bbox[1]+s.bbox[3]-box[1]-box[3])/2)<=size*.25
+                   and .75<=s.size/size<=1.25)
+    left=[s for s in neighbors if s.bbox[2]<box[0] and same(s)]
+    right=[s for s in neighbors if s.bbox[0]>box[2] and same(s)]
+    _need(left and right,'scan_punctuation_neighbors_unproved')
+    left=max(left,key=lambda s:s.bbox[2]);right=min(right,key=lambda s:s.bbox[0])
+    rect=(max(box[0]-size*.5,(left.bbox[2]+box[0])/2),box[1]-size*.15,
+          min(box[2]+size*.5,(box[2]+right.bbox[0])/2),box[3]+size*.15)
+    _need(rect[0]>=0 and rect[1]>=0 and rect[2]<=display.rect.width and rect[3]<=display.rect.height
+          and not any(_intersects(rect,b) for b in other_boxes),
+          'scan_punctuation_crop_crosses_neighbor')
+    _need((math.ceil((rect[2]-rect[0])*6)+2)*(math.ceil((rect[3]-rect[1])*6)+2)<=MAX_QUERY_PIXELS,
+          'ink_query_exceeds_bound')
+    pix=display.pixmap(rect,scale=6,max_pixels=MAX_QUERY_PIXELS)
+    image=Image.frombytes('RGB',(pix.width,pix.height),pix.samples);gray=image.convert('L')
+    border=[gray.getpixel((x,y)) for y in (0,1,gray.height-2,gray.height-1) for x in range(gray.width)]
+    border += [gray.getpixel((x,y)) for x in (0,1,gray.width-2,gray.width-1) for y in range(gray.height)]
+    background=sorted(border)[len(border)//2]
+    _need(min(border)>=background-35 and gray.getextrema()[0]<=background-60,
+          'scan_punctuation_ink_not_closed')
+    # A retained terminal period may authorize one detached source island to
+    # the right of the old word box, near its original baseline. Dust elsewhere
+    # or an absent mark cannot justify a supplemental punctuation display.
+    pending={(x,y) for y in range(gray.height) for x in range(gray.width)
+             if gray.getpixel((x,y))<background-60}
+    islands=[]
+    while pending:
+        first=pending.pop();stack=[first];points=[first]
+        while stack:
+            x,y=stack.pop()
+            for ny in range(y-1,y+2):
+                for nx in range(x-1,x+2):
+                    point=(nx,ny)
+                    if point in pending:pending.remove(point);stack.append(point);points.append(point)
+        islands.append((min(x for x,y in points)+pix.x,min(y for x,y in points)+pix.y,
+                        max(x for x,y in points)+pix.x+1,max(y for x,y in points)+pix.y+1))
+    seed=(box[0]*6,box[1]*6,box[2]*6,box[3]*6)
+    detached=[b for b in islands if not _intersects(b,seed)]
+    _need(len(detached)==1,'scan_punctuation_detached_ink_unproved')
+    mark=detached[0]
+    _need(span.origin_y>0 and mark[0]>=seed[2] and
+          mark[1]>=6*(span.origin_y-size*.35) and mark[3]<=6*(box[3]+size*.15)
+          and max(mark[2]-mark[0],mark[3]-mark[1])<=size*6*.35,
+          'scan_punctuation_detached_ink_unproved')
+    stream=io.BytesIO();image.save(stream,format='PNG',optimize=True);data=stream.getvalue()
+    with Image.open(io.BytesIO(data)) as decoded:
+        _need(decoded.convert('RGB').tobytes()==pix.samples,'scan_punctuation_encoding_changed_pixels')
+    # Pixmap clip bounds are rounded to rendered pixels; metrics must describe
+    # the actual projection rather than the pre-rounding requested rectangle.
+    actual=[pix.x/6,pix.y/6,(pix.x+pix.width)/6,(pix.y+pix.height)/6]
+    _need(not any(_intersects(actual,b) for b in other_boxes),'scan_punctuation_crop_crosses_neighbor')
+    return data,dict(projection='source-word-gap-punctuation-1',reading_bbox=actual,
+        native_display_box=[pix.x,pix.y,pix.x+pix.width,pix.y+pix.height],
+        bounded_reading_bbox=list(rect),scan_layers=len(images),detached_ink_box=list(mark),left_neighbor_bbox=list(left.bbox),
+        right_neighbor_bbox=list(right.bbox),rendered_rgb_sha256=hashlib.sha256(pix.samples).hexdigest())
+
 def render(book, doc, source, raw, fragment, package):
     """Current factory/raw ownership authorizes a display, never saved audits."""
     source.validate(book)
@@ -180,7 +269,6 @@ def render(book, doc, source, raw, fragment, package):
         try:
             _need(raw is not None and inventory is not None,'retained_raw_or_inventory_missing')
             _need(bound,'immutable_source_pdf_binding_unproved')
-            _need(image is not None,'native_bitonal_visible_page_unproved')
             _need(all(r==occurrences[0] for r in occurrences),'ambiguous_glyph_descriptor')
             _,text,record=occurrences[0]
             matches=[(line,sp) for line in inventory['lines'] for sp in line['source'].spans
@@ -197,9 +285,10 @@ def render(book, doc, source, raw, fragment, package):
             _need(expected[original]>0 and actual[original]==expected[original],'current_glyph_tree_differs')
             others=[sp.bbox for ln in inventory['lines'] for sp in ln['source'].spans
                     if sp is not span and sp.text.strip()]
-            data,proof=_complete_ink(image,record['bbox'],record['size'],display,others)
+            data,proof=(_complete_ink(image,record['bbox'],record['size'],display,others)
+                        if image is not None else _punctuation_gap(display,raw,line,span,others))
             # Pixel identity is unchanged by a new presentation metric version.
-            projected=dict(record,display_projection=INK_VERSION,native_display_box=proof['native_display_box'])
+            projected=dict(record,display_projection=proof.get('projection',INK_VERSION),native_display_box=proof['native_display_box'])
             src=native_text.image_name(projected)
             presentation = _presentation(span, proof)
             _need(package is not None,'resource_sink_missing')

@@ -18576,3 +18576,27 @@ msgstr "Προβολή επιλογών σειράς"
 #~ msgstr ""
 #~ "Τα βιβλία πρέπει πρώτα να αρχειοθετηθούν και να συγχρονιστεί η συσκευή "
 #~ "πριν μπορέσει να διαγραφεί με ασφάλεια το βιβλίο."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Όλες οι ετικέτες"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Δεν ήταν δυνατή η φόρτωση των ετικετών. Δοκιμάστε ξανά."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Ετικέτα χωρίς όνομα"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Η ιεραρχία ετικετών δεν είναι προσωρινά διαθέσιμη. Δοκιμάστε ξανά."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Όλα τα βιβλία αυτής της κατηγορίας"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Διαδρομή πλοήγησης"

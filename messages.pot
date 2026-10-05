@@ -17941,3 +17941,27 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr ""
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr ""
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr ""
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr ""
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr ""

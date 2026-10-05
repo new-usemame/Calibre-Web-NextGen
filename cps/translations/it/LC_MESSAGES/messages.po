@@ -20001,3 +20001,27 @@ msgstr "Mostra sezione Libri letti e Libri da leggere"
 #~ msgstr ""
 #~ "I libri devono essere prima archiviati e il dispositivo sincronizzato "
 #~ "prima che un libro possa essere eliminato in sicurezza."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Tutti i tag"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Impossibile caricare i tag. Riprova."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Tag senza nome"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "La gerarchia dei tag è temporaneamente non disponibile. Riprova."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Tutti i libri in questa categoria"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Percorso di navigazione"

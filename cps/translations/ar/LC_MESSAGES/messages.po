@@ -18457,3 +18457,27 @@ msgstr "إظهار قسم المقروء/غير المقروء"
 #~ "Books must first be archived and the device synced before a book can "
 #~ "safely be deleted."
 #~ msgstr "يجب أولاً أرشفة الكتب ومزامنة الجهاز قبل أن يتم حذف الكتاب بأمان."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "كل الوسوم"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "تعذر تحميل الوسوم. يرجى المحاولة مرة أخرى."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "وسم بلا اسم"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "التسلسل الهرمي للوسوم غير متاح مؤقتًا. يرجى المحاولة مرة أخرى."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "كل الكتب في هذه الفئة"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "مسار التنقل"

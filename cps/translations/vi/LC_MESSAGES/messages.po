@@ -18426,3 +18426,27 @@ msgstr "Hiển thị đã đọc và chưa đọc"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Ấn vào ảnh cover để tải metadata vào form"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Tất cả thẻ"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Không thể tải thẻ. Vui lòng thử lại."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Thẻ không có tên"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Hệ thống phân cấp thẻ tạm thời không khả dụng. Vui lòng thử lại."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Tất cả sách trong danh mục này"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Đường dẫn điều hướng"

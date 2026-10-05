@@ -18599,3 +18599,27 @@ msgstr "Vis serieutvalg"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klikk på omslaget for å laste metadata til skjemaet"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Alle tagger"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Kunne ikke laste taggene. Prøv igjen."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Tagg uten navn"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Tagghierarkiet er midlertidig utilgjengelig. Prøv igjen."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Alle bøker i denne kategorien"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Brødsmulesti"

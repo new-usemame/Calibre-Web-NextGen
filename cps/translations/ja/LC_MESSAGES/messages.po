@@ -19059,3 +19059,27 @@ msgstr "既読/未読セクションを表示"
 #~ "書籍を安全に削除するには、まず書籍をアーカイブしてデバイスを同期する必要が"
 #~ "あります。本を安全に削除するためには、初めに本をアーカイブした上で端末と同"
 #~ "期する必要があります"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "すべてのタグ"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "タグを読み込めませんでした。もう一度お試しください。"
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "名前のないタグ"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "タグの階層は一時的に利用できません。もう一度お試しください。"
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "このカテゴリのすべての本"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "パンくずリスト"

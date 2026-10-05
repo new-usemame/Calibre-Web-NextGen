@@ -19296,3 +19296,27 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ msgstr ""
 #~ "Bücher müssen zuerst archiviert werden und dann mit dem Gerät "
 #~ "synchronisiert werden, bevor ein Buch sicher gelöscht werden kann."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Alle Schlagwörter"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Schlagwörter konnten nicht geladen werden. Bitte erneut versuchen."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Unbenanntes Schlagwort"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Die Schlagworthierarchie ist vorübergehend nicht verfügbar. Bitte erneut versuchen."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Alle Bücher in dieser Kategorie"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Brotkrümelnavigation"

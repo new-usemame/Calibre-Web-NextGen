@@ -18599,3 +18599,27 @@ msgstr "Tampilkan pilihan baca/belum dibaca"
 #~ msgstr ""
 #~ "Buku harus diarsipkan terlebih dahulu dan perangkat disinkronkan sebelum "
 #~ "buku dapat dihapus dengan aman."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Semua tag"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Tag tidak dapat dimuat. Silakan coba lagi."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Tag tanpa nama"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Hierarki tag untuk sementara tidak tersedia. Silakan coba lagi."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Semua buku dalam kategori ini"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Jalur navigasi"

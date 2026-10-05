@@ -18996,3 +18996,27 @@ msgstr "Mostrar seção de lidos/não lidos"
 #~ msgstr ""
 #~ "Os livros devem primeiro ser arquivados e o dispositivo deve ser "
 #~ "sincronizado antes que um livro possa ser apagado com segurança."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Todas as etiquetas"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Não foi possível carregar as etiquetas. Tente novamente."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Etiqueta sem nome"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "A hierarquia de etiquetas está temporariamente indisponível. Tente novamente."
+
+#: cps/opds.py
+msgid "All books in this category"
+msgstr "Todos os livros nesta categoria"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Caminho de navegação"

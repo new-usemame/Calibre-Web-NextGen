@@ -4097,7 +4097,8 @@ msgstr "Rood"
 msgid "Registration failed."
 msgstr "Registratie mislukt."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "{name} verwijderen"
@@ -9607,7 +9608,8 @@ msgstr ""
 "Aangepaste kolommen met tekstwaarden uit de bibliotheek verschijnen hier."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/search_form.html
 msgid "Tags"
 msgstr "Labels"
 
@@ -12971,6 +12973,10 @@ msgid "Upload Format"
 msgstr "Uploadformaat"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr "Auteur en titel omwisselen"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "Boekenreeks volgnummer"
 
@@ -13085,10 +13091,6 @@ msgstr "Geen resultaten gevonden! Gebruik een ander trefwoord."
 #: cps/templates/book_table.html cps/templates/user_table.html
 msgid "This Field is Required"
 msgstr "Dit veld is verplicht"
-
-#: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr "Auteur en titel omwisselen"
 
 #: cps/templates/book_table.html
 msgid "Select all"

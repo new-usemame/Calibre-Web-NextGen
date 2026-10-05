@@ -4217,7 +4217,8 @@ msgstr "Rouge"
 msgid "Registration failed."
 msgstr "L’inscription a échoué."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "Retirer {name}"
@@ -9768,7 +9769,8 @@ msgstr ""
 "apparaissent ici."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/search_form.html
 msgid "Tags"
 msgstr "Étiquettes"
 
@@ -13157,6 +13159,10 @@ msgid "Upload Format"
 msgstr "Format du fichier téléversé"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr " Échanger l’auteur et le titre"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "ID de séries"
 
@@ -13276,10 +13282,6 @@ msgstr "Aucun résultat. Veuillez essayer avec un nouveau mot clé."
 #: cps/templates/book_table.html cps/templates/user_table.html
 msgid "This Field is Required"
 msgstr "Ce champ est requis"
-
-#: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr " Échanger l’auteur et le titre"
 
 #: cps/templates/book_table.html
 msgid "Select all"

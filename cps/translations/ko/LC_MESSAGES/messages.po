@@ -3901,7 +3901,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -9175,7 +9176,8 @@ msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/search_form.html
 msgid "Tags"
 msgstr "태그"
 
@@ -12327,6 +12329,10 @@ msgid "Upload Format"
 msgstr "다른 형식 업로드"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr "저자와 제목 바꾸기"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "시리즈 ID"
 
@@ -12441,10 +12447,6 @@ msgstr "검색 결과가 없습니다. 다른 검색어로 검색해 보세요."
 #: cps/templates/book_table.html cps/templates/user_table.html
 msgid "This Field is Required"
 msgstr "이 항목은 필수입니다."
-
-#: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr "저자와 제목 바꾸기"
 
 #: cps/templates/book_table.html
 msgid "Select all"

@@ -23,18 +23,19 @@ TRACKER = 'http://127.0.0.1:64155'
 
 class OwnedDownload:
     """Real SQLite attempts plus observable client wire and publication files."""
-    def __init__(self, repository, now, tmp_path, *, adapter='qbittorrent', href=ORIGINAL):
+    def __init__(self, repository, now, tmp_path, *, adapter='qbittorrent', href=ORIGINAL, client_config=None, tracker=TRACKER):
         self.repo, self.now, self.tmp = repository, now, tmp_path
+        self.identity = ID
         self.engine = '2.0.11.0'
         self.api = '2.11.2'
         self.properties = dict(hash=ID, has_metadata=True, infohash_v2=FULL)
         self.adds, self.files, self.calls = [], [], []
         self.tag = None
         self.lose_ack = False
-        self.client = repository.create_connection('Client', adapter, config(tmp_path, adapter), enabled=True)
+        self.client = repository.create_connection('Client', adapter, client_config or config(tmp_path, adapter), enabled=True)
         source = repository.create_connection('Source', 'torznab', dict(secret='', auth_kind='none',
             username='', credential_origins=[], private_origins=[], private_networks=[],
-            tracker_origins=[TRACKER]), enabled=True)
+            tracker_origins=[tracker]), enabled=True)
         self.payload = dict(kind='acquisition', transport='torrent', media_type='application/x-bittorrent',
             href=href, release_key='b'*64, client_id=self.client.id, client_revision=self.client.revision)
         self.offer = repository.create_offer(1, source.id, self.payload)
@@ -58,7 +59,7 @@ class OwnedDownload:
         self.tag = 'cwng-' + self.repo.box.display_identity(str([
             self.payload['release_key'], self.client.id, self.client.revision, key]))
         if known:
-            self.repo.record_external(self.job.id, claim.token, ID)
+            self.repo.record_external(self.job.id, claim.token, self.identity)
         self.repo.release(self.job.id, claim.token)
 
     def transfer(self, url, policy, **kw):
@@ -75,10 +76,10 @@ class OwnedDownload:
         if path.endswith('/torrents/info'):
             query = parse_qs(urlsplit(url).query)
             if 'hashes' in query:
-                assert query['hashes'] == [ID]
+                assert query['hashes'] == [self.identity]
             if not self.tag:
                 return document([])
-            return document([dict(hash=ID, tags=self.tag, category='books', state='uploading',
+            return document([dict(hash=self.identity, tags=self.tag, category='books', state='uploading',
                 progress=1, amount_left=0, save_path='/downloads')])
         if path.endswith('/torrents/add'):
             assert kw['upload'] is None and kw['form']['urls'] == self.payload['href']
@@ -88,10 +89,10 @@ class OwnedDownload:
                 raise clients().ClientError('submission_ambiguous')
             return document(b'Ok.')
         if path.endswith('/torrents/properties'):
-            assert parse_qs(urlsplit(url).query)['hash'] == [ID]
+            assert parse_qs(urlsplit(url).query)['hash'] == [self.identity]
             return document(self.properties)
         if path.endswith('/torrents/files'):
-            self.files.append(ID)
+            self.files.append(self.identity)
             return document([dict(name=self.book.name, size=self.book.stat().st_size, progress=1)])
         raise AssertionError('Unexpected client/source effect: ' + path)
 
@@ -227,7 +228,7 @@ def test_single_topic_admission_keeps_multihash_and_network_authority_bounds():
         for tag, digest in [('1120', FULL), ('1221', FULL), ('1220', FULL[:-1]),
                             ('1220', FULL + '0'), ('1220', 'g'*64)]
     ] + [TRACKERLESS + suffix for suffix in (
-        '&xt=urn:btmh:1220' + FULL, '&xt=urn:btih:' + 'a'*40,
+        '&xt=urn:btmh:1220' + FULL, '&xt=urn:btih:' + 'a'*40 + '&xt=urn:btih:' + 'b'*40,
         '&x.pe=127.0.0.1:51413', '&xs=https://source.example/file',
         '&dn=' + 'x'*8192, '&dn=x'*32,
     )]

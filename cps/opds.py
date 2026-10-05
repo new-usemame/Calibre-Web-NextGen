@@ -242,8 +242,8 @@ OPDS_ROOT_ENTRY_DEFS = {
     },
     'categories': {
         'endpoint': 'opds.feed_categoryindex',
-        'title': N_('Categories'),
-        'description': N_('Books ordered by category'),
+        'title': N_('Tags'),
+        'description': N_('Books grouped by tags'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_CATEGORY),
     },
     'series': {

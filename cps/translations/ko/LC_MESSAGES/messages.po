@@ -2203,13 +2203,14 @@ msgid "Books ordered by publisher"
 msgstr "출판사별 정렬"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "카테고리"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "태그"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "카테고리별 정렬"
+msgid "Books grouped by tags"
+msgstr "태그별로 묶은 책"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2367,8 +2368,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "카테고리 보기"
+msgid "Show Tags Section"
+msgstr "태그 섹션 표시"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -3901,7 +3902,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -5494,6 +5496,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "카테고리"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9174,11 +9180,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "태그"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11075,8 +11076,8 @@ msgstr "파일 형식: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "카테고리: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "태그: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12327,6 +12328,10 @@ msgid "Upload Format"
 msgstr "다른 형식 업로드"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr "저자와 제목 바꾸기"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "시리즈 ID"
 
@@ -12443,10 +12448,6 @@ msgid "This Field is Required"
 msgstr "이 항목은 필수입니다."
 
 #: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr "저자와 제목 바꾸기"
-
-#: cps/templates/book_table.html
 msgid "Select all"
 msgstr "모두 선택"
 
@@ -12487,8 +12488,8 @@ msgid "Enter Authors"
 msgstr "저자 입력"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "카테고리 입력"
+msgid "Enter Tags"
+msgstr "태그 입력"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12569,9 +12570,11 @@ msgstr "바꾸고자 하는 입력란을 수정하십시오. 빈 입력란은 �
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"저자, 태그, 언어 및 출판사에 여러 값을 입력할 수 있습니다. 쉼표로 구분하세요"
+"(예: \"이름1, 이름2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -17550,8 +17553,8 @@ msgid "Authors in this Library"
 msgstr "이 서재의 저자"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "이 서재의 카테고리"
+msgid "Tags in this Library"
+msgstr "이 서재의 태그"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18201,6 +18204,22 @@ msgstr "선택한 서재 Kobo 동기화"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "읽음/읽지 않음 표시"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "카테고리별 정렬"
+
+#~ msgid "Show Category Section"
+#~ msgstr "카테고리 보기"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "카테고리: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "카테고리 입력"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "이 서재의 카테고리"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr "jpg/jpeg/png/webp/bmp 형식만 지원합니다."

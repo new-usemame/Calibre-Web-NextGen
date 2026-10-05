@@ -11,7 +11,8 @@ permanently empty.
 
 Pin the new contract:
 
-* setup(<file path>) → 2 root handlers: stdout StreamHandler + RotatingFileHandler at the path
+* setup(<file path>) → stdout and rotating file when their sinks differ;
+  a shared file gets one rotating writer, including after rollover (#1613)
 * setup(LOG_TO_STDOUT) → 1 root handler: stdout StreamHandler, no file
 * rotation defaults: 5 MiB × 5 backups (was 100 KB × 2 — useless)
 * setup() returns the path written to, or "" for default, or LOG_TO_STDOUT for stdout-only
@@ -22,6 +23,8 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
+from pathlib import Path
 from logging import StreamHandler
 from logging.handlers import RotatingFileHandler
 
@@ -66,6 +69,170 @@ def _stream_handlers_to_stdout():
 
 @pytest.mark.unit
 class TestDualHandlerSetup:
+    @pytest.mark.parametrize('failure', ['directory_permissions', 'descriptor_path', 'partial_rename'])
+    def test_failed_rollover_still_persists_shared_records(self, tmp_path, reset_root, monkeypatch, failure):
+        path = tmp_path / 'shared.log'
+        with path.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            target = '/dev/fd/' + str(redirected.fileno()) if failure == 'descriptor_path' else str(path)
+            cwa_logger.setup(target, logging.INFO)
+            handler = _file_handlers()[0]
+            handler.maxBytes = 1
+            if failure == 'partial_rename':
+                rotate = handler.rotate
+
+                def lose_directory_write_permission(source, destination):
+                    rotate(source, destination)
+                    tmp_path.chmod(0o500)
+                    raise PermissionError('directory became unwritable after rename')
+
+                monkeypatch.setattr(handler, 'rotate', lose_directory_write_permission)
+            try:
+                if failure == 'directory_permissions':
+                    tmp_path.chmod(0o500)
+                for index in range(3):
+                    logging.getLogger('cps.failed_rollover_test').info('failed-rollover-marker-%d', index)
+                redirected.flush()
+                for index in range(3):
+                    assert sum(p.read_text().count('failed-rollover-marker-' + str(index))
+                               for p in tmp_path.glob('shared.log*')) == 1
+            finally:
+                tmp_path.chmod(0o700)
+
+    def test_rollover_during_settings_reload_keeps_one_active_writer(self, tmp_path, reset_root, monkeypatch):
+        path = tmp_path / 'shared.log'
+        with path.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            cwa_logger.setup(str(path), logging.INFO)
+            previous = _file_handlers()[0]
+            previous.doRollover()
+            original = cwa_logger._make_file_handler
+            started = threading.Event()
+            completed = threading.Event()
+            workers = []
+
+            def rotate():
+                started.set()
+                with previous.lock:
+                    previous.doRollover()
+                completed.set()
+
+            def interleave(*args, **kwargs):
+                created = original(*args, **kwargs)
+                worker = threading.Thread(target=rotate)
+                workers.append(worker)
+                worker.start()
+                assert started.wait(2)
+                # The broken replacement permits rollover here. A coherent
+                # handoff blocks it until setup releases the existing writer.
+                completed.wait(0.1)
+                return created
+
+            monkeypatch.setattr(cwa_logger, '_make_file_handler', interleave)
+            try:
+                cwa_logger.setup(str(path), logging.INFO)
+            finally:
+                for worker in workers:
+                    worker.join(2)
+                    assert not worker.is_alive()
+            logging.getLogger('cps.concurrent_sink_test').info('concurrent-reload-marker')
+            redirected.flush()
+            assert path.read_text().count('concurrent-reload-marker') == 1
+            assert sum(p.read_text().count('concurrent-reload-marker')
+                       for p in tmp_path.glob('shared.log*')) == 1
+
+    @pytest.mark.parametrize('alias', ['same', 'symlink', 'hardlink'])
+    def test_shared_file_sink_writes_once_and_follows_rotation(self, tmp_path, reset_root, monkeypatch, alias):
+        path = tmp_path / 'shared.log'
+        path.touch()
+        stdout_path = path
+        if alias != 'same':
+            stdout_path = tmp_path / 'stdout.log'
+            if alias == 'symlink':
+                stdout_path.symlink_to(path)
+            else:
+                os.link(path, stdout_path)
+        with stdout_path.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            assert cwa_logger.setup(str(path), logging.INFO) == str(path)
+            # Settings can be reapplied; the old file handler must close
+            # without reintroducing a second writer to the same sink.
+            assert cwa_logger.setup(str(path), logging.INFO) == str(path)
+            log = logging.getLogger('cps.shared_sink_test')
+            log.info('shared-before-rotation')
+            redirected.flush()
+            assert path.read_text().count('shared-before-rotation') == 1
+            # Force the next emitted record to roll the actual file. The
+            # inherited stdout descriptor still names the old inode.
+            _file_handlers()[0].maxBytes = 1
+            log.info('shared-after-rotation')
+            redirected.flush()
+            assert path.read_text().count('shared-after-rotation') == 1
+            backup = Path(str(path) + '.1').read_text()
+            assert backup.count('shared-before-rotation') == 1
+            assert 'shared-after-rotation' not in backup
+            # ConfigSQL reloads logging after settings saves. Stdout now
+            # points to the backup, but it still belongs to this log sink.
+            cwa_logger.setup(str(path), logging.INFO)
+            log.info('shared-after-reload')
+            redirected.flush()
+            assert path.read_text().count('shared-after-reload') == 1
+            assert 'shared-after-reload' not in Path(str(path) + '.1').read_text()
+
+    @pytest.mark.parametrize('change', ['target', 'stdout_object', 'stdout_descriptor'])
+    def test_changed_sink_after_rotation_keeps_both_outputs(self, tmp_path, reset_root, monkeypatch, change):
+        path = tmp_path / 'shared.log'
+        output = tmp_path / 'new-stdout.log'
+        with path.open('a', encoding='utf-8') as redirected, output.open('a', encoding='utf-8') as replacement:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            cwa_logger.setup(str(path), logging.INFO)
+            _file_handlers()[0].doRollover()
+            if change == 'target':
+                path = tmp_path / 'new-target.log'
+                stdout_path = tmp_path / 'shared.log.1'
+            elif change == 'stdout_object':
+                monkeypatch.setattr(sys, 'stdout', replacement)
+                stdout_path = output
+            else:
+                os.dup2(replacement.fileno(), redirected.fileno())
+                stdout_path = output
+            cwa_logger.setup(str(path), logging.INFO)
+            logging.getLogger('cps.changed_sink_test').info('changed-sink-marker')
+            redirected.flush()
+            replacement.flush()
+            assert path.read_text().count('changed-sink-marker') == 1
+            assert stdout_path.read_text().count('changed-sink-marker') == 1
+
+    def test_fallback_target_shared_with_stdout_writes_once(self, tmp_path, reset_root, monkeypatch):
+        fallback = tmp_path / 'fallback.log'
+        requested = tmp_path / 'missing-directory' / 'requested.log'
+        make_file_handler = cwa_logger._make_file_handler
+        monkeypatch.setattr(cwa_logger, '_make_file_handler',
+                            lambda path: make_file_handler(path, default_path=str(fallback)))
+        with fallback.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            assert cwa_logger.setup(str(requested), logging.INFO) == ''
+            logging.getLogger('cps.shared_sink_test').info('fallback-single-record')
+            redirected.flush()
+            assert fallback.read_text().count('fallback-single-record') == 1
+            _file_handlers()[0].doRollover()
+            assert cwa_logger.setup(str(requested), logging.INFO) == ''
+            logging.getLogger('cps.shared_sink_test').info('fallback-after-reload')
+            redirected.flush()
+            assert fallback.read_text().count('fallback-after-reload') == 1
+            assert 'fallback-after-reload' not in Path(str(fallback) + '.1').read_text()
+
+    def test_distinct_regular_stdout_and_logfile_both_receive_one_record(self, tmp_path, reset_root, monkeypatch):
+        path = tmp_path / 'app.log'
+        output = tmp_path / 'service-output.log'
+        with output.open('a', encoding='utf-8') as redirected:
+            monkeypatch.setattr(sys, 'stdout', redirected)
+            cwa_logger.setup(str(path), logging.INFO)
+            logging.getLogger('cps.distinct_sink_test').info('distinct-sink-marker')
+            redirected.flush()
+            assert path.read_text().count('distinct-sink-marker') == 1
+            assert output.read_text().count('distinct-sink-marker') == 1
+
     def test_file_path_attaches_both_stdout_and_file_handler(self, tmp_path, reset_root):
         path = tmp_path / "calibre-web.log"
         cwa_logger.setup(str(path), logging.INFO)

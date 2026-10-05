@@ -2311,13 +2311,14 @@ msgid "Books ordered by publisher"
 msgstr "Böcker ordnade efter förlag"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Kategorier"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Taggar"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Böcker ordnade efter kategori"
+msgid "Books grouped by tags"
+msgstr "Böcker grupperade efter taggar"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2474,8 +2475,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "Visa avsnittet Kategorier"
+msgid "Show Tags Section"
+msgstr "Visa taggsektionen"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -4097,7 +4098,8 @@ msgstr "Röd"
 msgid "Registration failed."
 msgstr "Registreringen misslyckades."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "Ta bort {name}"
@@ -5718,6 +5720,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Kategorier"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9483,11 +9489,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "Taggar"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr "Taggar — uteslut"
@@ -11433,8 +11434,8 @@ msgstr "Filformat: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Kategori: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Taggar: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12663,6 +12664,10 @@ msgid "Upload Format"
 msgstr "Ladda upp format"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr " Byt författare och titel"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "Serie-ID"
 
@@ -12785,10 +12790,6 @@ msgid "This Field is Required"
 msgstr "Detta fält är obligatoriskt"
 
 #: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr " Byt författare och titel"
-
-#: cps/templates/book_table.html
 msgid "Select all"
 msgstr "Markera alla"
 
@@ -12829,8 +12830,8 @@ msgid "Enter Authors"
 msgstr "Ange författare"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Ange kategorier"
+msgid "Enter Tags"
+msgstr "Ange taggar"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12911,11 +12912,11 @@ msgstr "Redigera fälten du vill ändra. Tomma fält ignoreras:"
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"Flera värden stöds för Författare, Taggar/kategorier, Språk och Förlag. "
-"Använd kommaseparerade värden (t.ex. \"Namn1, Namn2\")."
+"Flera värden stöds för författare, taggar, språk och förlag. Avgränsa "
+"värdena med kommatecken (t.ex. \"Namn1, Namn2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -18220,8 +18221,8 @@ msgid "Authors in this Library"
 msgstr "Författare i det här biblioteket"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Kategorier i det här biblioteket"
+msgid "Tags in this Library"
+msgstr "Taggar i det här biblioteket"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18904,6 +18905,29 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Böcker ordnade efter kategori"
+
+#~ msgid "Show Category Section"
+#~ msgstr "Visa avsnittet Kategorier"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Kategori: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Ange kategorier"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "Flera värden stöds för Författare, Taggar/kategorier, Språk och Förlag. "
+#~ "Använd kommaseparerade värden (t.ex. \"Namn1, Namn2\")."
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Kategorier i det här biblioteket"
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

@@ -2185,13 +2185,14 @@ msgid "Books ordered by publisher"
 msgstr "書籍按出版社排序"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "分類"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "標籤"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "書籍按分類排序"
+msgid "Books grouped by tags"
+msgstr "依標籤分組的書籍"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2347,8 +2348,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "顯示分類部分"
+msgid "Show Tags Section"
+msgstr "顯示標籤部分"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -3880,7 +3881,8 @@ msgstr "紅色"
 msgid "Registration failed."
 msgstr "註冊失敗"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "移除 {name}"
@@ -5473,6 +5475,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "分類"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9153,11 +9159,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "標籤"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr "標籤 — 排除"
@@ -11055,8 +11056,8 @@ msgstr "文件格式：%(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "分類：%(name)s"
+msgid "Tags: %(name)s"
+msgstr "標籤：%(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12292,6 +12293,11 @@ msgid "Upload Format"
 msgstr "上傳格式"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+#, fuzzy
+msgid " Exchange author & title"
+msgstr "交換作者和標題"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "叢書編號"
 
@@ -12408,11 +12414,6 @@ msgid "This Field is Required"
 msgstr "此欄必須填寫"
 
 #: cps/templates/book_table.html
-#, fuzzy
-msgid " Exchange author & title"
-msgstr "交換作者和標題"
-
-#: cps/templates/book_table.html
 msgid "Select all"
 msgstr "選擇全部"
 
@@ -12454,8 +12455,8 @@ msgid "Enter Authors"
 msgstr "輸入作者"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "輸入分類"
+msgid "Enter Tags"
+msgstr "輸入標籤"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12539,9 +12540,11 @@ msgstr "編輯您想要變更的欄位。空白欄位將被忽略："
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"作者、標籤、語言和出版社均支援多個值。請使用逗號分隔（例如：「名字1, 名字"
+"2」）。"
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -17470,8 +17473,8 @@ msgid "Authors in this Library"
 msgstr "作者在此書庫中"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "分類在此書庫中"
+msgid "Tags in this Library"
+msgstr "此書庫中的標籤"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18114,6 +18117,22 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "書籍按分類排序"
+
+#~ msgid "Show Category Section"
+#~ msgstr "顯示分類部分"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "分類：%(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "輸入分類"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "分類在此書庫中"
 
 #~ msgid "Create"
 #~ msgstr "建立"

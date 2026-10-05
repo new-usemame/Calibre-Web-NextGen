@@ -22,6 +22,7 @@ def main():
     p.add_argument("--public-fixture", type=Path)
     p.add_argument("--v2-magnet-evidence-dir", type=Path,
                    help="Retain exact original magnet fixtures outside the temporary normal runtime")
+    p.add_argument("--dual-magnet-evidence-dir", type=Path)
     p.add_argument("--mobi-fixture", type=Path, default=APP / 'tests/fixtures/sample_books/test_original_direct.mobi')
     p.add_argument("--mobi-uncompressed-fixture", type=Path, default=APP / 'tests/fixtures/sample_books/test_original_direct_uncompressed.mobi')
     args = p.parse_args()
@@ -126,7 +127,7 @@ def main():
             text=True,
             timeout=150,
         )
-        print(r.stdout, r.stderr, flush=True)
+        print("PDF fixture conversion EXIT", r.returncode, r.stdout, r.stderr, flush=True)
         assert r.returncode == 0
         files["/direct.pdf"] = pdf
         files["/repacked.epub"] = root / "repacked.epub"
@@ -501,6 +502,9 @@ def main():
                 from acquisition_v2_magnet_runtime_probe import run_v2_magnet_runtime
                 v2_magnets = run_v2_magnet_runtime(root,repo,owner,other_owner,args.fixture,ingest,library,
                                                     evidence_dir=args.v2_magnet_evidence_dir)
+                from acquisition_dual_magnet_runtime_probe import run_dual_magnet_runtime
+                dual_magnets = run_dual_magnet_runtime(root,repo,owner,other_owner,args.fixture,ingest,library,
+                                                     evidence_dir=args.dual_magnet_evidence_dir)
                 from acquisition_mobi_runtime_probe import run_mobi_runtime
                 mobi = run_mobi_runtime(root,repo,owner,other_owner,ingest,library,
                                         mobi_fixture=args.mobi_fixture, mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
@@ -523,6 +527,8 @@ def main():
                     app_reading_state=reader_state,
                 )
                 v2_magnets['prior_seed_checks'] = pure_v2['prior_seed_checks']
+                dual_magnets['original_epub_and_reading_state_preserved'] = True
+                dual_magnets['prior_seed_checks'] = pure_v2['prior_seed_checks']
             print(
                 "CWNG_ACQUISITION_FULL_RUNTIME="
                 + json.dumps(
@@ -537,6 +543,7 @@ def main():
                         hybrid=hybrid,
                         pure_v2=pure_v2,
                         v2_magnets=v2_magnets,
+                        dual_magnets=dual_magnets,
                         mobi=mobi,
                         client_mobi=client_mobi,
                         http_gets=gets,

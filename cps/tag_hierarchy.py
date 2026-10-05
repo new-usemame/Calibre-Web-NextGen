@@ -11,6 +11,9 @@ from sqlalchemy import Integer, false, literal_column, text
 
 from . import db, hierarchy
 
+MAX_GROUP_PATH_LENGTH = 4096
+MAX_GROUP_DEPTH = 64
+
 
 def is_configured(calibre_db):
     """An absent table/row means Calibre's default: flat built-in tags.
@@ -46,6 +49,11 @@ class TagTree:
         records = {}
         for book_id, tag_id, name in pairs:
             parts = hierarchy.split_path(name) if configured else []
+            # Rendering and group URLs have finite bounds. Keep unusual but
+            # valid Calibre values browsable as exact records instead of
+            # breaking every sibling or advertising an unreachable group.
+            if len(parts) > MAX_GROUP_DEPTH or len(".".join(parts)) > MAX_GROUP_PATH_LENGTH:
+                parts = []
             if not parts:
                 node = records.setdefault(tag_id, {
                     "id": tag_id, "name": name if name.strip() else _("Unnamed tag"),
@@ -98,7 +106,7 @@ class TagTree:
         or stored tag name enters SQL syntax. LIKE and NOCASE name comparisons
         would select values that the displayed tree never counted.
         """
-        if not isinstance(path, str) or not path or len(path) > 4096:
+        if not isinstance(path, str) or not path or len(path) > MAX_GROUP_PATH_LENGTH:
             raise LookupError("Tag group not found")
         node = self._paths.get(".".join(hierarchy.split_path(path)))
         if node is None:

@@ -133,6 +133,19 @@ def test_large_subtree_does_not_exhaust_sqlite_bind_variables(library_client):
         connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, previous)
 
 
+@pytest.mark.parametrize("name", [".".join(["x"] * 1100), "Parent." + "x" * 4096])
+def test_deep_or_unlinkable_tags_preserve_exact_browsable_records(library_client, name):
+    library, client = library_client
+    library.session.execute(db.Tags.__table__.insert(), {"id": 8, "name": name})
+    library.session.execute(db.books_tags_link.insert(), {"book": 1, "tag": 8})
+    payload = _tree(client)
+    leaf = next(node for node in payload["items"] if node.get("id") == 8)
+    assert leaf == {"id": 8, "name": name, "path": None,
+                    "count": 1, "total_count": 1, "children": []}
+    # The ordinary sibling hierarchy still renders/counts correctly.
+    assert next(node for node in payload["items"] if node["path"] == "Horror")["total_count"] == 4
+
+
 @pytest.mark.parametrize("preference", [None, "[]", '["#subjects"]'])
 def test_only_explicit_builtin_preference_enables_tree(library_client, preference):
     library, client = library_client

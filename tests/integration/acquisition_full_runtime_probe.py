@@ -20,6 +20,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--fixture", type=Path, required=True)
     p.add_argument("--public-fixture", type=Path)
+    p.add_argument("--v2-magnet-evidence-dir", type=Path,
+                   help="Retain exact original magnet fixtures outside the temporary normal runtime")
     p.add_argument("--mobi-fixture", type=Path, default=APP / 'tests/fixtures/sample_books/test_original_direct.mobi')
     p.add_argument("--mobi-uncompressed-fixture", type=Path, default=APP / 'tests/fixtures/sample_books/test_original_direct_uncompressed.mobi')
     args = p.parse_args()
@@ -496,6 +498,9 @@ def main():
                 hybrid = run_hybrid_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
                 from acquisition_torrent_v2_runtime_probe import run_torrent_v2_runtime
                 pure_v2 = run_torrent_v2_runtime(root,repo,owner,other_owner,args.fixture,ingest,library)
+                from acquisition_v2_magnet_runtime_probe import run_v2_magnet_runtime
+                v2_magnets = run_v2_magnet_runtime(root,repo,owner,other_owner,args.fixture,ingest,library,
+                                                    evidence_dir=args.v2_magnet_evidence_dir)
                 from acquisition_mobi_runtime_probe import run_mobi_runtime
                 mobi = run_mobi_runtime(root,repo,owner,other_owner,ingest,library,
                                         mobi_fixture=args.mobi_fixture, mobi_uncompressed_fixture=args.mobi_uncompressed_fixture)
@@ -511,11 +516,13 @@ def main():
                             (owner,first_id)).fetchall() == rows
                 client_mobi['original_epub_and_reading_state_preserved'] = True
                 pure_v2['original_epub_and_reading_state_preserved'] = True
+                v2_magnets['original_epub_and_reading_state_preserved'] = True
                 pure_v2['prior_seed_checks'] = dict(
                     book_id=first_id, stored_sha256=first_hash,
                     calibre_bookmarks=calibre_annotations,
                     app_reading_state=reader_state,
                 )
+                v2_magnets['prior_seed_checks'] = pure_v2['prior_seed_checks']
             print(
                 "CWNG_ACQUISITION_FULL_RUNTIME="
                 + json.dumps(
@@ -529,6 +536,7 @@ def main():
                         torrent_metadata=torrent_metadata,
                         hybrid=hybrid,
                         pure_v2=pure_v2,
+                        v2_magnets=v2_magnets,
                         mobi=mobi,
                         client_mobi=client_mobi,
                         http_gets=gets,

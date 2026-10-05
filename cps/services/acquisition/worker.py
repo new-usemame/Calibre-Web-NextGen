@@ -20,7 +20,7 @@ from .staging import (StagingError, cleanup_settled, digest, discard_publication
                       publish, publication_state, validate_book)
 from .storage import Conflict
 from .clients import CLIENTS, USENET_KINDS, TORRENT_KINDS, torrent_book, torrent_books
-from .torrent import validate_magnet, validate_torrent
+from .torrent import magnet_identities, validate_torrent
 from .sabnzbd import SABClient, ClientError, completed_book, completed_books, open_completed_file, validate_nzb, _safe_root
 from .bundle_files import fingerprint_candidates
 
@@ -301,6 +301,17 @@ class AcquisitionWorker:
         repo = self.repository
         client_row, client_config = self._client_material(offer)
         client = (self.client_factory or CLIENTS[client_row.adapter])(client_config, transfer=self.transfer)
+        direct_magnet = offer['transport'] == 'torrent' and offer['href'].startswith('magnet:')
+        if direct_magnet:
+            # The private durable offer, never a refetched mutable source or a
+            # shortened external ID, is the expected full identity on every
+            # poll/restart/shared-attempt adoption, even after an uncertain add.
+            hashes = magnet_identities(offer['href'], tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+            prepare = getattr(client, 'prepare_submission', None)
+            if callable(prepare):
+                prepare(offer['href'], checkpoint=checkpoint)
+            elif hashes.v2 is not None:
+                raise ClientError('unsupported_client_version')
         def submission_name(key):
             identity = [offer['release_key'], client_row.id, client_row.revision]
             # Nullable upgrade preserves existing remote names. New attempts
@@ -315,15 +326,19 @@ class AcquisitionWorker:
         if started is None:
             # Fetch/validate before issuing the durable POST fence. A bad key or
             # descriptor here is safely retryable without an uncertain submit.
-            if offer['transport'] == 'torrent' and offer['href'].startswith('magnet:'):
+            if direct_magnet:
                 descriptor = offer['href']
-                validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             else:
                 document = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],) if config['secret'] else (),
                     allow_magnet_redirect=offer['transport'] == 'torrent'), max_bytes=512 * 1024, checkpoint=checkpoint)
                 descriptor = document.url if document.url.startswith('magnet:') else document.body
                 if offer['transport'] == 'nzb': validate_nzb(descriptor)
-                elif isinstance(descriptor, str): validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+                elif isinstance(descriptor, str):
+                    hashes = magnet_identities(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+                    # No durable original topic authority exists for a mutable
+                    # HTTP redirect. Preserve the established v1 redirect flow.
+                    if hashes.v2 is not None:
+                        raise ClientError('unsupported_magnet_redirect')
                 else: validate_torrent(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             # A read-only client prerequisite must not fence a POST that was
             # never attempted. qBittorrent resolves hybrid engine identity here.

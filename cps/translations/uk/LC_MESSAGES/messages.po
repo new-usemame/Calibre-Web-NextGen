@@ -18491,3 +18491,7 @@ msgstr "Виберіть порядок розумних полиць на бі�
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Показувати цю розумну полицю в моїй стрічці OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Перегляди розумних полиць"

@@ -20614,3 +20614,7 @@ msgstr "Choisissez l’ordre de vos étagères intelligentes dans la barre laté
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Afficher cette étagère intelligente dans mon catalogue OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Vues d’étagères intelligentes"

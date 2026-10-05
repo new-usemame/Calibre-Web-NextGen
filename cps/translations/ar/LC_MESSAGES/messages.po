@@ -18528,3 +18528,7 @@ msgstr "اختر كيفية ترتيب رفوفك الذكية في الشريط
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "إظهار هذا الرف الذكي في موجز OPDS الخاص بي"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "مشاهدات الرفوف الذكية"

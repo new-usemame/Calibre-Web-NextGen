@@ -18647,3 +18647,7 @@ msgstr "Επιλέξτε τη σειρά των έξυπνων ραφιών σα
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Εμφάνιση αυτού του έξυπνου ραφιού στη ροή OPDS μου"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Προβολές έξυπνων ραφιών"

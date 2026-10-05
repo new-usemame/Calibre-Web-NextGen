@@ -18670,3 +18670,7 @@ msgstr "Velg rekkefølgen for de smarte hyllene dine i sidefeltet."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Vis denne smarte hyllen i OPDS-strømmen min"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Visninger av smarte hyller"

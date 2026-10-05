@@ -18522,3 +18522,7 @@ msgstr "選擇智慧書架在側邊欄中的順序。"
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "在我的 OPDS 目錄中顯示此智慧書架"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "智慧書架瀏覽次數"

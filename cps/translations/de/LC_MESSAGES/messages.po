@@ -19367,3 +19367,7 @@ msgstr "Wählen Sie die Reihenfolge Ihrer intelligenten Regale in der Seitenleis
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Dieses intelligente Regal in meinem OPDS-Feed anzeigen"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Aufrufe intelligenter Regale"

@@ -19477,3 +19477,7 @@ msgstr "Wybierz kolejność inteligentnych półek na pasku bocznym."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Udostępnij tę inteligentną półkę w moim kanale OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Wyświetlenia inteligentnych półek"

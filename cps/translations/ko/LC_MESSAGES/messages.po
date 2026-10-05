@@ -18829,3 +18829,7 @@ msgstr "사이드바에서 스마트 책장의 순서를 선택하세요."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "이 스마트 책장을 내 OPDS 피드에 표시"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "스마트 책장 조회 수"

@@ -19185,3 +19185,7 @@ msgstr "Izberite vrstni red pametnih polic v stranski vrstici."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Prikaži to pametno polico v mojem viru OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Ogledi pametnih polic"

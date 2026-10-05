@@ -19368,3 +19368,7 @@ msgstr "Válassza ki az intelligens polcok sorrendjét az oldalsávban."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Ez az intelligens polc jelenjen meg az OPDS-hírcsatornámban"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Intelligens polcok megtekintései"

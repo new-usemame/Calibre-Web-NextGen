@@ -18497,3 +18497,7 @@ msgstr "Chọn thứ tự giá sách thông minh trong thanh bên."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Hiển thị giá sách thông minh này trong nguồn OPDS của tôi"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Lượt xem giá sách thông minh"

@@ -20072,3 +20072,7 @@ msgstr "Scegli l’ordine dei tuoi scaffali intelligenti nella barra laterale."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Mostra questo scaffale intelligente nel mio catalogo OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Visualizzazioni degli scaffali intelligenti"

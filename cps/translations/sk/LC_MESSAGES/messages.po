@@ -19363,3 +19363,7 @@ msgstr "Vyberte poradie svojich inteligentných políc v bočnom paneli."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Sprístupniť túto inteligentnú policu v mojom kanáli OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Zobrazenia inteligentných políc"

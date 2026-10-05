@@ -18670,3 +18670,7 @@ msgstr "Pilih urutan rak pintar Anda di bilah samping."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Tampilkan rak pintar ini dalam umpan OPDS saya"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Tampilan rak pintar"

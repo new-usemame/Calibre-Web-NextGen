@@ -19279,3 +19279,7 @@ msgstr "Elige el orden de tus estanterías inteligentes en la barra lateral."
 #. Smart-shelf naming: sync warnings, ordering and OPDS exposure.
 msgid "Expose this smart shelf in my OPDS feed"
 msgstr "Mostrar esta estantería inteligente en mi catálogo OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Vistas de estanterías inteligentes"

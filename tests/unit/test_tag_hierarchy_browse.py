@@ -161,7 +161,30 @@ def test_only_explicit_builtin_preference_enables_tree(library_client, preferenc
         library.session.execute(text("UPDATE preferences SET val=:value"), {"value": preference})
     payload = _tree(client)
     assert payload["hierarchical"] is False
-    assert next(node for node in payload["items"] if node["id"] == 2)["path"] is None
+    assert payload["items"] == []
+    # Flat libraries retain the established endpoint and literal stored names.
+    flat = client.get("/api/v1/tags").get_json()["items"]
+    assert next(node for node in flat if node["id"] == 2)["name"] == "Horror.Gothic"
+
+
+def test_flat_tree_probe_does_not_require_enumerating_book_tag_membership(library_client):
+    library, client = library_client
+    library.session.execute(text("UPDATE preferences SET val='[]'"))
+    library.session.commit()
+    connection = library.session.connection().connection.driver_connection
+
+    def deny_membership_reads(action, table, _column, _database, _source):
+        if action == sqlite3.SQLITE_READ and table in {"books", "tags", "books_tags_link"}:
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    connection.set_authorizer(deny_membership_reads)
+    try:
+        response = client.get("/api/v1/tags/tree")
+        assert response.status_code == 200, response.data
+        assert response.get_json() == {"hierarchical": False, "items": []}
+    finally:
+        connection.set_authorizer(None)
 
 
 @pytest.mark.parametrize("preference", ['{"tags": true}', '["tags", 42]', '{broken'])

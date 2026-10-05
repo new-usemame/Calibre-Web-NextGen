@@ -472,7 +472,12 @@ def test_original_return_reaches_joined_source_before_prior_page_notes(tmp_path,
         assert all_nodes.index(note) < all_nodes.index(marker)
 
 
-def test_native_figure_opens_source_details_with_explicit_return(tmp_path):
+@pytest.mark.parametrize('reason,label',[
+    ('embedded','Original figure and neighboring context'),
+    ('ocr_uncertain_region','Original printed region and neighboring context'),
+    ('source_visual_table','Original printed table and neighboring context'),
+])
+def test_native_figure_opens_source_details_with_explicit_return(tmp_path,reason,label):
     """An unflagged native table image must still be inspectable on a reader."""
     with pymupdf.open() as doc:
         page = doc.new_page(width=500, height=700)
@@ -485,8 +490,8 @@ def test_native_figure_opens_source_details_with_explicit_return(tmp_path):
                                    bbox=(45, 370, 300, 390))
         book = assemble.Book(elements=[figure, caption], pages={0: [figure, caption]},
                              figures=[dict(pno=0, bbox=box, full_page=False,
-                                           needs_ink=False, found='embedded')])
-        assert not book.needs_source_evidence(0)
+                                           needs_ink=False, found=reason)])
+        assert book.needs_source_evidence(0)==(reason!='embedded')
         target = tmp_path / 'native-figure.epub'
         result = build_epub.build(book, str(target), doc=doc,
                                   metadata={'title': 'Native figure', 'language': 'en'})
@@ -501,6 +506,7 @@ def test_native_figure_opens_source_details_with_explicit_return(tmp_path):
         original = ET.fromstring(archive.read('OEBPS/' + name))
         detail = next(n for n in original.iter() if n.get('id') == anchor)
         assert detail.tag == XHTML + 'h2', 'figure URI must land on its visible heading'
+        assert ''.join(detail.itertext())==label
         owner = next(section for section in original.iter(XHTML + 'section')
                      if detail in list(section))
         returns = [a for a in owner.iter(XHTML + 'a')
@@ -510,5 +516,13 @@ def test_native_figure_opens_source_details_with_explicit_return(tmp_path):
             home, target_id = back.get('href').split('#')
             destination = ET.fromstring(archive.read('OEBPS/' + home))
             assert len([n for n in destination.iter() if n.get('id') == target_id]) == 1
-        assert len([n for n in original.iter() if n.get('id', '').startswith('inspection_')]) >= 2
+        if reason=='embedded':
+            assert len([n for n in original.iter() if n.get('id', '').startswith('inspection_')]) >= 2
+        else:
+            # This synthetic page is native text, with no OCR provenance to
+            # authorize scan tiles. Its complete detail still has real pixels.
+            images=list(owner.iter(XHTML+'img'))
+            assert images
+            with Image.open(io.BytesIO(archive.read('OEBPS/'+images[0].get('src')))) as image:
+                assert image.width>=820 and image.height>=520
         assert sum('Printed table caption' in ''.join(c.itertext()) for c in chapters) == 1

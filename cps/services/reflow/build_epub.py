@@ -221,6 +221,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 caption = _nav_runs_html(elements[index].runs,
                     _source_nav_marks(navigation,pno,index,None),
                     available, ref_ids, ambiguous)
+                source_caption = caption
                 if elements[index].caption_uncertain:
                     caption_box = elements[index].bbox
                     figure_box = element.bbox
@@ -1929,8 +1930,15 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                               'Original printed lettering and neighboring layout',
                               figure['bbox']))
         for figure_index, figure in inspectable_figures.get(pno, []):
+            reason=figure.get('found')
+            label=('Original printed table and neighboring context' if reason=='source_visual_table' else
+                   'Original printed region and neighboring context' if reason in (
+                       'ocr_uncertain_region','native_spacing_uncertain','native_outline_conflict',
+                       'unverified_scan_layout','unrecovered_scan_layer','unverified_paired_columns',
+                       'uncertain_aligned_scan_list','sparse_scan_spread_panel','uncertain_scan_key_panel') else
+                   'Original figure and neighboring context')
             specs.append(('figure_%d' % figure_index,
-                          'Original figure and neighboring context', figure['bbox']))
+                          label, figure['bbox']))
         if not specs and pno not in recovered and pno not in scanned and pno not in readings and not book.needs_source_evidence(pno):
             continue
         if doc is None:
@@ -2037,7 +2045,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             src = 'images/fig_p%04d_%d.jpg' % (pno, figure_index)
             pattern = r'<img\b[^>]*\bsrc="' + re.escape(src) + r'"[^>]*/>'
             html = re.sub(pattern, lambda m: '<a href="%s#figure_%d" '
-                          'aria-label="Inspect original figure and page details">%s</a>' %
+                          'aria-label="Inspect original page and enlarged details">%s</a>' %
                           (href, figure_index, m.group(0)), html)
         if ambiguous:
             link = '<a href="%s#notes">Original printed notes and context</a>' % href

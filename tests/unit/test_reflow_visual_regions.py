@@ -73,7 +73,7 @@ def test_whole_table_preserves_raw_ownership_caption_and_publication(table,tmp_p
         html=b''.join(z.read(n) for n in z.namelist() if n.startswith('OEBPS/ch') and n.endswith('.xhtml')).decode()
         detail=z.read('OEBPS/original-p0000.xhtml').decode()
         assert html.count('Table 1: Modes')==1 and 'original-p0000.xhtml#figure_0' in html
-        assert 'id="figure_0"' in detail and 'Original figure' in detail
+        assert 'id="figure_0"' in detail and 'Original printed table' in detail
         assert any('original_p0000_figure_0' in n for n in z.namelist())
 
 @pytest.mark.parametrize('damage',['caption','partial_line','partial_region','duplicate','metadata','foreign_figure','raster','unissued','raw_changed'])

@@ -106,7 +106,8 @@ def _source_shape(node):
     if classes.intersection({'source-evidence-notice','source-evidence'}):
         return None
     if (node.tagName == 'a' and
-        node.getAttribute('aria-label') == 'Inspect original figure and page details' and
+        node.getAttribute('aria-label') in ('Inspect original figure and page details',
+                                         'Inspect original page and enlarged details') and
         len(node.childNodes) == 1 and node.firstChild.nodeType == Node.ELEMENT_NODE and node.firstChild.tagName == 'img'):
         return _source_shape(node.firstChild)
     attributes = tuple(sorted((name,node.getAttribute(name)) for name in node.attributes.keys() if not name.startswith('xmlns')))

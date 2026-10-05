@@ -2275,13 +2275,14 @@ msgid "Books ordered by publisher"
 msgstr "出版社順"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "カテゴリ"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "タグ"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "カテゴリ順"
+msgid "Books grouped by tags"
+msgstr "タグ別にまとめた書籍"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2439,8 +2440,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "カテゴリセクションを表示"
+msgid "Show Tags Section"
+msgstr "タグセクションを表示"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -5574,6 +5575,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "カテゴリ"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9254,12 +9259,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "タグ"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11161,8 +11160,8 @@ msgstr "ファイル形式: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "カテゴリ: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "タグ: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12576,8 +12575,8 @@ msgid "Enter Authors"
 msgstr "著者名を入力"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "カテゴリ名を入力"
+msgid "Enter Tags"
+msgstr "タグを入力"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12659,11 +12658,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"著者、タグ/カテゴリ、言語、出版社では複数の値がサポートされています。カンマ区"
-"切りで指定してください（例：\"Name1, Name2\"）。"
+"著者、タグ、言語、出版社には複数の値を指定できます。カンマで区切ってください"
+"（例：「名前1, 名前2」）。"
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -17767,8 +17766,8 @@ msgid "Authors in this Library"
 msgstr "このライブラリ内の著者数"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "このライブラリ内のカテゴリ数"
+msgid "Tags in this Library"
+msgstr "このライブラリ内のタグ"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18447,6 +18446,29 @@ msgstr "選択した本棚をKoboと同期"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "既読/未読セクションを表示"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "カテゴリ順"
+
+#~ msgid "Show Category Section"
+#~ msgstr "カテゴリセクションを表示"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "カテゴリ: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "カテゴリ名を入力"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "著者、タグ/カテゴリ、言語、出版社では複数の値がサポートされています。カン"
+#~ "マ区切りで指定してください（例：\"Name1, Name2\"）。"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "このライブラリ内のカテゴリ数"
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

@@ -2292,13 +2292,14 @@ msgid "Books ordered by publisher"
 msgstr "Boeken gesorteerd op uitgever"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Categorieën"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Labels"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Boeken gesorteerd op categorie"
+msgid "Books grouped by tags"
+msgstr "Boeken gegroepeerd op labels"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2455,9 +2456,8 @@ msgid "Show Books On Hold"
 msgstr "Gepauzeerde boeken tonen"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
-msgid "Show Category Section"
-msgstr "Categoriekeuze tonen"
+msgid "Show Tags Section"
+msgstr "Sectie Labels tonen"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -5755,6 +5755,10 @@ msgstr "Kruimelpad van de catalogus"
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr "Catalogi en downloadclients"
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Categorieën"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9607,12 +9611,6 @@ msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 "Aangepaste kolommen met tekstwaarden uit de bibliotheek verschijnen hier."
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "Labels"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr "Labels — uitsluiten"
@@ -11706,8 +11704,8 @@ msgstr "Bestandsformaat: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Categorie: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Labels: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -13133,8 +13131,8 @@ msgid "Enter Authors"
 msgstr "Voer Auteurs in"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Voer categorieën in"
+msgid "Enter Tags"
+msgstr "Voer labels in"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -13215,9 +13213,11 @@ msgstr "Bewerk de velden die je wilt wijzigen. Lege velden worden genegeerd:"
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"Voor auteurs, labels, talen en uitgevers worden meerdere waarden "
+"ondersteund. Scheid de waarden met komma’s (bijvoorbeeld \"Naam1, Naam2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -18265,8 +18265,8 @@ msgid "Authors in this Library"
 msgstr "Auteurs in deze bibliotheek"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Categorieën in deze bibliotheek"
+msgid "Tags in this Library"
+msgstr "Labels in deze bibliotheek"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18928,6 +18928,23 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Boeken gesorteerd op categorie"
+
+#, fuzzy
+#~ msgid "Show Category Section"
+#~ msgstr "Categoriekeuze tonen"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Categorie: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Voer categorieën in"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Categorieën in deze bibliotheek"
 
 #~ msgid ""
 #~ "Applies only to this catalog. The server upload-format setting must also "

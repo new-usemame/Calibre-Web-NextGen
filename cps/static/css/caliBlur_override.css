@@ -349,3 +349,10 @@ body:not(.admin) > div.container-fluid > div > div.col-sm-10 > div.discover.rand
     white-space: normal !important;
     overflow: visible !important;
 }
+
+/* #1511: the Classic desktop theme paints a second tag-list heading. Use
+   the escaped localized page title instead of its hard-coded English copy.
+   Keep the theme's positioning and mobile hidden-heading rule unchanged. */
+body.catlist > div.container-fluid > div > div.col-sm-10 > div.container[data-heading]:before {
+    content: attr(data-heading);
+}

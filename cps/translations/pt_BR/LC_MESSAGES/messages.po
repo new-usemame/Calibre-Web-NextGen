@@ -2258,13 +2258,14 @@ msgid "Books ordered by publisher"
 msgstr "Livros ordenados por editora"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Categorias"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Tags"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Livros ordenados por categoria"
+msgid "Books grouped by tags"
+msgstr "Livros agrupados por tags"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2423,9 +2424,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
-msgid "Show Category Section"
-msgstr "Mostrar seção de categoria"
+msgid "Show Tags Section"
+msgstr "Mostrar seção de tags"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -5567,6 +5567,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Categorias"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9251,12 +9255,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "Tags"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr "Tags — excluir"
@@ -11157,8 +11155,8 @@ msgstr "Formato do arquivo: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Categoria: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Tags: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12575,8 +12573,8 @@ msgid "Enter Authors"
 msgstr "Entrar Autores"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Entrar Categorias"
+msgid "Enter Tags"
+msgstr "Digite as tags"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12657,9 +12655,11 @@ msgstr "Edite os campos que queira mudar. Campos em branco serão ignorados:"
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"Vários valores são aceitos para autores, tags, idiomas e editoras. Separe os "
+"valores por vírgulas (por exemplo, \"Nome1, Nome2\")."
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -17721,8 +17721,8 @@ msgid "Authors in this Library"
 msgstr "Autores nesta Biblioteca"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Categorias nesta Biblioteca"
+msgid "Tags in this Library"
+msgstr "Tags nesta biblioteca"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18379,6 +18379,23 @@ msgstr "Sincronizar Estantes Selecionadas com Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar seção de lidos/não lidos"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Livros ordenados por categoria"
+
+#, fuzzy
+#~ msgid "Show Category Section"
+#~ msgstr "Mostrar seção de categoria"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Categoria: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Entrar Categorias"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Categorias nesta Biblioteca"
 
 #~ msgid "New shelf name…"
 #~ msgstr "Novo nome da estante…"

@@ -352,14 +352,14 @@ def _sequence_folios(raw_pages, body_size):
         gap=line.bbox[1]-max(other.bbox[3] for other in lines[:-1])
         printed_size=median(sp.size for sp in line.spans if sp.text.strip())
         deep=line.bbox[1]>=raw.height*.88
-        if (line.bbox[1]>=raw.height*.88 and line.size<=body_size*1.02
+        if (line.bbox[1]>=raw.height*.88 and line.size<=body_size*1.5
                 and gap>=line.size*.8):
             if re.fullmatch(r'[0-9]{1,5}',line.stripped):
                 footer_peers[raw.pno]=(int(line.stripped)-raw.pno,line.bbox[1]/raw.height,line.bbox)
             elif re.fullmatch(r'[0-9SsOoIl]{1,5}',line.stripped) and any(ch.isdigit() for ch in line.stripped):
                 damaged.append((raw,line))
         if (line.bbox[1]<raw.height*.7
-                or printed_size>body_size*(1.15 if deep else 1.02)
+                or printed_size>body_size*(1.5 if deep else 1.02)
                 or gap<printed_size*(.8 if deep else 1.5)):continue
         if not re.fullmatch(r"[0-9]{1,5}",line.stripped):
             # A damaged folio is retained verbatim. Its furniture role can come
@@ -455,6 +455,7 @@ def _repeated_detached_heads(raw_pages, body_size):
     The result names exact line boxes, so equal words in prose stay in prose.
     """
     groups = defaultdict(list)
+    footer_boxes = _sequence_folios(raw_pages,body_size)
     for raw in raw_pages:
         lines = sorted((line for block in raw.text_blocks for line in block.lines
                         if line.stripped), key=lambda line: (line.bbox[1], line.bbox[0]))
@@ -463,6 +464,8 @@ def _repeated_detached_heads(raw_pages, body_size):
         top = lines[0].bbox[1]
         row = [line for line in lines if line.bbox[1] < top + body_size]
         following = [line for line in lines if line not in row]
+        footer = next((line for line in lines if line.bbox==footer_boxes.get(raw.pno)),None)
+        if raw.width >= raw.height*1.2:footer=None
         if not following or max(line.bbox[3] for line in row) > raw.height * .20:
             continue
         if min(line.bbox[1] for line in following) - max(line.bbox[3] for line in row) < body_size * .8:
@@ -476,8 +479,8 @@ def _repeated_detached_heads(raw_pages, body_size):
                      or peer.bbox[0] > line.bbox[2]+body_size*.4)
                 and peer.size <= body_size*1.2]
             folio = folios[0] if len(folios)==1 else None
-            if (len(text) > BAND_TEXT_MAX or sum(c.isalpha() for c in text) < 6
-                    or line.size > body_size * (1.2 if folio is not None else 1.02)
+            if (len(text) > BAND_TEXT_MAX or sum(c.isalpha() for c in text) < (3 if footer is not None else 6)
+                    or line.size > body_size * (1.5 if footer is not None else 1.2 if folio is not None else 1.02)
                     or CAPTION_LINE.match(text)):
                 continue
             leading = _LEADING_PRINTED_FOLIO.fullmatch(text)
@@ -490,11 +493,13 @@ def _repeated_detached_heads(raw_pages, body_size):
                 # A detached margin row with a progressing separate folio is
                 # independent evidence when scan font-size estimates wobble.
                 key = (text.casefold(), 'separate', int(folio.stripped)-raw.pno)
+            elif footer is not None:
+                key = (text.casefold(), 'footer', int(footer.stripped)-raw.pno)
             else:
                 key = (text.casefold(), None, None)
                 if line.size >= body_size * .98:
                     continue
-            groups[key].append((raw, line, folio if key[1]=='separate' else None))
+            groups[key].append((raw, line, folio if key[1]=='separate' else footer if key[1]=='footer' else None))
     proved = defaultdict(list)
     for rows in groups.values():
         for raw, line, folio in rows:
@@ -516,9 +521,10 @@ def _repeated_scan_spread_heads(raw_pages, *, table_labels=None):
     """Qualify damaged marginal lettering above two measured prose panels.
 
     OCR type-size estimates and exact spellings are unreliable here. Require a
-    detached, physically smaller row, an actual empty central gutter, matching
-    placement and similar source lettering on three nearby leaves. Only exact
-    original line occurrences acquire the role; no recognized text is repaired.
+    detached row, an actual empty central gutter, matching placement and similar
+    source lettering on three nearby leaves. Body-sized or deeper lettering
+    also requires the printed folios to progress across the two-up leaves.
+    Only exact original occurrences acquire the role; no text is repaired.
     """
     candidates = []
     for raw in raw_pages:
@@ -546,7 +552,7 @@ def _repeated_scan_spread_heads(raw_pages, *, table_labels=None):
             for block in raw.text_blocks:
                 paragraph = sorted((line for line in block.lines if id(line) in panel_ids),
                                    key=lambda line: line.bbox[1])
-                wrapped += sum(0 < following.bbox[1]-prior.bbox[1] <= height*1.15
+                wrapped += sum(0 < following.bbox[1]-prior.bbox[1] <= height*1.5
                     and abs(prior.bbox[0]-following.bbox[0]) <= raw.width*.02
                     and not prior.stripped.endswith(('.',':',';','!','?','”','’','"'))
                     for prior,following in zip(paragraph,paragraph[1:]))
@@ -580,20 +586,27 @@ def _repeated_scan_spread_heads(raw_pages, *, table_labels=None):
                 alignments.extend((abs(first.bbox[0]-min(line.bbox[0] for line in remaining)),
                                    abs(first.bbox[2]-max(line.bbox[2] for line in remaining))))
             letters = re.sub(r'[^a-z]', '', first.stripped.lower())
+            leading = _LEADING_PRINTED_FOLIO.fullmatch(first.stripped)
+            trailing = _TRAILING_PRINTED_FOLIO.fullmatch(first.stripped)
+            folio = int(leading[1]) if leading else int(trailing[2]) if trailing else None
+            folio_offset = folio-2*raw.pno-side if folio is not None else None
+            needs_folio = first.bbox[3] > raw.height*.08 or first.bbox[3]-first.bbox[1] > height*.75
             if (len(letters) < 6 or len(first.stripped) > BAND_TEXT_MAX or CAPTION_LINE.match(first.stripped)
-                    or first.bbox[3] > raw.height*.08 or first.bbox[3]-first.bbox[1] > height*.75
+                    or first.bbox[3] > raw.height*(.12 if folio is not None else .08)
+                    or first.bbox[3]-first.bbox[1] > height*(1.25 if folio is not None else .75)
                     or first.bbox[2]-first.bbox[0] > raw.width*.32 or not remaining
                     or min(line.bbox[1] for line in remaining)-first.bbox[3] < height*.65
                     or min(alignments) > raw.width*.03):
                 continue
             candidates.append((raw, first, side, letters, keyed,
-                               keyed and outer_alignment > raw.width*.03))
+                               keyed and outer_alignment > raw.width*.03,folio_offset,needs_folio))
     proved = defaultdict(list)
     vetoes = []
-    for raw, line, side, letters, keyed, interior_label in candidates:
+    for raw, line, side, letters, keyed, interior_label, folio_offset, needs_folio in candidates:
         local = [(other, candidate, text, row_keys, interior)
-                 for other, candidate, panel, text, row_keys, interior in candidates
+                 for other, candidate, panel, text, row_keys, interior, offset, _ in candidates
                  if panel == side and abs(other.pno-raw.pno) <= 12
+                 and (not needs_folio or offset==folio_offset)
                  and abs(candidate.bbox[1]/other.height-line.bbox[1]/raw.height) <= .02
                  and abs(candidate.bbox[0]/other.width-line.bbox[0]/raw.width) <= .025
                  and abs((candidate.bbox[2]-candidate.bbox[0])/other.width-
@@ -613,7 +626,11 @@ def _repeated_scan_spread_heads(raw_pages, *, table_labels=None):
             len({other.pno for other, _, text in peers
                  if SequenceMatcher(None, anchor, text, autojunk=False).ratio() >= .55}) >= 3
             for _, _, anchor in peers)
-        if not contradicted and (len(matching) >= 3 or template):
+        numbered = sorted(matching)
+        progression = not needs_folio or any(raw.pno in numbered[i:i+3]
+            and numbered[i+1]-numbered[i]==numbered[i+2]-numbered[i+1]
+            and numbered[i+1]-numbered[i] in (1,2) for i in range(len(numbered)-2))
+        if not contradicted and progression and (len(matching) >= 3 or template):
             proved[raw.pno].append(line.bbox)
         elif keyed or contradicted:
             vetoes.append((raw,line,letters))

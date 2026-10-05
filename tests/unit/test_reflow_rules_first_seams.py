@@ -218,6 +218,52 @@ def test_prose_neighbors_can_prove_a_real_running_head_above_keyed_rows():
     assert not style.scan_table_label_boxes
 
 
+@pytest.mark.parametrize('bad_folios',[False,True])
+def test_scan_spread_folios_prove_body_sized_heads_below_the_fixed_margin(bad_folios):
+    from dataclasses import replace
+    raws = [_scan_spread(i,'TRADITIONAL ASTROLOGY',height=10,gap=18) for i in range(5)]
+    for raw in raws:
+        for index,line in enumerate(raw.blocks[0].lines):
+            x,y,x1,y1 = line.bbox
+            box = (x,y+32,x1,y1+32)
+            text=line.stripped
+            if y==20:
+                side=int(x>400)
+                folio=(16 if bad_folios else 16+raw.pno*2+side)
+                text=(str(folio)+' '+text) if side==0 else (text+' '+str(folio))
+            raw.blocks[0].lines[index]=replace(line,bbox=box,
+                spans=[extract.Span(text,18 if y==20 else 11,'OCR',0,box)])
+    style=skeleton.book_style(raws)
+    if bad_folios:
+        assert not style.scan_spread_head_boxes
+    else:
+        assert len(style.scan_spread_head_boxes)==5
+        assert all(len(boxes)==2 for boxes in style.scan_spread_head_boxes.values())
+
+
+@pytest.mark.parametrize('footer_kind',['progressing','missing','unrelated'])
+def test_progressing_deep_folios_prove_a_larger_short_portrait_running_head(footer_kind):
+    raws=[]
+    for page in range(5):
+        lines=[_line('Moon',192,27,11),_line('Ordinary source prose continues here',40,78,8.5),
+               _line('and continues over the following leaf',40,590,8.5)]
+        if footer_kind!='missing':
+            lines.append(_line(str(105+page if footer_kind=='progressing' else 105),197,630,11))
+        raw=extract.RawPage(page,447,666,[extract.Block(0,(40,27,397,641),lines)],
+                            images=[extract.Image((0,0,447,666),1.0)])
+        raws.append(raw)
+    style=skeleton.book_style(raws)
+    for raw in raws:
+        head=raw.blocks[0].lines[0]
+        if footer_kind=='progressing':
+            assert skeleton._furniture_reason(head,raw,style)=='repeated_detached_head'
+            assert skeleton._furniture_reason(raw.blocks[0].lines[-1],raw,style) is not None
+        else:
+            assert skeleton._furniture_reason(head,raw,style) is None
+    book=assemble.assemble([skeleton.page_skeleton(raw,style) for raw in raws],style,raw_pages=raws)
+    assert book.conservation.ok,book.conservation.to_dict()
+
+
 @pytest.mark.parametrize('kind', ['body-sized', 'touching', 'unrelated', 'single-page', 'native'])
 def test_spread_head_proof_does_not_remove_real_content(kind):
     texts = ['28 PTE RE AE VSD Rey', 'ame) HHE REAL Ved Robey', '26 PTE RE AE VSD Robey']

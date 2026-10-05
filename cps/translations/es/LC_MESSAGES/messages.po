@@ -2368,13 +2368,14 @@ msgid "Books ordered by publisher"
 msgstr "Libros ordenados por editor"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Categorías"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Etiquetas"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Libros ordenados por categorías"
+msgid "Books grouped by tags"
+msgstr "Libros agrupados por etiquetas"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2532,8 +2533,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "Mostrar Sección de Categorías"
+msgid "Show Tags Section"
+msgstr "Mostrar la sección de etiquetas"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -4156,7 +4157,8 @@ msgstr "Rojo"
 msgid "Registration failed."
 msgstr "Error en el registro."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "Quitar {name}"
@@ -5774,6 +5776,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Categorías"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9541,11 +9547,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "Etiquetas"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr "Etiquetas — excluir"
@@ -11490,8 +11491,8 @@ msgstr "Formato del archivo: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Categoría : %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Etiquetas: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12741,6 +12742,10 @@ msgid "Upload Format"
 msgstr "Subir formato"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr " Intercambiar autor y título"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "ID de Series"
 
@@ -12866,10 +12871,6 @@ msgid "This Field is Required"
 msgstr "Este campo es obligatorio"
 
 #: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr " Intercambiar autor y título"
-
-#: cps/templates/book_table.html
 msgid "Select all"
 msgstr "Seleccionar todo"
 
@@ -12910,8 +12911,8 @@ msgid "Enter Authors"
 msgstr "Introduce los autores"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Introduce las categorías"
+msgid "Enter Tags"
+msgstr "Introduce las etiquetas"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12993,11 +12994,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"Se admiten varios valores para Autores, Etiquetas/Categorías, Idiomas y "
-"Editoriales. Usa valores separados por comas (p. ej., \"Nombre1, Nombre2\")."
+"Se admiten varios valores para autores, etiquetas, idiomas y editoriales. "
+"Usa valores separados por comas (p. ej., \"Nombre1, Nombre2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -18385,8 +18386,8 @@ msgid "Authors in this Library"
 msgstr "Autores en esta Biblioteca"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Categorías en esta Biblioteca"
+msgid "Tags in this Library"
+msgstr "Etiquetas en esta biblioteca"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -19080,6 +19081,30 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Libros ordenados por categorías"
+
+#~ msgid "Show Category Section"
+#~ msgstr "Mostrar Sección de Categorías"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Categoría : %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Introduce las categorías"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "Se admiten varios valores para Autores, Etiquetas/Categorías, Idiomas y "
+#~ "Editoriales. Usa valores separados por comas (p. ej., \"Nombre1, "
+#~ "Nombre2\")."
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Categorías en esta Biblioteca"
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

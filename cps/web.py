@@ -1261,7 +1261,7 @@ def render_category_books(page, book_id, order):
         else:
             abort(404)
     return render_title_template('index.html', random=random, entries=entries, pagination=pagination, id=book_id,
-                                 title=_("Category: %(name)s", name=tagsname), page="category", order=order[1])
+                                 title=_("Tags: %(name)s", name=tagsname), page="category", order=order[1])
 
 
 def render_language_books(page, name, order):
@@ -2737,7 +2737,7 @@ def category_list():
         entries = sorted(entries, key=lambda x: unicode_sort_key(getattr(x[0], 'sort', None) or x[0].name, get_collation_locale()), reverse=not order_no)
         char_list = generate_char_list(entries)
         return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
-                                     title=_("Categories"), page="catlist", data="category", order=order_no)
+                                     title=_("Tags"), page="catlist", data="category", order=order_no)
     else:
         abort(404)
 

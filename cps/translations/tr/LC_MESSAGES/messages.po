@@ -2219,13 +2219,14 @@ msgid "Books ordered by publisher"
 msgstr "Yayınevine göre sıralanmış eKitaplar"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Kategoriler"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Etiketler"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Kategoriye göre sıralanmış eKitaplar"
+msgid "Books grouped by tags"
+msgstr "Etiketlere göre gruplandırılmış kitaplar"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2386,9 +2387,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
-msgid "Show Category Section"
-msgstr "Kategori seçimini göster"
+msgid "Show Tags Section"
+msgstr "Etiket bölümünü göster"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -3930,7 +3930,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -5523,6 +5524,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Kategoriler"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9203,11 +9208,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "Etiketler"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11105,8 +11105,8 @@ msgstr "Biçim: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Kategori: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Etiketler: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12375,6 +12375,10 @@ msgid "Upload Format"
 msgstr "Yükleme"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr ""
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 #, fuzzy
 msgid "Series ID"
 msgstr "Seriler"
@@ -12494,10 +12498,6 @@ msgid "This Field is Required"
 msgstr ""
 
 #: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr ""
-
-#: cps/templates/book_table.html
 #, fuzzy
 msgid "Select all"
 msgstr "Kitaplık oluştur"
@@ -12543,9 +12543,8 @@ msgid "Enter Authors"
 msgstr "Yazarlar"
 
 #: cps/templates/book_table.html
-#, fuzzy
-msgid "Enter Categories"
-msgstr "Kategoriler"
+msgid "Enter Tags"
+msgstr "Etiketleri girin"
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -12637,9 +12636,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"Yazarlar, etiketler, diller ve yayıncılar için birden fazla değer "
+"desteklenir. Değerleri virgülle ayırın (ör. \"Ad1, Ad2\")."
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -17624,8 +17625,8 @@ msgid "Authors in this Library"
 msgstr "Bu kitaplıktaki Yazarlar"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Bu kitaplıktaki kategoriler"
+msgid "Tags in this Library"
+msgstr "Bu kitaplıktaki etiketler"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18285,6 +18286,24 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Seri seçimini göster"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Kategoriye göre sıralanmış eKitaplar"
+
+#, fuzzy
+#~ msgid "Show Category Section"
+#~ msgstr "Kategori seçimini göster"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Kategori: %(name)s"
+
+#, fuzzy
+#~ msgid "Enter Categories"
+#~ msgstr "Kategoriler"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Bu kitaplıktaki kategoriler"
 
 #, fuzzy
 #~ msgid "New interface available"

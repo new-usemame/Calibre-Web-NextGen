@@ -2289,13 +2289,14 @@ msgid "Books ordered by publisher"
 msgstr "Livros ordenados por editora"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Categorias"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Etiquetas"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Livros ordenados por categoria"
+msgid "Books grouped by tags"
+msgstr "Livros agrupados por etiquetas"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2454,9 +2455,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
-msgid "Show Category Section"
-msgstr "Mostrar secção da categoria"
+msgid "Show Tags Section"
+msgstr "Mostrar secção de etiquetas"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -3994,7 +3994,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -5587,6 +5588,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Categorias"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9267,11 +9272,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "Etiquetas"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11170,8 +11170,8 @@ msgstr "Formato do ficheiro: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Categoria: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Etiquetas: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12449,6 +12449,11 @@ msgid "Upload Format"
 msgstr "Formato de carregamento"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+#, fuzzy
+msgid " Exchange author & title"
+msgstr "Trocar autor por título"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "Identificador da série"
 
@@ -12570,11 +12575,6 @@ msgstr "Este campo é obrigatório"
 
 #: cps/templates/book_table.html
 #, fuzzy
-msgid " Exchange author & title"
-msgstr "Trocar autor por título"
-
-#: cps/templates/book_table.html
-#, fuzzy
 msgid "Select all"
 msgstr "Criar estante"
 
@@ -12616,8 +12616,8 @@ msgid "Enter Authors"
 msgstr "Preencher autores"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Preencher categorias"
+msgid "Enter Tags"
+msgstr "Introduzir etiquetas"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12701,9 +12701,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"São suportados vários valores para autores, etiquetas, idiomas e editoras. "
+"Separe os valores por vírgulas (por exemplo, \"Nome1, Nome2\")."
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -17717,8 +17719,8 @@ msgid "Authors in this Library"
 msgstr "Autores nesta biblioteca"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Categorias nesta biblioteca"
+msgid "Tags in this Library"
+msgstr "Etiquetas nesta biblioteca"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18376,6 +18378,23 @@ msgstr "Sincronizar com Kobo as estantes selecionadas"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar secção de lidos/não lidos"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Livros ordenados por categoria"
+
+#, fuzzy
+#~ msgid "Show Category Section"
+#~ msgstr "Mostrar secção da categoria"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Categoria: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Preencher categorias"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Categorias nesta biblioteca"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

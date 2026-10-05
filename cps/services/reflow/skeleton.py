@@ -22,6 +22,7 @@ chart labels actually are — stray single glyphs and columns of numbers.
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
+from difflib import SequenceMatcher
 from statistics import median
 from typing import List, Optional, Tuple
 
@@ -250,6 +251,7 @@ class BookStyle(object):
     folio_boxes: dict = field(default_factory=dict)
     local_running_boxes: dict = field(default_factory=dict)
     repeated_head_boxes: dict = field(default_factory=dict)
+    scan_spread_head_boxes: dict = field(default_factory=dict)
 
     @property
     def boiler_threshold(self):
@@ -509,6 +511,67 @@ def _repeated_detached_heads(raw_pages, body_size):
     return dict(proved)
 
 
+def _repeated_scan_spread_heads(raw_pages):
+    """Qualify damaged marginal lettering above two measured prose panels.
+
+    OCR type-size estimates and exact spellings are unreliable here. Require a
+    detached, physically smaller row, an actual empty central gutter, matching
+    placement and similar source lettering on three nearby leaves. Only exact
+    original line occurrences acquire the role; no recognized text is repaired.
+    """
+    candidates = []
+    for raw in raw_pages:
+        if not raw.is_page_scan or raw.width < raw.height * 1.2:
+            continue
+        lines = [line for block in raw.text_blocks for line in block.lines if line.stripped]
+        wide = [line for line in lines if raw.width*.25 <= line.bbox[2]-line.bbox[0] <= raw.width*.45
+                and line.bbox[3] > raw.height*.05 and line.bbox[1] < raw.height*.85]
+        panels = [[line for line in wide if (line.bbox[0]+line.bbox[2])/2 < raw.width*.5],
+                  [line for line in wide if (line.bbox[0]+line.bbox[2])/2 > raw.width*.5]]
+        if any(len(panel) < 4 for panel in panels):
+            continue
+        gutter = (max(line.bbox[2] for line in panels[0]), min(line.bbox[0] for line in panels[1]))
+        if gutter[1]-gutter[0] < raw.width*GUTTER_MIN or any(
+                line.bbox[0] < gutter[0] and line.bbox[2] > gutter[1] for line in lines):
+            continue
+        for side, panel in enumerate(panels):
+            height = median(line.bbox[3]-line.bbox[1] for line in panel)
+            x0, x1 = min(line.bbox[0] for line in panel), max(line.bbox[2] for line in panel)
+            members = [line for line in lines if (line.bbox[2] <= gutter[0] if side==0 else line.bbox[0] >= gutter[1])]
+            if not members or height <= 0:
+                continue
+            first = min(members, key=lambda line: line.bbox[1])
+            remaining = [line for line in members if line is not first]
+            letters = re.sub(r'[^a-z]', '', first.stripped.lower())
+            if (len(letters) < 6 or len(first.stripped) > BAND_TEXT_MAX or CAPTION_LINE.match(first.stripped)
+                    or first.bbox[3] > raw.height*.08 or first.bbox[3]-first.bbox[1] > height*.75
+                    or first.bbox[2]-first.bbox[0] > raw.width*.32 or not remaining
+                    or min(line.bbox[1] for line in remaining)-first.bbox[3] < height*.65
+                    or min(abs(first.bbox[0]-x0), abs(first.bbox[2]-x1)) > raw.width*.03):
+                continue
+            candidates.append((raw, first, side, letters))
+    proved = defaultdict(list)
+    for raw, line, side, letters in candidates:
+        peers = [(other, candidate, text) for other, candidate, panel, text in candidates
+                 if panel == side and abs(other.pno-raw.pno) <= 12
+                 and abs(candidate.bbox[1]/other.height-line.bbox[1]/raw.height) <= .02
+                 and abs(candidate.bbox[0]/other.width-line.bbox[0]/raw.width) <= .025
+                 and abs((candidate.bbox[2]-candidate.bbox[0])/other.width-
+                         (line.bbox[2]-line.bbox[0])/raw.width) <= .045]
+        matching = {other.pno for other, _, text in peers
+                    if SequenceMatcher(None, letters, text, autojunk=False).ratio() >= .55}
+        # A badly damaged reading may not resemble its peers. Five matching
+        # marginal placements plus a three-leaf repeated label establish the
+        # local printed template without correcting that occurrence's words.
+        template = len({other.pno for other, _, _ in peers}) >= 5 and any(
+            len({other.pno for other, _, text in peers
+                 if SequenceMatcher(None, anchor, text, autojunk=False).ratio() >= .55}) >= 3
+            for _, _, anchor in peers)
+        if len(matching) >= 3 or template:
+            proved[raw.pno].append(line.bbox)
+    return dict(proved)
+
+
 def book_style(raw_pages, outline=None):
     """Measure the book once: body size, heading ladder, repeated band strings.
 
@@ -547,7 +610,8 @@ def book_style(raw_pages, outline=None):
                      page_count=len(raw_pages), outline=list(outline or []),
                      folio_boxes=_sequence_folios(raw_pages,body_size),
                      local_running_boxes=_local_running_folios(raw_pages,body_size),
-                     repeated_head_boxes=_repeated_detached_heads(raw_pages,body_size))
+                     repeated_head_boxes=_repeated_detached_heads(raw_pages,body_size),
+                     scan_spread_head_boxes=_repeated_scan_spread_heads(raw_pages))
 
 
 # ------------------------------------------------------------------ heading vetoes
@@ -1523,7 +1587,8 @@ def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover,
     regions = []
     claimed = {id(line) for region in skel.regions
                if region.reason == 'uncertain_aligned_scan_list' or
-                  (region.kind=='furniture' and region.reason=='sequence_folio')
+                  (region.kind=='furniture' and region.reason in
+                   ('sequence_folio', 'repeated_scan_spread_head'))
                for line in region.lines}
     eligible = {id(line) for _, lines in kept_blocks for line in lines}
     blocks = []
@@ -2048,6 +2113,8 @@ _PROSE_SENTENCE = re.compile(r"[A-Z\u201c\u2018\"']\S*[.!?](?:\s|$)")
 
 
 def _furniture_reason(line, raw, style, top_y=None):
+    if line.bbox in getattr(style, 'scan_spread_head_boxes', {}).get(raw.pno, ()):
+        return 'repeated_scan_spread_head'
     if getattr(style,"folio_boxes",{}).get(raw.pno) == line.bbox:
         return "folio_sequence"
     if getattr(style,"local_running_boxes",{}).get(raw.pno) == line.bbox:

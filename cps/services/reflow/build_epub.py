@@ -1421,7 +1421,7 @@ def _source_page_items(page_homes):
         for pno, href in sorted(page_homes.items()))
 
 
-def _printed_furniture(book, page_homes, language):
+def _printed_furniture(book, page_homes, language, evidence=None):
     """Retain exact marginal text in an accessible, page-bound inspection channel.
 
     This is published after the source gate: furniture is a separate source
@@ -1430,13 +1430,27 @@ def _printed_furniture(book, page_homes, language):
     sections = []
     for pno, inventory in sorted(getattr(book, 'source_inventory', {}).items()):
         lines = {row['id']: row['source'] for row in inventory.get('lines', [])}
-        furniture = [lines[key].text for region in inventory.get('regions', [])
-                     if region['suggested_kind'] == 'furniture' for key in region['line_ids']]
+        furniture = []
+        source = (evidence or {}).get(pno, {})
+        details = {detail['id']: detail for detail in source.get('details', [])}
+        for index, region in enumerate(inventory.get('regions', [])):
+            if region['suggested_kind'] != 'furniture':continue
+            if region['reason'] == 'repeated_scan_spread_head':
+                key = 'furniture_%d' % index
+                detail = details.get(key)
+                if not detail or not source.get('href'):
+                    raise ValueError('Original scan running-head pixels are required')
+                furniture.append('<figure><a href="%s#%s"><img src="%s" '
+                    'alt="Original printed running head"/></a><figcaption>'
+                    '<a href="%s#%s">View larger</a></figcaption></figure>' %
+                    (source['href'],key,detail['src'],source['href'],key))
+            else:
+                furniture.extend('<p>%s</p>' % escape(lines[key].text) for key in region['line_ids'])
         if not furniture or pno not in page_homes:
             continue
         sections.append('<section class="reflow-retained-furniture" id="furniture_p%04d"><h2>PDF page %d</h2>%s'
                         '<p><a href="%s#pg_%04d">Return to reading</a></p></section>' %
-                        (pno, pno+1, ''.join('<p>%s</p>' % escape(t) for t in furniture), page_homes[pno], pno))
+                        (pno, pno+1, ''.join(furniture), page_homes[pno], pno))
     if not sections:
         return None
     return _document('Printed running heads and folios',
@@ -1863,6 +1877,11 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
     scanned = {pno for pno, source in (source_pages or {}).items()
                if json.loads(source.provenance_json).get('layer') == 'ocr'}
     wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered or pno in scanned or pno in readings]
+    for pno, inventory in getattr(book, 'source_inventory', {}).items():
+        if pno in page_html and pno not in wanted and any(
+                region['suggested_kind']=='furniture' and region['reason']=='repeated_scan_spread_head'
+                for region in inventory.get('regions', [])):
+            wanted.append(pno)
     # Native figures need an inspection route even when their extraction has no
     # uncertainty flag. Add navigation after layout admission; the model-owned
     # figure, caption and source words remain unchanged.
@@ -1886,6 +1905,9 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             runtime_progress({"kind": "evidence_page", "page": pno,
                               "ordinal": index + 1, "total": len(wanted)})
         specs = []
+        for region_index, region in enumerate(getattr(book, 'source_inventory', {}).get(pno, {}).get('regions', [])):
+            if region['suggested_kind']=='furniture' and region['reason']=='repeated_scan_spread_head':
+                specs.append(('furniture_%d' % region_index, 'Original printed running head', region['bbox']))
         ambiguous = book.ambiguous_note_numbers(pno)
         if ambiguous:
             boxes = [note.bbox for note in book.notes if note.pno == pno
@@ -1954,7 +1976,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
             edge_proof = None
-            if key.startswith(('text_', 'caption_')):
+            if key.startswith(('text_', 'caption_', 'furniture_')):
                 reading_rect, edge_proof = display.complete_detail_rect(reading_rect)
                 rect = display.source_rect(reading_rect) * doc[pno].derotation_matrix
             package_source_image(src, display.source_image(reading_rect,
@@ -2397,7 +2419,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         # An ordinary spine item also works in readers which ignore EPUB page-list.
         # Keep this generated reference after the book, never inside its prose.
         if page_homes:
-            furniture = _printed_furniture(book, page_homes, language)
+            furniture = _printed_furniture(book, page_homes, language, evidence)
             if furniture:
                 documents[FURNITURE_HREF] = furniture
                 manifest.append({'id': 'printed-furniture', 'href': FURNITURE_HREF,

@@ -53,6 +53,116 @@ def test_unrepeated_heading_and_undetached_repetition_remain_body():
         assert not any(r.kind == 'furniture' for r in skel.regions)
 
 
+def _scan_spread(page, head, *, height=6, gap=12, body_height=12):
+    lines = []
+    for x in (35, 450):
+        box = (x, 20, x+125, 20+height)
+        lines.append(extract.Line([extract.Span(head, 15, 'OCR', 0, box)], box))
+        for row in range(6):
+            y = 20+height+gap+row*body_height
+            box = (x, y, x+335, y+body_height)
+            lines.append(extract.Line([extract.Span('Ordinary source prose continues across the spread.',
+                         11, 'OCR', 0, box)], box))
+    raw = extract.RawPage(page, 842, 595, [extract.Block(0,(35,20,785,130),lines)])
+    raw.text_layer_invisible = True
+    raw.images = [extract.Image((0,0,842,595), 1.0)]
+    for line in lines:
+        if line.bbox[1] == 20:
+            line.transcription_uncertain = True
+    return raw
+
+
+def test_damaged_scan_spread_heads_use_repeated_lettering_and_measured_ink_height():
+    raws = [_scan_spread(i, text) for i, text in enumerate([
+        '28 PTE RE AE VSD Rey', 'ame) HHE REAL Ved Robey', '26 PTE RE AE VSD Robey'])]
+    style = skeleton.book_style(raws)
+    for raw in raws:
+        heads = [line for line in raw.blocks[0].lines if line.bbox[1] == 20]
+        for head in heads:
+            assert skeleton._furniture_reason(head, raw, style) == 'repeated_scan_spread_head'
+        body = raw.blocks[0].lines[1]
+        assert skeleton._furniture_reason(body, raw, style) is None
+        skel = skeleton.page_skeleton(raw, style)
+        assert len([region for region in skel.regions if region.kind=='furniture']) == 2
+        assert not any(region.kind=='artwork' and region.bbox[1] == 20 for region in skel.regions)
+    book = assemble.assemble([skeleton.page_skeleton(raw,style) for raw in raws],style,raw_pages=raws)
+    assert book.conservation.ok, book.conservation.to_dict()
+    with pytest.raises(ValueError, match='pixels are required'):
+        build_epub._printed_furniture(book,{i:'ch001.xhtml' for i in range(3)},'en')
+    evidence = {}
+    for pno, inventory in book.source_inventory.items():
+        evidence[pno] = dict(href='original-p%04d.xhtml' % pno, details=[
+            dict(id='furniture_%d'%i, src='images/head_%d_%d.jpg'%(pno,i))
+            for i,region in enumerate(inventory['regions']) if region['suggested_kind']=='furniture'])
+    html = build_epub._printed_furniture(book,{i:'ch001.xhtml' for i in range(3)},'en',evidence)
+    root = ET.fromstring(html)
+    assert len(list(root.iter('{http://www.w3.org/1999/xhtml}img'))) == 6
+    assert 'PTE RE AE' not in ''.join(root.itertext())
+    assert 'View larger' in ''.join(root.itertext())
+
+
+def test_badly_damaged_head_requires_five_local_placements_and_repeated_label_template():
+    raws = [_scan_spread(i,text) for i,text in enumerate([
+        'Pith RENT Vo lRerbary', 'THE REAL ASTROLOGY', 'THE REAL ASTROLOGY',
+        'THE REAL ASTROLOGY', 'THE REAL ASTROLOGY'])]
+    style = skeleton.book_style(raws)
+    assert len(style.scan_spread_head_boxes[0]) == 2
+    # Two plausible neighbors cannot turn a different source label into a head.
+    assert 0 not in skeleton.book_style(raws[:3]).scan_spread_head_boxes
+    # Repetition far away does not establish this page's local template.
+    for raw in raws[1:]:raw.pno += 20
+    assert 0 not in skeleton.book_style(raws).scan_spread_head_boxes
+
+
+@pytest.mark.parametrize('kind', ['body-sized', 'touching', 'unrelated', 'single-page', 'native'])
+def test_spread_head_proof_does_not_remove_real_content(kind):
+    texts = ['28 PTE RE AE VSD Rey', 'ame) HHE REAL Ved Robey', '26 PTE RE AE VSD Robey']
+    if kind == 'unrelated': texts = ['Original source first label', 'Distinct words second title', 'Another unrelated third heading']
+    raws = [_scan_spread(i, text, height=12 if kind=='body-sized' else 6,
+                         gap=0 if kind=='touching' else 12) for i,text in enumerate(texts)]
+    if kind == 'single-page': raws = raws[:1]
+    if kind == 'native':
+        for raw in raws: raw.images = []
+    style = skeleton.book_style(raws)
+    assert not getattr(style, 'scan_spread_head_boxes', {})
+
+
+def test_scan_heads_publish_original_pixels_and_return_outside_reading_prose(tmp_path):
+    import zipfile
+    import pymupdf
+    raws = [_scan_spread(i,text) for i,text in enumerate([
+        '28 PTE RE AE VSD Rey', 'ame) HHE REAL Ved Robey', '26 PTE RE AE VSD Robey'])]
+    style = skeleton.book_style(raws)
+    book = assemble.assemble([skeleton.page_skeleton(raw,style) for raw in raws],style,raw_pages=raws)
+    doc = pymupdf.open()
+    try:
+        for raw in raws:
+            page = doc.new_page(width=raw.width,height=raw.height)
+            for line in raw.blocks[0].lines:
+                page.insert_text((line.bbox[0],line.bbox[3]),line.text,
+                                 fontsize=6 if line.bbox[1]==20 else 11)
+        out = tmp_path/'scan-heads.epub'
+        build_epub.build(book,str(out),doc=doc)
+        with zipfile.ZipFile(out) as z:
+            root = ET.fromstring(z.read('OEBPS/printed-furniture.xhtml'))
+            imgs = list(root.iter('{http://www.w3.org/1999/xhtml}img'))
+            assert len(imgs)==6
+            for image in imgs:
+                pix = pymupdf.Pixmap(z.read('OEBPS/'+image.attrib['src']))
+                assert min(pix.samples)<100  # real lettering, not a blank placeholder
+            links = list(root.iter('{http://www.w3.org/1999/xhtml}a'))
+            for link in links:
+                href,anchor = link.attrib['href'].split('#')
+                target = ET.fromstring(z.read('OEBPS/'+href))
+                assert target.find('.//*[@id="%s"]'%anchor) is not None
+            chapters = ''.join(z.read(name).decode() for name in z.namelist()
+                              if name.startswith('OEBPS/ch') and name.endswith('.xhtml'))
+            assert 'PTE RE AE' not in chapters
+            assert 'Ordinary source prose' in chapters
+    finally:
+        doc.close()
+
+
 def test_three_page_sentence_keeps_notes_and_notices_after_complete_prose():
     """The second seam must find the first seam's paragraph, past page-local notes."""
     notice = '<p class="source-evidence-notice">Check the original.</p>'

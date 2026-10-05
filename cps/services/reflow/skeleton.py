@@ -1176,7 +1176,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
                 blocks.append(replace(block, lines=kept,
                     bbox=_lines_bbox(kept, block.bbox)))
         note_raw = replace(raw, blocks=blocks)
-    body_blocks, note_regions = _split_off_notes(note_raw, style, skel)
+    body_blocks, note_regions = _split_off_notes(note_raw, style, skel, pixel_probe)
 
     top_y = min((ln.bbox[1] for blk in raw.text_blocks for ln in blk.lines),
                 default=None)
@@ -1947,7 +1947,7 @@ def _attach_disputed_scan_markers(raw, skel):
         skel.regions.remove(art);skel.regions.remove(carrier)
 
 
-def _split_off_notes(raw, style, skel):
+def _split_off_notes(raw, style, skel, pixel_probe=None):
     """Separate the footnote zone from the body, keeping multi-block notes together.
 
     The zone's start is chosen, not just found: a number read out of glyphs is
@@ -1959,6 +1959,11 @@ def _split_off_notes(raw, style, skel):
     carry their own evidence and do not ask for the corroboration.
     """
     from . import note_evidence
+    pixel_note = note_evidence.pixel_separated_note(raw,style.body_size,pixel_probe)
+    if pixel_note is not None:
+        body,block,number,separator = pixel_note
+        return body,[Region(kind='note',lines=list(block.lines),number=number,
+                            bbox=block.bbox,reason='native_pixel_separated_note')]
     ruled = note_evidence.ruled_region(raw)
     if ruled is not None and note_evidence.raised_opening(ruled[1][0]):
         body, notes = ruled[0], []

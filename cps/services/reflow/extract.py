@@ -614,6 +614,11 @@ class ScanPixelProbe(object):
         from .scan_grids import measure
         return measure(self._doc, self._pno, rect)
 
+    def thin_separator(self, rect, max_thickness):
+        """One continuous thin painted stroke, including its measured skew."""
+        from .scan_grids import separator
+        return separator(self._doc,self._pno,rect,max_thickness)
+
     def coverage(self, rect):
         """The share of this rectangle's blocks that hold print: near 1.0 on a
         full-bleed cover, near 0 on a text or blank page."""

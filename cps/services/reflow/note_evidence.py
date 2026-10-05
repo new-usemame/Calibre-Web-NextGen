@@ -86,6 +86,67 @@ def ruled_region(raw):
     return outside, below, tuple(rule)
 
 
+def pixel_separated_note(raw, body_size, pixel_probe):
+    """A native N. opening, isolated painted separator, and unique callout.
+
+    Some native PDFs embed the note divider as a narrow bitmap rather than a
+    drawing. Number equality alone cannot establish a note: all three source
+    witnesses and the entire lower-page territory must agree. Raw text and
+    image primitives are never edited by this proof.
+    """
+    if (pixel_probe is None or not body_size or raw.is_page_scan
+            or raw.drawings or raw.drawing_rects
+            or getattr(raw,'source_geometry',{}).get('space')=='reading'
+            or getattr(raw,'transcript_unverified',False)):
+        return None
+    candidates=[]
+    for block in raw.text_blocks:
+        if len(block.lines)<2 or block.bbox[1]<raw.height*.65:continue
+        opening,following=block.lines[:2]
+        literal=re.fullmatch(r'([1-9]\d{0,2})\.',opening.stripped)
+        if (not literal or len(opening.spans)!=1 or len(following.stripped.split())<3
+                or not following.stripped[:1].isupper()
+                or following.size>body_size*.95
+                or not 0<=following.bbox[0]-opening.bbox[2]<=body_size*3
+                or not opening.bbox[1]<=following.bbox[1]<=opening.bbox[3]
+                or following.bbox[3]<opening.bbox[3]-.25*body_size):continue
+        if any(sp.font=='ocr' or sp.uncertain or sp.encoding_unresolved or sp.transcription_uncertain
+               for ln in block.lines for sp in ln.spans):continue
+        candidates.append((block,int(literal[1])))
+    if len(candidates)!=1:return None
+    note,number=candidates[0]
+    outside=[b for b in raw.text_blocks if b is not note]
+    prose=[b for b in outside if not re.fullmatch(r'\d{1,4}',b.text.strip())]
+    if (not prose or any(b.bbox[3]>note.bbox[1] for b in outside)):
+        return None
+    left=min(b.bbox[0] for b in prose);right=max(b.bbox[2] for b in prose)
+    if (right-left<body_size*12 or abs(note.bbox[0]-left)>body_size
+            or note.bbox[2]>right+body_size*.5):return None
+    top=max(b.bbox[3] for b in prose)
+    if not body_size<=note.bbox[1]-top<=body_size*4:return None
+    callouts=[]
+    for block in prose:
+        for ln in block.lines:
+            for sp in ln.spans:
+                if sp.text.strip()!=str(number):continue
+                if (sp.font=='ocr' or sp.uncertain or sp.encoding_unresolved or sp.transcription_uncertain
+                        or sp.size>ln.size*.7):continue
+                height=ln.bbox[3]-ln.bbox[1]
+                if height>0 and sp.bbox[3]<ln.bbox[3]-.25*height:
+                    callouts.append(sp)
+    if len(callouts)!=1:return None
+    gap=(left,top,right,note.bbox[1])
+    rules=pixel_probe.rules(gap)
+    if len(rules)!=1:return None
+    if (not hasattr(pixel_probe,'thin_separator') or
+            pixel_probe.thin_separator(gap,min(2,body_size*.25)) is None):return None
+    ink=pixel_probe.ink_bounds(gap)
+    if (not ink or ink[2]-ink[0]<(right-left)*.6 or ink[3]-ink[1]>body_size*.75
+            or not ink[1]<=rules[0]<=ink[3]
+            or ink[1]-top<body_size*.35):return None
+    return outside,note,number,ink
+
+
 def raised_opening(block):
     if not block.lines:
         return False

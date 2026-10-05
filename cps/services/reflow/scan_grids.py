@@ -10,6 +10,41 @@ SCALE = 3
 MAX_PIXELS = 1_000_000
 
 
+def separator(doc,pno,rect,max_thickness):
+    """Measure one thin long rule from unmodified source pixels.
+
+    Each occupied column must contain one continuous stroke. Its thickness is
+    measured vertically, separately from the larger bounding box of a skewed
+    rule. The fitted center line is analysis only; no source is transformed.
+    """
+    if (len(rect)!=4 or not all(math.isfinite(v) for v in rect)
+            or rect[2]<=rect[0] or rect[3]<=rect[1] or not 0<max_thickness<=3
+            or (math.ceil((rect[2]-rect[0])*SCALE)+2)*
+               (math.ceil((rect[3]-rect[1])*SCALE)+2)>MAX_PIXELS):return None
+    clip=extract.pymupdf.Rect(rect)&doc[pno].rect
+    if clip.is_empty or any(abs(a-b)>.01 for a,b in zip(clip,rect)):return None
+    pix=doc[pno].get_pixmap(matrix=extract.pymupdf.Matrix(SCALE,SCALE),
+        clip=clip,colorspace=extract.pymupdf.csGRAY,alpha=False)
+    data=pix.samples;points=[];thickness=[]
+    for x in range(pix.width):
+        ys=[y for y in range(pix.height) if data[y*pix.width+x]<240]
+        if not ys:continue
+        if ys[-1]-ys[0]+1!=len(ys):return None
+        height=len(ys)/SCALE
+        # One boundary sample accounts for antialiasing/rounding at this fixed
+        # scale. The stroke ceiling remains independent of its sloped envelope.
+        if height>max_thickness+1/SCALE:return None
+        points.append((x,(ys[0]+ys[-1])/2));thickness.append(height)
+    if len(points)<pix.width*.7:return None
+    if any(b[0]-a[0]>2 for a,b in zip(points,points[1:])):return None
+    mx=sum(x for x,y in points)/len(points);my=sum(y for x,y in points)/len(points)
+    variance=sum((x-mx)**2 for x,y in points)
+    if not variance:return None
+    slope=sum((x-mx)*(y-my) for x,y in points)/variance
+    if abs(slope)>.025 or any(abs(y-my-slope*(x-mx))>SCALE for x,y in points):return None
+    return dict(slope=slope,max_thickness=max(thickness),occupied_fraction=len(points)/pix.width)
+
+
 def _tracks(image):
     from PIL import Image
     best = None

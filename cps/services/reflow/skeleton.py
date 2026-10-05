@@ -252,6 +252,7 @@ class BookStyle(object):
     local_running_boxes: dict = field(default_factory=dict)
     repeated_head_boxes: dict = field(default_factory=dict)
     scan_spread_head_boxes: dict = field(default_factory=dict)
+    scan_table_label_boxes: dict = field(default_factory=dict)
 
     @property
     def boiler_threshold(self):
@@ -511,7 +512,7 @@ def _repeated_detached_heads(raw_pages, body_size):
     return dict(proved)
 
 
-def _repeated_scan_spread_heads(raw_pages):
+def _repeated_scan_spread_heads(raw_pages, *, table_labels=None):
     """Qualify damaged marginal lettering above two measured prose panels.
 
     OCR type-size estimates and exact spellings are unreliable here. Require a
@@ -554,27 +555,55 @@ def _repeated_scan_spread_heads(raw_pages):
             if wrapped < 3:
                 continue
             x0, x1 = min(line.bbox[0] for line in panel), max(line.bbox[2] for line in panel)
-            members = [line for line in lines if (line.bbox[2] <= gutter[0] if side==0 else line.bbox[0] >= gutter[1])]
+            members = [line for line in lines if
+                       ((line.bbox[0]+line.bbox[2])/2 < raw.width*.5 if side==0
+                        else (line.bbox[0]+line.bbox[2])/2 > raw.width*.5)]
             if not members or height <= 0:
                 continue
             first = min(members, key=lambda line: line.bbox[1])
             remaining = [line for line in members if line is not first]
+            # Separate short keys beside wrapped descriptions establish rows,
+            # even when each description looks exactly like ordinary prose.
+            keys = [key for key in remaining
+                    if len(key.stripped.split()) <= 4 and key.bbox[2]-key.bbox[0] <= raw.width*.16
+                    and any(description.bbox[0]-key.bbox[2] >= height*.3
+                            and abs((description.bbox[1]+description.bbox[3]-
+                                     key.bbox[1]-key.bbox[3])/2) <= height*.4
+                            for description in panel)]
+            keyed = any(len({round(key.bbox[1]/height) for key in keys
+                             if abs(key.bbox[0]-anchor.bbox[0]) <= raw.width*.02}) >= 3
+                        for anchor in keys)
+            outer_alignment = min(abs(first.bbox[0]-min(line.bbox[0] for line in remaining)),
+                                  abs(first.bbox[2]-max(line.bbox[2] for line in remaining)))
+            alignments = [abs(first.bbox[0]-x0), abs(first.bbox[2]-x1)]
+            if keyed:
+                alignments.extend((abs(first.bbox[0]-min(line.bbox[0] for line in remaining)),
+                                   abs(first.bbox[2]-max(line.bbox[2] for line in remaining))))
             letters = re.sub(r'[^a-z]', '', first.stripped.lower())
             if (len(letters) < 6 or len(first.stripped) > BAND_TEXT_MAX or CAPTION_LINE.match(first.stripped)
                     or first.bbox[3] > raw.height*.08 or first.bbox[3]-first.bbox[1] > height*.75
                     or first.bbox[2]-first.bbox[0] > raw.width*.32 or not remaining
                     or min(line.bbox[1] for line in remaining)-first.bbox[3] < height*.65
-                    or min(abs(first.bbox[0]-x0), abs(first.bbox[2]-x1)) > raw.width*.03):
+                    or min(alignments) > raw.width*.03):
                 continue
-            candidates.append((raw, first, side, letters))
+            candidates.append((raw, first, side, letters, keyed,
+                               keyed and outer_alignment > raw.width*.03))
     proved = defaultdict(list)
-    for raw, line, side, letters in candidates:
-        peers = [(other, candidate, text) for other, candidate, panel, text in candidates
+    vetoes = []
+    for raw, line, side, letters, keyed, interior_label in candidates:
+        local = [(other, candidate, text, row_keys, interior)
+                 for other, candidate, panel, text, row_keys, interior in candidates
                  if panel == side and abs(other.pno-raw.pno) <= 12
                  and abs(candidate.bbox[1]/other.height-line.bbox[1]/raw.height) <= .02
                  and abs(candidate.bbox[0]/other.width-line.bbox[0]/raw.width) <= .025
                  and abs((candidate.bbox[2]-candidate.bbox[0])/other.width-
                          (line.bbox[2]-line.bbox[0])/raw.width) <= .045]
+        # Missing OCR row keys cannot turn that table into a prose witness.
+        # A locally repeated label aligned to an interior description column
+        # is positive contrary evidence, even on its apparently unkeyed peers.
+        contradicted = any(interior and SequenceMatcher(None,letters,text,autojunk=False).ratio() >= .55
+                           for _,_,text,_,interior in local)
+        peers = [(other,candidate,text) for other,candidate,text,row_keys,_ in local if not row_keys]
         matching = {other.pno for other, _, text in peers
                     if SequenceMatcher(None, letters, text, autojunk=False).ratio() >= .55}
         # A badly damaged reading may not resemble its peers. Five matching
@@ -584,8 +613,24 @@ def _repeated_scan_spread_heads(raw_pages):
             len({other.pno for other, _, text in peers
                  if SequenceMatcher(None, anchor, text, autojunk=False).ratio() >= .55}) >= 3
             for _, _, anchor in peers)
-        if len(matching) >= 3 or template:
+        if not contradicted and (len(matching) >= 3 or template):
             proved[raw.pno].append(line.bbox)
+        elif keyed or contradicted:
+            vetoes.append((raw,line,letters))
+    if table_labels is not None:
+        for raw,line,letters in vetoes:
+            for other in raw_pages:
+                if not other.is_page_scan or abs(other.pno-raw.pno)>12:continue
+                for block in other.text_blocks:
+                    for candidate in block.lines:
+                        if (abs(candidate.bbox[1]/other.height-line.bbox[1]/raw.height)<=.02
+                                and abs(candidate.bbox[0]/other.width-line.bbox[0]/raw.width)<=.025
+                                and abs((candidate.bbox[2]-candidate.bbox[0])/other.width-
+                                        (line.bbox[2]-line.bbox[0])/raw.width)<=.045
+                                and SequenceMatcher(None,letters,re.sub(r'[^a-z]','',candidate.stripped.lower()),
+                                                    autojunk=False).ratio()>=.55):
+                            boxes=table_labels.setdefault(other.pno,[])
+                            if candidate.bbox not in boxes:boxes.append(candidate.bbox)
     return dict(proved)
 
 
@@ -623,12 +668,14 @@ def book_style(raw_pages, outline=None):
 
     ladder = heading_ladder(body_size, census, pages, len(raw_pages))
 
+    table_labels = {}
+    spread_heads = _repeated_scan_spread_heads(raw_pages,table_labels=table_labels)
     return BookStyle(body_size=body_size, ladder=ladder, band_hits=dict(bands),
                      page_count=len(raw_pages), outline=list(outline or []),
                      folio_boxes=_sequence_folios(raw_pages,body_size),
                      local_running_boxes=_local_running_folios(raw_pages,body_size),
                      repeated_head_boxes=_repeated_detached_heads(raw_pages,body_size),
-                     scan_spread_head_boxes=_repeated_scan_spread_heads(raw_pages))
+                     scan_spread_head_boxes=spread_heads, scan_table_label_boxes=table_labels)
 
 
 # ------------------------------------------------------------------ heading vetoes
@@ -2133,6 +2180,8 @@ _PROSE_SENTENCE = re.compile(r"[A-Z\u201c\u2018\"']\S*[.!?](?:\s|$)")
 def _furniture_reason(line, raw, style, top_y=None):
     if line.bbox in getattr(style, 'scan_spread_head_boxes', {}).get(raw.pno, ()):
         return 'repeated_scan_spread_head'
+    if line.bbox in getattr(style, 'scan_table_label_boxes', {}).get(raw.pno, ()):
+        return None
     if getattr(style,"folio_boxes",{}).get(raw.pno) == line.bbox:
         return "folio_sequence"
     if getattr(style,"local_running_boxes",{}).get(raw.pno) == line.bbox:

@@ -147,6 +147,37 @@ def test_repeated_column_labels_stay_attached_to_short_table_rows(long_rows):
     assert book.conservation.ok, book.conservation.to_dict()
 
 
+@pytest.mark.parametrize('header_at_outer_edge', [False, True])
+@pytest.mark.parametrize('missing_key_pages',[0,3])
+def test_wrapped_table_descriptions_do_not_prove_repeated_running_heads(header_at_outer_edge,missing_key_pages):
+    raws = []
+    for page in range(5):
+        lines = []
+        for base,label in ((35,'Planetary powers'),(450,'House meanings')):
+            x = base if header_at_outer_edge else base+90
+            box = (x,20,x+125,26)
+            lines.append(extract.Line([extract.Span(label,6,'OCR',0,box)],box))
+            for row,key in enumerate(('Sun','Moon','Mars','Venus')):
+                y = 46+row*48
+                box = (base,y,base+80,y+11)
+                if page < 5-missing_key_pages:
+                    lines.append(extract.Line([extract.Span(key,10,'OCR',0,box)],box))
+                for off,text in ((0,'Planet name guides the native through everyday reactions'),
+                                 (12,'while its dignity can shift with changing circumstances')):
+                    box = (base+90,y+off,base+330,y+off+11)
+                    lines.append(extract.Line([extract.Span(text,10,'OCR',0,box)],box))
+        raws.append(extract.RawPage(page,842,595,[extract.Block(0,(35,20,780,235),lines)],
+                    images=[extract.Image((0,0,842,595),1.0)]))
+    style = skeleton.book_style(raws)
+    assert not style.scan_spread_head_boxes
+    skels = [skeleton.page_skeleton(raw,style) for raw in raws]
+    labels = {'Planetary powers','House meanings'}
+    assert not any(region.kind=='furniture' and labels.intersection(line.stripped for line in region.lines)
+                   for skel in skels for region in skel.regions)
+    book = assemble.assemble(skels,style,raw_pages=raws)
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
 def test_staggered_spread_heads_retain_left_then_right_source_order():
     from dataclasses import replace
     raws = [_scan_spread(i,'THE REAL ASTROLOGY') for i in range(3)]
@@ -165,6 +196,26 @@ def test_staggered_spread_heads_retain_left_then_right_source_order():
     for inventory in book.source_inventory.values():
         heads = [region for region in inventory['regions'] if region['reason']=='repeated_scan_spread_head']
         assert [region['bbox'][0] for region in heads] == [35,450]
+
+
+def test_prose_neighbors_can_prove_a_real_running_head_above_keyed_rows():
+    from dataclasses import replace
+    raws = [_scan_spread(i,'THE REAL ASTROLOGY') for i in range(4)]
+    keyed = raws[-1]
+    lines = []
+    for line in keyed.blocks[0].lines:
+        if line.bbox[1] == 20:
+            lines.append(line)
+            continue
+        x,y,x1,y1 = line.bbox
+        box = (x+90,y,x1,y1)
+        lines.append(replace(line,bbox=box,spans=[replace(span,bbox=box) for span in line.spans]))
+        keybox = (x,y,x+80,y1)
+        lines.append(extract.Line([extract.Span('Sun',11,'OCR',0,keybox)],keybox))
+    keyed.blocks[0].lines = lines
+    style = skeleton.book_style(raws)
+    assert len(style.scan_spread_head_boxes[3]) == 2
+    assert not style.scan_table_label_boxes
 
 
 @pytest.mark.parametrize('kind', ['body-sized', 'touching', 'unrelated', 'single-page', 'native'])

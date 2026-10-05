@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Entity-list browse endpoints for /api/v1."""
 from ..unicode_collation import locale_sort_key
-from flask import jsonify, request
+from flask import abort, jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy import func, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from . import api_v1
-from .. import calibre_db, db, helper
+from .. import calibre_db, constants, db, helper, tag_hierarchy
 from ..cw_login import current_user
 from ..services.calibre_db_lock import metadata_db_write_lock
 from ..usermanagement import login_required_if_no_ano
@@ -54,6 +54,19 @@ def list_tags():
             .all())
     items = [{"id": t.id, "name": t.name, "count": cnt} for t, cnt in rows]
     return {"items": items}
+
+
+@api_v1.route("/tags/tree")
+@login_required_if_no_ano
+def tag_tree():
+    """Configured built-in tag groups; the flat maintenance API stays intact."""
+    if not current_user.check_visibility(constants.SIDEBAR_CATEGORY):
+        abort(404)
+    try:
+        tree = tag_hierarchy.read_tree(calibre_db)
+    except (SQLAlchemyError, ValueError, TypeError):
+        abort(503, description=_("Tag hierarchy temporarily unavailable. Please try again."))
+    return jsonify({"hierarchical": tree.hierarchical, "items": tree.items})
 
 
 def _require_metadata_editor():

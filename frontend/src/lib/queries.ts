@@ -45,6 +45,7 @@ export const ENTITY_PLURAL: Record<EntityKind, string> = {
 };
 
 export interface BooksQuery {
+  tagPath?: string;
   page: number;
   perPage?: number;
   search?: string;
@@ -336,12 +337,13 @@ export function useBooks(q: BooksQuery) {
   const savingSource = useIsMutating({ mutationKey: ['discover-source-save'] }) > 0;
   const {
     page, perPage = 24, search = '', sort = 'new', readFilter = 'all',
-    entityKind, entityId, view, showHidden = false, enabled = true,
+    entityKind, entityId, tagPath, view, showHidden = false, enabled = true,
   } = q;
   const params = new URLSearchParams();
   params.set('page', String(page));
   params.set('per_page', String(perPage));
   params.set('sort', sort);
+  if (tagPath !== undefined) params.set('tag_path', tagPath);
   // The API's search path is separate from entity/read filtering, so `search`
   // is only sent in the unfiltered library view.
   //
@@ -367,7 +369,7 @@ export function useBooks(q: BooksQuery) {
   }
   const query = useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
-      entityKind ?? '', entityId ?? '', view ?? '', showHidden, me?.id, me?.library_mode, revision,
+      entityKind ?? '', entityId ?? '', view ?? '', tagPath ?? '', showHidden, me?.id, me?.library_mode, revision,
       view === 'discover' ? discoverSource.data?.source : '',
       view === 'discover' ? discoverSource.data?.available : true],
     queryFn: ({ signal }) => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`, { signal }),

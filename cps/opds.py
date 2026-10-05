@@ -17,9 +17,9 @@ from flask_babel import lazy_gettext as N_
 
 
 from sqlalchemy.sql.expression import func, text, or_, and_, true, false
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 
-from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy
+from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy, tag_hierarchy
 from .custom_column_visibility import retryable_column_reads, browsable_columns, is_cc_visible
 from .usermanagement import requires_basic_auth_if_no_ano, auth
 from .helper import get_download_link, get_book_cover, hot_books_page
@@ -793,7 +793,57 @@ def feed_publisher(book_id):
 def feed_categoryindex():
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
+    if request.args.get('view') != 'flat':
+        tree = _opds_tag_tree()
+        if tree.hierarchical:
+            return _opds_tag_navigation(tree.items)
     return render_element_index(db.Tags.name, db.books_tags_link, 'opds.feed_letter_category')
+
+
+def _opds_tag_tree():
+    try:
+        return tag_hierarchy.read_tree(calibre_db, get_opds_restricted_common_filter())
+    except (SQLAlchemyError, ValueError, TypeError):
+        abort(503, description=_("Tag hierarchy temporarily unavailable. Please try again."))
+
+
+def _opds_tag_navigation(nodes, parent=None):
+    elements = []
+    if parent is not None:
+        elements.append({"name": _("All books in this category"),
+                         "opds_url": url_for('opds.feed_tag_group', path=parent, books=1)})
+    for node in nodes:
+        target = (url_for('opds.feed_tag_group', path=node['path']) if node['path'] is not None
+                  else url_for('opds.feed_category', book_id=node['id']))
+        elements.append({"name": node['name'], "opds_url": target})
+    pagination = Pagination(1, max(len(elements), 1), len(elements))
+    return render_xml_template('feed.xml', listelements=elements, pagination=pagination)
+
+
+@opds.route("/opds/tag_group")
+@requires_basic_auth_if_no_ano
+def feed_tag_group():
+    if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
+        abort(404)
+    path = request.args.get('path', '')
+    if not path or len(path) > 4096:
+        abort(404)
+    tree = _opds_tag_tree()
+    try:
+        predicate = tree.book_filter(path)
+    except LookupError:
+        abort(404)
+    path = '.'.join(hierarchy.split_path(path))
+    node = tree.get_node(path)
+    if node['children'] and request.args.get('books') != '1':
+        return _opds_tag_navigation(node['children'], parent=path)
+    offset = max(request.args.get('offset', 0, type=int), 0)
+    entries, __, pagination = fill_opds_indexpage(
+        offset // config.config_books_per_page + 1, 0, db.Books,
+        and_(predicate, get_opds_restricted_common_filter()), BOOK_SORT_ORDERS['new'],
+        True, config.config_read_column)
+    cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+    return render_xml_template('feed.xml', entries=entries, pagination=pagination, cc=cc)
 
 
 @opds.route("/opds/category/letter/<book_id>")

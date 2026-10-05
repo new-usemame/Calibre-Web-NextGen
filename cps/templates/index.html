@@ -49,6 +49,22 @@
 </form>
 {% endmacro %}
 {% block body %}
+{% if tag_breadcrumbs is defined %}
+<nav class="discover" aria-label="{{ _('Breadcrumb') }}">
+  <a href="{{ url_for('web.category_list') }}">{{ _('Tags') }}</a>
+  {% for name, path in tag_breadcrumbs %}
+    <span aria-hidden="true">›</span>
+    <a href="{{ url_for('web.tag_group', path=path) }}" {% if loop.last %}aria-current="page"{% endif %}>{{ name }}</a>
+  {% endfor %}
+</nav>
+{% if tag_subcategories %}
+<div class="discover"><h2>{{ _('Subcategories') }}</h2><ul role="list">
+  {% for child in tag_subcategories %}
+  <li><a href="{{ url_for('web.tag_group', path=child.path) }}">{{ child.name }} <span class="badge">{{ child.total_count }}</span></a></li>
+  {% endfor %}
+</ul></div>
+{% endif %}
+{% endif %}
 {% if breadcrumbs %}
   {% from 'macros/hierarchy.html' import hierarchy_breadcrumbs %}
   <div class="discover">

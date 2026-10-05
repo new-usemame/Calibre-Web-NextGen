@@ -4,7 +4,7 @@
 Authentication proxies and the visibility predicate are fixture seams; these
 tests prove neither a production login nor the complete common-filter policy.
 """
-import json
+import sqlite3
 from types import SimpleNamespace
 
 import flask
@@ -111,6 +111,26 @@ def test_unparseable_tags_remain_exact_record_leaves(library_client):
     # The existing maintenance API remains flat and uses the raw stored names.
     flat = client.get("/api/v1/tags").get_json()["items"]
     assert next(node for node in flat if node["id"] == 4)["name"] == "Horror. Gothic "
+
+
+def test_large_subtree_does_not_exhaust_sqlite_bind_variables(library_client):
+    library, client = library_client
+    # More IDs than SQLite's deliberately lowered limit, with a real query.
+    library.session.execute(db.Tags.__table__.insert(), [
+        {"id": 100 + i, "name": "Scale.Child" + str(i)} for i in range(24)])
+    library.session.execute(db.books_tags_link.insert(), [
+        {"book": 1, "tag": 100 + i} for i in range(24)])
+    connection = library.session.connection().connection.driver_connection
+    previous = connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 20)
+    try:
+        assert _tree(client)["hierarchical"] is True
+        from cps import tag_hierarchy
+        tree = tag_hierarchy.read_tree(library)
+        rows = library.session.query(db.Books.id).filter(
+            library.common_filters(), tree.book_filter("Scale")).all()
+        assert [row[0] for row in rows] == [1]
+    finally:
+        connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, previous)
 
 
 @pytest.mark.parametrize("preference", [None, "[]", '["#subjects"]'])

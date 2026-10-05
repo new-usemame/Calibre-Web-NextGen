@@ -35,7 +35,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto_redirect
 from . import db, ub, config, app, user_library
-from . import calibre_db, kobo_sync_status, hierarchy
+from . import calibre_db, kobo_sync_status, hierarchy, tag_hierarchy
 from .services.ereader_send import (
     ereader_addresses, other_users_with_ereader, record_email_activity,
     send_includes_own_address,
@@ -2718,6 +2718,16 @@ def language_overview():
 @login_required_if_no_ano
 def category_list():
     if current_user.check_visibility(constants.SIDEBAR_CATEGORY):
+        if request.args.get('view') != 'flat':
+            try:
+                tree = tag_hierarchy.read_tree(calibre_db)
+            except (SQLAlchemyError, ValueError, TypeError):
+                abort(503, description=_("Tag hierarchy temporarily unavailable. Please try again."))
+            if tree.hierarchical:
+                no_tags = calibre_db.session.query(db.Books.id).filter(
+                    ~db.Books.tags.any(), calibre_db.common_filters()).count()
+                return render_title_template('tag_tree.html', entries=tree.items,
+                                             no_tag_count=no_tags, title=_("Tags"), page="catlist")
         if current_user.get_view_property('category', 'dir') == 'desc':
             order = [locale_sort_key(db.Tags.name).desc(), db.Tags.name.desc(), db.Tags.id.desc()]
             order_no = 0
@@ -2740,6 +2750,35 @@ def category_list():
                                      title=_("Categories"), page="catlist", data="category", order=order_no)
     else:
         abort(404)
+
+
+@web.route("/tag_group")
+@login_required_if_no_ano
+def tag_group():
+    if not current_user.check_visibility(constants.SIDEBAR_CATEGORY):
+        abort(404)
+    path = request.args.get('path', '')
+    if not path or len(path) > 4096:
+        abort(404)
+    try:
+        tree = tag_hierarchy.read_tree(calibre_db)
+        predicate = tree.book_filter(path)
+    except LookupError:
+        abort(404)
+    except (SQLAlchemyError, ValueError, TypeError):
+        abort(503, description=_("Tag hierarchy temporarily unavailable. Please try again."))
+    path = '.'.join(hierarchy.split_path(path))
+    node = tree.get_node(path)
+    order = _sort_context(request.args.get('sort_param', 'stored'), 'tag_group')
+    page = request.args.get('page', 1, type=int)
+    entries, random, pagination = calibre_db.fill_indexpage(
+        page, 0, db.Books, predicate, order[0], True, config.config_read_column,
+        db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series,
+        *_sort_join(order))
+    return render_title_template(
+        'index.html', entries=entries, random=random, pagination=pagination,
+        title=escape(path), page='tag_group', id=path, order=order[1],
+        tag_breadcrumbs=hierarchy.breadcrumb_trail(path), tag_subcategories=node['children'])
 
 
 @web.route("/custom_column/<int:column_id>", defaults={'category_path': ''},

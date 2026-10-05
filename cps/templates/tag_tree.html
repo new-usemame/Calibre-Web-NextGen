@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% set tree_ids = namespace(value=0) %}
+{% macro nodes(items) %}
+<ul role="list" class="tag-tree-list">
+  {% for node in items %}
+  {% set tree_ids.value = tree_ids.value + 1 %}
+  {% set children_id = 'tag-tree-children-' ~ tree_ids.value %}
+  <li>
+    <div class="tag-tree-row">
+      {% if node.children %}
+      <button type="button" class="btn btn-default tag-tree-toggle"
+              aria-expanded="false" aria-controls="{{ children_id }}" aria-label="{{ node.name }}">▸</button>
+      {% endif %}
+      <a href="{% if node.path is not none %}{{ url_for('web.tag_group', path=node.path) }}{% else %}{{ url_for('web.books_list', data='category', book_id=node.id, sort_param='stored') }}{% endif %}">
+        {{ node.name }} <span class="badge">{{ node.total_count }}</span>
+      </a>
+    </div>
+    {% if node.children %}<div id="{{ children_id }}" class="tag-tree-children" hidden>{{ nodes(node.children) }}</div>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+{% block header %}
+<style>
+.tag-tree-list { list-style: none; padding-inline-start: 1.5rem; }
+.tag-tree-row { display: flex; align-items: center; gap: .5rem; }
+.tag-tree-row a { display: inline-flex; align-items: center; min-height: 44px; gap: .5rem; overflow-wrap: anywhere; }
+.tag-tree-toggle { min-width: 44px; min-height: 44px; }
+.tag-tree-children[hidden] { display: none; }
+</style>
+{% endblock %}
+{% block body %}
+<h1>{{ _('Tags') }}</h1>
+<p><a href="{{ url_for('web.category_list', view='flat') }}">{{ _('All tags') }}</a></p>
+<p>{{ _('Select a category to see the books assigned to it and all of its sub-categories.') }}</p>
+<div data-tag-tree>{{ nodes(entries) }}</div>
+{% if no_tag_count %}
+<p><a href="{{ url_for('web.books_list', data='category', book_id=-1, sort_param='stored') }}">{{ _('None') }} <span class="badge">{{ no_tag_count }}</span></a></p>
+{% endif %}
+{% endblock %}
+{% block js %}<script src="{{ url_for('static', filename='js/tag-tree.js') }}" defer></script>{% endblock %}

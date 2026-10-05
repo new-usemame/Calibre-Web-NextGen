@@ -1,6 +1,9 @@
 {# Only named, supported scopes get an export action. No unfiltered fallback. #}
 {% set export = namespace(source=none, id=none, params={'sort': order|default('new')}) %}
-{% if page in ['root', 'newest'] %}
+{% if page == 'tag_group' %}
+  {% set export.source = 'catalog' %}
+  {% set export.params = dict(export.params, tag_path=id) %}
+{% elif page in ['root', 'newest'] %}
   {% set export.source = 'catalog' %}
 {% elif page in ['read', 'unread', 'favorites', 'archived', 'rated'] %}
   {% set export.source = 'catalog' %}

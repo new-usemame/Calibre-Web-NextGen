@@ -3915,7 +3915,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -9189,7 +9190,8 @@ msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/search_form.html
 msgid "Tags"
 msgstr "Đánh dấu"
 
@@ -12346,6 +12348,11 @@ msgid "Upload Format"
 msgstr "Định dạng tải lên"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+#, fuzzy
+msgid " Exchange author & title"
+msgstr "Đổi tác giả và tên sách"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "Series ID"
 
@@ -12461,11 +12468,6 @@ msgstr "Không tìm thấy kết quả! Hãy thử lại với từ khoá khác.
 #: cps/templates/book_table.html cps/templates/user_table.html
 msgid "This Field is Required"
 msgstr "Đây là trường bắt buộc"
-
-#: cps/templates/book_table.html
-#, fuzzy
-msgid " Exchange author & title"
-msgstr "Đổi tác giả và tên sách"
 
 #: cps/templates/book_table.html
 #, fuzzy

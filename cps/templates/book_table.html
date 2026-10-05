@@ -283,7 +283,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header text-center">
-        <span>{{_('Edit Metadata')}}</span>
+        <span id="metaEditSelectedLabel">{{_('Edit Metadata')}}</span>
       </div>
       <div class="modal-body">
         <div class="text-left">{{_('Edit the fields you want changed. Blank fields will be ignored:')}}</div>
@@ -291,45 +291,45 @@
           {{_('Multiple values are supported for Authors, Tags/Categories, Languages, and Publishers. Use comma-separated values (e.g., "Name1, Name2").')}}
         </div>
           <br>
-          Title:
+          <label for="title_input">{{_('Title')}}</label>
           <input class="form-control" id="title_input">
           <p></p>
 
-          Title Sort:
+          <label for="title_sort_input">{{_('Title Sort')}}</label>
           <input class="form-control" id="title_sort_input">
           <p></p>
 
-          Author Sort:
+          <label for="author_sort_input">{{_('Author Sort')}}</label>
           <input class="form-control" id="author_sort_input">
           <p></p>
 
-          Authors:
+          <label for="authors_input">{{_('Authors')}}</label>
           <input class="form-control" id="authors_input">
           <p></p>
 
-          Tags / Categories:
+          <label for="categories_input">{{_('Tags')}}</label>
           <input class="form-control" id="categories_input">
           <p></p>
 
-          Series:
+          <label for="series_input">{{_('Series')}}</label>
           <input class="form-control" id="series_input">
           <p></p>
 
-          Languages:
+          <label for="languages_input">{{_('Languages')}}</label>
           <input class="form-control" id="languages_input">
           <p></p>
 
-          Publishers:
+          <label for="publishers_input">{{_('Publishers')}}</label>
           <input class="form-control" id="publishers_input">
           <p></p>
 
-          Comments:
+          <label for="comments_input">{{_('Comments')}}</label>
           <input class="form-control" id="comments_input">
           <p></p>
         </div>
 
       <div class="modal-footer">
-        <input id="edit_selected_confirm" type="button" class="btn btn-danger" value="{{_('Edit')}}" name="edit_selected_confirm" id="edit_selected_confirm" data-dismiss="modal">
+        <input id="edit_selected_confirm" type="button" class="btn btn-danger" value="{{_('Edit')}}" name="edit_selected_confirm" data-dismiss="modal">
         <button id="edit_selected_abort" type="button" class="btn btn-default" data-dismiss="modal">{{_('Cancel')}}</button>
       </div>
       </div>

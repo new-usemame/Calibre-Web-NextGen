@@ -4041,7 +4041,8 @@ msgstr "Czerwony"
 msgid "Registration failed."
 msgstr "Rejestracja nie powiodła się."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "Usuń \"{name}\""
@@ -9366,7 +9367,8 @@ msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/search_form.html
 msgid "Tags"
 msgstr "Etykiety"
 
@@ -12507,6 +12509,10 @@ msgid "Upload Format"
 msgstr "Wyślij format"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr " Zamień autora i tytuł"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "ID cyklu"
 
@@ -12626,10 +12632,6 @@ msgstr "Nie znaleziono! Spróbuj użyć innego słowa kluczowego."
 #: cps/templates/book_table.html cps/templates/user_table.html
 msgid "This Field is Required"
 msgstr "To pole jest wymagane"
-
-#: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr " Zamień autora i tytuł"
 
 #: cps/templates/book_table.html
 msgid "Select all"

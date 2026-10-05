@@ -49,9 +49,11 @@ input[type=checkbox] {accent-color: #cc7b19;}
   }
 }
 
+/* The localized mirror is decoration. Reveal the canonical value while typing. */
 input.datepicker {color: transparent}
-input.datepicker:focus {color: transparent}
-input.datepicker:focus + input {color: #555}
+input.datepicker:focus {color: inherit}
+input.datepicker:has(+ input.fake-input.hidden) {color: inherit}
+input.datepicker:focus + input.fake-input {visibility: hidden}
 
 @media only screen and (max-width: 767px) {
         .row-fluid > .col-sm-2 {

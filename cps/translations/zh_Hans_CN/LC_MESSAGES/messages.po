@@ -2222,13 +2222,14 @@ msgid "Books ordered by publisher"
 msgstr "书籍按出版社排序"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "分类"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "标签"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "书籍按分类排序"
+msgid "Books grouped by tags"
+msgstr "按标签分组的书籍"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2386,8 +2387,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "显示分类栏目"
+msgid "Show Tags Section"
+msgstr "显示标签栏目"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -5511,6 +5512,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "分类"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9191,12 +9196,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "标签"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11090,8 +11089,8 @@ msgstr "文件格式：%(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "分类：%(name)s"
+msgid "Tags: %(name)s"
+msgstr "标签：%(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12507,8 +12506,8 @@ msgid "Enter Authors"
 msgstr "输入作者"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "输入分类"
+msgid "Enter Tags"
+msgstr "输入标签"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12592,11 +12591,11 @@ msgstr "编辑您想要更改的字段。空白字段将被忽略："
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"作者、标签/类别、语言和出版社均支持多个值。请使用逗号分隔的值（例如：“Name1, "
-"Name2”）。"
+"作者、标签、语言和出版社均支持多个值。请使用逗号分隔（例如：“名字1, 名字"
+"2”）。"
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -17681,8 +17680,8 @@ msgid "Authors in this Library"
 msgstr "位作者在此书库中"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "种分类在此书库中"
+msgid "Tags in this Library"
+msgstr "此书库中的标签"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18344,6 +18343,29 @@ msgstr "同步所选书架到 Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "显示已读、未读栏目"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "书籍按分类排序"
+
+#~ msgid "Show Category Section"
+#~ msgstr "显示分类栏目"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "分类：%(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "输入分类"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "作者、标签/类别、语言和出版社均支持多个值。请使用逗号分隔的值（例"
+#~ "如：“Name1, Name2”）。"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "种分类在此书库中"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr "封面文件只支持 jpg、jpeg、png、webp、bmp 文件"

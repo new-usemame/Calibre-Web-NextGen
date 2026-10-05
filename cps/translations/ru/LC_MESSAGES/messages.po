@@ -2348,13 +2348,14 @@ msgid "Books ordered by publisher"
 msgstr "Книги, упорядоченные по издателю"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Категории"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Теги"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Книги, упорядоченные по категории"
+msgid "Books grouped by tags"
+msgstr "Книги, сгруппированные по тегам"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2512,8 +2513,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "Показать раздел категорий"
+msgid "Show Tags Section"
+msgstr "Показать раздел тегов"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -5763,6 +5764,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Категории"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9585,12 +9590,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "Теги"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr "Теги — исключить"
@@ -11563,8 +11562,8 @@ msgstr "Формат файла: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Категория: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Теги: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12976,8 +12975,8 @@ msgid "Enter Authors"
 msgstr "Введите авторов"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Введите категории"
+msgid "Enter Tags"
+msgstr "Введите теги"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -13060,12 +13059,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"Для авторов, тегов/категорий, языков и издателей поддерживается ввод "
-"нескольких значений. Используйте значения через запятую (например, «Имя1, "
-"Имя2»)."
+"Для авторов, тегов, языков и издателей можно указать несколько значений. "
+"Разделяйте их запятыми (например, «Имя1, Имя2»)."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -18438,8 +18436,8 @@ msgid "Authors in this Library"
 msgstr "Авторы в этой библиотеке"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Категории в этой библиотеке"
+msgid "Tags in this Library"
+msgstr "Теги в этой библиотеке"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -19136,6 +19134,30 @@ msgstr "Показывать выбранные полки в OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Книги, упорядоченные по категории"
+
+#~ msgid "Show Category Section"
+#~ msgstr "Показать раздел категорий"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Категория: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Введите категории"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "Для авторов, тегов/категорий, языков и издателей поддерживается ввод "
+#~ "нескольких значений. Используйте значения через запятую (например, «Имя1, "
+#~ "Имя2»)."
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Категории в этой библиотеке"
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

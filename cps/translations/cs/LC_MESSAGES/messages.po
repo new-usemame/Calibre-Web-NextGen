@@ -2231,13 +2231,14 @@ msgid "Books ordered by publisher"
 msgstr "Knihy seřazené podle vydavatele"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Kategorie"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Štítky"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Knihy seřazené podle kategorie"
+msgid "Books grouped by tags"
+msgstr "Knihy seskupené podle štítků"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2396,9 +2397,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
-msgid "Show Category Section"
-msgstr "Zobrazit výběr kategorie"
+msgid "Show Tags Section"
+msgstr "Zobrazit sekci štítků"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -5532,6 +5532,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Kategorie"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9212,12 +9216,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "Štítky"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11115,8 +11113,8 @@ msgstr "Soubor formátů: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Kategorie: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Štítky: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12551,9 +12549,8 @@ msgid "Enter Authors"
 msgstr "Autoři"
 
 #: cps/templates/book_table.html
-#, fuzzy
-msgid "Enter Categories"
-msgstr "Kategorie"
+msgid "Enter Tags"
+msgstr "Zadejte štítky"
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -12644,9 +12641,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"Pro autory, štítky, jazyky a vydavatele lze zadat více hodnot. Oddělte je "
+"čárkami (např. \"Jméno1, Jméno2\")."
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -17646,8 +17645,8 @@ msgid "Authors in this Library"
 msgstr "Autorů v této knihovně"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Kategorií v této knihovně"
+msgid "Tags in this Library"
+msgstr "Štítky v této knihovně"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18312,6 +18311,24 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Zobrazit výběr sérií"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Knihy seřazené podle kategorie"
+
+#, fuzzy
+#~ msgid "Show Category Section"
+#~ msgstr "Zobrazit výběr kategorie"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Kategorie: %(name)s"
+
+#, fuzzy
+#~ msgid "Enter Categories"
+#~ msgstr "Kategorie"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Kategorií v této knihovně"
 
 #~ msgid "Only jpg/jpeg files are supported as coverfile"
 #~ msgstr "Pouze jpg/jpeg jsou podporované soubory pro obal"

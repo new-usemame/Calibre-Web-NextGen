@@ -2317,13 +2317,14 @@ msgid "Books ordered by publisher"
 msgstr "Knjige, razvrščene po založniku"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Kategorije"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Oznake"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Knjige, razvrščene po kategorijah"
+msgid "Books grouped by tags"
+msgstr "Knjige, razvrščene po oznakah"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2481,8 +2482,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "Prikaži oddelek kategorije"
+msgid "Show Tags Section"
+msgstr "Prikaži razdelek oznak"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -5606,6 +5607,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Kategorije"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -9286,12 +9291,6 @@ msgstr ""
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/cwa_settings.html
-#: cps/templates/search_form.html
-msgid "Tags"
-msgstr "Oznake"
-
 #: cps/spa_strings.py
 msgid "Tags — exclude"
 msgstr ""
@@ -11189,8 +11188,8 @@ msgstr "Vrsta datoteke: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Kategorija: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Oznake: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -12618,8 +12617,8 @@ msgid "Enter Authors"
 msgstr "Vnesi avtorja"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Vnesi kategorijo"
+msgid "Enter Tags"
+msgstr "Vnesite oznake"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12703,11 +12702,11 @@ msgstr "Uredite polja, ki jih želite spremeniti. Prazna polja bodo prezrta:"
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"Za avtorje, oznake/kategorije, jezike in založnike je podprtih več "
-"vrednosti. Uporabite vrednosti, ločene z vejico (npr. \"Ime1, Ime2\")."
+"Za avtorje, oznake, jezike in založnike lahko vnesete več vrednosti. Ločite "
+"jih z vejicami (npr. \"Ime1, Ime2\")."
 
 #: cps/templates/book_table.html
 #, fuzzy
@@ -17870,8 +17869,8 @@ msgid "Authors in this Library"
 msgstr "Avtorjev v tej knjižnici"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Kategorij v tej knjižnici"
+msgid "Tags in this Library"
+msgstr "Oznake v tej knjižnici"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18549,6 +18548,29 @@ msgstr "Usklajevanje izbrane police s Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Prikaži razdelek Prebrano/neprebrano"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Knjige, razvrščene po kategorijah"
+
+#~ msgid "Show Category Section"
+#~ msgstr "Prikaži oddelek kategorije"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Kategorija: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Vnesi kategorijo"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "Za avtorje, oznake/kategorije, jezike in založnike je podprtih več "
+#~ "vrednosti. Uporabite vrednosti, ločene z vejico (npr. \"Ime1, Ime2\")."
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Kategorij v tej knjižnici"
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

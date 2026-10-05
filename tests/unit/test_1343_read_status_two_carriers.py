@@ -269,13 +269,16 @@ class TestMirrorReadStatusToReadBook:
         assert _read_status(session, 7, 42) == ub.ReadBook.STATUS_UNREAD
 
     @pytest.mark.unit
-    def test_marking_unread_does_not_create_a_row(self):
-        """Nothing to clear means nothing to write — an UNREAD row is the
-        default state and inventing one is just a row per never-read book."""
+    def test_marking_unread_records_intent_without_starting_or_creating_positions(self):
+        """A neutral Unread row keeps explicit intent for a later paused merge."""
         session = _session()
         self._mirror()(session, 7, 42, False)
         session.commit()
-        assert _read_status(session, 7, 42) is None
+        row = session.query(ub.ReadBook).filter_by(user_id=7, book_id=42).one()
+        assert row.read_status == ub.ReadBook.STATUS_UNREAD
+        assert row.read_status_choice_at is not None
+        assert row.times_started_reading == 0
+        assert row.kobo_reading_state is None
 
     @pytest.mark.unit
     def test_scoped_to_one_user_and_one_book(self):

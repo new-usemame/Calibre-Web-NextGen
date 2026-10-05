@@ -18,6 +18,7 @@ from werkzeug.security import check_password_hash
 from . import lm, ub, config, logger, limiter, constants, services, rate_limits
 from .services import app_passwords
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 
 
 log = logger.create()
@@ -143,9 +144,10 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         # This used to hardcode dark, from when light was deprecated; #845
         # brought six themes back, so honour whatever the admin configured.
         user.theme = config_theme_code(getattr(config, 'config_theme', None))
+        seed_new_user_ui_font_defaults(user, config)
             
-        # Kobo sync setting defaults to 0 (disabled) for new users
-        user.kobo_only_shelves_sync = 0
+        # Match every other new account: send only selected shelves.
+        user.kobo_only_shelves_sync = 1
         user.opds_only_shelves_sync = 0
         
         ub.session.add(user)

@@ -63,13 +63,13 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1);
   margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted);
 }
-.crumb { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.crumb { display: inline-flex; align-items: center; gap: var(--sp-1); min-width: 0; max-width: 100%; }
 .crumbs button {
   background: none; border: 0; padding: 0; cursor: pointer;
   color: var(--accent); font: inherit;
 }
 .crumbs button:hover { text-decoration: underline; }
-.crumbs [aria-current='page'] { color: var(--text); font-weight: var(--fw-medium); }
+.crumbs [aria-current='page'] { color: var(--text); font-weight: var(--fw-medium); min-width: 0; overflow-wrap: anywhere; }
 
 .checkbox {
   display: inline-flex; align-items: center; gap: var(--sp-2);
@@ -83,8 +83,10 @@
 .facet { margin-bottom: var(--sp-4); }
 
 .navList { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); padding: 0; }
+.navList > li { min-width: 0; max-width: 100%; }
 .navChip {
   display: inline-flex; align-items: center; min-height: 36px;
+  max-width: 100%; overflow-wrap: anywhere; text-align: start;
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--border); border-radius: var(--r-full);
   background: var(--surface-1); color: var(--text);
@@ -137,7 +139,7 @@
 .pagination { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-5); }
 
 .activity { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--border); }
-.activity > h2 { margin: 0 0 var(--sp-3); font-size: var(--fs-md); font-family: var(--font-display); }
+.activity > h2 { overflow-wrap: anywhere; margin: 0 0 var(--sp-3); font-size: var(--fs-md); font-family: var(--font-display); }
 .jobs { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; }
 .job {
   display: flex; flex-wrap: wrap; gap: var(--sp-3);
@@ -178,3 +180,9 @@
   .job { align-items: flex-start; }
   .jobActions { width: 100%; }
 }
+
+/* Error borders convey severity; body text must remain readable in every theme. */
+.searchFailure > p { color: var(--text); }
+
+/* Queries and configured catalog labels can contain long unbroken words. */
+.searchStatus { overflow-wrap: anywhere; }

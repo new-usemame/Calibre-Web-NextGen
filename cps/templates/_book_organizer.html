@@ -106,7 +106,7 @@
       </button>
       <ul class="dropdown-menu" role="menu" aria-labelledby="book-organizer-shelf-toggle">
         {% for shelf_item in shelves %}
-        {% if not shelf_item.is_public or can_edit_public_shelf %}
+        {% if not current_user.is_anonymous and (shelf_item.user_id == current_user.id or (shelf_item.is_public and current_user.role_edit_shelfs())) %}
         <li role="presentation">
           <a href="#"
              role="menuitem"
@@ -174,14 +174,26 @@
 
 {# index.html / search.html book lists. `page` is the route page key, `id` is the book_id param. #}
 {% macro books_list_organizer(page, id, order, query=none, multiselect=true, settings=true, can_delete=false, can_edit_public_shelf=false, shelves=none, custom_sort_columns=none) %}
+{% macro list_sort_url(key) -%}
+  {%- if page.startswith('cc_') -%}
+    {{- url_for('web.cc_category_list', column_id=page[3:]|int, category_path=id, sort_param=key) -}}
+  {%- elif page == 'global_library' -%}
+    {{- url_for('web.global_library', sort_param=key, search=global_search|default('')) -}}
+  {%- elif query is not none -%}
+    {{- url_for('web.books_list', data=page, sort_param=key, query=query) -}}
+  {%- else -%}
+    {{- url_for('web.books_list', data=page, book_id=id, sort_param=key) -}}
+  {%- endif -%}
+{%- endmacro %}
+
 {% if page == 'hot' %}
   {% set opts = [
     {'key': 'hotasc', 'icons': ['glyphicon-sort-by-order'],
      'label': _('Downloads, fewest first'),
-     'url': url_for('web.books_list', data=page, book_id=id, sort_param='hotasc')},
+     'url': list_sort_url('hotasc')},
     {'key': 'hotdesc', 'icons': ['glyphicon-sort-by-order-alt'],
      'label': _('Downloads, most first'),
-     'url': url_for('web.books_list', data=page, book_id=id, sort_param='hotdesc')},
+     'url': list_sort_url('hotdesc')},
   ] %}
 {% else %}
   {% set opts = [] %}
@@ -189,81 +201,95 @@
     {% set opts = opts + [
       {'key': 'new', 'icons': ['glyphicon-book', 'glyphicon-calendar', 'glyphicon-sort-by-order'],
        'label': _('Date added, newest first'),
-       'url': url_for('web.books_list', data=page, sort_param='new', query=query)},
+       'url': list_sort_url('new')},
       {'key': 'old', 'icons': ['glyphicon-book', 'glyphicon-calendar', 'glyphicon-sort-by-order-alt'],
        'label': _('Date added, oldest first'),
-       'url': url_for('web.books_list', data=page, sort_param='old', query=query)},
+       'url': list_sort_url('old')},
       {'key': 'abc', 'icons': ['glyphicon-font', 'glyphicon-sort-by-alphabet'],
        'label': _('Title A → Z'),
-       'url': url_for('web.books_list', data=page, sort_param='abc', query=query)},
+       'url': list_sort_url('abc')},
       {'key': 'zyx', 'icons': ['glyphicon-font', 'glyphicon-sort-by-alphabet-alt'],
        'label': _('Title Z → A'),
-       'url': url_for('web.books_list', data=page, sort_param='zyx', query=query)},
+       'url': list_sort_url('zyx')},
       {'key': 'authaz', 'icons': ['glyphicon-user', 'glyphicon-sort-by-alphabet'],
        'label': _('Author A → Z'),
-       'url': url_for('web.books_list', data=page, sort_param='authaz', query=query)},
+       'url': list_sort_url('authaz')},
       {'key': 'authza', 'icons': ['glyphicon-user', 'glyphicon-sort-by-alphabet-alt'],
        'label': _('Author Z → A'),
-       'url': url_for('web.books_list', data=page, sort_param='authza', query=query)},
+       'url': list_sort_url('authza')},
       {'key': 'pubnew', 'icons': ['glyphicon-calendar', 'glyphicon-sort-by-order'],
        'label': _('Published, newest first'),
-       'url': url_for('web.books_list', data=page, sort_param='pubnew', query=query)},
+       'url': list_sort_url('pubnew')},
       {'key': 'pubold', 'icons': ['glyphicon-calendar', 'glyphicon-sort-by-order-alt'],
        'label': _('Published, oldest first'),
-       'url': url_for('web.books_list', data=page, sort_param='pubold', query=query)},
+       'url': list_sort_url('pubold')},
     ] %}
   {% else %}
     {% set opts = opts + [
       {'key': 'new', 'icons': ['glyphicon-book', 'glyphicon-calendar', 'glyphicon-sort-by-order'],
        'label': _('Date added, newest first'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='new')},
+       'url': list_sort_url('new')},
       {'key': 'old', 'icons': ['glyphicon-book', 'glyphicon-calendar', 'glyphicon-sort-by-order-alt'],
        'label': _('Date added, oldest first'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='old')},
+       'url': list_sort_url('old')},
       {'key': 'abc', 'icons': ['glyphicon-font', 'glyphicon-sort-by-alphabet'],
        'label': _('Title A → Z'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='abc')},
+       'url': list_sort_url('abc')},
       {'key': 'zyx', 'icons': ['glyphicon-font', 'glyphicon-sort-by-alphabet-alt'],
        'label': _('Title Z → A'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='zyx')},
+       'url': list_sort_url('zyx')},
       {'key': 'authaz', 'icons': ['glyphicon-user', 'glyphicon-sort-by-alphabet'],
        'label': _('Author A → Z'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='authaz')},
+       'url': list_sort_url('authaz')},
       {'key': 'authza', 'icons': ['glyphicon-user', 'glyphicon-sort-by-alphabet-alt'],
        'label': _('Author Z → A'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='authza')},
+       'url': list_sort_url('authza')},
       {'key': 'pubnew', 'icons': ['glyphicon-calendar', 'glyphicon-sort-by-order'],
        'label': _('Published, newest first'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='pubnew')},
+       'url': list_sort_url('pubnew')},
       {'key': 'pubold', 'icons': ['glyphicon-calendar', 'glyphicon-sort-by-order-alt'],
        'label': _('Published, oldest first'),
-       'url': url_for('web.books_list', data=page, book_id=id, sort_param='pubold')},
+       'url': list_sort_url('pubold')},
     ] %}
-    {% if page == 'magicshelf' and custom_sort_columns %}
-      {% set custom_opts = namespace(items=[]) %}
-      {% for column in custom_sort_columns %}
-        {% set custom_opts.items = custom_opts.items + [
-          {'key': 'cc-' ~ column.id ~ '-asc', 'icons': ['glyphicon-sort-by-order'],
-           'label': column.name ~ ' ↑',
-           'url': url_for('web.render_magic_shelf', shelf_id=id, sort_param='cc-' ~ column.id ~ '-asc')},
-          {'key': 'cc-' ~ column.id ~ '-desc', 'icons': ['glyphicon-sort-by-order-alt'],
-           'label': column.name ~ ' ↓',
-           'url': url_for('web.render_magic_shelf', shelf_id=id, sort_param='cc-' ~ column.id ~ '-desc')},
-        ] %}
-      {% endfor %}
-      {% set opts = opts + custom_opts.items %}
-    {% endif %}
+
     {% if page == 'series' %}
       {% set opts = opts + [
         {'key': 'seriesasc', 'icons': ['glyphicon-sort-by-order'],
          'label': _('Series number, ascending'),
-         'url': url_for('web.books_list', data=page, book_id=id, sort_param='seriesasc')},
+         'url': list_sort_url('seriesasc')},
         {'key': 'seriesdesc', 'icons': ['glyphicon-sort-by-order-alt'],
          'label': _('Series number, descending'),
-         'url': url_for('web.books_list', data=page, book_id=id, sort_param='seriesdesc')},
+         'url': list_sort_url('seriesdesc')},
       ] %}
     {% endif %}
   {% endif %}
+  {% if page in ['root', 'global_library', 'rated', 'unread', 'read', 'author', 'publisher', 'series', 'ratings', 'formats', 'category', 'language', 'archived', 'favorites', 'hidden', 'hidden_books', 'search', 'advsearch', 'magicshelf'] or page.startswith('cc_') %}
+    {% if custom_sort_columns is none and classic_sort_columns is defined %}
+      {% set custom_sort_columns = classic_sort_columns() %}
+    {% endif %}
+    {% set custom_opts = namespace(items=[]) %}
+    {% for column in custom_sort_columns or [] %}
+      {% for direction, arrow in [('asc', '↑'), ('desc', '↓')] %}
+        {% set key = 'cc-' ~ column.id ~ '-' ~ direction %}
+        {% if page == 'magicshelf' %}
+          {% set sort_url = url_for('web.render_magic_shelf', shelf_id=id, sort_param=key) %}
+        {% else %}
+          {% set sort_url = list_sort_url(key) %}
+        {% endif %}
+        {% set custom_opts.items = custom_opts.items + [
+          {'key': key, 'icons': ['glyphicon-sort-by-order' if direction == 'asc' else 'glyphicon-sort-by-order-alt'],
+           'label': column.name ~ ' ' ~ arrow, 'url': sort_url},
+        ] %}
+      {% endfor %}
+    {% endfor %}
+    {% set opts = opts + custom_opts.items %}
+  {% endif %}
+
+{% endif %}
+{% if page == 'global_library' and recent_missing|default(false) %}
+  {# This dedicated view always lists missing books newest first. #}
+  {% set opts = [{'key': 'new', 'icons': opts[0].icons, 'label': opts[0].label,
+                  'url': list_sort_url('recent-missing')}] %}
 {% endif %}
 {# remap order alias 'abc' is order key for title asc; the existing template uses order=='abc' so map matches #}
 {{ organizer_bar(active_key=order, sort_options=opts,
@@ -294,6 +320,18 @@
    'label': _('Published, oldest first'),
    'url': url_for('web.books_list', data='author', book_id=id, sort_param='pubold')},
 ] %}
+{% set custom_opts = namespace(items=[]) %}
+{% for column in (classic_sort_columns() if classic_sort_columns is defined else []) %}
+  {% for direction, arrow in [('asc', '↑'), ('desc', '↓')] %}
+    {% set key = 'cc-' ~ column.id ~ '-' ~ direction %}
+    {% set custom_opts.items = custom_opts.items + [
+      {'key': key, 'icons': ['glyphicon-sort-by-order' if direction == 'asc' else 'glyphicon-sort-by-order-alt'],
+       'label': column.name ~ ' ' ~ arrow,
+       'url': url_for('web.books_list', data='author', book_id=id, sort_param=key)},
+    ] %}
+  {% endfor %}
+{% endfor %}
+{% set opts = opts + custom_opts.items %}
 {{ organizer_bar(active_key=order, sort_options=opts,
                  can_delete=can_delete, can_edit_public_shelf=can_edit_public_shelf, shelves=shelves) }}
 {% endmacro %}

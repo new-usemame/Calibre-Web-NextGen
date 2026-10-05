@@ -75,7 +75,7 @@
 
       <div class="form-group">
         <label>{{_('Custom columns')}}</label>
-        <p class="settings-explanation">{{_('Magic Shelves')}} — {{_('Sort by')}}</p>
+        <p class="settings-explanation">{{_('Sort by')}}</p>
         {% set selected_sort_columns = (conf.config_sortable_custom_columns or '').split(',') %}
         {% for sortColumn in sortableColumns %}
         <div class="checkbox">
@@ -107,7 +107,7 @@
           <option value="{{ restrictColumn.id }}" {% if restrictColumn.id == conf.config_restricted_column %}selected{% endif %}>{{ restrictColumn.name }}</option>
           {% endfor %}
         </select>
-        <p class="settings-explanation">{{_('Restrict book visibility based on values in a Calibre text custom column.')}}</p>
+        <p class="settings-explanation">{{_('Restrict book visibility based on values in a Calibre text, enumeration, or Boolean custom column. Boolean columns distinguish Yes, No, and Undefined.')}}</p>
       </div>
       
       <div class="form-group">
@@ -120,6 +120,27 @@
     <!-- Site Customization Card (fork #463: moved here from Basic Configuration) -->
     <div class="settings-container">
       <h4 class="settings-section-header">{{_('Site Customization')}}</h4>
+      <input type="hidden" name="support_settings_present" value="1">
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="config_show_project_support" value="on"
+                 {% if conf.config_show_project_support is not defined or conf.config_show_project_support %}checked{% endif %}>
+          {{_('Show Calibre-Web NextGen support links to readers')}}
+        </label>
+        <p class="settings-explanation">{{_('When enabled, readers see the project support links. Administrators always see them.')}}</p>
+      </div>
+      <div class="form-group">
+        <label for="config_support_url">{{_('Your support URL')}}</label>
+        <input type="url" class="form-control" name="config_support_url" id="config_support_url"
+               maxlength="2048" value="{{ conf.config_support_url or '' }}" autocomplete="off">
+        <p class="settings-explanation">{{_('When project support links are hidden, readers can use this destination instead. Leave blank to hide those links without a replacement. Use an absolute HTTP or HTTPS URL without username or password.')}}</p>
+      </div>
+      <div class="form-group">
+        <label for="config_support_label">{{_('Your support link label')}}</label>
+        <input type="text" class="form-control" name="config_support_label" id="config_support_label"
+               maxlength="80" value="{{ conf.config_support_label or '' }}" autocomplete="off">
+        <p class="settings-explanation">{{_('Up to 80 characters. If left blank while a URL is set, the link says “Contact support”.')}}</p>
+      </div>
       {# Fork #225 (@froggybottomboys): admin-set server-wide announcement banner. #}
       <div class="form-group">
         <label for="config_server_announcement">{{_('Server announcement banner')}}</label>
@@ -215,6 +236,26 @@
       </div>
 
       <div class="form-group">
+        <label for="config_default_ui_font_body">{{_('Default UI body font for new users')}}</label>
+        <select name="config_default_ui_font_body" id="config_default_ui_font_body" class="form-control" aria-describedby="default-ui-font-help">
+          <option value="" {% if not conf.config_default_ui_font_body %}selected{% endif %}>{{_('Default (System Sans-Serif)')}}</option>
+          <option value="system-sans" {% if conf.config_default_ui_font_body == "system-sans" %}selected{% endif %}>{{_('System Sans-Serif')}}</option>
+          <option value="serif" {% if conf.config_default_ui_font_body == "serif" %}selected{% endif %}>{{_('Bookish Serif')}}</option>
+          <option value="mono" {% if conf.config_default_ui_font_body == "mono" %}selected{% endif %}>{{_('Monospace')}}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="config_default_ui_font_display">{{_('Default UI display font for new users')}}</label>
+        <select name="config_default_ui_font_display" id="config_default_ui_font_display" class="form-control" aria-describedby="default-ui-font-help">
+          <option value="" {% if not conf.config_default_ui_font_display %}selected{% endif %}>{{_('Default (System Sans-Serif)')}}</option>
+          <option value="system-sans" {% if conf.config_default_ui_font_display == "system-sans" %}selected{% endif %}>{{_('System Sans-Serif')}}</option>
+          <option value="serif" {% if conf.config_default_ui_font_display == "serif" %}selected{% endif %}>{{_('Bookish Serif')}}</option>
+          <option value="mono" {% if conf.config_default_ui_font_display == "mono" %}selected{% endif %}>{{_('Monospace')}}</option>
+        </select>
+        <p id="default-ui-font-help" class="settings-explanation">{{_('Applies to accounts created from now on. Each user can change these fonts under Account settings.')}}</p>
+      </div>
+
+      <div class="form-group">
         <label for="config_opds_default_locale">{{_('OPDS Default Locale for Anonymous Clients')}}</label>
         <select name="config_opds_default_locale" id="config_opds_default_locale" class="form-control">
           <option value="" {% if not conf.config_opds_default_locale %}selected{% endif %}>{{_('(none — fall back to English)')}}</option>
@@ -226,11 +267,31 @@
       </div>
     </div>
     
+    <div class="settings-container">
+      <h4 class="settings-section-header">{{_('OPDS Downloads')}}</h4>
+      <div class="form-group">
+        <label for="config_opds_filename_template">{{_('OPDS download filename template')}}</label>
+        <input type="text" class="form-control" name="config_opds_filename_template" id="config_opds_filename_template"
+               value="{{ opds_filename_template if opds_filename_template is not none and opds_filename_template is defined else conf.config_opds_filename_template or '' }}" maxlength="1024" placeholder="{author_sort} - {title} ({id})"
+               aria-describedby="opds-filename-help{% if opds_filename_error %} opds-filename-error{% endif %}"{% if opds_filename_error %} aria-invalid="true"{% endif %}>
+        {% if opds_filename_error %}<p id="opds-filename-error" class="opds-filename-error" role="alert">{{ opds_filename_error }}</p>{% endif %}
+        <p id="opds-filename-help" class="settings-explanation">{{_('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}}</p>
+        <p class="settings-explanation">{{_('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}}</p>
+        <details>
+          <summary>{{_('Filename template fields and examples')}}</summary>
+          <p><code>{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {{ '{#custom_field}' }}</code></p>
+          <p>{{_('First character:')}} <code>{author_sort[0]}</code>. {{_('Padded series number:')}} <code>{series_index:0&gt;3s}</code>.</p>
+          <p>{{_('Example:')}} <code>{series:|| - }{series_index:0&gt;3s|| - }{title}</code></p>
+          <p>{{_('In KOReader, enable Use server filenames for the OPDS catalog.')}}</p>
+        </details>
+      </div>
+    </div>
+
     <!-- Default Visibilities for New Users Card -->
     <div class="settings-container">
       <h4 class="settings-section-header">{{_('Default Visibilities for New Users')}}</h4>
       <p class="settings-explanation">{{_('Choose which sidebar sections are visible by default for new users.')}}</p>
-      
+
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 20px; background: #202c34a3; padding: 2rem; border-radius: 4px;">
         {% for element in sidebar %}
           {% if element['config_show'] %}
@@ -245,7 +306,7 @@
           <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
       </div>
-      
+
       {% if not simple %}
       <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #5c6b74;">
         <a href="#" id="get_tags" data-id="0" class="btn btn-default" data-toggle="modal" data-target="#restrictModal">{{_('Add Allowed/Denied Tags')}}</a>
@@ -263,7 +324,7 @@
 </div>
 {% endblock %}
 {% block modal %}
-{{ restrict_modal() }}
+{{ restrict_modal(restriction_is_bool|default(false)) }}
 {% endblock %}
 {% block js %}
 <script src="{{ url_for('static', filename='js/libs/bootstrap-table/bootstrap-table.min.js') }}"></script>

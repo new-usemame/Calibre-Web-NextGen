@@ -19,6 +19,25 @@ PROBE = Path(__file__).with_name("calibre_ingest_runtime_probe.py")
 FIXTURE = REPO_ROOT / "tests/fixtures/sample_books/test_minimal_valid.epub"
 
 
+def test_real_calibre_folder_labels_original_source_and_replay(cwa_container, container_name):
+    """Check real tag/custom-field APIs and stale-target recovery in the image."""
+    folder_probe = PROBE.with_name("ingest_folder_labels_runtime_probe.py")
+    for path in (PROBE, folder_probe, FIXTURE):
+        subprocess.run(["docker", "cp", str(path), f"{container_name}:/tmp/{path.name}"], check=True)
+    completed = subprocess.run(
+        ["docker", "exec", container_name, "cwa-as-abc", "python3",
+         f"/tmp/{folder_probe.name}", "--fixture", f"/tmp/{FIXTURE.name}"],
+        check=False, capture_output=True, text=True, timeout=240,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    records = [line.split("=", 1)[1] for line in completed.stdout.splitlines()
+               if line.startswith("CWNG_FOLDER_LABELS=")]
+    assert records, completed.stdout
+    result = json.loads(records[-1])
+    assert result["stale_target_retained"]
+    assert result["root_noop"] and result["disabled_noop"]
+
+
 def test_real_calibre_identical_overwrite_and_rollback_recovery(
     cwa_container, container_name
 ):

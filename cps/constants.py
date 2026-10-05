@@ -157,10 +157,6 @@ def tmp_conversion_dir():
         DEFAULT_TMP_CONVERSION_DIR,
     )
 
-# Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
-DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
-CACHE_DIR           = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
-
 OAUTH_SSL_STRICT = os.environ.get('OAUTH_SSL_STRICT', "1").lower() in ("true", "1")
 
 if HOME_CONFIG:
@@ -172,6 +168,13 @@ else:
     CONFIG_DIR = os.environ.get('CALIBRE_DBPATH', BASE_DIR)
     if getattr(sys, 'frozen', False):
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
+
+
+# Derived cache belongs with writable per-install state, not image-owned code.
+# Existing explicit CACHE_DIR deployments keep their chosen location. Thumbnail
+# cache already uses CONFIG_DIR/thumbnails and is deliberately unchanged.
+DEFAULT_CACHE_DIR = os.path.join(CONFIG_DIR, 'cache')
+CACHE_DIR = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
 
 
 def config_path(*parts, _join=os.path.join):

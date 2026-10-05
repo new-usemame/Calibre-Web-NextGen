@@ -242,7 +242,7 @@ def test_global_detail_hides_member_state_for_non_member():
         patch.object(books_mod, "current_user", editor), \
         patch.object(books_mod, "count_user_annotations") as annotations, \
         patch.object(books_mod, "get_kosync_progress_display") as progress, \
-        patch.object(books_mod, "book_is_in_progress") as in_progress, \
+        patch.object(books_mod, "read_statuses_for_books") as statuses, \
         patch.object(books_mod, "_original_filename", return_value=None), \
         patch.object(books_mod, "get_convert_options", return_value=([], [])), \
         patch.object(books_mod.user_cover, "override_for_user", return_value=None), \
@@ -259,13 +259,14 @@ def test_global_detail_hides_member_state_for_non_member():
     assert body["favorited"] is False
     assert body["hidden"] is False
     assert body["in_progress"] is False
+    assert body["read_status"] == "unread"
     assert body["annotation_count"] == 0
     assert body["kosync_progress"] is None
     assert body["kosync_progress_timestamp"] is None
     assert body["kosync_progress_created_at"] is None
     annotations.assert_not_called()
     progress.assert_not_called()
-    in_progress.assert_not_called()
+    statuses.assert_not_called()
     get_book.assert_called_once_with(
         42,
         0,

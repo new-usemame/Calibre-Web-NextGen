@@ -55,7 +55,7 @@ test('Classic and New UI consume the canonical rule schema and date rules previe
     expect(payload.count).toBeGreaterThanOrEqual(0);
   }
 
-  await page.goto('/app/magic');
+  await page.goto('/app/magic/new');
   await expect(page.locator('main#main h1')).toBeVisible();
   const spaField = page.locator('main#main select:has(option[value="pubdate"])').first();
   const spaOperator = page.locator('main#main select:has(option[value="in_last_days"])').first();

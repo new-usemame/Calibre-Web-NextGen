@@ -33,7 +33,9 @@ Three invariants this test pins:
    awkward to invoke from a unit test without full app init.
 """
 
-import inspect
+from types import SimpleNamespace
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 import pytest
 
@@ -96,67 +98,28 @@ class TestCurrentlyReadingTemplate:
 
 
 @pytest.mark.unit
-class TestBuildFilterFromRuleHandlesThreeStatuses:
-    def test_in_progress_branch_filters_on_status_in_progress(self):
-        """The no-custom-column fallback in build_filter_from_rule
-        must dispatch on int(value) and query ReadBook with
-        STATUS_IN_PROGRESS when value == 2. Before the backport, the
-        function only knew STATUS_FINISHED — in-progress books would
-        be classified as finished. Source-pin because the function
-        depends on ub.session at runtime."""
-        from cps.magic_shelf import build_filter_from_rule
-
-        src = inspect.getsource(build_filter_from_rule)
-        assert "ub.ReadBook.STATUS_IN_PROGRESS" in src, (
-            "build_filter_from_rule must reference STATUS_IN_PROGRESS "
-            "by name in its built-in fallback so the read_status==2 "
-            "preset resolves to the correct ReadBook query."
-        )
-        # The STATUS_IN_PROGRESS branch must run its own query (not
-        # share with the STATUS_FINISHED branch). Pin that there are
-        # at least two distinct ReadBook.read_status comparisons in
-        # the fallback — one IN_PROGRESS, one FINISHED.
-        assert src.count("ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS") >= 1
-        assert src.count("ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED") >= 1
-
-    def test_status_value_parsed_as_int_not_bool(self):
-        """The pre-backport code did `is_checking_read = (int(value) == 1)`
-        which collapsed all non-1 values to the unread branch. The
-        backport must parse status_value as int and dispatch on its
-        actual numeric value, not coerce to bool."""
-        from cps.magic_shelf import build_filter_from_rule
-
-        src = inspect.getsource(build_filter_from_rule)
-        assert "status_value = int(value)" in src, (
-            "build_filter_from_rule must parse the rule value as a "
-            "true integer (status_value = int(value)) so 0/1/2 each "
-            "dispatch to their own branch. The pre-fix `is_checking_"
-            "read = (int(value) == 1)` shape collapsed 2 to False."
-        )
-        assert "is_checking_read = (int(value) == 1)" not in src, (
-            "build_filter_from_rule must not retain the boolean-coerce "
-            "shape; that path silently misroutes STATUS_IN_PROGRESS."
-        )
-
-    def test_unread_branch_uses_complement_of_finished_set(self):
-        """The unread branch must NOT issue a query for ReadBook rows
-        with STATUS_UNREAD (such rows often don't exist — the default
-        is "no ReadBook row at all"). It must build the unread set as
-        the complement of STATUS_FINISHED book ids, mirroring how the
-        original pre-backport code worked. If a future edit changes
-        the unread branch to filter on STATUS_UNREAD directly, users
-        with no ReadBook rows would see an empty unread shelf."""
-        from cps.magic_shelf import build_filter_from_rule
-
-        src = inspect.getsource(build_filter_from_rule)
-        # The unread branch must emit ~db.Books.id.in_(...) when
-        # status_value == STATUS_UNREAD. Pin the operator usage.
-        assert "~db.Books.id.in_(matching_book_ids)" in src, (
-            "Unread must be expressed as the negation of the finished "
-            "set (~db.Books.id.in_(matching_book_ids)). Direct "
-            "STATUS_UNREAD filtering would miss users whose default "
-            "state is no ReadBook row."
-        )
+def test_legacy_magic_read_rules_select_real_statuses_and_include_untouched_books(monkeypatch):
+    """The actual SQL must distinguish in-progress from read and retain absent rows."""
+    from cps import db, ub, config, magic_shelf
+    engine = create_engine("sqlite://")
+    db.Books.__table__.create(engine)
+    ub.ReadBook.__table__.create(engine)
+    session = sessionmaker(bind=engine)()
+    for book_id in range(1, 5):
+        session.execute(db.Books.__table__.insert().values(
+            id=book_id, title=str(book_id), sort=str(book_id), author_sort="A",
+            uuid=str(book_id), series_index=1, path="A/" + str(book_id), has_cover=0))
+    for book_id, status in ((1, 0), (2, 1), (3, 2)):
+        session.add(ub.ReadBook(user_id=7, book_id=book_id, read_status=status))
+    session.commit()
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(config, "config_read_column", 0, raising=False)
+    for value, expected in (("0", [1, 3, 4]), ("1", [2]), ("2", [3])):
+        condition = magic_shelf.build_filter_from_rule(
+            {"id": "read_status", "operator": "equal", "value": value}, user_id=7)
+        assert sorted(book_id for book_id, in session.query(db.Books.id).filter(condition)) == expected
+    session.close()
+    engine.dispose()
 
 
 @pytest.mark.unit
@@ -180,4 +143,5 @@ class TestQueryBuilderTemplateExposesThreeRadioValues:
             "collapses to 0/1 only."
         )
         assert read_status["input"] == "radio"
-        assert read_status["values"] == {0: "Unread", 2: "Currently Reading", 1: "Read"}
+        assert read_status["values"] == {0: "Unread", 2: "Currently Reading", 1: "Read",
+                                        3: "Did not finish", 4: "On hold"}

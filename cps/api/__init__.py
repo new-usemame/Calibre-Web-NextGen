@@ -204,12 +204,16 @@ from . import shelves  # noqa: E402,F401
 from . import search   # noqa: E402,F401
 from . import account  # noqa: E402,F401
 from . import reader   # noqa: E402,F401
+from . import reader_fonts  # noqa: E402,F401
+from . import book_reviews  # noqa: E402,F401
+from . import ingest_folder_labels  # noqa: E402,F401
 from . import edit     # noqa: E402,F401
 from . import upload   # noqa: E402,F401
 from . import admin    # noqa: E402,F401
 from . import info     # noqa: E402,F401
 from . import duplicates  # noqa: E402,F401
 from . import magicshelves  # noqa: E402,F401
+from . import columns  # noqa: E402,F401
 from . import comic     # noqa: E402,F401
 from . import admin_security  # noqa: E402,F401
 from . import notices   # noqa: E402,F401
@@ -217,3 +221,4 @@ from . import kobo_two_way  # noqa: E402,F401
 from . import kobo_pairing  # noqa: E402,F401
 from . import koreader_devices  # noqa: E402,F401
 from . import acquisition  # noqa: E402,F401
+from . import discover_source  # noqa: E402,F401

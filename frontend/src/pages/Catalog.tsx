@@ -1,3 +1,5 @@
+import { useShelfDragSelection } from '../components/ShelfDrag';
+import { readGuestCustomFields, readGuestCustomLabels, customFieldsForSave, GUEST_CUSTOM_FIELDS_KEY, GUEST_CUSTOM_LABELS_KEY } from '../lib/customColumnDisplay';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch, useLocation } from 'wouter';
@@ -5,12 +7,14 @@ import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, Upload
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { BookCard } from '../components/BookCard';
 import { BookCover } from '../components/BookCover';
+import { BookListExport } from '../components/BookListExport';
 import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { DiscoverSource } from '../components/DiscoverSource';
 import { DiscoverSection } from '../components/DiscoverSection';
 import { VirtualizedGridRows } from '../components/VirtualizedGridRows';
-import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
+import { useUpdateCatalogCustomFields, useDiscoverSource, useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
@@ -55,6 +59,9 @@ const READ_FILTERS: { label: string; value: ReadFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'Unread', value: 'unread' },
   { label: 'Read', value: 'read' },
+  { label: 'Currently reading', value: 'in_progress' },
+  { label: 'Did not finish', value: 'did_not_finish' },
+  { label: 'On hold', value: 'on_hold' },
 ];
 
 // Fork #640 — the plain Library view remembers its sort order and read filter
@@ -229,6 +236,8 @@ function useLibraryRefresh() {
 
 export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogProps) {
   const me = useMe().data;
+  const discoverSource = useDiscoverSource(view === 'discover');
+  const discoverIdentity = view === 'discover' ? `${discoverSource.data?.source ?? ''}:${discoverSource.data?.available ?? ''}` : '';
   const revision = useLibraryRevision();
   const libraryScope = `${me?.id ?? 'guest'}:${me?.library_mode ?? 'monolibrary'}:${revision}`;
   const t = useT();
@@ -318,7 +327,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // Multi-select / bulk mode
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectAllBusy, setSelectAllBusy] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selectAllError, setSelectAllError] = useState('');
+  const selectAllRequest = useRef(0);
   const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
+  useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
+    setSelected(new Set(ids)); setSelecting(true);
+  } }, `${me?.id ?? 'guest'}:${me?.library_mode ?? 'monolibrary'}:${discoverIdentity}`);
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
@@ -330,6 +346,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const personalLibrary = me?.library_mode === 'personal_library';
   const removalImpact = useMyLibraryRemovalImpact();
   const removeFromLibrary = useRemoveFromMyLibrary();
+  const updateCatalogCustomFields = useUpdateCatalogCustomFields();
 
   // Catalog-wide choices follow a signed-in account. Guests stay local-only;
   // an existing local value is adopted once when the account has no value yet.
@@ -353,6 +370,28 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     = useShelfBadgesHidden({ onError: catalogPreferenceError });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
+  // `null` means show every administrator-enabled field. Signed-in readers
+  // follow their account; guest choices remain local to this browser.
+  const customFieldOwner = me && !me.role?.anonymous ? me.id : 'guest';
+  const customFieldPreviousOwner = useRef(customFieldOwner);
+  const [visibleCustomColumnIds, setVisibleCustomColumnIds] = useState<number[] | null>(
+    () => customFieldOwner === 'guest' ? readGuestCustomFields() : me?.catalog?.custom_field_ids ?? null);
+  const [customFieldLabels, setCustomFieldLabels] = useState<Record<string, string>>(
+    () => customFieldOwner === 'guest' ? readGuestCustomLabels() : me?.catalog?.custom_field_labels ?? {});
+  useEffect(() => {
+    const ownerChanged = customFieldPreviousOwner.current !== customFieldOwner;
+    customFieldPreviousOwner.current = customFieldOwner;
+    // Ignore intermediate save snapshots, but always clear the previous
+    // reader's state when the account changes, even during an in-flight save.
+    if (ownerChanged || !updateCatalogCustomFields.isPending) {
+      setVisibleCustomColumnIds(customFieldOwner === 'guest'
+        ? readGuestCustomFields() : me?.catalog?.custom_field_ids ?? null);
+      setCustomFieldLabels(customFieldOwner === 'guest'
+        ? readGuestCustomLabels() : me?.catalog?.custom_field_labels ?? {});
+    }
+  }, [customFieldOwner, me?.catalog?.custom_field_ids, me?.catalog?.custom_field_labels,
+      updateCatalogCustomFields.isPending]);
   const [density, setDensity] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
   const [rowsChoice, setRowsChoice] = usePersistentChoice(
@@ -486,9 +525,19 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   useEffect(() => {
     if (!settingsOpen) return;
     const onDoc = (e: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setSettingsOpen(false);
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && settingsMenuRef.current?.contains(focused)) focused.blur();
+        setSettingsOpen(false);
+      }
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSettingsOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const focusInside = settingsMenuRef.current?.contains(document.activeElement);
+        setSettingsOpen(false);
+        if (focusInside) settingsTriggerRef.current?.focus();
+      }
+    };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -503,28 +552,87 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // the menu itself to the selected option.
   useLayoutEffect(() => {
     if (!settingsOpen) return;
+    let active = true;
     const constrainMenu = () => {
+      if (!active) return;
       const menu = settingsMenuRef.current;
       if (!menu) return;
+      // The toolbar can wrap at desktop widths too. A gear on the left
+      // cannot right-align a wider menu without putting its inputs offscreen.
+      // The mobile containing block is the toolbar; respect either anchor.
+      const parent = menu.offsetParent;
+      if (parent instanceof HTMLElement) {
+        const right = parent.getBoundingClientRect().right;
+        const left = Math.max(8, Math.min(right - menu.offsetWidth,
+          window.innerWidth - menu.offsetWidth - 8));
+        menu.style.right = `${right - left - menu.offsetWidth}px`;
+      }
       const available = window.innerHeight - menu.getBoundingClientRect().top - 12;
-      menu.style.maxHeight = `${Math.max(160, available)}px`;
+      menu.style.maxHeight = `${Math.max(60, available)}px`;
     };
     constrainMenu();
+    const toolbar = settingsMenuRef.current?.closest<HTMLElement>(`.${styles.toolbar}`);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(constrainMenu);
+    const observedItems = new Set<Element>();
+    const observeItems = () => {
+      if (!toolbar || !active) return;
+      for (const item of observedItems) {
+        if (item.parentElement !== toolbar) {
+          observer?.unobserve(item);
+          observedItems.delete(item);
+        }
+      }
+      for (const item of toolbar.children) {
+        if (!observedItems.has(item)) {
+          observer?.observe(item);
+          observedItems.add(item);
+        }
+      }
+      constrainMenu();
+    };
+    if (settingsMenuRef.current) observer?.observe(settingsMenuRef.current);
+    if (toolbar) observer?.observe(toolbar);
+    observeItems();
+    // Select mode inserts a control after the menu has opened. Its later
+    // loading-label size changes must be observed too, without a resize.
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(observeItems);
+    if (toolbar) mutations?.observe(toolbar, { childList: true });
+    void document.fonts?.ready.then(constrainMenu);
+    document.fonts?.addEventListener('loadingdone', constrainMenu);
     window.addEventListener('resize', constrainMenu);
-    return () => window.removeEventListener('resize', constrainMenu);
-  }, [settingsOpen]);
+    // Native focus can scroll the page while this panel stays open. Its
+    // available viewport space must follow the moved anchor too.
+    window.addEventListener('scroll', constrainMenu, { passive: true });
+    return () => {
+      active = false;
+      observer?.disconnect();
+      mutations?.disconnect();
+      document.fonts?.removeEventListener('loadingdone', constrainMenu);
+      window.removeEventListener('resize', constrainMenu);
+      window.removeEventListener('scroll', constrainMenu);
+    };
+  }, [settingsOpen, t, canUpload]);
 
   // The saved default view is part of the filter identity: turning it on/off (or
   // saving a different one) changes which books belong here, so the accumulator
   // must reset rather than append the new set onto the old (#928).
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', perPage, showHidden,
-    filterActive ? JSON.stringify(defaultFilter) : '', libraryScope].join('|');
+    filterActive ? JSON.stringify(defaultFilter) : '', libraryScope, discoverIdentity].join('|');
 
   const previousLibraryScope = useRef(libraryScope);
   const changedLibrary = previousLibraryScope.current !== libraryScope;
+  const previousDiscoverIdentity = useRef(discoverIdentity);
+  const changedDiscover = previousDiscoverIdentity.current !== discoverIdentity;
+  useLayoutEffect(() => {
+    if (!changedDiscover) return;
+    previousDiscoverIdentity.current = discoverIdentity;
+    // A different source is a new bulk-action scope, even while selection mode stays on.
+    setSelected(new Set());
+    setPage(1); setAllBooks([]); accKeyRef.current = '';
+  }, [changedDiscover, discoverIdentity]);
   // Use page 1 in this render, before the effect updates pagination. Otherwise
   // changing selection on a loaded page can issue the new query at the old offset.
-  const requestPage = changedLibrary ? 1 : page;
+  const requestPage = changedLibrary || changedDiscover ? 1 : page;
   useEffect(() => {
     if (!changedLibrary) return;
     previousLibraryScope.current = libraryScope;
@@ -627,8 +735,51 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     ? { ...defaultFilter, sort, ...(readFilter !== 'all' ? { read_status: readFilter } : {}) }
     : null;
   const advQuery = useAdvancedSearch(advParams, requestPage, perPage);
-  const { data, isLoading, isFetching, isPlaceholderData, error } =
+  const { data, dataUpdatedAt, isLoading, isFetching, isPlaceholderData, error } =
     filterActive ? advQuery : booksQuery;
+  const customSortOptions = view === 'hot' || view === 'discover'
+    ? [] : (data?.custom_sort_options ?? []);
+  const activeSortOptions = [...sortOptions, ...customSortOptions];
+  const customColumnDefinitions = (data?.custom_column_definitions ?? []).map((column) => ({
+    ...column,
+    name: customFieldLabels[String(column.id)]?.trim() || column.name,
+  }));
+  const visibleCustomColumns = visibleCustomColumnIds === null
+    ? customColumnDefinitions
+    : customColumnDefinitions.filter((column) => visibleCustomColumnIds.includes(column.id));
+  const saveCustomFields = (ids: number[], labels = customFieldLabels) => {
+    if (me && !me.role?.anonymous) updateCatalogCustomFields.mutate(
+      { ...customFieldsForSave(data?.custom_column_definitions ?? [], ids, labels), expected_user_id: me.id, known_custom_column_ids: (data?.custom_column_definitions ?? []).map((column) => column.id) }, { onError: () => announce(t('Could not save.'), { assertive: true }) });
+  };
+  const toggleCustomColumn = (id: number) => {
+    const selected = new Set(visibleCustomColumnIds ?? customColumnDefinitions.map((column) => column.id));
+    if (selected.has(id)) selected.delete(id); else selected.add(id);
+    const next = [...selected];
+    setVisibleCustomColumnIds(next);
+    if (customFieldOwner === 'guest') {
+      try { localStorage.setItem(GUEST_CUSTOM_FIELDS_KEY, JSON.stringify(next)); } catch { /* unavailable */ }
+    }
+    saveCustomFields(next);
+  };
+  const saveCustomFieldLabel = (id: number, value: string) => {
+    value = value.trim();
+    if (value === (customFieldLabels[String(id)] ?? '').trim()) return;
+    const next = { ...customFieldLabels, [String(id)]: value };
+    if (!value.trim()) delete next[String(id)];
+    setCustomFieldLabels(next);
+    if (customFieldOwner === 'guest') {
+      try { localStorage.setItem(GUEST_CUSTOM_LABELS_KEY, JSON.stringify(next)); } catch { /* unavailable */ }
+    }
+    const ids = visibleCustomColumnIds ?? customColumnDefinitions.map((column) => column.id);
+    saveCustomFields(ids, next);
+  };
+
+  // A saved custom sort can be removed by an administrator. Trust the server's
+  // effective value so the controlled select never retains an absent option.
+  useEffect(() => {
+    if (!data || isPlaceholderData || data.sort_persistable === false || !data.sort || data.sort === sort) return;
+    setSort(data.sort);
+  }, [data, isPlaceholderData, sort]);
 
   // Accumulate pages; replace the accumulator whenever the filter set changes.
   // Skip placeholder data: on a filter change react-query briefly returns the
@@ -643,9 +794,64 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     } else {
       setAllBooks((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, isPlaceholderData, resetKey]);
+  // A successful idempotent bulk action can refetch byte-identical data.
+  // React Query keeps that object identity, but the cleared accumulator still
+  // needs to consume the newly confirmed result.
+  }, [data, dataUpdatedAt, isPlaceholderData, resetKey]);
 
   const total = data?.total ?? 0;
+
+  useLayoutEffect(() => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
+    setSelectAllError('');
+  }, [resetKey]);
+
+  const selectAllBooks = async () => {
+    const requestId = ++selectAllRequest.current;
+    setSelectAllBusy(true);
+    setSelectAllError('');
+    announce(t('Selecting all books in this view…'));
+    try {
+      let ids: number[];
+      // Discover is intentionally a random, one-page pick list. Its current
+      // rendered cards are the entire view, so preserve that exact sample.
+      if (view === 'discover') {
+        ids = allBooks.map((book) => book.id);
+      } else if (filterActive && advParams) {
+        const result = await apiPost<{ ids: number[] }>('/api/v1/search/advanced', {
+          ...advParams, select_all: true,
+        });
+        ids = result.ids;
+      } else {
+        const params = new URLSearchParams({ select_all: '1', sort });
+        if (search && !entityKind && !view) params.set('search', search);
+        if (view) params.set('filter', view);
+        else if (readFilter !== 'all') params.set('filter', readFilter);
+        if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
+        if (entityKind && entityId !== undefined && entityId !== '') {
+          params.set(entityKind, String(entityId));
+        }
+        const result = await apiGet<{ ids: number[] }>(`/api/v1/books?${params.toString()}`);
+        ids = result.ids;
+      }
+      if (requestId !== selectAllRequest.current) return;
+      setSelected(new Set(ids));
+      announce(t('Selected all {count} books in this view.', { count: ids.length }));
+    } catch (error) {
+      if (requestId !== selectAllRequest.current) return;
+      const apiError = error instanceof ApiError ? error : undefined;
+      const limit = apiError?.detail?.code === 'selection_too_large'
+        ? t('Select all is limited to {max} books. Narrow the current view and try again.', {
+          max: typeof apiError.detail.max_items === 'number' ? apiError.detail.max_items : 100000,
+        })
+        : t('Could not select all books. Try again.');
+      setSelectAllError(limit);
+      announce(limit, { assertive: true });
+    } finally {
+      if (requestId === selectAllRequest.current) setSelectAllBusy(false);
+    }
+  };
   const hasMore = allBooks.length < total;
   // A disabled query is not "loading" as far as react-query is concerned, so the
   // pre-measurement render has to be treated as first load explicitly. Without
@@ -810,7 +1016,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       <div className={styles.header}>
         {filtered && <span className={styles.kindLabel}>{t(KIND_OPTIONS[entityKind!].label)}</span>}
-        <h1 className={renamingTag ? 'sr-only' : styles.title}>{heading}</h1>
+        <h1 data-testid="catalog-heading" tabIndex={-1} className={renamingTag ? 'sr-only' : styles.title}>{heading}</h1>
         {renamingTag ? (
           <form className={styles.renameForm} onSubmit={submitTagRename}>
             <label className="sr-only" htmlFor="tag-name-input">{t('Tag name')}</label>
@@ -892,6 +1098,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
+        {view !== 'discover' && view !== 'hot' && <BookListExport disabled={isLoading || isPlaceholderData || !!error} source={filterActive
+          ? { source: 'advanced', params: { ...advParams } }
+          : { source: 'catalog', params: {
+              sort,
+              ...(search && !entityKind && !view ? { search } : {}),
+              ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
+              ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
+              ...(entityKind && entityId !== undefined && entityId !== '' ? { [entityKind]: String(entityId) } : {}),
+            } }} />}
+
         {/* #1288: Upload is a library-wide ACTION, not one of the view-scoped
             controls hideLibraryControls exists to hide (search box, Advanced,
             read-status filter). Gating it there made it vanish on every entity
@@ -910,9 +1126,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           </Link>
         )}
 
-        {/* Read-status segmented control (disabled while a text search is active,
-            which the API resolves on a separate code path). Hidden in a fixed
-            discovery view, which owns the server-side filter. */}
+        {/* Read status composes with text search and entity filters. Fixed
+            discovery views own their server-side filter. */}
         {!isView && (
         <div className={styles.segmented} role="group" aria-label={t('Read status filter')}>
           {READ_FILTERS.map((rf) => (
@@ -921,7 +1136,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               type="button"
               className={readFilter === rf.value ? styles.segActive : styles.seg}
               aria-pressed={readFilter === rf.value}
-              disabled={!!search && !filtered}
               onClick={() => setReadFilter(rf.value)}
             >
               {t(rf.label)}
@@ -936,7 +1150,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           onChange={(e) => chooseSort(e.target.value)}
           aria-label={t('Sort order')}
         >
-          {sortOptions.map((opt) => (
+          {activeSortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {t(opt.label)}
             </option>
@@ -946,9 +1160,13 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <button
           type="button"
           className={selecting ? styles.selectBtnActive : styles.selectBtn}
+          disabled={bulkBusy}
           onClick={() => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
             setSelecting((s) => !s);
             setSelected(new Set());
+            setSelectAllError('');
           }}
           aria-pressed={selecting}
           title={t('Select multiple')}
@@ -956,6 +1174,18 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           <ListChecks size={15} />
           <span className={styles.selectLabel}>{selecting ? t('Done') : t('Select')}</span>
         </button>
+        {selecting && (
+          <button type="button" className={styles.selectAllBtn}
+            onClick={() => { void selectAllBooks(); }}
+            // The complete-ID query does not depend on the next card page.
+            // Keep new-view loading guarded, but let a settled view select
+            // all while its background pagination is slow.
+            disabled={selectAllBusy || bulkBusy || total === 0
+              || (isFetching && (requestPage === 1 || resetKey !== accKeyRef.current))}
+            aria-busy={selectAllBusy}>
+            {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
+          </button>
+        )}
 
         {/* Manual library scan (fork #780 / #665) — the SPA equivalent of the
             classic header's "Refresh Library" button. Spins while the background
@@ -980,14 +1210,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             <button
               type="button"
               data-testid="catalog-view-settings"
+              ref={settingsTriggerRef}
               className={settingsOpen ? styles.gearBtnActive : styles.gearBtn}
               onClick={() => setSettingsOpen((o) => !o)}
-              aria-haspopup="true"
               aria-expanded={settingsOpen}
               title={t('View settings')}
               aria-label={t('View settings')}
             >
-              <Settings size={15} />
+              <Settings size={15} aria-hidden="true" focusable={false} />
             </button>
             {settingsOpen && (
               <div ref={settingsMenuRef} className={styles.settingsMenu}
@@ -1050,6 +1280,30 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   />
                   <span>{t('Show shelf tags')}</span>
                 </label>
+                {customColumnDefinitions.length > 0 && (
+                  <fieldset className={styles.densityField}>
+                    <legend>{t('Custom fields on book cards')}</legend>
+                    {customColumnDefinitions.map((column) => (
+                      <div key={column.id} className={styles.customFieldSetting}>
+                        <label className={styles.settingsItem}>
+                          <input type="checkbox" checked={visibleCustomColumns.some((item) => item.id === column.id)}
+                            onChange={() => toggleCustomColumn(column.id)} />
+                          <span>{column.name}</span>
+                        </label>
+                        <input
+                          type="text"
+                          className={styles.customFieldLabel}
+                          defaultValue={customFieldLabels[String(column.id)] ?? ''}
+                          key={`${column.id}:${customFieldLabels[String(column.id)] ?? ''}`}
+                          maxLength={80}
+                          placeholder={t('Custom display name')}
+                          aria-label={t('Display name for {name}', { name: column.name })}
+                          onBlur={(event) => saveCustomFieldLabel(column.id, event.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </fieldset>
+                )}
                 <fieldset className={styles.densityField}>
                   <legend>{t('Book density')}</legend>
                   {DENSITY_OPTIONS.map((option) => (
@@ -1084,6 +1338,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           </div>
         )}
       </div>
+      {selectAllError && <p className={styles.refreshStatusError}>{selectAllError}</p>}
+
+      {view === 'discover' && <DiscoverSource />}
 
       {/* Library-scan status (aria-live so the "please wait" → "complete"
           transition is announced, SC 4.1.3). Hidden when idle + empty. */}
@@ -1100,6 +1357,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       {/* Discover: random picks, library landing only (not while searching). */}
       {!hideLibraryControls && !search && !discoverHidden && (
         <DiscoverSection
+          actionsDisabled={bulkBusy || selectAllBusy}
           onClose={() => setDiscoverHidden(true)}
           closeDisabled={discoverPreferenceSaving}
           hideActions={cardActionsHidden}
@@ -1149,9 +1407,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   hideActions={cardActionsHidden}
                   hideReadingTags={readingTagsHidden}
                   hideShelfTags={shelfBadgesHidden}
+                  customColumnDefinitions={visibleCustomColumns}
                   selectable={selecting}
                   selected={selected.has(book.id)}
                   onToggleSelect={toggleSelect}
+                  selectionDisabled={selectAllBusy || bulkBusy}
                   onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
                   removeLabel={t('Remove {title} from my library', { title: book.title })}
                 />
@@ -1176,8 +1436,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             search && !filtered
               ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
-                ? t('No {filter} books here.', { filter: readFilter })
-                : t('No books here.')
+                ? t('No {filter} books here.', { filter: t(READ_FILTERS.find(rf => rf.value === readFilter)!.label) })
+                : view === 'discover' ? t('No unread books in this Discover source.') : t('No books here.')
           }>
           {search && !filtered && personalLibrary && me?.role?.browse_global && (
             <Link href={`/global?q=${encodeURIComponent(search)}`} className={styles.uploadLink}>
@@ -1234,10 +1494,18 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           ids={[...selected]}
           personalLibrary={personalLibrary}
           onClear={() => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
             setSelected(new Set());
             setSelecting(false);
           }}
-          onRetryable={(failedIds) => setSelected(new Set(failedIds))}
+          onRetryable={(failedIds) => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
+            setSelected(new Set(failedIds));
+          }}
+          onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy}
           currentTag={entityKind === 'tag' ? entityName : undefined}
           onChanged={() => {
             // A bulk action changed read state / membership / removed books.

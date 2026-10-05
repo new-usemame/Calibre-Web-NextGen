@@ -1,0 +1,5 @@
+.box { min-width: 0; max-width: 100%; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.actions button { min-height: 44px; white-space: normal; }
+.hint, .status { font-size: var(--fs-sm); color: var(--text-muted); margin: var(--sp-1) 0 0; }
+.error { font-size: var(--fs-sm); color: var(--danger-text); margin: var(--sp-1) 0 0; }

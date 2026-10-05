@@ -283,6 +283,138 @@ def test_ambiguous_helper_failure_does_not_restore_after_marker_committed(
     assert existing.read_bytes() == b"committed replacement"
 
 
+def test_folder_label_failure_on_preexisting_marker_retains_source_for_retry(
+    ingest_processor, monkeypatch, tmp_path
+):
+    source = tmp_path / "ingest" / "Owner" / "incoming.epub"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"already imported bytes")
+    processor = _processor(ingest_processor, tmp_path)
+    processor.filepath = str(source)
+    processor.ingest_folder = str(tmp_path / "ingest")
+    processor.cwa_settings.update({
+        "auto_ingest_folder_label_target": "#removed",
+        "auto_ingest_folder_label_nested": False,
+    })
+    _disable_post_import_work(ingest_processor, processor, monkeypatch)
+    processor._content_marker_book_ids = lambda _digest: [7]
+
+    def rejecting_transaction(_staged, _identity, _imported, _source_digest, _metadata, action):
+        if action == "inspect":
+            return {"status": "already_imported", "book_ids": [7], "formats": []}
+        raise ingest_processor.subprocess.CalledProcessError(1, ["calibre-debug"])
+
+    processor._run_calibre_transaction = rejecting_transaction
+
+    with pytest.raises(ingest_processor.RetryIngestSourceError):
+        processor.add_book_to_library(str(source))
+    assert source.is_file()
+
+
+def test_existing_folder_label_replay_child_inherits_metadata_exclusion(
+    ingest_processor, monkeypatch, tmp_path
+):
+    """A surviving replay child must retain both maintenance and writer locks."""
+    import os
+    import json
+    from types import SimpleNamespace
+    import calibre_library_target
+
+    source = tmp_path / "ingest" / "Owner" / "incoming.epub"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"already imported bytes")
+    processor = _processor(ingest_processor, tmp_path)
+    processor.filepath = str(source)
+    processor.ingest_folder = str(tmp_path / "ingest")
+    processor.cwa_settings.update({
+        "auto_ingest_folder_label_target": "tags",
+        "auto_ingest_folder_label_nested": False,
+    })
+    _disable_post_import_work(ingest_processor, processor, monkeypatch)
+    processor._content_marker_book_ids = lambda _digest: [7]
+    monkeypatch.setattr(calibre_library_target, "config_dir", lambda: str(tmp_path))
+    original_lock = ingest_processor.metadata_db_write_lock
+    writer_inode = []
+
+    @contextmanager
+    def tracked_lock():
+        with original_lock() as fd:
+            writer_inode.append(os.fstat(fd).st_ino)
+            yield fd
+
+    monkeypatch.setattr(ingest_processor, "metadata_db_write_lock", tracked_lock)
+    inherited = []
+
+    def completed(_command, _environment, **kwargs):
+        inherited.extend(os.fstat(fd).st_ino for fd in kwargs.get("pass_fds", ()))
+        return SimpleNamespace(stdout="CWNG_INGEST_RESULT=" + json.dumps({
+            "status": "already_imported", "book_ids": [7],
+        }))
+
+    monkeypatch.setattr(ingest_processor, "_run_calibredb_add_with_retry", completed)
+    processor.add_book_to_library(str(source))
+    assert writer_inode and writer_inode[0] in inherited, (
+        "folder-label child lost the writer gate when its parent exits"
+    )
+    assert len(inherited) == 2, "raw replay must inherit maintenance and writer descriptors"
+    assert processor.last_added_book_id == 7
+
+
+@pytest.mark.parametrize("fail_replay", [False, True])
+def test_concurrent_folder_label_replay_skips_unlocked_format_inspection(
+    ingest_processor, monkeypatch, tmp_path, fail_replay
+):
+    source = tmp_path / "ingest" / "Owner" / "incoming.epub"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"concurrent duplicate")
+    processor = _processor(ingest_processor, tmp_path)
+    processor.filepath = str(source)
+    processor.ingest_folder = str(tmp_path / "ingest")
+    processor.cwa_settings.update({
+        "auto_ingest_folder_label_target": "tags",
+        "auto_ingest_folder_label_nested": False,
+    })
+    _disable_post_import_work(ingest_processor, processor, monkeypatch)
+    lock_held = False
+
+    @contextmanager
+    def tracked_lock():
+        nonlocal lock_held
+        lock_held = True
+        try:
+            yield
+        finally:
+            lock_held = False
+
+    monkeypatch.setattr(ingest_processor, "metadata_db_write_lock", tracked_lock)
+    marker_reads = []
+
+    def marker_lookup(_digest):
+        marker_reads.append(lock_held)
+        return [7] if lock_held else []
+
+    processor._content_marker_book_ids = marker_lookup
+    actions = []
+
+    def transaction(_staged, _identity, _imported, _digest, _metadata, action):
+        actions.append(action)
+        if fail_replay:
+            raise ingest_processor.subprocess.CalledProcessError(1, ["calibre-debug"])
+        return {"status": "already_imported", "book_ids": [7]}
+
+    processor._run_calibre_transaction = transaction
+    if fail_replay:
+        with pytest.raises(ingest_processor.RetryIngestSourceError):
+            processor.add_book_to_library(str(source))
+        assert source.is_file()
+    else:
+        processor.add_book_to_library(str(source))
+
+    assert marker_reads == ([False, True, True] if fail_replay else [False, True])
+    assert actions == ["apply-folder-labels"]
+    assert processor.last_added_book_id == (None if fail_replay else 7)
+
+
 def test_sanity_check_finishes_before_metadata_write_lock(
     ingest_processor, monkeypatch, tmp_path
 ):
@@ -410,3 +542,114 @@ def test_recovery_copy_uses_digest_and_retention_limit(
         file.read_bytes() == b"known good"
         for directory in recovery_sets for file in directory.iterdir()
     )
+
+
+def test_raw_import_owns_maintenance_but_remote_post_processing_does_not(
+        ingest_processor, monkeypatch, tmp_path):
+    import calibre_library_target as routing
+    monkeypatch.setattr(routing, "config_dir", lambda: str(tmp_path))
+    source = tmp_path / "new.epub"
+    source.write_bytes(b"new book")
+    p = _processor(ingest_processor, tmp_path)
+    p.cwa_settings["auto_ingest_automerge"] = "new_record"
+    _disable_post_import_work(ingest_processor, p, monkeypatch)
+    observed = []
+    def transaction(*_args):
+        assert routing.ownership.busy(str(tmp_path), "maintenance")
+        return {"status": "imported", "book_ids": [7]}
+    p._run_calibre_transaction = transaction
+    p.fetch_metadata_if_enabled = lambda **_kw: observed.append(
+        routing.ownership.busy(str(tmp_path), "maintenance"))
+    p.add_book_to_library(str(source))
+    assert observed == [False], "network metadata fetch unnecessarily holds the offline library"
+    assert not routing.ownership.busy(str(tmp_path), "maintenance")
+
+
+def test_committed_import_finishes_followups_when_conversion_takes_maintenance(
+        ingest_processor, monkeypatch, tmp_path):
+    import sqlite3
+    import calibre_library_target as routing
+    monkeypatch.setattr(routing, "config_dir", lambda: str(tmp_path))
+    app_db = tmp_path / "app.db"
+    with sqlite3.connect(app_db) as con:
+        con.execute("CREATE TABLE settings (config_unicode_filename INTEGER)")
+        con.execute("INSERT INTO settings VALUES (0)")
+    monkeypatch.setattr(ingest_processor, "get_app_db_path", lambda: str(app_db))
+    source = tmp_path / "new.epub"
+    source.write_bytes(b"new book committed before competing conversion")
+    p = _processor(ingest_processor, tmp_path)
+    p.cwa_settings["auto_ingest_automerge"] = "new_record"
+    _disable_post_import_work(ingest_processor, p, monkeypatch)
+    p._fix_unicode_path = ingest_processor.NewBookProcessor._fix_unicode_path.__get__(p)
+    p._run_calibre_transaction = lambda *_a: {"status": "imported", "book_ids": [7]}
+    maintenance = routing.ownership.maintenance(str(tmp_path))
+    followups = []
+    p.fetch_metadata_if_enabled = lambda **_kw: maintenance.__enter__()
+    p.generate_missing_cover_if_enabled = lambda _id: followups.append("cover")
+    p.trigger_auto_send_if_enabled = lambda **_kw: followups.append("send")
+    try:
+        p.add_book_to_library(str(source))
+    finally:
+        maintenance.__exit__(None, None, None)
+    assert followups == ["cover", "send"], "a busy optional path fix skipped the committed book's followups"
+    assert p.last_added_book_id == 7
+
+
+@pytest.mark.parametrize("busy", [False, True])
+def test_generated_cover_coordinates_raw_metadata_and_skips_busy_optional_work(
+    ingest_processor, monkeypatch, tmp_path, busy
+):
+    import sqlite3
+    from types import SimpleNamespace
+    from cps.services import cover_generator
+
+    processor = _processor(ingest_processor, tmp_path)
+    book_dir = Path(processor.library_dir) / "Author/Book (1)"
+    book_dir.mkdir(parents=True)
+    with sqlite3.connect(processor.metadata_db) as connection:
+        connection.executescript(
+            "CREATE TABLE books(id INTEGER, path TEXT, title TEXT, has_cover INTEGER, series_index REAL);"
+            "INSERT INTO books VALUES(1, 'Author/Book (1)', 'Book', 0, 1);"
+            "CREATE TABLE authors(id INTEGER, name TEXT);"
+            "CREATE TABLE books_authors_link(id INTEGER, book INTEGER, author INTEGER);"
+            "CREATE TABLE series(id INTEGER, name TEXT);"
+            "CREATE TABLE books_series_link(book INTEGER, series INTEGER);"
+        )
+    active = []
+
+    @contextmanager
+    def offline():
+        if busy:
+            raise TimeoutError("library maintenance busy")
+        active.append("maintenance")
+        try:
+            yield
+        finally:
+            active.pop()
+
+    @contextmanager
+    def metadata():
+        assert active == ["maintenance"], "raw cover access acquired no maintenance ownership"
+        active.append("metadata")
+        try:
+            yield
+        finally:
+            active.pop()
+
+    ownership_at_write = []
+
+    def generate(destination, *_args, **_kwargs):
+        ownership_at_write.append(list(active))
+        Path(destination).write_bytes(b"generated cover")
+        return True
+
+    monkeypatch.setattr(ingest_processor, "offline_library_access", offline)
+    monkeypatch.setattr(ingest_processor, "metadata_db_write_lock", metadata)
+    monkeypatch.setattr(cover_generator, "settings_from_app_db", lambda _path: SimpleNamespace(auto_enabled=True, default_preset="classic"))
+    monkeypatch.setattr(cover_generator, "generate_cover_file", generate)
+    assert processor.generate_missing_cover_if_enabled(1) is (not busy)
+    with sqlite3.connect(processor.metadata_db) as connection:
+        assert connection.execute("SELECT has_cover FROM books WHERE id=1").fetchone()[0] == (0 if busy else 1)
+    assert (book_dir / "cover.jpg").exists() is (not busy)
+    assert ownership_at_write == ([] if busy else [["maintenance", "metadata"]])
+    assert active == []

@@ -1,13 +1,16 @@
 import { memo } from 'react';
-import { BookOpen, BookCheck, BookPlus, Check, EyeOff, List, X, Pencil } from 'lucide-react';
+import { BookOpen, BookCheck, BookPlus, Check, EyeOff, List, X, Star } from 'lucide-react';
 import { Link } from 'wouter';
-import type { Book } from '../lib/api';
-import { useT } from '../lib/i18n';
+import type { Book, ListCustomColumnDefinition } from '../lib/api';
+import { useT, useI18n } from '../lib/i18n';
 import { BookCover } from './BookCover';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { formatAuthors } from '../lib/authors';
+import { formatCustomColumnDate } from '../lib/customColumnDisplay';
 import styles from './BookCard.module.css';
 import { Spinner } from './Spinner';
+import { BookCardActions } from './BookCardActions';
+import { ShelfDragHandle, useShelfDrag } from './ShelfDrag';
 
 interface BookCardProps {
   book: Book;
@@ -29,7 +32,7 @@ interface BookCardProps {
    *  so it only appears where it's wanted (catalog + search) and only for users
    *  who can edit. Suppressed in selection mode. */
   quickEdit?: boolean;
-  /** Drop the whole bottom action row — "Read now" and the edit pencil — for
+  /** Remove the cover action disclosure (read, edit, favorite and read status) for
    *  users who asked to declutter the grid (fork #1054: "many users are reading
    *  on their ereaders, so Read Now is redundant"). Persisted per browser and
    *  toggled from the catalog's View settings.
@@ -58,6 +61,8 @@ interface BookCardProps {
   /** The authenticated account's viewer role. Kept explicit so a catalog card
    *  can never infer file access from the formats it happens to receive. */
   canRead?: boolean;
+  /** User-selected scalar Calibre fields, defined once by the list response. */
+  customColumnDefinitions?: ListCustomColumnDefinition[];
 }
 
 /** How many shelf names a cover shows before the rest fold into "+N". Two, not
@@ -87,11 +92,15 @@ function BookCardInner({
   addPending = false,
   detailsEnabled = true,
   canRead = false,
+  customColumnDefinitions = [],
 }: BookCardProps) {
   const t = useT();
+  const { locale } = useI18n();
+  const shelfDrag = useShelfDrag();
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
   const readTarget = getPrimaryReadTarget(book.id, book.formats, canRead);
+  const coverActions = !selectable && !hideActions && membership !== 'unowned';
 
   // Series name + position under the cover (fork #657, #673, #855). Series-heavy
   // libraries navigate by series and want it visible without clicking into each
@@ -125,6 +134,18 @@ function BookCardInner({
     : (book.shelves ?? []).filter((s) => s.id !== excludeShelfId);
   const shownShelves = shelves.slice(0, MAX_SHELF_TAGS);
   const extraShelves = shelves.slice(MAX_SHELF_TAGS);
+  const customFieldLines = customColumnDefinitions.flatMap((column) => {
+    const value = book.custom_columns?.[String(column.id)]?.[0]?.value;
+    if (value === null || value === undefined || value === '') return [];
+    let display = String(value);
+    if (column.datatype === 'datetime' && typeof value === 'string') {
+      display = formatCustomColumnDate(value, locale);
+    } else if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
+      display = new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
+    }
+    if (!display) return [];
+    return [{ id: column.id, text: `${column.name}: ${display}` }];
+  });
 
   // Cover + overlay badges. All non-interactive (pointer-events: none via CSS) so
   // the single wrapping control (link or toggle button) is the only tab stop.
@@ -144,9 +165,10 @@ function BookCardInner({
           otherwise the name gets the full cover width. */}
       {shelves.length > 0 && (
         <div
-          className={selectable || onRemove ? `${styles.shelfRow} ${styles.shelfRowInset}` : styles.shelfRow}
+          className={selectable || onRemove || coverActions ? `${styles.shelfRow} ${styles.shelfRowInset}` : styles.shelfRow}
           data-testid="shelf-tags"
         >
+          <div className={styles.shelfLabels}>
           {shownShelves.map((s) => (
             <span key={s.id} className={styles.shelfBadge} role="img"
               aria-label={t('On shelf {name}', { name: s.name })} title={s.name}>
@@ -161,6 +183,12 @@ function BookCardInner({
               +{extraShelves.length}
             </span>
           )}
+          </div>
+          <span className={styles.shelfSummary} role="img"
+            aria-label={t('On shelf {name}', { name: shelves.map(s => s.name).join(', ') })}
+            title={shelves.map(s => s.name).join(', ')}>
+            {shelves.length}
+          </span>
         </div>
       )}
       <div className={styles.badgeRow}>
@@ -168,30 +196,34 @@ function BookCardInner({
             the WCAG pass: it announces the badge once, rather than letting the
             icon and the adjacent text be read as two separate things. Keep it
             even now that the label is visible. */}
-        {!hideReadingTags && book.in_progress ? (
+        {!hideReadingTags && (book.read_status === 'did_not_finish' || book.read_status === 'on_hold') ? (
+          <span className={styles.readingBadge}>
+            {book.read_status === 'did_not_finish' ? t('Did not finish') : t('On hold')}
+          </span>
+        ) : !hideReadingTags && book.in_progress ? (
           <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
             data-testid="reading-badge">
             <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
-            {t('Reading')}
+            <span className={styles.badgeLabel}>{t('Reading')}</span>
           </span>
         ) : !hideReadingTags && book.read ? (
           <span className={styles.readBadge} role="img" aria-label={t('Read')}
             data-testid="read-badge">
             <Check size={13} strokeWidth={3} aria-hidden="true" focusable={false} />
-            {t('Read')}
+            <span className={styles.badgeLabel}>{t('Read')}</span>
           </span>
         ) : null}
         {book.hidden && (
           <span className={styles.hiddenBadge} role="img" aria-label={t('Hidden')}
             data-testid="hidden-book-badge">
             <EyeOff size={12} aria-hidden="true" focusable={false} />
-            {t('Hidden')}
+            <span className={styles.badgeLabel}>{t('Hidden')}</span>
           </span>
         )}
         {membership === 'owned' && (
           <span className={styles.libraryBadge} role="img" aria-label={t('In your library')}>
             <BookCheck size={12} aria-hidden="true" focusable={false} />
-            {t('In your library')}
+            <span className={styles.badgeLabel}>{t('In your library')}</span>
           </span>
         )}
         {seriesIndexLabel && (
@@ -203,6 +235,8 @@ function BookCardInner({
             #{seriesIndexLabel}
           </span>
         )}
+        {book.favorited && <span className={styles.favoriteBadge} role="img" aria-label={t('Favorite')}
+          data-testid="favorite-badge"><Star size={14} fill="currentColor" aria-hidden="true" focusable={false} /></span>}
       </div>
       {selectable && (
         <span className={selected ? styles.checkboxOn : styles.checkboxOff} aria-hidden="true">
@@ -222,30 +256,38 @@ function BookCardInner({
     <div className={styles.info}>
       <p className={styles.title} dir="auto">{book.title}</p>
       <p className={styles.author} dir="auto">{authorStr}</p>
-      {seriesParts && (
-        <p
-          className={styles.series}
-          dir="auto"
-          data-testid="book-card-series"
-          title={seriesParts.before + seriesParts.name + seriesParts.after}
-        >
-          {seriesParts.before && <span className={styles.seriesIndex}>{seriesParts.before}</span>}
-          <span className={styles.seriesName}>{seriesParts.name}</span>
-          {seriesParts.after && <span className={styles.seriesIndex}>{seriesParts.after}</span>}
-        </p>
-      )}
+      {customFieldLines.map((field) => (
+        <p key={field.id} className={styles.customField} dir="auto" title={field.text}>{field.text}</p>
+      ))}
     </div>
+  );
+
+  const seriesContent = seriesParts && (
+    <>
+      {seriesParts.before && <span className={styles.seriesIndex}>{seriesParts.before}</span>}
+      <span className={styles.seriesName}>{seriesParts.name}</span>
+      {seriesParts.after && <span className={styles.seriesIndex}>{seriesParts.after}</span>}
+    </>
+  );
+  const seriesTitle = seriesParts && seriesParts.before + seriesParts.name + seriesParts.after;
+  const seriesLine = seriesParts && (
+    <p className={styles.series} dir="auto" data-testid="book-card-series" title={seriesTitle!}>
+      {seriesContent}
+    </p>
   );
 
   // Selection mode: the whole card is a single toggle button. aria-pressed is
   // valid here (a real button) and announces the selection state.
   if (selectable) {
     return (
-      <div className={styles.wrap} style={style}>
+      <div className={styles.wrap} style={style} data-book-id={book.id}>
         <button
           type="button"
+          draggable={!!shelfDrag?.available && !selectionDisabled && !shelfDrag.busy}
+          onDragStart={event => shelfDrag?.nativeStart(book, event)}
+          onDragEnd={() => shelfDrag?.cancel()}
           className={selected ? styles.cardSelected : styles.card}
-          disabled={selectionDisabled}
+          disabled={selectionDisabled || shelfDrag?.busy}
           aria-pressed={selected}
           aria-label={
             selected
@@ -258,40 +300,41 @@ function BookCardInner({
         >
           {cover}
           {info}
+          {seriesLine}
         </button>
+        <ShelfDragHandle book={book} disabled={selectionDisabled || shelfDrag?.busy} />
       </div>
     );
   }
 
-  // Browse mode: the card is a single link. Action controls are SIBLINGS of the
-  // link (never nested inside <a> — that's invalid + a second tab stop).
-  //
-  // The read + edit controls share one flex row in NORMAL FLOW below the
-  // metadata (#1166). They used to be absolutely positioned over the bottom of
-  // the card, with room for the pencil reserved as fixed padding on the label
-  // (#1112) — which holds only while the card is wider than the reservation. On
-  // a 4-column phone grid the card is ~80px and the reservation 60px, so the
-  // label wrapped to two lines, the row grew, and the 44px pencil rose into the
-  // series line. Reported by rogovmtlz, @iroQuai and @HLRobius.
-  //
-  // A real row lets the browser allocate the space instead of the stylesheet
-  // guessing at it, so a control can no longer land on top of card text at any
-  // width, density or locale — the same "impossible by construction" move the
-  // badge row above makes. `.removeBtn` stays absolute: it belongs to the cover,
-  // not to this row.
+  // The cover, title and author open the book; the series line keeps its own
+  // sibling destination. A single sibling disclosure lives inside the cover's
+  // aspect-ratio area, with its portaled panel outside a clipped book rail.
   const hasAddAction = membership === 'unowned' && !!onAddToLibrary;
-  const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));
 
   return (
-    <div className={styles.wrap} style={style}>
+    <div className={styles.wrap} style={style} data-book-id={book.id}>
       {detailsEnabled ? (
-        <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
+        <Link href={`/book/${book.id}`} draggable={!!shelfDrag?.available && !selectionDisabled && !shelfDrag.busy} onDragStart={event => shelfDrag?.nativeStart(book, event)} onDragEnd={() => shelfDrag?.cancel()} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
           {cover}{info}
         </Link>
       ) : (
         <div className={styles.card} aria-label={book.title}>{cover}{info}</div>
       )}
-      {onRemove && (
+      {seriesLine && (detailsEnabled && book.series_id != null ? (
+        <Link href={`/series/${book.series_id}`} className={`${styles.series} ${styles.seriesLink}`}
+          dir="auto" data-testid="book-card-series" title={seriesTitle!}>
+          {seriesContent}
+        </Link>
+      ) : (
+        seriesLine
+      ))}
+      <ShelfDragHandle book={book} disabled={selectionDisabled} />
+      {coverActions && <div className={styles.coverActions}>
+        <BookCardActions book={book} readTarget={readTarget} quickEdit={quickEdit}
+          onRemove={onRemove} removeLabel={removeLabel} shelfNames={shelves.map(shelf => shelf.name)} />
+      </div>}
+      {onRemove && !coverActions && (
         <button
           type="button"
           className={styles.removeBtn}
@@ -301,50 +344,14 @@ function BookCardInner({
           <X size={14} strokeWidth={3} aria-hidden="true" />
         </button>
       )}
-      {hasActionRow && (
-        <div className={[
-          styles.actionRow,
-          quickEdit ? styles.actionRowEdit : '',
-        ].filter(Boolean).join(' ')}>
-          {hasAddAction ? (
-            <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
-              disabled={addPending}
-              aria-label={t('Add {title} to my library', { title: book.title })}
-              onClick={() => onAddToLibrary?.(book)}>
-              {addPending ? <Spinner size={13} /> : <BookPlus size={15} aria-hidden="true" focusable={false} />}
-              <span className={styles.readNowLabel}>{addPending ? t('Adding…') : t('Add')}</span>
-            </button>
-          ) : readTarget && !hideActions ? (
-            <Link
-              href={readTarget}
-              className={styles.readNow}
-              aria-label={t('Read {title}', { title: book.title })}
-            >
-              <BookOpen size={15} aria-hidden="true" focusable={false} />
-              {/* The text is a span so a narrow card can drop the wording and
-                  keep the icon, rather than ellipsising it to "R…". The
-                  aria-label above still names the action either way. */}
-              <span className={styles.readNowLabel}>{t('Read now')}</span>
-            </Link>
-          ) : null}
-          {quickEdit && !hideActions && (
-            <Link
-              href={`/book/${book.id}/edit`}
-              className={styles.quickEditBtn}
-              aria-label={t('Edit {title}', { title: book.title })}
-              // The pencil is a SIBLING of the card link (never nested in an <a>),
-              // so a click can't bubble to the card's own navigation — stopPropagation
-              // keeps that invariant explicit if the layout is ever re-nested.
-              // wouter's <Link> runs SPA navigation only on a plain left-click; on
-              // ⌘/ctrl/shift/alt-click it returns early without preventDefault, so the
-              // browser opens the edit page in a new tab natively (#798).
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Pencil size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
-            </Link>
-          )}
-        </div>
-      )}
+      {hasAddAction && <div className={styles.actionRow}>
+        <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
+          disabled={addPending} aria-label={t('Add {title} to my library', { title: book.title })}
+          onClick={() => onAddToLibrary?.(book)}>
+          {addPending ? <Spinner size={13} /> : <BookPlus size={15} aria-hidden="true" focusable={false} />}
+          <span className={styles.readNowLabel}>{addPending ? t('Adding…') : t('Add')}</span>
+        </button>
+      </div>}
     </div>
   );
 }

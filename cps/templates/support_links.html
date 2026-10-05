@@ -1,0 +1,7 @@
+{% macro support_link(destinations, compact=False) -%}
+  {% if destinations.show_project_links %}
+    <li><a id="top_support"{% if compact %} data-text="{{_('Support')}}"{% endif %} href="https://ko-fi.com/calibrewebnextgen" target="_blank" rel="noopener noreferrer"><span class="glyphicon glyphicon-heart"></span> <span class="hidden-sm">{{_('Support Calibre-Web NextGen')}}</span></a></li>
+  {% elif destinations.url %}
+    <li><a id="top_support"{% if compact %} data-text="{{_('Support')}}"{% endif %} href="{{ destinations.url }}" target="_blank" rel="noopener noreferrer"><span class="glyphicon glyphicon-heart"></span> <span class="hidden-sm">{{ destinations.label }}</span></a></li>
+  {% endif %}
+{%- endmacro %}

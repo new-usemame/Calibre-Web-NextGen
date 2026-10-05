@@ -9,8 +9,10 @@
       {% if current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and current_user.role_browse_global() %}
         <p><a href="{{ url_for('web.global_library', search=adv_searchterm) }}">{{ _('Search the global library for "%(query)s" instead', query=adv_searchterm) }}</a></p>
       {% endif %}
+      {% include '_book_list_export.html' %}
     {% else %}
       <h2>{{result_count}} {{_('Results for:')}} {{adv_searchterm}}</h2>
+      {% include '_book_list_export.html' %}
       {% if current_user.is_authenticated %}
         {% if current_user.shelf.all() or g.shelves_access %}
           <div id="shelf-actions" class="btn-toolbar" role="toolbar">
@@ -22,7 +24,7 @@
               </button>
               <ul id="add-to-shelves" class="dropdown-menu" aria-labelledby="add-to-shelf">
                 {% for shelf in g.shelves_access %}
-                  {% if not shelf.is_public or current_user.role_edit_shelfs() %}
+                  {% if not current_user.is_anonymous and (shelf.user_id == current_user.id or (shelf.is_public and current_user.role_edit_shelfs())) %}
                     <li><a class="postAction" role="button" data-action="{{ url_for('shelf.search_to_shelf', shelf_id=shelf.id) }}"> {{shelf.name}}{% if shelf.is_public == 1 %} {{_('(Public)')}}{% endif %}</a></li>
                   {% endif %}
                 {%endfor%}

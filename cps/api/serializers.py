@@ -94,6 +94,7 @@ def serialize_user(user):
             "download": user.role_download(),
             "delete_books": user.role_delete_books(),
             "edit_shelfs": user.role_edit_shelfs(),
+            "share_shelfs": user.role_share_shelfs(),
             "viewer": user.role_viewer(),
             "browse_global": bool(
                 getattr(user, "role_browse_global", lambda: False)()
@@ -182,8 +183,13 @@ def cover_url_for(book, resolution, cover_override=None):
 
 
 def serialize_book_list_item(book, read=False, archived=False, hidden=False,
-                             in_progress=False, cover_override=None):
-    series = book.series[0].name if getattr(book, "series", None) else None
+                             in_progress=False, read_status=None,
+                             cover_override=None, custom_columns=None):
+    series_list = getattr(book, "series", None) or []
+    series = series_list[0].name if series_list else None
+    series_id = getattr(series_list[0], "id", None) if series_list else None
+    if read_status is None:
+        read_status = "finished" if read else ("in_progress" if in_progress else "unread")
     return {
         "id": book.id,
         "title": book.title,
@@ -192,6 +198,7 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False,
         # SPA cards show a comma, not a pipe (#730). Matches web.py / api/browse.py.
         "authors": [a.name.replace("|", ",") for a in book.authors] if getattr(book, "authors", None) else [],
         "series": series,
+        "series_id": series_id,
         "series_index": book.series_index,
         "cover_url": cover_url_for(book, "sm", cover_override),
         "formats": [d.format for d in book.data] if getattr(book, "data", None) else [],
@@ -204,9 +211,23 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False,
         "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
         "read": bool(read),
         "in_progress": bool(in_progress),
+        "read_status": read_status,
         "archived": bool(archived),
         "hidden": bool(hidden),
+        # List endpoints send definitions once at the page level; this compact
+        # id -> values map lets cards and table rows show selected Calibre fields
+        # without paying for a detail request per book.
+        "custom_columns": custom_columns or {},
     }
+
+
+def serialize_custom_column_value(value, datatype):
+    """Match the edit/Classic calendar policy, including Calibre's no-date sentinel."""
+    if datatype == "datetime" and isinstance(value, (datetime, date)):
+        if value.year <= 101:
+            return None
+        return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    return value.isoformat() if isinstance(value, (datetime, date)) else value
 
 
 def _serialize_custom_columns(book, definitions):
@@ -217,9 +238,7 @@ def _serialize_custom_columns(book, definitions):
             continue
         serialized_values = []
         for entry in values:
-            value = getattr(entry, "value", None)
-            if isinstance(value, (datetime, date)):
-                value = value.isoformat()
+            value = serialize_custom_column_value(getattr(entry, "value", None), column.datatype)
             item = {"value": value, "extra": getattr(entry, "extra", None)}
             if column.datatype == "comments" and isinstance(value, str):
                 item["value_html"] = clean_string(value, getattr(book, "id", None))
@@ -237,7 +256,8 @@ def _serialize_custom_columns(book, definitions):
 
 
 def serialize_book_detail(book, read=False, archived=False, favorited=False, hidden=False,
-                          in_progress=False, custom_column_definitions=None,
+                          in_progress=False, read_status=None,
+                          custom_column_definitions=None,
                           original_filename=None, annotation_count=0,
                           cover_override=None):
     """Full detail serializer — pure, no Flask/DB imports.
@@ -248,6 +268,8 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
     without that enrichment.
     """
     bid = book.id
+    if read_status is None:
+        read_status = "finished" if read else ("in_progress" if in_progress else "unread")
 
     # Series (first entry only) — {id, name} so the UI can link to the series view
     series_list = getattr(book, "series", None) or []
@@ -375,11 +397,14 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "identifiers": identifiers,
         "custom_columns": _serialize_custom_columns(book, custom_column_definitions),
         "formats": formats,
+        # This diagnostic field remains in API data for edit/diagnostic screens;
+        # the per-account preference controls presentation on book detail only.
         "original_filename": original_filename,
         "read": bool(read),
         "archived": bool(archived),
         "favorited": bool(favorited),
         "hidden": bool(hidden),
         "in_progress": bool(in_progress),
+        "read_status": read_status,
         "annotation_count": int(annotation_count or 0),
     }

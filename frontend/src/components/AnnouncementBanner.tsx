@@ -4,6 +4,7 @@ import { useT, type TFunction } from '../lib/i18n';
 import { prioritizeAnnouncements } from '../lib/announcementQueue';
 import { useDismissMyLibraryIntro, useMe } from '../lib/queries';
 import type { Me } from '../lib/api';
+import { showsProjectSupport } from '../lib/permissions';
 import { KofiMark, KOFI_URL } from './KofiMark';
 import styles from './HelpBanner.module.css';
 
@@ -72,6 +73,7 @@ const ANNOUNCEMENTS: readonly Announcement[] = [
     legacyDismissKey: 'cwng_kofi_banner_dismissed_v1',
     clickAction: 'open-url-and-dismiss',
     url: KOFI_URL,
+    eligible: showsProjectSupport,
     content: (t) => (
       <>
         <span className={styles.supportIconWrap}><KofiMark /></span>

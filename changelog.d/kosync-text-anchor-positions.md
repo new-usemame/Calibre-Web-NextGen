@@ -1,0 +1,4 @@
+### Added
+
+- **Reading apps that keep your place as words now sync to the exact sentence.** A KOSync client that has no KOReader or epub.js locator, such as a speed reader or a text-to-speech player, can report its position as a percentage plus the words around it. The server finds those words in the library EPUB. KOReader on the same file and the web reader then open at that sentence. In the other direction, a Kobo, KOReader or web-reader position is returned to such a client as words. Words are exchanged only for accounts that may read or download the book. The client checks `GET /kosync/users/auth`, which now lists these server capabilities.
+- **A Calibre book id works as a KOSync document key.** A client that downloaded a book over OPDS but kept no copy of the file can sync it by its book id. Only books the account may open are resolved. The progress then reaches the Kobo bookmark and the read status, as it does for a checksum-keyed push.

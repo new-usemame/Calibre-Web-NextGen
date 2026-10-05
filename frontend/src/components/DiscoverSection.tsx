@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Shuffle, X } from 'lucide-react';
+import { DiscoverSource } from './DiscoverSource';
 import { BookCard } from './BookCard';
 import { Spinner } from './Spinner';
 import { useDiscover, useMe } from '../lib/queries';
@@ -13,8 +14,8 @@ const STRIP_COUNT = 12;
 /** A boxed, visually-distinct strip of random book picks at the top of the
  *  library. Reshuffle for a fresh set, or dismiss with the × (the parent
  *  persists the hidden state and offers a "Show Discover section" toggle). */
-export function DiscoverSection({ onClose, closeDisabled = false, hideActions = false, hideReadingTags = false, hideShelfTags = false }:
-  { onClose: () => void; closeDisabled?: boolean; hideActions?: boolean; hideReadingTags?: boolean; hideShelfTags?: boolean }) {
+export function DiscoverSection({ onClose, closeDisabled = false, hideActions = false, hideReadingTags = false, hideShelfTags = false, actionsDisabled = false }:
+  { onClose: () => void; closeDisabled?: boolean; hideActions?: boolean; hideReadingTags?: boolean; hideShelfTags?: boolean; actionsDisabled?: boolean }) {
   const t = useT();
   const announce = useAnnouncer();
   const [nonce, setNonce] = useState(0);
@@ -22,7 +23,7 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
   const me = useMe().data;
   const configuredCount = me?.display?.random_books;
   const count = configuredCount && configuredCount > 0 ? configuredCount : STRIP_COUNT;
-  const { data, isLoading, isFetching } = useDiscover(count, nonce);
+  const { data, isLoading, isFetching, error, refetch } = useDiscover(count, nonce);
   const books = data?.items ?? [];
 
   useEffect(() => {
@@ -32,9 +33,8 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
     }
   }, [announce, isFetching, t]);
 
-  // Empty library (or discover returned nothing): render nothing rather than an
-  // empty box — there's nothing to discover.
-  if (!isLoading && books.length === 0) return null;
+  // A signed-in reader must be able to recover from an empty or removed source.
+  if (me?.role.anonymous && !isLoading && !error && books.length === 0) return null;
 
   return (
     <section className={styles.box} aria-label={t('Discover')} data-testid="discover-section">
@@ -43,7 +43,7 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
           <span className={styles.sparkle}><Sparkles size={18} aria-hidden="true" focusable={false} /></span>
           <div className={styles.titleText}>
             <h2 className={styles.title}>{t('Discover')}</h2>
-            <p className={styles.sub}>{t('A few random picks from your library')}</p>
+            <p className={styles.sub}>{t('A few random picks from your Discover source')}</p>
           </div>
         </div>
         <div className={styles.actions}>
@@ -76,13 +76,15 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
         </div>
       </div>
 
-      {isLoading ? (
+      <DiscoverSource />
+
+      {error ? <div className={styles.message}><p role="alert">{t('Failed to load books.')}</p><button type="button" onClick={() => void refetch()}>{t('Retry')}</button></div> : isLoading ? (
         <div className={styles.loading}><Spinner size={22} /></div>
-      ) : (
+      ) : books.length === 0 ? <p className={styles.message}>{t('No unread books in this Discover source.')}</p> : (
         <div className={styles.strip}>
           {books.map((b) => (
             <div className={styles.item} key={b.id}>
-              <BookCard book={b} hideActions={hideActions} hideReadingTags={hideReadingTags}
+              <BookCard book={b} selectionDisabled={actionsDisabled} hideActions={hideActions} hideReadingTags={hideReadingTags}
                 hideShelfTags={hideShelfTags}
                 canRead={canReadBooks(me)} />
             </div>

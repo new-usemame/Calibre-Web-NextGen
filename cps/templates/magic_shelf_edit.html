@@ -334,13 +334,14 @@ div.help-panel > .panel-body {
         <div class="panel panel-default help-panel">
             <div class="panel-heading" onclick="$('#help-content').slideToggle();">
                 <h4 class="panel-title">
-                    <span class="glyphicon space glyphicon-question-sign"></span> What are Magic Shelves? 
+                    <span class="glyphicon space glyphicon-question-sign"></span> {{_('What are smart shelves?')}}
                     <small class="pull-right"><span class="glyphicon space glyphicon-chevron-down"></span></small>
                 </h4>
             </div>
             <div class="panel-body">
             <div id="help-content" class="help-content" style="display: none;">
-                <p><strong>Magic Shelves</strong> are dynamic shelves that automatically populate based on rules you define. No manual organization needed!</p>
+                <p>{{_('Smart shelves collect books automatically using rules.')}}</p>
+                <p class="text-muted">{{_('Smart shelves were called Magic Shelves in older versions.')}}</p>
                 
                 <div class="help-example">
                     <strong>Example:</strong> Create a "Recently Added" shelf that shows all books added in the last 30 days:
@@ -418,15 +419,16 @@ div.help-panel > .panel-body {
                                    placeholder="Search quick-pick icons...">
                             <div class="icon-picker-grid" id="icon-picker-grid">
                                 {% for icon in allowed_icons %}
-                                <div class="icon-option" data-icon="{{ icon }}" title="{{ icon }}">
+                                <button type="button" class="icon-option" data-icon="{{ icon }}" title="{{ icon }}">
                                     {{ icon }}
-                                </div>
+                                </button>
                                 {% endfor %}
                             </div>
                         </div>
                     </div>
 
                     <!-- Kobo Sync Checkbox -->
+                    {% if is_owner %}
                     <div class="form-group shelf-option-card">
                         <label>
                             <input style="margin-right: 2rem !important;" type="checkbox" id="shelf-kobo-sync" {{ 'checked' if shelf and shelf.kobo_sync else '' }} {{ 'disabled' if not kobo_magic_sync_enabled else '' }}>
@@ -434,27 +436,29 @@ div.help-panel > .panel-body {
                         </label>
                         {% if not kobo_magic_sync_enabled %}
                         {% if koreader_sync %}
-                        <small class="form-text" style="color: #e2b93d;">Turn on “Sync Magic Shelves to e-readers (Kobo and KOReader)” in CWA Settings first — until then this checkbox has no effect and the shelf won't reach your e-readers.</small>
+                        <small class="form-text" style="color: #e2b93d;">{{_('Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader.', setting=_('Sync smart shelves to e-readers (Kobo and KOReader)'))}}</small>
                         {% else %}
-                        <small class="form-text" style="color: #e2b93d;">Turn on “Sync Magic Shelves to Kobo” in CWA Settings first — until then this checkbox has no effect and the shelf won't reach your Kobo.</small>
+                        <small class="form-text" style="color: #e2b93d;">{{_('Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has no effect and the shelf will not reach your e-reader.', setting=_('Sync smart shelves to Kobo'))}}</small>
                         {% endif %}
                         {% else %}
                         <small class="form-text text-muted">Only works if Kobo integration is enabled</small>
                         {% endif %}
                     </div>
+                    {% endif %}
 
                     {% if opds_expose_enabled %}
                     <div class="form-group shelf-option-card">
                         <label>
                             <input style="margin-right: 2rem !important;" type="checkbox" id="shelf-opds-expose" {{ 'checked' if opds_expose_checked else '' }}>
-                            Expose this magic shelf in my OPDS feed
+                            {{_('Expose this smart shelf in my OPDS feed')}}
                         </label>
                         <small class="form-text text-muted">Used when your profile is set to expose only selected shelves through OPDS</small>
                     </div>
                     {% endif %}
 
                     <!-- Public Shelf Checkbox (only for custom shelves with permission) -->
-                    {% if current_user.role_edit_shelfs() and not (shelf and shelf.is_system) %}
+                    {% if ((is_owner and current_user.role_share_shelfs()) or
+                           (not is_owner and current_user.role_edit_shelfs())) and not (shelf and shelf.is_system) %}
                     <div class="form-group shelf-option-card">
                         <label>
                             <input style="margin-right: 2rem !important;" type="checkbox" id="shelf-is-public" {{ 'checked' if shelf and shelf.is_public == 1 else '' }}>
@@ -597,12 +601,25 @@ $(function() {
     // QueryBuilder's bundled renderer ignores labels on custom operator
     // objects. Replace only raw, untranslated IDs; built-in regional labels
     // remain untouched.
-    $('#builder').on('afterCreateRuleOperators.queryBuilder', function() {
+    // Name QueryBuilder's generated controls before its first rule is rendered.
+    $('#builder').on('afterCreateRuleFilters.queryBuilder', function(event, rule) {
+        rule.$el.find('.rule-filter-container select').attr('aria-label', {{_('Rule field')|tojson}});
+    });
+    $('#builder').on('afterCreateRuleOperators.queryBuilder', function(event, rule) {
+        rule.$el.find('.rule-operator-container select').attr('aria-label', {{_('Rule operator')|tojson}});
         $(this).find('.rule-operator-container option').each(function() {
             var type = $(this).val();
             if ($(this).text().trim() === type && operatorLabels[type]) {
                 $(this).text(operatorLabels[type]);
             }
+        });
+    });
+    $('#builder').on('afterCreateRuleInput.queryBuilder', function(event, rule) {
+        var $values = rule.$el.find('.rule-value-container input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), .rule-value-container select, .rule-value-container textarea');
+        $values.each(function(index) {
+            var name = rule.filter.label + ': ' + {{_('value')|tojson}};
+            if ($values.length > 1) name += ' ' + (index + 1);
+            $(this).attr('aria-label', name);
         });
     });
 
@@ -772,9 +789,14 @@ $(function() {
             name: shelfName,
             icon: $('#shelf-icon').val(),
             rules: rules,
+            {% if is_owner %}
             kobo_sync: $('#shelf-kobo-sync').is(':checked'),
+            {% endif %}
             opds_expose: $('#shelf-opds-expose').is(':checked'),
+            {% if ((is_owner and current_user.role_share_shelfs()) or
+                   (not is_owner and current_user.role_edit_shelfs())) and not (shelf and shelf.is_system) %}
             is_public: $('#shelf-is-public').is(':checked')
+            {% endif %}
         };
 
         console.log('Submitting shelf data:', shelfData);

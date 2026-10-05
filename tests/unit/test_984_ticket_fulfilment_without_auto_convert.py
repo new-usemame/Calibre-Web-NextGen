@@ -5,8 +5,8 @@
 """Fork #984: fulfilment tickets must run their converter even when ordinary
 book conversion is disabled.
 
-An ACSM or LCPL file is a ticket/licence, not a book that can be imported in
-its original format.  Auto-Convert OFF and the per-format conversion ignore
+An LCPL file is a licence, not a book that can be imported in its original
+format. ACSM has a separate import-hook fulfillment path.  Auto-Convert OFF and the per-format conversion ignore
 list therefore cannot use the ordinary "import the original" fallback: the
 plugin-backed converter is the only path that can produce a book.
 """
@@ -68,6 +68,7 @@ class _FakeProcessor:
         self._convert_result = convert_result
         self._use_real_converter = use_real_converter
         self.imported = []
+        self.fulfillment_calls = 0
         self.convert_book_calls = []
         self.convert_to_kepub_calls = 0
         self.backed_up = []
@@ -84,6 +85,13 @@ class _FakeProcessor:
         if self._use_real_converter:
             return _REAL_CONVERT_BOOK(self, end_format=end_format)
         return self._convert_result
+
+    def ingest_acsm(self):
+        self.fulfillment_calls += 1
+        if self._convert_result[0]:
+            self.add_book_to_library(self._convert_result[1], identity_path=self.filepath)
+        else:
+            self.backup(self.filepath, backup_type="failed")
 
     def convert_to_kepub(self):
         self.convert_to_kepub_calls += 1
@@ -153,7 +161,7 @@ def _run_main(
     return holder["fake"], str(source)
 
 
-@pytest.mark.parametrize("ticket_format", ["acsm", "lcpl"])
+@pytest.mark.parametrize("ticket_format", ["lcpl"])
 def test_ticket_is_fulfilled_when_auto_convert_is_off(
     monkeypatch, tmp_path, capsys, ticket_format
 ):
@@ -174,7 +182,7 @@ def test_ticket_is_fulfilled_when_auto_convert_is_off(
     assert "Auto-Convert is deactivated" in output
 
 
-@pytest.mark.parametrize("ticket_format", ["acsm", "lcpl"])
+@pytest.mark.parametrize("ticket_format", ["lcpl"])
 def test_ticket_is_fulfilled_even_when_its_format_is_ignored(
     monkeypatch, tmp_path, capsys, ticket_format
 ):
@@ -210,28 +218,6 @@ def test_real_book_is_still_imported_as_is_when_auto_convert_is_off(
     assert fake.imported == [source]
 
 
-def test_unconvertible_acsm_uses_ticket_failure_flow(
-    monkeypatch, tmp_path, capsys
-):
-    fake, source = _run_main(
-        monkeypatch,
-        tmp_path,
-        input_format="acsm",
-        auto_convert_on=False,
-        convert_result=(False, ""),
-        can_convert=False,
-        create_import_manifest=True,
-    )
-
-    output = capsys.readouterr().out
-    assert fake.convert_book_calls == []
-    assert fake.imported == []
-    assert fake.backed_up == [(source, "failed")]
-    assert not Path(source + ".cwa.json").exists()
-    assert "ACSM_NOTICE:" in output
-    assert "is currently unsupported / is not a known ebook format" not in output
-
-
 def test_successful_fulfilment_never_retains_raw_ticket_as_book_format(
     monkeypatch, tmp_path
 ):
@@ -248,61 +234,4 @@ def test_successful_fulfilment_never_retains_raw_ticket_as_book_format(
 
     assert fake.imported == [converted]
     assert fake.added_formats == []
-    assert source not in fake.imported
-
-
-def test_failed_ticket_fulfilment_keeps_plugin_reason_and_preserves_original(
-    monkeypatch, tmp_path, capsys
-):
-    source_path = tmp_path / "Library Ticket.acsm"
-    import_manifest = Path(str(source_path) + ".cwa.json")
-    import_manifest.write_text('{"action": "import"}')
-    failed_manifest = Path(str(source_path) + ".cwa.failed.json")
-    failed_manifest.write_text("preserve this")
-    plugin_output = (
-        "ValueError: No plugin to handle input format: acsm\n"
-        "DeACSM v0.0.16: Trying to parse file Library Ticket.acsm\n"
-        "DeACSM v0.0.16: ADE auth is missing or broken\n"
-    )
-
-    def _fail(cmd, *args, **kwargs):
-        raise subprocess.CalledProcessError(1, cmd, output=plugin_output)
-
-    monkeypatch.setattr(ingest_processor, "_run_converter_streaming", _fail)
-    fake, source = _run_main(
-        monkeypatch,
-        tmp_path,
-        input_format="acsm",
-        auto_convert_on=False,
-        convert_result=(False, ""),
-        use_real_converter=True,
-    )
-
-    output = capsys.readouterr().out
-    assert fake.convert_book_calls == [None]
-    assert fake.imported == []
-    assert fake.backed_up == [(source, "failed")]
-    assert not import_manifest.exists()
-    assert failed_manifest.read_text() == "preserve this"
-    assert "ADE auth is missing or broken" in output
-    assert "An ACSM-capable Calibre plugin is installed and did run" in output
-    assert "place the ACSM Input plugin zip" not in output
-
-
-def test_acsm_targeting_kepub_uses_the_two_stage_fulfilment_route(
-    monkeypatch, tmp_path
-):
-    converted = str(tmp_path / "Library Ticket.kepub")
-    fake, source = _run_main(
-        monkeypatch,
-        tmp_path,
-        input_format="acsm",
-        auto_convert_on=False,
-        convert_result=(True, converted),
-        target_format="kepub",
-    )
-
-    assert fake.convert_to_kepub_calls == 1
-    assert fake.convert_book_calls == []
-    assert fake.imported == [converted]
     assert source not in fake.imported

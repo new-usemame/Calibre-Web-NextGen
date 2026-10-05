@@ -31,7 +31,7 @@ export function advancedSearchToQuery(params: AdvancedSearchParams): string {
     const value = (params[key] ?? '').trim();
     if (value) out.set(key, value);
   }
-  if (params.read_status === 'read' || params.read_status === 'unread') {
+  if (params.read_status && params.read_status !== 'all') {
     out.set('read_status', params.read_status);
   }
   for (const key of [...ID_LIST_KEYS, ...FORMAT_LIST_KEYS]) {
@@ -73,7 +73,7 @@ export function advancedSearchFromQuery(search: string): AdvancedSearchParams | 
     if (value && RATING_RE.test(value)) { params[key] = value; found = true; }
   }
   const readStatus = query.get('read_status');
-  if (readStatus === 'read' || readStatus === 'unread') {
+  if (readStatus === 'read' || readStatus === 'unread' || readStatus === 'in_progress' || readStatus === 'did_not_finish' || readStatus === 'on_hold') {
     params.read_status = readStatus;
     found = true;
   }

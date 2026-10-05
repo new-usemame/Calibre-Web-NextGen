@@ -4,6 +4,7 @@
 {% block body %}
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <h2>{{title}}</h2>
+{% include '_book_list_export.html' %}
 
 {% if author is not none %}
 <section class="author-bio">

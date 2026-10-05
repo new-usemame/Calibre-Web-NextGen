@@ -1,3 +1,4 @@
+import { BookListExport } from '../components/BookListExport';
 import { useState, useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useSearch } from 'wouter';
@@ -17,8 +18,9 @@ import styles from './AdvancedSearch.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 
-type ReadStatus = 'all' | 'read' | 'unread';
+type ReadStatus = 'all' | 'read' | 'unread' | 'in_progress' | 'did_not_finish' | 'on_hold';
 
 interface FormState {
   title: string;
@@ -112,6 +114,7 @@ export function AdvancedSearch() {
   const writtenQueryRef = useRef(currentQuery());
 
   const { data, isFetching, isPlaceholderData, error } = useAdvancedSearch(submitted, page);
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
 
   // Skip placeholder data: on a new search react-query briefly returns the
   // PREVIOUS result (placeholderData) under the new key — acting on it would
@@ -223,12 +226,13 @@ export function AdvancedSearch() {
           </Field>
 
           <Field label={t('Read status')}>
-            <div className={styles.segmented}>
-              {(['all', 'unread', 'read'] as ReadStatus[]).map((rs) => (
+            <div className={styles.segmented} role="group" aria-label={t('Read status')}>
+              {(['all', 'unread', 'read', 'in_progress', 'did_not_finish', 'on_hold'] as ReadStatus[]).map((rs) => (
                 <button key={rs} type="button"
                   className={form.read_status === rs ? styles.segActive : styles.seg}
+                  aria-pressed={form.read_status === rs}
                   onClick={() => set('read_status', rs)}>
-                  {rs === 'all' ? t('Any') : t(rs === 'unread' ? 'Unread' : 'Read')}
+                  {t(({ all: 'Any', unread: 'Unread', read: 'Read', in_progress: 'Currently reading', did_not_finish: 'Did not finish', on_hold: 'On hold' })[rs])}
                 </button>
               ))}
             </div>
@@ -318,6 +322,8 @@ export function AdvancedSearch() {
       {/* Results */}
       {submitted !== null && (
         <section className={styles.results} aria-label={t('Search results')}>
+          <BookListExport disabled={isFetching || isPlaceholderData || !!error} source={{ source: 'advanced', params: { ...submitted } }} />
+
           {error ? (
             <EmptyState message={error instanceof Error ? error.message : t('Search failed.')} />
           ) : isFetching && results.length === 0 ? (
@@ -335,7 +341,7 @@ export function AdvancedSearch() {
               <div className={styles.resultsGrid}>
                 {results.map((book, i) => (
                   <BookCard key={book.id} book={book} quickEdit={canEdit} canRead={!!me?.role?.viewer}
-                    hideActions={cardActionsHidden}
+                    hideActions={cardActionsHidden} customColumnDefinitions={customColumns}
                     hideReadingTags={readingTagsHidden}
                 hideShelfTags={shelfBadgesHidden}
                     style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />

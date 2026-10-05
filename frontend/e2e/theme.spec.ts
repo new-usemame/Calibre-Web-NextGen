@@ -80,7 +80,10 @@ test.describe('per-user theme picker', () => {
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
       await page.goto('/app/admin');
-      const adminSelect = page.locator('main select').first();
+      // Ingest settings also contain a themed select, but it deliberately uses
+      // the smaller surface-2 control style. Keep this assertion scoped to the
+      // Library settings form whose theme tokens are under test.
+      const adminSelect = page.locator('#library-settings select').first();
       await expect(adminSelect).toBeVisible();
       expect(await adminSelect.evaluate((el) => {
         const style = getComputedStyle(el);

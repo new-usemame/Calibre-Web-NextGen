@@ -2539,7 +2539,7 @@ def HandleSyncRequest():
                     book.Books, kobo_reading_state)
                 new_reading_state_last_modified = max(
                     new_reading_state_last_modified,
-                    kobo_reading_state.last_modified,
+                    books_cursor_datetime(kobo_reading_state.last_modified),
                 )
                 reading_state_book_ids_emitted.append(book.Books.id)
                 if entitlement_is_unchanged:
@@ -2733,7 +2733,8 @@ def HandleSyncRequest():
         .filter(ub.ArchivedBook.user_id == current_user.id) \
         .order_by(func.datetime(ub.ArchivedBook.last_modified).desc()).first()
 
-    max_change = max_change.last_modified if max_change else new_archived_last_modified
+    max_change = (books_cursor_datetime(max_change.last_modified) if max_change
+                  else new_archived_last_modified)
 
     new_archived_last_modified = max(new_archived_last_modified, max_change)
 
@@ -2761,7 +2762,10 @@ def HandleSyncRequest():
                 }
             })
             reading_state_book_ids_emitted.append(kobo_reading_state.book_id)
-            new_reading_state_last_modified = max(new_reading_state_last_modified, kobo_reading_state.last_modified)
+            new_reading_state_last_modified = max(
+                new_reading_state_last_modified,
+                books_cursor_datetime(kobo_reading_state.last_modified),
+            )
 
     # Re-download repair is independent of the opaque reading-state cursor.
     # Only latches which pre-date this request are eligible: work armed by an
@@ -2923,7 +2927,7 @@ def HandleSyncRequest():
                 shelf.id, page=1, page_size=None
             )
 
-            new_tags_last_modified = max(shelf.last_modified, new_tags_last_modified)
+            new_tags_last_modified = max(books_cursor_datetime(shelf.last_modified), new_tags_last_modified)
 
             tag = create_kobo_tag_magic(shelf, books)
             if not tag:
@@ -3957,7 +3961,7 @@ def sync_shelves(sync_token, sync_results, only_kobo_shelves=False):
     new_tags_last_modified = sync_token.tags_last_modified
     # transmit all archived shelfs independent of last sync (why should this matter?)
     for shelf in ub.session.query(ub.ShelfArchive).filter(ub.ShelfArchive.user_id == current_user.id):
-        new_tags_last_modified = max(shelf.last_modified, new_tags_last_modified)
+        new_tags_last_modified = max(books_cursor_datetime(shelf.last_modified), new_tags_last_modified)
         sync_results.append({
             "DeletedTag": {
                 "Tag": {
@@ -3996,7 +4000,7 @@ def sync_shelves(sync_token, sync_results, only_kobo_shelves=False):
         if not shelf_lib.check_shelf_view_permissions(shelf):
             continue
 
-        new_tags_last_modified = max(shelf.last_modified, new_tags_last_modified)
+        new_tags_last_modified = max(books_cursor_datetime(shelf.last_modified), new_tags_last_modified)
 
         tag = create_kobo_tag(shelf)
         if not tag:
@@ -4179,17 +4183,12 @@ def HandleStateRequest(book_uuid):
             if request_status_info:
                 book_read = kobo_reading_state.book_read_link
                 new_book_read_status = get_ub_read_status(request_status_info["Status"])
-                status_clock_accepted = device_positions.timestamp_is_newer(
-                    request_lm, book_read.last_modified,
+                from .services.reading_status import update_automatic_read_status
+                status_accepted = update_automatic_read_status(
+                    book_read, new_book_read_status,
+                    observed_clock=request_lm, require_newer_clock=True,
                 )
-                if (new_book_read_status != book_read.read_status
-                        and status_clock_accepted):
-                    if new_book_read_status == ub.ReadBook.STATUS_IN_PROGRESS:
-                        book_read.times_started_reading += 1
-                        book_read.last_time_started_reading = datetime.now(timezone.utc)
-                    book_read.read_status = new_book_read_status
-                    _apply_kobo_last_modified(book_read, request_lm)
-                if (status_clock_accepted
+                if (status_accepted
                         and new_book_read_status == ub.ReadBook.STATUS_FINISHED
                         and not helper.set_custom_read_column_value(
                             book.id, True, source="Kobo read-status",
@@ -4318,6 +4317,8 @@ def get_read_status_for_kobo(ub_book_read):
         ub.ReadBook.STATUS_UNREAD: "ReadyToRead",
         ub.ReadBook.STATUS_FINISHED: "Finished",
         ub.ReadBook.STATUS_IN_PROGRESS: "Reading",
+        ub.ReadBook.STATUS_DID_NOT_FINISH: "ReadyToRead",
+        ub.ReadBook.STATUS_ON_HOLD: "ReadyToRead",
     }
     return enum_to_string_map[ub_book_read.read_status]
 
@@ -4325,8 +4326,9 @@ def get_read_status_for_kobo(ub_book_read):
 def reconcile_custom_read_column_for_kobo(book_ids, reading_state_cursor):
     """Mirror changed Calibre read markers into timestamped Kobo state rows.
 
-    The Calibre column is boolean while ReadBook is tri-state.  A true marker
-    always means FINISHED; false is intentionally ignored because it cannot
+    The Calibre column is boolean while ReadBook has personal reading states.
+    A true marker means FINISHED unless the user explicitly paused the book;
+    false is intentionally ignored because it cannot
     distinguish UNREAD from a legitimate IN_PROGRESS value reported by a
     reader.  Work is limited to the already-selected entitlement candidates,
     so an incremental sync never scans the full library and no token is
@@ -4380,11 +4382,10 @@ def reconcile_custom_read_column_for_kobo(book_ids, reading_state_cursor):
                 read_by_book[book.id] = book_read
                 status_changed = True
             else:
-                status_changed = (
-                    book_read.read_status != ub.ReadBook.STATUS_FINISHED
+                from .services.reading_status import update_automatic_read_status
+                status_changed = update_automatic_read_status(
+                    book_read, ub.ReadBook.STATUS_FINISHED, changed_only=True,
                 )
-                if status_changed:
-                    book_read.read_status = ub.ReadBook.STATUS_FINISHED
 
             needs_state = status_changed or (
                 book_read.kobo_reading_state is None

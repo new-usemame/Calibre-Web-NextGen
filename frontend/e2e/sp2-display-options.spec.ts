@@ -162,16 +162,22 @@ test('book detail exposes imported name, tag disclosure, and semantic progress',
     detail.tags = Array.from({ length: 25 }, (_, i) => ({ id: i + 1000, name: `SP2 tag ${i + 1}` }));
     await route.fulfill({ response, json: detail });
   });
-  await page.goto(`/app/book/${book.id}`);
-  await expect(page.getByText('reader-selected-name.epub')).toBeVisible();
-  const progress = page.getByRole('progressbar', { name: 'Reading progress' });
-  await expect(progress).toHaveAttribute('aria-valuenow', '42');
-  const disclosure = page.locator('button[aria-controls="book-tags"]');
-  await expect(disclosure).toHaveAccessibleName('Show all 25 tags');
-  await expect(page.getByText('SP2 tag 25')).toHaveCount(0);
-  await disclosure.click();
-  await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByText('SP2 tag 25')).toBeVisible();
+  try {
+    await page.goto(`/app/book/${book.id}`);
+    await expect(page.getByText('reader-selected-name.epub')).toBeVisible();
+    const progress = page.getByRole('progressbar', { name: 'Reading progress' });
+    await expect(progress).toHaveAttribute('aria-valuenow', '42');
+    const disclosure = page.locator('button[aria-controls="book-tags"]');
+    await expect(disclosure).toHaveAccessibleName('Show all 25 tags');
+    await expect(page.getByText('SP2 tag 25')).toHaveCount(0);
+    await disclosure.click();
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByText('SP2 tag 25')).toBeVisible();
+  } finally {
+    // The detail can revalidate while its disclosures change. Settle this
+    // test's interceptors before the context disposes route.fetch responses.
+    await page.unrouteAll({ behavior: 'wait' });
+  }
 });
 
 test('Customize panel can restore hidden Table view', async ({ page }) => {

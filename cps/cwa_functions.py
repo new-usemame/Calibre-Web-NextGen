@@ -5,10 +5,10 @@
 # See CONTRIBUTORS for full list of authors.
 
 from flask import Blueprint, redirect, flash, url_for, request, send_from_directory, abort, jsonify, current_app
-from flask_babel import gettext as _, lazy_gettext as _l
+from flask_babel import gettext as _, lazy_gettext as _l, ngettext, get_locale, format_date
 from markupsafe import escape
 
-from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy
+from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy, content_server
 from .constants import LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
@@ -52,6 +52,11 @@ from .schedule import (
 )
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 from .services import ereader_scope
+from .services.ingest_folder_labels import (
+    IngestFolderLabelError,
+    eligible_custom_column_options,
+    validate_target as validate_ingest_folder_label_target,
+)
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
 # reconnect endpoint uses CalibreDB.refresh_for_new_data() instead, to avoid
 # the engine-disposal race in fork issue #192 (PR #199, v4.0.30).
@@ -60,6 +65,13 @@ from .tasks.ops import TaskConvertLibraryRun, TaskEpubFixerRun
 
 switch_theme = Blueprint('switch_theme', __name__)
 library_refresh = Blueprint('library_refresh', __name__)
+def _restart_content_server_when_done(process, library_hold):
+    process.wait()
+    # A failed wait does not prove the child exited; retain the hold rather
+    # than let the content server reopen the library while it may be in use.
+    library_hold.release()
+
+
 convert_library = Blueprint('convert_library', __name__)
 epub_fixer = Blueprint('epub_fixer', __name__)
 cover_enforcer_ui = Blueprint('cover_enforcer_ui', __name__)
@@ -107,6 +119,51 @@ def _local_calls_only(view):
     return local_only
 
 log = logger.create()
+
+
+def _ingest_folder_label_columns():
+    """Existing tag-like custom columns offered by the ingest setting."""
+    try:
+        from . import db
+        columns = calibre_db.session.query(db.CustomColumns).all()
+        return eligible_custom_column_options(columns)
+    except Exception:
+        log.exception("Could not load custom columns for ingest-folder labels")
+        return []
+
+
+def _folder_label_settings_for_post(result, form, current, columns):
+    """Keep Classic's paired folder-label controls partial-save safe."""
+    target_key = 'auto_ingest_folder_label_target'
+    nested_key = 'auto_ingest_folder_label_nested'
+    target_present = target_key in form
+    nested_present = nested_key in form
+    if not target_present and not nested_present:
+        result.pop(target_key, None)
+        result.pop(nested_key, None)
+        return False
+
+    target = form.get(target_key) if target_present else current.get(target_key, 'disabled')
+    try:
+        validated = validate_ingest_folder_label_target(target, columns)
+    except IngestFolderLabelError:
+        result.pop(target_key, None)
+        result.pop(nested_key, None)
+        return True
+
+    if target_present:
+        result[target_key] = validated
+    else:
+        result.pop(target_key, None)
+    if nested_present:
+        result[nested_key] = 1 if form.get(nested_key) else 0
+    elif target_present:
+        # Posting the target control submits this settings section; an omitted
+        # checkbox then has the ordinary unchecked meaning.
+        result[nested_key] = 0
+    else:
+        result.pop(nested_key, None)
+    return False
 
 
 def _mirror_hardcover_sync_for_rollback(cwa_db):
@@ -846,6 +903,12 @@ def set_cwa_settings():
             result = {"auto_convert_ignored_formats":[], "auto_ingest_ignored_formats":[], "auto_convert_retained_formats":[]}
             # set boolean_settings
             for setting in boolean_settings:
+                if (setting == 'auto_ingest_folder_label_nested'
+                        and 'auto_ingest_folder_label_target' not in request.form
+                        and setting not in request.form):
+                    # Older/partial clients may post unrelated settings only.
+                    # Keep the paired folder-label preference untouched then.
+                    continue
                 value = request.form.get(setting)
                 if value is None:
                     value = 0
@@ -1066,6 +1129,15 @@ def set_cwa_settings():
             config.config_kobo_sync_magic_shelves = 'config_kobo_sync_magic_shelves' in request.form
             config.save()
 
+            # Validate the selected target before writing it. The importer
+            # repeats this check at its Calibre transaction boundary in case
+            # metadata.db changes after the settings form is saved.
+            invalid_folder_label_settings = _folder_label_settings_for_post(
+                result, request.form, cwa_settings, _ingest_folder_label_columns(),
+            )
+            if invalid_folder_label_settings:
+                flash(_("Choose Tags or an existing comma-separated text custom column. Folder-label settings were not saved."), category="error")
+
             # Preserve the legacy CWA column for downgrade compatibility;
             # this page no longer owns a second Hardcover enable switch.
             result['hardcover_auto_fetch_enabled'] = int(
@@ -1170,12 +1242,14 @@ def set_cwa_settings():
         )
     )
 
+    ingest_folder_label_columns = _ingest_folder_label_columns()
     return render_title_template("cwa_settings.html", title=_("Calibre-Web NextGen User Settings"), page="cwa-settings",
                                     cwa_settings=rendered_cwa_settings, ignorable_formats=ignorable_formats, target_formats=target_formats,
                                     automerge_options=automerge_options, autoingest_options=autoingest_options,
                                     hardcover_token_available=hardcover_token_available,
                                     next_duplicate_scan_run=next_scan_run,
                                     processed_books_dir=constants.processed_books_dir(),
+                                    ingest_folder_label_columns=ingest_folder_label_columns,
                                     koreader_sync=ereader_scope.koreader_library_on(),
                                     config=config)
 
@@ -1215,25 +1289,27 @@ def get_cwa_stats() -> dict[str,int]:
 
     return totals
 
-### TABLE HEADERS
-headers = {
-    "enforcement":{
-        "no_paths":[
-            _("Timestamp"), _("Book ID"), _("Book Title"), _("Book Author"), _("Trigger Type")],
-        "with_paths":[
-            _("Timestamp"), _("Book ID"), _("Filepath")]
-        },
-    "epub_fixer":{
-        "no_fixes":[
-            _("Timestamp"), _("Filename"), _("Manual?"), _("No. Fixes"), _("Original Backed Up?")],
-        "with_fixes":[
-            _("Timestamp"), _("Filename"), _("Filepath"), _("Fixes Applied")]
-        },
-    "imports":[
-        _("Timestamp"), _("Filename"), _("Original Backed Up?")],
-    "conversions":[
-        _("Timestamp"), _("Filename"), _("Original Format"), _("End Format"), _("Original Backed Up?")],
-}
+def get_stats_headers():
+    """Resolve history column labels for this request and keep them extractable."""
+    return {
+        "enforcement":{
+            "no_paths":[
+                _("Timestamp"), _("Book ID"), _("Book Title"), _("Book Author"), _("Trigger Type")],
+            "with_paths":[
+                _("Timestamp"), _("Book ID"), _("Filepath")]
+            },
+        "epub_fixer":{
+            "no_fixes":[
+                _("Timestamp"), _("Filename"), _("Manual?"), _("No. Fixes"), _("Original Backed Up?")],
+            "with_fixes":[
+                _("Timestamp"), _("Filename"), _("Filepath"), _("Fixes Applied")]
+            },
+        "imports":[
+            _("Timestamp"), _("Filename"), _("Original Backed Up?")],
+        "conversions":[
+            _("Timestamp"), _("Filename"), _("Original Format"), _("End Format"), _("Original Backed Up?")],
+    }
+
 
 @cwa_stats.route("/cwa-stats-show", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1255,9 +1331,10 @@ def cwa_stats_show():
     today = datetime.now().strftime('%Y-%m-%d')
     
     # Handle 'all' as a special string value, otherwise parse as int
-    if days_param == 'all':
+    is_all_time = days_param == 'all'
+    if is_all_time:
         days = None  # None means all time
-        date_range_label = "All Time"
+        date_range_label = _("All Time")
     else:
         days = int(days_param) if days_param else None
     
@@ -1265,7 +1342,7 @@ def cwa_stats_show():
     
     # Set default label if not set
     if not date_range_label:
-        date_range_label = "Last 30 days"
+        date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", 30, count=30)
     
     if start_date and end_date:
         try:
@@ -1279,22 +1356,24 @@ def cwa_stats_show():
             if range_days > 365:
                 show_warning = True
             
-            date_range_label = f"{start_date} to {end_date}"
+            date_range_label = _("%(start)s to %(end)s",
+                                 start=format_date(start_dt, format='short'),
+                                 end=format_date(end_dt, format='short'))
         except ValueError:
             # Invalid date format, fall back to 30 days
             start_date = None
             end_date = None
             days = 30
-            date_range_label = "Last 30 days"
+            date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", 30, count=30)
     elif days:
-        if date_range_label != "All Time":
-            date_range_label = f"Last {days} days"
+        if not is_all_time:
+            date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", days, count=days)
         if days > 365:
             show_warning = True
-    elif days is None and date_range_label != "All Time":
+    elif days is None and not is_all_time:
         # Default to 30 days if no parameters provided
         days = 30
-        date_range_label = "Last 30 days"
+        date_range_label = ngettext("Last %(count)s day", "Last %(count)s days", 30, count=30)
     
     cwa_db = CWA_DB()
     
@@ -1446,6 +1525,7 @@ def cwa_stats_show():
         hardcover_stats = None
 
     return render_title_template("cwa_stats_tabs.html", title=_("Calibre-Web NextGen Stats & Activity"),
+                                stats_locale=str(get_locale()),
                                 page="cwa-stats",
                                 active_tab=active_tab,
                                 dashboard_stats=dashboard_stats,
@@ -1482,12 +1562,12 @@ def cwa_stats_show():
                                 selected_user_id=user_id,
                                 cwa_stats=get_cwa_stats(),
                                 hardcover_stats=hardcover_stats,
-                                data_enforcement=data_enforcement, headers_enforcement=headers["enforcement"]["no_paths"], 
-                                data_enforcement_with_paths=data_enforcement_with_paths, headers_enforcement_with_paths=headers["enforcement"]["with_paths"], 
-                                data_imports=data_imports, headers_import=headers["imports"],
-                                data_conversions=data_conversions, headers_conversion=headers["conversions"],
-                                data_epub_fixer=data_epub_fixer, headers_epub_fixer=headers["epub_fixer"]["no_fixes"],
-                                data_epub_fixer_with_fixes=data_epub_fixer_with_fixes, headers_epub_fixer_with_fixes=headers["epub_fixer"]["with_fixes"])
+                                data_enforcement=data_enforcement, headers_enforcement=get_stats_headers()["enforcement"]["no_paths"],
+                                data_enforcement_with_paths=data_enforcement_with_paths, headers_enforcement_with_paths=get_stats_headers()["enforcement"]["with_paths"],
+                                data_imports=data_imports, headers_import=get_stats_headers()["imports"],
+                                data_conversions=data_conversions, headers_conversion=get_stats_headers()["conversions"],
+                                data_epub_fixer=data_epub_fixer, headers_epub_fixer=get_stats_headers()["epub_fixer"]["no_fixes"],
+                                data_epub_fixer_with_fixes=data_epub_fixer_with_fixes, headers_epub_fixer_with_fixes=get_stats_headers()["epub_fixer"]["with_fixes"])
 
 @cwa_stats.route("/cwa-stats-export-csv/<tab_name>", methods=["GET"])
 @login_required_if_no_ano
@@ -1831,7 +1911,7 @@ def show_full_enforcement():
     cwa_db = CWA_DB()
     data = cwa_db.enforce_show(paths=False, verbose=True, web_ui=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Enforcement History"), page="cwa-stats-full",
-                                    table_headers=headers["enforcement"]["no_paths"], data=data)
+                                    table_headers=get_stats_headers()["enforcement"]["no_paths"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-enforcement-with-paths", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1840,7 +1920,7 @@ def show_full_enforcement_path():
     cwa_db = CWA_DB()
     data = cwa_db.enforce_show(paths=True, verbose=True, web_ui=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Enforcement History (w/ Paths)"), page="cwa-stats-full",
-                                    table_headers=headers["enforcement"]["with_paths"], data=data)
+                                    table_headers=get_stats_headers()["enforcement"]["with_paths"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-imports", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1849,7 +1929,7 @@ def show_full_imports():
     cwa_db = CWA_DB()
     data = cwa_db.get_import_history(verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Import History"), page="cwa-stats-full",
-                                    table_headers=headers["imports"], data=data)
+                                    table_headers=get_stats_headers()["imports"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-conversions", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1858,7 +1938,7 @@ def show_full_conversions():
     cwa_db = CWA_DB()
     data = cwa_db.get_conversion_history(verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full Conversion History"), page="cwa-stats-full",
-                                    table_headers=headers["conversions"], data=data)
+                                    table_headers=get_stats_headers()["conversions"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-epub-fixer", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1867,7 +1947,7 @@ def show_full_epub_fixer():
     cwa_db = CWA_DB()
     data = cwa_db.get_epub_fixer_history(fixes=False, verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full EPUB Fixer History (w/out Paths & Fixes)"), page="cwa-stats-full",
-                                    table_headers=headers["epub_fixer"]["no_fixes"], data=data)
+                                    table_headers=get_stats_headers()["epub_fixer"]["no_fixes"], data=data)
 
 @cwa_stats.route("/cwa-stats-show/full-epub-fixer-with-paths-fixes", methods=["GET", "POST"])
 @login_required_if_no_ano
@@ -1876,7 +1956,7 @@ def show_full_epub_fixer_with_paths_fixes():
     cwa_db = CWA_DB()
     data = cwa_db.get_epub_fixer_history(fixes=True, verbose=True)
     return render_title_template("cwa_stats_full.html", title=_("Calibre-Web NextGen - Full EPUB Fixer History (w/ Paths & Fixes)"), page="cwa-stats-full",
-                                    table_headers=headers["epub_fixer"]["with_fixes"], data=data)
+                                    table_headers=get_stats_headers()["epub_fixer"]["with_fixes"], data=data)
 
 ##————————————————————————————————————————————————————————————————————————————##
 ##                                                                            ##
@@ -2067,8 +2147,32 @@ def _service_status(log_filename: str):
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
-    cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+    # convert_library works on the format files on disk, so it needs the library
+    # to itself. The server comes back only if it was running, and also when the
+    # run cannot be launched at all -- otherwise a failed launch left it stopped
+    # until the next save or restart (#2210 review).
+    library_hold = None
+    try:
+        library_hold = content_server.hold_library()
+        cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+    except Exception as error:
+        try:
+            with open(_service_log_path("convert-library.log"), "a") as failed_log:
+                failed_log.write(f"\n[convert-library]: Cannot start library conversion: {error}\n")
+                failed_log.write(f"NextGen Convert Library Service - Run Failed: {datetime.now()}\n")
+                failed_log.write(f"NextGen Convert Library Service - Run Ended: {datetime.now()}\n")
+        finally:
+            if library_hold is not None:
+                library_hold.release()
+        raise
     queue.put(cl_process)
+    try:
+        Thread(target=_restart_content_server_when_done, args=(cl_process, library_hold), daemon=True).start()
+    except RuntimeError:
+        # This function already runs in a native conversion worker. Keep the
+        # child cancellable and wait here if a separate waiter cannot start.
+        log.warning("Cannot start conversion waiter; waiting in the conversion worker")
+        _restart_content_server_when_done(cl_process, library_hold)
 
 def get_tmp_conversion_dir() -> str:
     return f"{constants.tmp_conversion_dir()}/"
@@ -2094,7 +2198,12 @@ def kill_convert_library(queue):
         sleep(0.05) # Required to prevent high cpu usage
         if trigger_file.exists():
             # Kill the convert_library process
-            cl_process = queue.get()
+            try:
+                cl_process = queue.get(timeout=0.1)
+            except Empty:
+                if is_convert_library_finished():
+                    break
+                continue
             cl_process.terminate()
             # Remove any potentially left over lock files
             try:
@@ -2347,8 +2456,8 @@ def start_epub_fixer():
 
 
 @epub_fixer.route('/cwa-epub-fixer/run-book', methods=["POST"])
-@csrf.exempt
 @login_required_if_no_ano
+@admin_required
 def run_epub_fixer_for_book():
     if config.config_use_google_drive:
         return jsonify({"success": False, "error": _("Single-book EPUB Fixer is not supported with Google Drive libraries.")}), 400

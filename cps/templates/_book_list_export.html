@@ -1,0 +1,46 @@
+{# Only named, supported scopes get an export action. No unfiltered fallback. #}
+{% set export = namespace(source=none, id=none, params={'sort': order|default('new')}) %}
+{% if page in ['root', 'newest'] %}
+  {% set export.source = 'catalog' %}
+{% elif page in ['read', 'unread', 'favorites', 'archived', 'rated'] %}
+  {% set export.source = 'catalog' %}
+  {% set export.params = dict(export.params, filter=page) %}
+{% elif page in ['author', 'series', 'publisher', 'category', 'language', 'ratings', 'formats'] and id is defined and id|string != '-1' %}
+  {% set export.source = 'classic_catalog' if page == 'category' else 'catalog' %}
+  {% set key = {'author':'author','series':'series','publisher':'publisher','category':'tag','language':'language','ratings':'rating','formats':'format'}[page] %}
+  {% set export_params_updated = export.params.update({key: id}) %}
+{% elif page == 'shelf' and shelf is defined %}
+  {% set export.source = 'shelf' %}{% set export.id = shelf.id %}
+  {# Classic sort actions materialize BookShelf.order before rendering. #}
+  {% set export.params = {'sort': 'stored'} %}
+{% elif page == 'magicshelf' and id is defined %}
+  {% set export.source = 'classic_smart_shelf' %}{% set export.id = id %}
+{% elif page == 'advsearch' and entries is defined and book_export_snapshot|default(none) %}
+  {% set export.source = 'classic_advanced' %}
+  {% set export.params = dict(export.params, snapshot=book_export_snapshot) %}
+{% elif page == 'search' and query is defined and query %}
+  {% set export.source = 'catalog' %}
+  {% set export.params = dict(export.params, search=query) %}
+{% elif page == 'global_library' %}
+  {% set export.source = 'global' %}
+  {% set export.params = dict(export.params, search=global_search, filter='not_in_my_library' if recent_missing else 'all') %}
+{% endif %}
+{% if export.source and current_user.is_authenticated and not current_user.is_anonymous %}
+<section class="book-list-export" aria-label="{{ _('Export this book list') }}"
+  data-url="{{ url_for('api_v1.export_book_list') }}"
+  data-source="{{ export.source }}" data-id="{{ export.id if export.id is not none else '' }}"
+  data-params="{{ export.params|tojson|forceescape }}"
+  data-pending="{{ _('Preparing book list…') }}"
+  data-success="{{ _('Book list download started.') }}"
+  data-error="{{ _('Could not export the book list. Please try again.') }}"
+  data-limit="{{ _('Too many books to export. Narrow the filters and try again.') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <button type="button" disabled class="btn btn-default" data-export-format="csv" style="min-height:44px">{{ _('Export CSV') }}</button>
+    <button type="button" disabled class="btn btn-default" data-export-format="txt" style="min-height:44px">{{ _('Export TXT') }}</button>
+  </div>
+  <p class="help-block" style="color:inherit">{{ _('Exports all matching books, including pages you have not loaded.') }}</p>
+  <p role="status"></p>
+</section>
+<script src="{{ url_for('static', filename='js/book-list-export.js') }}" defer></script>
+{% endif %}

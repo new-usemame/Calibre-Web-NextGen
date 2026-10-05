@@ -31,7 +31,7 @@ from flask_babel import get_locale
 from .cw_login import current_user
 from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from werkzeug.datastructures import Headers
 from werkzeug.http import parse_options_header
 from werkzeug.security import generate_password_hash
@@ -53,11 +53,13 @@ from .tasks.convert import TaskConvert
 from . import logger, config, db, ub, fs
 from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
-                        SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
+                        SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait
 from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
+from .services.conversion_capabilities import get_conversion_capabilities
+from .services.opds_filename import render_filename as render_opds_filename
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -384,11 +386,12 @@ def send_broadcast_email(subject, body_html, recipients, sender_name):
 def get_convert_options(book):
     """Return the allowed source and target conversion formats for a book.
 
-    Mirrors the logic in ``editbooks.render_edit_book`` so the SPA and the
-    legacy edit page agree on what can be converted to what. Source formats are
-    book formats present on the book that calibre's converter can read; target
-    formats depend on whether the calibre converter and/or kepubify are
-    configured and exclude formats the book already has.
+    The configured Calibre installation's active plugin registry determines
+    the formats that its converter can read and write. This keeps the SPA,
+    legacy edit page and conversion API aligned, including explicitly enabled
+    user-installed format plugins. If the bounded capability probe is
+    unavailable, Calibre formats fail closed; independently configured
+    kepubify remains available for EPUB books.
     """
     converter_path = getattr(config, "config_converterpath", "")
     kepubify_path = getattr(config, "config_kepubifypath", "")
@@ -396,20 +399,37 @@ def get_convert_options(book):
     allowed_conversion_formats = list()
     kepub_possible = None
     if converter_path:
+        input_formats, output_formats = get_conversion_capabilities(
+            converter_path,
+            getattr(config, "config_binariesdir", "") or "",
+        )
+        # OEB writes a directory tree, while conversion tasks store one file.
+        # It is a real Calibre output plugin but not a supported library format.
+        output_formats = output_formats.difference({"oeb"})
         for file in book.data:
-            if file.format.lower() in EXTENSIONS_CONVERT_FROM:
-                valid_source_formats.append(file.format.lower())
+            file_format = (file.format or "").lower().lstrip(".")
+            if file_format in input_formats and file_format not in {"zip", "rar"}:
+                valid_source_formats.append(file_format)
     if kepubify_path and 'epub' in [file.format.lower() for file in book.data]:
         kepub_possible = True
-        if not converter_path:
+        if 'epub' not in valid_source_formats:
             valid_source_formats.append('epub')
 
     if converter_path:
-        allowed_conversion_formats = EXTENSIONS_CONVERT_TO[:]
+        # Keep the familiar built-in order, then append custom plugin outputs
+        # deterministically. The historical constants remain an ordering hint,
+        # not an assertion that every Calibre build supports those formats.
+        allowed_conversion_formats = [
+            file_format
+            for file_format in dict.fromkeys(EXTENSIONS_CONVERT_TO)
+            if file_format in output_formats
+        ]
+        allowed_conversion_formats.extend(sorted(output_formats.difference(allowed_conversion_formats)))
         for file in book.data:
-            if file.format.lower() in allowed_conversion_formats:
-                allowed_conversion_formats.remove(file.format.lower())
-    if kepub_possible:
+            file_format = (file.format or "").lower().lstrip(".")
+            if file_format in allowed_conversion_formats:
+                allowed_conversion_formats.remove(file_format)
+    if kepub_possible and 'kepub' not in allowed_conversion_formats:
         allowed_conversion_formats.append('kepub')
     return valid_source_formats, allowed_conversion_formats
 
@@ -734,7 +754,7 @@ def get_sorted_author(value):
 SQLITE_IN_CHUNK_SIZE = 900
 
 
-def hot_books_page(visibility_filter, order, offset, limit):
+def hot_books_page(visibility_filter, order, offset, limit, ids_only=False):
     """One page of the downloaded books the viewer can see, and their count.
 
     Returns ``(entries, total)``: read-status rows (``generate_linked_query``)
@@ -760,6 +780,8 @@ def hot_books_page(visibility_filter, order, offset, limit):
             if book_id not in present and book_id < highest:
                 ub.delete_download(book_id)
     page_ids = visible[offset:offset + limit]
+    if ids_only:
+        return page_ids, len(visible)
     entries = []
     if page_ids:
         rows = (calibre_db.generate_linked_query(config.config_read_column, db.Books)
@@ -835,10 +857,162 @@ def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     }
 
 
+def canonical_read_status(status):
+    """Return the stable API/UI name for a stored status value."""
+    return {
+        ub.ReadBook.STATUS_UNREAD: "unread",
+        ub.ReadBook.STATUS_FINISHED: "finished",
+        ub.ReadBook.STATUS_IN_PROGRESS: "in_progress",
+        ub.ReadBook.STATUS_DID_NOT_FINISH: "did_not_finish",
+        ub.ReadBook.STATUS_ON_HOLD: "on_hold",
+    }.get(status, "unread")
+
+
+def read_status_code(status_name):
+    """Parse a canonical reading-state string, or return None."""
+    return {
+        "unread": ub.ReadBook.STATUS_UNREAD,
+        "finished": ub.ReadBook.STATUS_FINISHED,
+        "in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+        "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+        "on_hold": ub.ReadBook.STATUS_ON_HOLD,
+    }.get(status_name)
+
+
+def book_ids_with_read_status(user_id, *statuses):
+    """Book ids whose exact reading state belongs to one app user."""
+    if user_id is None or not statuses:
+        return []
+    return [int(book_id) for (book_id,) in ub.session.query(
+        ub.ReadBook.book_id).filter(
+            ub.ReadBook.user_id == int(user_id),
+            ub.ReadBook.read_status.in_(statuses),
+        ).all()]
+
+
+def read_statuses_for_books(book_read_statuses, read_column_configured, user):
+    """Resolve a batch of legacy read carriers to the exact per-user status.
+
+    In custom-column mode DNF/on-hold rows are personal overlays on the
+    library-wide boolean. They take precedence for their owner without changing
+    what another user sees. Existing finished-column precedence over a stale
+    in-progress row is retained.
+    """
+    carriers = {int(book_id): value for book_id, value in book_read_statuses}
+    if not carriers:
+        return {}
+
+    personal_statuses = {}
+    try:
+        authenticated = (user is not None and user.is_authenticated
+                         and not getattr(user, "is_anonymous", False))
+    except (AttributeError, RuntimeError):
+        authenticated = False
+    if read_column_configured and authenticated:
+        ids = sorted(carriers)
+        for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+            chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+            rows = ub.session.query(ub.ReadBook.book_id, ub.ReadBook.read_status).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk),
+                ub.ReadBook.read_status.in_((
+                    ub.ReadBook.STATUS_IN_PROGRESS,
+                    ub.ReadBook.STATUS_DID_NOT_FINISH,
+                    ub.ReadBook.STATUS_ON_HOLD,
+                )),
+            ).all()
+            personal_statuses.update(
+                (int(book_id), status) for book_id, status in rows)
+
+    resolved = {}
+    for book_id, carrier in carriers.items():
+        exact = personal_statuses.get(book_id)
+        if exact in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                     ub.ReadBook.STATUS_ON_HOLD):
+            status = exact
+        elif read_column_configured:
+            if carrier:
+                status = ub.ReadBook.STATUS_FINISHED
+            elif exact == ub.ReadBook.STATUS_IN_PROGRESS:
+                status = ub.ReadBook.STATUS_IN_PROGRESS
+            else:
+                status = ub.ReadBook.STATUS_UNREAD
+        else:
+            status = carrier if carrier is not None else ub.ReadBook.STATUS_UNREAD
+        resolved[book_id] = canonical_read_status(status)
+    return resolved
+
+
 def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
     """Return True for one book using the shared batch read-state derivation."""
     return int(book_id) in book_in_progress_ids(
         ((book_id, read_status_value),), read_column_configured, user)
+
+
+def set_explicit_book_read_status(book_id, status_name, sync_hardcover=True):
+    """Set one of the five explicit user reading states without bool coercion.
+
+    DNF and on-hold are personal states even when a library-wide Calibre bool
+    read column is configured. They never write that shared marker and never
+    reset or rewrite any position/history rows. The existing Read/Unread action
+    remains the owner of the legacy reset and custom-column semantics.
+    """
+    statuses = {
+        "unread": ub.ReadBook.STATUS_UNREAD,
+        "finished": ub.ReadBook.STATUS_FINISHED,
+        "in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+        "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+        "on_hold": ub.ReadBook.STATUS_ON_HOLD,
+    }
+    if status_name not in statuses:
+        return _("Invalid reading status")
+
+    status = statuses[status_name]
+    if status == ub.ReadBook.STATUS_UNREAD:
+        return edit_book_read_status(book_id, False, sync_hardcover=sync_hardcover)
+    if status == ub.ReadBook.STATUS_FINISHED:
+        return edit_book_read_status(book_id, True, sync_hardcover=sync_hardcover)
+
+    uid = int(current_user.id)
+    if (status == ub.ReadBook.STATUS_IN_PROGRESS and config.config_read_column
+            and not set_custom_read_column_value(
+                book_id, False, source="explicit reading status")):
+        return _("Read status could not be set")
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == uid,
+        ub.ReadBook.book_id == book_id,
+    ).first()
+    if row is None:
+        row = ub.ReadBook(user_id=uid, book_id=book_id,
+                          read_status=ub.ReadBook.STATUS_UNREAD,
+                          times_started_reading=0)
+        ub.session.add(row)
+
+    now = datetime.now(timezone.utc)
+    previous = row.read_status
+    row.read_status_choice_at = now
+    if previous != status:
+        if status == ub.ReadBook.STATUS_IN_PROGRESS:
+            row.times_started_reading = (row.times_started_reading or 0) + 1
+            row.last_time_started_reading = now
+        row.read_status = status
+        row.last_modified = now
+
+    # The reading-state graph carries status changes to Kobo without touching
+    # any existing position. New rows get empty bookmark/statistics carriers.
+    state = row.kobo_reading_state
+    if state is None:
+        state = ub.KoboReadingState(user_id=uid, book_id=book_id)
+        row.kobo_reading_state = state
+    if state.current_bookmark is None:
+        state.current_bookmark = ub.KoboBookmark()
+    if state.statistics is None:
+        state.statistics = ub.KoboStatistics()
+
+    if not ub.session_commit("Reading status updated for book {}".format(book_id)):
+        return _("Read status could not be set")
+    return ""
 
 
 def reset_reading_position(session, user_id, book_id):
@@ -1021,22 +1195,21 @@ def mirror_read_status_to_readbook(session, user_id, book_id, finished):
     deliberately sticky — a sync must not un-read a book — whereas this one
     follows the toggle both ways, because here the user is the one asking.
 
-    Only ``read_status`` is touched. ``times_started_reading`` and the position
+    Status and its explicit choice clock are touched. ``times_started_reading`` and the position
     rows belong to ``reset_reading_position``, which the caller runs on clear.
 
-    Marking unread when no row exists writes nothing: absent already means
-    unread, and inventing a row per never-read book is just churn.
+    Even an explicit Unread choice needs a row: its intent must survive a
+    future merge with a paused duplicate. It adds no start or position.
     """
     uid = int(user_id)
     row = session.query(ub.ReadBook).filter(
         ub.ReadBook.user_id == uid,
         ub.ReadBook.book_id == book_id).first()
     if row is None:
-        if not finished:
-            return
         row = ub.ReadBook(user_id=uid, book_id=book_id)
         session.add(row)
     row.read_status = ub.ReadBook.STATUS_FINISHED if finished else ub.ReadBook.STATUS_UNREAD
+    row.read_status_choice_at = datetime.now(timezone.utc)
 
 
 def custom_read_column_value(book):
@@ -1170,6 +1343,7 @@ def edit_book_read_status(book_id, read_status=None, sync_hardcover=True):
                                      else ub.ReadBook.STATUS_UNREAD)
             book = read_book
         now_unread = book.read_status == ub.ReadBook.STATUS_UNREAD
+        book.read_status_choice_at = datetime.now(timezone.utc)
         if not book.kobo_reading_state:
             kobo_reading_state = ub.KoboReadingState(user_id=current_user.id, book_id=book_id)
             kobo_reading_state.current_bookmark = ub.KoboBookmark()
@@ -1801,17 +1975,32 @@ def uniq(inpt):
     return output
 
 
-def check_email(email):
+def _taken_by_another_user(column, value, user_id):
+    # Uniqueness is case-insensitive, so the account being edited must not count
+    # as a clash with itself: renaming "myname" to "MyName" is not a collision.
+    query = ub.session.query(ub.User.id).filter(func.lower(column) == value.lower())
+    if user_id is not None:
+        query = query.filter(ub.User.id != user_id)
+    return query.first() is not None
+
+
+def check_email(email, user_id=None):
+    """Return the normalized address, or raise if another account already uses it.
+
+    Pass ``user_id`` when changing an existing account's address."""
     email = valid_email(email)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.email) == email.lower()).first():
+    if _taken_by_another_user(ub.User.email, email, user_id):
         log.error("Found an existing account for this Email address")
         raise Exception(_("Found an existing account for this Email address"))
     return email
 
 
-def check_username(username):
+def check_username(username, user_id=None):
+    """Return the stripped name, or raise if another account already uses it.
+
+    Pass ``user_id`` when renaming an existing account."""
     username = strip_whitespaces(username)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).scalar():
+    if _taken_by_another_user(ub.User.name, username, user_id):
         log.error("This username is already taken")
         raise Exception(_("This username is already taken"))
     return username
@@ -3119,7 +3308,7 @@ def check_unrar(unrar_location):
 
 def check_architecture():
     arch = platform.machine()
-    if arch not in ['x86_64', 'aarch64']:
+    if arch.lower() not in ['x86_64', 'aarch64', 'amd64', 'arm64']:
         return _("Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is optimized for x86_64 and aarch64.", arch=arch)
     return None
 
@@ -3200,7 +3389,8 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
-def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False):
+def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,
+                      filename_template=None):
     book_format = book_format.split(".")[0]
     # Try filtered view first to respect user restrictions.
     # allow_show_hidden=True: a user's own hidden book is still downloadable
@@ -3300,8 +3490,22 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             log.error(f"Failed to log download stats: {e}")
 
     file_name = book.title
-    if len(book.authors) > 0:
-        file_name = file_name + ' - ' + book.authors[0].name
+    first_author = next((author for author in book.authors if author is not None), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + (first_author.name or '')
+    if isinstance(filename_template, str):
+        filename_template = strip_whitespaces(filename_template)
+    if filename_template:
+        try:
+            file_name = render_opds_filename(
+                filename_template, book, calibre_db.session,
+                title_regex=config.config_title_regex,
+                unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
+            )
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+            # A corrupt or manually changed setting must not prevent downloads.
+            log.warning("Invalid OPDS filename template; using the default filename")
     file_name = get_valid_filename(file_name, replace_whitespace=False)
     headers = Headers()
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")

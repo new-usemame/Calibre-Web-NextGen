@@ -38,6 +38,9 @@ NODE_MODULES = FRONTEND / "node_modules"
 #: that turns each on. An entry here is a statement that the spec does NOT guard
 #: ordinary CI -- so it needs a reason, the same way a lane opt-out does.
 INFRASTRUCTURE_GATED = {
+    "ingest-folder-labels.spec.ts":
+        "mutates instance-wide CWA ingest settings; runs in the serialized "
+        "server-state-chromium project (E2E_SERVER_STATE=1) after broad CI.",
     "subpath.spec.ts":
         "needs the nginx sub-path rig at E2E_SUBPATH_URL (cwn-nginx-571). No "
         "workflow sets that variable, so this spec runs in no CI job. Tracked "
@@ -51,6 +54,11 @@ INFRASTRUCTURE_GATED = {
         "archives a seeded book for the shared seed login, which hides it from "
         "every parallel lane's catalog while the spec runs. It runs in the same "
         "env-gated server-state-chromium project (E2E_SERVER_STATE=1) step.",
+    "font-defaults-751.spec.ts":
+        "changes instance-wide account-creation defaults through both admin "
+        "interfaces and restores the saved values. It runs in the serialized "
+        "server-state-chromium project (E2E_SERVER_STATE=1) to avoid racing "
+        "other users of the shared test server.",
     "visual-regression.spec.ts":
         "needs the pinned private Docker app/browser rig and its committed Linux "
         "pixel baselines at E2E_VISUAL_REGRESSION=1. Ordinary CI deliberately "

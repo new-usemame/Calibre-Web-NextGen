@@ -268,7 +268,7 @@ end
 
 local function newRuntime()
     local runtime = setmetatable({}, { __index = Runtime })
-    function runtime:getDocumentDigest() return "md5:the book" end
+    function runtime:getDocumentContentDigest() return "md5:the book" end
     function runtime:fetchPlaceholder() error("a placeholder was fetched over the book") end
     function runtime:getLibraryState() return { books = {} } end
     return runtime
@@ -592,7 +592,7 @@ local function testALibraryWhoseListWasNotSavedIsNotEmptied()
         function runtime:newSyncClient() return client end
         function runtime:refreshLibraryViews() end
         function runtime:applyLibraryCollections() end
-        function runtime:getDocumentDigest(path) return path == book and "md5:book" or nil end
+        function runtime:getDocumentContentDigest(path) return path == book and "md5:book" or nil end
         return runtime
     end
     local function run(runtime, opts)

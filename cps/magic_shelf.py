@@ -123,7 +123,8 @@ _NATIVE_RULE_FIELDS = (
      'description': 'Book description/comments', 'operators': _TEXT_OPERATORS,
      '_binding': (db.Comments, 'text')},
     {'id': 'read_status', 'label': 'Read Status', 'type': 'integer', 'input': 'radio',
-     'values': {0: 'Unread', 2: 'Currently Reading', 1: 'Read'},
+     'values': {0: 'Unread', 2: 'Currently Reading', 1: 'Read',
+                3: 'Did not finish', 4: 'On hold'},
      'description': 'Book reading status', 'operators': _SELECT_OPERATORS,
      '_binding': ('custom_column', 'read_status')},
     {'id': 'hardcover_id', 'label': 'Has Hardcover ID', 'type': 'integer', 'input': 'radio',
@@ -224,6 +225,7 @@ def get_rule_custom_columns():
 def build_rule_schema_for_locale(locale):
     """Build the request-ready schema, including library-specific choices."""
     from . import calibre_db, isoLanguages
+    from flask_babel import gettext
 
     language_map = {}
     for language in calibre_db.session.query(db.Languages).all():
@@ -232,7 +234,11 @@ def build_rule_schema_for_locale(locale):
                 locale, language.lang_code)
         except Exception:
             language_map[language.lang_code] = language.lang_code
-    return build_rule_schema(language_map, get_rule_custom_columns())
+    schema = build_rule_schema(language_map, get_rule_custom_columns())
+    for field in schema['fields']:
+        if field['id'] == 'read_status':
+            field['values'] = {key: gettext(label) for key, label in field['values'].items()}
+    return schema
 
 
 def normalize_magic_shelf_order(order_list, available_ids):
@@ -449,6 +455,40 @@ SYSTEM_SHELF_TEMPLATES = {
                 'input': 'radio',
                 'operator': 'equal',
                 'value': 0  # Just check for unread
+            }]
+        }
+    },
+    'did_not_finish': {
+        'name': 'Did not finish',
+        'display_name': N_('Did not finish'),
+        'icon': '⏭️',
+        'description': 'Books you chose not to finish',
+        'rules': {
+            'condition': 'AND',
+            'rules': [{
+                'id': 'read_status',
+                'field': 'read_status',
+                'type': 'integer',
+                'input': 'radio',
+                'operator': 'equal',
+                'value': ub.ReadBook.STATUS_DID_NOT_FINISH,
+            }]
+        }
+    },
+    'on_hold': {
+        'name': 'On hold',
+        'display_name': N_('On hold'),
+        'icon': '⏸️',
+        'description': 'Books you have paused for later',
+        'rules': {
+            'condition': 'AND',
+            'rules': [{
+                'id': 'read_status',
+                'field': 'read_status',
+                'type': 'integer',
+                'input': 'radio',
+                'operator': 'equal',
+                'value': ub.ReadBook.STATUS_ON_HOLD,
             }]
         }
     },
@@ -745,40 +785,40 @@ def build_filter_from_rule(rule, user_id=None):
                 try:
                     status_value = int(value)
                 except (ValueError, TypeError):
-                    status_value = 0
+                    return None
+                if status_value not in (ub.ReadBook.STATUS_UNREAD,
+                                        ub.ReadBook.STATUS_FINISHED,
+                                        ub.ReadBook.STATUS_IN_PROGRESS,
+                                        ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                        ub.ReadBook.STATUS_ON_HOLD):
+                    return None
 
-                if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
-                    # Currently reading: match STATUS_IN_PROGRESS
-                    matching_books = ub.session.query(ub.ReadBook).filter(
+                if status_value == ub.ReadBook.STATUS_UNREAD:
+                    # Preserve the historical unread meaning (including
+                    # in-progress) while excluding the two explicit paused
+                    # states so they do not fall into Yet to Read.
+                    matching_books = ub.session.query(ub.ReadBook.book_id).filter(
                         ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
+                        ub.ReadBook.read_status.in_((
+                            ub.ReadBook.STATUS_FINISHED,
+                            ub.ReadBook.STATUS_DID_NOT_FINISH,
+                            ub.ReadBook.STATUS_ON_HOLD,
+                        )),
                     ).all()
-                elif status_value == ub.ReadBook.STATUS_FINISHED:
-                    # Finished reading
-                    matching_books = ub.session.query(ub.ReadBook).filter(
-                        ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED
-                    ).all()
+                    matching_book_ids = [rb[0] for rb in matching_books]
+                    condition = ~db.Books.id.in_(matching_book_ids)
                 else:
-                    # Unread: books with no ReadBook entry or STATUS_UNREAD
-                    matching_books = ub.session.query(ub.ReadBook).filter(
+                    matching_books = ub.session.query(ub.ReadBook.book_id).filter(
                         ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED
+                        ub.ReadBook.read_status == status_value
                     ).all()
-
-                matching_book_ids = [rb.book_id for rb in matching_books]
+                    matching_book_ids = [rb[0] for rb in matching_books]
+                    condition = db.Books.id.in_(matching_book_ids)
 
                 if operator_name == 'equal':
-                    if status_value == ub.ReadBook.STATUS_UNREAD:
-                        # Unread = NOT in finished list
-                        return ~db.Books.id.in_(matching_book_ids)
-                    else:
-                        return db.Books.id.in_(matching_book_ids)
+                    return condition
                 elif operator_name == 'not_equal':
-                    if status_value == ub.ReadBook.STATUS_UNREAD:
-                        return db.Books.id.in_(matching_book_ids)
-                    else:
-                        return ~db.Books.id.in_(matching_book_ids)
+                    return ~condition
                 else:
                     return None
             else:
@@ -797,11 +837,24 @@ def build_filter_from_rule(rule, user_id=None):
         try:
             status_value = int(value)
         except (ValueError, TypeError):
-            status_value = 0
+            return None
+        if status_value not in (ub.ReadBook.STATUS_UNREAD,
+                                ub.ReadBook.STATUS_FINISHED,
+                                ub.ReadBook.STATUS_IN_PROGRESS,
+                                ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                ub.ReadBook.STATUS_ON_HOLD):
+            return None
 
         # "Marked read" in custom-column mode means a truthy column row exists.
         cc_read = getattr(db.Books, cc_relationship).any(column == True)  # noqa: E712
 
+        paused_ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+            ub.ReadBook.user_id == user_id,
+            ub.ReadBook.read_status.in_((
+                ub.ReadBook.STATUS_DID_NOT_FINISH,
+                ub.ReadBook.STATUS_ON_HOLD,
+            )),
+        ).all()] if user_id is not None else []
         if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
             # The in-progress tri-state exists only in ub.ReadBook — KOReader/
             # Kobo sync writes it there regardless of the configured read
@@ -818,13 +871,25 @@ def build_filter_from_rule(rule, user_id=None):
                 ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
             ).all()]
             condition = and_(db.Books.id.in_(in_progress_ids), ~cc_read)
+        elif status_value == ub.ReadBook.STATUS_DID_NOT_FINISH:
+            ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_DID_NOT_FINISH,
+            ).all()] if user_id is not None else []
+            condition = db.Books.id.in_(ids)
+        elif status_value == ub.ReadBook.STATUS_ON_HOLD:
+            ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_ON_HOLD,
+            ).all()] if user_id is not None else []
+            condition = db.Books.id.in_(ids)
         elif status_value == ub.ReadBook.STATUS_FINISHED:
-            condition = cc_read
+            condition = and_(cc_read, ~db.Books.id.in_(paused_ids))
         else:
             # Unread: no truthy column row. Books never touched have no row
             # at all, so match on absence-of-read rather than value == False
             # (the old shape hid every never-marked book from "Yet to Read").
-            condition = ~cc_read
+            condition = and_(~cc_read, ~db.Books.id.in_(paused_ids))
 
         if operator_name == 'equal':
             return condition

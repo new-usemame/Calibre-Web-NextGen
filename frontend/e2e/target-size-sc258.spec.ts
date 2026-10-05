@@ -121,32 +121,26 @@ async function bookHasFormat(page: Page, bookId: number, format: string) {
   return detail.formats.some(({ format: current }) => current.toUpperCase() === format);
 }
 
-test('touch cards expose no action targets; the book page carries them (2026-09-12 ruling)', async ({ page, isMobile }) => {
+test('touch cover disclosure and action panel provide reachable targets', async ({ page, isMobile }) => {
   test.skip(isMobile !== true, 'coarse-pointer target-size regression');
 
   await page.goto('/app/');
   const details = page.locator('a[aria-label^="Open details for"]');
   await expect(details.first()).toBeVisible();
 
-  // The operator removed the per-card disclosure: a touch card is a cover and
-  // a title link, so there is no small card control left to measure. Assert the
-  // absence rather than deleting the coverage, then measure the controls the
-  // actions actually moved to.
-  await expect(
-    page.getByRole('button', { name: /^More actions for / }),
-    'a touch card must expose no More actions target',
-  ).toHaveCount(0);
-  const edit = page.locator('a[aria-label^="Edit "]').first();
-  await expect(edit).toBeAttached();
-  expect(
-    await edit.boundingBox(),
-    'the legacy card pencil must occupy no touch target',
-  ).toBeNull();
+  const trigger = page.getByRole('button', { name: /^Actions for / }).first();
+  await expectSc258Target('Touch card Actions', trigger);
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: /^Actions for / });
+  await expect(dialog).toBeVisible();
+  for (const control of await dialog.locator('a,button').all()) {
+    const box = await control.boundingBox();
+    expect(box?.width, 'touch action panel target width').toBeGreaterThanOrEqual(44);
+    expect(box?.height, 'touch action panel target height').toBeGreaterThanOrEqual(44);
+  }
+  await page.keyboard.press('Escape');
 
-  // Where those actions live now. Read now and Add to shelf are full-width row
-  // controls; the Edit affordance is the gear menu's "Edit metadata" item (the
-  // menu stays open while measured). These are the measurements that protect a
-  // touch user's reach.
+  // Book detail continues to offer the same full-size actions.
   const href = await details.first().getAttribute('href');
   const bookId = href!.match(/\/book\/(\d+)$/)![1];
   await page.goto(`/app/book/${bookId}`);
@@ -165,8 +159,7 @@ test('touch cards expose no action targets; the book page carries them (2026-09-
     page.getByRole('button', { name: 'Add to shelf' }),
   );
 
-  // A shelf card loses its X on touch too, and shelf membership is reached from
-  // the same Add-to-shelf control measured above.
+  // Shelf removal is reachable from the same touch-sized card panel.
   const headers = await csrfHeaders(page);
   const created = await page.request.post('/api/v1/shelves', {
     headers,
@@ -178,16 +171,12 @@ test('touch cards expose no action targets; the book page carries them (2026-09-
     const added = await page.request.post(`/api/v1/shelves/${shelfId}/books/${bookId}`, { headers });
     expect(added.ok(), 'temporary shelf membership').toBeTruthy();
     await page.goto(`/app/shelf/${shelfId}`);
-    const remove = page.getByRole('button', { name: 'Remove from shelf', includeHidden: true });
-    await expect(remove).toHaveCount(1);
-    expect(
-      await remove.boundingBox(),
-      'the legacy shelf X must occupy no touch target',
-    ).toBeNull();
-    await expect(
-      page.getByRole('button', { name: /^More actions for / }),
-      'a shelf card must expose no More actions target',
-    ).toHaveCount(0);
+    const shelfTrigger = page.getByRole('button', { name: /^Actions for / }).first();
+    await expectSc258Target('Shelf card Actions', shelfTrigger);
+    await shelfTrigger.click();
+    await expectSc258Target('Shelf panel Remove from shelf',
+      page.getByRole('dialog').getByRole('button', { name: 'Remove from shelf', exact: true }));
+    await page.keyboard.press('Escape');
   } finally {
     await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
   }

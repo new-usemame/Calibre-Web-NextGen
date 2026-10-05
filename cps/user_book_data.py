@@ -116,6 +116,7 @@ PER_USER_BOOK_MODELS = (
     "UserHiddenBook",
     "BookCoverPreview",
     "UserLibraryBook",
+    "BookReview",
 )
 # These ledgers are user-scoped through Device rather than a user_id column.
 # Keep the device-scoped registry extension separate from the flat-model tuple
@@ -162,6 +163,32 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             ann.book_id = to_book_id
     session.flush()
 
+    # Private book reviews are authored text. If both copies have a note for
+    # the same user, retain both (destination first) instead of discarding
+    # either one; exact duplicate text is kept once. Merged text can exceed
+    # the normal API write limit, but remains readable and intact.
+    for review in session.query(ub.BookReview).filter(
+            ub.BookReview.book_id == from_book_id).all():
+        existing = session.query(ub.BookReview).filter(
+            ub.BookReview.user_id == review.user_id,
+            ub.BookReview.book_id == to_book_id).first()
+        if existing is None:
+            review.book_id = to_book_id
+            continue
+        if existing.text != review.text:
+            if not existing.text:
+                existing.text = review.text
+            elif review.text:
+                existing.text = existing.text + "\n\n" + review.text
+        if _newer(review.updated_at, existing.updated_at):
+            existing.updated_at = review.updated_at
+        if _newer(existing.created_at, review.created_at):
+            # _newer is strict, so swap only when the losing row is older.
+            if review.created_at is not None:
+                existing.created_at = review.created_at
+        session.delete(review)
+    session.flush()
+
     # Kobo reading state: UNIQUE(user_id, book_id). If both books have a
     # state for the same user, the most recently modified one wins; ORM
     # deletes so the bookmark/statistics children follow.
@@ -180,8 +207,10 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             session.delete(state)
     session.flush()
 
-    # ReadBook: UNIQUE(user_id, book_id); merge keeps the further-along
-    # read status. Bulk delete (no ORM cascade) — the loser's
+    # ReadBook: keep the further-along legacy state. A paused classification
+    # is a user's explicit choice rather than a progress rank, so when either
+    # copy has one, preserve the newer classification instead.
+    # Bulk delete (no ORM cascade) — the loser's
     # KoboReadingState was already merged above.
     _READ_RANK = {ub.ReadBook.STATUS_UNREAD: 0,
                   ub.ReadBook.STATUS_IN_PROGRESS: 1,
@@ -192,15 +221,42 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             ub.ReadBook.user_id == rb.user_id,
             ub.ReadBook.book_id == to_book_id).first()
         if existing is None:
+            moved_values = {ub.ReadBook.book_id: to_book_id}
+            if rb.read_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                   ub.ReadBook.STATUS_ON_HOLD):
+                moved_values[ub.ReadBook.last_modified] = rb.last_modified
             session.query(ub.ReadBook).filter(ub.ReadBook.id == rb.id).update(
-                {ub.ReadBook.book_id: to_book_id}, synchronize_session=False)
+                moved_values, synchronize_session=False)
         else:
-            if _READ_RANK.get(rb.read_status, 0) > _READ_RANK.get(existing.read_status, 0):
+            paused = (ub.ReadBook.STATUS_DID_NOT_FINISH, ub.ReadBook.STATUS_ON_HOLD)
+            has_paused = rb.read_status in paused or existing.read_status in paused
+            chosen_clock = existing.last_modified
+            if has_paused:
+                replace_status = _newer(rb.read_status_choice_at, existing.read_status_choice_at)
+                if (not replace_status
+                        and not _newer(existing.read_status_choice_at, rb.read_status_choice_at)
+                        and rb.read_status in paused and existing.read_status not in paused):
+                    replace_status = True  # A tied/unknown clock cannot imply resume intent.
+            else:
+                replace_status = (_READ_RANK.get(rb.read_status, 0)
+                                  > _READ_RANK.get(existing.read_status, 0))
+            if replace_status:
                 existing.read_status = rb.read_status
+                if has_paused:
+                    chosen_clock = rb.last_modified
+                    existing.read_status_choice_at = rb.read_status_choice_at
+            if not has_paused and _newer(rb.read_status_choice_at, existing.read_status_choice_at):
+                existing.read_status_choice_at = rb.read_status_choice_at
             existing.times_started_reading = \
                 (existing.times_started_reading or 0) + (rb.times_started_reading or 0)
             if _newer(rb.last_time_started_reading, existing.last_time_started_reading):
                 existing.last_time_started_reading = rb.last_time_started_reading
+            if has_paused:
+                # Summing counters is not a new reading-state choice. Supply
+                # even an unchanged winner's clock to defeat onupdate=now.
+                from sqlalchemy.orm.attributes import flag_modified
+                existing.last_modified = chosen_clock
+                flag_modified(existing, "last_modified")
             session.query(ub.ReadBook).filter(ub.ReadBook.id == rb.id).delete(
                 synchronize_session=False)
     session.flush()
@@ -425,7 +481,7 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
 
     for model in (ub.Bookmark, ub.ReadBook, ub.ArchivedBook, ub.Downloads,
                   ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview,
-                  ub.UserLibraryBook):
+                  ub.UserLibraryBook, ub.BookReview):
         _scoped(session.query(model), model).delete(synchronize_session=False)
 
     # Per-device entitlement state has no user_id of its own.  Scope a user

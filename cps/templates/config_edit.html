@@ -2,7 +2,7 @@
 {% block flash %}
 <div id="spinning_success" class="row-fluid text-center" style="display:none;">
     <div class="alert alert-info"><div class="css-spinner" role="status" aria-label="{{ _('Loading') }}"></div></div>
-        <select name="config_login_type" id="config_login_type" class="form-control" data-controlall="login-settings">
+        <select name="config_login_type" id="config_login_type" class="form-control" data-controlall="login-settings" {% if generic_oauth_environment_managed and generic_oauth_environment_active %}disabled{% endif %}>
            <option value="0" {% if config.config_login_type == 0 %}selected{% endif %}>{{_('Use Standard Authentication')}}</option>
            {% if feature_support['ldap'] %}
            <option value="1" {% if config.config_login_type == 1 %}selected{% endif %}>{{_('Use LDAP Authentication')}}</option>
@@ -11,6 +11,10 @@
            <option value="2" {% if config.config_login_type == 2 %}selected{% endif %}>{{_('Use OAuth')}}</option>
            {% endif %}
         </select>
+        {% if generic_oauth_environment_managed %}
+        <small class="form-text text-muted">{{_('Generic OIDC is managed by the environment. Its settings and secret cannot be changed here; secret-file rotation takes effect after restart.')}}</small>
+        {% if generic_oauth_environment_error %}<div class="alert alert-warning" role="status">{{_('Generic OIDC is inactive because its environment configuration is incomplete or invalid: %(reason)s', reason=generic_oauth_environment_error)}}</div>{% endif %}
+        {% endif %}
         
         <!-- Authentication switching warning -->
         {% if feature_support['oauth'] %}
@@ -297,6 +301,47 @@
       </div>
     </div>
     {% endif %}
+    <div class="form-group">
+      <input type="checkbox" id="config_calibre_server_enabled" name="config_calibre_server_enabled" data-control="calibre-server-settings" {% if config.config_calibre_server_enabled %}checked{% endif %}>
+      <label for="config_calibre_server_enabled">{{_('Enable Calibre Content Server')}}</label>
+    </div>
+    <div data-related="calibre-server-settings">
+      <div class="form-group" style="margin-left:10px;">
+        <label for="config_calibre_server_port">{{_('Content Server Port')}}</label>
+        <input type="number" min="1" max="65535" class="form-control" name="config_calibre_server_port" id="config_calibre_server_port" value="{% if config.config_calibre_server_port != None %}{{ config.config_calibre_server_port }}{% endif %}" autocomplete="off" {% if config.config_calibre_server_env['port'] %}disabled{% endif %}>
+      </div>
+      <div class="form-group" style="margin-left:10px;">
+        <label for="config_calibre_server_listen">{{_('Content Server Listen Address')}}</label>
+        <input type="text" class="form-control" name="config_calibre_server_listen" id="config_calibre_server_listen" value="{% if config.config_calibre_server_listen != None %}{{ config.config_calibre_server_listen }}{% endif %}" autocomplete="off" placeholder="127.0.0.1">
+        <p class="help-block">{{_('127.0.0.1 keeps the content server reachable only from this machine. Enter 0.0.0.0 to expose it on the network, which is required to reach it from another container or host.')}}</p>
+      </div>
+      <div class="form-group" style="margin-left:10px;">
+        <input type="checkbox" id="config_calibre_server_anonymous_writes" name="config_calibre_server_anonymous_writes" data-control="calibre-server-trusted" data-control-invert="calibre-server-auth" {% if config.config_calibre_server_anonymous_writes %}checked{% endif %}>
+        <label for="config_calibre_server_anonymous_writes">{{_('Allow Anonymous Writes (no username or password required)')}}</label>
+        <p class="help-block">{{_('Without a username and password, anyone who can reach the listen address can read the whole library. Behind Docker port mapping or a reverse proxy on this machine, every client appears to come from the same address, so allowing that address lets everyone write.')}}</p>
+      </div>
+      <div data-related="calibre-server-trusted">
+        <div class="form-group" style="margin-left:10px;">
+          <label for="config_calibre_server_trusted_ips">{{_('Addresses Allowed to Write Without a Password (Comma Separated IPs/CIDRs)')}}</label>
+          <input type="text" class="form-control" name="config_calibre_server_trusted_ips" id="config_calibre_server_trusted_ips" value="{% if config.config_calibre_server_trusted_ips != None %}{{ config.config_calibre_server_trusted_ips }}{% endif %}" autocomplete="off">
+          <p class="help-block">{{_('Leave empty to allow unauthenticated writes only from this machine. Every address listed here can add, edit and delete books in the library without any credentials, so keep it as narrow as possible.')}}</p>
+        </div>
+      </div>
+      <div data-related="calibre-server-auth">
+        <div class="form-group" style="margin-left:10px;">
+          <label for="config_calibre_server_username">{{_('Content Server Username')}}</label>
+          <input type="text" class="form-control" name="config_calibre_server_username" id="config_calibre_server_username" value="{% if config.config_calibre_server_username != None %}{{ config.config_calibre_server_username }}{% endif %}" autocomplete="off" {% if config.config_calibre_server_env['username'] %}disabled{% endif %}>
+        </div>
+        <div class="form-group" style="margin-left:10px;">
+          <label for="config_calibre_server_password_e">{{_('Content Server Password')}}</label>
+          <input type="password" class="form-control" name="config_calibre_server_password_e" id="config_calibre_server_password_e" value="" autocomplete="off" {% if config.config_calibre_server_password_e %}placeholder="********" disabled{% endif %} {% if config.config_calibre_server_env['password'] %}disabled{% endif %}>
+        </div>
+        <div class="form-group" id="calibre_server_password_clear_group" style="margin-left:10px;{% if not config.config_calibre_server_password_e or config.config_calibre_server_env['password'] %}display:none;{% endif %}">
+          <button type="button" id="config_calibre_server_password_clear" class="btn btn-default">{{_('Reset Password')}}</button>
+          <p class="help-block">{{_('The content server stays stopped until a new password is saved.')}}</p>
+        </div>
+      </div>
+    </div>
     {% if feature_support['goodreads'] %}
     <div class="form-group">
       <input type="checkbox" id="config_use_goodreads" name="config_use_goodreads" data-control="goodreads-settings" {% if config.config_use_goodreads %}checked{% endif %}>
@@ -375,7 +420,7 @@
     {% if feature_support['ldap'] or feature_support['oauth'] %}
       <div class="form-group">
         <label for="config_login_type">{{_('Login type')}}</label>
-        <select name="config_login_type" id="config_login_type" class="form-control" data-control="login-settings">
+        <select name="config_login_type" id="config_login_type" class="form-control" data-control="login-settings" {% if generic_oauth_environment_managed and generic_oauth_environment_active %}disabled{% endif %}>
            <option value="0" {% if config.config_login_type == 0 %}selected{% endif %}>{{_('Use Standard Authentication')}}</option>
            {% if feature_support['ldap'] %}
            <option value="1" {% if config.config_login_type == 1 %}selected{% endif %}>{{_('Use LDAP Authentication')}}</option>
@@ -499,6 +544,10 @@
           </p>
           {% set generic = (provider | selectattr('provider_name', 'equalto', 'generic') | first) or {} %}
           <p>{{ _('Generic OAuth Provider') }}</p>
+          {% if generic.get('environment_managed') %}
+          <div class="alert alert-info" role="status">{{_('Generic OIDC settings are supplied by the environment and are read-only here. They are not saved to the application database.')}}</div>
+          <fieldset disabled aria-label="{{_('Environment-managed Generic OIDC settings')}}">
+          {% endif %}
           
           <!-- Metadata URL for auto-discovery -->
           <div class="form-group">
@@ -560,6 +609,7 @@
             <input type="text" class="form-control" id="config_generic_oauth_scope" name="config_generic_oauth_scope" value="{% if generic.get('scope') != None %}{{ generic['scope'] }}{% endif %}" autocomplete="off" placeholder="openid profile email">
             <small class="form-text text-muted">{{_('Space-separated list of OAuth scopes')}}</small>
           </div>
+          {% if generic.get('environment_managed') %}</fieldset>{% endif %}
           
           <!-- OAuth Redirect Host Configuration -->
           <div class="form-group">
@@ -571,15 +621,24 @@
               {{_('Required if: accessing via multiple hostnames, behind reverse proxy, or getting "invalid redirect URI" errors.')}}
             </small>
           </div>
+          {% if generic.get('environment_managed') %}<fieldset disabled aria-label="{{_('Environment-managed Generic OIDC settings')}}">{% endif %}
           
           <div class="form-group">
             <label for="config_generic_oauth_client_id">{{_('OAuth Client Id')}}</label>
             <input type="text" class="form-control" id="config_generic_oauth_client_id" name="config_generic_oauth_client_id" value="{% if generic.get('oauth_client_id') != None %}{{ generic['oauth_client_id'] }}{% endif %}" autocomplete="off">
           </div>
+          {% if not generic.get('environment_managed') %}
           <div class="form-group">
             <label for="config_generic_oauth_client_secret">{{_('OAuth Client Secret')}}</label>
             <input type="text" class="form-control" id="config_generic_oauth_client_secret" name="config_generic_oauth_client_secret" value="{% if generic.get('oauth_client_secret') != None %}{{ generic['oauth_client_secret'] }}{% endif %}" autocomplete="off">
           </div>
+          {% else %}
+          <div class="form-group">
+            <label for="config_generic_oauth_client_secret">{{_('OAuth Client Secret')}}</label>
+            <input type="password" class="form-control" id="config_generic_oauth_client_secret" value="" autocomplete="new-password" placeholder="{{_('Supplied by environment')}}" readonly>
+            <small class="form-text text-muted">{{_('The secret is never displayed or saved in the application database. Restart the service after rotating a mounted secret file.')}}</small>
+          </div>
+          {% endif %}
           
           <!-- Field Mapping Configuration -->
           <h5>{{_('Field Mapping Configuration')}}</h5>
@@ -651,6 +710,7 @@
             <label for="config_generic_oauth_login_button">{{_('Login Button Text')}}</label>
             <input type="text" class="form-control" id="config_generic_oauth_login_button" name="config_generic_oauth_login_button" value="{% if generic.get('login_button') != None %}{{ generic['login_button'] }}{% endif %}" autocomplete="off" placeholder="OpenID Connect">
           </div>
+          {% if generic.get('environment_managed') %}</fieldset>{% endif %}
           <hr/>
           {% for prov in provider if prov['provider_name'] != "generic" %}
           <div class="form-group">

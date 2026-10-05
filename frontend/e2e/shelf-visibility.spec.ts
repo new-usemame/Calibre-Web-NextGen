@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 
 /*
  * #1734 / #1908 — an ordinary shelf owner was offered "Make public" even
- * though the server requires edit_shelfs for that direction. The decision
+ * though the server can disable own-shelf sharing independently of editing public shelves. The decision
  * helper has unit coverage; these route-mocked cases pin its rendered-page
  * wiring so the control cannot drift away from the role and shelf payloads.
  */
@@ -28,6 +28,7 @@ async function mockShelfPage(page: Page, editShelfs: boolean, isPublic: boolean)
       viewer: true,
       download: true,
       edit_shelfs: editShelfs,
+      share_shelfs: editShelfs,
     },
     features: {
       anon_browse: false,
@@ -63,14 +64,14 @@ async function openMockedShelf(page: Page) {
 }
 
 test.describe('#1734 shelf visibility control', () => {
-  test('does not offer Make public to an owner without edit_shelfs', async ({ page }) => {
+  test('does not offer Make public to an owner with sharing disabled', async ({ page }) => {
     await mockShelfPage(page, false, false);
     await openMockedShelf(page);
 
     await expect(page.getByRole('button', { name: 'Make public', exact: true })).toHaveCount(0);
   });
 
-  test('offers Make public to an owner with edit_shelfs', async ({ page }) => {
+  test('offers Make public to an owner with sharing enabled', async ({ page }) => {
     await mockShelfPage(page, true, false);
     await openMockedShelf(page);
 

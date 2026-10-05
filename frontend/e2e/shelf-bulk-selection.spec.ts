@@ -228,7 +228,11 @@ test('shelf: bulk read, reorder, route reuse and reversible per-card removal coe
       await page.goto(`/app/shelf/${shelves[1].id}`);
     } else {
       await card.hover();
-      await page.getByRole('button', { name: 'Remove from shelf', exact: true }).filter({ visible: true }).first().click();
+      const actions = card.locator('..').getByRole('button', { name: /^Actions for / });
+      await actions.click();
+      const dialog = page.getByRole('dialog', { name: /^Actions for / });
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole('button', { name: 'Remove from shelf', exact: true }).click();
       expect((await removal).ok()).toBeTruthy();
     }
     await expect(card).toHaveCount(0);

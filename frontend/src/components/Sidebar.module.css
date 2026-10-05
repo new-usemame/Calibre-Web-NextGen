@@ -603,3 +603,25 @@
   font-size: var(--fs-sm);
 }
 .tableVisibility input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+
+.sectionHeader { display: flex; align-items: center; }
+.sectionHeader > a:first-child { flex: 1; min-width: 0; }
+.sectionControl { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; height: 32px; color: var(--text-muted); border-radius: var(--r-sm); background: transparent; border: 0; }
+.sectionControl:hover { color: var(--text); background: var(--surface-3); }
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .sectionControl { display: none; }
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .sectionControl { display: inline-flex; }
+}
+
+/* Targets expand only during a book drag, leaving saved sidebar choices alone. */
+.dropTarget { min-height: 44px; border: 1px dashed var(--accent); }
+.dropOver { background: var(--accent-soft); color: var(--accent-text); outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The selection toolbar shares the normal overlay level and paints later in
+   the catalog. During a book drag, lower shelf targets must receive hits above
+   that toolbar. Raise the desktop rail's stacking context and mobile drawer. */
+.rail.bookDragging, :is(.nav, .navOpen).bookDragging {
+  z-index: calc(var(--z-overlay) + 1);
+}

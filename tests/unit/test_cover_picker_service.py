@@ -163,7 +163,7 @@ def _fake_metarecord(provider_id, source_name, title, cover_url, isbn=None):
 class TestGatherCoverCandidates:
     def test_amazon_highres_candidate_uses_book_isbn_when_amazon_provider_disabled(self):
         providers = [_fake_provider("amazon", "Amazon", search_results=[])]
-        highres_url = "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+        highres_url = "https://m.media-amazon.com/images/P/0441172717.01.MAIN._SCRM_.jpg"
 
         with (
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
@@ -193,7 +193,7 @@ class TestGatherCoverCandidates:
     def test_amazon_highres_candidate_uses_book_asin_when_no_isbn(self):
         """A Kindle edition carries an ASIN and no ISBN, so the ISBN-only
         lookup gave it no high-resolution candidate at all (fork #304)."""
-        highres_url = "https://m.media-amazon.com/images/P/B0DJ1TV47C.01._SCRM_SL2000_.jpg"
+        highres_url = "https://m.media-amazon.com/images/P/B0DJ1TV47C.01.MAIN._SCRM_.jpg"
 
         with (
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
@@ -217,7 +217,7 @@ class TestGatherCoverCandidates:
     def test_amazon_highres_candidate_id_unchanged_for_isbn_books(self):
         """candidate_id is the apply step's handle; an ISBN book's id must not
         drift now that the same slot also carries ASINs."""
-        highres_url = "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+        highres_url = "https://m.media-amazon.com/images/P/0441172717.01.MAIN._SCRM_.jpg"
         with (
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
             patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key", return_value=highres_url),
@@ -304,7 +304,7 @@ class TestGatherCoverCandidates:
         assert statuses[0].status == "ok"
 
     def test_amazon_highres_candidate_deduplicates_existing_grid_url(self):
-        highres_url = "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+        highres_url = "https://m.media-amazon.com/images/P/0441172717.01.MAIN._SCRM_.jpg"
         providers = [
             _fake_provider("amazon", "Amazon", search_results=[
                 _fake_metarecord("amazon", "Amazon", "Dune", highres_url),

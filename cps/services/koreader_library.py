@@ -197,7 +197,14 @@ def read_statuses(user, ids, *, session=None, cdb=None, read_column=None):
                    if status == ub.ReadBook.STATUS_IN_PROGRESS}
     statuses = {}
     for book_id in ids:
-        if book_id in finished:
+        exact = tri_state.get(book_id)
+        if exact in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                     ub.ReadBook.STATUS_ON_HOLD):
+            # KOReader's wire contract has only unread/reading/finished. Keep
+            # the projection conservative; the richer state remains private
+            # to the server and is not copied into the device protocol.
+            statuses[book_id] = READ_UNREAD
+        elif book_id in finished:
             statuses[book_id] = READ_FINISHED
         elif book_id in reading:
             statuses[book_id] = READ_READING
@@ -483,7 +490,7 @@ def build_manifest(user, *, cdb=None, session=None, read_column=None):
     scope = ereader_scope.membership(user, session=session)
     if not scope.reliable:
         raise ScopeUnavailable(
-            "One of the magic shelves that choose this device's books could "
+            "One of the smart shelves that choose this device's books could "
             "not be read")
     ids = ereader_scope.held_book_ids(user, cdb=cdb, session=session, scope=scope)
     shelves, members, scope_shelves = shelf_catalogue(user, session=session)
@@ -640,6 +647,7 @@ def set_read_status(user, book_id, status):
                           times_started_reading=0)
         ub.session.add(row)
     now = datetime.now(timezone.utc)
+    row.read_status_choice_at = now
     if row.read_status != ub.ReadBook.STATUS_IN_PROGRESS:
         row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
         row.times_started_reading = (row.times_started_reading or 0) + 1

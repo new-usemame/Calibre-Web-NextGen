@@ -13,7 +13,7 @@
       <input type="text" class="form-control typeahead" name="authors" id="authors" value="" autocomplete="off">
     </div>
     <div class="form-group">
-      <label for="Publisher">{{_('Publisher')}}</label>
+      <label for="publisher">{{_('Publisher')}}</label>
       <input type="text" class="form-control" name="publisher" id="publisher" value="">
     </div>
     <div class="row">
@@ -21,9 +21,9 @@
         <label for="publishstart">{{_('Published Date From')}}</label>
         <div class="input-group">
           <input type="text" class="datepicker form-control" name="publishstart" id="publishstart" value="">
-          <input type="text" class="form-control fake-input hidden" id="fake_publishstart" value="">
+          <input type="text" class="form-control fake-input hidden" id="fake_publishstart" aria-hidden="true" tabindex="-1" readonly value="">
           <span class="input-group-btn">
-            <button type="button" id="publishstart_delete" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle"></span></button>
+            <button type="button" id="publishstart_delete" aria-label="{{ _('Remove {name}').format(name=_('Published Date From')) }}" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle" aria-hidden="true"></span></button>
           </span>
         </div>
       </div>
@@ -31,9 +31,9 @@
         <label for="publishend">{{_('Published Date To')}}</label>
         <div class="input-group ">
           <input type="text" class="datepicker form-control" name="publishend" id="publishend" value="">
-          <input type="text" class="form-control fake-input hidden" id="fake_publishend" value="">
+          <input type="text" class="form-control fake-input hidden" id="fake_publishend" aria-hidden="true" tabindex="-1" readonly value="">
           <span class="input-group-btn">
-            <button type="button" id="publishend_delete" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle"></span></button>
+            <button type="button" id="publishend_delete" aria-label="{{ _('Remove {name}').format(name=_('Published Date To')) }}" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle" aria-hidden="true"></span></button>
           </span>
         </div>
       </div>
@@ -43,8 +43,11 @@
       <select name="read_status" id="read_status" class="form-control">
         <option value="Any" selected>{{_('Any')}}</option>
         <option value="">{{_('Empty')}}</option>
-        <option value="True" >{{_('Yes')}}</option>
-        <option value="False" >{{_('No')}}</option>
+        <option value="unread">{{_('Unread')}}</option>
+        <option value="finished">{{_('Finished')}}</option>
+        <option value="in_progress">{{_('Currently reading')}}</option>
+        <option value="did_not_finish">{{_('Did not finish')}}</option>
+        <option value="on_hold">{{_('On hold')}}</option>
       </select>
     </div>
     <div class="row">
@@ -198,22 +201,22 @@
       {% if c.datatype == 'datetime' %}
       <div class="row">
         <div class="form-group col-sm-6">
-          <label for="{{ 'custom_column_' ~ c.id }}">{{_('From:')}}</label>
+          <label for="{{ 'custom_column_' ~ c.id }}_start">{{_('From:')}}</label>
           <div class="input-group">
-            <input type="text" class="datepicker form-control" name="{{ 'custom_column_' ~ c.id }}_start" id="{{ 'custom_column_' ~ c.id }}_start" value="">
-            <input type="text" class="form-control fake-input hidden" id="fake_{{ 'custom_column_' ~ c.id }}_start" value="">
+            <input type="text" class="datepicker form-control" name="{{ 'custom_column_' ~ c.id }}_start" id="{{ 'custom_column_' ~ c.id }}_start" aria-label="{{ c.name ~ ' — ' ~ _('From:') }}" value="">
+            <input type="text" class="form-control fake-input hidden" id="fake_{{ 'custom_column_' ~ c.id }}_start" aria-hidden="true" tabindex="-1" readonly value="">
             <span class="input-group-btn">
-              <button type="button" id="{{ 'custom_column_' ~ c.id }}_start_delete" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle"></span></button>
+              <button type="button" id="{{ 'custom_column_' ~ c.id }}_start_delete" aria-label="{{ _('Remove {name}').format(name=c.name ~ ' — ' ~ _('From:')) }}" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle" aria-hidden="true"></span></button>
             </span>
           </div>
         </div>
         <div class="form-group col-sm-6">
-          <label for="{{ 'custom_column_' ~ c.id }}">{{_('To:')}}</label>
+          <label for="{{ 'custom_column_' ~ c.id }}_end">{{_('To:')}}</label>
           <div class="input-group ">
-            <input type="text" class="datepicker form-control" name="{{ 'custom_column_' ~ c.id }}_end" id="{{ 'custom_column_' ~ c.id }}_end" value="">
-            <input type="text" class="form-control fake-input hidden" id="fake_{{ 'custom_column_' ~ c.id }}_end" value="">
+            <input type="text" class="datepicker form-control" name="{{ 'custom_column_' ~ c.id }}_end" id="{{ 'custom_column_' ~ c.id }}_end" aria-label="{{ c.name ~ ' — ' ~ _('To:') }}" value="">
+            <input type="text" class="form-control fake-input hidden" id="fake_{{ 'custom_column_' ~ c.id }}_end" aria-hidden="true" tabindex="-1" readonly value="">
             <span class="input-group-btn">
-              <button type="button" id="{{ 'custom_column_' ~ c.id }}_end_delete" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle"></span></button>
+              <button type="button" id="{{ 'custom_column_' ~ c.id }}_end_delete" aria-label="{{ _('Remove {name}').format(name=c.name ~ ' — ' ~ _('To:')) }}" class="datepicker_delete btn btn-default"><span class="glyphicon glyphicon-remove-circle" aria-hidden="true"></span></button>
             </span>
           </div>
         </div>

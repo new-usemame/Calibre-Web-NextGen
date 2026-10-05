@@ -276,6 +276,8 @@ corrected.
 
 The Admin → Settings panel has many optional toggles (auto-convert formats, automatic backups, EPUB fixer, KOReader sync, OAuth, etc.). The [upstream wiki](https://github.com/crocodilestick/Calibre-Web-Automated/wiki) is the source of truth for those; this fork doesn't change them.
 
+For deployment-managed Generic OIDC credentials and endpoint settings, see the [environment configuration guide](docs/OAUTH-ENVIRONMENT-CONFIGURATION.md).
+
 ---
 
 ## Updating
@@ -411,6 +413,21 @@ After Shelfmark starts, open it and pick **Settings → Security → Authenticat
 
 ## Common configurations
 
+### Writable cache storage
+
+The general derived cache defaults to `cache/` under the configured application
+config directory (`/config/cache` in Docker). Set `CACHE_DIR` to keep an explicit
+cache location; that directory must be writable by the service user. Existing
+thumbnail storage stays at `/config/thumbnails`, and metadata change logs and
+scratch storage keep their existing locations under the config directory.
+
+Upgrades regenerate disposable general cache entries in the new default location.
+The old `cps/cache` directory is left untouched; no user data or existing
+thumbnail cache is moved or deleted. Deployments that explicitly set `CACHE_DIR`
+keep that location. Startup no longer creates or changes ownership of the
+image-owned `cps/cache` directory.
+
+
 ### Network shares (NFS, SMB, ZFS)
 
 See [`examples/.env.example`](examples/.env.example) for the complete environment-variable reference and defaults.
@@ -432,20 +449,35 @@ Tested and supported. Ingest is a few seconds slower; everything else behaves th
 
 ### Calibre desktop coexistence
 
-If you want to open the same library in calibre desktop while calibre-web-nextgen is running, set both:
+**Docker Desktop on macOS: give native Mac Calibre exclusive access to a
+host-bind-mounted library.** Stop the calibre-web-nextgen container before
+opening that library in Mac Calibre, and fully quit Mac Calibre before starting
+the container again. This also applies to native Mac `calibredb` commands.
+Stopping ingest alone leaves other application and metadata writers active.
+
+The compatibility flags below do not make simultaneous Mac and Linux-container
+access safe. In a finite Docker Desktop bind-mount test, an exclusive byte-range
+lock held on either side blocked another process on the same side but did not
+block the opposite side. A separate concurrent library-write test produced a
+malformed database even with both flags enabled and library DELETE journal mode. Use
+exclusive access rather than relying on a lock wait across this boundary.
+
+For deployments where desktop and server processes share working filesystem
+locks, set both flags to release the web application's database connection
+between requests:
 
 ```yaml
 - NETWORK_SHARE_MODE=true
 - DESKTOP_COMPAT_MODE=true
 ```
 
-By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. That blocks calibre desktop from opening the library — on calibre 9.9.0 + macOS it crashes without an error dialog. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the file lock is released between web requests, letting calibre desktop open the database in the gaps.
+By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
 
-Changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
+On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
 
 Trade-offs:
 - Each web request pays a small extra overhead to open and close the database connection.
-- If calibre desktop is actively writing when a web request comes in, the request waits up to 60 seconds for the lock. Heavy simultaneous use can slow the web UI.
+- Where filesystem locks are shared correctly, a web request can wait up to 60 seconds for an active desktop writer. Heavy simultaneous use can slow the web UI.
 - Designed for home-server use where calibre desktop is opened occasionally for bulk edits, not for concurrent heavy use of both.
 
 ### Calibre plugins (DeDRM and others)
@@ -467,6 +499,12 @@ calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you i
    ```
 
 Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input wants an Adobe login) keep their settings in files next to the zips. Easiest path: configure the plugin in Calibre desktop on your computer first, then copy its settings files (e.g. `plugins/dedrm.json`, the `plugins/DeACSM/` folder) from your desktop Calibre configuration folder into the same container `plugins/` folder and restart.
+
+The book editor's conversion choices come from the configured Calibre install's active input and output plugins. For example, a KFX input plugin makes KFX books eligible as sources; a KFX output choice appears only when Calibre reports an installed output plugin that can write KFX. Plugins are not bundled, and a separate comic/KPF workflow does not by itself add an `ebook-convert` output format. The capability check uses the same `CWA_CALIBRE_USER_PLUGINS` setting as conversion jobs, refreshes at least once a minute, and hides Calibre conversion choices if the local capability probe is unavailable or invalid. Directory-only OEB output is excluded because book conversion stores one file. The separate EPUB-to-KEPUB option remains available when `kepubify` is configured.
+
+ACSM tickets use Calibre’s import hooks before ordinary book processing. Auto-Convert off imports the fulfilled EPUB/PDF as returned; when enabled, conversion applies to that resulting book. A failed optional conversion keeps the fulfilled book. A missing or unsuccessful ACSM plugin preserves the original ticket in the failed-books folder, and no raw ACSM format is added to the library. Successful source receipts prevent duplicate imports and repeated fulfillment after completion. Configure the plugin’s account authorization first; installing its zip alone cannot authorize Adobe fulfillment.
+
+Before import, the fulfilled book is stored under `processed_books/acsm_fulfilled/<ticket SHA-256>/` with its original ticket basename and a manifest binding the ticket and book bytes. If import fails, the original ticket and fulfilled book remain; retry uses the validated book without spending the ticket again. The recovery entry is removed only after a confirmed library import. An interrupted or damaged entry stops automatic fulfillment and prints its path for manual recovery: preserve these files, inspect the downloaded EPUB/PDF, and import that book directly if needed. Do not delete a recovery entry merely to retry an already consumed ticket.
 
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
@@ -624,7 +662,9 @@ CWA has built-in KOReader sync; no separate kosync server is needed. With the pl
 
 If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
 
-**Matching filenames across devices (OPDS downloads).** If you download books to KOReader over OPDS and sync progress by filename across several e-readers, turn on **Use server filenames** in KOReader's OPDS catalog settings (the checkbox when you add or edit the catalog). By default KOReader names a downloaded file `Author - Title.epub` from the catalog entry, which differs from the on-disk library name `Title - Author.epub` and forces a manual rename. CWA already sends the library name in the download's `Content-Disposition` header; with **Use server filenames** on, KOReader uses that name, so the file matches your library and your other devices without renaming.
+For matching OPDS filenames across devices, enable Use server filenames in KOReader's OPDS catalog configuration. KOReader normally builds `Author - Title.epub` from the feed. The server normally suggests `Title - Author.epub`, with only the first author. With Use server filenames enabled, KOReader uses the server's suggested name.
+
+Administrators can change that name through the OPDS download filename template preference. For fields, examples, and device limits, see [OPDS download filenames](docs/opds-filename-template.md). A blank preference keeps the existing naming behavior.
 
 ### Kobo sync
 
@@ -788,34 +828,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `███████████████████░` 94% | 3385/3589 | 0 |
-| Slovak (`sk`) | `███████████████████░` 94% | 3382/3589 | 0 |
-| Swedish (`sv`) | `██████████████████░░` 92% | 3293/3589 | 0 |
-| Italian (`it`) | `█████████████████░░░` 86% | 3104/3589 | 0 |
-| Spanish (`es`) | `█████████████████░░░` 86% | 3088/3589 | 0 |
-| French (`fr`) | `█████████████████░░░` 85% | 3052/3589 | 125 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████████████░░░░░` 74% | 2655/3589 | 181 |
-| Dutch (`nl`) | `██████████████░░░░░░` 72% | 2599/3589 | 288 |
-| Polish (`pl`) | `██████████████░░░░░░` 72% | 2571/3589 | 0 |
-| German (`de`) | `█████████████░░░░░░░` 66% | 2358/3589 | 12 |
-| Hungarian (`hu`) | `██████████░░░░░░░░░░` 48% | 1713/3589 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 39% | 1397/3589 | 305 |
-| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 36% | 1311/3589 | 244 |
-| Slovenian (`sl`) | `███████░░░░░░░░░░░░░` 34% | 1205/3589 | 312 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 32% | 1168/3589 | 342 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 26% | 939/3589 | 266 |
-| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 22% | 784/3589 | 281 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 19% | 697/3589 | 354 |
-| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 19% | 673/3589 | 355 |
-| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 19% | 674/3589 | 356 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 14% | 505/3589 | 393 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 13% | 476/3589 | 402 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 445/3589 | 367 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 12% | 430/3589 | 430 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 423/3589 | 351 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 356/3589 | 382 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 290/3589 | 379 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 208/3589 | 339 |
+| Russian (`ru`) | `██████████████████░░` 88% | 3546/4048 | 0 |
+| French (`fr`) | `█████████████████░░░` 87% | 3514/4048 | 123 |
+| Slovak (`sk`) | `█████████████████░░░` 83% | 3377/4048 | 0 |
+| Swedish (`sv`) | `████████████████░░░░` 81% | 3293/4048 | 0 |
+| Italian (`it`) | `███████████████░░░░░` 77% | 3104/4048 | 0 |
+| Spanish (`es`) | `███████████████░░░░░` 76% | 3088/4048 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 76% | 3076/4048 | 281 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 66% | 2664/4048 | 174 |
+| Polish (`pl`) | `█████████████░░░░░░░` 64% | 2569/4048 | 0 |
+| German (`de`) | `████████████░░░░░░░░` 59% | 2399/4048 | 11 |
+| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 43% | 1753/4048 | 118 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 35% | 1418/4048 | 298 |
+| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 33% | 1324/4048 | 236 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1219/4048 | 304 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 29% | 1184/4048 | 332 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 24% | 961/4048 | 258 |
+| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 20% | 806/4048 | 273 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 723/4048 | 343 |
+| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 699/4048 | 345 |
+| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 698/4048 | 344 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 530/4048 | 383 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 502/4048 | 392 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 471/4048 | 359 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4048 | 419 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 449/4048 | 340 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 382/4048 | 373 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 316/4048 | 371 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 234/4048 | 332 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

@@ -985,11 +985,12 @@ _DETECT_MATRIX = [
     # The cps/ gate above is scoped to .py deliberately. Locale catalogues are
     # tier-1 auto-merge PRs and a malformed one already fails Fast Tests via
     # test_translations_compile.py, so sending them through a full image build
-    # would buy nothing and stall every translation PR behind it. Same for
-    # templates and static assets, which cannot stop the container booting.
+    # would buy nothing and stall every translation PR behind it.
+    # Classic templates and static files need the complete current image: a
+    # partial overlay omits static files and can retain deleted templates.
     (["cps/translations/de/LC_MESSAGES/messages.po"], "false", "false"),
-    (["cps/templates/index.html"], "false", "false"),
-    (["cps/static/css/style.css"], "false", "false"),
+    (["cps/templates/index.html"], "true", "true"),
+    (["cps/static/css/style.css"], "true", "true"),
     (["frontend/src/App.tsx"], "false", "true"),
     # Mixed PR: one build-relevant path anywhere in the diff is enough.
     (["README.md", "Dockerfile"], "true", "false"),
@@ -1017,8 +1018,8 @@ def test_changed_paths_classifies_build_definition_edits(changed, want_build, wa
         f"changed={changed} → build={out['build']!r}, expected {want_build!r}. "
         "A Dockerfile/requirements/root/integration-suite edit, or any change "
         "to application Python under cps/, must run the Docker integration "
-        "job — it is the only one that boots the container. Non-Python cps/ "
-        "assets and everything else must not pay for it."
+        "job — it is the only one that boots the container. Classic templates "
+        "and non-SPA static files also need a complete current runtime image."
     )
     assert out["frontend"] == want_frontend, (
         f"changed={changed} → frontend={out['frontend']!r}, expected {want_frontend!r}"

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/libs/normalize.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" type="text/css"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/kthoom.css') }}" type="text/css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}" type="text/css"/>
 
   <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/libs/plugins.js') }}"></script>
@@ -24,6 +25,7 @@
   <script src="{{ url_for('static', filename='js/reading/annotations_comic.js') }}" defer></script>
 </head>
 <body>
+{% include '_reader_lookup_banner.html' %}
 <div id="sidebar">
   <div id="tocView" class="view" tabindex="-1">
     <ul id="thumbnails"></ul>
@@ -185,7 +187,8 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <script>
     window.calibre = {
-        bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=comicfile, book_format=extension.upper()) }}",
+        bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=comicfile, book_format=extension.upper(), lookup=1 if lookup_mode else None) }}",
+        lookupMode: {{ lookup_mode|default(false)|tojson }},
         bookmark: "{{ bookmark.bookmark_key if bookmark != None }}",
         useBookmarks: "{{ current_user.is_authenticated | tojson }}",
         annotationsApiBase: "{{ url_for('annotations.annotations_view', book_id=comicfile) }}"

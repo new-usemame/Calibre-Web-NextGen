@@ -253,7 +253,7 @@ def test_newly_wrapped_shelf_states_are_translated(locale):
     body, _ = _call_view(locale)
     catalog = body["catalog"]
     for msgid in (
-        "No shelves yet. Create one above to start collecting books.",
+        "No shelves yet. Create a shelf to start collecting books.",
         "Could not save order.",
     ):
         assert catalog.get(msgid)

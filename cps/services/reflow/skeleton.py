@@ -1263,6 +1263,10 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None, visual_objec
         candidates = _vector_figures(raw)
     else:
         candidates = []
+    from . import scan_grids
+    kept_blocks, candidates, grid_artwork, note_regions = scan_grids.regions(
+        raw, kept_blocks, pixel_probe, candidates, note_regions)
+    skel.regions.extend(grid_artwork)
     kept_blocks, candidates, captioned_artwork, note_regions = _complete_captioned_scan_diagrams(
         raw, kept_blocks, candidates, style, pixel_probe, note_regions)
     skel.regions.extend(captioned_artwork)
@@ -1680,10 +1684,13 @@ def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover,
     from .assemble import HYPHENS
     regions = []
     claimed = {id(line) for region in skel.regions
-               if region.reason == 'uncertain_aligned_scan_list' or
+               if region.reason in ('uncertain_aligned_scan_list', 'source_scan_grid') or
                   (region.kind=='furniture' and region.reason in
                    ('sequence_folio', 'repeated_scan_spread_head'))
                for line in region.lines}
+    claimed.update(id(line) for region in candidates
+                   if region.reason == 'source_scan_grid'
+                   for line in region.caption_lines)
     eligible = {id(line) for _, lines in kept_blocks for line in lines}
     blocks = []
     for block in raw.text_blocks:

@@ -609,6 +609,11 @@ class ScanPixelProbe(object):
     def rules(self, rect):
         return rule_rows(self._doc, self._pno, rect, mask=self._mask)
 
+    def grid(self, rect):
+        """Closed source grid, including the cell text masked by art probes."""
+        from .scan_grids import measure
+        return measure(self._doc, self._pno, rect)
+
     def coverage(self, rect):
         """The share of this rectangle's blocks that hold print: near 1.0 on a
         full-bleed cover, near 0 on a text or blank page."""

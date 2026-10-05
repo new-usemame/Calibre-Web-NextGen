@@ -247,8 +247,8 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                         figure_box[0] <= caption_box[0] and figure_box[1] <= caption_box[1]
                         and figure_box[2] >= caption_box[2] and figure_box[3] >= caption_box[3]):
                     source_caption = ''
-            source_region = reason in ("source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel")
-            if reason == "source_visual_table":
+            source_region = reason in ("source_scan_grid", "source_visual_table", "ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel")
+            if reason in ("source_visual_table", "source_scan_grid"):
                 caption = ('Original table · Cell text and associations are retained together '
                            'as source pixels; no searchable table transcription is claimed. '
                            '<a href="original-p%04d.xhtml#figure_%d">View larger</a>' % (pno, figure_index))
@@ -1936,7 +1936,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                               figure['bbox']))
         for figure_index, figure in inspectable_figures.get(pno, []):
             reason=figure.get('found')
-            label=('Original printed table and neighboring context' if reason=='source_visual_table' else
+            label=('Original printed table and neighboring context' if reason in ('source_visual_table','source_scan_grid') else
                    'Original printed region and neighboring context' if reason in (
                        'ocr_uncertain_region','native_spacing_uncertain','native_outline_conflict',
                        'unverified_scan_layout','unrecovered_scan_layer','unverified_paired_columns',

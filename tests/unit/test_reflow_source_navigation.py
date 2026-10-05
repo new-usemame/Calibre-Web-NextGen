@@ -476,6 +476,7 @@ def test_original_return_reaches_joined_source_before_prior_page_notes(tmp_path,
     ('embedded','Original figure and neighboring context'),
     ('ocr_uncertain_region','Original printed region and neighboring context'),
     ('source_visual_table','Original printed table and neighboring context'),
+    ('source_scan_grid','Original printed table and neighboring context'),
 ])
 def test_native_figure_opens_source_details_with_explicit_return(tmp_path,reason,label):
     """An unflagged native table image must still be inspectable on a reader."""

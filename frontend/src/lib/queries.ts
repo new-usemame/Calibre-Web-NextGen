@@ -407,7 +407,7 @@ export function useGlobalLibrary(q: GlobalLibraryQuery) {
 const LIBRARY_VIEW_QUERIES = new Set([
   'books', 'adv-search', 'global-library', 'book', 'book-shelves',
   'shelf', 'shelves', 'magicshelf', 'magicshelves', 'entities',
-  'discover-strip', 'account', 'me', 'about',
+  'discover-strip', 'account', 'me', 'about', 'tag-tree',
 ]);
 
 async function refreshLibraryViews(qc: QueryClient): Promise<void> {
@@ -442,7 +442,7 @@ function setBookMembership(qc: QueryClient, bookId: number, owned: boolean) {
  *  delete, merge, My Library membership) calls this, so no badge keeps
  *  counting a book its shelf no longer shows (#2235). */
 function invalidateBookVisibilityViews(qc: QueryClient) {
-  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves']) {
+  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves', 'tag-tree']) {
     void qc.invalidateQueries({ queryKey: [key] });
   }
 }
@@ -625,6 +625,7 @@ export function tagConflictOf(error: unknown): TagConflict | null {
 }
 
 function invalidateTagViews(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['tag-tree'] });
   // 'entities' un-suffixed: a merge or delete REMOVES a row from the all-tags
   // browse list, so that list must refetch too — not just the tag's own page.
   void qc.invalidateQueries({ queryKey: ['entities'] });
@@ -1327,6 +1328,7 @@ export function useUpdateMetadata(id: string | number) {
       // page, whose membership an edit can equally change.
       qc.removeQueries({ queryKey: ['books'] });
       qc.removeQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['tag-tree'] });
     },
   });
 }

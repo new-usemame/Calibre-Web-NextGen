@@ -275,7 +275,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
 
   // Scroll/state restoration (#578): identity of THIS catalog instance (library
   // vs a specific entity vs a discovery view) — stable across a book → Back trip.
-  const restoreKey = `catalog:${libraryScope}:${entityKind ?? ''}:${entityId ?? ''}:${view ?? ''}:${tagPath ?? ''}`;
+  const restoreKey = `catalog:${libraryScope}:${entityKind ?? ''}:${entityId ?? ''}:${view ?? ''}:${encodeURIComponent(tagPath ?? '')}`;
   // Only restore a snapshot when it's consistent with the current URL query. A
   // fresh top-bar search navigates to /?q=… on the SAME library route; a stale
   // snapshot must not be rehydrated there or it would ignore the new search
@@ -618,7 +618,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // The saved default view is part of the filter identity: turning it on/off (or
   // saving a different one) changes which books belong here, so the accumulator
   // must reset rather than append the new set onto the old (#928).
-  const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', tagPath ?? '', perPage, showHidden,
+  const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', encodeURIComponent(tagPath ?? ''), perPage, showHidden,
     filterActive ? JSON.stringify(defaultFilter) : '', libraryScope, discoverIdentity].join('|');
 
   const previousLibraryScope = useRef(libraryScope);

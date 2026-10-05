@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import flask
 import pytest
 from flask_babel import Babel
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
 from cps import db
@@ -26,6 +26,7 @@ def library_client(monkeypatch):
     from cps.cw_login import utils
 
     engine = create_engine("sqlite://")
+    event.listen(engine, "connect", db._register_sqlite_udfs)
     for table in (db.Books.__table__, db.Tags.__table__, db.books_tags_link):
         table.create(engine)
     with engine.begin() as connection:
@@ -111,7 +112,9 @@ def test_unparseable_tags_remain_exact_record_leaves(library_client):
     assert opaque == {"id": 6, "name": "...", "path": None,
                       "count": 1, "total_count": 1, "children": []}
     # The existing maintenance API remains flat and uses the raw stored names.
-    flat = client.get("/api/v1/tags").get_json()["items"]
+    flat_response = client.get("/api/v1/tags")
+    assert flat_response.status_code == 200, flat_response.data
+    flat = flat_response.get_json()["items"]
     assert next(node for node in flat if node["id"] == 4)["name"] == "Horror. Gothic "
 
 
@@ -135,7 +138,8 @@ def test_large_subtree_does_not_exhaust_sqlite_bind_variables(library_client):
         connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, previous)
 
 
-@pytest.mark.parametrize("name", [".".join(["x"] * 1100), "Parent." + "x" * 4096])
+@pytest.mark.parametrize("name", [".".join(["x"] * 1100), "Parent." + "x" * 4096],
+                         ids=["depth-1100", "path-over-4096"])
 def test_deep_or_unlinkable_tags_preserve_exact_browsable_records(library_client, name):
     library, client = library_client
     library.session.execute(db.Tags.__table__.insert(), {"id": 8, "name": name})

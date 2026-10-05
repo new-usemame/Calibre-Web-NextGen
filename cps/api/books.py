@@ -1242,7 +1242,7 @@ def list_books():
                 language_code=language_code,
                 rating_id=rating_id,
                 book_format=book_format,
-                filter_val=(filter_val if filter_val in
+                filter_val=(filter_val if tag_path is not None or filter_val in
                             ("read", "unread", "in_progress", "did_not_finish", "on_hold",
                              "favorites", "rated", "archived") else None),
                 show_hidden=show_hidden if tag_path is None else False,

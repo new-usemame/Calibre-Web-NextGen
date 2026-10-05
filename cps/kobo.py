@@ -2539,7 +2539,7 @@ def HandleSyncRequest():
                     book.Books, kobo_reading_state)
                 new_reading_state_last_modified = max(
                     new_reading_state_last_modified,
-                    kobo_reading_state.last_modified,
+                    books_cursor_datetime(kobo_reading_state.last_modified),
                 )
                 reading_state_book_ids_emitted.append(book.Books.id)
                 if entitlement_is_unchanged:
@@ -2733,7 +2733,8 @@ def HandleSyncRequest():
         .filter(ub.ArchivedBook.user_id == current_user.id) \
         .order_by(func.datetime(ub.ArchivedBook.last_modified).desc()).first()
 
-    max_change = max_change.last_modified if max_change else new_archived_last_modified
+    max_change = (books_cursor_datetime(max_change.last_modified) if max_change
+                  else new_archived_last_modified)
 
     new_archived_last_modified = max(new_archived_last_modified, max_change)
 
@@ -2761,7 +2762,10 @@ def HandleSyncRequest():
                 }
             })
             reading_state_book_ids_emitted.append(kobo_reading_state.book_id)
-            new_reading_state_last_modified = max(new_reading_state_last_modified, kobo_reading_state.last_modified)
+            new_reading_state_last_modified = max(
+                new_reading_state_last_modified,
+                books_cursor_datetime(kobo_reading_state.last_modified),
+            )
 
     # Re-download repair is independent of the opaque reading-state cursor.
     # Only latches which pre-date this request are eligible: work armed by an
@@ -2923,7 +2927,7 @@ def HandleSyncRequest():
                 shelf.id, page=1, page_size=None
             )
 
-            new_tags_last_modified = max(shelf.last_modified, new_tags_last_modified)
+            new_tags_last_modified = max(books_cursor_datetime(shelf.last_modified), new_tags_last_modified)
 
             tag = create_kobo_tag_magic(shelf, books)
             if not tag:
@@ -3957,7 +3961,7 @@ def sync_shelves(sync_token, sync_results, only_kobo_shelves=False):
     new_tags_last_modified = sync_token.tags_last_modified
     # transmit all archived shelfs independent of last sync (why should this matter?)
     for shelf in ub.session.query(ub.ShelfArchive).filter(ub.ShelfArchive.user_id == current_user.id):
-        new_tags_last_modified = max(shelf.last_modified, new_tags_last_modified)
+        new_tags_last_modified = max(books_cursor_datetime(shelf.last_modified), new_tags_last_modified)
         sync_results.append({
             "DeletedTag": {
                 "Tag": {
@@ -3996,7 +4000,7 @@ def sync_shelves(sync_token, sync_results, only_kobo_shelves=False):
         if not shelf_lib.check_shelf_view_permissions(shelf):
             continue
 
-        new_tags_last_modified = max(shelf.last_modified, new_tags_last_modified)
+        new_tags_last_modified = max(books_cursor_datetime(shelf.last_modified), new_tags_last_modified)
 
         tag = create_kobo_tag(shelf)
         if not tag:

@@ -14,13 +14,13 @@ import shutil
 import time
 
 from .catalog import policy
-from .contracts import DIRECT_FORMATS, direct_format_allowed
+from .contracts import DIRECT_FORMATS, MOBI_MEDIA_TYPE, direct_format_allowed
 from .http import TransportError, run_transfer
 from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
                       publish, publication_state, validate_book)
 from .storage import Conflict
 from .clients import CLIENTS, USENET_KINDS, TORRENT_KINDS, torrent_book, torrent_books
-from .torrent import validate_magnet, validate_torrent
+from .torrent import magnet_identities, validate_torrent
 from .sabnzbd import SABClient, ClientError, completed_book, completed_books, open_completed_file, validate_nzb, _safe_root
 from .bundle_files import fingerprint_candidates
 
@@ -97,6 +97,7 @@ class AcquisitionWorker:
         private = None
         last_heartbeat = 0.0
         media_type = None
+        usenet = False
 
         def checkpoint():
             nonlocal last_heartbeat
@@ -111,6 +112,10 @@ class AcquisitionWorker:
                 raise TransportError('access_revoked')
             if state not in ('publishing', 'importing') and media_type is not None and not self.media_allowed(media_type):
                 raise TransportError('format_not_allowed')
+            if state not in ('publishing', 'importing') and usenet and media_type == MOBI_MEDIA_TYPE:
+                _, current_client = self._client_material(offer)
+                if current_client.get('allow_mobi') is not True:
+                    raise TransportError('format_not_allowed')
             now = time.monotonic()
             if now - last_heartbeat >= 5:
                 repo.heartbeat(job.id, token, lease_seconds=60)
@@ -188,9 +193,25 @@ class AcquisitionWorker:
                 raise StagingError('source_changed')
             if usenet:
                 with source.open('rb') as stream:
-                    media_type = 'application/pdf' if stream.read(5) == b'%PDF-' else 'application/epub+zip'
+                    signature = stream.read(68)
+                # A staged client source is already hash-bound, but its format
+                # must survive a new worker. Magic selects the existing strict
+                # byte validator; it never grants admission on its own.
+                media_type = ('application/pdf' if signature[:5] == b'%PDF-' else
+                              MOBI_MEDIA_TYPE if signature[60:68] == b'BOOKMOBI' else
+                              'application/epub+zip')
+                if signature[:5] == b'%PDF-' and signature[60:68] == b'BOOKMOBI':
+                    # A legal PalmDB name can begin with the PDF marker, and a
+                    # legal PDF can contain BOOKMOBI at this offset. Resolve
+                    # that ambiguity with the existing full validators.
+                    try:
+                        validate_book(source, MOBI_MEDIA_TYPE, max_bytes=self.max_bytes)
+                    except StagingError:
+                        pass  # Still requires the PDF validator below.
+                    else:
+                        media_type = MOBI_MEDIA_TYPE
                 validate_book(source, media_type, max_bytes=self.max_bytes)
-                extension = 'pdf' if media_type == 'application/pdf' else 'epub'
+                extension = DIRECT_FORMATS[media_type][1]
             token_path = private / 'publication.token'
             if token_path.exists() or token_path.is_symlink():
                 if token_path.is_symlink() or not token_path.is_file() or token_path.stat().st_size > 128:
@@ -204,7 +225,24 @@ class AcquisitionWorker:
                 publication_token = secrets.token_urlsafe(32)
                 persist_capability(token_path, publication_token)
             checkpoint()
-            permit = repo.prepare_publication(job.id, token, publication_token)
+            def authorize_publication():
+                # Pure reads while the repository holds the capability's write
+                # reservation: settings/grants cannot change between this
+                # check and issuance. Do not heartbeat or perform file I/O here.
+                if not self.enabled():
+                    raise Paused()
+                if not self.execution_allowed(job):
+                    raise TransportError('access_revoked')
+                if not self.media_allowed(media_type):
+                    raise TransportError('format_not_allowed')
+                if usenet:
+                    _, current_client = self._client_material(offer)
+                    if media_type == MOBI_MEDIA_TYPE and current_client.get('allow_mobi') is not True:
+                        raise TransportError('format_not_allowed')
+                elif not direct_format_allowed(media_type, repo.connection_config(job.connection_id).config):
+                    raise TransportError('unsupported_offer')
+            permit = repo.prepare_publication(job.id, token, publication_token,
+                                              authorize=authorize_publication)
             if state == 'staged':
                 state = 'publishing'
             publish(source, self.ingest_dir, permit, extension, checkpoint=checkpoint)
@@ -249,16 +287,33 @@ class AcquisitionWorker:
             self._cleanup(job.id)
         return current
 
-    def _download_client(self, job, token, offer, config, source, checkpoint):
-        repo = self.repository
-        clients = [row for row in repo.list_connections() if row.id == offer.get('client_id')
+    def _client_material(self, offer):
+        clients = [row for row in self.repository.list_connections() if row.id == offer.get('client_id')
             and row.adapter in (USENET_KINDS if offer['transport'] == 'nzb' else TORRENT_KINDS) and row.revision == offer.get('client_revision')]
         if not clients:
             raise ClientError('download_client_unavailable')
-        client_config = repo.connection_config(clients[0].id).config
-        client = (self.client_factory or CLIENTS[clients[0].adapter])(client_config, transfer=self.transfer)
+        material = self.repository.connection_config(clients[0].id)
+        if material.revision != clients[0].revision:
+            raise ClientError('download_client_unavailable')
+        return clients[0], material.config
+
+    def _download_client(self, job, token, offer, config, source, checkpoint):
+        repo = self.repository
+        client_row, client_config = self._client_material(offer)
+        client = (self.client_factory or CLIENTS[client_row.adapter])(client_config, transfer=self.transfer)
+        direct_magnet = offer['transport'] == 'torrent' and offer['href'].startswith('magnet:')
+        if direct_magnet:
+            # The private durable offer, never a refetched mutable source or a
+            # shortened external ID, is the expected full identity on every
+            # poll/restart/shared-attempt adoption, even after an uncertain add.
+            hashes = magnet_identities(offer['href'], tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+            prepare = getattr(client, 'prepare_submission', None)
+            if callable(prepare):
+                prepare(offer['href'], checkpoint=checkpoint)
+            elif hashes.v2 is not None:
+                raise ClientError('unsupported_client_version')
         def submission_name(key):
-            identity = [offer['release_key'], clients[0].id, clients[0].revision]
+            identity = [offer['release_key'], client_row.id, client_row.revision]
             # Nullable upgrade preserves existing remote names. New attempts
             # have their own durable key, including a retry after definite failure.
             if key:
@@ -271,29 +326,51 @@ class AcquisitionWorker:
         if started is None:
             # Fetch/validate before issuing the durable POST fence. A bad key or
             # descriptor here is safely retryable without an uncertain submit.
-            if offer['transport'] == 'torrent' and offer['href'].startswith('magnet:'):
+            if direct_magnet:
                 descriptor = offer['href']
-                validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             else:
                 document = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],) if config['secret'] else (),
                     allow_magnet_redirect=offer['transport'] == 'torrent'), max_bytes=512 * 1024, checkpoint=checkpoint)
                 descriptor = document.url if document.url.startswith('magnet:') else document.body
                 if offer['transport'] == 'nzb': validate_nzb(descriptor)
-                elif isinstance(descriptor, str): validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+                elif isinstance(descriptor, str):
+                    hashes = magnet_identities(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+                    # No durable original topic authority exists for a mutable
+                    # HTTP redirect. Preserve the established v1 redirect flow.
+                    if hashes.v2 is not None:
+                        raise ClientError('unsupported_magnet_redirect')
                 else: validate_torrent(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
-            checkpoint()
-            fresh = repo.begin_submission(job.id, token)
-            external_id, started, key = repo.submission_identity(job.id, token)
+            # A read-only client prerequisite must not fence a POST that was
+            # never attempted. qBittorrent resolves hybrid engine identity here.
+            prepare = getattr(client, 'prepare_submission', None)
+            if callable(prepare):
+                prepare(descriptor, checkpoint=checkpoint)
+            fenced_submit = getattr(client, 'submit_fenced', None)
+            fresh = False
+            def before_submit():
+                nonlocal fresh
+                checkpoint()
+                fresh = repo.begin_submission(job.id, token)
+                _, _, attempt_key = repo.submission_identity(job.id, token)
+                return submission_name(attempt_key) if fresh else None
+            try:
+                if callable(fenced_submit):
+                    # Native torrent adapters perform their read-only collision
+                    # check first, then invoke this callback immediately before
+                    # the add operation. An expired preflight never issues a
+                    # durable attempt; accepted/uncertain POSTs remain fenced.
+                    external_id = fenced_submit(descriptor, before_submit, checkpoint=checkpoint)
+                else:
+                    name = before_submit()
+                    if fresh:
+                        external_id = client.submit(name, descriptor, checkpoint=checkpoint)
+            except TransportError as error:
+                if fresh and error.code in ('needs_auth', 'client_error', 'torrent_already_exists'):
+                    repo.clear_rejected_submission(job.id, token, error_code=error.code)
+                raise
             if fresh:
-                try:
-                    external_id = client.submit(submission_name(key), descriptor, checkpoint=checkpoint)
-                except TransportError as error:
-                    if error.code in ('needs_auth', 'client_error'):
-                        repo.clear_rejected_submission(job.id, token, error_code=error.code)
-                    raise
                 repo.record_external(job.id, token, external_id)
-            else:
-                external_id, started, key = repo.submission_identity(job.id, token)
+            external_id, started, key = repo.submission_identity(job.id, token)
         checkpoint()
         remote = client.find(submission_name(key), external_id, checkpoint=checkpoint)
         if remote is None:

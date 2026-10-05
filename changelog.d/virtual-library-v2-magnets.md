@@ -1,0 +1,3 @@
+### Added
+
+- **Direct pure-v2 magnet releases can import books through qBittorrent with libtorrent 2.0.** CWNG preserves the original single SHA-256 btmh URI, waits for usable client metadata, and compares the full reported digest before inspecting completed files. Restart, uncertain acknowledgement and shared-request recovery keep the original identity and submission attempt. Unsupported clients refuse before submission and can be retried after compatibility is restored. Dual-topic magnets and HTTP links redirecting to pure-v2 magnets remain unsupported; v1 magnets, v1 redirects and existing torrent files keep their behavior.

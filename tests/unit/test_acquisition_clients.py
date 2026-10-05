@@ -207,7 +207,7 @@ def test_qbit_524_json_add_ack_persists_hash_before_followup_auth(tmp_path):
     assert c.QBitClient(config(tmp_path,'qbittorrent'),transfer=transfer).submit('cwng-owned','magnet:?xt=urn:btih:'+identity)==identity
 
 
-@pytest.mark.parametrize('variant',['nzbget-24.8','nzbget-26.3','qbittorrent-5.0','qbittorrent-5.2.4','transmission-4.0.6','transmission-4.1.3'])
+@pytest.mark.parametrize('variant',['nzbget-24.8','nzbget-26.3','qbittorrent-4.6.7','qbittorrent-5.2.4','transmission-4.0.6','transmission-4.1.3'])
 def test_pinned_released_compatibility_fixtures(tmp_path,variant):
     from pathlib import Path
     data=json.loads((Path(__file__).parents[1]/'fixtures/acquisition-clients.json').read_text())[variant];c=clients();identity='a'*40

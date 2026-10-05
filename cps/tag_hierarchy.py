@@ -122,6 +122,10 @@ class TagTree:
 
 def read_tree(calibre_db, book_filter=None):
     configured = is_configured(calibre_db)
+    # The existing flat endpoint supplies records and counts in this mode.
+    # A mode probe must not enumerate every visible book/tag pair twice.
+    if not configured:
+        return TagTree(False, [])
     if book_filter is None:
         book_filter = calibre_db.common_filters()
     pairs = (calibre_db.session.query(db.Books.id, db.Tags.id, db.Tags.name)

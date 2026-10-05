@@ -37,7 +37,7 @@ def open_repository(app_db_path, *, initialize_key=False):
         with engine.connect() as conn:
             inspector = inspect(conn)
             existing = set(inspector.get_table_names())
-            for table in (tables.connections, tables.offers, tables.jobs, tables.receipts):
+            for table in (tables.connections, tables.offers, tables.jobs, tables.receipts, tables.manifests):
                 if table.name not in existing or not set(table.c.keys()).issubset(
                         column["name"] for column in inspector.get_columns(table.name)):
                     raise StorageError("Acquisition database needs an application upgrade")

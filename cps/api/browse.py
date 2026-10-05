@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Entity-list browse endpoints for /api/v1."""
+from ..unicode_collation import locale_sort_key
 from flask import jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy import func, text
@@ -21,7 +22,7 @@ def list_authors():
             .join(db.Books)
             .filter(calibre_db.common_filters())
             .group_by(text('books_authors_link.author'))
-            .order_by(func.ng_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
+            .order_by(locale_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
             .all())
     items = [{"id": a.id, "name": a.name.replace("|", ","), "count": cnt} for a, cnt in rows]
     return {"items": items}
@@ -35,7 +36,7 @@ def list_series():
             .join(db.Books)
             .filter(calibre_db.common_filters())
             .group_by(text('books_series_link.series'))
-            .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
+            .order_by(locale_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
             .all())
     items = [{"id": s.id, "name": s.name, "count": cnt} for s, cnt in rows]
     return {"items": items}
@@ -49,7 +50,7 @@ def list_tags():
             .join(db.Books)
             .filter(calibre_db.common_filters())
             .group_by(db.Tags.id)
-            .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id)
+            .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id)
             .all())
     items = [{"id": t.id, "name": t.name, "count": cnt} for t, cnt in rows]
     return {"items": items}
@@ -195,7 +196,7 @@ def list_publishers():
             .join(db.Books, db.books_publishers_link.c.book == db.Books.id)
             .filter(calibre_db.common_filters())
             .group_by(db.Publishers.id)
-            .order_by(func.ng_sort_key(db.Publishers.sort), db.Publishers.sort, db.Publishers.id)
+            .order_by(locale_sort_key(db.Publishers.name), db.Publishers.name, db.Publishers.id)
             .all())
     items = [{"id": p.id, "name": p.name, "count": cnt} for p, cnt in rows]
     return {"items": items}

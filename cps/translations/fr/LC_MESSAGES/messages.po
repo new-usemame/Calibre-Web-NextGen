@@ -1390,13 +1390,30 @@ msgstr "Format original"
 msgid "End Format"
 msgstr "Format de fin"
 
+#: cps/cwa_functions.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
+msgid "All Time"
+msgstr "Depuis le début"
+
 #: cps/cwa_functions.py
+#, python-format
+msgid "Last %(count)s day"
+msgid_plural "Last %(count)s days"
+msgstr[0] "Le dernier jour (%(count)s)"
+msgstr[1] "Les %(count)s derniers jours"
+
+#: cps/cwa_functions.py
+#, python-format
+msgid "%(start)s to %(end)s"
+msgstr "Du %(start)s au %(end)s"
+
+#: cps/cwa_functions.py cps/templates/cwa_user_activity.html
 msgid "Unknown User"
 msgstr "Utilisateur inconnu"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Stats & Activity"
-msgstr ""
+msgstr "Calibre-Web NextGen — Statistiques et activité"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Enforcement History"
@@ -1706,8 +1723,8 @@ msgstr "Les métadonnées ont bien été mises à jour"
 msgid "Error editing book: {}"
 msgstr "Erreur d'édition du livre : {}"
 
-#: cps/editbooks.py cps/templates/kobo_reconcile.html cps/updater.py
-#: cps/uploader.py
+#: cps/editbooks.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/kobo_reconcile.html cps/updater.py cps/uploader.py
 msgid "Unknown"
 msgstr "Inconnu"
 
@@ -2475,9 +2492,9 @@ msgid "{} Stars"
 msgstr "{} Étoiles"
 
 #: cps/opds.py cps/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_epub_fixer.html cps/templates/feed.xml
-#: cps/templates/index.html cps/templates/index.xml cps/templates/layout.html
-#: cps/templates/search_form.html
+#: cps/templates/cwa_epub_fixer.html cps/templates/cwa_stats_i18n.html
+#: cps/templates/feed.xml cps/templates/index.html cps/templates/index.xml
+#: cps/templates/layout.html cps/templates/search_form.html
 msgid "Search"
 msgstr "Chercher"
 
@@ -2884,6 +2901,23 @@ msgstr ""
 #, fuzzy
 msgid "Manual (drag below)"
 msgstr "Manuel (glisser pour réorganiser)"
+
+#: cps/spa_strings.py
+msgid "Allow direct DRM-free MOBI 6 books"
+msgstr "Autoriser les livres MOBI 6 sans DRM en téléchargement direct"
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this catalog. The server upload-format setting must also "
+"allow MOBI. Normal conversion settings apply; without conversion, MOBI can "
+"be downloaded but cannot be opened in the web reader. Download clients have "
+"a separate format opt-in."
+msgstr ""
+"S’applique uniquement à ce catalogue. Le paramètre des formats de "
+"téléversement du serveur doit également autoriser le MOBI. Les paramètres de "
+"conversion habituels s’appliquent ; sans conversion, le MOBI peut être "
+"téléchargé, mais ne peut pas être ouvert dans le lecteur Web. Les clients de "
+"téléchargement disposent d’une autorisation distincte pour les formats."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3829,7 +3863,8 @@ msgstr "Bleu"
 msgid "Book content"
 msgstr "Contenu du livre"
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/layout.html
 msgid "Browse"
 msgstr "Explorer"
 
@@ -4165,7 +4200,8 @@ msgstr "Éditeurs (séparés par des virgules)"
 msgid "Read"
 msgstr "Lu"
 
-#: cps/spa_strings.py cps/templates/image.html
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/image.html
 msgid "Reading"
 msgstr "Lecture"
 
@@ -4190,7 +4226,8 @@ msgstr "Retirer {name}"
 msgid "Request failed."
 msgstr "La requête a échoué."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Reset"
 msgstr "Réinitialiser"
 
@@ -5448,6 +5485,7 @@ msgid "Any tags"
 msgstr "Toutes les étiquettes"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
 msgid "Apply"
 msgstr "Appliquer"
 
@@ -5520,7 +5558,7 @@ msgstr "Attribuer à l'appareil"
 msgid "Assigned to {name}."
 msgstr "Attribué à {name}."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
 msgid "Authentication"
 msgstr "Authentification"
 
@@ -5670,7 +5708,8 @@ msgstr "Livre {id}"
 msgid "Book {number}"
 msgstr "Livre {number}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
 msgid "Books"
 msgstr "Livres"
 
@@ -5771,17 +5810,18 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"CWNG copies a completed EPUB or PDF from this mapping. It does not move "
-"files, delete client jobs, or change seeding limits. NZBGet needs "
-"credentials that can read configuration, queue and history. qBittorrent "
-"needs an existing category. Transmission uses the configured folder and "
-"label."
+"CWNG copies completed books allowed by this connection and the server format "
+"settings. It does not move files, delete client jobs, or change seeding "
+"limits. NZBGet needs credentials that can read configuration, queue and "
+"history. qBittorrent needs an existing category. Transmission uses the "
+"configured folder and label."
 msgstr ""
-"CWNG copie un EPUB ou PDF terminé depuis cette correspondance. Il ne déplace "
-"pas les fichiers, ne supprime pas les tâches et ne modifie pas les limites "
-"de partage. NZBGet exige des identifiants permettant de lire configuration, "
-"file et historique. qBittorrent exige une catégorie existante. Transmission "
-"utilise le dossier et l’étiquette configurés."
+"CWNG copie les livres terminés autorisés par cette connexion et par les "
+"paramètres de formats du serveur. Il ne déplace pas les fichiers, ne "
+"supprime pas les tâches du client et ne modifie pas les limites de partage. "
+"NZBGet nécessite des identifiants permettant de lire la configuration, la "
+"file d’attente et l’historique. qBittorrent nécessite une catégorie "
+"existante. Transmission utilise le dossier et le libellé configurés."
 
 #: cps/spa_strings.py
 msgid "Can browse and request"
@@ -6864,7 +6904,8 @@ msgstr ""
 "Éjectez la liseuse, puis redémarrez KOReader avec le Wi-Fi activé. Votre "
 "bibliothèque apparaît dans quelques instants."
 
-#: cps/spa_strings.py cps/templates/admin.html cps/templates/register.html
+#: cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cwa_stats_i18n.html cps/templates/register.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Email"
 msgstr "Adresse mail"
@@ -6970,7 +7011,8 @@ msgid "Export"
 msgstr "Exporter"
 
 #: cps/spa_strings.py cps/templates/_book_list_export.html
-#: cps/templates/annotations_view.html
+#: cps/templates/annotations_view.html cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
@@ -7130,7 +7172,8 @@ msgstr ""
 msgid "From address"
 msgstr "Adresse de l’expéditeur"
 
-#: cps/spa_strings.py cps/templates/search_form.html
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
+#: cps/templates/search_form.html
 msgid "From:"
 msgstr "Depuis :"
 
@@ -8632,6 +8675,10 @@ msgid "Reader settings saved."
 msgstr "Paramètres de lecture enregistrés."
 
 #: cps/spa_strings.py
+msgid "Reading app"
+msgstr "Application de lecture"
+
+#: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Apparence de lecture"
 
@@ -9132,7 +9179,7 @@ msgstr "Recherche dans ce catalogue…"
 msgid "Searching…"
 msgstr "Recherche…"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
 msgid "Security"
 msgstr "Sécurité"
 
@@ -10362,7 +10409,8 @@ msgstr "Texte du titre"
 msgid "Title, author, or ISBN"
 msgstr "Titre, auteur ou ISBN"
 
-#: cps/spa_strings.py cps/templates/search_form.html
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
+#: cps/templates/search_form.html
 msgid "To:"
 msgstr "Vers :"
 
@@ -10940,7 +10988,8 @@ msgstr "Client de téléchargement qBittorrent"
 msgid "shared"
 msgstr "partagé"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
 msgid "to"
 msgstr "à"
 
@@ -11591,6 +11640,151 @@ msgstr "Modèle de nom de fichier des téléchargements OPDS"
 msgid "Padded series number:"
 msgstr "Numéro de série complété :"
 
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "En attente de votre choix de livre"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Livre demandé. Un administrateur doit approuver la demande."
+
+#: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Livre ajouté à votre activité."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Ce choix de livre était périmé. Actualisation de la liste…"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr ""
+"Les demandes sont suspendues. Vous pouvez toujours consulter les livres "
+"disponibles."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Ce livre n’a pas pu être demandé. Réessayez."
+
+#: cps/spa_strings.py
+msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+"Le choix était périmé et les livres disponibles n’ont pas pu être "
+"actualisés. Réessayez."
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr ""
+"Ce choix de livre était périmé. La liste a été actualisée ; choisissez à "
+"nouveau."
+
+#: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "Les livres disponibles n’ont pas pu être chargés. Réessayez."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} livres disponibles trouvés."
+
+#: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Choisissez un livre dans ce téléchargement"
+
+#: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Masquer les livres disponibles"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Choisir un autre livre"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Chargement des livres disponibles…"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "Aucun livre n’est disponible dans ce téléchargement."
+
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Importer ce livre"
+
+#: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Demander ce livre"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Importer ce livre : {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Demander ce livre : {filename}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} octets"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Demandé"
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+"Le livre choisi n’est plus dans le téléchargement terminé. Restaurez son "
+"fichier d’origine avant de réessayer."
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+"Le livre ou le téléchargement terminé a changé. Restaurez les fichiers "
+"d’origine avant de réessayer."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
+"Le téléchargement terminé dépasse les limites de fichiers prévues. "
+"Choisissez une publication plus petite."
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr "Règle non prise en charge"
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr ""
+"Cette règle ne peut pas être modifiée ici. Elle sera conservée sauf si vous "
+"la supprimez."
+
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "Autoriser les livres MOBI 6 terminés sans DRM"
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this download client. The server upload-format setting must "
+"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+"can be downloaded but cannot be opened in the web reader."
+msgstr ""
+"S’applique uniquement à ce client de téléchargement. Le paramètre des "
+"formats de téléversement du serveur doit également autoriser le MOBI. Les "
+"paramètres de conversion habituels s’appliquent ; sans conversion, le MOBI "
+"peut être téléchargé, mais ne peut pas être ouvert dans le lecteur Web."
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "En attente"
@@ -11833,7 +12027,7 @@ msgstr "L'étagère n'était pas masquée"
 msgid "Error unhiding shelf"
 msgstr "Erreur lors de l'affichage de l'étagère"
 
-#: cps/templates/admin.html cps/web.py
+#: cps/templates/admin.html cps/templates/cwa_stats_i18n.html cps/web.py
 msgid "Downloads"
 msgstr "Téléchargements"
 
@@ -12588,7 +12782,7 @@ msgstr "Port externe"
 msgid "Books per Page"
 msgstr "Livres par page"
 
-#: cps/templates/admin.html
+#: cps/templates/admin.html cps/templates/cwa_stats_i18n.html
 msgid "Uploads"
 msgstr "Téléversements"
 
@@ -14807,6 +15001,126 @@ msgstr ""
 msgid "Rendering e-reader previews:"
 msgstr ""
 
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Analytics"
+msgstr "Analyse de l’utilisation de l’API"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Track endpoint activity, integration usage, and API patterns"
+msgstr ""
+"Suivez l’activité des points d’accès, l’utilisation des intégrations et de "
+"l’API"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 7 Days"
+msgstr "Les 7 derniers jours"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 30 Days"
+msgstr "Les 30 derniers jours"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 90 Days"
+msgstr "Les 90 derniers jours"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 6 Months"
+msgstr "Les 6 derniers mois"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last Year"
+msgstr "L’année écoulée"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Custom Range"
+msgstr "Période personnalisée"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Demo Data"
+msgstr "Afficher les données de démonstration"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "DEMO MODE"
+msgstr "MODE DÉMONSTRATION"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Kobo Syncs"
+msgstr "Synchronisations Kobo"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "OPDS Accesses"
+msgstr "Accès OPDS"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Email Deliveries"
+msgstr "Envois par courriel"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Web UI Requests"
+msgstr "Requêtes de l’interface web"
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Breakdown"
+msgstr "Répartition de l’utilisation de l’API"
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Activity Timing"
+msgstr "Activité de l’API par heure"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint Access Frequency"
+msgstr "Fréquence d’accès aux points d’accès"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint"
+msgstr "Point d’accès"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Category"
+msgstr "Catégorie"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Access Count"
+msgstr "Nombre d’accès"
+
+#: cps/templates/cwa_api_stats.html
+msgid "Last Accessed"
+msgstr "Dernier accès"
+
+#: cps/templates/cwa_api_stats.html
+msgid "No endpoint data available"
+msgstr "Aucune donnée de point d’accès disponible"
+
+#: cps/templates/cwa_api_stats.html
+msgid "No API usage data available"
+msgstr "Aucune donnée d’utilisation de l’API disponible"
+
+#: cps/templates/cwa_api_stats.html
+msgid "No timing data available"
+msgstr "Aucune donnée horaire disponible"
+
+#: cps/templates/cwa_api_stats.html
+#, python-format
+msgid "API Calls: %(count)s"
+msgstr "Appels API : %(count)s"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+msgid "Please select both start and end dates"
+msgstr "Sélectionnez une date de début et une date de fin"
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Real Data"
+msgstr "Afficher les données réelles"
+
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run Archive"
@@ -14932,6 +15246,189 @@ msgstr "Correction EPUB démarrée pour le livre sélectionné"
 #: cps/templates/cwa_epub_fixer.html
 msgid "Error starting EPUB Fixer"
 msgstr "Erreur lors du démarrage du correcteur EPUB"
+
+#: cps/templates/cwa_library_stats.html cps/templates/stats.html
+msgid "Library Statistics"
+msgstr "Statistiques de la librairie Calibre"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Comprehensive insights into your Calibre library collection"
+msgstr "Statistiques détaillées de votre collection Calibre"
+
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_stats_system.html
+msgid "Total Books"
+msgstr "Nombre total de livres"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Added Books"
+msgstr "Livres ajoutés"
+
+#: cps/templates/cwa_library_stats.html
+msgid "N/A"
+msgstr "S.O."
+
+#: cps/templates/cwa_library_stats.html
+msgid "All time view"
+msgstr "Vue depuis le début"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Conversions"
+msgstr "Conversions"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Formats"
+msgstr "Nombre total de formats"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Library Growth Over Time"
+msgstr "Évolution de la bibliothèque"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Largest Series"
+msgstr "Séries les plus importantes"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Publication Year Distribution"
+msgstr "Répartition par année de publication"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Rating Statistics"
+msgstr "Statistiques des notes"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Top Enforced Books"
+msgstr "Livres les plus souvent traités"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Import Source Flows"
+msgstr "Flux des sources d’import"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Format Distribution"
+msgstr "Répartition des formats"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Most Fixed Books"
+msgstr "Livres les plus souvent corrigés"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(count)s fix"
+msgid_plural "%(count)s fixes"
+msgstr[0] "%(count)s correction"
+msgstr[1] "%(count)s corrections"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last fixed: %(date)s"
+msgstr "Dernière correction : %(date)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No EPUB fixes recorded"
+msgstr "Aucune correction EPUB enregistrée"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No growth data available"
+msgstr "Aucune donnée d’évolution disponible"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Added: %(count)s"
+msgstr "Ajoutés : %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Total: %(count)s"
+msgstr "Total : %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Books Added"
+msgstr "Livres ajoutés"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Library Size"
+msgstr "Taille totale de la bibliothèque"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No format data available"
+msgstr "Aucune donnée de format disponible"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(format)s — books: %(count)s (%(percent)s%%)"
+msgstr "%(format)s — livres : %(count)s (%(percent)s%%)"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No series data available"
+msgstr "Aucune donnée de série disponible"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Books: %(count)s"
+msgstr "Livres : %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Highest Index: %(index)s"
+msgstr "Numéro maximal dans la série : %(index)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Number of Books"
+msgstr "Nombre de livres"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No publication year data available"
+msgstr "Aucune donnée d’année de publication disponible"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(year)s — books: %(count)s"
+msgstr "%(year)s — livres : %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No rating data available"
+msgstr "Aucune donnée de note disponible"
+
+#: cps/templates/cwa_library_stats.html
+msgid "vs previous period"
+msgstr "par rapport à la période précédente"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(percent)s%% Unrated"
+msgstr "%(percent)s%% sans note"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Rating: %(stars)s; books: %(count)s"
+msgstr "Note : %(stars)s ; livres : %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No enforcement data available"
+msgstr "Aucune donnée d’application des métadonnées disponible"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Enforcements: %(count)s"
+msgstr "Applications des métadonnées : %(count)s"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last: %(date)s"
+msgstr "Dernière : %(date)s"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Enforcements"
+msgstr "Applications des métadonnées"
+
+#: cps/templates/cwa_library_stats.html
+msgid "No conversion data available"
+msgstr "Aucune donnée de conversion disponible"
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Conversions: %(count)s"
+msgstr "Conversions : %(count)s"
 
 #: cps/templates/cwa_settings.html
 #, fuzzy
@@ -16073,6 +16570,398 @@ msgstr "Avis %(count)s Match(s) en attente"
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 msgid "Click to See More"
 msgstr "Cliquer pour voir plus"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Logins"
+msgstr "Connexions"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Failed Login Attempts"
+msgstr "Tentatives de connexion échouées"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Logouts"
+msgstr "Déconnexions"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Searches"
+msgstr "Recherches"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Added to Shelf"
+msgstr "Ajouts à une étagère"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Removed from Shelf"
+msgstr "Retraits d’une étagère"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf Views"
+msgstr "Vues d’étagères"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Magic Shelf Views"
+msgstr "Vues d’étagères intelligentes"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Kobo Sync"
+msgstr "Synchronisation Kobo"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "OPDS Feed"
+msgstr "Flux OPDS"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Email Delivery"
+msgstr "Envoi par courriel"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Web UI"
+msgstr "Interface web"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Other"
+msgstr "Autre"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Desktop"
+msgstr "Ordinateur"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Mobile"
+msgstr "Téléphone"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Tablet"
+msgstr "Tablette"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Book Detail"
+msgstr "Fiche du livre"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Series Page"
+msgstr "Page de la série"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Author Page"
+msgstr "Page de l’auteur"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf"
+msgstr "Étagère"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Direct Link"
+msgstr "Lien direct"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Server Activity Dashboard"
+msgstr "Tableau de bord de l’activité du serveur"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Track server activity, file conversions, and automatic fixes."
+msgstr ""
+"Suivez l’activité du serveur, les conversions de fichiers et les corrections "
+"automatiques."
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen - Server Stats"
+msgstr "Calibre-Web NextGen — statistiques du serveur"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Enforced"
+msgstr "Livres dont les métadonnées ont été appliquées"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Converted"
+msgstr "Livres convertis"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Fixed"
+msgstr "Livres corrigés"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Hardcover Auto-Fetch Statistics"
+msgstr "Statistiques de récupération automatique Hardcover"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Total Processed"
+msgstr "Total traité"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Auto-Matched"
+msgstr "Correspondances automatiques"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Pending Review"
+msgstr "En attente de vérification"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Manually Reviewed"
+msgstr "Vérifications manuelles"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Conversion History"
+msgstr "Calibre-Web NextGen — historique des conversions"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Import History"
+msgstr "Calibre-Web NextGen — historique des imports"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen EPUB Fixer History"
+msgstr "Calibre-Web NextGen — historique des corrections EPUB"
+
+#: cps/templates/cwa_stats_system.html
+msgid "EPUB Fixer History with Paths & Fixes"
+msgstr "Historique des corrections EPUB avec chemins et détails"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Enforcement History"
+msgstr "Calibre-Web NextGen — historique d’application des métadonnées"
+
+#: cps/templates/cwa_stats_system.html
+msgid "Enforcement History with Paths"
+msgstr "Historique d’application des métadonnées avec chemins"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "User Activity"
+msgstr "Activité des utilisateurs"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "Library Stats"
+msgstr "Statistiques de la bibliothèque"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "API Usage"
+msgstr "Utilisation de l’API"
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "System Stats"
+msgstr "Statistiques du système"
+
+#: cps/templates/cwa_user_activity.html
+msgid "User Activity Dashboard"
+msgstr "Tableau de bord de l’activité des utilisateurs"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Track library usage, downloads, and user engagement"
+msgstr ""
+"Suivez l’utilisation de la bibliothèque, les téléchargements et l’activité "
+"des utilisateurs"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Filter by User:"
+msgstr "Filtrer par utilisateur :"
+
+#: cps/templates/cwa_user_activity.html
+msgid "All Users"
+msgstr "Tous les utilisateurs"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Time Period:"
+msgstr "Période :"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Large date ranges may take longer to load"
+msgstr "Le chargement de longues périodes peut prendre plus de temps"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Active Users"
+msgstr "Utilisateurs actifs"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Total Downloads"
+msgstr "Nombre total de téléchargements"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Books Read"
+msgstr "Livres lus"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity Timeline"
+msgstr "Chronologie de l’activité"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Peak Usage Hours"
+msgstr "Heures de forte activité"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Event Types"
+msgstr "Types d’événements"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Format Preferences by User"
+msgstr "Préférences de format par utilisateur"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Discovery Sources"
+msgstr "Sources de découverte"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Device Breakdown"
+msgstr "Répartition des appareils"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Most Active Days"
+msgstr "Jours les plus actifs"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Top Users"
+msgstr "Utilisateurs les plus actifs"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Popular Books"
+msgstr "Livres populaires"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Recent Searches"
+msgstr "Recherches récentes"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Average Session Duration"
+msgstr "Durée moyenne des sessions"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Avg Session Length"
+msgstr "Durée moyenne d’une session"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "%(minutes)s min"
+msgstr "%(minutes)s min"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Search Success Rate"
+msgstr "Taux de réussite des recherches"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Searches Leading to Actions"
+msgstr "Recherches suivies d’une action"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Successful searches: %(successful)s / %(total)s"
+msgstr "Recherches réussies : %(successful)s / %(total)s"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Shelf Activity"
+msgstr "Activité des étagères"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No Activity Data Yet"
+msgstr "Aucune donnée d’activité pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Start using your library to see beautiful visualizations and insights!"
+msgstr ""
+"Commencez à utiliser votre bibliothèque pour découvrir les graphiques et les "
+"statistiques !"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Downloads, reading sessions, and searches will be tracked here."
+msgstr ""
+"Les téléchargements, les sessions de lecture et les recherches seront "
+"affichés ici."
+
+#: cps/templates/cwa_user_activity.html
+msgid "Download Formats Distribution"
+msgstr "Répartition des formats téléchargés"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Reading Velocity (Books per Week)"
+msgstr "Rythme de lecture (livres par semaine)"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format data yet"
+msgstr "Aucune donnée de format pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No activity data yet"
+msgstr "Aucune donnée d’activité pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Activity: %(count)s"
+msgstr "Activité : %(count)s"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity"
+msgstr "Activité"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No reading data yet"
+msgstr "Aucune donnée de lecture pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "4-Week Avg"
+msgstr "Moyenne sur 4 semaines"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format preference data yet"
+msgstr "Aucune donnée de préférence de format pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No discovery data yet"
+msgstr "Aucune donnée de découverte pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No device data yet"
+msgstr "Aucune donnée d’appareil pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No failed attempts"
+msgstr "Aucune tentative échouée"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No user activity yet"
+msgstr "Aucune activité utilisateur pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No popular books yet"
+msgstr "Aucun livre populaire pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No searches yet"
+msgstr "Aucune recherche pour le moment"
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Minutes: %(start)s–%(end)s; sessions: %(count)s"
+msgstr "Minutes : %(start)s–%(end)s ; sessions : %(count)s"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Minutes"
+msgstr "Minutes"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Sessions"
+msgstr "Sessions"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No session data available"
+msgstr "Aucune donnée de session disponible"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Success Rate"
+msgstr "Taux de réussite"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Views"
+msgstr "Vues"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Added"
+msgstr "Ajoutés"
+
+#: cps/templates/cwa_user_activity.html
+msgid "Removed"
+msgstr "Retirés"
+
+#: cps/templates/cwa_user_activity.html
+msgid "No shelf activity yet"
+msgstr "Aucune activité d’étagère pour le moment"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Before you go — what made you switch back?"
@@ -17744,10 +18633,6 @@ msgid "Order saved. The sidebar reflects the new order on next page load."
 msgstr ""
 
 #: cps/templates/stats.html
-msgid "Library Statistics"
-msgstr "Statistiques de la librairie Calibre"
-
-#: cps/templates/stats.html
 msgid "Books in this Library"
 msgstr "Livres dans la bibiothèque"
 
@@ -18441,6 +19326,31 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid ""
+#~ "Applies only to this catalog. The server upload-format setting must also "
+#~ "allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+#~ "can be downloaded but cannot be opened in the web reader. Download "
+#~ "clients still accept EPUB and PDF only."
+#~ msgstr ""
+#~ "S’applique uniquement à ce catalogue. Le réglage des formats téléversés "
+#~ "du serveur doit aussi autoriser MOBI. Les réglages habituels de "
+#~ "conversion s’appliquent ; sans conversion, MOBI peut être téléchargé mais "
+#~ "ne peut pas être ouvert dans le lecteur web. Les clients de "
+#~ "téléchargement acceptent toujours uniquement EPUB et PDF."
+
+#~ msgid ""
+#~ "CWNG copies a completed EPUB or PDF from this mapping. It does not move "
+#~ "files, delete client jobs, or change seeding limits. NZBGet needs "
+#~ "credentials that can read configuration, queue and history. qBittorrent "
+#~ "needs an existing category. Transmission uses the configured folder and "
+#~ "label."
+#~ msgstr ""
+#~ "CWNG copie un EPUB ou PDF terminé depuis cette correspondance. Il ne "
+#~ "déplace pas les fichiers, ne supprime pas les tâches et ne modifie pas "
+#~ "les limites de partage. NZBGet exige des identifiants permettant de lire "
+#~ "configuration, file et historique. qBittorrent exige une catégorie "
+#~ "existante. Transmission utilise le dossier et l’étiquette configurés."
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

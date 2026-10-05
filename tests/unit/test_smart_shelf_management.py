@@ -111,3 +111,32 @@ def test_ordinary_shelf_opds_selection_is_per_viewer_and_partial_saves_preserve_
     finally:
         session.close()
         engine.dispose()
+
+@pytest.mark.unit
+@pytest.mark.parametrize('rules', [
+    {'condition': 'OR', 'rules': [{'condition': 'AND', 'rules': [
+        {'id': 'future_field', 'operator': 'contains', 'value': {'toString': None}},
+    ]}]},
+    {'condition': 'AND', 'rules': [
+        {'id': 'title', 'operator': 'retired_operator', 'value': 0},
+    ]},
+    {'condition': 'AND', 'rules': []},
+])
+def test_shelf_with_no_evaluable_filter_keeps_rules_for_editor(management, monkeypatch, rules):
+    from cps.api import magicshelves as api
+    client, session, ub, _ = management
+    shelf = session.query(ub.MagicShelf).get(4)
+    shelf.rules = rules
+    session.commit()
+    monkeypatch.setattr(api, 'load_configured_columns', lambda _: [])
+    monkeypatch.setattr(api.config, 'config_books_per_page', 24, raising=False)
+    client.application.add_url_rule('/api/v1/magicshelf/<int:shelf_id>',
+                                    view_func=inspect.unwrap(api.magic_shelf_books))
+    response = client.get('/api/v1/magicshelf/4')
+    assert response.status_code == 200
+    assert response.json['items'] == []
+    assert response.json['total'] == 0
+    assert response.json.get('rules') == rules
+    assert response.json['can_edit'] is True
+    # Returning rules must retain the existing private-shelf authorization gate.
+    assert client.get('/api/v1/magicshelf/3').status_code == 403

@@ -137,6 +137,47 @@ def backups_taken(fixer_module):
     return sorted(p.name for p in fixer_module._test_backup_dir.iterdir())
 
 
+def test_manual_path_output_records_repair_and_noop_in_real_sqlite(fixer_module, monkeypatch, tmp_path):
+    """The CLI passes Path output names: both repair and repeat must persist history.
+
+    A fake history sink accepts any object and concealed the released SQLite
+    binding failure after the book had already been rewritten (#1528).
+    """
+    from cwa_db import CWA_DB
+
+    monkeypatch.setenv("CWA_DB_PATH", str(tmp_path / "cwa-config"))
+    monkeypatch.setattr(fixer_module, "CWA_DB", CWA_DB)
+    book = build_epub(tmp_path / "manual.epub")
+    with zipfile.ZipFile(book) as archive:
+        entries = {name: archive.read(name) for name in archive.namelist()}
+    entries["OEBPS/text.xhtml"] = entries["OEBPS/text.xhtml"].replace(
+        b"<p>", b'<p data-AmznRemoved="2">', 1)
+    with zipfile.ZipFile(book, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content, compress_type=(
+                zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED))
+    original = book.read_bytes()
+    fixer = fixer_module.EPUBFixer(manually_triggered=True)
+    try:
+        assert fixer.process(str(book), book)
+        repaired = book.read_bytes()
+        assert b"data-AmznRemoved" not in epub_payload(book)["OEBPS/text.xhtml"]
+        assert (fixer_module._test_backup_dir / book.name).read_bytes() == original
+        second = fixer_module.EPUBFixer(manually_triggered=True)
+        try:
+            assert second.process(str(book), book) == []
+            assert book.read_bytes() == repaired
+            rows = second.db.cur.execute(
+                "SELECT file_path, CAST(manually_triggered AS INTEGER), "
+                "CAST(num_of_fixes_applied AS INTEGER) "
+                "FROM epub_fixes ORDER BY id").fetchall()
+            assert rows == [(str(book), 1, 1), (str(book), 1, 0)]
+        finally:
+            second.db.con.close()
+    finally:
+        fixer.db.con.close()
+
+
 # --------------------------------------------------------------------------
 # Defect 1 — the phantom "Converted <file> from ascii to utf-8"
 # --------------------------------------------------------------------------

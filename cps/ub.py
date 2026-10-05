@@ -1732,6 +1732,11 @@ class Annotation(Base):
     # not safe to present to epub.js as CFIs.
     start_xpointer = Column(Text, nullable=True)
     end_xpointer = Column(Text, nullable=True)
+    # The passage as a word-based client named it: JSON
+    # ``{"exact", "prefix", "suffix"}`` (services/text_anchor). Kept after the
+    # server places it, so the words go back to that client unchanged and an
+    # unplaced one (``position_type`` 'text_quote') can be placed later.
+    text_quote = Column(Text, nullable=True)
     # Phase 2 (KOReader bridge) — opaque per-device id of the row a device last
     # wrote/saw for this annotation (e.g. the KoboReader.sqlite Bookmark.BookmarkID
     # the plugin created). Lets the plugin dedup + suppress feedback loops without
@@ -1782,9 +1787,10 @@ class Annotation(Base):
         ),
     )
 
-    _VALID_SOURCES = {"kobo", "webreader", "koreader"}
+    _VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote"}
     _VALID_POSITION_TYPES = {
         "cfi", "pdf_quad", "comic_page", "koreader_xpointer", "unanchored",
+        "text_quote",
     }
 
     @validates("source")
@@ -5039,6 +5045,23 @@ def migrate_annotation_koreader_identity(engine, _session):
         ))
 
 
+def migrate_annotation_text_quote(engine, _session):
+    """Add the nullable ``text_quote`` column to ``annotation``. Idempotent."""
+    with engine.begin() as conn:
+        if not conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
+        )).first():
+            return
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        if "text_quote" in existing:
+            return
+        try:
+            conn.execute(text("ALTER TABLE annotation ADD COLUMN text_quote TEXT"))
+        except exc.OperationalError as e:
+            if "duplicate column" not in str(e).lower():
+                raise
+
+
 def migrate_annotation_decouple_source_target(engine, _session):
     """Decouple annotation origin from sync target.
 
@@ -5318,6 +5341,7 @@ def migrate_Database(_session):
     migrate_device_reading_position_slice(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
+    migrate_annotation_text_quote(engine, _session)
     from .services.browser_source import migrate_account_browser_source
     migrate_account_browser_source(engine)
     migrate_book_cover_preview_table(engine, _session)

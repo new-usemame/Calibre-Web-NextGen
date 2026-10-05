@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Dependency-free collation keys for Latin text.
+"""Locale-aware keys with an optional platform ICU adapter for Nordic readers.
 
 Only Latin script is folded - see _fold_latin_marks.
 
-This is intentionally a bounded improvement, not an ICU replacement. Accented
+Other languages retain the Latin-only legacy policy below. Accented
 letters fold to their base for ordering and buckets. Spanish ``ñ`` remains a
 distinct letter after the N block, while Unicode casefold supplies German
 ``ß`` -> ``ss`` primary equivalence.
@@ -42,11 +42,15 @@ def _fold_latin_marks(decomposed):
     return "".join(out)
 
 
-def unicode_sort_key(value):
+def unicode_sort_key(value, locale=None):
     if value is None:
         return None
     if not isinstance(value, str):
         return None
+    from .nordic_collation import context
+    native = context(locale)
+    if native is not None:
+        return native.sort_key(value)
     protected = value.replace("ñ", _ENYE_MARKER).replace("Ñ", _ENYE_MARKER)
     decomposed = unicodedata.normalize("NFKD", protected)
     # Recompose so a kept mark rejoins its base (ka + dakuten -> ga); otherwise
@@ -56,14 +60,39 @@ def unicode_sort_key(value):
     return folded.replace(_ENYE_MARKER.casefold(), "n\uffff")
 
 
-def unicode_initial(value):
+def unicode_initial(value, locale=None):
     if value is None:
         return None
     if not isinstance(value, str):
         return None
     if not value:
         return ""
+    from .nordic_collation import context
+    native = context(locale)
+    if native is not None:
+        initial = native.initial(value)
+        if initial is not None:
+            return initial
     if value[0] in ("ñ", "Ñ"):
         return "Ñ"
     key = unicode_sort_key(value[0])
     return key[0].upper() if key else ""
+
+
+def locale_sort_key(column, locale=None, *, user=None):
+    """Bind this request's locale into SQL, never into a reused connection."""
+    from sqlalchemy import func
+    from .cw_babel import get_collation_locale
+    language = get_collation_locale(user) if locale is None else locale
+    if language in ('sv', 'fi', 'da', 'nb', 'nn'):
+        return func.ng_sort_key(column, language)
+    return func.ng_sort_key(column)
+
+
+def locale_initial(column, locale=None, *, user=None):
+    from sqlalchemy import func
+    from .cw_babel import get_collation_locale
+    language = get_collation_locale(user) if locale is None else locale
+    if language in ('sv', 'fi', 'da', 'nb', 'nn'):
+        return func.ng_initial(column, language)
+    return func.ng_initial(column)

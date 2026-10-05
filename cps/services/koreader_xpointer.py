@@ -322,11 +322,13 @@ def spine_solid_texts(epub_path) -> Optional[tuple]:
 
 
 def xpointer_at_solid_index(epub_path, member: str, index: int,
-                            expected: str) -> Optional[str]:
+                            expected: str, *, after: bool = False) -> Optional[str]:
     """XPointer of the ``index``-th non-whitespace character of ``member``.
 
     ``expected`` is the chapter's non-whitespace text as the caller aligned it
     (``spine_solid_texts``); a chapter that no longer reads so gives None.
+    With ``after`` the point is just past that character instead: the end of
+    a range that includes it.
     """
     def run(book):
         found = _item_and_chapter(book, member)
@@ -345,7 +347,47 @@ def xpointer_at_solid_index(epub_path, member: str, index: int,
                     break
                 need -= 1
         return _xpointer_string(book, item, _Pos(parent, _Text(parent, ordinal, value),
-                                                 raw, chapter))
+                                                 raw + 1 if after else raw, chapter))
+    return _resolve(epub_path, run)
+
+
+def solid_span_of_xpointers(epub_path, start_xpointer: str,
+                            end_xpointer: str) -> Optional[tuple[str, int, int]]:
+    """``(member, i, j)``: the non-whitespace characters a range covers.
+
+    ``i`` counts the non-whitespace characters of the chapter's body before
+    the start, ``j`` those before the end, so the range holds characters
+    ``i`` to ``j - 1``. Both ends must be text positions in one chapter, in
+    order, around at least one character.
+    """
+    def run(book):
+        start = _point_from_xpointer(book, start_xpointer)
+        end = _point_from_xpointer(book, end_xpointer)
+        if start is None or end is None or start[1] is not end[1]:
+            return None
+        counts = []
+        for _book, _item, pos in (start, end):
+            if pos.text is None:
+                return None
+            solid = _solid(pos.chapter)
+            k = solid.position.get((pos.text.parent, pos.text.ordinal))
+            if k is None:
+                return None  # a whitespace-only node
+            counts.append(solid.starts[k]
+                          + len(pos.text.value[:pos.offset].translate(_NO_SPACE)))
+        i, j = counts
+        return (start[1].member, i, j) if i < j else None
+    return _resolve(epub_path, run)
+
+
+def passage_between(epub_path, start_xpointer: str, end_xpointer: str) -> Optional[str]:
+    """The text a reader sees between two XPointers of one chapter, or None."""
+    def run(book):
+        start = _point_from_xpointer(book, start_xpointer)
+        end = _point_from_xpointer(book, end_xpointer)
+        if start is None or end is None or start[1] is not end[1]:
+            return None
+        return _text_between(start[2], end[2])
     return _resolve(epub_path, run)
 
 

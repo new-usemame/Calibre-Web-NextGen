@@ -29,6 +29,10 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
     return message
 
 
+_("Allow direct DRM-free MOBI 6 books")
+_("Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients have a separate format opt-in.")
+
+
 _("{succeeded} added to the shelf; {failed} failed.")
 _("{succeeded} book(s) deleted; {failed} failed.")
 _("{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.")
@@ -798,7 +802,7 @@ _("Bulleted list")
 _("CA certificate path")
 _("CWA settings")
 _("CWNG cannot read the mapped completed folder. Check its mount and permissions.")
-_("CWNG copies a completed EPUB or PDF from this mapping. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label.")
+_("CWNG copies completed books allowed by this connection and the server format settings. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label.")
 _("Can browse and request")
 _("Can upload books")
 _("Cancel")
@@ -1445,6 +1449,7 @@ _("Read from here")
 _("Read status")
 _("Read status filter")
 _("Reader settings saved.")
+_("Reading app")
 _("Reading appearance")
 _("Reading data is kept. Browser reappears when you next save reading progress or annotations.")
 _("Reading from here. This is now your Browser position.")
@@ -2126,3 +2131,5 @@ _("The completed download exceeds the safe file limits. Choose a smaller release
 _("Unsupported rule")
 _("This rule cannot be edited here. It will be kept unless you remove it.")
 
+_("Allow completed DRM-free MOBI 6 books")
+_("Applies only to this download client. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader.")

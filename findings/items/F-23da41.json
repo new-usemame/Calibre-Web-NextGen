@@ -1,0 +1,14 @@
+{
+  "area": "ingest",
+  "body": "Source observation: cps/cwa_functions.py refresh_library invokes ingest_processor.py and maps every return2 to the translated message that the book ingest service is already running. Exit2 is also used for runtime initialization failures; proposed1158 additionally uses it for an existing source still held by a writer, preserving the retry queue after a reopened-writer check. That source-deferred result would therefore produce the running-service message even when the blocker is the writer. The complete browser/HTTP trigger has not been executed in this audit, and the1158 busy-source branch is proposed rather than merged at capture.\n\nKeep queue/defer signaling for source preservation. Distinguish lock contention, initialization failure and busy-source deferral in the refresh result, or use an accurate shared message. Verify the actual refresh completion message and subsequent retry for both lock-held and source-held cases. This is a separate translated usability change, not part of page-based conversion budgets. No new user issue or public promise is created.",
+  "created": "2026-10-03",
+  "id": "F-23da41",
+  "refs": [
+    "#2450",
+    "#1158"
+  ],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "Manual library refresh interprets every ingest exit2 as an already-running service"
+}

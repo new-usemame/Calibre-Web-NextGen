@@ -2279,15 +2279,14 @@ msgstr ""
 msgid "Books organized in shelves"
 msgstr "Kirjat sarjoittain"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "Muokkaa hyllyä"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Älykkäät hyllyt"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Kirjat sarjoittain"
+msgid "Books organized in smart shelves"
+msgstr "Älykkäisiin hyllyihin järjestetyt kirjat"
 
 #: cps/opds.py
 #, fuzzy
@@ -3393,11 +3392,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3668,9 +3667,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Luo älykäs hylly"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6487,9 +6486,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "Muokkaa älykästä hyllyä"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9053,10 +9052,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10285,7 +10280,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11127,13 +11122,13 @@ msgid "Hidden Books"
 msgstr "Näytä ekirjat"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr ""
+msgid "Error loading smart shelf"
+msgstr "Älykkään hyllyn lataaminen epäonnistui"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr ""
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Älykäs hylly — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11177,11 +11172,6 @@ msgstr ""
 msgid "Error creating shelf"
 msgstr ""
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "luo hylly"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11193,11 +11183,6 @@ msgstr ""
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr ""
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "Muokkaa hyllyä"
 
 #: cps/web.py
 #, fuzzy
@@ -11472,18 +11457,25 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synkronoi älykkäät hyllyt lukulaitteisiin (Kobo ja KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Synkronoi älykkäät hyllyt Koboon"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"Älykkäiden hyllyjen synkronointi on poistettu käytöstä koko järjestelmässä. "
+"Ota ”%(setting)s” käyttöön CWA-asetuksissa, jotta tämä hylly siirtyy "
+"lukulaitteisiisi."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15102,25 +15094,16 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Kun toiminto on käytössä, merkityt älykkäät hyllyt siirtyvät Koboon "
+"kokoelmina. Ota myös Kobo-synkronointi käyttöön perusasetuksissa."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader vastaanottaa myös merkityt älykkäät hyllyt kirjastoonsa."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15586,8 +15569,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "Älykkäiden hyllyjen katselut"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16465,10 +16448,6 @@ msgstr "Syötä domainnimi"
 msgid "Denied Domains (Blacklist)"
 msgstr "Rekisteröinnissä sallitut domainit"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr ""
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16657,8 +16636,8 @@ msgid "Mobile Notice"
 msgstr ""
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Älykkäitä hyllyjä on paras muokata tietokoneella tai tabletilla."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16915,10 +16894,6 @@ msgid "Create Shelf"
 msgstr "luo hylly"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr ""
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Kirjan tiedot"
 
@@ -17109,12 +17084,38 @@ msgid "Download Access Log"
 msgstr "Ota pääsyloki käyttöön"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Mitä älykkäät hyllyt ovat?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Älykkäät hyllyt keräävät kirjoja automaattisesti sääntöjen avulla."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr ""
+"Älykkäitä hyllyjä kutsuttiin vanhemmissa versioissa nimellä ”Magic Shelves”."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr ""
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Ota ensin ”%(setting)s” käyttöön CWA-asetuksissa. Siihen asti tällä "
+"valintaruudulla ei ole vaikutusta eikä hylly siirry lukulaitteeseen."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Näytä tämä älykäs hylly OPDS-syötteessäni"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -18036,12 +18037,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr ""
+msgid "Smart shelves order"
+msgstr "Älykkäiden hyllyjen järjestys"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Valitse älykkäiden hyllyjesi järjestys sivupalkissa."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18089,8 +18090,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr ""
+msgid "Smart shelves visibility"
+msgstr "Älykkäiden hyllyjen näkyvyys"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18290,6 +18291,22 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Näytä sarjavalinta"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "Muokkaa hyllyä"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Kirjat sarjoittain"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "luo hylly"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Muokkaa hyllyä"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Kirjat kategorioittain"

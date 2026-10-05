@@ -2261,14 +2261,14 @@ msgstr ""
 msgid "Books organized in shelves"
 msgstr ""
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "កែប្រែធ្នើ"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "ធ្នើឆ្លាតវៃ"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
-msgstr ""
+msgid "Books organized in smart shelves"
+msgstr "សៀវភៅដែលរៀបចំក្នុងធ្នើឆ្លាតវៃ"
 
 #: cps/opds.py
 #, fuzzy
@@ -3370,11 +3370,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3645,9 +3645,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "បង្កើតធ្នើឆ្លាតវៃ"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6464,9 +6464,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "កែសម្រួលធ្នើឆ្លាតវៃ"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9030,10 +9030,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10262,7 +10258,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11100,13 +11096,13 @@ msgid "Hidden Books"
 msgstr "សៀវភៅដែលមានប្រជាប្រិយភាព"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr ""
+msgid "Error loading smart shelf"
+msgstr "មានកំហុសក្នុងការផ្ទុកធ្នើឆ្លាតវៃ"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr ""
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "ធ្នើឆ្លាតវៃ — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11149,11 +11145,6 @@ msgstr ""
 msgid "Error creating shelf"
 msgstr ""
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "បង្កើតធ្នើ"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11165,11 +11156,6 @@ msgstr ""
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr ""
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "កែប្រែធ្នើ"
 
 #: cps/web.py
 #, fuzzy
@@ -11437,18 +11423,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "ធ្វើសមកាលកម្មធ្នើឆ្លាតវៃទៅឧបករណ៍អានអេឡិចត្រូនិក (Kobo និង KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "ធ្វើសមកាលកម្មធ្នើឆ្លាតវៃទៅ Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"ការធ្វើសមកាលកម្មធ្នើឆ្លាតវៃត្រូវបានបិទជាសកល។ សូមបើក «%(setting)s» ក្នុងការកំណត់ CWA "
+"ដើម្បីឱ្យធ្នើនេះទៅដល់ឧបករណ៍អានរបស់អ្នក។"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15057,25 +15049,16 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"នៅពេលបើក ធ្នើឆ្លាតវៃដែលបានសម្គាល់នឹងទៅដល់ Kobo ជាបណ្ដុំ។ សូមបើក Kobo Sync "
+"ក្នុងការកំណត់មូលដ្ឋានផងដែរ។"
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader ក៏ទទួលធ្នើឆ្លាតវៃដែលបានសម្គាល់ក្នុងបណ្ណាល័យរបស់វាផងដែរ។"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15541,8 +15524,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "ការមើលធ្នើឆ្លាតវៃ"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16414,10 +16397,6 @@ msgstr "ជ្រើសរើសឈ្មោះអ្នកប្រើប្រ
 msgid "Denied Domains (Blacklist)"
 msgstr ""
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr ""
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16607,8 +16586,8 @@ msgid "Mobile Notice"
 msgstr ""
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "ការកែសម្រួលធ្នើឆ្លាតវៃដំណើរការល្អបំផុតនៅលើកុំព្យូទ័រ ឬថេប្លេត។"
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16865,10 +16844,6 @@ msgid "Create Shelf"
 msgstr "បង្កើតធ្នើ"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr ""
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "ព័ត៌មានលម្អិតរបស់សៀវភៅ"
 
@@ -17055,12 +17030,37 @@ msgid "Download Access Log"
 msgstr "ឯកសារ DLS"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "តើធ្នើឆ្លាតវៃជាអ្វី?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "ធ្នើឆ្លាតវៃប្រមូលសៀវភៅដោយស្វ័យប្រវត្តិតាមច្បាប់។"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "ធ្នើឆ្លាតវៃត្រូវបានហៅថា «Magic Shelves» នៅក្នុងកំណែមុនៗ។"
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr ""
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"សូមបើក «%(setting)s» ក្នុងការកំណត់ CWA ជាមុនសិន។ រហូតដល់ពេលនោះ ប្រអប់ធីកនេះគ្មានឥទ្ធិពល "
+"ហើយធ្នើនឹងមិនទៅដល់ឧបករណ៍អានរបស់អ្នកទេ។"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "បង្ហាញធ្នើឆ្លាតវៃនេះក្នុងមតិព័ត៌មាន OPDS របស់ខ្ញុំ"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -17984,12 +17984,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr ""
+msgid "Smart shelves order"
+msgstr "លំដាប់ធ្នើឆ្លាតវៃ"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "ជ្រើសរើសលំដាប់ធ្នើឆ្លាតវៃរបស់អ្នកនៅក្នុងរបារចំហៀង។"
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18036,8 +18036,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr ""
+msgid "Smart shelves visibility"
+msgstr "ភាពមើលឃើញនៃធ្នើឆ្លាតវៃ"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18240,6 +18240,18 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "បង្ហាញជម្រើសស៊េរី"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "កែប្រែធ្នើ"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "បង្កើតធ្នើ"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "កែប្រែធ្នើ"
 
 #, fuzzy
 #~ msgid "Show Category Section"

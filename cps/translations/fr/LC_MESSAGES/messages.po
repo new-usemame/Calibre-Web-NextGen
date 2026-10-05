@@ -2463,15 +2463,14 @@ msgstr "Étagères"
 msgid "Books organized in shelves"
 msgstr "Livres organisés par étagères"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "Étagères magiques ✨"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Étagères intelligentes"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Livres organisés par étagères"
+msgid "Books organized in smart shelves"
+msgstr "Livres organisés en étagères intelligentes"
 
 #: cps/opds.py
 msgid "description"
@@ -3666,11 +3665,11 @@ msgstr "Appliquer à {n} livres"
 msgid "Match condition"
 msgstr "Condition de correspondance"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Champ de la règle"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Opérateur de la règle"
 
@@ -3947,7 +3946,7 @@ msgstr "La mise à jour de la couverture a échoué."
 msgid "Cover updated."
 msgstr "Couverture mise à jour."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Créer l’étagère intelligente"
 
@@ -6888,7 +6887,7 @@ msgstr "Modifier les étagères publiques"
 msgid "Edit shared library cover"
 msgstr "Modifier la couverture partagée de la bibliothèque"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Modifier l’étagère intelligente"
 
@@ -9598,10 +9597,6 @@ msgid "Smart shelf not found."
 msgstr "Étagère intelligente introuvable."
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Étagères intelligentes"
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -11002,7 +10997,7 @@ msgstr "type (isbn, amazon, doi…)"
 msgid "unknown"
 msgstr "inconnu"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "valeur"
 
@@ -11907,13 +11902,13 @@ msgid "Hidden Books"
 msgstr "Livre caché"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Erreur lors du chargement de l'étagère magique"
+msgid "Error loading smart shelf"
+msgstr "Erreur lors du chargement de l’étagère intelligente"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Étagère magique&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Étagère intelligente — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11956,10 +11951,6 @@ msgstr "Nom de l'étagère trop long (100 caractères maximum)"
 msgid "Error creating shelf"
 msgstr "Erreur lors de la création de l'étagère"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Créer une étagère magique"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11972,10 +11963,6 @@ msgstr "Autorisation refusée pour modifier le statut public"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Erreur lors de la mise à jour de l'étagère"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Modifier l'étagère magique"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -12266,22 +12253,26 @@ msgstr ""
 "Connectez-vous au Wi-Fi et ouvrez-le depuis votre bibliothèque : il se "
 "télécharge tout seul."
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
 msgstr ""
-"La synchronisation des étagères magiques avec les liseuses est désactivée "
-"pour tout le serveur — cette étagère n’atteindra pas vos liseuses tant que « "
-"Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader) » "
-"n’est pas activé dans les paramètres CWA."
+"Synchroniser les étagères intelligentes avec les liseuses (Kobo et KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Synchroniser les étagères intelligentes avec Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"La synchronisation des étagères intelligentes est désactivée globalement. "
+"Activez « %(setting)s » dans les paramètres CWA pour que cette étagère "
+"arrive sur vos liseuses."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -16057,35 +16048,20 @@ msgstr ""
 "dans l’interface Web lorsque vous utilisez une langue autre que l’anglais, "
 "si la traduction de la langue choisie n’est pas complète."
 
-# KOReader: the magic shelf sync setting names e-readers
-#: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-"Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader)"
-
 #: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
-"Lorsque cette option est activée, les étagères magiques marquées pour la "
-"synchronisation liseuse arrivent sur votre Kobo sous forme de collections et "
-"dans votre bibliothèque KOReader sous forme d’étagères. Pour Kobo, activez "
-"aussi Kobo Sync dans la configuration de base."
+"Une fois activées, les étagères intelligentes marquées arrivent sur votre "
+"Kobo sous forme de collections. Activez aussi Kobo Sync dans la "
+"configuration de base."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Synchroniser Magic Shelves avec Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
+msgid "KOReader also receives marked smart shelves in its library."
 msgstr ""
-"Lorsqu'elles sont activées, vos étagères magiques seront synchronisées avec "
-"votre appareil Kobo sous forme de collections. Remarque : vous devez "
-"également activer Kobo Sync dans la configuration de base."
+"KOReader reçoit également les étagères intelligentes marquées dans sa "
+"bibliothèque."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -16601,7 +16577,7 @@ msgid "Shelf Views"
 msgstr "Vues d’étagères"
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
+msgid "Smart Shelf Views"
 msgstr "Vues d’étagères intelligentes"
 
 #: cps/templates/cwa_stats_i18n.html
@@ -17488,10 +17464,6 @@ msgstr "Saisir le nom de domaine"
 msgid "Denied Domains (Blacklist)"
 msgstr "Domaines refusés (Liste noire)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Magique)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -17689,10 +17661,10 @@ msgid "Mobile Notice"
 msgstr "Avis mobile"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
+msgid "Smart shelf editing works best on desktop or tablet devices."
 msgstr ""
-"La modification de l'étagère magique fonctionne mieux sur les ordinateurs de "
-"bureau ou les tablettes."
+"La modification des étagères intelligentes fonctionne mieux sur ordinateur "
+"ou tablette."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -17942,10 +17914,6 @@ msgid "Create Shelf"
 msgstr "Créer une étagère"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Étagères magiques ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Détails du livre"
 
@@ -18132,6 +18100,22 @@ msgid "Download Access Log"
 msgstr "Télécharger les journaux d’accès"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Que sont les étagères intelligentes ?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr ""
+"Les étagères intelligentes rassemblent automatiquement les livres selon des "
+"règles."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr ""
+"Les étagères intelligentes s’appelaient « Magic Shelves » dans les anciennes "
+"versions."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Modèle système"
 
@@ -18140,6 +18124,19 @@ msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 "Il s'agit d'une étagère modèle préconfigurée. Vous pouvez la modifier "
 "librement."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Activez d’abord « %(setting)s » dans les paramètres CWA. Jusque-là, cette "
+"case n’a aucun effet et l’étagère n’arrivera pas sur votre liseuse."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Afficher cette étagère intelligente dans mon catalogue OPDS"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -19079,14 +19076,13 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Configurez les actions que cet utilisateur est autorisé à effectuer."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Ordre des étagères magiques"
+msgid "Smart shelves order"
+msgstr "Ordre des étagères intelligentes"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
+msgid "Choose how your smart shelves are ordered in the sidebar."
 msgstr ""
-"Choisissez comment vos étagères magiques sont classées dans la barre "
-"latérale."
+"Choisissez l’ordre de vos étagères intelligentes dans la barre latérale."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -19135,8 +19131,8 @@ msgstr ""
 "Manuel."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Visibilité des étagères magiques"
+msgid "Smart shelves visibility"
+msgstr "Visibilité des étagères intelligentes"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -19327,6 +19323,88 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "Étagères magiques ✨"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Livres organisés par étagères"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Erreur lors du chargement de l'étagère magique"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Étagère magique&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Créer une étagère magique"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Modifier l'étagère magique"
+
+#~ msgid ""
+#~ "E-reader sync for Magic Shelves is disabled globally — this shelf won't "
+#~ "reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
+#~ "KOReader)' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "La synchronisation des étagères magiques avec les liseuses est désactivée "
+#~ "pour tout le serveur — cette étagère n’atteindra pas vos liseuses tant "
+#~ "que « Synchroniser les étagères magiques avec les liseuses (Kobo et "
+#~ "KOReader) » n’est pas activé dans les paramètres CWA."
+
+# KOReader: the magic shelf sync setting names e-readers
+#~ msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
+#~ msgstr ""
+#~ "Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader)"
+
+#~ msgid ""
+#~ "When active, Magic Shelves marked for e-reader sync reach your Kobo as "
+#~ "collections and your KOReader library as shelves. Kobo also needs Kobo "
+#~ "Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Lorsque cette option est activée, les étagères magiques marquées pour la "
+#~ "synchronisation liseuse arrivent sur votre Kobo sous forme de collections "
+#~ "et dans votre bibliothèque KOReader sous forme d’étagères. Pour Kobo, "
+#~ "activez aussi Kobo Sync dans la configuration de base."
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Synchroniser Magic Shelves avec Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Lorsqu'elles sont activées, vos étagères magiques seront synchronisées "
+#~ "avec votre appareil Kobo sous forme de collections. Remarque : vous devez "
+#~ "également activer Kobo Sync dans la configuration de base."
+
+#~ msgid "Magic Shelf Views"
+#~ msgstr "Vues d’étagères intelligentes"
+
+#~ msgid "(Magic)"
+#~ msgstr "(Magique)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "La modification de l'étagère magique fonctionne mieux sur les ordinateurs "
+#~ "de bureau ou les tablettes."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Étagères magiques ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Ordre des étagères magiques"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr ""
+#~ "Choisissez comment vos étagères magiques sont classées dans la barre "
+#~ "latérale."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Visibilité des étagères magiques"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "Livres classés par catégorie"

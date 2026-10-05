@@ -1541,7 +1541,7 @@ def render_magic_shelf(shelf_id, sort_param, page):
 
     except Exception as e:
         log.error(f"Error retrieving books for magic shelf {shelf_id}: {e}")
-        flash(_("Error loading magic shelf"), category="error")
+        flash(_("Error loading smart shelf"), category="error")
         return redirect(url_for('web.index'))
     
     # Create proper pagination object
@@ -1566,7 +1566,7 @@ def render_magic_shelf(shelf_id, sort_param, page):
     return render_title_template('index.html', 
                                  entries=entries, 
                                  pagination=pagination,
-                                 title=_("Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s", icon=shelf.icon, name=shelf.name), 
+                                 title=_("Smart shelf — %(icon)s %(name)s", icon=escape(shelf.icon), name=escape(shelf.name)),
                                  page="magicshelf",
                                  shelf=shelf,
                                  is_hidden_shelf=is_hidden,
@@ -2056,7 +2056,7 @@ def create_magic_shelf():
             return jsonify({"success": False, "message": _("Error creating shelf")}), 500
     
     return render_title_template('magic_shelf_edit.html',
-                                 title=_("Create Magic Shelf"),
+                                 title=_("Create smart shelf"),
                                  page="magic_shelf_create",
                                  is_owner=True,
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
@@ -2198,7 +2198,7 @@ def edit_magic_shelf(shelf_id):
     # For GET request, render the edit form
     return render_title_template('magic_shelf_edit.html',
                                  shelf=shelf,
-                                 title=_("Edit Magic Shelf"),
+                                 title=_("Edit smart shelf"),
                                  page="magic_shelf_edit",
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
                                  opds_expose_checked=opds_expose_checked,

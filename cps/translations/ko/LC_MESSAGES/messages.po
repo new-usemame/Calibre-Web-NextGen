@@ -2258,15 +2258,14 @@ msgstr "서재"
 msgid "Books organized in shelves"
 msgstr "서재별 정렬"
 
-#: cps/opds.py
-#, fuzzy
-msgid "Magic Shelves"
-msgstr "선택한 서재 Kobo 동기화"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "스마트 책장"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "서재별 정렬"
+msgid "Books organized in smart shelves"
+msgstr "스마트 책장에 정리된 책"
 
 #: cps/opds.py
 #, fuzzy
@@ -3362,11 +3361,11 @@ msgstr ""
 msgid "Match condition"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr ""
 
@@ -3637,9 +3636,9 @@ msgstr ""
 msgid "Cover updated."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "스마트 책장 만들기"
 
 #: cps/spa_strings.py
 msgid "Create your account"
@@ -6456,9 +6455,9 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
-msgstr ""
+msgstr "스마트 책장 편집"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9022,10 +9021,6 @@ msgid "Smart shelf not found."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
@@ -10254,7 +10249,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr ""
 
@@ -11095,14 +11090,13 @@ msgid "Hidden Books"
 msgstr "숨긴 책"
 
 #: cps/web.py
-#, fuzzy
-msgid "Error loading magic shelf"
-msgstr "이메일 전송 오류"
+msgid "Error loading smart shelf"
+msgstr "스마트 책장을 불러오는 중 오류 발생"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr ""
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "스마트 책장 — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11149,11 +11143,6 @@ msgstr ""
 msgid "Error creating shelf"
 msgstr "서재를 삭제하는 중 오류가 발생했습니다."
 
-#: cps/templates/layout.html cps/web.py
-#, fuzzy
-msgid "Create Magic Shelf"
-msgstr "서재 생성"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11166,11 +11155,6 @@ msgstr ""
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "서재를 삭제하는 중 오류가 발생했습니다."
-
-#: cps/web.py
-#, fuzzy
-msgid "Edit Magic Shelf"
-msgstr "서재 편집"
 
 #: cps/web.py
 #, fuzzy
@@ -11443,18 +11427,24 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "스마트 책장을 전자책 리더와 동기화(Kobo 및 KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "스마트 책장을 Kobo와 동기화"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"스마트 책장 동기화가 전체 설정에서 비활성화되어 있습니다. 이 책장이 전자책 리"
+"더에 전달되도록 CWA 설정에서 “%(setting)s”를 활성화하세요."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -15051,26 +15041,16 @@ msgstr ""
 "습니다. (영어 제외)"
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"활성화하면 표시된 스마트 책장이 Kobo에 컬렉션으로 전달됩니다. 기본 설정에서 "
+"Kobo 동기화도 활성화하세요."
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
-msgid "Sync Magic Shelves to Kobo"
-msgstr "선택한 서재 Kobo 동기화"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader도 라이브러리에서 표시된 스마트 책장을 받습니다."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15541,8 +15521,8 @@ msgid "Shelf Views"
 msgstr ""
 
 #: cps/templates/cwa_stats_i18n.html
-msgid "Magic Shelf Views"
-msgstr ""
+msgid "Smart Shelf Views"
+msgstr "스마트 책장 조회 수"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
@@ -16411,10 +16391,6 @@ msgstr "도메인 입력"
 msgid "Denied Domains (Blacklist)"
 msgstr "차단 도메인 (블랙리스트)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr ""
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16607,8 +16583,8 @@ msgid "Mobile Notice"
 msgstr ""
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "스마트 책장은 컴퓨터나 태블릿에서 편집하는 것이 가장 좋습니다."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16864,10 +16840,6 @@ msgid "Create Shelf"
 msgstr "서재 생성"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr ""
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "책 상세정보"
 
@@ -17055,12 +17027,37 @@ msgid "Download Access Log"
 msgstr "액세스 로그 다운로드"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "스마트 책장이란?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "스마트 책장은 규칙에 따라 책을 자동으로 모읍니다."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "이전 버전에서는 스마트 책장을 “Magic Shelves”라고 불렀습니다."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr ""
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"먼저 CWA 설정에서 “%(setting)s”를 활성화하세요. 그때까지 이 체크박스는 효과"
+"가 없으며 책장이 전자책 리더에 전달되지 않습니다."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "이 스마트 책장을 내 OPDS 피드에 표시"
 
 #: cps/templates/magic_shelf_edit.html
 #, fuzzy
@@ -17959,13 +17956,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
-msgid "Magic Shelves Order"
-msgstr "선택한 서재 Kobo 동기화"
+msgid "Smart shelves order"
+msgstr "스마트 책장 순서"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "사이드바에서 스마트 책장의 순서를 선택하세요."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18013,8 +18009,8 @@ msgid "Manual order is used only when the order mode is set to Manual."
 msgstr ""
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr ""
+msgid "Smart shelves visibility"
+msgstr "스마트 책장 표시"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18204,6 +18200,34 @@ msgstr "선택한 서재 Kobo 동기화"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "읽음/읽지 않음 표시"
+
+#, fuzzy
+#~ msgid "Magic Shelves"
+#~ msgstr "선택한 서재 Kobo 동기화"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "서재별 정렬"
+
+#, fuzzy
+#~ msgid "Error loading magic shelf"
+#~ msgstr "이메일 전송 오류"
+
+#, fuzzy
+#~ msgid "Create Magic Shelf"
+#~ msgstr "서재 생성"
+
+#, fuzzy
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "서재 편집"
+
+#, fuzzy
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "선택한 서재 Kobo 동기화"
+
+#, fuzzy
+#~ msgid "Magic Shelves Order"
+#~ msgstr "선택한 서재 Kobo 동기화"
 
 #~ msgid "Books ordered by category"
 #~ msgstr "카테고리별 정렬"

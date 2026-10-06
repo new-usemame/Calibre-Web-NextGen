@@ -18542,3 +18542,35 @@ msgstr "Zobrazit výběr sérií"
 #~ msgstr ""
 #~ "Knihy musí být nejprve archivovány a zařízení musí být synchronizováno, "
 #~ "než bude kniha bezpečně smazána."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Všechny štítky"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Štítky se nepodařilo načíst. Zkuste to znovu."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Štítek bez názvu"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Hierarchie štítků je dočasně nedostupná. Zkuste to znovu."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "Všechny knihy v této skupině štítků"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Drobečková navigace"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Vyberte skupinu štítků a procházejte knihy z této skupiny a jejích podštítků."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Podštítky"

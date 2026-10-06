@@ -10,6 +10,7 @@ import { MagicLink } from './pages/MagicLink';
 import { Catalog } from './pages/Catalog';
 import { BookDetail } from './pages/BookDetail';
 import { BrowseList } from './pages/BrowseList';
+import { TagsBrowse, TagGroup } from './pages/TagsBrowse';
 import { NotFound } from './pages/NotFound';
 import { Shelves } from './pages/Shelves';
 import { ShelfEditor } from './pages/ShelfEditor';
@@ -226,7 +227,8 @@ export function App() {
             {(p) => <Catalog entityKind="series" entityId={decodeURIComponent(p.id)} />}
           </Route>
 
-          <Route path={SPA_ROUTES.tags}>{() => <BrowseList plural="tags" title="Tags" />}</Route>
+          <Route path={SPA_ROUTES.tags}>{() => <TagsBrowse />}</Route>
+          <Route path={SPA_ROUTES.tagGroup}>{() => <TagGroup />}</Route>
           <Route path={SPA_ROUTES.tag}>
             {(p) => <Catalog entityKind="tag" entityId={decodeURIComponent(p.id)} />}
           </Route>

@@ -19374,3 +19374,35 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ msgstr ""
 #~ "A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy "
 #~ "egy könyvet biztonságosan törölhessen."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Minden címke"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "A címkéket nem sikerült betölteni. Próbálja újra."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Névtelen címke"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "A címkehierarchia átmenetileg nem érhető el. Próbálja újra."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "A címkecsoport összes könyve"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Navigációs útvonal"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Válasszon címkecsoportot a csoport és az alcímkéi könyveinek böngészéséhez."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Alcímkék"

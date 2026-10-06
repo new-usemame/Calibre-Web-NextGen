@@ -20033,3 +20033,35 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Alle labels"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "De labels konden niet worden geladen. Probeer het opnieuw."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Naamloos label"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "De labelhiërarchie is tijdelijk niet beschikbaar. Probeer het opnieuw."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "Alle boeken in deze labelgroep"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Kruimelpad"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Kies een labelgroep om boeken uit die groep en de onderliggende labels te bekijken."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Onderliggende labels"

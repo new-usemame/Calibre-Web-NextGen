@@ -45,6 +45,7 @@ export const ENTITY_PLURAL: Record<EntityKind, string> = {
 };
 
 export interface BooksQuery {
+  tagPath?: string;
   page: number;
   perPage?: number;
   search?: string;
@@ -336,12 +337,13 @@ export function useBooks(q: BooksQuery) {
   const savingSource = useIsMutating({ mutationKey: ['discover-source-save'] }) > 0;
   const {
     page, perPage = 24, search = '', sort = 'new', readFilter = 'all',
-    entityKind, entityId, view, showHidden = false, enabled = true,
+    entityKind, entityId, tagPath, view, showHidden = false, enabled = true,
   } = q;
   const params = new URLSearchParams();
   params.set('page', String(page));
   params.set('per_page', String(perPage));
   params.set('sort', sort);
+  if (tagPath !== undefined) params.set('tag_path', tagPath);
   // The API's search path is separate from entity/read filtering, so `search`
   // is only sent in the unfiltered library view.
   //
@@ -367,7 +369,7 @@ export function useBooks(q: BooksQuery) {
   }
   const query = useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
-      entityKind ?? '', entityId ?? '', view ?? '', showHidden, me?.id, me?.library_mode, revision,
+      entityKind ?? '', entityId ?? '', view ?? '', tagPath ?? '', showHidden, me?.id, me?.library_mode, revision,
       view === 'discover' ? discoverSource.data?.source : '',
       view === 'discover' ? discoverSource.data?.available : true],
     queryFn: ({ signal }) => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`, { signal }),
@@ -405,7 +407,7 @@ export function useGlobalLibrary(q: GlobalLibraryQuery) {
 const LIBRARY_VIEW_QUERIES = new Set([
   'books', 'adv-search', 'global-library', 'book', 'book-shelves',
   'shelf', 'shelves', 'magicshelf', 'magicshelves', 'entities',
-  'discover-strip', 'account', 'me', 'about',
+  'discover-strip', 'account', 'me', 'about', 'tag-tree',
 ]);
 
 async function refreshLibraryViews(qc: QueryClient): Promise<void> {
@@ -440,7 +442,7 @@ function setBookMembership(qc: QueryClient, bookId: number, owned: boolean) {
  *  delete, merge, My Library membership) calls this, so no badge keeps
  *  counting a book its shelf no longer shows (#2235). */
 function invalidateBookVisibilityViews(qc: QueryClient) {
-  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves']) {
+  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves', 'tag-tree']) {
     void qc.invalidateQueries({ queryKey: [key] });
   }
 }
@@ -623,6 +625,7 @@ export function tagConflictOf(error: unknown): TagConflict | null {
 }
 
 function invalidateTagViews(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['tag-tree'] });
   // 'entities' un-suffixed: a merge or delete REMOVES a row from the all-tags
   // browse list, so that list must refetch too — not just the tag's own page.
   void qc.invalidateQueries({ queryKey: ['entities'] });
@@ -1325,6 +1328,7 @@ export function useUpdateMetadata(id: string | number) {
       // page, whose membership an edit can equally change.
       qc.removeQueries({ queryKey: ['books'] });
       qc.removeQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['tag-tree'] });
     },
   });
 }

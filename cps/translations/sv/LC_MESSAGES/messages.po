@@ -19363,3 +19363,35 @@ msgstr "Visa avsnittet Läst/oläst"
 #~ msgstr ""
 #~ "Böcker måste först arkiveras och enheten synkroniseras innan en bok "
 #~ "säkert kan tas bort."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Alla taggar"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Det gick inte att läsa in taggarna. Försök igen."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Namnlös tagg"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Tagghierarkin är tillfälligt otillgänglig. Försök igen."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "Alla böcker i den här tagggruppen"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Navigeringsstig"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Välj en tagggrupp för att bläddra bland böcker från gruppen och dess undertaggar."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Undertaggar"

@@ -19484,3 +19484,35 @@ msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
 #~ msgstr ""
 #~ "Książki muszą najpierw zostać zarchiwizowane a urządzenie "
 #~ "zsynchronizowane, zanim książka będzie mogła zostać bezpiecznie usunięta."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Wszystkie tagi"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Nie udało się wczytać tagów. Spróbuj ponownie."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Tag bez nazwy"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "Hierarchia tagów jest chwilowo niedostępna. Spróbuj ponownie."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "Wszystkie książki w tej grupie etykiet"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Ścieżka nawigacji"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Wybierz grupę etykiet, aby przeglądać książki z tej grupy i jej etykiet podrzędnych."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Etykiety podrzędne"

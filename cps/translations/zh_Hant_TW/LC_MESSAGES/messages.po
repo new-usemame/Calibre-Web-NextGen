@@ -18512,3 +18512,35 @@ msgstr "顯示已讀/未讀選擇"
 #~ "Books must first be archived and the device synced before a book can "
 #~ "safely be deleted."
 #~ msgstr "必須先將書籍存檔並同步設備，然後才能安全地刪除書籍。"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "所有標籤"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "無法載入標籤。請重試。"
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "未命名標籤"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "標籤階層暫時無法使用。請重試。"
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "此標籤群組中的所有書籍"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "導覽路徑"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "選擇一個標籤群組，瀏覽該群組及其子標籤中的書籍。"
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "子標籤"

@@ -20646,3 +20646,35 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "Toutes les étiquettes"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Impossible de charger les étiquettes. Veuillez réessayer."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "Étiquette sans nom"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "La hiérarchie des étiquettes est temporairement indisponible. Veuillez réessayer."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "Tous les livres de ce groupe d’étiquettes"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "Fil d’Ariane"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "Choisissez un groupe d’étiquettes pour parcourir les livres de ce groupe et de ses sous-étiquettes."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "Sous-étiquettes"

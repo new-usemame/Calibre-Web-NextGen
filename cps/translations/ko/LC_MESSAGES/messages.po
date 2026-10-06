@@ -18801,3 +18801,35 @@ msgstr "읽음/읽지 않음 표시"
 #~ "safely be deleted."
 #~ msgstr ""
 #~ "책을 안전하게 삭제하려면 먼저 보관 처리 후 기기 동기화가 필요합니다."
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "모든 태그"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "태그를 불러오지 못했습니다. 다시 시도해 주세요."
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "이름 없는 태그"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "태그 계층을 일시적으로 사용할 수 없습니다. 다시 시도해 주세요."
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "이 태그 그룹의 모든 책"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "탐색 경로"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "태그 그룹을 선택하여 해당 그룹과 하위 태그의 책을 탐색하세요."
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "하위 태그"

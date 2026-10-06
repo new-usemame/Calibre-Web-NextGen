@@ -18,3 +18,5 @@ The compatibility upgrade records the highest existing account ID before serving
 Administrators can set the same per-column choices on the existing user editor, including Guest when anonymous browsing is enabled. Guest choices apply to anonymous Classic, New UI and OPDS readers; each signed-in reader keeps their own choices.
 
 A saved Guest choice takes precedence over anonymous browser preferences, including choices preserved during upgrade. Without a saved choice, anonymous browser preferences and the normal Calibre defaults still apply. After adding columns in Calibre, use the existing library schema refresh/restart before browsing. Ordinary slash values such as `AC/DC` work; leading or doubled slashes and dot-segment values remain limited by Classic and OPDS path URLs. Reload an old cached profile form before saving column choices.
+
+Built-in Tags use a separate Calibre preference; see [Browsing built-in tags](tag-browsing.md).

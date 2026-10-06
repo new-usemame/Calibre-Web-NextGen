@@ -18330,3 +18330,35 @@ msgstr "បង្ហាញជម្រើសស៊េរី"
 #, fuzzy
 #~ msgid "CWA Discord Server"
 #~ msgstr "ស្រាវជ្រាវ"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "All tags"
+msgstr "ស្លាកទាំងអស់"
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "មិនអាចផ្ទុកស្លាកបានទេ។ សូមព្យាយាមម្តងទៀត។"
+
+#: cps/tag_hierarchy.py
+msgid "Unnamed tag"
+msgstr "ស្លាកគ្មានឈ្មោះ"
+
+#: cps/web.py cps/opds.py
+msgid "Tag hierarchy temporarily unavailable. Please try again."
+msgstr "ឋានានុក្រមស្លាកមិនអាចប្រើបានជាបណ្តោះអាសន្ន។ សូមព្យាយាមម្តងទៀត។"
+
+#: cps/opds.py
+msgid "All books in this tag group"
+msgstr "សៀវភៅទាំងអស់ក្នុងក្រុមស្លាកនេះ"
+
+#: cps/templates/index.html
+msgid "Breadcrumb"
+msgstr "ផ្លូវរុករក"
+
+#: cps/templates/tag_tree.html cps/spa_strings.py
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "ជ្រើសរើសក្រុមស្លាក ដើម្បីរកមើលសៀវភៅក្នុងក្រុមនោះ និងស្លាករងរបស់វា។"
+
+#: cps/templates/index.html
+msgid "Subtags"
+msgstr "ស្លាករង"

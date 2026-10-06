@@ -96,45 +96,42 @@ def _acquire_lock_or_exit():
 # The ebook-convert / kepubify / calibredb process currently running, if any.
 _current_child = None
 
-# Convert Library works in its own directory next to the shared tmp_conversion_dir.
-# The ingest processor rmtree()s the shared one after every run and Convert Library
-# emptied it after every book, and the two have separate locks, so a run during an
-# ingest could delete the file the other was converting. The "<prefix><pid>_" naming
-# is what remove_convert_library_tmp_dirs() in cps/cwa_functions.py matches on Cancel.
+# Convert Library works in its own subdirectory of the shared tmp_conversion_dir.
+# The ingest processor cleared the shared dir after every book and Convert Library
+# emptied it after every book, under separate locks, so either could delete the file
+# the other was converting. Ingest's cleanup now leaves directories with this prefix
+# alone (ingest_processor.empty_tmp_conversion_dir), and Cancel removes the
+# "<prefix><pid>_" dirs of the run it stopped (cps/cwa_functions.py).
 PRIVATE_TMP_PREFIX = ".cwa_convert_library_"
 
 
-def private_tmp_parents(shared_tmp_dir):
-    """Where the working directory may live: beside the shared one, else the system temp dir."""
-    beside = os.path.dirname(shared_tmp_dir.rstrip("/")) or "."
-    return [beside, tempfile.gettempdir()]
-
-
 def make_private_tmp_dir(shared_tmp_dir):
-    """Create this run's working directory and return it with a trailing slash.
+    """Create this run's working directory inside the shared one; return it with a trailing slash.
 
-    It goes beside the shared one, creating that parent if needed
-    (CWA_TMP_CONVERSION_DIR can be any path). If the parent can't be created or
-    written to (a tmp conversion dir mounted at /cwa-tmp has "/" as its parent), it
-    goes in the system temp dir instead. The name carries this process's PID so
-    Cancel can remove exactly this run's directory. Leftovers from runs that were
-    killed are removed first, which is safe because the caller holds the
-    convert_library lock, so no other run is using them.
+    Staying inside keeps the scratch files on the volume CWA_TMP_CONVERSION_DIR
+    names. The name carries this process's PID so Cancel can remove exactly this
+    run's directory. Leftovers from runs that were killed are removed first, which
+    is safe because the caller holds the convert_library lock, so no other run is
+    using them. A run with nowhere to work ends with the lines the web status page
+    waits for, rather than crashing before them.
     """
-    parents = private_tmp_parents(shared_tmp_dir)
-    for parent in dict.fromkeys(parents):
-        for leftover in Path(parent).glob(PRIVATE_TMP_PREFIX + "*"):
-            shutil.rmtree(leftover, ignore_errors=True)
-    prefix = f"{PRIVATE_TMP_PREFIX}{os.getpid()}_"
+    for leftover in Path(shared_tmp_dir).glob(PRIVATE_TMP_PREFIX + "*"):
+        shutil.rmtree(leftover, ignore_errors=True)
     try:
-        os.makedirs(parents[0], exist_ok=True)
-        path = tempfile.mkdtemp(prefix=prefix, dir=parents[0])
+        if not os.path.isdir(shared_tmp_dir):
+            Path(shared_tmp_dir).mkdir(parents=True, exist_ok=True)
+            service_user.chown_to_service_user(
+                shared_tmp_dir, "[convert-library]:", recursive=False, log=print_and_log)
+        path = tempfile.mkdtemp(prefix=f"{PRIVATE_TMP_PREFIX}{os.getpid()}_", dir=shared_tmp_dir)
     except OSError as error:
-        print_and_log(f"[convert-library]: Could not create a working directory in {parents[0]} ({error}), "
-                      f"using {parents[1]} instead")
-        path = tempfile.mkdtemp(prefix=prefix, dir=parents[1])
+        print_and_log(f"[convert-library]: ERROR - Could not create a working directory "
+                      f"in {shared_tmp_dir} ({error}). Nothing was converted.")
+        logger.info(f"\nNextGen Convert Library Service - Run Failed: {datetime.now()}")
+        logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
+        sys.exit(2)
     atexit.register(shutil.rmtree, path, True)
     return path + "/"
+
 
 # Tools left to finish on cancel: stopping calibredb part-way through add_format
 # can leave a file copied into the book folder that metadata.db never records.
@@ -261,8 +258,8 @@ class LibraryConverter:
 
         self.current_book = 1
         self.ingest_folder, self.library_dir, shared_tmp_dir = self.get_dirs(str(app_paths.dirs_json()))
-        # Never the shared directory: ingest removes that one outright at the end of
-        # every run, and emptying it here deleted the book an ingest was converting.
+        # Never the shared directory itself: ingest clears it after every book, and
+        # emptying it here deleted the book an ingest was converting.
         self.tmp_conversion_dir = make_private_tmp_dir(shared_tmp_dir)
 
         # Calibre subprocess environment. Operator-opt-in plugin loading

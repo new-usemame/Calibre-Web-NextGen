@@ -249,7 +249,7 @@ def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypat
     shared.mkdir(parents=True)
     ingest_book = shared / "ingest-in-progress.epub"
     ingest_book.write_text("x")
-    newer_run = config / (convert_library.PRIVATE_TMP_PREFIX + "99999999_newer")
+    newer_run = shared / (convert_library.PRIVATE_TMP_PREFIX + "99999999_newer")
     newer_run.mkdir()
     monkeypatch.setattr(cwa_functions, "get_tmp_conversion_dir", lambda: str(shared) + "/")
 
@@ -257,7 +257,7 @@ def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypat
     # its step there, then exits. If Cancel cleaned up first, the write fails.
     script = subprocess.Popen([sys.executable, "-c",
         "import os, signal, sys, time\n"
-        f"own = os.path.join({str(config)!r}, {convert_library.PRIVATE_TMP_PREFIX!r} + f'{{os.getpid()}}_run')\n"
+        f"own = os.path.join({str(shared)!r}, {convert_library.PRIVATE_TMP_PREFIX!r} + f'{{os.getpid()}}_run')\n"
         "os.mkdir(own)\n"
         "def stop(*a):\n"
         "    time.sleep(1)\n"
@@ -276,7 +276,7 @@ def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypat
         cwa_functions.kill_convert_library(q)
         assert script.returncode == 143, "Cancel removed the working dir while the run was still stopping"
         assert ingest_book.exists(), "Cancel deleted a book an ingest was converting"
-        assert not list(config.glob(f"{convert_library.PRIVATE_TMP_PREFIX}{script.pid}_*")), \
+        assert not list(shared.glob(f"{convert_library.PRIVATE_TMP_PREFIX}{script.pid}_*")), \
             "the cancelled run's half-finished files were left behind"
         assert newer_run.exists(), "Cancel removed another run's working dir"
         assert lock.exists(), "the web Cancel deleted a lock it does not own"

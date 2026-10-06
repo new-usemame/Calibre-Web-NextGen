@@ -2178,18 +2178,14 @@ def get_tmp_conversion_dir() -> str:
     return f"{constants.tmp_conversion_dir()}/"
 
 def remove_convert_library_tmp_dirs(tmp_conversion_dir, pid) -> None:
-    """Remove the working dirs of one Convert Library run, which sit beside the shared one.
+    """Remove the working dirs of one Convert Library run inside the shared conversion dir.
 
     Only the run with this PID is touched, so a run that started since keeps its own
-    dir. The shared tmp_conversion_dir is left alone: an ingest may be converting a
-    book in it. Convert Library falls back to the system temp dir when it can't write
-    beside the shared one, so both places are checked. The name matches
-    make_private_tmp_dir() in scripts/convert_library.py.
+    dir, and nothing else in the shared dir is: an ingest may be converting a book in
+    it. The name matches make_private_tmp_dir() in scripts/convert_library.py.
     """
-    beside = Path(tmp_conversion_dir.rstrip('/')).parent
-    for parent in {beside, Path(tempfile.gettempdir())}:
-        for path in parent.glob(f".cwa_convert_library_{pid}_*"):
-            shutil.rmtree(path, ignore_errors=True)
+    for path in Path(tmp_conversion_dir).glob(f".cwa_convert_library_{pid}_*"):
+        shutil.rmtree(path, ignore_errors=True)
 
 def is_convert_library_finished() -> bool:
     return "NextGen Convert Library Service - Run Ended: " in _read_log_tail(

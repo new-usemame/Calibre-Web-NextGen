@@ -18,6 +18,8 @@ NAMED_BOOLEAN_PREFERENCE_PATHS = {
     # The classic grid's "Hide shelf badges on covers" toggle already stores
     # this; sharing its path keeps one answer across both UIs (#1254).
     "shelf_badges_hidden": ("cover", "hide_shelf_badges"),
+    # Cards stay draggable without the grip; it is for touch and keyboard (#2475).
+    "shelf_drag_handles_hidden": ("preferences", "shelf_drag_handles_hidden"),
 }
 
 

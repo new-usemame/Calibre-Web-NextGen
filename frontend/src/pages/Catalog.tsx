@@ -1,4 +1,4 @@
-import { useShelfDragSelection } from '../components/ShelfDrag';
+import { useShelfDrag, useShelfDragSelection } from '../components/ShelfDrag';
 import { readGuestCustomFields, readGuestCustomLabels, customFieldsForSave, GUEST_CUSTOM_FIELDS_KEY, GUEST_CUSTOM_LABELS_KEY } from '../lib/customColumnDisplay';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
+import { useShelfDragHandlesHidden } from '../lib/useShelfDragHandlesHidden';
 import { useT } from '../lib/i18n';
 import { useRangeSelection } from '../lib/useRangeSelection';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -368,7 +369,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // #1254: shelf tags on covers, shared with the classic grid's toggle.
   const [shelfBadgesHidden, setShelfBadgesHidden, shelfBadgesPreferenceSaving]
     = useShelfBadgesHidden({ onError: catalogPreferenceError });
+  // #2475: the grip on each card, for people who drag the card itself.
+  const [shelfDragHandlesHidden, setShelfDragHandlesHidden, shelfDragHandlesPreferenceSaving]
+    = useShelfDragHandlesHidden({ onError: catalogPreferenceError });
+  const shelfDragAvailable = !!useShelfDrag()?.available;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // An export started from the menu is cancelled if the menu unmounts it.
+  const exportPending = useRef(false);
+  const setExportPending = useCallback((pending: boolean) => { exportPending.current = pending; }, []);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   // `null` means show every administrator-enabled field. Signed-in readers
@@ -526,13 +534,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     if (!settingsOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        if (exportPending.current) return;
         const focused = document.activeElement;
         if (focused instanceof HTMLElement && settingsMenuRef.current?.contains(focused)) focused.blur();
         setSettingsOpen(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !exportPending.current) {
         const focusInside = settingsMenuRef.current?.contains(document.activeElement);
         setSettingsOpen(false);
         if (focusInside) settingsTriggerRef.current?.focus();
@@ -986,6 +995,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     });
   };
 
+  const showExport = view !== 'discover' && view !== 'hot';
+  const bookListExport = <BookListExport onPendingChange={hideLibraryControls ? undefined : setExportPending} disabled={isLoading || isPlaceholderData || !!error} source={filterActive
+          ? { source: 'advanced', params: { ...advParams } }
+          : { source: 'catalog', params: {
+              sort,
+              ...(search && !entityKind && !view ? { search } : {}),
+              ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
+              ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
+              ...(entityKind && entityId !== undefined && entityId !== '' ? { [entityKind]: String(entityId) } : {}),
+            } }} />;
   return (
     <main ref={setCatalogNode} className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`} data-testid="catalog-page">
       {filtered && (
@@ -1098,15 +1117,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
-        {view !== 'discover' && view !== 'hot' && <BookListExport disabled={isLoading || isPlaceholderData || !!error} source={filterActive
-          ? { source: 'advanced', params: { ...advParams } }
-          : { source: 'catalog', params: {
-              sort,
-              ...(search && !entityKind && !view ? { search } : {}),
-              ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
-              ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
-              ...(entityKind && entityId !== undefined && entityId !== '' ? { [entityKind]: String(entityId) } : {}),
-            } }} />}
+        {/* #2475: the library landing keeps Export in View settings; filtered
+            views have no gear, so it stays in the toolbar there. */}
+        {showExport && hideLibraryControls && bookListExport}
 
         {/* #1288: Upload is a library-wide ACTION, not one of the view-scoped
             controls hideLibraryControls exists to hide (search box, Advanced,
@@ -1212,7 +1225,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               data-testid="catalog-view-settings"
               ref={settingsTriggerRef}
               className={settingsOpen ? styles.gearBtnActive : styles.gearBtn}
-              onClick={() => setSettingsOpen((o) => !o)}
+              onClick={() => setSettingsOpen((o) => (o && exportPending.current) || !o)}
               aria-expanded={settingsOpen}
               title={t('View settings')}
               aria-label={t('View settings')}
@@ -1280,6 +1293,20 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   />
                   <span>{t('Show shelf tags')}</span>
                 </label>
+                {shelfDragAvailable && (
+                  <label className={styles.settingsItem}>
+                    <input
+                      type="checkbox"
+                      data-testid="show-shelf-drag-handles"
+                      className={styles.settingsCheck}
+                      checked={!shelfDragHandlesHidden}
+                      disabled={shelfDragHandlesPreferenceSaving}
+                      onChange={(e) => setShelfDragHandlesHidden(!e.target.checked)}
+                    />
+                    <span>{t('Show shelf drag handles')}</span>
+                  </label>
+                )}
+                {showExport && !me?.role?.anonymous && <div className={styles.settingsExport}>{bookListExport}</div>}
                 {customColumnDefinitions.length > 0 && (
                   <fieldset className={styles.densityField}>
                     <legend>{t('Custom fields on book cards')}</legend>

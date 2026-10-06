@@ -9483,6 +9483,10 @@ msgid "Show shelf tags"
 msgstr "Afficher les étiquettes d'étagère"
 
 #: cps/spa_strings.py
+msgid "Show shelf drag handles"
+msgstr "Afficher les poignées de glissement vers les étagères"
+
+#: cps/spa_strings.py
 msgid ""
 "Show the global library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"

@@ -25,6 +25,7 @@ _UNSET_PREFERENCES = {
     "reading_tags_hidden": None,
     "show_original_filename": None,
     "shelf_badges_hidden": None,
+    "shelf_drag_handles_hidden": None,
 }
 
 
@@ -64,6 +65,7 @@ def test_me_serializes_named_preference_and_unset_state():
         "reading_tags_hidden": False,
         "show_original_filename": None,
         "shelf_badges_hidden": None,
+        "shelf_drag_handles_hidden": None,
     }
 
 
@@ -80,6 +82,18 @@ def test_shelf_badge_preference_is_the_classic_grid_toggle():
     response, _session = _call({"preferences": {"shelf_badges_hidden": True}}, user)
     assert _status(response) == 200
     assert user.view_settings == {"cover": {"hide_shelf_badges": True}}
+
+
+def test_shelf_drag_handle_preference_saves_and_reads_back():
+    """#2475: hiding the grip on book cards follows the account, so the
+    View settings switch survives a reload and another browser."""
+    from cps.api.serializers import serialize_user
+
+    user = _FakeUser()
+    response, _session = _call({"preferences": {"shelf_drag_handles_hidden": True}}, user)
+    assert _status(response) == 200
+    assert serialize_user(_serializable_user(user.view_settings))["preferences"][
+        "shelf_drag_handles_hidden"] is True
 
 
 def test_me_ignores_malformed_stored_preference():

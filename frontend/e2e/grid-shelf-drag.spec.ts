@@ -336,3 +336,34 @@ test('a pending catalog bulk action disables a second shelf action and selection
     expect(removed.ok(), await removed.text()).toBeTruthy();
   }
 });
+
+test('View settings can hide the card grip while the card still drags (#2475)', async ({ dragPage: page, secondaryUser }) => {
+  const csrf = await page.request.get('/api/v1/auth/csrf');
+  const headers = { 'X-CSRFToken': (await csrf.json()).csrf_token as string };
+  const created = await page.request.post('/api/v1/shelves', { headers, data: { name: `Grip ${secondaryUser.username}` } });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const shelf = await created.json();
+  const toggleGrip = async () => {
+    await page.getByTestId('catalog-view-settings').click();
+    const toggle = page.getByTestId('show-shelf-drag-handles');
+    const saved = page.waitForResponse(r => r.url().includes('/api/v1/account/preferences') && r.request().method() === 'POST');
+    await toggle.click();
+    expect((await saved).ok()).toBeTruthy();
+    await page.keyboard.press('Escape');
+  };
+  const grips = page.getByRole('button', { name: /^Add .+ to a shelf$/ });
+  try {
+    await page.goto('/app');
+    await expect(grips.first(), 'the grip ships on').toBeVisible();
+    await toggleGrip();
+    await expect(grips).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId('catalog-page')).toBeVisible();
+    await expect(grips, 'the choice follows the account across a reload').toHaveCount(0);
+    await expect(page.locator('a[draggable="true"][href*="/book/"]').first(), 'cards keep native drag').toBeVisible();
+  } finally {
+    if (!await grips.count()) await toggleGrip().catch(() => {});
+    const removed = await secondaryUser.context.request.post(`/api/v1/shelves/${shelf.id}/delete`, { headers });
+    expect(removed.ok(), await removed.text()).toBeTruthy();
+  }
+});

@@ -6,6 +6,7 @@ import { canEditShelf } from '../lib/permissions';
 import { draggedBookIds } from '../lib/shelfAdd';
 import { joinBulkSentences } from '../lib/bulkResults';
 import { useT } from '../lib/i18n';
+import { useShelfDragHandlesHidden } from '../lib/useShelfDragHandlesHidden';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import type { Book } from '../lib/api';
@@ -16,7 +17,7 @@ type Payload = { ids: number[]; owner?: React.MutableRefObject<Selection> };
 type Drag = Payload & { x: number; y: number; shelfId?: number };
 const MIME = 'application/x-cwng-shelf-books';
 const Context = createContext<{
-  drag: Drag | null; busy: boolean; available: boolean;
+  drag: Drag | null; busy: boolean; available: boolean; handlesHidden: boolean;
   register: (selection: React.MutableRefObject<Selection>) => () => void;
   pointerStart: (book: Book, event: ReactPointerEvent<HTMLButtonElement>) => void;
   nativeStart: (book: Book, event: ReactDragEvent<HTMLElement>) => void;
@@ -42,6 +43,7 @@ export function ShelfDragProvider({ children }: { children: ReactNode }) {
   const me = useMe().data;
   const shelves = (useShelves().data?.items ?? []).filter(s => canEditShelf(me, s));
   const { addToShelf } = useBulkActions();
+  const [handlesHidden] = useShelfDragHandlesHidden();
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const [picker, setPicker] = useState<Payload | null>(null);
@@ -171,7 +173,7 @@ export function ShelfDragProvider({ children }: { children: ReactNode }) {
   const closePicker = useCallback(() => { if (!pending.current) setPicker(null); }, []);
   useFocusTrap(dialogRef, { active: !!picker, onClose: closePicker });
   const context = {
-    drag, busy: addToShelf.isPending, available: shelves.length > 0, register, pointerStart, cancel,
+    drag, busy: addToShelf.isPending, available: shelves.length > 0, handlesHidden, register, pointerStart, cancel,
     pick: (book: Book, keyboard = false) => {
       if (ignoreClick.current && !keyboard) { ignoreClick.current = false; return; }
       ignoreClick.current = false;
@@ -215,7 +217,7 @@ export function ShelfDragProvider({ children }: { children: ReactNode }) {
 export function ShelfDragHandle({ book, disabled = false }: { book: Book; disabled?: boolean }) {
   const drag = useShelfDrag();
   const t = useT();
-  if (!drag?.available) return null;
+  if (!drag?.available || drag.handlesHidden) return null;
   return <button type="button" className={styles.handle} disabled={disabled || drag.busy}
     aria-label={t('Add {title} to a shelf', { title: book.title })}
     title={t('Drag to a shelf, or choose a shelf')}

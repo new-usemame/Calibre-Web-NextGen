@@ -9323,6 +9323,10 @@ msgid "Show shelf tags"
 msgstr "Boekenplanklabels tonen"
 
 #: cps/spa_strings.py
+msgid "Show shelf drag handles"
+msgstr "Sleepgrepen voor boekenplanken tonen"
+
+#: cps/spa_strings.py
 msgid ""
 "Show the global library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"

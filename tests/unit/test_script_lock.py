@@ -34,6 +34,7 @@ def _sleeper(*extra):
     return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", *extra])
 
 
+@pytest.mark.skipif(not os.path.isdir("/proc"), reason="matching the owner's name needs /proc")
 def test_live_owner_matching_any_name_is_respected(tmp_path):
     lock = tmp_path / "x.lock"
     owner = _sleeper("convert_library")

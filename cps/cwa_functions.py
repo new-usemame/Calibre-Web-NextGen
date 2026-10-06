@@ -2205,11 +2205,20 @@ def kill_convert_library(queue):
                     break
                 continue
             cl_process.terminate()
-            # Remove any potentially left over lock files
+            # Wait for it before cleaning up. On SIGTERM the script stops its tool (a
+            # running calibredb add_format is allowed to finish, up to 300s) and removes
+            # its own lock on the way out; emptying the conversion dir first would pull
+            # the file out from under that calibredb, and its last log lines would land
+            # after the TERMINATED marker. The lock is not ours to delete: a run killed
+            # outright leaves one that the next run clears as stale.
             try:
-                os.remove(tempfile.gettempdir() + '/convert_library.lock')
-            except FileNotFoundError:
-                ...
+                cl_process.wait(timeout=330)
+            except subprocess.TimeoutExpired:
+                cl_process.kill()
+                try:
+                    cl_process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    log.error("Convert library cancel: the process did not exit after SIGKILL")
             # Empty tmp conversion dir of half finished files
             empty_tmp_con_dir(get_tmp_conversion_dir())
             # Remove the trigger file that triggered this block

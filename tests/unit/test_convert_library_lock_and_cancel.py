@@ -60,7 +60,8 @@ def test_lock_held_by_a_running_convert_library_is_respected(tmp_path):
         owner.wait()
 
 
-@pytest.mark.parametrize("content", ["", "not-a-pid", "dead", "reused"])
+@pytest.mark.parametrize("content", ["", "not-a-pid", "dead",
+    pytest.param("reused", marks=pytest.mark.skipif(not os.path.isdir("/proc"), reason="a reused PID is only detectable through /proc"))])
 def test_stale_lock_is_cleared(tmp_path, log_lines, content):
     lock = tmp_path / "convert_library.lock"
     other = None
@@ -203,3 +204,90 @@ def test_remove_lock_only_removes_our_own_lock(tmp_path):
     lock.write_text("999999999")  # another run's lock
     convert_library.removeLock(str(lock))
     assert lock.read_text() == "999999999"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="process groups")
+def test_cancel_arriving_while_the_tool_starts_still_stops_it(tmp_path, monkeypatch, log_lines):
+    """A SIGTERM between Popen starting the tool and _current_child being set must not be lost."""
+    converter = convert_library.LibraryConverter.__new__(convert_library.LibraryConverter)
+    converter.verbose = False
+    real_popen = subprocess.Popen
+    started = []
+
+    class SignalledDuringLaunch(real_popen):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            started.append(self)
+            convert_library._stop_on_sigterm(15, None)  # Cancel lands here
+
+    monkeypatch.setattr(convert_library.subprocess, "Popen", SignalledDuringLaunch)
+    begun = time.monotonic()
+    with pytest.raises(SystemExit) as exited:
+        converter._run_streaming(["sleep", "30"])
+    assert exited.value.code == 128 + 15
+    assert time.monotonic() - begun < 15, "Cancel waited out the tool instead of stopping it"
+    assert started[0].poll() is not None
+    assert convert_library._pending_stop is None
+
+
+def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypatch):
+    """The web Cancel must not clean up under a run that is still stopping, nor delete its lock."""
+    from cps import cwa_functions
+    import queue as queue_module
+
+    monkeypatch.setattr(cwa_functions.tempfile, "gettempdir", lambda: str(tmp_path))
+    log_path = tmp_path / "convert-library.log"
+    log_path.write_text("")
+    monkeypatch.setattr(cwa_functions, "_service_log_path", lambda name: str(log_path))
+    monkeypatch.setattr(cwa_functions, "archive_run_log", lambda path: None)
+    monkeypatch.setattr(cwa_functions, "get_tmp_conversion_dir", lambda: str(tmp_path / "tmp-conv"))
+    finished = tmp_path / "finished"
+    seen = {}
+    monkeypatch.setattr(cwa_functions, "empty_tmp_con_dir",
+                        lambda d: seen.setdefault("finished_before_cleanup", finished.exists()))
+
+    # Stands in for the script: on SIGTERM it finishes its step, then exits.
+    script = subprocess.Popen([sys.executable, "-c",
+        "import signal, sys, time\n"
+        "def stop(*a):\n"
+        "    time.sleep(1)\n"
+        f"    open({str(finished)!r}, 'w').close()\n"
+        "    sys.exit(143)\n"
+        "signal.signal(signal.SIGTERM, stop)\n"
+        "print('ready', flush=True)\n"
+        "time.sleep(30)\n"], stdout=subprocess.PIPE, text=True)
+    try:
+        assert script.stdout.readline().strip() == "ready"
+        lock = tmp_path / "convert_library.lock"
+        lock.write_text(str(script.pid))
+        (tmp_path / ".kill_convert_library_trigger").write_text("")
+        q = queue_module.Queue()
+        q.put(script)
+        cwa_functions.kill_convert_library(q)
+        assert seen == {"finished_before_cleanup": True}
+        assert script.returncode == 143
+        assert lock.exists(), "the web Cancel deleted a lock it does not own"
+        assert "TERMINATED BY USER" in log_path.read_text()
+    finally:
+        if script.poll() is None:
+            script.kill()
+        script.wait()
+
+
+def test_cancel_keeps_draining_a_finishing_calibredb(tmp_path, monkeypatch, log_lines):
+    """While Cancel waits for calibredb, its output must still be read, or a full pipe blocks it."""
+    marker = tmp_path / "written"
+    tool = tmp_path / "calibredb"
+    tool.write_text(f"#!/bin/sh\nyes x | head -c 300000\necho ok > '{marker}'\n")
+    tool.chmod(0o755)
+    child = subprocess.Popen([str(tool)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    monkeypatch.setattr(convert_library, "_current_child", child)
+    try:
+        with pytest.raises(SystemExit):
+            convert_library._stop_on_sigterm(15, None)
+        assert child.returncode == 0
+        assert marker.read_text().strip() == "ok"
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.wait()

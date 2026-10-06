@@ -108,6 +108,12 @@ def _signal_tool(child, sig):
         child.send_signal(sig)
 
 
+# True while _run_streaming is starting a tool that is not yet in _current_child;
+# a stop signal arriving then is held in _pending_stop and acted on once it is.
+_launching = False
+_pending_stop = None
+
+
 def _stop_on_sigterm(signum, frame):
     """Stop the running tool, then exit normally so atexit removes the lock.
 
@@ -115,20 +121,34 @@ def _stop_on_sigterm(signum, frame):
     SIGTERM exits without running atexit and leaves the child running, so a
     cancelled run kept converting in the background.
     """
+    global _pending_stop
     child = _current_child
+    if child is None and _launching:
+        _pending_stop = signum
+        return
+    _pending_stop = None
     if child is not None and child.poll() is None:
         if os.path.basename(str(child.args[0])) in _FINISH_ON_CANCEL:
+            # The main loop that reads its output is suspended in this handler, so
+            # keep draining it here or a chatty calibredb could block on a full pipe.
             try:
-                child.wait(timeout=300)
+                child.communicate(timeout=300)
             except subprocess.TimeoutExpired:
-                child.kill()
+                _signal_tool(child, signal.SIGKILL)
+            except (OSError, ValueError, RuntimeError):
+                child.wait()
         else:
             _signal_tool(child, signal.SIGTERM)
             try:
                 child.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 _signal_tool(child, signal.SIGKILL)
-    print_and_log("[convert-library]: Cancelled, stopping now...")
+    try:
+        print_and_log("[convert-library]: Cancelled, stopping now...")
+    except RuntimeError:
+        # The signal interrupted a print in progress (reentrant BufferedWriter call);
+        # the exit below still has to happen.
+        pass
     sys.exit(128 + signum)
 
 
@@ -655,6 +675,11 @@ class LibraryConverter:
         # Only the tail is needed to explain a failure; a verbose conversion of
         # a large PDF can print tens of thousands of lines.
         output_tail = deque(maxlen=200)
+        # A Cancel that lands while the tool is being started is deferred until the
+        # child is recorded in _current_child, so the handler cannot miss it. (Blocking
+        # the signals instead would not work: the child inherits a blocked mask.)
+        global _launching, _current_child
+        _launching = True
         try:
             with subprocess.Popen(
                 args,
@@ -667,8 +692,10 @@ class LibraryConverter:
                 start_new_session=os.name != "nt",
                 **_child_ownership()
             ) as process:
-                global _current_child
                 _current_child = process
+                _launching = False
+                if _pending_stop is not None:
+                    _stop_on_sigterm(_pending_stop, None)
                 try:
                     for line in process.stdout:  # Read from the combined stdout (which includes stderr)
                         output_tail.append(line)
@@ -681,6 +708,10 @@ class LibraryConverter:
         except OSError as error:
             # A missing or unexecutable tool fails this book, not the whole run.
             raise subprocess.CalledProcessError(127, args, output=str(error), stderr=str(error)) from error
+        finally:
+            _launching = False
+            if _pending_stop is not None:
+                _stop_on_sigterm(_pending_stop, None)
 
         if process.returncode != 0:
             output = ''.join(output_tail)

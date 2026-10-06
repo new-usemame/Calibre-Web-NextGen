@@ -34,6 +34,9 @@ def owner_alive(path, names):
     if pid <= 0 or pid == os.getpid():
         # Our own PID can only be there if a killed run's PID was reused by us.
         return False
+    if os.name == "nt":
+        # os.kill(pid, 0) terminates the process on Windows; assume the owner is alive.
+        return True
     if not os.path.isdir("/proc"):
         # Not Linux: the best available check is "does that PID exist".
         try:
@@ -65,6 +68,9 @@ def _create(path):
             os.remove(staging)
         except FileNotFoundError:
             pass
+        except OSError:
+            # Another user's file of the same name in a sticky /tmp: no lock for us.
+            return False
         fd = os.open(staging, os.O_CREAT | os.O_EXCL | os.O_WRONLY | O_NOFOLLOW, 0o644)
         with os.fdopen(fd, "w") as f:
             f.write(str(os.getpid()))
@@ -84,7 +90,7 @@ def _create(path):
     finally:
         try:
             os.remove(staging)
-        except FileNotFoundError:
+        except OSError:
             pass
 
 
@@ -102,7 +108,8 @@ def acquire(path, names, on_stale=None):
     guard = None
     if fcntl is not None:
         try:
-            guard = os.fdopen(os.open(f"{path}.guard", os.O_CREAT | os.O_WRONLY | os.O_APPEND | O_NOFOLLOW, 0o644), "a")
+            # Read-only is enough for flock, so a guard created by another user still works.
+            guard = os.fdopen(os.open(f"{path}.guard", os.O_CREAT | os.O_RDONLY | O_NOFOLLOW, 0o644), "r")
             fcntl.flock(guard, fcntl.LOCK_EX)
         except OSError:
             if guard:
@@ -120,8 +127,10 @@ def acquire(path, names, on_stale=None):
                 os.remove(path)
             except FileNotFoundError:
                 pass
-            except OSError:
+            except OSError as error:
                 # Not ours to remove (another user's lock in a sticky /tmp): treat it as held.
+                if on_stale:
+                    on_stale(f"Could not remove the stale lock {path}: {error}")
                 return False
         return False
     finally:

@@ -132,6 +132,10 @@ def _stop_on_sigterm(signum, frame):
             # The main loop that reads its output is suspended in this handler, so
             # keep draining it here or a chatty calibredb could block on a full pipe.
             try:
+                print_and_log("[convert-library]: Cancel received; letting the library import that is running finish...")
+            except RuntimeError:
+                pass
+            try:
                 child.communicate(timeout=300)
             except subprocess.TimeoutExpired:
                 _signal_tool(child, signal.SIGKILL)

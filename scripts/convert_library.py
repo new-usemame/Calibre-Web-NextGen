@@ -95,6 +95,47 @@ def _acquire_lock_or_exit():
 
 # The ebook-convert / kepubify / calibredb process currently running, if any.
 _current_child = None
+
+# Convert Library works in its own directory next to the shared tmp_conversion_dir.
+# The ingest processor rmtree()s the shared one after every run and Convert Library
+# emptied it after every book, and the two have separate locks, so a run during an
+# ingest could delete the file the other was converting. The "<prefix><pid>_" naming
+# is what remove_convert_library_tmp_dirs() in cps/cwa_functions.py matches on Cancel.
+PRIVATE_TMP_PREFIX = ".cwa_convert_library_"
+
+
+def private_tmp_parents(shared_tmp_dir):
+    """Where the working directory may live: beside the shared one, else the system temp dir."""
+    beside = os.path.dirname(shared_tmp_dir.rstrip("/")) or "."
+    return [beside, tempfile.gettempdir()]
+
+
+def make_private_tmp_dir(shared_tmp_dir):
+    """Create this run's working directory and return it with a trailing slash.
+
+    It goes beside the shared one, creating that parent if needed
+    (CWA_TMP_CONVERSION_DIR can be any path). If the parent can't be created or
+    written to (a tmp conversion dir mounted at /cwa-tmp has "/" as its parent), it
+    goes in the system temp dir instead. The name carries this process's PID so
+    Cancel can remove exactly this run's directory. Leftovers from runs that were
+    killed are removed first, which is safe because the caller holds the
+    convert_library lock, so no other run is using them.
+    """
+    parents = private_tmp_parents(shared_tmp_dir)
+    for parent in dict.fromkeys(parents):
+        for leftover in Path(parent).glob(PRIVATE_TMP_PREFIX + "*"):
+            shutil.rmtree(leftover, ignore_errors=True)
+    prefix = f"{PRIVATE_TMP_PREFIX}{os.getpid()}_"
+    try:
+        os.makedirs(parents[0], exist_ok=True)
+        path = tempfile.mkdtemp(prefix=prefix, dir=parents[0])
+    except OSError as error:
+        print_and_log(f"[convert-library]: Could not create a working directory in {parents[0]} ({error}), "
+                      f"using {parents[1]} instead")
+        path = tempfile.mkdtemp(prefix=prefix, dir=parents[1])
+    atexit.register(shutil.rmtree, path, True)
+    return path + "/"
+
 # Tools left to finish on cancel: stopping calibredb part-way through add_format
 # can leave a file copied into the book folder that metadata.db never records.
 _FINISH_ON_CANCEL = ("calibredb",)
@@ -219,12 +260,10 @@ class LibraryConverter:
         self.hierarchy_of_success = {'epub', 'lit', 'mobi', 'azw', 'azw3', 'fb2', 'fbz', 'azw4', 'prc', 'odt', 'lrf', 'pdb',  'cbz', 'pml', 'rb', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'snb', 'tcr', 'pdf', 'docx', 'rtf', 'html', 'htmlz', 'txtz', 'txt', 'kfx', 'kfx-zip'}
 
         self.current_book = 1
-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
-        # ingest_processor.py removes this directory outright when it finishes and
-        # recreates it on its next run, so it is absent for every Convert Library
-        # run that follows an ingest. Own it here rather than depending on another
-        # service having left one behind.
-        self.ensure_tmp_conversion_dir()
+        self.ingest_folder, self.library_dir, shared_tmp_dir = self.get_dirs(str(app_paths.dirs_json()))
+        # Never the shared directory: ingest removes that one outright at the end of
+        # every run, and emptying it here deleted the book an ingest was converting.
+        self.tmp_conversion_dir = make_private_tmp_dir(shared_tmp_dir)
 
         # Calibre subprocess environment. Operator-opt-in plugin loading
         # (CWA_CALIBRE_USER_PLUGINS=true) routes HOME to /config so any
@@ -511,8 +550,8 @@ class LibraryConverter:
             file_extension = Path(file).suffix
 
             print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Converting {filename} from {file_extension} format to {self.target_format} format...")
-            # An ingest can remove the directory at any point, and a failed book
-            # skips empty_tmp_con_dir(), so check before every book.
+            # A failed book skips empty_tmp_con_dir(), and the directory can be
+            # removed from outside the run (a temp cleaner), so check before every book.
             self.ensure_tmp_conversion_dir()
 
             try: # Get Calibre Library Book ID from the immediate book folder (e.g., "Title (6120)")
@@ -648,12 +687,7 @@ class LibraryConverter:
 
 
     def ensure_tmp_conversion_dir(self):
-        """Create the temp conversion directory if it is missing.
-
-        ingest_processor.py ends each run with shutil.rmtree() on this same path,
-        so it disappears out from under a Convert Library run that is already
-        going as well as before one starts.
-        """
+        """Recreate this run's working directory if something removed it mid-run."""
         if os.path.isdir(self.tmp_conversion_dir):
             return
         try:

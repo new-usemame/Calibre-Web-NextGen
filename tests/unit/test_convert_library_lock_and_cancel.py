@@ -231,7 +231,11 @@ def test_cancel_arriving_while_the_tool_starts_still_stops_it(tmp_path, monkeypa
 
 
 def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypatch):
-    """The web Cancel must not clean up under a run that is still stopping, nor delete its lock."""
+    """The web Cancel waits for the run to stop, then removes only that run's working dir.
+
+    It must not delete the lock, clean up under a run that is still stopping, or touch
+    the shared conversion dir, where an ingest may be converting a book.
+    """
     from cps import cwa_functions
     import queue as queue_module
 
@@ -240,18 +244,24 @@ def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypat
     log_path.write_text("")
     monkeypatch.setattr(cwa_functions, "_service_log_path", lambda name: str(log_path))
     monkeypatch.setattr(cwa_functions, "archive_run_log", lambda path: None)
-    monkeypatch.setattr(cwa_functions, "get_tmp_conversion_dir", lambda: str(tmp_path / "tmp-conv"))
-    finished = tmp_path / "finished"
-    seen = {}
-    monkeypatch.setattr(cwa_functions, "empty_tmp_con_dir",
-                        lambda d: seen.setdefault("finished_before_cleanup", finished.exists()))
+    config = tmp_path / "config"
+    shared = config / ".cwa_conversion_tmp"
+    shared.mkdir(parents=True)
+    ingest_book = shared / "ingest-in-progress.epub"
+    ingest_book.write_text("x")
+    newer_run = config / (convert_library.PRIVATE_TMP_PREFIX + "99999999_newer")
+    newer_run.mkdir()
+    monkeypatch.setattr(cwa_functions, "get_tmp_conversion_dir", lambda: str(shared) + "/")
 
-    # Stands in for the script: on SIGTERM it finishes its step, then exits.
+    # Stands in for the script: it works in its own dir, and on SIGTERM it finishes
+    # its step there, then exits. If Cancel cleaned up first, the write fails.
     script = subprocess.Popen([sys.executable, "-c",
-        "import signal, sys, time\n"
+        "import os, signal, sys, time\n"
+        f"own = os.path.join({str(config)!r}, {convert_library.PRIVATE_TMP_PREFIX!r} + f'{{os.getpid()}}_run')\n"
+        "os.mkdir(own)\n"
         "def stop(*a):\n"
         "    time.sleep(1)\n"
-        f"    open({str(finished)!r}, 'w').close()\n"
+        "    open(os.path.join(own, 'half.epub'), 'w').close()\n"
         "    sys.exit(143)\n"
         "signal.signal(signal.SIGTERM, stop)\n"
         "print('ready', flush=True)\n"
@@ -264,8 +274,11 @@ def test_web_cancel_waits_for_the_script_and_leaves_its_lock(tmp_path, monkeypat
         q = queue_module.Queue()
         q.put(script)
         cwa_functions.kill_convert_library(q)
-        assert seen == {"finished_before_cleanup": True}
-        assert script.returncode == 143
+        assert script.returncode == 143, "Cancel removed the working dir while the run was still stopping"
+        assert ingest_book.exists(), "Cancel deleted a book an ingest was converting"
+        assert not list(config.glob(f"{convert_library.PRIVATE_TMP_PREFIX}{script.pid}_*")), \
+            "the cancelled run's half-finished files were left behind"
+        assert newer_run.exists(), "Cancel removed another run's working dir"
         assert lock.exists(), "the web Cancel deleted a lock it does not own"
         assert "TERMINATED BY USER" in log_path.read_text()
     finally:

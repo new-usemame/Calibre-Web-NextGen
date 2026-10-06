@@ -2177,15 +2177,19 @@ def convert_library_start(queue):
 def get_tmp_conversion_dir() -> str:
     return f"{constants.tmp_conversion_dir()}/"
 
-def empty_tmp_con_dir(tmp_conversion_dir) -> None:
-    try:
-        files = os.listdir(tmp_conversion_dir)
-        for file in files:
-            file_path = os.path.join(tmp_conversion_dir, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-    except Exception as e:
-        print(f"[cwa-functions]: An error occurred while emptying {tmp_conversion_dir}. See the following error: {e}")
+def remove_convert_library_tmp_dirs(tmp_conversion_dir, pid) -> None:
+    """Remove the working dirs of one Convert Library run, which sit beside the shared one.
+
+    Only the run with this PID is touched, so a run that started since keeps its own
+    dir. The shared tmp_conversion_dir is left alone: an ingest may be converting a
+    book in it. Convert Library falls back to the system temp dir when it can't write
+    beside the shared one, so both places are checked. The name matches
+    make_private_tmp_dir() in scripts/convert_library.py.
+    """
+    beside = Path(tmp_conversion_dir.rstrip('/')).parent
+    for parent in {beside, Path(tempfile.gettempdir())}:
+        for path in parent.glob(f".cwa_convert_library_{pid}_*"):
+            shutil.rmtree(path, ignore_errors=True)
 
 def is_convert_library_finished() -> bool:
     return "NextGen Convert Library Service - Run Ended: " in _read_log_tail(
@@ -2219,8 +2223,9 @@ def kill_convert_library(queue):
                     cl_process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
                     log.error("Convert library cancel: the process did not exit after SIGKILL")
-            # Empty tmp conversion dir of half finished files
-            empty_tmp_con_dir(get_tmp_conversion_dir())
+            # A run killed outright never reached its atexit cleanup, so remove the
+            # half-finished files in its own working dir (never the shared one).
+            remove_convert_library_tmp_dirs(get_tmp_conversion_dir(), cl_process.pid)
             # Remove the trigger file that triggered this block
             try:
                 os.remove(trigger_file)

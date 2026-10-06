@@ -80,6 +80,10 @@ def test_companion_231_login_finds_token_and_signs_in(monkeypatch, tmp_path):
     token = _scrape(page.get_data(as_text=True))
     assert token, "no CSRF token in the page a scraping client receives"
 
+    # Enforcement is real: the same POST without the token is refused.
+    refused = client.post("/login", data={"username": "reader", "password": "x"})
+    assert refused.status_code == 400
+
     resp = client.post(
         "/login",
         data={"username": "reader", "password": "x", "csrf_token": token},

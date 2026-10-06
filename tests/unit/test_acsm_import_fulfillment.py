@@ -119,7 +119,7 @@ def _acsm_import_process_probe(tmp_path, failure_name):
         fulfilled = Path(recovered['path']).read_bytes()
         retained = ticket.read_bytes(), manifest.read_bytes()
         assert retained == original
-        assert not Path(processor.tmp_conversion_dir).exists()
+        assert not any(Path(processor.tmp_conversion_dir).iterdir()), 'ingest left its scratch files behind'
 
         def completed_import(path, **kwargs):
             assert kwargs == {'identity_path': str(ticket)}

@@ -28,6 +28,7 @@ import app_paths
 import service_user
 
 from cwa_db import CWA_DB
+import script_lock
 from library_paths import get_calibre_metadata_db_path
 
 try:
@@ -157,21 +158,20 @@ def exit_if_cancelled() -> None:
 
 ### LOCK FILES
 # Defining function to delete the lock on script exit
+LOCK_PATH = os.path.join(tempfile.gettempdir(), 'kindle_epub_fixer.lock')
+
+
 def removeLock():
-    try:
-        os.remove(tempfile.gettempdir() + '/kindle_epub_fixer.lock')
-    except FileNotFoundError:
-        ...
+    """Remove the lock, but only while it is still ours (see script_lock.release)."""
+    script_lock.release(LOCK_PATH)
 
 
 def _acquire_lock_or_exit():
     """Single-instance guard. Run only when this module is executed as a
     script — never on import — so pytest-xdist workers (which share /tmp
     across processes) don't take each other out at import time."""
-    try:
-        lock = open(tempfile.gettempdir() + '/kindle_epub_fixer.lock', 'x')
-        lock.close()
-    except FileExistsError:
+    if not script_lock.acquire(LOCK_PATH, ("kindle_epub_fixer",),
+                               on_stale=lambda message: print_and_log(f"[cwa-kindle-epub-fixer] {message}")):
         print_and_log("[cwa-kindle-epub-fixer] CANCELLING... kindle-epub-fixer was initiated but is already running")
         logger.info(f"\nNextGen Kindle EPUB Fixer Service - Run Ended: {datetime.now()}")
         sys.exit(2)

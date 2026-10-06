@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import shutil
+import signal
 from pathlib import Path
 import subprocess
 import tempfile
@@ -23,6 +24,7 @@ import app_paths
 import service_user
 from calibre_library_target import ownership, operation
 from cwa_db import CWA_DB
+import script_lock
 from kindle_epub_fixer import EPUBFixer
 
 ### Global Variables
@@ -60,26 +62,74 @@ def print_and_log(string) -> None:
     print(string)
 
 
+LOCK_PATH = os.path.join(tempfile.gettempdir(), 'convert_library.lock')
+_LOCK_NAMES = ("convert_library",)
+
+
 # Defining function to delete the lock on script exit
-def removeLock():
-    try:
-        os.remove(tempfile.gettempdir() + '/convert_library.lock')
-    except FileNotFoundError:
-        ...
+def removeLock(path=None):
+    """Remove the lock, but only while it is still ours (see script_lock.release)."""
+    script_lock.release(path or LOCK_PATH)
+
+
+def acquire_lock(path=None):
+    """Take the lock, clearing one left by a run that was killed. False if another run holds it."""
+    return script_lock.acquire(path or LOCK_PATH, _LOCK_NAMES,
+                               on_stale=lambda message: print_and_log(f"[convert-library]: {message}"))
 
 
 def _acquire_lock_or_exit():
     """Single-instance guard. Run only when this module is executed as a
     script — never on import — so pytest-xdist workers (which share /tmp
     across processes) don't take each other out at import time."""
-    try:
-        lock = open(tempfile.gettempdir() + '/convert_library.lock', 'x')
-        lock.close()
-    except FileExistsError:
+    if not acquire_lock():
         print_and_log("[convert-library]: CANCELLING... convert-library was initiated but is already running")
         logger.info(f"\nNextGen Convert Library Service - Run Cancelled: {datetime.now()}")
         sys.exit(2)
     atexit.register(removeLock)
+    # A tool runs in its own session, so Ctrl-C at a terminal reaches only this
+    # script; both signals stop the tool the same way.
+    signal.signal(signal.SIGTERM, _stop_on_sigterm)
+    signal.signal(signal.SIGINT, _stop_on_sigterm)
+
+
+# The ebook-convert / kepubify / calibredb process currently running, if any.
+_current_child = None
+# Tools left to finish on cancel: stopping calibredb part-way through add_format
+# can leave a file copied into the book folder that metadata.db never records.
+_FINISH_ON_CANCEL = ("calibredb",)
+
+
+def _signal_tool(child, sig):
+    """Signal the tool and anything it started (it runs in its own session)."""
+    try:
+        os.killpg(child.pid, sig)
+    except (ProcessLookupError, PermissionError, AttributeError):
+        child.send_signal(sig)
+
+
+def _stop_on_sigterm(signum, frame):
+    """Stop the running tool, then exit normally so atexit removes the lock.
+
+    The web UI's Cancel sends SIGTERM to this script. Python's default for
+    SIGTERM exits without running atexit and leaves the child running, so a
+    cancelled run kept converting in the background.
+    """
+    child = _current_child
+    if child is not None and child.poll() is None:
+        if os.path.basename(str(child.args[0])) in _FINISH_ON_CANCEL:
+            try:
+                child.wait(timeout=300)
+            except subprocess.TimeoutExpired:
+                child.kill()
+        else:
+            _signal_tool(child, signal.SIGTERM)
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                _signal_tool(child, signal.SIGKILL)
+    print_and_log("[convert-library]: Cancelled, stopping now...")
+    sys.exit(128 + signum)
 
 
 def _load_backup_destinations():
@@ -614,14 +664,20 @@ class LibraryConverter:
                 text=True,
                 encoding='utf-8',
                 errors='replace',
+                start_new_session=os.name != "nt",
                 **_child_ownership()
             ) as process:
-                for line in process.stdout:  # Read from the combined stdout (which includes stderr)
-                    output_tail.append(line)
-                    if self.verbose:
-                        print_and_log(line)
-                    else:
-                        print(line)
+                global _current_child
+                _current_child = process
+                try:
+                    for line in process.stdout:  # Read from the combined stdout (which includes stderr)
+                        output_tail.append(line)
+                        if self.verbose:
+                            print_and_log(line)
+                        else:
+                            print(line)
+                finally:
+                    _current_child = None
         except OSError as error:
             # A missing or unexecutable tool fails this book, not the whole run.
             raise subprocess.CalledProcessError(127, args, output=str(error), stderr=str(error)) from error

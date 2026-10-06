@@ -1085,8 +1085,8 @@ def empty_tmp_conversion_dir(tmp_conversion_dir) -> None:
         else:
             try:
                 os.unlink(entry.path)
-            except FileNotFoundError:
-                pass
+            except OSError:
+                pass  # as rmtree(ignore_errors=True) did: one stuck file must not stop the rest
 
 
 def is_a_book_format(input_format) -> bool:

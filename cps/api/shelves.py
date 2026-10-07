@@ -15,7 +15,7 @@ from sqlalchemy import or_, func
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
-from .serializers import serialize_shelf
+from .serializers import serialize_shelf, cover_url_for
 from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
@@ -299,6 +299,63 @@ def delete_shelf_api(shelf_id):
         ub.session.rollback()
         return _err("db_error", "Could not delete shelf: %s" % getattr(e, "orig", e), 500)
     return "", 204
+
+
+# ── Book picker (bulk add) ───────────────────────────────────────────────────
+
+AVAILABLE_BOOKS_PAGE_SIZE = 30
+
+
+@api_v1.route("/shelves/<int:shelf_id>/available-books")
+@login_required_if_no_ano
+def shelf_available_books_api(shelf_id):
+    """Searchable, paged book list for the shelf page's "Add books" picker.
+
+    Same visibility filters as normal browsing (``common_filters`` /
+    ``get_search_results``). Each row says whether the book is already on this
+    shelf so the picker can disable it; the write path stays the per-book
+    ``POST /shelves/<id>/books/<book_id>`` endpoint, which owns permission,
+    de-duplication and library-membership checks.
+    """
+    shelf = ub.session.query(ub.Shelf).filter(ub.Shelf.id == shelf_id).first()
+    if shelf is None:
+        return _err("not_found", "Shelf not found", 404)
+    if not check_shelf_edit_permissions(shelf):
+        return _err("forbidden", "You are not allowed to add to this shelf", 403)
+
+    query = (request.args.get("query") or "").strip()
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    per_page = AVAILABLE_BOOKS_PAGE_SIZE
+    offset = (page - 1) * per_page
+
+    if query:
+        entries, total, __ = calibre_db.get_search_results(query, config, offset, None, per_page)
+    else:
+        base = calibre_db.session.query(db.Books).filter(calibre_db.common_filters())
+        total = base.count()
+        entries = base.order_by(*BOOK_SORT_ORDERS["new"]).offset(offset).limit(per_page).all()
+
+    in_shelf = {
+        row.book_id for row in
+        ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()
+    }
+    items = []
+    for entry in entries:
+        # Search rows wrap the book in `.Books`; the plain query yields it directly.
+        book = getattr(entry, "Books", entry)
+        items.append({
+            "id": book.id,
+            "title": book.title,
+            "authors": [a.name for a in book.authors] if book.authors else [],
+            "cover_url": cover_url_for(book, "sm"),
+            "in_shelf": book.id in in_shelf,
+        })
+    return jsonify({
+        "items": items,
+        "page": page,
+        "total": total,
+        "has_more": offset + len(items) < total,
+    })
 
 
 # ── Add / remove a book ──────────────────────────────────────────────────────

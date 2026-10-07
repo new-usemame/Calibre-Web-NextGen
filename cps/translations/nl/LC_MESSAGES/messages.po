@@ -20095,8 +20095,14 @@ msgid "Library rating"
 msgstr "Bibliotheekbeoordeling"
 
 #. #2248 personal ratings; explicit account consent.
-msgid "Off by default. Only opted-in ratings contribute; individual names are never shown."
-msgstr "Standaard uitgeschakeld. Alleen beoordelingen die met toestemming worden gedeeld tellen mee; namen worden nooit getoond."
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. "
+"If you are the only person sharing a rating for a book, the average is "
+"your score."
+msgstr ""
+"Standaard uitgeschakeld. Alleen beoordelingen die met toestemming worden "
+"gedeeld tellen mee, en namen worden nooit getoond. Als u als enige een "
+"beoordeling voor een boek deelt, is het gemiddelde uw score."
 
 #. #2248 personal ratings; explicit account consent.
 msgid "Save rating"

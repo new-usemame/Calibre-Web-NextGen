@@ -455,7 +455,7 @@
           <input type="hidden" name="share_book_ratings_present" value="1">
           <input type="checkbox" name="share_book_ratings" id="share_book_ratings" {% if content.get_view_property('preferences', 'share_book_ratings') is sameas true %}checked{% endif %}>
           <label for="share_book_ratings">{{_('Share my ratings in the household average')}}</label>
-          <p class="help-block">{{_('Off by default. Only opted-in ratings contribute; individual names are never shown.')}}</p>
+          <p class="help-block">{{_('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}}</p>
         </div>
         {% endif %}
       </div>

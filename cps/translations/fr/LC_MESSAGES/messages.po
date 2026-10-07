@@ -20707,8 +20707,14 @@ msgid "Library rating"
 msgstr "Note de la bibliothèque"
 
 #. #2248 personal ratings; explicit account consent.
-msgid "Off by default. Only opted-in ratings contribute; individual names are never shown."
-msgstr "Désactivé par défaut. Seules les notes partagées avec accord explicite sont incluses ; les noms ne sont jamais affichés."
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. "
+"If you are the only person sharing a rating for a book, the average is "
+"your score."
+msgstr ""
+"Désactivé par défaut. Seules les notes partagées avec accord explicite "
+"comptent, et les noms ne sont jamais affichés. Si vous êtes la seule "
+"personne à partager une note pour un livre, la moyenne est votre note."
 
 #. #2248 personal ratings; explicit account consent.
 msgid "Save rating"

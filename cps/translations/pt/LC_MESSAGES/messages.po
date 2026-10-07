@@ -18779,7 +18779,10 @@ msgid "Library rating"
 msgstr ""
 
 #. #2248 personal ratings; explicit account consent.
-msgid "Off by default. Only opted-in ratings contribute; individual names are never shown."
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. "
+"If you are the only person sharing a rating for a book, the average is "
+"your score."
 msgstr ""
 
 #. #2248 personal ratings; explicit account consent.

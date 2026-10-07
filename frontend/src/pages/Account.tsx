@@ -335,7 +335,7 @@ export function Account() {
               disabled={updateNamedPreferences.isPending}
               onChange={event => updateNamedPreferences.mutate({ share_book_ratings: event.currentTarget.checked })} />
             <span className={styles.scopeText}><strong>{t('Share my ratings in the household average')}</strong>
-              <small>{t('Off by default. Only opted-in ratings contribute; individual names are never shown.')}</small></span>
+              <small>{t('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}</small></span>
           </label>
         </fieldset>
       </section>

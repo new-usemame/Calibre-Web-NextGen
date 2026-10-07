@@ -98,7 +98,7 @@ export function ShelfAddBooks({ shelfId, onClose, onAdded }: {
       <div className={styles.results} aria-busy={list.isFetching}>
         {list.isLoading && <div className={styles.center}><Spinner /></div>}
         {list.isError && <p role="alert" className={styles.error}>{t('Could not load books.')}</p>}
-        {!list.isLoading && !list.isError && books.length === 0 && <p className={styles.empty}>{t('No books found.')}</p>}
+        {!list.isLoading && !list.isError && books.length === 0 && <p className={styles.empty}>{t('No books match those criteria.')}</p>}
         <ul className={styles.list}>
           {books.map((book) => {
             const checked = selected.has(book.id);

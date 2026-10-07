@@ -19328,6 +19328,42 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "Add books"
+msgstr "Ajouter des livres"
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr "Ajouter des livres à l’étagère"
+
+#: cps/spa_strings.py
+msgid "Add selected"
+msgstr "Ajouter la sélection"
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr "Impossible d’ajouter les livres sélectionnés. Veuillez réessayer."
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr "Impossible de charger les livres."
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr "Sur l’étagère"
+
+#: cps/spa_strings.py
+msgid "Search library"
+msgstr "Rechercher dans la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr "Rechercher un titre, un auteur, une série…"
+
+#: cps/spa_strings.py
+msgid "{failed} of {total} books could not be added. They remain selected."
+msgstr "{failed} livre(s) sur {total} n’ont pas pu être ajoutés. Ils restent sélectionnés."
+
 #, fuzzy
 #~ msgid "Magic Shelves"
 #~ msgstr "Étagères magiques ✨"

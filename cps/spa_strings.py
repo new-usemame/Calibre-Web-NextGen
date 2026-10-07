@@ -1970,6 +1970,15 @@ _("← Back")
 _("← Back to book")
 _("← Back to sign in")
 _("← Library")
+_("Add books")
+_("Add books to shelf")
+_("Add selected")
+_("Could not add the selected books. Please try again.")
+_("Could not load books.")
+_("On shelf")
+_("Search library")
+_("Search title, author, series…")
+_("{failed} of {total} books could not be added. They remain selected.")
 # ==== END AUTOGEN ====
 
 # New-user sync safety (#1057).

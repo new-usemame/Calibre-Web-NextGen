@@ -86,6 +86,10 @@ def picker(monkeypatch):
     app = Flask(__name__)
     app.add_url_rule("/api/v1/shelves/<int:shelf_id>/available-books",
                      view_func=inspect.unwrap(shelves_api.shelf_available_books_api))
+    app.add_url_rule("/shelf/<int:shelf_id>/available_books",
+                     view_func=inspect.unwrap(shelf_module.shelf_available_books))
+    app.add_url_rule("/cover/<int:book_id>/<resolution>", endpoint="web.get_cover",
+                     view_func=lambda book_id, resolution: "")
     yield app.test_client(), searches
 
     session.close()
@@ -160,3 +164,17 @@ def test_unknown_shelf_is_not_found(picker):
     client, _ = picker
     status, _body = _get(client, "/api/v1/shelves/404/available-books")
     assert status == 404
+
+
+def test_classic_modal_shares_the_query_and_its_permission_gate(picker):
+    client, searches = picker
+    status, body = _get(client, "/shelf/9/available_books?query=book%203")
+
+    assert status == 200
+    assert [book["id"] for book in body["books"]] == [3, 30, 31, 32, 33, 34, 35]
+    assert body["books"][-1]["in_shelf"] is True
+    assert body["books"][0]["cover"] == "/cover/3/sm"
+
+    status, _body = _get(client, "/shelf/10/available_books")
+    assert status == 403
+    assert searches == ["book 3"]

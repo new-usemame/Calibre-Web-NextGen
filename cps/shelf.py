@@ -1149,7 +1149,7 @@ def shelf_available_books(shelf_id):
         })
 
     return jsonify({'status': 'ok', 'shelf_id': shelf_id,
-                    'shelf_name': shelf.name, 'books': books})
+                    'shelf_name': shelf.name, 'books': rows})
 
 
 # ---------------------------------------------------------------------------

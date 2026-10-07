@@ -580,8 +580,17 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       menu.style.maxHeight = `${Math.max(60, available)}px`;
     };
     constrainMenu();
+    // An observer delivery must not resize what it observes. Clamping the
+    // height can add a classic scrollbar that widens the max-content menu, and
+    // WebKit on Linux/Windows then reports a ResizeObserver loop (#2475 CI).
+    // The synchronous call above still positions the first paint.
+    let frame = 0;
+    const scheduleConstrain = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => { frame = 0; constrainMenu(); });
+    };
     const toolbar = settingsMenuRef.current?.closest<HTMLElement>(`.${styles.toolbar}`);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(constrainMenu);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleConstrain);
     const observedItems = new Set<Element>();
     const observeItems = () => {
       if (!toolbar || !active) return;
@@ -614,6 +623,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     window.addEventListener('scroll', constrainMenu, { passive: true });
     return () => {
       active = false;
+      cancelAnimationFrame(frame);
       observer?.disconnect();
       mutations?.disconnect();
       document.fonts?.removeEventListener('loadingdone', constrainMenu);

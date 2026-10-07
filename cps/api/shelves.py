@@ -310,8 +310,9 @@ def delete_shelf_api(shelf_id):
 def shelf_available_books_api(shelf_id):
     """Searchable, paged book list for the shelf page's "Add books" picker.
 
-    Same visibility filters as normal browsing (``common_filters`` /
-    ``get_search_results``). Each row says whether the book is already on this
+    The query is ``cps.shelf.shelf_picker_books``, shared with the classic
+    modal: the caller's browsing visibility minus archived books, which the
+    add path refuses. Each row says whether the book is already on this
     shelf so the picker can disable it; the write path stays the per-book
     ``POST /shelves/<id>/books/<book_id>`` endpoint, which owns permission,
     de-duplication and library-membership checks.

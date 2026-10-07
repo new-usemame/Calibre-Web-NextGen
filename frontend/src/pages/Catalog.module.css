@@ -459,6 +459,7 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .settingsItem:hover { background: var(--surface-3); }
+.settingsExport { padding: var(--sp-2); border-top: 1px solid var(--border); margin-top: var(--sp-1); max-width: 320px; }
 .customFieldSetting { padding: 0 var(--sp-2) var(--sp-2); }
 .customFieldSetting .settingsItem { padding-inline: 0; }
 .customFieldLabel {

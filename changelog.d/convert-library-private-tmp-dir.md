@@ -1,0 +1,2 @@
+### Fixed
+- **Convert Library and ingest no longer delete each other's files.** Both worked in the same temp conversion directory, which ingest cleared after every book and Convert Library emptied after every book, so a Convert Library run during an ingest could delete the book the other was converting. Convert Library now works in its own folder inside that directory, ingest leaves that folder alone, and cancelling Convert Library removes only its own folder. Thanks @splitsec2 (#2425).

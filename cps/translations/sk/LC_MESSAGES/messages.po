@@ -1323,7 +1323,25 @@ msgstr "Pôvodný formát"
 msgid "End Format"
 msgstr "Cieľový formát"
 
+#: cps/cwa_functions.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
+msgid "All Time"
+msgstr ""
+
 #: cps/cwa_functions.py
+#, python-format
+msgid "Last %(count)s day"
+msgid_plural "Last %(count)s days"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#: cps/cwa_functions.py
+#, python-format
+msgid "%(start)s to %(end)s"
+msgstr ""
+
+#: cps/cwa_functions.py cps/templates/cwa_user_activity.html
 msgid "Unknown User"
 msgstr "Neznámy používateľ"
 
@@ -1623,8 +1641,8 @@ msgstr "Metadáta boli úspešne aktualizované"
 msgid "Error editing book: {}"
 msgstr "Chyba pri úprave knihy: {}"
 
-#: cps/editbooks.py cps/templates/kobo_reconcile.html cps/updater.py
-#: cps/uploader.py
+#: cps/editbooks.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/kobo_reconcile.html cps/updater.py cps/uploader.py
 msgid "Unknown"
 msgstr "Neznámy"
 
@@ -2303,13 +2321,14 @@ msgid "Books ordered by publisher"
 msgstr "Knihy usporiadané podľa vydavateľa"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
-msgstr "Kategórie"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
+msgstr "Značka"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Knihy usporiadané podľa kategórie"
+msgid "Books grouped by tags"
+msgstr "Knihy zoskupené podľa značiek"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2357,13 +2376,14 @@ msgstr "Police"
 msgid "Books organized in shelves"
 msgstr "Knihy organizované v policiach"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "Magické police"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Inteligentné police"
 
 #: cps/opds.py
-msgid "Books organized in magic shelves"
-msgstr "Knihy usporiadané v magických policiach"
+msgid "Books organized in smart shelves"
+msgstr "Knihy usporiadané v inteligentných policiach"
 
 #: cps/opds.py
 msgid "description"
@@ -2385,9 +2405,9 @@ msgid "{} Stars"
 msgstr "{} Hviezdičiek"
 
 #: cps/opds.py cps/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_epub_fixer.html cps/templates/feed.xml
-#: cps/templates/index.html cps/templates/index.xml cps/templates/layout.html
-#: cps/templates/search_form.html
+#: cps/templates/cwa_epub_fixer.html cps/templates/cwa_stats_i18n.html
+#: cps/templates/feed.xml cps/templates/index.html cps/templates/index.xml
+#: cps/templates/layout.html cps/templates/search_form.html
 msgid "Search"
 msgstr "Hľadať"
 
@@ -2466,8 +2486,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "Zobraziť časť Kategórie"
+msgid "Show Tags Section"
+msgstr "Zobraziť sekciu značiek"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -2798,6 +2818,18 @@ msgstr "Upravené (najstaršie → nedávne)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Ručne (presuňte nižšie)"
+
+#: cps/spa_strings.py
+msgid "Allow direct DRM-free MOBI 6 books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this catalog. The server upload-format setting must also "
+"allow MOBI. Normal conversion settings apply; without conversion, MOBI can "
+"be downloaded but cannot be opened in the web reader. Download clients have "
+"a separate format opt-in."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3529,11 +3561,11 @@ msgstr "Použiť na {n} kníh"
 msgid "Match condition"
 msgstr "Podmienka zhody"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Pole pravidla"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Operátor pravidla"
 
@@ -3723,7 +3755,8 @@ msgstr "Modrá"
 msgid "Book content"
 msgstr "Obsah knihy"
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/layout.html
 msgid "Browse"
 msgstr "Prechádzať"
 
@@ -3805,7 +3838,7 @@ msgstr "Aktualizácia obálky zlyhala."
 msgid "Cover updated."
 msgstr "Obálka bola aktualizovaná."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Vytvoriť inteligentnú policu"
 
@@ -4056,7 +4089,8 @@ msgstr "Vydavatelia (oddelení čiarkou)"
 msgid "Read"
 msgstr "Prečítané"
 
-#: cps/spa_strings.py cps/templates/image.html
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/image.html
 msgid "Reading"
 msgstr "Čítanie"
 
@@ -4072,7 +4106,8 @@ msgstr "Červená"
 msgid "Registration failed."
 msgstr "Registrácia zlyhala."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr "Odstrániť {name}"
@@ -4081,7 +4116,8 @@ msgstr "Odstrániť {name}"
 msgid "Request failed."
 msgstr "Požiadavka zlyhala."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Reset"
 msgstr "Obnoviť"
 
@@ -5310,6 +5346,7 @@ msgid "Any tags"
 msgstr "Ľubovoľné značky"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
 msgid "Apply"
 msgstr "Použiť"
 
@@ -5380,7 +5417,7 @@ msgstr "Priradiť k zariadeniu"
 msgid "Assigned to {name}."
 msgstr "Priradené k {name}."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
 msgid "Authentication"
 msgstr "Overovanie"
 
@@ -5528,7 +5565,8 @@ msgstr "Kniha {id}"
 msgid "Book {number}"
 msgstr "Kniha {number}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
 msgid "Books"
 msgstr "Knihy"
 
@@ -5622,11 +5660,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"CWNG copies a completed EPUB or PDF from this mapping. It does not move "
-"files, delete client jobs, or change seeding limits. NZBGet needs "
-"credentials that can read configuration, queue and history. qBittorrent "
-"needs an existing category. Transmission uses the configured folder and "
-"label."
+"CWNG copies completed books allowed by this connection and the server format "
+"settings. It does not move files, delete client jobs, or change seeding "
+"limits. NZBGet needs credentials that can read configuration, queue and "
+"history. qBittorrent needs an existing category. Transmission uses the "
+"configured folder and label."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5691,6 +5729,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Kategórie"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -6672,7 +6714,7 @@ msgstr "Upravovať verejné police"
 msgid "Edit shared library cover"
 msgstr "Upraviť obálku zdieľanej knižnice"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Upraviť inteligentnú policu"
 
@@ -6694,7 +6736,8 @@ msgstr ""
 "Odpojte čítačku a reštartujte KOReader so zapnutou Wi-Fi. Vaša knižnica sa o "
 "chvíľu zobrazí."
 
-#: cps/spa_strings.py cps/templates/admin.html cps/templates/register.html
+#: cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cwa_stats_i18n.html cps/templates/register.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Email"
 msgstr "E-mail"
@@ -6797,7 +6840,8 @@ msgid "Export"
 msgstr "Exportovať"
 
 #: cps/spa_strings.py cps/templates/_book_list_export.html
-#: cps/templates/annotations_view.html
+#: cps/templates/annotations_view.html cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Export CSV"
 msgstr "Exportovať CSV"
 
@@ -6952,7 +6996,8 @@ msgstr "Formátovanie sa zachová tam, kde ho stránka knihy podporuje."
 msgid "From address"
 msgstr "Adresa odosielateľa"
 
-#: cps/spa_strings.py cps/templates/search_form.html
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
+#: cps/templates/search_form.html
 msgid "From:"
 msgstr "Od:"
 
@@ -8906,7 +8951,7 @@ msgstr ""
 msgid "Searching…"
 msgstr "Hľadá sa…"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
 msgid "Security"
 msgstr "Zabezpečenie"
 
@@ -9200,6 +9245,10 @@ msgid "Show shelf tags"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Show shelf drag handles"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Show the global library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"
@@ -9308,10 +9357,6 @@ msgstr ""
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Inteligentná polica sa nenašla."
-
-#: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Inteligentné police"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9478,11 +9523,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
-
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "Značka"
 
 #: cps/spa_strings.py
 msgid "Tags — exclude"
@@ -10050,7 +10090,8 @@ msgstr "Text názvu"
 msgid "Title, author, or ISBN"
 msgstr "Názov, autor alebo ISBN"
 
-#: cps/spa_strings.py cps/templates/search_form.html
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
+#: cps/templates/search_form.html
 msgid "To:"
 msgstr "Do:"
 
@@ -10604,7 +10645,8 @@ msgstr ""
 msgid "shared"
 msgstr "zdieľané"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
 msgid "to"
 msgstr "do"
 
@@ -10616,7 +10658,7 @@ msgstr "typ (isbn, amazon, doi…)"
 msgid "unknown"
 msgstr "neznáme"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "hodnota"
 
@@ -10824,6 +10866,43 @@ msgstr "← Späť na prihlásenie"
 #: cps/spa_strings.py
 msgid "← Library"
 msgstr "← Knižnica"
+
+#: cps/spa_strings.py
+msgid "Add books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add selected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{failed} of {total} books could not be added. They remain selected."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -11330,6 +11409,17 @@ msgstr ""
 msgid "This rule cannot be edited here. It will be kept unless you remove it."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this download client. The server upload-format setting must "
+"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+"can be downloaded but cannot be opened in the web reader."
+msgstr ""
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Čakajúca"
@@ -11434,8 +11524,8 @@ msgstr "Súborový formát: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Kategória: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Značka: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -11451,13 +11541,13 @@ msgid "Hidden Books"
 msgstr "Skryté knihy"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Chyba pri načítaní magickej police"
+msgid "Error loading smart shelf"
+msgstr "Chyba pri načítaní inteligentnej police"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Inteligentná polica — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11500,10 +11590,6 @@ msgstr "Názov police je príliš dlhý (max. 100 znakov)"
 msgid "Error creating shelf"
 msgstr "Chyba pri vytváraní police"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Vytvoriť magickú policu"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11515,10 +11601,6 @@ msgstr "Zmena verejného stavu bola zamietnutá"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Chyba pri aktualizácii police"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Upraviť magickú policu"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11570,7 +11652,7 @@ msgstr "Polica nebola skrytá"
 msgid "Error unhiding shelf"
 msgstr "Chyba pri zrušení skrytia police"
 
-#: cps/templates/admin.html cps/web.py
+#: cps/templates/admin.html cps/templates/cwa_stats_i18n.html cps/web.py
 msgid "Downloads"
 msgstr "Stiahnutia"
 
@@ -11791,24 +11873,25 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr "Pripojte sa k Wi-Fi a otvorte ju zo svojej knižnice: stiahne sa sama."
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
-msgstr ""
-"Synchronizácia magických políc s čítačkami je globálne vypnutá — táto polica "
-"sa do vašich čítačiek nedostane, kým v Nastaveniach CWA nezapnete "
-"„Synchronizovať magické police do čítačiek (Kobo a KOReader)“."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
+msgstr "Synchronizovať inteligentné police s čítačkami (Kobo a KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Synchronizovať inteligentné police s Kobo"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
-"Synchronizácia magických políc s Kobo je globálne vypnutá — táto polica sa "
-"do vášho Kobo nedostane, kým v Nastaveniach CWA nezapnete „Synchronizovať "
-"magické police do Kobo“."
+"Synchronizácia inteligentných políc je globálne vypnutá. Zapnite "
+"„%(setting)s“ v nastaveniach CWA, aby sa táto polica dostala do vašich "
+"čítačiek."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -12288,7 +12371,7 @@ msgstr "Externý port"
 msgid "Books per Page"
 msgstr "Kníh na stránku"
 
-#: cps/templates/admin.html
+#: cps/templates/admin.html cps/templates/cwa_stats_i18n.html
 msgid "Uploads"
 msgstr "Nahrávania"
 
@@ -12670,6 +12753,10 @@ msgid "Upload Format"
 msgstr "Formát nahrávania"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr " Vymeniť autora a názov"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "ID série"
 
@@ -12790,10 +12877,6 @@ msgid "This Field is Required"
 msgstr "Toto pole je povinné"
 
 #: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr " Vymeniť autora a názov"
-
-#: cps/templates/book_table.html
 msgid "Select all"
 msgstr "Vybrať všetko"
 
@@ -12834,8 +12917,8 @@ msgid "Enter Authors"
 msgstr "Zadajte autorov"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
-msgstr "Zadajte kategórie"
+msgid "Enter Tags"
+msgstr "Zadajte značky"
 
 #: cps/templates/book_table.html
 msgid "Enter Series"
@@ -12916,11 +12999,11 @@ msgstr "Upravte polia, ktoré chcete zmeniť. Prázdne polia budú ignorované:"
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"Pre Autorov, Štítky/Kategórie, Jazyky a Vydavateľov je podporovaných viac "
-"hodnôt. Použite hodnoty oddelené čiarkou (napr. \"Meno1, Meno2\")."
+"Pre autorov, značky, jazyky a vydavateľov možno zadať viac hodnôt. Oddeľte "
+"ich čiarkami (napr. \"Meno1, Meno2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -14552,6 +14635,124 @@ msgstr "Nahradiť obálku týmto kandidátom?"
 msgid "Rendering e-reader previews:"
 msgstr "Vykresľujú sa náhľady pre čítačku:"
 
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Analytics"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Track endpoint activity, integration usage, and API patterns"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 7 Days"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 30 Days"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 90 Days"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 6 Months"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last Year"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Custom Range"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Demo Data"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "DEMO MODE"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Kobo Syncs"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "OPDS Accesses"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Email Deliveries"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Web UI Requests"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Breakdown"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Activity Timing"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint Access Frequency"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Category"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Access Count"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Last Accessed"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "No endpoint data available"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "No API usage data available"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "No timing data available"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+#, python-format
+msgid "API Calls: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+msgid "Please select both start and end dates"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Real Data"
+msgstr ""
+
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run Archive"
@@ -14690,6 +14891,190 @@ msgstr "EPUB Fixer bol spustený pre vybranú knihu"
 #: cps/templates/cwa_epub_fixer.html
 msgid "Error starting EPUB Fixer"
 msgstr "Chyba pri spúšťaní EPUB Fixera"
+
+#: cps/templates/cwa_library_stats.html cps/templates/stats.html
+msgid "Library Statistics"
+msgstr "Štatistiky police"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Comprehensive insights into your Calibre library collection"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_stats_system.html
+msgid "Total Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Added Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "N/A"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "All time view"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Conversions"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Formats"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Library Growth Over Time"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Largest Series"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Publication Year Distribution"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Rating Statistics"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Top Enforced Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Import Source Flows"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Format Distribution"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Most Fixed Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(count)s fix"
+msgid_plural "%(count)s fixes"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last fixed: %(date)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No EPUB fixes recorded"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No growth data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Added: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Total: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Books Added"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Library Size"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No format data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(format)s — books: %(count)s (%(percent)s%%)"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No series data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Books: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Highest Index: %(index)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Number of Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No publication year data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(year)s — books: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No rating data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "vs previous period"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(percent)s%% Unrated"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Rating: %(stars)s; books: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No enforcement data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Enforcements: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last: %(date)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Enforcements"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No conversion data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Conversions: %(count)s"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Enable/Disable Calibre-Web NextGen Services"
@@ -15365,31 +15750,16 @@ msgstr ""
 "sú kompletné."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr "Synchronizovať magické police do čítačiek (Kobo a KOReader)"
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
-"Ak je aktívne, magické police označené na synchronizáciu s čítačkou sa "
-"dostanú do vášho Kobo ako kolekcie a do knižnice KOReader ako police. Kobo "
-"navyše vyžaduje synchronizáciu Kobo v Základnej konfigurácii."
+"Po zapnutí sa označené inteligentné police prenesú do Kobo ako kolekcie. "
+"Zapnite aj synchronizáciu Kobo v základnom nastavení."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Synchronizovať magické police do Kobo"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"Ak je aktívne, vaše magické police sa synchronizujú s vaším zariadením Kobo "
-"ako kolekcie. Poznámka: Musíte tiež povoliť synchronizáciu Kobo v Základnej "
-"konfigurácii."
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "KOReader tiež prijíma označené inteligentné police do svojej knižnice."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15880,6 +16250,390 @@ msgstr "Skontrolovať %(count)s čakajúcich zhôd"
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 msgid "Click to See More"
 msgstr "Kliknutím zobrazíte viac"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Logins"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Failed Login Attempts"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Logouts"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Searches"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Added to Shelf"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Removed from Shelf"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf Views"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Zobrazenia inteligentných políc"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Kobo Sync"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "OPDS Feed"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Email Delivery"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Web UI"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Other"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Desktop"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Mobile"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Tablet"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Book Detail"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Series Page"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Author Page"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Direct Link"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Server Activity Dashboard"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Track server activity, file conversions, and automatic fixes."
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen - Server Stats"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Enforced"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Converted"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Fixed"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Hardcover Auto-Fetch Statistics"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Total Processed"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Auto-Matched"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Pending Review"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Manually Reviewed"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Conversion History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Import History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen EPUB Fixer History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "EPUB Fixer History with Paths & Fixes"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Enforcement History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Enforcement History with Paths"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "User Activity"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "Library Stats"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "API Usage"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "System Stats"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "User Activity Dashboard"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Track library usage, downloads, and user engagement"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Filter by User:"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "All Users"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Time Period:"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Large date ranges may take longer to load"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Active Users"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Total Downloads"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Books Read"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity Timeline"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Peak Usage Hours"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Event Types"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Format Preferences by User"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Discovery Sources"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Device Breakdown"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Most Active Days"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Top Users"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Popular Books"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Recent Searches"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Average Session Duration"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Avg Session Length"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "%(minutes)s min"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Search Success Rate"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Searches Leading to Actions"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Successful searches: %(successful)s / %(total)s"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Shelf Activity"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No Activity Data Yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Start using your library to see beautiful visualizations and insights!"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Downloads, reading sessions, and searches will be tracked here."
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Download Formats Distribution"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Reading Velocity (Books per Week)"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No activity data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Activity: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No reading data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "4-Week Avg"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format preference data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No discovery data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No device data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No failed attempts"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No user activity yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No popular books yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No searches yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Minutes: %(start)s–%(end)s; sessions: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Minutes"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Sessions"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No session data available"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Success Rate"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Views"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Added"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Removed"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No shelf activity yet"
+msgstr ""
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Before you go — what made you switch back?"
@@ -16406,10 +17160,6 @@ msgstr "Zadajte doménové meno"
 msgid "Denied Domains (Blacklist)"
 msgstr "Zakázané domény (Čierny zoznam)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Magická)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16607,8 +17357,8 @@ msgid "Mobile Notice"
 msgstr "Upozornenie pre mobilné zariadenia"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr "Úprava magickej police funguje najlepšie na počítači alebo tablete."
+msgid "Smart shelf editing works best on desktop or tablet devices."
+msgstr "Inteligentné police sa najlepšie upravujú na počítači alebo tablete."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16877,10 +17627,6 @@ msgid "Create Shelf"
 msgstr "Vytvoriť policu"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Magické police ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Detailu o knihe"
 
@@ -17060,12 +17806,37 @@ msgid "Download Access Log"
 msgstr "Stiahnuť denník prístupu"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Čo sú inteligentné police?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr "Inteligentné police automaticky zhromažďujú knihy podľa pravidiel."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Inteligentné police sa v starších verziách nazývali „Magic Shelves“."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Systémová šablóna"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr "Toto je preddefinovaná šablónová polica. Môžete ju voľne upravovať."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Najprv zapnite „%(setting)s“ v nastaveniach CWA. Dovtedy toto políčko nemá "
+"účinok a polica sa do čítačky neprenesie."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Sprístupniť túto inteligentnú policu v mojom kanáli OPDS"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -17552,10 +18323,6 @@ msgstr ""
 "stránky."
 
 #: cps/templates/stats.html
-msgid "Library Statistics"
-msgstr "Štatistiky police"
-
-#: cps/templates/stats.html
 msgid "Books in this Library"
 msgstr "Knihy v tejto knižnici"
 
@@ -17564,8 +18331,8 @@ msgid "Authors in this Library"
 msgstr "Autori v tejto knižnici"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
-msgstr "Kategórie v tejto knižnici"
+msgid "Tags in this Library"
+msgstr "Značky v tejto knižnici"
 
 #: cps/templates/stats.html
 msgid "Series in this Library"
@@ -18005,12 +18772,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Nakonfigurujte, aké akcie je tento používateľ oprávnený vykonávať."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Poradie magických políc"
+msgid "Smart shelves order"
+msgstr "Poradie inteligentných políc"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "Vyberte, ako sú vaše magické police zoradené v bočnom paneli."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Vyberte poradie svojich inteligentných políc v bočnom paneli."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -18059,8 +18826,8 @@ msgstr ""
 "Manuálne."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Viditeľnosť magických políc"
+msgid "Smart shelves visibility"
+msgstr "Viditeľnosť inteligentných políc"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -18253,6 +19020,106 @@ msgstr "Sprístupniť vybrané police cez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zobraziť sekciu Prečítané/Neprečítané"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Magické police"
+
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Knihy usporiadané v magických policiach"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Chyba pri načítaní magickej police"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Vytvoriť magickú policu"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Upraviť magickú policu"
+
+#~ msgid ""
+#~ "E-reader sync for Magic Shelves is disabled globally — this shelf won't "
+#~ "reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
+#~ "KOReader)' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "Synchronizácia magických políc s čítačkami je globálne vypnutá — táto "
+#~ "polica sa do vašich čítačiek nedostane, kým v Nastaveniach CWA nezapnete "
+#~ "„Synchronizovať magické police do čítačiek (Kobo a KOReader)“."
+
+#~ msgid ""
+#~ "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
+#~ "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+#~ msgstr ""
+#~ "Synchronizácia magických políc s Kobo je globálne vypnutá — táto polica "
+#~ "sa do vášho Kobo nedostane, kým v Nastaveniach CWA nezapnete "
+#~ "„Synchronizovať magické police do Kobo“."
+
+#~ msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
+#~ msgstr "Synchronizovať magické police do čítačiek (Kobo a KOReader)"
+
+#~ msgid ""
+#~ "When active, Magic Shelves marked for e-reader sync reach your Kobo as "
+#~ "collections and your KOReader library as shelves. Kobo also needs Kobo "
+#~ "Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Ak je aktívne, magické police označené na synchronizáciu s čítačkou sa "
+#~ "dostanú do vášho Kobo ako kolekcie a do knižnice KOReader ako police. "
+#~ "Kobo navyše vyžaduje synchronizáciu Kobo v Základnej konfigurácii."
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Synchronizovať magické police do Kobo"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Ak je aktívne, vaše magické police sa synchronizujú s vaším zariadením "
+#~ "Kobo ako kolekcie. Poznámka: Musíte tiež povoliť synchronizáciu Kobo v "
+#~ "Základnej konfigurácii."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Magická)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr "Úprava magickej police funguje najlepšie na počítači alebo tablete."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Magické police ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Poradie magických políc"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "Vyberte, ako sú vaše magické police zoradené v bočnom paneli."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Viditeľnosť magických políc"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Knihy usporiadané podľa kategórie"
+
+#~ msgid "Show Category Section"
+#~ msgstr "Zobraziť časť Kategórie"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Kategória: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Zadajte kategórie"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "Pre Autorov, Štítky/Kategórie, Jazyky a Vydavateľov je podporovaných viac "
+#~ "hodnôt. Použite hodnoty oddelené čiarkou (napr. \"Meno1, Meno2\")."
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Kategórie v tejto knižnici"
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

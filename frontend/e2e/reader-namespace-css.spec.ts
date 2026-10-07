@@ -70,6 +70,15 @@ test('#2255 publisher namespaces apply to external and inline CSS, including non
 });
 
 test('#2255 a hidden publisher footnote opens safely and Go to note reveals its target', async ({page}) => {
+  // Enlarged saved text makes revealing this long note add pagination columns.
+  // Keep the preference deterministic without changing the shared account.
+  await page.route('**/api/v1/reader/settings', async route => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.reader = {...payload.reader, fontSize: 130, lineHeight: 190, margin: 32, font: 'Arial'};
+    await route.fulfill({response, json: payload});
+  });
   await openBook(page);
   const chapter = page.frameLocator('iframe').first();
   await expect(chapter.locator('#fn-80-2')).toHaveCSS('max-height', '0px');
@@ -82,9 +91,14 @@ test('#2255 a hidden publisher footnote opens safely and Go to note reveals its 
     const state = window as unknown as Record<string, unknown>;
     return !!(state.NOTE_SCRIPT_RAN || state.NOTE_IMG_ONERROR_RAN || state.NOTE_HANDLER_RAN);
   })).toBe(false);
+  const frame = page.locator('iframe').first();
+  const hiddenWidth = await frame.evaluate(node => node.getBoundingClientRect().width);
   await note.getByRole('button', {name: 'Go to note', exact: true}).click();
   await expect(note).toBeHidden();
   await expect(chapter.locator('#fn-80-2')).toHaveCSS('max-height', 'none');
+  // A brief intersection before the revealed chapter expands is not arrival.
+  await expect.poll(() => frame.evaluate(node => node.getBoundingClientRect().width),
+    {message: 'the revealed long note has expanded the chapter'}).toBeGreaterThan(hiddenWidth);
   // A multi-column aside has one union box spanning offscreen columns. Check
   // the first note paragraph the reader must actually see, including clipping.
   await expect(chapter.locator('#fn-80-2 > p').first()).toBeInViewport();

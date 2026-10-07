@@ -1317,7 +1317,23 @@ msgstr "Eredeti formátum"
 msgid "End Format"
 msgstr "Célformátum"
 
+#: cps/cwa_functions.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
+msgid "All Time"
+msgstr ""
+
 #: cps/cwa_functions.py
+#, python-format
+msgid "Last %(count)s day"
+msgid_plural "Last %(count)s days"
+msgstr[0] ""
+
+#: cps/cwa_functions.py
+#, python-format
+msgid "%(start)s to %(end)s"
+msgstr ""
+
+#: cps/cwa_functions.py cps/templates/cwa_user_activity.html
 msgid "Unknown User"
 msgstr "Ismeretlen felhasználó"
 
@@ -1616,8 +1632,8 @@ msgstr "A metaadatok sikeresen frissültek"
 msgid "Error editing book: {}"
 msgstr "Hiba a könyv szerkesztésénél: {}"
 
-#: cps/editbooks.py cps/templates/kobo_reconcile.html cps/updater.py
-#: cps/uploader.py
+#: cps/editbooks.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/kobo_reconcile.html cps/updater.py cps/uploader.py
 msgid "Unknown"
 msgstr "Ismeretlen"
 
@@ -2281,13 +2297,14 @@ msgid "Books ordered by publisher"
 msgstr "Könyvek kiadók szerint rendezve"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
-#: cps/templates/book_table.html cps/web.py
-msgid "Categories"
+#: cps/templates/book_edit.html cps/templates/book_table.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html cps/web.py
+msgid "Tags"
 msgstr "Címkék"
 
 #: cps/opds.py
-msgid "Books ordered by category"
-msgstr "Könyvek címke szerint rendezve"
+msgid "Books grouped by tags"
+msgstr "Könyvek címkék szerint csoportosítva"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_edit.html cps/templates/book_table.html
@@ -2339,14 +2356,14 @@ msgstr "Polcok"
 msgid "Books organized in shelves"
 msgstr "Könyvek sorozat szerint rendezve"
 
-#: cps/opds.py
-msgid "Magic Shelves"
-msgstr "Varázspolcok"
+#: cps/opds.py cps/spa_strings.py cps/templates/feed.xml
+#: cps/templates/layout.html
+msgid "Smart shelves"
+msgstr "Intelligens polcok"
 
 #: cps/opds.py
-#, fuzzy
-msgid "Books organized in magic shelves"
-msgstr "Könyvek sorozat szerint rendezve"
+msgid "Books organized in smart shelves"
+msgstr "Intelligens polcokra rendezett könyvek"
 
 #: cps/opds.py
 msgid "description"
@@ -2368,9 +2385,9 @@ msgid "{} Stars"
 msgstr "{} csillag"
 
 #: cps/opds.py cps/search.py cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_epub_fixer.html cps/templates/feed.xml
-#: cps/templates/index.html cps/templates/index.xml cps/templates/layout.html
-#: cps/templates/search_form.html
+#: cps/templates/cwa_epub_fixer.html cps/templates/cwa_stats_i18n.html
+#: cps/templates/feed.xml cps/templates/index.html cps/templates/index.xml
+#: cps/templates/layout.html cps/templates/search_form.html
 msgid "Search"
 msgstr "Keresés"
 
@@ -2447,8 +2464,8 @@ msgid "Show Books On Hold"
 msgstr ""
 
 #: cps/render_template.py cps/templates/user_table.html
-msgid "Show Category Section"
-msgstr "Címkék mutatása"
+msgid "Show Tags Section"
+msgstr "Címkék szakaszának megjelenítése"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Series Section"
@@ -2767,6 +2784,23 @@ msgstr "Módosítva (legrégebbi → legutóbbi)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Kézi (húzd át alább)"
+
+#: cps/spa_strings.py
+msgid "Allow direct DRM-free MOBI 6 books"
+msgstr "Közvetlen, DRM nélküli MOBI 6 könyvek engedélyezése"
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this catalog. The server upload-format setting must also "
+"allow MOBI. Normal conversion settings apply; without conversion, MOBI can "
+"be downloaded but cannot be opened in the web reader. Download clients have "
+"a separate format opt-in."
+msgstr ""
+"Csak erre a katalógusra vonatkozik. A szerver feltöltési formátumokra "
+"vonatkozó beállításának is engedélyeznie kell a MOBI-t. A szokásos "
+"konvertálási beállítások érvényesek; konvertálás nélkül a MOBI letölthető, "
+"de a webes olvasóban nem nyitható meg. A letöltőkliensek formátumonként "
+"külön engedélyezhetők."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3426,11 +3460,11 @@ msgstr ""
 msgid "Match condition"
 msgstr "Egyezési feltétel"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
 msgstr "Szabály mezője"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
 msgstr "Szabály operátora"
 
@@ -3618,7 +3652,8 @@ msgstr ""
 msgid "Book content"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/layout.html
 msgid "Browse"
 msgstr "Böngészés"
 
@@ -3700,7 +3735,7 @@ msgstr ""
 msgid "Cover updated."
 msgstr "Borító frissítve."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
 msgstr "Intelligens polc létrehozása"
 
@@ -3948,7 +3983,8 @@ msgstr ""
 msgid "Read"
 msgstr "Olvasva"
 
-#: cps/spa_strings.py cps/templates/image.html
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
+#: cps/templates/image.html
 msgid "Reading"
 msgstr ""
 
@@ -3964,7 +4000,8 @@ msgstr ""
 msgid "Registration failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
 msgstr ""
@@ -3973,7 +4010,8 @@ msgstr ""
 msgid "Request failed."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Reset"
 msgstr ""
 
@@ -5183,6 +5221,7 @@ msgid "Any tags"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
 msgid "Apply"
 msgstr "Alkalmaz"
 
@@ -5251,7 +5290,7 @@ msgstr ""
 msgid "Assigned to {name}."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
 msgid "Authentication"
 msgstr ""
 
@@ -5397,7 +5436,8 @@ msgstr ""
 msgid "Book {number}"
 msgstr "{number}. könyv"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
 msgid "Books"
 msgstr "Könyvek"
 
@@ -5489,18 +5529,18 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"CWNG copies a completed EPUB or PDF from this mapping. It does not move "
-"files, delete client jobs, or change seeding limits. NZBGet needs "
-"credentials that can read configuration, queue and history. qBittorrent "
-"needs an existing category. Transmission uses the configured folder and "
-"label."
+"CWNG copies completed books allowed by this connection and the server format "
+"settings. It does not move files, delete client jobs, or change seeding "
+"limits. NZBGet needs credentials that can read configuration, queue and "
+"history. qBittorrent needs an existing category. Transmission uses the "
+"configured folder and label."
 msgstr ""
-"A CWNG egy kész EPUB- vagy PDF-fájlt másol erről a megfeleltetésről. Nem "
-"mozgat fájlokat, nem töröl kliensfeladatokat, és nem módosítja a "
-"visszaosztási korlátokat. Az NZBGethez a beállításokat, várólistát és "
-"előzményeket olvasni képes hitelesítő adatok szükségesek. A qBittorrent "
-"meglévő kategóriát igényel. A Transmission a beállított mappát és címkét "
-"használja."
+"A CWNG átmásolja azokat a befejezett könyveket, amelyeket ez a kapcsolat és "
+"a szerver formátumbeállításai engedélyeznek. Nem helyez át fájlokat, nem "
+"törli a kliens feladatait, és nem módosítja a megosztási korlátokat. Az "
+"NZBGetnek olyan hitelesítő adatokra van szüksége, amelyekkel olvasható a "
+"konfiguráció, a várólista és az előzmények. A qBittorrenthez már létező "
+"kategória szükséges. A Transmission a beállított mappát és címkét használja."
 
 #: cps/spa_strings.py
 msgid "Can browse and request"
@@ -5564,6 +5604,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Catalogs and download clients"
 msgstr "Katalógusok és letöltőkliensek"
+
+#: cps/spa_strings.py
+msgid "Categories"
+msgstr "Címkék"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -6524,7 +6568,7 @@ msgstr ""
 msgid "Edit shared library cover"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/web.py
 msgid "Edit smart shelf"
 msgstr "Intelligens polc szerkesztése"
 
@@ -6544,7 +6588,8 @@ msgid ""
 "in a moment."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/admin.html cps/templates/register.html
+#: cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cwa_stats_i18n.html cps/templates/register.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Email"
 msgstr "E-mail"
@@ -6643,7 +6688,8 @@ msgid "Export"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/_book_list_export.html
-#: cps/templates/annotations_view.html
+#: cps/templates/annotations_view.html cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Export CSV"
 msgstr ""
 
@@ -6798,7 +6844,8 @@ msgstr ""
 msgid "From address"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/search_form.html
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
+#: cps/templates/search_form.html
 msgid "From:"
 msgstr "Ettől:"
 
@@ -8712,7 +8759,7 @@ msgstr "Keresés ebben a katalógusban…"
 msgid "Searching…"
 msgstr "Keresés…"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
 msgid "Security"
 msgstr ""
 
@@ -9001,6 +9048,10 @@ msgid "Show shelf tags"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Show shelf drag handles"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Show the global library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"
@@ -9103,10 +9154,6 @@ msgstr ""
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr ""
-
-#: cps/spa_strings.py
-msgid "Smart shelves"
-msgstr "Intelligens polcok"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9262,11 +9309,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Tag-like custom columns defined in the library appear here."
 msgstr ""
-
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
-msgid "Tags"
-msgstr "Címkék"
 
 #: cps/spa_strings.py
 msgid "Tags — exclude"
@@ -9847,7 +9889,8 @@ msgstr ""
 msgid "Title, author, or ISBN"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/search_form.html
+#: cps/spa_strings.py cps/templates/cwa_user_activity.html
+#: cps/templates/search_form.html
 msgid "To:"
 msgstr "Eddig:"
 
@@ -10368,7 +10411,8 @@ msgstr "qBittorrent letöltőkliens"
 msgid "shared"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cwa_api_stats.html
+#: cps/templates/cwa_library_stats.html
 msgid "to"
 msgstr ""
 
@@ -10380,7 +10424,7 @@ msgstr ""
 msgid "unknown"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "value"
 msgstr "érték"
 
@@ -10584,6 +10628,43 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "← Library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add selected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11100,6 +11181,21 @@ msgstr ""
 msgid "This rule cannot be edited here. It will be kept unless you remove it."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "A DRM-mentes, befejezett MOBI 6 könyvek engedélyezése"
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this download client. The server upload-format setting must "
+"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+"can be downloaded but cannot be opened in the web reader."
+msgstr ""
+"Csak erre a letöltőkliensre vonatkozik. A szerver feltöltési formátumokra "
+"vonatkozó beállításának is engedélyeznie kell a MOBI-t. A szokásos "
+"konvertálási beállítások érvényesek; konvertálás nélkül a MOBI letölthető, "
+"de a webes olvasóban nem nyitható meg."
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Várakozás"
@@ -11202,8 +11298,8 @@ msgstr "Fájlformátum: %(format)s"
 
 #: cps/web.py
 #, python-format
-msgid "Category: %(name)s"
-msgstr "Címke: %(name)s"
+msgid "Tags: %(name)s"
+msgstr "Címkék: %(name)s"
 
 #: cps/web.py
 #, python-format
@@ -11221,13 +11317,13 @@ msgid "Hidden Books"
 msgstr "Rejtett könyvek"
 
 #: cps/web.py
-msgid "Error loading magic shelf"
-msgstr "Hiba varázspolc betöltése közben"
+msgid "Error loading smart shelf"
+msgstr "Hiba az intelligens polc betöltésekor"
 
 #: cps/web.py
 #, python-format
-msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr "Varázspolc&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+msgid "Smart shelf — %(icon)s %(name)s"
+msgstr "Intelligens polc — %(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
@@ -11270,10 +11366,6 @@ msgstr "Polc név túl hosszú (max. 100 karakter)"
 msgid "Error creating shelf"
 msgstr "Hiba polc létrehozásakor"
 
-#: cps/templates/layout.html cps/web.py
-msgid "Create Magic Shelf"
-msgstr "Varázspolc létrehozása"
-
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
 msgstr ""
@@ -11285,10 +11377,6 @@ msgstr "Nincs jogosultsága megváltoztatni a publikus státuszt"
 #: cps/web.py
 msgid "Error updating shelf"
 msgstr "Hiba polc frissítésekor"
-
-#: cps/web.py
-msgid "Edit Magic Shelf"
-msgstr "Varázspolc szerkesztése"
 
 #: cps/web.py
 msgid "Shelf not found"
@@ -11339,7 +11427,7 @@ msgstr "A polc nem lett elrejtve"
 msgid "Error unhiding shelf"
 msgstr "Hiba polc újra megjelenítésekor"
 
-#: cps/templates/admin.html cps/web.py
+#: cps/templates/admin.html cps/templates/cwa_stats_i18n.html cps/web.py
 msgid "Downloads"
 msgstr "Letöltések"
 
@@ -11564,18 +11652,26 @@ msgstr ""
 msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
 msgstr ""
 
-#: cps/services/ereader_scope.py
-msgid ""
-"E-reader sync for Magic Shelves is disabled globally — this shelf won't "
-"reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and "
-"KOReader)' is enabled in CWA Settings."
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to e-readers (Kobo and KOReader)"
 msgstr ""
+"Intelligens polcok szinkronizálása e-könyv-olvasókra (Kobo és KOReader)"
+
+#: cps/services/ereader_scope.py cps/templates/cwa_settings.html
+#: cps/templates/magic_shelf_edit.html
+msgid "Sync smart shelves to Kobo"
+msgstr "Intelligens polcok szinkronizálása Kobóra"
 
 #: cps/services/ereader_scope.py
+#, python-format
 msgid ""
-"Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
-"your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
+"Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+"so this shelf can reach your e-readers."
 msgstr ""
+"Az intelligens polcok szinkronizálása globálisan le van tiltva. Engedélyezze "
+"a „%(setting)s” beállítást a CWA-beállításokban, hogy ez a polc eljusson az "
+"e-könyv-olvasókra."
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -12072,7 +12168,7 @@ msgstr "Külső port"
 msgid "Books per Page"
 msgstr "Könyvek oldalanként"
 
-#: cps/templates/admin.html
+#: cps/templates/admin.html cps/templates/cwa_stats_i18n.html
 msgid "Uploads"
 msgstr "Feltöltések"
 
@@ -12447,6 +12543,10 @@ msgid "Upload Format"
 msgstr "Feltöltés formátuma"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
+msgid " Exchange author & title"
+msgstr "Szerző és cím felcserélése"
+
+#: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
 msgstr "Sorozat sorszám"
 
@@ -12570,10 +12670,6 @@ msgid "This Field is Required"
 msgstr "Ez a mező kötelező"
 
 #: cps/templates/book_table.html
-msgid " Exchange author & title"
-msgstr "Szerző és cím felcserélése"
-
-#: cps/templates/book_table.html
 msgid "Select all"
 msgstr "Minden kijelölése"
 
@@ -12614,7 +12710,7 @@ msgid "Enter Authors"
 msgstr "Szerzők bevitele"
 
 #: cps/templates/book_table.html
-msgid "Enter Categories"
+msgid "Enter Tags"
 msgstr "Címkék bevitele"
 
 #: cps/templates/book_table.html
@@ -12697,11 +12793,11 @@ msgstr ""
 
 #: cps/templates/book_table.html
 msgid ""
-"Multiple values are supported for Authors, Tags/Categories, Languages, and "
-"Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+"Multiple values are supported for Authors, Tags, Languages, and Publishers. "
+"Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
-"Több érték támogatott szerzőkhöz, címkékhez, nyelvekhez és kiadókhoz. "
-"Vesszővel válassza el őket egymástól (pl.: \"Név1, Név2\")"
+"Több érték adható meg a szerzőkhöz, címkékhez, nyelvekhez és kiadókhoz. "
+"Vesszővel válassza el őket (például: \"Név1, Név2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -14236,6 +14332,124 @@ msgstr "Lecseréli a borítót erre a jelöltre?"
 msgid "Rendering e-reader previews:"
 msgstr "Kobo előnézetek renderelése:"
 
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Analytics"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Track endpoint activity, integration usage, and API patterns"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 7 Days"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 30 Days"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 90 Days"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last 6 Months"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Last Year"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Custom Range"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Demo Data"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "DEMO MODE"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Kobo Syncs"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "OPDS Accesses"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Email Deliveries"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Web UI Requests"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Usage Breakdown"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "API Activity Timing"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint Access Frequency"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Endpoint"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_stats_i18n.html
+msgid "Category"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Access Count"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "Last Accessed"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "No endpoint data available"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "No API usage data available"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+msgid "No timing data available"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html
+#, python-format
+msgid "API Calls: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+msgid "Please select both start and end dates"
+msgstr ""
+
+#: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
+#: cps/templates/cwa_user_activity.html
+msgid "Show Real Data"
+msgstr ""
+
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run Archive"
@@ -14361,6 +14575,188 @@ msgstr "EPUB javító elindult a kijelölt könyvekhez"
 #: cps/templates/cwa_epub_fixer.html
 msgid "Error starting EPUB Fixer"
 msgstr "Hiba EPUB javító indításakor"
+
+#: cps/templates/cwa_library_stats.html cps/templates/stats.html
+msgid "Library Statistics"
+msgstr "A Calibre könyvár statisztikái"
+
+#: cps/templates/cwa_library_stats.html
+msgid "Comprehensive insights into your Calibre library collection"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html cps/templates/cwa_stats_system.html
+msgid "Total Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Added Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "N/A"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "All time view"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Conversions"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Formats"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Library Growth Over Time"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Largest Series"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Publication Year Distribution"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Rating Statistics"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Top Enforced Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Import Source Flows"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Format Distribution"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Most Fixed Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(count)s fix"
+msgid_plural "%(count)s fixes"
+msgstr[0] ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last fixed: %(date)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No EPUB fixes recorded"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No growth data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Added: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Total: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Books Added"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Total Library Size"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No format data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(format)s — books: %(count)s (%(percent)s%%)"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No series data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Books: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Highest Index: %(index)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Number of Books"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No publication year data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(year)s — books: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No rating data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "vs previous period"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "%(percent)s%% Unrated"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Rating: %(stars)s; books: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No enforcement data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Enforcements: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Last: %(date)s"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "Enforcements"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+msgid "No conversion data available"
+msgstr ""
+
+#: cps/templates/cwa_library_stats.html
+#, python-format
+msgid "Conversions: %(count)s"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 #, fuzzy
@@ -14979,28 +15375,16 @@ msgstr ""
 "eltérő nyelvet használ, aminek a fordítási állapota nem teljes."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
-msgstr ""
-
-#: cps/templates/cwa_settings.html
 msgid ""
-"When active, Magic Shelves marked for e-reader sync reach your Kobo as "
-"collections and your KOReader library as shelves. Kobo also needs Kobo Sync "
-"in Basic Configuration."
+"When enabled, marked smart shelves reach your Kobo as collections. Enable "
+"Kobo Sync in Basic Configuration too."
 msgstr ""
+"Bekapcsoláskor a megjelölt intelligens polcok gyűjteményként kerülnek a "
+"Kobóra. Az alapbeállításokban a Kobo-szinkronizálást is engedélyezni kell."
 
 #: cps/templates/cwa_settings.html
-msgid "Sync Magic Shelves to Kobo"
-msgstr "Kiválasztott varázspolcok szinkronizációja Kobo eszközzel"
-
-#: cps/templates/cwa_settings.html
-msgid ""
-"When active, your Magic Shelves will be synced to your Kobo device as "
-"collections. Note: You must also enable Kobo Sync in Basic Configuration."
-msgstr ""
-"Aktiválás esetén a Magic Shelves gyűjteményekként szinkronizálódnak a Kobo "
-"eszközödre. Megjegyzés: a Kobo Sync-et is engedélyezned kell az Alap "
-"konfigurációban."
+msgid "KOReader also receives marked smart shelves in its library."
+msgstr "A KOReader könyvtára is megkapja a megjelölt intelligens polcokat."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
@@ -15479,6 +15863,390 @@ msgstr "%(count)s függő találat ellenőrzése"
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 msgid "Click to See More"
 msgstr "Több megjelenítése"
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Logins"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Failed Login Attempts"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Logouts"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
+msgid "Searches"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Added to Shelf"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Removed from Shelf"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf Views"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Smart Shelf Views"
+msgstr "Intelligens polcok megtekintései"
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Kobo Sync"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "OPDS Feed"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Email Delivery"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Web UI"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Other"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Desktop"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Mobile"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Tablet"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Book Detail"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Series Page"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Author Page"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Shelf"
+msgstr ""
+
+#: cps/templates/cwa_stats_i18n.html
+msgid "Direct Link"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Server Activity Dashboard"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Track server activity, file conversions, and automatic fixes."
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen - Server Stats"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Enforced"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Converted"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Books Fixed"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Hardcover Auto-Fetch Statistics"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Total Processed"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Auto-Matched"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Pending Review"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Manually Reviewed"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Conversion History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Import History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen EPUB Fixer History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "EPUB Fixer History with Paths & Fixes"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Calibre-Web NextGen Enforcement History"
+msgstr ""
+
+#: cps/templates/cwa_stats_system.html
+msgid "Enforcement History with Paths"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "User Activity"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "Library Stats"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "API Usage"
+msgstr ""
+
+#: cps/templates/cwa_stats_tabs.html
+msgid "System Stats"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "User Activity Dashboard"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Track library usage, downloads, and user engagement"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Filter by User:"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "All Users"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Time Period:"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Large date ranges may take longer to load"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Active Users"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Total Downloads"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Books Read"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity Timeline"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Peak Usage Hours"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Event Types"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Format Preferences by User"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Discovery Sources"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Device Breakdown"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Most Active Days"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Top Users"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Popular Books"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Recent Searches"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Average Session Duration"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Avg Session Length"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "%(minutes)s min"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Search Success Rate"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Searches Leading to Actions"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Successful searches: %(successful)s / %(total)s"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Shelf Activity"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No Activity Data Yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Start using your library to see beautiful visualizations and insights!"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Downloads, reading sessions, and searches will be tracked here."
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Download Formats Distribution"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Reading Velocity (Books per Week)"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No activity data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Activity: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Activity"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No reading data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "4-Week Avg"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No format preference data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No discovery data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No device data yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No failed attempts"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No user activity yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No popular books yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No searches yet"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+#, python-format
+msgid "Minutes: %(start)s–%(end)s; sessions: %(count)s"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Minutes"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Sessions"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No session data available"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Success Rate"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Views"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Added"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "Removed"
+msgstr ""
+
+#: cps/templates/cwa_user_activity.html
+msgid "No shelf activity yet"
+msgstr ""
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Before you go — what made you switch back?"
@@ -16002,10 +16770,6 @@ msgstr "Tartomány megadása"
 msgid "Denied Domains (Blacklist)"
 msgstr "Elutasított domainek (tiltólista)"
 
-#: cps/templates/feed.xml
-msgid "(Magic)"
-msgstr "(Varázs)"
-
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
 "Open the .kobo/Kobo/Kobo eReader.conf file in a text editor and add (or "
@@ -16201,9 +16965,9 @@ msgid "Mobile Notice"
 msgstr "Mobil értesítés"
 
 #: cps/templates/index.html
-msgid "Magic shelf editing works best on desktop or tablet devices."
+msgid "Smart shelf editing works best on desktop or tablet devices."
 msgstr ""
-"A Magic shelf szerkesztése asztali gépen vagy tableten működik a legjobban."
+"Az intelligens polcokat asztali gépen vagy táblagépen a legjobb szerkeszteni."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -16453,10 +17217,6 @@ msgid "Create Shelf"
 msgstr "Polc készítése"
 
 #: cps/templates/layout.html
-msgid "Magic Shelves ✨"
-msgstr "Varázspolcok ✨"
-
-#: cps/templates/layout.html
 msgid "Book Details"
 msgstr "Könyv részletei"
 
@@ -16643,12 +17403,38 @@ msgid "Download Access Log"
 msgstr "Elárési napló letöltése"
 
 #: cps/templates/magic_shelf_edit.html
+msgid "What are smart shelves?"
+msgstr "Mik azok az intelligens polcok?"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves collect books automatically using rules."
+msgstr ""
+"Az intelligens polcok szabályok alapján automatikusan gyűjtik a könyveket."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Smart shelves were called Magic Shelves in older versions."
+msgstr "Az intelligens polcok neve a régebbi verziókban „Magic Shelves” volt."
+
+#: cps/templates/magic_shelf_edit.html
 msgid "System Template"
 msgstr "Rendszer sablon"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr "Ez egy előre beállított sablonpolc. Szabadon szerkeszthető."
+
+#: cps/templates/magic_shelf_edit.html
+#, python-format
+msgid ""
+"Turn on “%(setting)s” in CWA Settings first. Until then, this checkbox has "
+"no effect and the shelf will not reach your e-reader."
+msgstr ""
+"Először engedélyezze a „%(setting)s” beállítást a CWA-beállításokban. Addig "
+"ez a jelölőnégyzet hatástalan, és a polc nem jut el az e-könyv-olvasóra."
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Expose this smart shelf in my OPDS feed"
+msgstr "Ez az intelligens polc jelenjen meg az OPDS-hírcsatornámban"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -17140,10 +17926,6 @@ msgid "Order saved. The sidebar reflects the new order on next page load."
 msgstr "Sorrend mentve. Az oldalsáv a következő oldalbetöltéskor frissül."
 
 #: cps/templates/stats.html
-msgid "Library Statistics"
-msgstr "A Calibre könyvár statisztikái"
-
-#: cps/templates/stats.html
 msgid "Books in this Library"
 msgstr "Könyvek ebben a könyvtárban"
 
@@ -17152,7 +17934,7 @@ msgid "Authors in this Library"
 msgstr "Szerzők ebben a könyvtárban"
 
 #: cps/templates/stats.html
-msgid "Categories in this Library"
+msgid "Tags in this Library"
 msgstr "Címkék ebben a könyvtárban"
 
 #: cps/templates/stats.html
@@ -17575,12 +18357,12 @@ msgid "Configure what actions this user is allowed to perform."
 msgstr "Állítsa be milyen műveleteket hajthat végre ez a felhasználó."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Order"
-msgstr "Varázspolc rendezés"
+msgid "Smart shelves order"
+msgstr "Intelligens polcok sorrendje"
 
 #: cps/templates/user_edit.html
-msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr "Válassza ki a varázspolcok rendezését az oldalsávban."
+msgid "Choose how your smart shelves are ordered in the sidebar."
+msgstr "Válassza ki az intelligens polcok sorrendjét az oldalsávban."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
@@ -17629,8 +18411,8 @@ msgstr ""
 "állítva."
 
 #: cps/templates/user_edit.html
-msgid "Magic Shelves Visibility"
-msgstr "Varázspolc láthatóság"
+msgid "Smart shelves visibility"
+msgstr "Intelligens polcok láthatósága"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -17826,6 +18608,106 @@ msgstr "Kiválasztott polcok szinkronizációja Kobo eszközzel"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Olvasott/olvasatlan mutatása"
+
+#~ msgid "Magic Shelves"
+#~ msgstr "Varázspolcok"
+
+#, fuzzy
+#~ msgid "Books organized in magic shelves"
+#~ msgstr "Könyvek sorozat szerint rendezve"
+
+#~ msgid "Error loading magic shelf"
+#~ msgstr "Hiba varázspolc betöltése közben"
+
+#, python-format
+#~ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+#~ msgstr "Varázspolc&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
+
+#~ msgid "Create Magic Shelf"
+#~ msgstr "Varázspolc létrehozása"
+
+#~ msgid "Edit Magic Shelf"
+#~ msgstr "Varázspolc szerkesztése"
+
+#~ msgid "Sync Magic Shelves to Kobo"
+#~ msgstr "Kiválasztott varázspolcok szinkronizációja Kobo eszközzel"
+
+#~ msgid ""
+#~ "When active, your Magic Shelves will be synced to your Kobo device as "
+#~ "collections. Note: You must also enable Kobo Sync in Basic Configuration."
+#~ msgstr ""
+#~ "Aktiválás esetén a Magic Shelves gyűjteményekként szinkronizálódnak a "
+#~ "Kobo eszközödre. Megjegyzés: a Kobo Sync-et is engedélyezned kell az Alap "
+#~ "konfigurációban."
+
+#~ msgid "(Magic)"
+#~ msgstr "(Varázs)"
+
+#~ msgid "Magic shelf editing works best on desktop or tablet devices."
+#~ msgstr ""
+#~ "A Magic shelf szerkesztése asztali gépen vagy tableten működik a "
+#~ "legjobban."
+
+#~ msgid "Magic Shelves ✨"
+#~ msgstr "Varázspolcok ✨"
+
+#~ msgid "Magic Shelves Order"
+#~ msgstr "Varázspolc rendezés"
+
+#~ msgid "Choose how your magic shelves are ordered in the sidebar."
+#~ msgstr "Válassza ki a varázspolcok rendezését az oldalsávban."
+
+#~ msgid "Magic Shelves Visibility"
+#~ msgstr "Varázspolc láthatóság"
+
+#~ msgid "Books ordered by category"
+#~ msgstr "Könyvek címke szerint rendezve"
+
+#~ msgid "Show Category Section"
+#~ msgstr "Címkék mutatása"
+
+#, python-format
+#~ msgid "Category: %(name)s"
+#~ msgstr "Címke: %(name)s"
+
+#~ msgid "Enter Categories"
+#~ msgstr "Címkék bevitele"
+
+#~ msgid ""
+#~ "Multiple values are supported for Authors, Tags/Categories, Languages, "
+#~ "and Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
+#~ msgstr ""
+#~ "Több érték támogatott szerzőkhöz, címkékhez, nyelvekhez és kiadókhoz. "
+#~ "Vesszővel válassza el őket egymástól (pl.: \"Név1, Név2\")"
+
+#~ msgid "Categories in this Library"
+#~ msgstr "Címkék ebben a könyvtárban"
+
+#~ msgid ""
+#~ "Applies only to this catalog. The server upload-format setting must also "
+#~ "allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+#~ "can be downloaded but cannot be opened in the web reader. Download "
+#~ "clients still accept EPUB and PDF only."
+#~ msgstr ""
+#~ "Csak erre a katalógusra vonatkozik. A szerver feltöltési formátumainak "
+#~ "beállításában is engedélyezni kell a MOBI-t. A szokásos konvertálási "
+#~ "beállítások érvényesek; konvertálás nélkül a MOBI letölthető, de nem "
+#~ "nyitható meg a webes olvasóban. A letöltőkliensek továbbra is csak EPUB "
+#~ "és PDF formátumot fogadnak el."
+
+#~ msgid ""
+#~ "CWNG copies a completed EPUB or PDF from this mapping. It does not move "
+#~ "files, delete client jobs, or change seeding limits. NZBGet needs "
+#~ "credentials that can read configuration, queue and history. qBittorrent "
+#~ "needs an existing category. Transmission uses the configured folder and "
+#~ "label."
+#~ msgstr ""
+#~ "A CWNG egy kész EPUB- vagy PDF-fájlt másol erről a megfeleltetésről. Nem "
+#~ "mozgat fájlokat, nem töröl kliensfeladatokat, és nem módosítja a "
+#~ "visszaosztási korlátokat. Az NZBGethez a beállításokat, várólistát és "
+#~ "előzményeket olvasni képes hitelesítő adatok szükségesek. A qBittorrent "
+#~ "meglévő kategóriát igényel. A Transmission a beállított mappát és címkét "
+#~ "használja."
 
 #~ msgid ""
 #~ "Restrict book visibility based on values in a Calibre text custom column."

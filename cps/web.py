@@ -1285,7 +1285,7 @@ def render_category_books(page, book_id, order):
         else:
             abort(404)
     return render_title_template('index.html', random=random, entries=entries, pagination=pagination, id=book_id,
-                                 title=_("Category: %(name)s", name=tagsname), page="category", order=order[1])
+                                 title=_("Tags: %(name)s", name=tagsname), page="category", order=order[1])
 
 
 def render_language_books(page, name, order):
@@ -1565,7 +1565,7 @@ def render_magic_shelf(shelf_id, sort_param, page):
 
     except Exception as e:
         log.error(f"Error retrieving books for magic shelf {shelf_id}: {e}")
-        flash(_("Error loading magic shelf"), category="error")
+        flash(_("Error loading smart shelf"), category="error")
         return redirect(url_for('web.index'))
     
     # Create proper pagination object
@@ -1590,7 +1590,7 @@ def render_magic_shelf(shelf_id, sort_param, page):
     return render_title_template('index.html', 
                                  entries=entries, 
                                  pagination=pagination,
-                                 title=_("Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s", icon=shelf.icon, name=shelf.name), 
+                                 title=_("Smart shelf — %(icon)s %(name)s", icon=escape(shelf.icon), name=escape(shelf.name)),
                                  page="magicshelf",
                                  shelf=shelf,
                                  is_hidden_shelf=is_hidden,
@@ -2080,7 +2080,7 @@ def create_magic_shelf():
             return jsonify({"success": False, "message": _("Error creating shelf")}), 500
     
     return render_title_template('magic_shelf_edit.html',
-                                 title=_("Create Magic Shelf"),
+                                 title=_("Create smart shelf"),
                                  page="magic_shelf_create",
                                  is_owner=True,
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
@@ -2222,7 +2222,7 @@ def edit_magic_shelf(shelf_id):
     # For GET request, render the edit form
     return render_title_template('magic_shelf_edit.html',
                                  shelf=shelf,
-                                 title=_("Edit Magic Shelf"),
+                                 title=_("Edit smart shelf"),
                                  page="magic_shelf_edit",
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
                                  opds_expose_checked=opds_expose_checked,
@@ -2771,7 +2771,7 @@ def category_list():
         entries = sorted(entries, key=lambda x: unicode_sort_key(getattr(x[0], 'sort', None) or x[0].name, get_collation_locale()), reverse=not order_no)
         char_list = generate_char_list(entries)
         return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
-                                     title=_("Categories"), page="catlist", data="category", order=order_no)
+                                     title=_("Tags"), page="catlist", data="category", order=order_no)
     else:
         abort(404)
 
@@ -3651,11 +3651,11 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
         if not new_email:
             raise Exception(_("Email can't be empty and has to be a valid Email"))
         if new_email != current_user.email:
-            current_user.email = check_email(new_email)
+            current_user.email = check_email(new_email, current_user.id)
         if current_user.role_admin():
             if to_save.get("name", current_user.name) != current_user.name:
                 # Query username, if not existing, change
-                current_user.name = check_username(to_save.get("name"))
+                current_user.name = check_username(to_save.get("name"), current_user.id)
         current_user.random_books = 1 if to_save.get("show_random") == "on" else 0
         current_user.default_language = to_save.get("default_language", "all")
         # Per-custom-column sidebar visibility (independent of the built-in

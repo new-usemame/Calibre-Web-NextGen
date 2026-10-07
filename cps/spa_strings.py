@@ -29,6 +29,10 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
     return message
 
 
+_("Allow direct DRM-free MOBI 6 books")
+_("Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients have a separate format opt-in.")
+
+
 _("{succeeded} added to the shelf; {failed} failed.")
 _("{succeeded} book(s) deleted; {failed} failed.")
 _("{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.")
@@ -798,7 +802,7 @@ _("Bulleted list")
 _("CA certificate path")
 _("CWA settings")
 _("CWNG cannot read the mapped completed folder. Check its mount and permissions.")
-_("CWNG copies a completed EPUB or PDF from this mapping. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label.")
+_("CWNG copies completed books allowed by this connection and the server format settings. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label.")
 _("Can browse and request")
 _("Can upload books")
 _("Cancel")
@@ -1625,6 +1629,7 @@ _("Show less")
 _("Show more")
 _("Show password")
 _("Show shelf tags")
+_("Show shelf drag handles")
 _("Show the global library again? Your selection is kept exactly as you left it — switch back any time and it is still there. At its next update, your e-reader syncs the global library.")
 _("Show {name}")
 _("Show {name} the global library again? Their selection is kept but no longer used, and their e-reader syncs the global library at the next update.")
@@ -1965,6 +1970,15 @@ _("← Back")
 _("← Back to book")
 _("← Back to sign in")
 _("← Library")
+_("Add books")
+_("Add books to shelf")
+_("Add selected")
+_("Could not add the selected books. Please try again.")
+_("Could not load books.")
+_("On shelf")
+_("Search library")
+_("Search title, author, series…")
+_("{failed} of {total} books could not be added. They remain selected.")
 # ==== END AUTOGEN ====
 
 # New-user sync safety (#1057).
@@ -2127,6 +2141,8 @@ _("The completed download exceeds the safe file limits. Choose a smaller release
 _("Unsupported rule")
 _("This rule cannot be edited here. It will be kept unless you remove it.")
 
+_("Allow completed DRM-free MOBI 6 books")
+_("Applies only to this download client. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader.")
 
 # #2248 — personal book ratings and explicit household consent.
 _("Could not load your rating.")

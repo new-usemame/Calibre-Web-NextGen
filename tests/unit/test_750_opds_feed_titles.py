@@ -93,11 +93,11 @@ def babel_app_context():
         ("opds.feed_authorindex", "Authors"),
         ("opds.feed_seriesindex", "Series"),
         ("opds.feed_shelfindex", "Shelves"),
-        ("opds.feed_magic_shelfindex", "Magic Shelves"),
+        ("opds.feed_magic_shelfindex", "Smart shelves"),
         # per-entity detail feeds inherit the parent title
         ("opds.feed_author", "Authors"),
         ("opds.feed_series", "Series"),
-        ("opds.feed_category", "Categories"),
+        ("opds.feed_category", "Tags"),
         ("opds.feed_publisher", "Publishers"),
         ("opds.feed_format", "File formats"),
         ("opds.feed_languages", "Languages"),

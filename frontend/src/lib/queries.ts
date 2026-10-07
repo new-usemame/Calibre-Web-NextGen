@@ -1,12 +1,13 @@
 import type { ReaderBookmark } from "./readerResume";
 import type { ReaderFontCatalog } from './readerFonts';
-import { keepPreviousData, useQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useInfiniteQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import {
   apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, apiPostDownload, ApiError,
   navigateToLogout, noteSessionIdentity,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
+import type { PickerBook } from './shelfPicker';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
@@ -806,6 +807,32 @@ export function useShelf(id: string | number | undefined, page = 1, sort = 'stor
       && prevQuery.queryKey[2] === sort
         ? prev
         : undefined,
+  });
+}
+
+interface ShelfAvailableBooksPage {
+  items: PickerBook[];
+  page: number;
+  total: number;
+  has_more: boolean;
+}
+
+/** Paged, searchable library list for the shelf "Add books" picker. */
+export function useShelfAvailableBooks(shelfId: string | number, query: string, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['shelf-available-books', String(shelfId), query],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }): Promise<ShelfAvailableBooksPage> => {
+      const params = new URLSearchParams({ page: String(pageParam) });
+      if (query) params.set('query', query);
+      return apiGet<ShelfAvailableBooksPage>(
+        `/api/v1/shelves/${shelfId}/available-books?${params.toString()}`, { signal });
+    },
+    getNextPageParam: (last) => (last.has_more ? last.page + 1 : undefined),
+    enabled,
+    // Always re-check shelf membership when the picker is reopened.
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 

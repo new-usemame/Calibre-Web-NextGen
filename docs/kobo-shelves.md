@@ -9,14 +9,12 @@ you need a couple of settings that live in different places.
 Which ones depends on whether the shelf is an ordinary shelf or a smart shelf, and
 the two behave differently enough that it's worth knowing which you have.
 
-## Smart shelves and Magic Shelves are the same thing
+## Smart shelves across both interfaces
 
-The new interface calls them **Smart shelves**. The classic interface calls them
-**Magic Shelves ✨**, and so does the admin setting below. The API calls them
-`magicshelf`.
-
-Same feature, three names. If you are looking at a *Smart* shelf and hunting for a
-setting that says *Magic*, you are in the right place.
+Both interfaces and the admin settings call these **Smart shelves**. They were
+called **Magic Shelves ✨** in older Classic versions. The feature and its saved
+rules are the same; the API route `magicshelf` and setting key
+`config_kobo_sync_magic_shelves` retain their existing names.
 
 ## The settings
 
@@ -25,7 +23,7 @@ setting that says *Magic*, you are in the right place.
 Admin → **Edit Basic Configuration** → **Enable Kobo sync**. This is the one you
 turned on when you set the device up.
 
-**2. "Sync Magic Shelves to Kobo" — required for smart shelves, and it ships OFF.**
+**2. "Sync smart shelves to Kobo" — required for smart shelves, and it ships OFF.**
 
 Ordinary shelves do not need this one. Smart shelves do, because they are computed
 from a rule rather than a fixed list of books. **It is disabled by default**, which

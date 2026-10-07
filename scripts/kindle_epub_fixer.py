@@ -535,6 +535,11 @@ class EPUBFixer:
             r'^\ufeff?\s*<\?xml[^>]*encoding=["\']([^"\']+)["\']',
             re.IGNORECASE
         )
+        # Keep any BOM/leading whitespace (group 1); drop the comment and the
+        # whitespace that trails it.
+        commented_xml_decl_pattern = re.compile(
+            r'^(\ufeff?\s*)<!--\s*\?xml\b[^>]*?\?\s*-->\s*', re.IGNORECASE
+        )
 
         for filename in list(self.files.keys()):
             ext = filename.split('.')[-1].lower()
@@ -595,6 +600,16 @@ class EPUBFixer:
                     f"Added {declared_encoding} to XML declaration missing encoding info in {filename}"
                 )
             else:
+                # A leading comment that imitates a declaration
+                # (<!--?xml ...?-->) is debris from a tool that parsed the
+                # real declaration as markup. It does not count as one, but
+                # leaving it behind makes kepubify rewrite it into a second
+                # real declaration, which is not well-formed XML (#2506).
+                content, stripped = commented_xml_decl_pattern.subn(r'\1', content, count=1)
+                if stripped:
+                    self.fixed_problems.append(
+                        f"Removed commented-out XML declaration in {filename}"
+                    )
                 content = new_decl + '\n' + content
                 self.fixed_problems.append(f"Added XML declaration to {filename}")
 

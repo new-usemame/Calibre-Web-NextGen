@@ -105,6 +105,12 @@ test('View settings radios use the active theme accent', async ({ page }) => {
   expect(bounds[1]!.y + bounds[1]!.height)
     .toBeLessThanOrEqual(bounds[0]!.y + bounds[0]!.height);
 
+  // The row-count change refetches the list, which briefly disables Export in
+  // this menu (#2475). Grade the settled colours, not a frame of the fade back.
+  await expect(menu.getByRole('button', { name: 'Export CSV' })).toBeEnabled();
+  await menu.evaluate(element => Promise.all(element.getAnimations({ subtree: true })
+    .filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+    .map(animation => animation.finished)));
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();

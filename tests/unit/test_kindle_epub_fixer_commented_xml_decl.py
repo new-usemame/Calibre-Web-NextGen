@@ -144,11 +144,14 @@ def test_second_pass_changes_nothing(fixer_module, tmp_path):
     assert twice == once
 
 
-def test_processing_instruction_in_a_comment_is_left_alone(fixer_module, tmp_path):
-    chapter = REAL_DECL + '\n<!--?xml-stylesheet href="a.css"?-->\n' + BODY
-    text = fixed_chapter(fixer_module, tmp_path, chapter)
+@pytest.mark.parametrize(
+    "comment",
+    ['<!--?xml-stylesheet href="a.css"?-->', "<!-- ?xml stylesheet notes -->"],
+)
+def test_other_comments_mentioning_xml_are_left_alone(fixer_module, tmp_path, comment):
+    text = fixed_chapter(fixer_module, tmp_path, REAL_DECL + "\n" + comment + "\n" + BODY)
 
-    assert '<!--?xml-stylesheet href="a.css"?-->' in text
+    assert comment in text
 
 
 def test_converter_style_rewrite_would_stay_well_formed(fixer_module, tmp_path):

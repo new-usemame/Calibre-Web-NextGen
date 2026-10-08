@@ -540,9 +540,10 @@ class EPUBFixer:
         # but kepubify rewrites every such comment into a real declaration,
         # wherever it sits, and a declaration anywhere but the very start is
         # not well-formed XML, so every page of the KEPUB renders blank on a
-        # Kobo (#2506). Remove them all; they carry no content.
+        # Kobo (#2506). Remove them all. Only the <!--?xml ...?--> shape is
+        # touched; kepubify leaves a comment without the closing ? alone.
         commented_xml_decl_pattern = re.compile(
-            r'<!--\s*\?xml(?=[\s?])[^>]*?-->', re.IGNORECASE
+            r'<!--\s*\?xml(?=[\s?])[^>]*?\?\s*-->', re.IGNORECASE
         )
 
         for filename in list(self.files.keys()):

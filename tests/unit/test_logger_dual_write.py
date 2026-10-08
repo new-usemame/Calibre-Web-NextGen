@@ -84,7 +84,7 @@ def _emit_reporting_open_errors(self, record):
 
 @pytest.mark.unit
 class TestDualHandlerSetup:
-    @pytest.mark.parametrize('stdlib', ['open_error_propagates', 'open_error_reported'])
+    @pytest.mark.parametrize('stdlib', ['installed_stdlib', 'open_error_reported'])
     @pytest.mark.parametrize('failure', ['directory_permissions', 'descriptor_path', 'partial_rename'])
     def test_failed_rollover_still_persists_shared_records(self, tmp_path, reset_root, monkeypatch, failure, stdlib):
         if stdlib == 'open_error_reported':

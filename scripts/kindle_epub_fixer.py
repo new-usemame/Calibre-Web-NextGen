@@ -535,16 +535,14 @@ class EPUBFixer:
             r'^\ufeff?\s*<\?xml[^>]*encoding=["\']([^"\']+)["\']',
             re.IGNORECASE
         )
-        # A leading comment that imitates a declaration (<!--?xml ...?-->) is
-        # debris from a tool that parsed a real declaration as markup. It does
-        # not count as one, but kepubify rewrites it into a second real
-        # declaration, which is not well-formed XML, so every page of the KEPUB
-        # renders blank on a Kobo (#2506). Match it at the start or right after
-        # a real declaration; group 1 keeps the BOM, whitespace and any real
-        # declaration in front of it.
+        # A comment that imitates a declaration (<!--?xml ...?-->) is debris
+        # from a tool that parsed a real declaration as markup. It is not one,
+        # but kepubify rewrites every such comment into a real declaration,
+        # wherever it sits, and a declaration anywhere but the very start is
+        # not well-formed XML, so every page of the KEPUB renders blank on a
+        # Kobo (#2506). Remove them all; they carry no content.
         commented_xml_decl_pattern = re.compile(
-            r'^(\ufeff?\s*(?:<\?xml[^>]*\?>\s*)?)<!--\s*\?xml\b[^>]*?\?\s*-->\s*',
-            re.IGNORECASE
+            r'<!--\s*\?xml(?=[\s?])[^>]*?-->', re.IGNORECASE
         )
 
         for filename in list(self.files.keys()):
@@ -577,6 +575,14 @@ class EPUBFixer:
                     self.files[filename] = updated
                 continue
 
+            if ext in ['html', 'htm', 'xhtml', 'xml', 'opf', 'ncx', 'svg']:
+                content, stripped = commented_xml_decl_pattern.subn('', content)
+                if stripped:
+                    self.files[filename] = content
+                    self.fixed_problems.append(
+                        f"Removed commented-out XML declaration in {filename}"
+                    )
+
             if ext in ['html', 'htm']:
                 updated = self._update_html_charset(content, declared_encoding)
                 if updated != content:
@@ -590,12 +596,6 @@ class EPUBFixer:
 
             if ext not in ['html', 'htm', 'xhtml', 'xml', 'opf', 'ncx', 'svg']:
                 continue
-
-            content, stripped = commented_xml_decl_pattern.subn(r'\1', content, count=1)
-            if stripped:
-                self.fixed_problems.append(
-                    f"Removed commented-out XML declaration in {filename}"
-                )
 
             # v4.0.5 onwards: fix XML declaration contributed by DendyA
             new_decl = f'<?xml version="1.0" encoding="{declared_encoding}"?>'

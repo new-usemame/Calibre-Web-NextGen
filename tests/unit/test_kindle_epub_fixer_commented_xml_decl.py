@@ -4,15 +4,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-"""Regression tests for #2506: a chapter that opens with a *commented-out* XML
-declaration (``<!--?xml version="1.0" encoding="utf-8"?-->``) must not end up
-with a real declaration followed by that comment.
+"""Regression tests for #2506: no comment imitating an XML declaration
+(``<!--?xml version="1.0" encoding="utf-8"?-->``) may survive the fixer.
 
-The fixer's "has a declaration" check only matches a leading ``<?xml``, so it
-prepended a real one and left the comment behind. The stored EPUB is still
-well-formed (a comment may follow the declaration), but kepubify turns the
-comment into a second real declaration, which is not well-formed XML, so every
-page of the KEPUB renders blank on a Kobo.
+The stored EPUB stays well-formed with such a comment in it, but kepubify 4.0.4
+rewrites every one of them into a real declaration, wherever it sits (measured
+on the reporter's book: after a real declaration, after an ordinary comment,
+stacked, and mid-body all gave a KEPUB chapter that is not well-formed XML).
+On a Kobo that book opens with every page blank.
 """
 
 import re
@@ -96,36 +95,60 @@ def fixed_chapter(fixer_module, tmp_path, chapter):
         return zf.read("OEBPS/text.xhtml").decode("utf-8")
 
 
+REAL_DECL = '<?xml version="1.0" encoding="utf-8"?>'
+
+
 @pytest.mark.parametrize(
-    "prefix",
+    "chapter",
     [
-        FAKE_DECL,
-        FAKE_DECL + "\n",
-        "\ufeff" + FAKE_DECL,
-        "  \n" + FAKE_DECL,
-        '<!--?xml version="1.0"?-->',
+        pytest.param(FAKE_DECL + "<!DOCTYPE html>\n" + BODY, id="leading"),
+        pytest.param(FAKE_DECL + "\n<!DOCTYPE html>\n" + BODY, id="leading-newline"),
+        pytest.param("  \n" + FAKE_DECL + "<!DOCTYPE html>\n" + BODY, id="leading-whitespace"),
+        pytest.param('<!--?xml version="1.0"?--><!DOCTYPE html>\n' + BODY, id="no-encoding"),
+        # The layout an earlier fixer stored, so re-running the fixer repairs it.
+        pytest.param(REAL_DECL + "\n" + FAKE_DECL + "<!DOCTYPE html>\n" + BODY, id="after-real"),
+        pytest.param(FAKE_DECL + FAKE_DECL + "<!DOCTYPE html>\n" + BODY, id="stacked"),
+        pytest.param("<!-- gen -->\n" + FAKE_DECL + "<!DOCTYPE html>\n" + BODY, id="after-comment"),
+        pytest.param(REAL_DECL + "\n" + BODY.replace("<body>", FAKE_DECL + "<body>"), id="mid-body"),
     ],
 )
-def test_commented_declaration_is_not_left_behind(fixer_module, tmp_path, prefix):
-    text = fixed_chapter(fixer_module, tmp_path, prefix + "<!DOCTYPE html>\n" + BODY)
-
-    assert "<!--?xml" not in text
-    assert len(DECL_RE.findall(text)) == 1
-    assert text.startswith('<?xml version="1.0" encoding="utf-8"?>')
-    assert "<!DOCTYPE html>" in text
-
-
-def test_commented_declaration_after_real_one_is_removed(fixer_module, tmp_path):
-    """The layout in the #2506 report: a real declaration and then the fake one.
-    A book stored by the old fixer looks like this, so re-running the fixer has
-    to repair it rather than skip it because a declaration is already there."""
-    chapter = '<?xml version="1.0" encoding="utf-8"?>\n' + FAKE_DECL + "<!DOCTYPE html>\n" + BODY
+def test_no_commented_declaration_survives(fixer_module, tmp_path, chapter):
     text = fixed_chapter(fixer_module, tmp_path, chapter)
 
     assert "<!--?xml" not in text
     assert len(DECL_RE.findall(text)) == 1
-    assert text.startswith('<?xml version="1.0" encoding="utf-8"?>')
-    assert "<!DOCTYPE html>" in text
+    assert text.startswith(REAL_DECL)
+    assert "<p>Hello</p>" in text
+
+
+def test_html_chapter_loses_the_comment_too(fixer_module, tmp_path):
+    book = tmp_path / "book.epub"
+    with zipfile.ZipFile(book, "w") as zf:
+        zf.writestr("mimetype", b"application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        zf.writestr("META-INF/container.xml", CONTAINER_XML)
+        zf.writestr("OEBPS/content.opf", OPF.replace("text.xhtml", "text.html"))
+        zf.writestr("OEBPS/text.html", FAKE_DECL + "<!DOCTYPE html>\n" + BODY)
+    fixer_module.EPUBFixer().process(str(book), str(book))
+    with zipfile.ZipFile(book) as zf:
+        text = zf.read("OEBPS/text.html").decode("utf-8")
+
+    assert "<!--?xml" not in text
+    assert "<p>Hello</p>" in text
+
+
+def test_second_pass_changes_nothing(fixer_module, tmp_path):
+    chapter = "<!-- gen -->\n" + FAKE_DECL + FAKE_DECL + "<!DOCTYPE html>\n" + BODY
+    once = fixed_chapter(fixer_module, tmp_path, chapter)
+    twice = fixed_chapter(fixer_module, tmp_path, once)
+
+    assert twice == once
+
+
+def test_processing_instruction_in_a_comment_is_left_alone(fixer_module, tmp_path):
+    chapter = REAL_DECL + '\n<!--?xml-stylesheet href="a.css"?-->\n' + BODY
+    text = fixed_chapter(fixer_module, tmp_path, chapter)
+
+    assert '<!--?xml-stylesheet href="a.css"?-->' in text
 
 
 def test_converter_style_rewrite_would_stay_well_formed(fixer_module, tmp_path):

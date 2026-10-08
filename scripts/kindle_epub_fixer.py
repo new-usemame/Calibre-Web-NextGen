@@ -535,6 +535,17 @@ class EPUBFixer:
             r'^\ufeff?\s*<\?xml[^>]*encoding=["\']([^"\']+)["\']',
             re.IGNORECASE
         )
+        # A leading comment that imitates a declaration (<!--?xml ...?-->) is
+        # debris from a tool that parsed a real declaration as markup. It does
+        # not count as one, but kepubify rewrites it into a second real
+        # declaration, which is not well-formed XML, so every page of the KEPUB
+        # renders blank on a Kobo (#2506). Match it at the start or right after
+        # a real declaration; group 1 keeps the BOM, whitespace and any real
+        # declaration in front of it.
+        commented_xml_decl_pattern = re.compile(
+            r'^(\ufeff?\s*(?:<\?xml[^>]*\?>\s*)?)<!--\s*\?xml\b[^>]*?\?\s*-->\s*',
+            re.IGNORECASE
+        )
 
         for filename in list(self.files.keys()):
             ext = filename.split('.')[-1].lower()
@@ -579,6 +590,12 @@ class EPUBFixer:
 
             if ext not in ['html', 'htm', 'xhtml', 'xml', 'opf', 'ncx', 'svg']:
                 continue
+
+            content, stripped = commented_xml_decl_pattern.subn(r'\1', content, count=1)
+            if stripped:
+                self.fixed_problems.append(
+                    f"Removed commented-out XML declaration in {filename}"
+                )
 
             # v4.0.5 onwards: fix XML declaration contributed by DendyA
             new_decl = f'<?xml version="1.0" encoding="{declared_encoding}"?>'

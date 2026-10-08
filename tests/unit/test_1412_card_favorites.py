@@ -14,6 +14,8 @@ from cps.api import books
 def test_list_card_favorites_are_page_bounded_and_account_isolated(monkeypatch):
     engine = create_engine('sqlite://')
     ub.FavoriteBook.__table__.create(engine)
+    ub.BookRating.__table__.create(engine)
+    ub.User.__table__.create(engine)
     session = sessionmaker(bind=engine)()
     session.add_all([
         ub.FavoriteBook(user_id=11, book_id=1),
@@ -21,6 +23,8 @@ def test_list_card_favorites_are_page_bounded_and_account_isolated(monkeypatch):
         ub.FavoriteBook(user_id=11, book_id=99),
     ])
     session.commit()
+    from cps import db
+    db._sqlite_json_available(session, session)
     monkeypatch.setattr(ub, 'session', session)
     monkeypatch.setattr(books.config, 'config_read_column', 0, raising=False)
     monkeypatch.setattr(books, 'read_statuses_for_books', lambda *args, **kwargs: {})
@@ -36,8 +40,10 @@ def test_list_card_favorites_are_page_bounded_and_account_isolated(monkeypatch):
             monkeypatch.setattr(books, '_real_user_id', lambda: 11)
             first = books._rows_to_items(entries)
             assert [item['favorited'] for item in first] == [True, False]
-            assert len(queries) == 1
-            assert 'book_id IN' in queries[0]
+            # Personal and opt-in household scores are the other two bounded
+            # page projections. All three restrict their lookup to this page.
+            assert len(queries) == 3
+            assert all('book_id IN' in query for query in queries)
             monkeypatch.setattr(books, '_real_user_id', lambda: 22)
             second = books._rows_to_items(entries)
             assert [item['favorited'] for item in second] == [False, True]

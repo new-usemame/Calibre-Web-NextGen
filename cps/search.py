@@ -132,6 +132,18 @@ def adv_search_language(q, include_languages_inputs, exclude_languages_inputs):
 
 
 def adv_search_ratings(q, rating_high, rating_low):
+    from .personal_ratings import personal_score
+    from .sort_orders import viewer_id
+    uid = viewer_id(current_user)
+    if uid is not None:
+        score = personal_score(uid)
+        if rating_high or rating_low:
+            q = q.filter(score > 0)
+        if rating_high:
+            q = q.filter(score <= int(rating_high) * 2)
+        if rating_low:
+            q = q.filter(score >= int(rating_low) * 2)
+        return q
     if rating_high:
         rating_high = int(rating_high) * 2
         q = q.filter(db.Books.ratings.any(db.Ratings.rating <= rating_high))

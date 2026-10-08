@@ -446,6 +446,17 @@
           <label for="show_original_filename">{{_('Show original filename')}}</label>
           <p class="help-block">{{_('Shows the name a book had when it was imported.')}}</p>
         </div>
+        <div>
+          <input type="hidden" name="show_library_rating_present" value="1">
+          <input type="checkbox" name="show_library_rating" id="show_library_rating" {% if content.get_view_property('preferences', 'show_library_rating') is not sameas false %}checked{% endif %}>
+          <label for="show_library_rating">{{_('Show library rating')}}</label>
+        </div>
+        <div>
+          <input type="hidden" name="share_book_ratings_present" value="1">
+          <input type="checkbox" name="share_book_ratings" id="share_book_ratings" {% if content.get_view_property('preferences', 'share_book_ratings') is sameas true %}checked{% endif %}>
+          <label for="share_book_ratings">{{_('Share my ratings in the household average')}}</label>
+          <p class="help-block">{{_('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}}</p>
+        </div>
         {% endif %}
       </div>
       

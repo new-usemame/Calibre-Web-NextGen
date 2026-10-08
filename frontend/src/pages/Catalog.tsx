@@ -263,7 +263,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [tagDeleteError, setTagDeleteError] = useState('');
   // Series views expose two extra series-order options and default to ascending
   // series order so the list reads 1, 2, 3… instead of newest-first (#573).
-  const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...SORT_OPTIONS] : SORT_OPTIONS;
+  const readerSorts = SORT_OPTIONS.filter(option => !option.value.startsWith('rating') || (me && !me.role.anonymous));
+  const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...readerSorts] : readerSorts;
   // Library-only controls (search box, advanced link, read-status filter) are
   // hidden for both entity-scoped and discovery views.
   const hideLibraryControls = filtered || isView;
@@ -849,7 +850,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         else if (readFilter !== 'all') params.set('filter', readFilter);
         if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
         if (entityKind && entityId !== undefined && entityId !== '') {
-          params.set(entityKind, String(entityId));
+          params.set(entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind, String(entityId));
         }
         const result = await apiGet<{ ids: number[] }>(`/api/v1/books?${params.toString()}`);
         ids = result.ids;
@@ -1013,7 +1014,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               ...(search && !entityKind && !view ? { search } : {}),
               ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
               ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
-              ...(entityKind && entityId !== undefined && entityId !== '' ? { [entityKind]: String(entityId) } : {}),
+              ...(entityKind && entityId !== undefined && entityId !== '' ? {
+                [entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind]: String(entityId),
+              } : {}),
             } }} />;
   return (
     <main ref={setCatalogNode} className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`} data-testid="catalog-page">

@@ -1,4 +1,5 @@
 import { BookReview } from '../components/BookReview';
+import { PersonalRating } from '../components/PersonalRating';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
@@ -898,8 +899,10 @@ export function BookDetail() {
             {/* Rating — star parity with the classic detail page. Calibre stores
                 0–10 (half-star granularity); null means unrated (no stars shown,
                 not zero stars). */}
-            {book.rating != null && book.rating > 0 && (
+            {me && !me.role?.anonymous && <PersonalRating key={`${me.id}:${book.id}`} bookId={book.id} accountId={me.id} />}
+            {me?.preferences?.show_library_rating !== false && book.rating != null && book.rating > 0 && (
               <div className={styles.rating}>
+                <span>{t('Library rating')}</span>
                 <StarRating rating={book.rating} size={16} />
               </div>
             )}

@@ -112,6 +112,10 @@ def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch, s
                 for i in (0, 2)
             ])
         elif selection_filter == "rated":
+            # Signed-in Top Rated now uses this reader's scores. Keep the
+            # metadata rows as a distinct compatibility fixture too.
+            app_session.add_all([ub.BookRating(user_id=viewer.id,
+                book_id=rows[i][0].id, rating=10) for i in (0, 2)])
             rating = db.Ratings(10)
             for i in (0, 2):
                 rows[i][0].ratings.append(rating)

@@ -2,7 +2,7 @@
 
 Choose **Export CSV** or **Export TXT** on a supported library, search, shelf or smart-shelf list. The file contains all books matching the list’s filters, including pages you have not loaded. Sign in with a personal account to export. Your account’s book visibility still applies, including the existing category context on Classic tag pages. Global Library export requires the same access as browsing that archive.
 
-CSV contains title, authors, series and index, tags, rating, read status, formats and date added. Open it in Excel, LibreOffice, Numbers or a text-processing tool. Native Excel files are not generated. Formula-like text is marked as text so a book title cannot become a spreadsheet formula.
+CSV contains title, authors, series and index, tags, the Calibre library rating, read status, formats and date added. The existing Rating column keeps its metadata meaning; personal-rating filters and sort order still determine which signed-in books appear in the export. Private scores and household averages are not added to that column. Open it in Excel, LibreOffice, Numbers or a text-processing tool. Native Excel files are not generated. Formula-like text is marked as text so a book title cannot become a spreadsheet formula.
 
 TXT contains one book per line with its title and authors. Line breaks inside those fields are flattened.
 

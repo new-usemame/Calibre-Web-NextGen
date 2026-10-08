@@ -145,11 +145,11 @@
     </div>
     <div class="row">
       <div class="form-group col-sm-6">
-        <label for="ratinghigh">{{_('Rating Above')}}</label>
+        <label for="ratinghigh">{{ _('Your rating above') if current_user.is_authenticated and not current_user.is_anonymous else _('Rating Above') }}</label>
         <input type="number"  name="ratinghigh" id="ratinghigh" class="rating input-lg" data-clearable="" >
       </div>
         <div class="form-group col-sm-6">
-          <label for="ratinglow">{{_('Rating Below')}}</label>
+          <label for="ratinglow">{{ _('Your rating below') if current_user.is_authenticated and not current_user.is_anonymous else _('Rating Below') }}</label>
           <input type="number"  name="ratinglow" id="ratinglow" class="rating input-lg" data-clearable="" >
         </div>
     </div>

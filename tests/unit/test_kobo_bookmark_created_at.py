@@ -112,12 +112,16 @@ def _call_detail_with_bookmark(bookmark):
     from cps.api import books as books_mod
     from cps import ub
 
-    def query_side_effect(model):
+    def query_side_effect(*entities):
         q = MagicMock()
-        if model is ub.KoboReadingState:
-            q.filter.return_value.first.return_value = SimpleNamespace(current_bookmark=bookmark)
+        q.filter.return_value = q
+        q.join.return_value = q
+        q.group_by.return_value = q
+        q.__iter__.return_value = iter(())
+        if len(entities) == 1 and entities[0] is ub.KoboReadingState:
+            q.first.return_value = SimpleNamespace(current_bookmark=bookmark)
         else:
-            q.filter.return_value.first.return_value = None
+            q.first.return_value = None
         return q
 
     app = flask.Flask(__name__)

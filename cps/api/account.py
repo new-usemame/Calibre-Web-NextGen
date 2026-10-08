@@ -397,6 +397,11 @@ def update_named_preferences():
         return guard
 
     data = request.get_json(silent=True) or {}
+    if "expected_user_id" in data:
+        if type(data["expected_user_id"]) is not int:
+            return _err("invalid_request", "expected_user_id must be an integer", 400)
+        if data["expected_user_id"] != current_user.id:
+            return _err("account_changed", "The signed-in account changed. Reload your preferences.", 409)
     updates = data.get("preferences")
     if not isinstance(updates, dict) or not updates:
         return _err(

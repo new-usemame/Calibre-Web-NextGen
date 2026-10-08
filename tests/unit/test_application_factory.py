@@ -75,6 +75,7 @@ def _stub_real_bootstrap(monkeypatch):
     monkeypatch.setattr(cps.calibre_db, "session", None)
     monkeypatch.setattr(cps.calibre_db, "session_factory", None)
     monkeypatch.setattr(helper, "scavenge_staged_cover_files", lambda: None)
+    monkeypatch.setattr(helper, "start_legacy_cover_stage_sweep", lambda: None)
     updater_init = MagicMock()
     monkeypatch.setattr(cps.updater_thread, "init_updater", updater_init)
     updater_start = MagicMock()

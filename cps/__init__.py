@@ -521,10 +521,13 @@ def create_app(config=None, services=None):
         calibre_db.init_db()
         # A process can die after staging or after committing cover metadata but
         # before publication. The stage alone cannot tell us which occurred, so
-        # startup logs and removes it rather than guessing at publication.
+        # startup logs and removes it rather than guessing at publication. Only
+        # registered stages are visited here; stages from earlier versions get
+        # one background sweep so a large library never delays the server (#2509).
         try:
             from . import helper
             helper.scavenge_staged_cover_files()
+            helper.start_legacy_cover_stage_sweep()
         except Exception as ex:
             log.error("Cover stage startup scavenging failed: %s", ex)
         # The annotation content-id backfill needs both databases: app.db owns the

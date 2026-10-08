@@ -1,0 +1,3 @@
+### Fixed
+
+- **Covers now actually stay in the browser cache between library visits (#2386).** v4.1.46 stopped sending covers as "don't store", but with "Remember me" on, the login cookie was rewritten on every response, and the classic sidebar's shelf counts were stored in that cookie too. A browser only reuses a cached cover while the cookie it was saved with still matches, so each new visit downloaded every cover again. The login cookie now changes only when the session itself changes, or when it is past half its lifetime, so staying signed in works as before. Shelf counts are cached on the server instead. Thanks @Dirk71 for testing v4.1.46 and reporting that it hadn't helped.

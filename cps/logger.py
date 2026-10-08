@@ -133,9 +133,9 @@ class _ResilientRotatingFileHandler(RotatingFileHandler):
                     # Preserve the usual stderr diagnostic, then try the
                     # active file without attempting another rollover.
                     self.handleError(record)
-                    logging.FileHandler.emit(self, record)
+                    self._emit_to_active_file(record)
                     return
-            logging.FileHandler.emit(self, record)
+            self._emit_to_active_file(record)
         except OSError:
             self.handleError(record)
             # A partially completed rollover may leave no active path that
@@ -151,6 +151,14 @@ class _ResilientRotatingFileHandler(RotatingFileHandler):
                 self.handleError(record)
         except Exception:
             self.handleError(record)
+
+    def _emit_to_active_file(self, record):
+        # Open here rather than inside FileHandler.emit: since CPython
+        # 3.13.16 that method reports an open failure itself and drops the
+        # record, so the shared-stdout fallback above would never run.
+        if self.stream is None:
+            self.stream = self._open()
+        logging.FileHandler.emit(self, record)
 
 
 def _make_file_handler(log_file, max_bytes=ROTATION_MAX_BYTES,

@@ -67,10 +67,28 @@ def _stream_handlers_to_stdout():
     return out
 
 
+def _emit_reporting_open_errors(self, record):
+    """FileHandler.emit as CPython 3.13.16 ships it: a failure to open the
+    file is reported through handleError and the record is dropped, instead
+    of propagating to the caller as earlier releases did."""
+    if self.stream is None:
+        if self.mode != 'w' or not self._closed:
+            try:
+                self.stream = self._open()
+            except Exception:
+                self.handleError(record)
+                return
+    if self.stream:
+        StreamHandler.emit(self, record)
+
+
 @pytest.mark.unit
 class TestDualHandlerSetup:
+    @pytest.mark.parametrize('stdlib', ['open_error_propagates', 'open_error_reported'])
     @pytest.mark.parametrize('failure', ['directory_permissions', 'descriptor_path', 'partial_rename'])
-    def test_failed_rollover_still_persists_shared_records(self, tmp_path, reset_root, monkeypatch, failure):
+    def test_failed_rollover_still_persists_shared_records(self, tmp_path, reset_root, monkeypatch, failure, stdlib):
+        if stdlib == 'open_error_reported':
+            monkeypatch.setattr(logging.FileHandler, 'emit', _emit_reporting_open_errors)
         path = tmp_path / 'shared.log'
         with path.open('a', encoding='utf-8') as redirected:
             monkeypatch.setattr(sys, 'stdout', redirected)

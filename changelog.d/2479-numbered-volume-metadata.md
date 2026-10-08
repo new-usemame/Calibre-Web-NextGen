@@ -1,3 +1,0 @@
-### Fixed
-
-- **Automatic metadata no longer applies the next volume of a numbered series, and books with an "Unknown" author get filled in again (#2479, reported and designed by @splitsec2).** The title check counted "One Piece, Vol. 12" and "Vol. 13" as the same book (0.94 similar, same author), so a fetch could apply the neighbouring volume's title, description and cover. Titles whose volume numbers or years differ now never match, while "Vol. 12", "Volume 12" and "ONE PIECE 12" still do. Separately, Calibre's "Unknown" placeholder was treated as a real author that disagreed with every result, so a freshly added book with no author never received metadata unless its ISBN matched.

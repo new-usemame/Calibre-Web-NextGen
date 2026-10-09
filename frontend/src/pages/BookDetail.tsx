@@ -9,7 +9,7 @@ import {
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
   useActiveDeliveryDevices, useQueueDeviceDelivery, useOtherEreaders,
-  useDeleteFormat, useConvertFormat, useAddFormat,
+  useDeleteFormat, useConvertFormat, useAddFormat, useConversionTask,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
@@ -22,7 +22,7 @@ import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
-import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
+import { ApiError, resourceUrl, resourceSrcSet, TASK_FAILED, TASK_FINISHED, TASK_ENDED, TASK_CANCELLED } from '../lib/api';
 import { useT, useI18n } from '../lib/i18n';
 import { formatCustomColumnDate } from '../lib/customColumnDisplay';
 import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
@@ -1154,6 +1154,28 @@ function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolea
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // #1110: the conversion this page queued, followed until it ends so the
+  // reader learns the new format is ready without refreshing.
+  const [converting, setConverting] = useState<{ taskId: string; to: string; at: number } | null>(null);
+  const { task: conversion, gone: conversionGone } = useConversionTask(
+    id, converting?.taskId ?? null, converting?.at);
+  const conversionStat = conversion?.stat;
+  useEffect(() => {
+    if (!converting) return;
+    if (conversionGone) {
+      setConverting(null);
+      return;
+    }
+    if (conversionStat === undefined) return;
+    if (conversionStat === TASK_FINISHED) {
+      setMsg({ ok: true, text: t('{format} is ready.', { format: converting.to }) });
+    } else if (conversionStat === TASK_FAILED) {
+      setMsg({ ok: false, text: conversion?.error || t('Convert failed.') });
+    } else if (conversionStat !== TASK_ENDED && conversionStat !== TASK_CANCELLED) {
+      return;
+    }
+    setConverting(null);
+  }, [converting, conversionGone, conversionStat, conversion?.error, t]);
 
   const formats = book?.formats.map((f) => f.format) ?? [];
   const convertOptions = book?.convert_options;
@@ -1197,7 +1219,11 @@ function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolea
     convertFormat.mutate(
       { from: src.toUpperCase(), to: dst.toUpperCase() },
       {
-        onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
+        onSuccess: (r) => {
+          setMsg({ ok: true, text: r.message });
+          setTo('');
+          setConverting(r.task_id ? { taskId: r.task_id, to: dst.toUpperCase(), at: Date.now() } : null);
+        },
         onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
       },
     );

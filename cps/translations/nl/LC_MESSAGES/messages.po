@@ -3772,6 +3772,10 @@ msgid "Convert failed."
 msgstr "Conversie mislukt."
 
 #: cps/spa_strings.py
+msgid "{format} is ready."
+msgstr "{format} is klaar."
+
+#: cps/spa_strings.py
 msgid "Convert to"
 msgstr "Converteren naar"
 

@@ -3893,6 +3893,10 @@ msgid "Convert failed."
 msgstr "La conversion a échoué."
 
 #: cps/spa_strings.py
+msgid "{format} is ready."
+msgstr "Le fichier {format} est prêt."
+
+#: cps/spa_strings.py
 msgid "Convert to"
 msgstr "Convertir vers"
 

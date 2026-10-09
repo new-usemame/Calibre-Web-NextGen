@@ -56,6 +56,44 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.47',
+    date: '2026-10-09',
+    items: [
+      {
+        title: 'Look something up in a book without losing your place',
+        body: 'The book page now has a button with a glasses icon next to Read now. It opens the book without saving your position, moving it to Reading or sending progress to Hardcover, and the reader no longer shows a notice that covers its controls.',
+        category: 'Reading',
+      },
+      {
+        title: 'Know when a format conversion is done',
+        body: 'When you convert a book from the Files section of its page, the page now says when the new format is ready, or shows the converter\'s error, and adds the file to the list without a refresh.',
+        category: 'Library',
+      },
+      {
+        title: 'Covers load from your browser cache on return visits',
+        body: 'With Remember me on, covers were downloaded again on every visit because the login cookie kept changing. The cookie now stays the same while your session does, so the library opens faster.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Buttons work again in French and Italian',
+        body: 'An apostrophe in a translation stopped some pages\' scripts from running, which broke the Hardcover match review buttons, the EPUB Fixer, cancelling scheduled tasks and saving a shelf\'s order. Translated text in page scripts is now handled safely.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Metadata edits reach the book file on network shares',
+        body: 'On an NFS share with root squash, edits were saved to the library but not written into the book files a Kobo downloads. The metadata enforcer now runs as the app user, and if it still fails the log shows the real error.',
+        category: 'Admin',
+      },
+      {
+        title: 'Slovak is fully translated again',
+        body: 'More than 700 strings added since the last Slovak update, from book sources to the statistics dashboards, now appear in Slovak.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.46',
     date: '2026-10-08',
     items: [

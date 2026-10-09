@@ -16,6 +16,48 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.47] - 2026-10-09
+
+### Changed
+
+- **Opening a book without saving progress is one tap from the book page.**
+  In the New UI it is now a button (glasses icon) next to **Read now** instead
+  of an entry in the settings menu. The "Progress is not being saved" notice is
+  gone from every reader, so it no longer covers the reader controls. Thanks
+  to @darkmatterpelican and @Zackssmith (#2223).
+
+- **The Slovak interface is fully translated again.** The 703 strings added
+  since the last Slovak update — book sources and download clients, reading
+  status, private reviews and ratings, reader fonts, ingest folder labels,
+  the content server settings and the statistics dashboards — now appear in
+  Slovak instead of English. Contributed by @misko903.
+
+### Fixed
+
+- **A finished conversion now says it finished.** Converting a format from the
+  book page's Files section shows "EPUB is ready" (or the converter's error)
+  when the task ends and adds the new format to the file list, without a page
+  refresh. The server log also records each successful conversion, so it no
+  longer stops at "starting conversion" and looks stalled.
+
+- **Covers now actually stay in the browser cache between library visits (#2386).** v4.1.46 stopped sending covers as "don't store", but with "Remember me" on, the login cookie was rewritten on every response, and the classic sidebar's shelf counts were stored in that cookie too. A browser only reuses a cached cover while the cookie it was saved with still matches, so each new visit downloaded every cover again. The login cookie now changes only when the session itself changes, or when it is past half its lifetime, so staying signed in works as before. Shelf counts are cached on the server instead. Thanks @Dirk71 for testing v4.1.46 and reporting that it hadn't helped.
+
+- **Buttons work again on pages whose translation contains an apostrophe.**
+  A quote in a translated message ended the JavaScript string it was written
+  into, so the browser skipped the page's whole script. In French and Italian
+  this left the Hardcover match review buttons (Select, Reject, Skip) and the
+  EPUB Fixer doing nothing, and broke cancelling scheduled tasks (French) and
+  saving a shelf's order (Italian). Every translated string in page scripts is
+  now encoded safely. Thanks to @lguerard (#2503).
+
+- **Metadata edits are embedded into book files again when the library is on a network share with root squash.** After an edit, the metadata enforcer ran as root, which an NFS export typically maps to an unprivileged user, so calibredb could not open the library and every edit logged `Failed to enforce metadata ... exit status 1`. The enforcer now runs as the app user, like the ingest service and the web app, and when calibredb fails the log line now ends with calibredb's own error (for example the `PermissionError`) instead of only the exit status. Edits were always saved to the database; only the copy embedded in the book file (and so in the KEPUB served to a Kobo) was missing. Books edited while this was failing are only repaired by saving them again, or by running "Enforce All" from the admin page. Reported and fixed by @sgreadly.
+
+- **Log lines are no longer lost when a log rotation fails partway on newer
+  Python.** If the log directory stops being writable in the middle of a
+  rotation, the line being written still reaches the log through the shared
+  output, as it already did on older Python releases. Python 3.13.16 changed
+  where that error is handled, which silently dropped the line.
+
 ## [v4.1.46] - 2026-10-08
 
 ### Added

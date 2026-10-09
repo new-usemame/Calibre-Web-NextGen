@@ -862,16 +862,16 @@
     </div>
     <script>
       window.bookOrganizerI18n = {
-        addedToShelf: "{{ _('Added {n} books to {shelf}') }}",
-        addedToShelfPartial: "{{ _('Added {ok} of {n} books to {shelf} (rest were already there)') }}",
-        allAlreadyOnShelf: "{{ _('All {n} book(s) were already on {shelf}.') }}",
-        markedRead: "{{ _('Marked {n} books as read') }}",
-        markedUnread: "{{ _('Marked {n} books as unread') }}",
-        deleted: "{{ _('Deleted {n} books') }}",
-        confirmDeleteTitle: "{{ _('Delete books?') }}",
-        confirmDeleteBody: "{{ _('This will permanently delete {n} book(s) from your library. This cannot be undone.') }}",
-        nothingSelected: "{{ _('Select at least one book first.') }}",
-        requestFailed: "{{ _('Request failed: {err}') }}"
+        addedToShelf: {{ _('Added {n} books to {shelf}')|tojson }},
+        addedToShelfPartial: {{ _('Added {ok} of {n} books to {shelf} (rest were already there)')|tojson }},
+        allAlreadyOnShelf: {{ _('All {n} book(s) were already on {shelf}.')|tojson }},
+        markedRead: {{ _('Marked {n} books as read')|tojson }},
+        markedUnread: {{ _('Marked {n} books as unread')|tojson }},
+        deleted: {{ _('Deleted {n} books')|tojson }},
+        confirmDeleteTitle: {{ _('Delete books?')|tojson }},
+        confirmDeleteBody: {{ _('This will permanently delete {n} book(s) from your library. This cannot be undone.')|tojson }},
+        nothingSelected: {{ _('Select at least one book first.')|tojson }},
+        requestFailed: {{ _('Request failed: {err}')|tojson }}
       };
     </script>
     <script src="{{ url_for('static', filename='js/book_organizer.js') }}"></script>

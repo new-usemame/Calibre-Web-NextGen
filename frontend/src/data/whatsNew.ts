@@ -89,7 +89,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         title: 'Slovak is fully translated again',
         body: 'More than 700 strings added since the last Slovak update, from book sources to the statistics dashboards, now appear in Slovak.',
         category: 'Account',
-        link: { to: '/account', label: 'Choose your language' },
+        link: { to: '/account', label: 'Open account settings' },
       },
     ],
   },

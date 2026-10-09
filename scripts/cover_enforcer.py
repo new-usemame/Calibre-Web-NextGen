@@ -227,6 +227,11 @@ def _acquire_lock_or_exit():
                     os.remove(path)
                 except FileNotFoundError:
                     pass
+                except PermissionError:
+                    # Left by a run as another user (a manual root run, in sticky
+                    # /tmp); this user cannot reclaim it. cwa-init clears it at start.
+                    print(f"[cover-metadata-enforcer]: CANCELLING... a stale lock at {path} belongs to another user and cannot be removed; restart the container to clear it")
+                    sys.exit(2)
                 continue
             print("[cover-metadata-enforcer]: CANCELLING... cover-metadata-enforcer was initiated but is already running")
             sys.exit(2)
@@ -321,6 +326,7 @@ class Book:
         """Uses the export function of the calibredb utility to export any new metadata for the given book to metadata_temp, and returns the path to the new metadata.opf"""
         # Add retry logic with exponential backoff to handle database locks
         max_retries = 3
+        export_dir = None
         for attempt in range(max_retries):
             try:
                 # Add small delay before first attempt to allow other operations to complete
@@ -342,7 +348,8 @@ class Book:
                 # root-owned export from a killed root run, which the app user
                 # cannot clean up (#2518) -- could otherwise be embedded instead.
                 # empty_metadata_temp removes it with the rest after the pass.
-                export_dir = tempfile.mkdtemp(prefix=f"export-{self.book_id}-", dir=metadata_temp_dir)
+                if export_dir is None:
+                    export_dir = tempfile.mkdtemp(prefix=f"export-{self.book_id}-", dir=metadata_temp_dir)
                 with operation(timeout=60):
                     target = library_target(self.calibre_library)
                     result = subprocess.run(
@@ -1139,8 +1146,10 @@ class Enforcer:
         but the Calibre-Web Flask app runs as 'abc' (UID 1000). Files written here as root would
         be unwritable for cover-from-URL saves later, surfacing as
         'Cover-file is not a valid image file, or could not be stored'. The metadata-change
-        dispatcher now runs the enforcer as the app user, which makes this a no-op there.
+        dispatcher runs the enforcer as the app user, so this only acts when run as root.
         """
+        if os.geteuid() != 0:
+            return
         try:
             uid = int(os.environ.get("PUID", "1000"))
             gid = int(os.environ.get("PGID", "1000"))
@@ -1294,8 +1303,10 @@ class Enforcer:
         stderr = getattr(error, "stderr", None)
         if isinstance(stderr, str):
             lines = [line.strip() for line in stderr.splitlines() if line.strip()]
-            if lines:
-                reason = f" ({lines[-1]})"
+            # Prefer the exception line: calibredb can print warnings after it.
+            errors = [line for line in lines if re.match(r"^[\w.]+(Error|Exception):", line)]
+            if errors or lines:
+                reason = f" ({(errors or lines)[-1]})"
         print(f"[cover-metadata-enforcer] ERROR: Failed to enforce metadata for '{log_info.get('title', 'Unknown')}' (book_id={log_info.get('book_id', 'unknown')}): {error}{reason}", flush=True)
 
 

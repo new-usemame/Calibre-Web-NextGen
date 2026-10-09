@@ -85,7 +85,8 @@ def test_a_failed_calibredb_run_logs_why_not_just_its_exit_status(capsys):
         "Traceback (most recent call last):\n"
         "  File \"/opt/calibre/lib/calibre/db/backend.py\", line 470, in __init__\n"
         "PermissionError: [Errno 13] Permission denied: "
-        "'/mnt/calibre/calibre_test_case_sensitivity.txt'\n\n"
+        "'/mnt/calibre/calibre_test_case_sensitivity.txt'\n"
+        "Warning: plugin 'x' could not be loaded\n\n"
     )
     error = subprocess.CalledProcessError(
         1, ["calibredb", "export", "502"], output="", stderr=stderr
@@ -143,3 +144,38 @@ def test_metadata_export_never_reads_another_books_leftover_opf(monkeypatch, tmp
 
     assert export_dirs == [[]]
     assert Path(opf).read_text() == "<package>book 502</package>"
+
+
+def test_a_stale_lock_the_app_user_cannot_remove_ends_cleanly(monkeypatch, tmp_path):
+    """A root-owned lock in sticky /tmp (left by a manual root run) cannot be
+    removed by the app user; that must cancel the pass, not crash it."""
+    import cover_enforcer
+
+    monkeypatch.setattr(cover_enforcer.tempfile, "gettempdir", lambda: str(tmp_path))
+    (tmp_path / "cover_enforcer.lock").write_text("")
+
+    def refuse(path):
+        if path.endswith("cover_enforcer.lock"):
+            raise PermissionError(13, "Operation not permitted", path)
+        return real_remove(path)
+
+    real_remove = cover_enforcer.os.remove
+    monkeypatch.setattr(cover_enforcer.os, "remove", refuse)
+
+    with pytest.raises(SystemExit) as stop:
+        cover_enforcer._acquire_lock_or_exit()
+    assert stop.value.code == 2
+
+
+def test_the_app_user_does_not_try_to_chown_book_dirs(monkeypatch, tmp_path, capsys):
+    import cover_enforcer
+
+    calls = []
+    monkeypatch.setattr(cover_enforcer.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(cover_enforcer.os, "chown", lambda *a: calls.append(a))
+    (tmp_path / "book.epub").write_text("x")
+
+    cover_enforcer.Enforcer._reset_book_dir_ownership(str(tmp_path))
+
+    assert calls == []
+    assert "failed to chown" not in capsys.readouterr().out

@@ -52,8 +52,6 @@ export function NativeReader({ id, format }: { id: string; format: string }) {
         <span className={styles.fmt}>{fmt.toUpperCase()}</span>
       </div>
 
-      {lookupMode && <p className={styles.lookupNotice} role="status">{t('Progress is not being saved.')}</p>}
-
       {/* The reader shell is position:fixed, so THIS div is the scroll container,
           not the document. A scrollable div with no tabindex and no focusable
           children is keyboard-unreachable in engines that don't implement

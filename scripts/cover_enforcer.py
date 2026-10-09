@@ -1129,10 +1129,11 @@ class Enforcer:
     def _reset_book_dir_ownership(book_dir: str) -> None:
         """Reset the book directory and its files to abc:abc (LinuxServer.io PUID/PGID) after running as root.
 
-        Why: this script runs under s6 as root so it can call calibredb/ebook-polish, but the
-        Calibre-Web Flask app runs as 'abc' (UID 1000). Files written here as root would be
-        unwritable for cover-from-URL saves later, surfacing as
-        'Cover-file is not a valid image file, or could not be stored'.
+        Why: this script can run as root (a manual run from a shell, or an older dispatcher),
+        but the Calibre-Web Flask app runs as 'abc' (UID 1000). Files written here as root would
+        be unwritable for cover-from-URL saves later, surfacing as
+        'Cover-file is not a valid image file, or could not be stored'. The metadata-change
+        dispatcher now runs the enforcer as the app user, which makes this a no-op there.
         """
         try:
             uid = int(os.environ.get("PUID", "1000"))

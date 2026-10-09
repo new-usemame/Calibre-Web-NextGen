@@ -1,0 +1,3 @@
+### Fixed
+
+- **Metadata edits are embedded into book files again when the library is on a network share with root squash.** After an edit, the metadata enforcer ran as root, which an NFS export typically maps to an unprivileged user, so calibredb could not open the library and every edit logged `Failed to enforce metadata ... exit status 1`. The enforcer now runs as the app user, like the ingest service and the web app. Edits were always saved to the database; only the copy embedded in the book file (and so in the KEPUB served to a Kobo) was missing. Books edited while this was failing are only repaired by saving them again, or by running "Enforce All" from the admin page. Reported by @sgreadly.

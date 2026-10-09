@@ -98,6 +98,7 @@ interface SendPanelProps {
   /** Other users' eReaders an admin can add to the recipients (#2296). */
   otherEreaders: OtherEreader[];
   onSend: (format: string, convert: boolean, emails: string) => void;
+  onClose: () => void;
 }
 
 /** Compact send-to-e-reader form: pick a format, optionally convert, optionally
@@ -105,7 +106,7 @@ interface SendPanelProps {
  *  saved e-reader address (#715 — previously the field was blank with only a
  *  "blank = your e-reader email" hint, so users thought the address was lost).
  *  Empty recipient still falls back to the saved address server-side. */
-function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSend }: SendPanelProps) {
+function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSend, onClose }: SendPanelProps) {
   const t = useT();
   const [format, setFormat] = useState(formats[0] ?? '');
   const [convert, setConvert] = useState(false);
@@ -117,7 +118,9 @@ function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSe
     if (!dirty.current && defaultEmail) setEmails(defaultEmail);
   }, [defaultEmail]);
   return (
-    <div className={styles.sendPanel}>
+    <div id="book-send-ereader" className={styles.sendPanel} onKeyDown={(event) => {
+      if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+    }}>
       <div className={styles.sendRow}>
         <label className={styles.sendField}>
           <span>{t('Format')}</span>
@@ -452,11 +455,28 @@ export function BookDetail() {
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader
   // address used to prefill the recipient field, #715) until that's possible.
-  const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download;
+  const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download &&
+    !me?.role?.anonymous && (book?.formats.length ?? 0) > 0;
   const savedEreader = useAccount({ enabled: canSend }).data?.kindle_mail ?? '';
-  const [sendOpen, setSendOpen] = useState(false);
-  const otherEreaders = useOtherEreaders(canSend && sendOpen && !!me?.role?.admin).data?.others ?? [];
+  const formatsKey = JSON.stringify(book?.formats.map((format) => format.format) ?? []);
+  const [sendSession, setSendSession] = useState<{ bookId: string; userId: number; formatsKey: string } | null>(null);
+  const sendOpen = canSend && sendSession?.bookId === id && sendSession.userId === me?.id && sendSession.formatsKey === formatsKey;
+  // A draft and its async results belong to the book/account that opened it.
+  // A disabled query still retains cached data, so gate recipient data too.
+  const activeSendSession = useRef(sendSession);
+  activeSendSession.current = sendOpen ? sendSession : null;
+  const otherEreadersData = useOtherEreaders(sendOpen && !!me?.role?.admin).data;
+  const otherEreaders = sendOpen && me?.role?.admin ? otherEreadersData?.others ?? [] : [];
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
+  const sendTriggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (sendSession && !sendOpen) { setSendSession(null); setSendBanner(null); }
+  }, [sendSession, sendOpen]);
+  const toggleSendPanel = () => {
+    if (!canSend || !me) return;
+    setSendSession(sendOpen ? null : { bookId: id, userId: me.id, formatsKey });
+    setSendBanner(null);
+  };
   const [deviceSendOpen, setDeviceSendOpen] = useState(false);
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   /* Panels opened from the gear menu need a scroll nudge: the menu item's click
@@ -609,7 +629,7 @@ export function BookDetail() {
       id: 'send-ereader',
       label: t('Send to e-reader'),
       icon: <Send size={15} />,
-      onSelect: () => { setSendOpen((v) => !v); setSendBanner(null); },
+      onSelect: toggleSendPanel,
     });
   }
   if (inLibrary && me?.role?.download && book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0) {
@@ -710,7 +730,7 @@ export function BookDetail() {
       </Link>
 
       {/* The action row is deliberately ordered by the reader's next likely
-          step: read, edit, organise, then compact personal state.
+          step: read, send, edit, organise, then compact personal state.
           The flexible group is the spacer before the gear, which pins Settings
           to the far edge without letting it become an orphaned mobile row. */}
       <div className={styles.actions} data-testid="book-actions">
@@ -720,6 +740,13 @@ export function BookDetail() {
               {t('Read now')}
             </Link>
           ) : null}
+
+          {canSend && <button type="button" className={styles.actionSecondary}
+            ref={sendTriggerRef} onClick={toggleSendPanel}
+            aria-expanded={sendOpen} aria-controls="book-send-ereader">
+            <Send size={15} aria-hidden="true" focusable={false} />
+            {t('Send to e-reader')}
+          </button>}
 
           {/* One visible edit action: Edit metadata for anyone allowed to edit
               the book, since that is the edit people reach for most (#2338).
@@ -788,24 +815,33 @@ export function BookDetail() {
           the destructive control itself lives in the gear menu. */}
       {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
-      {/* Send-to-e-reader / send-to-device panels (opened from the menu),
+      {/* Send-to-e-reader / send-to-device panels (opened from the action row),
           directly under the row that opens them. */}
       <div ref={sendPanelWrapRef} className={styles.sendPanelWrap}>
         {sendOpen && (
         <SendPanel
+          key={`${id}:${me?.id}:${formatsKey}`}
           formats={book.formats.map((f) => f.format)}
           pending={sendToEreader.isPending}
           banner={sendBanner}
           defaultEmail={savedEreader}
           otherEreaders={otherEreaders}
+          onClose={() => {
+            setSendSession(null); setSendBanner(null); sendTriggerRef.current?.focus();
+          }}
           onSend={(format, convert, emails) => {
+            const session = activeSendSession.current;
+            if (!session) return;
             setSendBanner(null);
             sendToEreader.mutate(
               { format, convert, emails: emails || undefined },
               {
-                onSuccess: (r) => { setSendBanner({ ok: true, text: r.message }); },
-                onError: (err) =>
-                  setSendBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Send failed.') }),
+                onSuccess: (r) => {
+                  if (activeSendSession.current === session) setSendBanner({ ok: true, text: r.message });
+                },
+                onError: (err) => {
+                  if (activeSendSession.current === session) setSendBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Send failed.') });
+                },
               },
             );
           }}

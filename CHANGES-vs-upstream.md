@@ -886,3 +886,5 @@ For "Original fork patches": the diffs are small and isolated; PR descriptions i
 | [#2443](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2443) | (fork issue [#1617](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1617)) | Keep unsupported smart-shelf rules visible and removable, preserve stored JSON values and nested groups, and retain rules in empty-filter API responses. | `e5c059549` | `v4.1.46` |
 
 | [#2474](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2474) | (fork audit finding F-e088bf, recorded in #2452) | Synchronize existing leading CSS declarations with the fixer output encoding, preserving stylesheet text, unrelated entries and second-run no-op behavior. | `badb05aa5` | `v4.1.46` |
+
+| [#2456](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2456) | (fork private display-safety finding adjacent to #1498) | Display stored ordinary shelf names, rule-preview book titles and error messages as literal text in Classic, preserving values, counts, ordering and controls. | Unreleased | TBD |

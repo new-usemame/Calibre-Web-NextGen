@@ -724,7 +724,10 @@ $(function() {
         var rules = $('#builder').queryBuilder('getRules');
         if (!rules) {
             $results.removeClass('success').addClass('error').show();
-            $content.html('<p><strong>Error:</strong> Please define at least one rule.</p>');
+            $content.empty().append($('<p>').append(
+                $('<strong>').text('Error: '),
+                document.createTextNode('Please define at least one rule.')
+            ));
             return;
         }
         
@@ -738,18 +741,24 @@ $(function() {
             success: function(response) {
                 if (response.success) {
                     $results.removeClass('error').addClass('success').show();
-                    var html = '<p><strong><span class="glyphicon space glyphicon-ok-circle"></span> ' + response.count + ' book(s) match these rules</strong></p>';
+                    var $summary = $('<strong>').append(
+                        $('<span>').addClass('glyphicon space glyphicon-ok-circle'),
+                        document.createTextNode(' ' + response.count + ' book(s) match these rules')
+                    );
+                    $content.empty().append($('<p>').append($summary));
                     if (response.sample_books && response.sample_books.length > 0) {
-                        html += '<p><small>Sample results:</small></p><ul class="preview-book-list">';
+                        $content.append($('<p>').append($('<small>').text('Sample results:')));
+                        var $books = $('<ul>').addClass('preview-book-list');
                         response.sample_books.forEach(function(book) {
-                            html += '<li>' + book + '</li>';
+                            $books.append($('<li>').text(String(book)));
                         });
-                        html += '</ul>';
+                        $content.append($books);
                     }
-                    $content.html(html);
                 } else {
                     $results.removeClass('success').addClass('error').show();
-                    $content.html('<p><strong>Error:</strong> ' + response.message + '</p>');
+                    $content.empty().append($('<p>').append(
+                        $('<strong>').text('Error: '), document.createTextNode(response.message)
+                    ));
                 }
             },
             error: function(xhr) {
@@ -758,7 +767,9 @@ $(function() {
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     message = xhr.responseJSON.message;
                 }
-                $content.html('<p><strong>Error:</strong> ' + message + '</p>');
+                $content.empty().append($('<p>').append(
+                    $('<strong>').text('Error: '), document.createTextNode(message)
+                ));
             },
             complete: function() {
                 $btn.prop('disabled', false).html('<span class="glyphicon space glyphicon-eye-open"></span> Preview Rules');

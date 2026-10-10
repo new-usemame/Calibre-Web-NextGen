@@ -104,3 +104,14 @@ describe('EPUB archive targets remain viewer-gated across rolling deployments', 
     assert.equal(getReaderContentUrl(198, 'KEPUB', ''), '/show/198/kepub');
   });
 });
+
+describe('withViewerHash (#2537)', () => {
+  test('hands the reader page fragment to the pdf.js URL', async () => {
+    const { withViewerHash } = await import('../../src/lib/readerTarget.ts');
+    assert.equal(withViewerHash('/read/7/pdf', '#page=12&zoom=page-width'), '/read/7/pdf#page=12&zoom=page-width');
+    assert.equal(withViewerHash('/read/7/pdf?lookup=1', '#page=3'), '/read/7/pdf?lookup=1#page=3');
+    assert.equal(withViewerHash('/read/7/pdf#page=1', '#page=4'), '/read/7/pdf#page=4');
+    assert.equal(withViewerHash('/read/7/pdf', ''), '/read/7/pdf');
+    assert.equal(withViewerHash('/read/7/pdf', '#'), '/read/7/pdf');
+  });
+});

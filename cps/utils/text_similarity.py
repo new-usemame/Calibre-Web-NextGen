@@ -10,6 +10,7 @@ Text similarity utilities for metadata matching
 """
 from typing import List, Set
 import re
+import unicodedata
 
 
 def levenshtein_distance(s1: str, s2: str) -> int:
@@ -62,12 +63,18 @@ def normalize_string(s: str) -> str:
     - Convert to lowercase
     - Remove special characters and extra whitespace
     - Remove common articles and conjunctions
+    - Drop accents, so "étoffes" and "etoffes" compare equal
     """
     if not s:
         return ""
     
     # Convert to lowercase
     s = s.lower()
+
+    # Strip combining marks (NFKD splits "é" into "e" + accent). Letters with
+    # no decomposition, including non-Latin scripts, are kept as they are.
+    s = ''.join(c for c in unicodedata.normalize('NFKD', s)
+                if not unicodedata.combining(c))
     
     # Remove common articles and conjunctions
     articles = ['the', 'a', 'an', 'and', '&']
@@ -175,3 +182,29 @@ def calculate_year_similarity(year1: str, year2: str) -> float:
             return 0.0
     except (ValueError, AttributeError):
         return 0.0
+
+
+def normalize_isbn(value) -> str:
+    """Return an ISBN as 13 digits (an ISBN-10 is converted), else "".
+
+    Calibre stores whatever the source gave it: hyphens, spaces, ISBN-10.
+    Hardcover lists both forms per edition. Comparing the ISBN-13 form
+    makes "2-07-036822-X" and "9782070368228" the same book.
+    """
+    digits = re.sub(r"[^0-9Xx]", "", str(value or "")).upper()
+    if len(digits) == 10 and digits[:9].isdigit():
+        core = "978" + digits[:9]
+        total = sum((1 if i % 2 == 0 else 3) * int(d) for i, d in enumerate(core))
+        return core + str((10 - total % 10) % 10)
+    if len(digits) == 13 and digits.isdigit():
+        return digits
+    return ""
+
+
+def main_title(title: str) -> str:
+    """The title without its subtitle ("Play Nice: The Rise..." -> "Play Nice").
+
+    Cuts at the first colon or spaced dash, the two ways Calibre and
+    Hardcover attach a subtitle to a title.
+    """
+    return re.split(r"\s*(?::|\s[-\u2013\u2014]\s)\s*", title or "", maxsplit=1)[0].strip()

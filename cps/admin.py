@@ -263,6 +263,22 @@ def queue_metadata_backup():
     return json.dumps(show_text)
 
 
+def _enqueue_hardcover_auto_fetch(include_pending):
+    """Queue an auto-fetch run with the configured confidence, batch and rate."""
+    from cps.cwa_db_loader import load_cwa_db
+    from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
+    from cps.services.worker import WorkerThread
+
+    cwa_settings = load_cwa_db().CWA_DB().get_cwa_settings()
+    task = TaskAutoHardcoverID(
+        min_confidence=float(cwa_settings.get('hardcover_auto_fetch_min_confidence', 0.85)),
+        batch_size=int(cwa_settings.get('hardcover_auto_fetch_batch_size', 50)),
+        rate_limit_delay=float(cwa_settings.get('hardcover_auto_fetch_rate_limit', 5.0)),
+        include_pending=include_pending,
+    )
+    WorkerThread.add(current_user.name, task, hidden=False)
+
+
 @admi.route("/hardcover_auto_fetch", methods=["POST"])
 @user_login_required
 @admin_required
@@ -284,27 +300,7 @@ def trigger_hardcover_auto_fetch():
             show_text['text'] = _('Error: No Hardcover token available. Set HARDCOVER_TOKEN environment variable or configure in Basic Configuration.')
             return json.dumps(show_text), 400
         
-        # Get settings
-        from cps.cwa_db_loader import load_cwa_db
-        CWA_DB = load_cwa_db().CWA_DB
-        from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
-        from cps.services.worker import WorkerThread
-        
-        cwa_db = CWA_DB()
-        cwa_settings = cwa_db.get_cwa_settings()
-        
-        min_confidence = float(cwa_settings.get('hardcover_auto_fetch_min_confidence', 0.85))
-        batch_size = int(cwa_settings.get('hardcover_auto_fetch_batch_size', 50))
-        rate_limit = float(cwa_settings.get('hardcover_auto_fetch_rate_limit', 5.0))
-        
-        # Create and enqueue task
-        task = TaskAutoHardcoverID(
-            min_confidence=min_confidence,
-            batch_size=batch_size,
-            rate_limit_delay=rate_limit
-        )
-        
-        WorkerThread.add(current_user.name, task, hidden=False)
+        _enqueue_hardcover_auto_fetch(include_pending=False)
         
         log.info(f"Hardcover auto-fetch task manually triggered by {current_user.name}")
         show_text['text'] = _('Success! Hardcover auto-fetch task started. Check Tasks panel for progress.')
@@ -326,6 +322,10 @@ def hardcover_review_matches():
         pending_matches = ub.session.query(ub.HardcoverMatchQueue).filter(
             ub.HardcoverMatchQueue.reviewed == 0
         ).order_by(ub.HardcoverMatchQueue.created_at.desc()).all()
+        # A book matched from its edit page keeps its queue row; showing its
+        # candidates again would only invite a second, conflicting choice.
+        already_matched = _books_with_hardcover_id({m.book_id for m in pending_matches})
+        pending_matches = [m for m in pending_matches if m.book_id not in already_matched]
         
         # Parse JSON data for each match
         matches_data = []
@@ -353,7 +353,8 @@ def hardcover_review_matches():
             "hardcover_review_matches.html",
             title=_("Review Hardcover Matches"),
             page="hardcover-review",
-            matches=matches_data
+            matches=matches_data,
+            missing_count=len(_book_ids_without_hardcover_id()),
         )
         
     except Exception as e:
@@ -507,6 +508,163 @@ def hardcover_review_reject_all():
         ub.session.rollback()
         log.error(f"Error rejecting all pending matches: {e}")
         return json.dumps({'success': False, 'error': str(e)}), 500
+
+
+# Rows rendered on the "books without a Hardcover ID" page; counts cover all.
+HARDCOVER_MISSING_PAGE_LIMIT = 500
+HARDCOVER_MISSING_STATUSES = ('pending', 'rejected', 'skipped', 'unmatched')
+
+
+def _chunks(values, size=500):
+    values = list(values)
+    for start in range(0, len(values), size):
+        yield values[start:start + size]
+
+
+def _book_ids_without_hardcover_id():
+    from cps.tasks.auto_hardcover_id import HARDCOVER_IDENTIFIER_TYPES
+    rows = calibre_db.session.query(db.Books.id).filter(
+        ~db.Books.identifiers.any(db.Identifiers.type.in_(HARDCOVER_IDENTIFIER_TYPES))
+    ).all()
+    return [row[0] for row in rows]
+
+
+def _books_with_hardcover_id(book_ids):
+    from cps.tasks.auto_hardcover_id import HARDCOVER_IDENTIFIER_TYPES
+    found = set()
+    for chunk in _chunks(book_ids):
+        found.update(row[0] for row in calibre_db.session.query(db.Identifiers.book).filter(
+            db.Identifiers.book.in_(chunk),
+            db.Identifiers.type.in_(HARDCOVER_IDENTIFIER_TYPES),
+        ).all())
+    return found
+
+
+def _hardcover_match_statuses():
+    """Book id -> where it stands in the review queue.
+
+    A book waiting for review is "pending" whatever its history; otherwise a
+    rejection (which stops auto-fetch for good) wins over a skip.
+    """
+    statuses = {}
+    rank = {'pending': 3, 'rejected': 2, 'skipped': 1}
+    rows = ub.session.query(
+        ub.HardcoverMatchQueue.book_id,
+        ub.HardcoverMatchQueue.reviewed,
+        ub.HardcoverMatchQueue.review_action,
+    ).all()
+    for book_id, reviewed, action in rows:
+        if not reviewed:
+            status = 'pending'
+        elif action == 'reject':
+            status = 'rejected'
+        elif action == 'skip':
+            status = 'skipped'
+        else:
+            continue
+        if rank[status] > rank.get(statuses.get(book_id), 0):
+            statuses[book_id] = status
+    return statuses
+
+
+@admi.route("/admin/hardcover/missing")
+@user_login_required
+@admin_required
+def hardcover_missing_ids():
+    """Books with no Hardcover identifier, filterable by review-queue status."""
+    status_filter = request.args.get('status', 'all')
+    if status_filter not in HARDCOVER_MISSING_STATUSES:
+        status_filter = 'all'
+    try:
+        missing_ids = _book_ids_without_hardcover_id()
+        queue_statuses = _hardcover_match_statuses()
+        status_of = {book_id: queue_statuses.get(book_id, 'unmatched') for book_id in missing_ids}
+        counts = {status: 0 for status in HARDCOVER_MISSING_STATUSES}
+        for status in status_of.values():
+            counts[status] += 1
+
+        selected = [book_id for book_id, status in status_of.items()
+                    if status_filter == 'all' or status == status_filter]
+        books = []
+        for chunk in _chunks(selected):
+            books.extend(calibre_db.session.query(db.Books).filter(db.Books.id.in_(chunk)).all())
+        books.sort(key=lambda book: (book.sort or book.title or '').lower())
+        rows = [{
+            'id': book.id,
+            'title': book.title,
+            'authors': ', '.join(author.name for author in book.authors),
+            'status': status_of[book.id],
+        } for book in books[:HARDCOVER_MISSING_PAGE_LIMIT]]
+
+        return render_title_template(
+            "hardcover_missing_ids.html",
+            title=_("Books without a Hardcover ID"),
+            page="hardcover-missing",
+            rows=rows,
+            total=len(missing_ids),
+            shown_of=len(selected),
+            counts=counts,
+            status_filter=status_filter,
+            sync_enabled=config.hardcover_sync_enabled(),
+            token_available=bool(config.resolved_hardcover_token()),
+        )
+    except Exception as e:
+        log.error(f"Error listing books without a Hardcover ID: {e}")
+        flash(_("Error listing books without a Hardcover ID: %(error)s", error=str(e)), category="error")
+        return redirect(url_for('admin.admin'))
+
+
+@admi.route("/admin/hardcover/rematch", methods=["POST"])
+@user_login_required
+@admin_required
+def hardcover_rematch():
+    """Run auto-fetch again over every book without an ID, review queue included.
+
+    The scheduled run leaves books waiting for review alone; this one re-scores
+    them too (after a matcher improvement, or once Hardcover gained the book).
+    Rejected books stay excluded; "Allow retry" releases them one by one.
+    """
+    if not config.hardcover_sync_enabled():
+        flash(_('Error: Hardcover sync is disabled. Enable it in Basic Configuration or with HARDCOVER_SYNC_ENABLED.'),
+              category="error")
+    elif not config.resolved_hardcover_token():
+        flash(_('Error: No Hardcover token available. Set HARDCOVER_TOKEN environment variable or configure in Basic Configuration.'),
+              category="error")
+    else:
+        try:
+            _enqueue_hardcover_auto_fetch(include_pending=True)
+            log.info(f"Hardcover re-match (including pending reviews) triggered by {current_user.name}")
+            flash(_('Hardcover matching started for every book without a Hardcover ID. Check Tasks for progress.'),
+                  category="success")
+        except Exception as e:
+            log.error(f"Error starting Hardcover re-match: {e}")
+            flash(_('Error starting Hardcover auto-fetch task: %(error)s', error=str(e)), category="error")
+    return redirect(url_for('admin.hardcover_missing_ids', status=request.form.get('status', 'all')))
+
+
+@admi.route("/admin/hardcover/allow-retry/<int:book_id>", methods=["POST"])
+@user_login_required
+@admin_required
+def hardcover_allow_retry(book_id):
+    """Lift a rejection so the next auto-fetch searches this book again."""
+    try:
+        updated = ub.session.query(ub.HardcoverMatchQueue).filter(
+            ub.HardcoverMatchQueue.book_id == book_id,
+            ub.HardcoverMatchQueue.reviewed == 1,
+            ub.HardcoverMatchQueue.review_action == 'reject',
+        ).update({
+            ub.HardcoverMatchQueue.review_action: 'retry',
+            ub.HardcoverMatchQueue.reviewed_at: datetime.utcnow().isoformat(),
+            ub.HardcoverMatchQueue.reviewed_by: current_user.name,
+        }, synchronize_session=False)
+        ub.session.commit()
+        log.info(f"User {current_user.name} allowed Hardcover retry for book {book_id} ({updated} row(s))")
+        flash(_('The next Hardcover auto-fetch will search this book again.'), category="success")
+    except Exception as e:
+        ub.session.rollback()
+        log.error(f"Error allowing Hardcover retry for book {book_id}: {e}")
+        flash(_('Error: %(error)s', error=str(e)), category="error")
+    return redirect(url_for('admin.hardcover_missing_ids', status=request.form.get('status', 'all')))
 
 
 # method is available without login and not protected by CSRF to make it easy reachable, is per default switched off

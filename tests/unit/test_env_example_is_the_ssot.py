@@ -36,6 +36,7 @@ FRONTEND_ROOT = ROOT / "frontend"
 
 # name -> (argument index containing the environment key, files defining/calling it)
 PYTHON_ENV_HELPERS = {
+    "_mib": (0, frozenset({"cps/services/reflow/native_resources.py"})),
     "_configured_dir": (1, frozenset({"cps/constants.py", "scripts/app_paths.py"})),
     "_env_path": (0, frozenset({"scripts/app_paths.py"})),
     "_get_ingest_owner_id": (0, frozenset({"cps/editbooks.py"})),
@@ -47,6 +48,7 @@ PYTHON_ENV_HELPERS = {
 # collected through PYTHON_ENV_HELPERS.
 DYNAMIC_PYTHON_READERS = frozenset(
     {
+        ("cps/services/reflow/native_resources.py", "_mib"),
         ("cps/constants.py", "_configured_dir"),
         ("cps/editbooks.py", "_get_ingest_owner_id"),
         ("cps/sqlite_utils.py", "environment_flag_enabled"),
@@ -58,6 +60,7 @@ DYNAMIC_PYTHON_READERS = frozenset(
 # These names are intentionally outside the deployment SSOT. Each is owned by an
 # external runtime/tool rather than accepted as CWNG configuration.
 SSOT_EXCEPTIONS = {
+    "REFLOW_NATIVE_LEASE_FD": "internal descriptor handed from the native-resource parent to its OCR child; not a deployment setting",
     "CALIBRE_CONFIG_DIRECTORY": "written by CWNG for Calibre child processes; Calibre owns and consumes it",
     "CI": "provided and interpreted by the CI and Playwright runtimes",
     "CONFIG_DIR": "Compose interpolation helper; CWNG reads the resulting CALIBRE_DBPATH instead",
@@ -159,6 +162,8 @@ class _PythonEnvVisitor(ast.NodeVisitor):
         key = self._resolve_key(key_node)
         location = f"{self.relative_path}:{node.lineno}"
         if key is not None:
+            if seam == "_mib helper" and self.relative_path == "cps/services/reflow/native_resources.py":
+                key = "REFLOW_NATIVE_" + key + "_MIB"
             self.reads.setdefault(key, set()).add(location)
             return
         if (self.relative_path, self._current_function()) in DYNAMIC_PYTHON_READERS:

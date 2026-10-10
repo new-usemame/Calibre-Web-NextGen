@@ -10971,6 +10971,10 @@ msgstr ""
 msgid "Save Discover source"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr ""
+
 #: cps/spa_strings.py cps/web.py
 msgid "Discover source saved."
 msgstr ""

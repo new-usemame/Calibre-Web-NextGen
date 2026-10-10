@@ -439,7 +439,7 @@ def get_convert_options(book):
 # Convert existing book entry to new format
 def convert_book_format(book_id, calibre_path, old_book_format, new_book_format, user_id,
                         ereader_mail=None, subject=None, blocking=False, timeout=120,
-                        cover_user_id=None):
+                        cover_user_id=None, queued_tasks=None):
     book = calibre_db.get_book(book_id)
     data = calibre_db.get_book_format(book.id, old_book_format)
     if not data:
@@ -478,6 +478,9 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
         user=user_id, cover_user_id=cover_user_id,
     )
     WorkerThread.add(user_id, task)
+    if queued_tasks is not None:
+        # The caller watches this task in the task list (#1110).
+        queued_tasks.append(task)
     if blocking:
         # Only the context-free Event wait crosses onto the bounded native
         # thread pool. url_for(), translations, DB access, and task creation

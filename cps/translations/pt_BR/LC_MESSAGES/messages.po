@@ -3646,6 +3646,11 @@ msgid "Convert failed."
 msgstr "Falha na converção"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{format} is ready."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Convert to"
 msgstr ""
 
@@ -8162,10 +8167,6 @@ msgstr "Página anterior"
 msgid "Progress"
 msgstr "Progresso"
 
-#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
-msgid "Progress is not being saved."
-msgstr ""
-
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Publicados após"
@@ -10844,6 +10845,10 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Save Discover source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Change Discover source"
 msgstr ""
 
 #: cps/spa_strings.py cps/web.py

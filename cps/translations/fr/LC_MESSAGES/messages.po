@@ -3893,6 +3893,11 @@ msgid "Convert failed."
 msgstr "La conversion a échoué."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{format} is ready."
+msgstr "Le fichier {format} est prêt."
+
+#: cps/spa_strings.py
 msgid "Convert to"
 msgstr "Convertir vers"
 
@@ -8619,10 +8624,6 @@ msgstr "Page précédente"
 msgid "Progress"
 msgstr "Avancement"
 
-#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
-msgid "Progress is not being saved."
-msgstr "La progression n’est pas enregistrée."
-
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Publié après le"
@@ -11546,6 +11547,10 @@ msgstr "Source indisponible"
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Save Discover source"
 msgstr "Enregistrer la source de découverte"
+
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "Changer la source de découverte"
 
 #: cps/spa_strings.py cps/web.py
 msgid "Discover source saved."
@@ -19462,6 +19467,9 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Progress is not being saved."
+#~ msgstr "La progression n’est pas enregistrée."
 
 #~ msgid "Rating updated"
 #~ msgstr "Évaluation mise à jour"

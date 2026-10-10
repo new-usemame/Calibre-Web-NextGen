@@ -669,9 +669,15 @@ def convert_format(book_id):
         return _err("invalid_request", "Source format is not valid for conversion", 400)
     if dst not in allowed_targets:
         return _err("invalid_request", "Target format is not valid for conversion", 400)
-    rtn = convert_book_format(book_id, config.get_book_path(), src, dst, current_user.name)
+    queued = []
+    rtn = convert_book_format(book_id, config.get_book_path(), src, dst, current_user.name,
+                              queued_tasks=queued)
     if rtn is None:
-        return jsonify({"ok": True, "message": "Queued for conversion to %s" % dst})
+        # task_id matches /api/v1/tasks rows, so the book page can tell the
+        # reader when the new format is ready or why it failed (#1110).
+        task_id = str(queued[0].id) if queued else None
+        return jsonify({"ok": True, "message": "Queued for conversion to %s" % dst,
+                        "task_id": task_id})
     return _err("convert_failed", "There was an error converting this book: %s" % rtn, 400)
 
 

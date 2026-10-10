@@ -2,9 +2,10 @@ import type { ReaderBookmark } from "./readerResume";
 import type { ReaderFontCatalog } from './readerFonts';
 import { keepPreviousData, useQuery, useInfiniteQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, apiPostDownload, ApiError,
-  navigateToLogout, noteSessionIdentity,
+  navigateToLogout, noteSessionIdentity, TASK_FINISHED,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import type { PickerBook } from './shelfPicker';
@@ -1415,12 +1416,36 @@ export function useAddFormat(id: string | number) {
   });
 }
 
-/** Queue a format conversion (from -> to). */
+/** Queue a format conversion (from -> to). `task_id` names the queued task
+ *  in /api/v1/tasks (#1110). */
 export function useConvertFormat(id: string | number) {
   return useMutation({
     mutationFn: (v: { from: string; to: string }) =>
-      apiPost<{ ok: boolean; message: string }>(`/api/v1/books/${id}/convert`, v),
+      apiPost<{ ok: boolean; message: string; task_id?: string | null }>(`/api/v1/books/${id}/convert`, v),
   });
+}
+
+/** Follow one queued conversion until it ends (#1110: a finished conversion
+ *  used to look stalled until the reader refreshed the page). Returns the
+ *  task's row while it is listed; when it finishes, the book is refetched so
+ *  the new format appears in the file list. */
+export function useConversionTask(bookId: string | number, taskId: string | null, queuedAt = 0) {
+  const qc = useQueryClient();
+  const query = useQuery<{ items: TaskItem[] }>({
+    queryKey: ['tasks'],
+    queryFn: () => apiGet<{ items: TaskItem[] }>('/api/v1/tasks'),
+    enabled: !!taskId,
+    refetchInterval: 3000,
+  });
+  const task = taskId ? query.data?.items.find((it) => String(it.task_id) === taskId) : undefined;
+  // A list fetched after the task was queued that no longer holds it means the
+  // worker already pruned it; stop following it rather than polling forever.
+  const gone = !!taskId && !task && query.isSuccess && query.dataUpdatedAt > queuedAt;
+  const finished = task?.stat === TASK_FINISHED || gone;
+  useEffect(() => {
+    if (finished) void qc.invalidateQueries({ queryKey: ['book', String(bookId)] });
+  }, [finished, bookId, qc]);
+  return { task, gone };
 }
 
 /** Search online metadata providers (reuses the legacy /metadata/search).

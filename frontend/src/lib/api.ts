@@ -697,7 +697,15 @@ export interface TaskItem {
   user: string;
   is_cancellable: boolean;
   stat: number;
+  /** Converter output for a failed task, HTML-escaped by the server. */
+  error?: string | null;
 }
+
+/** TaskItem.stat values (cps/services/worker.py STAT_*). */
+export const TASK_FAILED = 1;
+export const TASK_FINISHED = 3;
+export const TASK_ENDED = 4;
+export const TASK_CANCELLED = 5;
 
 export class ApiError extends Error {
   status: number;

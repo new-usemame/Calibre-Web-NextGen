@@ -2193,11 +2193,7 @@ def edit_magic_shelf(shelf_id):
             ub.session_commit()
             
             # Invalidate cache
-            if 'magic_shelf_counts' in flask_session:
-                counts = flask_session['magic_shelf_counts']
-                if str(shelf_id) in counts:
-                    del counts[str(shelf_id)]
-                    flask_session.modified = True
+            magic_shelf.forget_book_counts(shelf.id)
             
             log.info(f"User {current_user.id} updated magic shelf {shelf_id} ('{name}') with icon '{icon}'")
             # Mirror of the create path: persisted-but-inert kobo intent gets
@@ -2314,6 +2310,7 @@ def delete_magic_shelf(shelf_id):
         # Delete the shelf
         ub.session.delete(shelf)
         ub.session_commit()
+        magic_shelf.forget_book_counts(shelf_id)
         log.info(f"User {current_user.id} deleted magic shelf {shelf_id} ('{shelf_name}')")
         return jsonify({"success": True})
     except Exception as e:

@@ -1,3 +1,0 @@
-### Fixed
-
-- **Books whose chapters open with a commented-out XML declaration no longer show blank pages on a Kobo.** Some EPUBs start a chapter with `<!--?xml version="1.0" encoding="utf-8"?-->`. The Kindle EPUB Fixer didn't recognise that as a declaration, added a real one and left the comment in place; kepubify then rewrote the comment into a second declaration, so the KEPUB wasn't valid XML. kepubify turns every such comment into a declaration, wherever it sits in the chapter, so the fixer now removes all of them. Running the EPUB Fixer again on a book stored by an earlier version repairs its EPUB; convert that book to KEPUB again (or re-ingest it) to replace the broken KEPUB. Reported and fixed by @sgreadly in #2506 / #2507.

@@ -227,6 +227,11 @@ def _acquire_lock_or_exit():
                     os.remove(path)
                 except FileNotFoundError:
                     pass
+                except PermissionError:
+                    # Left by a run as another user (a manual root run, in sticky
+                    # /tmp); this user cannot reclaim it. cwa-init clears it at start.
+                    print(f"[cover-metadata-enforcer]: CANCELLING... a stale lock at {path} belongs to another user and cannot be removed; restart the container to clear it")
+                    sys.exit(2)
                 continue
             print("[cover-metadata-enforcer]: CANCELLING... cover-metadata-enforcer was initiated but is already running")
             sys.exit(2)
@@ -321,6 +326,7 @@ class Book:
         """Uses the export function of the calibredb utility to export any new metadata for the given book to metadata_temp, and returns the path to the new metadata.opf"""
         # Add retry logic with exponential backoff to handle database locks
         max_retries = 3
+        export_dir = None
         for attempt in range(max_retries):
             try:
                 # Add small delay before first attempt to allow other operations to complete
@@ -337,16 +343,23 @@ class Book:
                 # Creating it here costs nothing and keeps the export from failing on a
                 # fresh volume.
                 os.makedirs(metadata_temp_dir, exist_ok=True)
+                # Export into a directory of this run's own. The .opf is found by
+                # walking the export, so anything already in metadata_temp -- a
+                # root-owned export from a killed root run, which the app user
+                # cannot clean up (#2518) -- could otherwise be embedded instead.
+                # empty_metadata_temp removes it with the rest after the pass.
+                if export_dir is None:
+                    export_dir = tempfile.mkdtemp(prefix=f"export-{self.book_id}-", dir=metadata_temp_dir)
                 with operation(timeout=60):
                     target = library_target(self.calibre_library)
                     result = subprocess.run(
-                        calibredb_command(["calibredb", "export", "--to-dir", metadata_temp_dir, self.book_id] + target.args, target),
+                        calibredb_command(["calibredb", "export", "--to-dir", export_dir, self.book_id] + target.args, target),
                         env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60,
                         input=target.stdin
                     )
 
                 if result.returncode == 0:
-                    temp_files = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(metadata_temp_dir) for f in filenames]
+                    temp_files = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(export_dir) for f in filenames]
                     opf_files = [f for f in temp_files if f.endswith('.opf')]
                     if opf_files:
                         return opf_files[0]
@@ -1129,11 +1142,14 @@ class Enforcer:
     def _reset_book_dir_ownership(book_dir: str) -> None:
         """Reset the book directory and its files to abc:abc (LinuxServer.io PUID/PGID) after running as root.
 
-        Why: this script runs under s6 as root so it can call calibredb/ebook-polish, but the
-        Calibre-Web Flask app runs as 'abc' (UID 1000). Files written here as root would be
-        unwritable for cover-from-URL saves later, surfacing as
-        'Cover-file is not a valid image file, or could not be stored'.
+        Why: this script can run as root (a manual run from a shell, or an older dispatcher),
+        but the Calibre-Web Flask app runs as 'abc' (UID 1000). Files written here as root would
+        be unwritable for cover-from-URL saves later, surfacing as
+        'Cover-file is not a valid image file, or could not be stored'. The metadata-change
+        dispatcher runs the enforcer as the app user, so this only acts when run as root.
         """
+        if os.geteuid() != 0:
+            return
         try:
             uid = int(os.environ.get("PUID", "1000"))
             gid = int(os.environ.get("PGID", "1000"))
@@ -1280,8 +1296,18 @@ class Enforcer:
         except Exception as e:
             print(f"[cover-metadata-enforcer] WARNING: Unable to record failed enforcement: {e}", flush=True)
 
-        # Always surface the failure to logs
-        print(f"[cover-metadata-enforcer] ERROR: Failed to enforce metadata for '{log_info.get('title', 'Unknown')}' (book_id={log_info.get('book_id', 'unknown')}): {error}", flush=True)
+        # Always surface the failure to logs. A failed calibredb run only says
+        # "returned non-zero exit status 1"; the reason (a PermissionError on a
+        # root-squashed share, #2518) is the last line of its stderr, so add it.
+        reason = ""
+        stderr = getattr(error, "stderr", None)
+        if isinstance(stderr, str):
+            lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+            # Prefer the exception line: calibredb can print warnings after it.
+            errors = [line for line in lines if re.match(r"^[\w.]+(Error|Exception):", line)]
+            if errors or lines:
+                reason = f" ({(errors or lines)[-1]})"
+        print(f"[cover-metadata-enforcer] ERROR: Failed to enforce metadata for '{log_info.get('title', 'Unknown')}' (book_id={log_info.get('book_id', 'unknown')}): {error}{reason}", flush=True)
 
 
     def empty_metadata_temp(self):

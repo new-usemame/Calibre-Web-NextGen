@@ -3772,6 +3772,11 @@ msgid "Convert failed."
 msgstr "Conversie mislukt."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{format} is ready."
+msgstr "{format} is klaar."
+
+#: cps/spa_strings.py
 msgid "Convert to"
 msgstr "Converteren naar"
 
@@ -8466,10 +8471,6 @@ msgstr "Vorige pagina"
 msgid "Progress"
 msgstr "Voortgang"
 
-#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
-msgid "Progress is not being saved."
-msgstr "Voortgang wordt niet opgeslagen."
-
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Gepubliceerd na"
@@ -11371,6 +11372,10 @@ msgstr "Bron niet beschikbaar"
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Save Discover source"
 msgstr "Bron voor ontdekken opslaan"
+
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "Bron voor ontdekken wijzigen"
 
 #: cps/spa_strings.py cps/web.py
 msgid "Discover source saved."
@@ -19057,6 +19062,9 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Progress is not being saved."
+#~ msgstr "Voortgang wordt niet opgeslagen."
 
 #, fuzzy
 #~ msgid "Rating updated"

@@ -1657,7 +1657,7 @@
             }).done(function () {
                 window.location.reload();
             }).fail(function (xhr) {
-                showActionToast(xhr.responseText || "{{ _('Failed to update tags') }}", $tagsContainer[0]);
+                showActionToast(xhr.responseText || {{ _('Failed to update tags')|tojson }}, $tagsContainer[0]);
             });
         }
 
@@ -1679,7 +1679,7 @@
                 $pill.find("input").focus();
                 return;
             }
-            var label = $pill.data("label") || "{{ _('Add tag') }}";
+            var label = $pill.data("label") || {{ _('Add tag')|tojson }};
             var finalized = false;
 
             function restorePill() {

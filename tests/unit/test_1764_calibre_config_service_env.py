@@ -22,12 +22,12 @@ ABC_CONFIG = "/config/.config/calibre-runtime"
 # the regression vector this file exists to catch.
 ABC_SERVICES = (
     "cwa-ingest-service",
+    "metadata-change-detector",
     "svc-calibre-web-automated",
 )
 ROOT_SERVICES = (
     "calibre-binaries-setup",
     "cwa-auto-library",
-    "metadata-change-detector",
 )
 
 

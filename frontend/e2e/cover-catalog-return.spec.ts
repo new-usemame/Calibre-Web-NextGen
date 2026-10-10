@@ -73,6 +73,7 @@ for (const scenario of ['completed read', 'Back while read pending', 'failed rea
       await route.fulfill({ json: detail(committed ? AFTER : BEFORE) });
     });
     await page.route(`**/api/v1/books/${ID}/review`, (route) => route.fulfill({ json: { review: null } }));
+    await page.route(`**/api/v1/books/${ID}/rating`, (route) => route.fulfill({ json: { personal_rating: null, household_rating: null } }));
     await page.route('**/book/*/cover/state', (route) => route.fulfill({ json: {
       locked: false, ereader_enabled: false,
       ereader_defaults: { aspect: 'kobo_libra_color', fill_mode: 'edge_mirror', color: '' },

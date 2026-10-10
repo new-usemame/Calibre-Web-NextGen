@@ -862,6 +862,7 @@ export function Reader({ id }: { id: string }) {
   const persistHighlight = useCallback(async (
     cfiRange: string, text: string, color: string, note: string,
   ) => {
+    let saved = false;
     try {
       // The create route answers with the stored row (`_data_json_row`), so the
       // listed row is built from what the SERVER recorded, falling back to what
@@ -890,14 +891,17 @@ export function Reader({ id }: { id: string }) {
         position_type: created?.position_type ?? 'cfi',
       }]);
       paintHighlight(cfiRange, color, newId, !!note);
+      saved = true;
       return true;
     } catch {
       announce(t('Could not save that note.'), { assertive: true });
       return false;
     } finally {
-      try {
-        (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
-      } catch { /* noop */ }
+      if (saved) {
+        try {
+          (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
+        } catch { /* noop */ }
+      }
     }
   }, [id, paintHighlight, announce, t]);
 

@@ -463,3 +463,72 @@ def test_full_standalone_page_advances_cursor_instead_of_stalling(
     assert len(_state_book_ids(first, harness.uuid_to_id)) == kobo.SYNC_ITEM_LIMIT
     assert len(_state_book_ids(second, harness.uuid_to_id)) == kobo.SYNC_ITEM_LIMIT
     assert datetime.min < first_cursor < second_cursor
+
+
+@pytest.mark.parametrize("path", ["standalone", "entitlement"])
+@pytest.mark.parametrize("source", ["stored-offset", "unexpired-orm-stamp"])
+def test_timezone_aware_state_clock_does_not_crash_the_sync(
+    reading_state_sync, source, path,
+):
+    """#2457: an aware reading-state clock must join the naive UTC cursor.
+
+    The token cursor is UTC-naive.  A state clock can reach the frontier
+    timezone-aware two ways: SQLAlchemy 2's SQLite reader parses a stored
+    ``+00:00`` suffix into an aware value, and the parent-state
+    ``before_flush`` stamp is ``datetime.now(timezone.utc)``, which stays
+    aware in memory until the row is expired.  Either one made ``max()``
+    raise TypeError and every Kobo sync return 500.
+    """
+    from sqlalchemy import text
+
+    from cps import kobo, ub
+
+    harness = reading_state_sync
+    state = harness.states[4]
+    # An already-synced device, so the factory-reset rewrite stays out.
+    harness.session.add(ub.KoboSyncedBooks(
+        user_id=harness.user.id,
+        book_id=harness.books[0].id,
+        book_uuid=str(harness.books[0].uuid),
+    ))
+    if path == "entitlement":
+        # The reporter's traceback: the state rides inside a changed book's
+        # entitlement rather than as a standalone ChangedReadingState.
+        harness.books[4].last_modified = datetime(2026, 8, 2)
+    harness.session.commit()
+    if source == "stored-offset":
+        harness.session.execute(
+            text(
+                "UPDATE kobo_reading_state SET last_modified = :clock "
+                "WHERE id = :id"
+            ),
+            {"clock": "2026-08-01 01:00:00.000000+00:00", "id": state.id},
+        )
+        harness.session.commit()
+    else:
+        # A child change flushed (not committed) earlier in the request: the
+        # ORM hook stamps the parent with an aware clock that the identity
+        # map then hands to the reading-state frontier query.
+        state.current_bookmark.progress_percent = 55.0
+        harness.session.flush()
+        assert state.last_modified.tzinfo is not None
+
+    # Resume past every fixture clock (book 1's is the newest at +1000s), so
+    # the altered state is the one the frontier page must carry.
+    token = kobo.SyncToken.SyncToken(
+        books_last_created=max(book.timestamp for book in harness.books),
+        books_last_modified=datetime(2026, 8, 1, 0, 4, 10),
+        books_last_id=harness.books[-1].id,
+        reading_state_last_modified=datetime(2026, 8, 1, 0, 16, 40),
+    ).build_sync_token()
+
+    response = harness.sync(token, physical_device=False)
+
+    assert response.status_code == 200
+    assert harness.uuid_to_id[str(harness.books[4].uuid)] in _state_book_ids(
+        response, harness.uuid_to_id,
+    )
+    cursor = kobo.SyncToken.SyncToken.from_headers({
+        harness.token_header: response.headers[harness.token_header],
+    }).reading_state_last_modified
+    assert cursor > datetime(2026, 8, 1, 0, 16, 40)

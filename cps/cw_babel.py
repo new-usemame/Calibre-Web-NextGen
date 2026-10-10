@@ -7,7 +7,7 @@
 from babel import negotiate_locale
 from flask_babel import Babel, Locale
 from babel.core import UnknownLocaleError
-from flask import request, has_request_context
+from flask import request, has_request_context, current_app
 from .cw_login import current_user
 
 from . import logger
@@ -118,6 +118,69 @@ def get_locale(user=None):
 
 def get_user_locale_language(user_language):
     return Locale.parse(user_language).get_language_name(get_locale())
+
+
+def _nordic_locale(raw):
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        language = Locale.parse(raw.replace('-', '_')).language
+    except (UnknownLocaleError, ValueError):
+        return None
+    if language == 'no':
+        return 'nb'
+    return language if language in ('sv', 'fi', 'da', 'nb', 'nn') else None
+
+
+def get_collation_locale(user=None):
+    """Sort in the reader's language even if its UI catalog is unavailable.
+
+    UI language validation remains in get_locale. Nordic sorting also accepts
+    the existing explicit ?lang mechanism for Danish/Nynorsk and normalizes
+    Norwegian 'no' to ICU's Bokmål locale. OPDS passes its Basic Auth viewer.
+    """
+    if not has_request_context():
+        return 'en'
+    if 'babel' not in current_app.extensions:
+        return 'en'
+    if user is None:
+        user = current_user
+    requested = _nordic_locale(request.args.get('lang'))
+    if requested:
+        return requested
+    # A valid translated non-Nordic override continues to win over the account.
+    available = get_available_translations()
+    override = _coerce_locale(request.args.get('lang'), available)
+    if override:
+        return override
+    if user is not None and getattr(user, 'name', None) != 'Guest':
+        stored = getattr(user, 'locale', None)
+        language = _nordic_locale(stored)
+        if language:
+            return language
+        translated = _coerce_locale(stored, available)
+        if translated:
+            return translated
+    for language, quality in request.accept_languages:
+        if quality > 0:
+            nordic = _nordic_locale(language)
+            if nordic:
+                return nordic
+            translated = _coerce_locale(language, available)
+            if not translated:
+                try:
+                    candidate = str(Locale.parse(language.replace('-', '_')))
+                except (UnknownLocaleError, ValueError):
+                    continue
+                translated = negotiate_locale([candidate], available)
+            if translated:
+                return translated
+    if request.path.startswith('/opds'):
+        from . import config
+        nordic = _nordic_locale(getattr(config, 'config_opds_default_locale', ''))
+        if nordic:
+            return nordic
+    return get_locale(user)
 
 
 def sanitize_locale_for_write(raw):

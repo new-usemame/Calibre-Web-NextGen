@@ -248,7 +248,7 @@ export function AdvancedSearch() {
             </div>
           </Field>
 
-          <Field label={t('Rating (stars)')}>
+          <Field label={t(me && !me.role.anonymous ? 'Your rating (stars)' : 'Rating (stars)')}>
             <div className={styles.rangeRow}>
               <select className={styles.input} value={form.rating_low}
                 onChange={(e) => set('rating_low', e.target.value)} aria-label={t('Minimum rating')}>

@@ -52,7 +52,7 @@
     resultEl.style.display = 'none';
     errorEl.style.display = 'none';
     submitBtn.disabled = true;
-    statusEl.textContent = '{{ _("Uploading...") }}';
+    statusEl.textContent = {{ _("Uploading...")|tojson }};
 
     var fd = new FormData(form);
     fetch(form.action, {
@@ -78,13 +78,13 @@
         document.getElementById('result-total').textContent = res.body.total_seen || 0;
         resultEl.style.display = 'block';
       } else {
-        errorEl.textContent = (res.body && res.body.message) || '{{ _("Import failed.") }}';
+        errorEl.textContent = (res.body && res.body.message) || {{ _("Import failed.")|tojson }};
         errorEl.style.display = 'block';
       }
     }).catch(function(err) {
       submitBtn.disabled = false;
       statusEl.textContent = '';
-      errorEl.textContent = '{{ _("Network error.") }} ' + err;
+      errorEl.textContent = {{ _("Network error.")|tojson }} + ' ' + err;
       errorEl.style.display = 'block';
     });
   });

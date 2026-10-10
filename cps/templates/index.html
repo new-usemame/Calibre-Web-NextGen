@@ -130,18 +130,9 @@
           ({{entry.Books.series_index|formatfloat(2)}})
         </p>
         {% endif %}
-        {% if entry.Books.ratings.__len__() > 0 %}
-        <div class="rating">
-          {% for number in range((entry.Books.ratings[0].rating/2)|int(2)) %}
-            <span class="glyphicon glyphicon-star good"></span>
-            {% if loop.last and loop.index < 5 %}
-              {% for numer in range(5 - loop.index) %}
-                <span class="glyphicon glyphicon-star-empty"></span>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
+        {% with library_rating=entry.Books.ratings[0].rating if entry.Books.ratings else 0 %}
+          {% include 'library_rating.html' %}
+        {% endwith %}
       </div>
     </div>
     {% endfor %}
@@ -159,7 +150,7 @@
   {% if page == 'magicshelf' %}
   <div class="alert alert-warning visible-xs" style="margin-top: 10px;">
     <span class="glyphicon glyphicon-warning-sign"></span> 
-    <strong>{{_('Mobile Notice')}}</strong>: {{_('Magic shelf editing works best on desktop or tablet devices.')}}
+    <strong>{{_('Mobile Notice')}}</strong>: {{_('Smart shelf editing works best on desktop or tablet devices.')}}
   </div>
   {% endif %}
 
@@ -304,18 +295,9 @@
           ({{entry.Books.series_index|formatfloat(2)}})
         </p>
         {% endif %}
-        {% if entry.Books.ratings.__len__() > 0 %}
-        <div class="rating">
-          {% for number in range((entry.Books.ratings[0].rating/2)|int(2)) %}
-            <span class="glyphicon glyphicon-star good"></span>
-            {% if loop.last and loop.index < 5 %}
-              {% for numer in range(5 - loop.index) %}
-                <span class="glyphicon glyphicon-star-empty"></span>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
+        {% with library_rating=entry.Books.ratings[0].rating if entry.Books.ratings else 0 %}
+          {% include 'library_rating.html' %}
+        {% endwith %}
       </div>
     </div>
     {% endfor %}

@@ -826,14 +826,15 @@
       <input type="checkbox" id="config_kobo_sync_magic_shelves" name="config_kobo_sync_magic_shelves" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="{{ magic_shelf_sync_hint }}">
       {% endif %}
       {% if koreader_sync %}
-      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync Magic Shelves to e-readers (Kobo and KOReader)')}}</label><br>
+      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync smart shelves to e-readers (Kobo and KOReader)')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, Magic Shelves marked for e-reader sync reach your Kobo as collections and your KOReader library as shelves. Kobo also needs Kobo Sync in Basic Configuration.')}}
+        {{_('When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too.')}}
+        {{_('KOReader also receives marked smart shelves in its library.')}}
       </p>
       {% else %}
-      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync Magic Shelves to Kobo')}}</label><br>
+      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync smart shelves to Kobo')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, your Magic Shelves will be synced to your Kobo device as collections. Note: You must also enable Kobo Sync in Basic Configuration.')}}
+        {{_('When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too.')}}
       </p>
       {% endif %}
 

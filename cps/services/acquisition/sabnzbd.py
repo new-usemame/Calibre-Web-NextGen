@@ -12,6 +12,7 @@ import re
 import stat
 
 from .catalog import connection_config as transport_config, policy
+from .contracts import MOBI_MEDIA_TYPE
 from .http import TransportError, run_transfer
 from .newznab import xml_document
 
@@ -94,6 +95,15 @@ def _validate_reported_path(config, storage):
     return path
 
 
+def _completed_media(path, config):
+    suffix = path.suffix.lower()
+    if suffix == '.mobi':
+        return MOBI_MEDIA_TYPE if config.get('allow_mobi') is True else None
+    if suffix not in BOOK_SUFFIXES:
+        return None
+    return 'application/epub+zip' if suffix == '.epub' else 'application/pdf'
+
+
 def completed_books(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=False):
     """Enumerate supported regular books from one owned completion path.
 
@@ -110,9 +120,9 @@ def completed_books(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=
             raise
         info = None
     if info is not None and stat.S_ISREG(info.st_mode):
-        if folder.suffix.lower() not in BOOK_SUFFIXES or not 0 < info.st_size <= max_bytes:
+        media = _completed_media(folder, config)
+        if media is None or not 0 < info.st_size <= max_bytes:
             return ()
-        media = 'application/epub+zip' if folder.suffix.lower() == '.epub' else 'application/pdf'
         return ((folder, media),)
     if info is not None and (stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode)):
         raise ClientError('unsafe_completed_path')
@@ -149,9 +159,9 @@ def completed_books(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=
                 continue
             if not stat.S_ISREG(info.st_mode):
                 raise ClientError('unsafe_completed_path')
-            if path.suffix.lower() not in BOOK_SUFFIXES or not 0 < info.st_size <= max_bytes:
+            media = _completed_media(path, config)
+            if media is None or not 0 < info.st_size <= max_bytes:
                 continue
-            media = 'application/epub+zip' if path.suffix.lower() == '.epub' else 'application/pdf'
             candidates.append((path, media))
             too_many_books |= len(candidates) > MAX_COMPLETED_BOOKS
             actual_bytes += info.st_size

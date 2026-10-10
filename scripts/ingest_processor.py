@@ -1066,6 +1066,29 @@ def _run_converter_streaming(cmd, env, timeout=None, *, owned_process_group=Fals
 _NOT_A_BOOK_FORMATS = frozenset({'acsm', 'lcpl'})
 
 
+# Convert Library's working dirs (PRIVATE_TMP_PREFIX in convert_library.py). It runs
+# under its own lock, so a run may be converting a book in one of them right now.
+CONVERT_LIBRARY_TMP_PREFIX = ".cwa_convert_library_"
+
+
+def empty_tmp_conversion_dir(tmp_conversion_dir) -> None:
+    """Remove what ingest left in the shared conversion dir, but not Convert Library's dirs."""
+    try:
+        entries = list(os.scandir(tmp_conversion_dir))
+    except FileNotFoundError:
+        return
+    for entry in entries:
+        if entry.name.startswith(CONVERT_LIBRARY_TMP_PREFIX):
+            continue
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path, ignore_errors=True)
+        else:
+            try:
+                os.unlink(entry.path)
+            except OSError:
+                pass  # as rmtree(ignore_errors=True) did: one stuck file must not stop the rest
+
+
 def is_a_book_format(input_format) -> bool:
     """False for formats that are tickets/licences rather than books."""
     return (input_format or '').lower() not in _NOT_A_BOOK_FORMATS
@@ -1972,29 +1995,11 @@ class NewBookProcessor:
         if timeout is None:
             timeout_minutes = self.cwa_settings.get('ingest_timeout_minutes', 15)
             timeout = timeout_minutes * 60  # Convert to seconds
+            if os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS') == '0':
+                timeout = 0  # Retry queues get one immediate writer probe.
 
-        start = time.time()
-        while time.time() - start < timeout:
-            if not os.path.exists(self.filepath):
-                return False
-            try:
-                # lsof '-F f' gets file access mode; we check for 'w' (write).
-                # Add timeout to prevent hanging (issue #654)
-                result = subprocess.run(['lsof', '-F', 'f', '--', self.filepath],
-                                      capture_output=True, text=True, timeout=10)
-                if 'w' not in result.stdout:
-                    return True # Not in use for writing
-            except subprocess.TimeoutExpired:
-                print("[ingest-processor] WARN: lsof command timed out. Assuming file is not in use.", flush=True)
-                return True  # If lsof hangs, assume file is ready to avoid indefinite wait
-            except FileNotFoundError:
-                print("[ingest-processor] WARN: 'lsof' command not found. Cannot reliably check if file is in use. Proceeding with caution.", flush=True)
-                return True # Fallback for systems without lsof
-            except Exception as e:
-                print(f"[ingest-processor] WARN: Error checking file usage with lsof: {e}", flush=True)
-                # On error, wait and retry to be safe
-            time.sleep(1)
-        return False # Timeout reached
+        from ingest_budget import wait_for_file_ready
+        return wait_for_file_ready(self.filepath, timeout)
 
 
     _COMIC_INGEST_EXTENSIONS = {'.cbz', '.cbt', '.cbr', '.cb7'}
@@ -3276,12 +3281,16 @@ def main(filepath=None):
         ext_tmp_check = Path(nbp.filename).suffix.replace('.', '')
         if ext_tmp_check not in nbp.ingest_ignored_formats:
             timeout_minutes = nbp.cwa_settings.get('ingest_timeout_minutes', 15)
+            if os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS') == '0':
+                timeout_minutes = 0
             print(f"[ingest-processor] Checking if file is ready (timeout: {timeout_minutes} minutes): {nbp.filename}", flush=True)
             ready = nbp.is_file_in_use()
             if not ready:
                 print(f"[ingest-processor] WARN: File did not become ready in time or vanished (after {timeout_minutes} minutes): {nbp.filename}", flush=True)
                 skip_delete = True
-                return 0
+                # A writer can reopen after PDF preflight. Preserve and queue
+                # an existing source instead of marking it successfully done.
+                return 2 if Path(filepath).exists() else 0
 
         # Sidecar manifest handling for explicit actions (e.g., add_format)
         manifest_path = filepath + ".cwa.json"
@@ -3517,7 +3526,7 @@ def main(filepath=None):
 
             try:
                 # Cleanup the temp conversion folder, which now contains the staging dir
-                shutil.rmtree(nbp.tmp_conversion_dir, ignore_errors=True)
+                empty_tmp_conversion_dir(nbp.tmp_conversion_dir)
             except Exception as e:
                 print(f"[ingest-processor] Error cleaning up temp conversion directory: {e}", flush=True)
 

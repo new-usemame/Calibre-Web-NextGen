@@ -449,20 +449,35 @@ Tested and supported. Ingest is a few seconds slower; everything else behaves th
 
 ### Calibre desktop coexistence
 
-If you want to open the same library in calibre desktop while calibre-web-nextgen is running, set both:
+**Docker Desktop on macOS: give native Mac Calibre exclusive access to a
+host-bind-mounted library.** Stop the calibre-web-nextgen container before
+opening that library in Mac Calibre, and fully quit Mac Calibre before starting
+the container again. This also applies to native Mac `calibredb` commands.
+Stopping ingest alone leaves other application and metadata writers active.
+
+The compatibility flags below do not make simultaneous Mac and Linux-container
+access safe. In a finite Docker Desktop bind-mount test, an exclusive byte-range
+lock held on either side blocked another process on the same side but did not
+block the opposite side. A separate concurrent library-write test produced a
+malformed database even with both flags enabled and library DELETE journal mode. Use
+exclusive access rather than relying on a lock wait across this boundary.
+
+For deployments where desktop and server processes share working filesystem
+locks, set both flags to release the web application's database connection
+between requests:
 
 ```yaml
 - NETWORK_SHARE_MODE=true
 - DESKTOP_COMPAT_MODE=true
 ```
 
-By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. That blocks calibre desktop from opening the library — on calibre 9.9.0 + macOS it crashes without an error dialog. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the file lock is released between web requests, letting calibre desktop open the database in the gaps.
+By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
 
-Changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
+On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
 
 Trade-offs:
 - Each web request pays a small extra overhead to open and close the database connection.
-- If calibre desktop is actively writing when a web request comes in, the request waits up to 60 seconds for the lock. Heavy simultaneous use can slow the web UI.
+- Where filesystem locks are shared correctly, a web request can wait up to 60 seconds for an active desktop writer. Heavy simultaneous use can slow the web UI.
 - Designed for home-server use where calibre desktop is opened occasionally for bulk edits, not for concurrent heavy use of both.
 
 ### Calibre plugins (DeDRM and others)
@@ -813,34 +828,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `█████████████████░░░` 87% | 3381/3878 | 0 |
-| Slovak (`sk`) | `█████████████████░░░` 87% | 3377/3878 | 0 |
-| French (`fr`) | `█████████████████░░░` 86% | 3340/3878 | 125 |
-| Swedish (`sv`) | `█████████████████░░░` 85% | 3289/3878 | 0 |
-| Italian (`it`) | `████████████████░░░░` 80% | 3100/3878 | 0 |
-| Spanish (`es`) | `████████████████░░░░` 80% | 3084/3878 | 0 |
-| Dutch (`nl`) | `███████████████░░░░░` 74% | 2888/3878 | 288 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████████░░░░░░` 68% | 2653/3878 | 179 |
-| Polish (`pl`) | `█████████████░░░░░░░` 66% | 2566/3878 | 0 |
-| German (`de`) | `████████████░░░░░░░░` 62% | 2389/3878 | 12 |
-| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 45% | 1744/3878 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 36% | 1397/3878 | 303 |
-| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 34% | 1310/3878 | 243 |
-| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 31% | 1204/3878 | 311 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 30% | 1170/3878 | 339 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 24% | 939/3878 | 265 |
-| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 20% | 784/3878 | 280 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 699/3878 | 351 |
-| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 675/3878 | 352 |
-| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 676/3878 | 353 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 507/3878 | 389 |
-| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 478/3878 | 399 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 447/3878 | 365 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 432/3878 | 426 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 425/3878 | 348 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 358/3878 | 379 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 292/3878 | 377 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 5% | 209/3878 | 337 |
+| Slovak (`sk`) | `████████████████████` 100% | 4078/4079 | 0 |
+| Russian (`ru`) | `██████████████████░░` 91% | 3728/4079 | 0 |
+| French (`fr`) | `█████████████████░░░` 87% | 3545/4079 | 123 |
+| Swedish (`sv`) | `████████████████░░░░` 81% | 3291/4079 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 76% | 3109/4079 | 279 |
+| Italian (`it`) | `███████████████░░░░░` 76% | 3102/4079 | 0 |
+| Spanish (`es`) | `███████████████░░░░░` 76% | 3086/4079 | 0 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 65% | 2664/4079 | 172 |
+| Polish (`pl`) | `█████████████░░░░░░░` 63% | 2567/4079 | 0 |
+| German (`de`) | `████████████░░░░░░░░` 59% | 2397/4079 | 11 |
+| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 43% | 1751/4079 | 118 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 35% | 1418/4079 | 296 |
+| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1324/4079 | 234 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1219/4079 | 302 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 29% | 1184/4079 | 330 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 24% | 961/4079 | 256 |
+| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 21% | 856/4079 | 221 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 723/4079 | 341 |
+| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 698/4079 | 342 |
+| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 699/4079 | 343 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 530/4079 | 381 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 502/4079 | 390 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 471/4079 | 357 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4079 | 417 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 449/4079 | 338 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 382/4079 | 371 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 316/4079 | 369 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 234/4079 | 330 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

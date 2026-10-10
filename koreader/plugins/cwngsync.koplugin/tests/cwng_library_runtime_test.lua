@@ -486,6 +486,36 @@ local function testAFirstFillShowsHowFarItHasGot()
     assertEqual(notices.open, 0, "no progress notice is left on screen once the sync ends")
 end
 
+local function testTheHomeListsCoversAsAFirstFillAddsThem()
+    -- #2329: the home read only the list a sync saves when it ends, so it
+    -- said "Your books appear here after the first sync" for the whole fill
+    -- and filled in at once when the sync stopped.
+    local Catalog = require("cwng_catalog")
+    local root = "/mnt/us/cwng-library"
+    local function listed(runtime)
+        local books = runtime:libraryCatalog()
+        local count = 0
+        for _, entry in ipairs(Catalog.entries(books or {}, runtime:getLibraryState().books, root)) do
+            if entry.present then count = count + 1 end
+        end
+        return count
+    end
+    local perform = Runtime.performLibraryAction
+    local midway
+    Runtime.performLibraryAction = function(self, client, action)
+        if action.book_id == 40 then midway = listed(self) end
+        return perform(self, client, action)
+    end
+    local ok, err = pcall(function()
+        local outcome = sync(manyNewBooks(60), true, function() return true, { size = 1, mtime = 1 } end, root)
+        assertEqual(outcome.ok, true, "the sync finishes")
+        assertEqual(midway, 39, "the home lists every cover added so far while the fill runs")
+        assertEqual(listed(outcome.runtime), 60, "and every book once it ends")
+    end)
+    Runtime.performLibraryAction = perform
+    if not ok then error(err, 0) end
+end
+
 local function written(name)
     for path, file in pairs(settings_files) do
         if path:sub(-#name) == name then return file end
@@ -874,6 +904,7 @@ testTheInventoryKnowsCoversFromBooks()
 testTheReaderCanTapBetweenDownloads()
 testTheReaderCanTapWhileTheListArrives()
 testAFirstFillShowsHowFarItHasGot()
+testTheHomeListsCoversAsAFirstFillAddsThem()
 testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
 testALibraryWhoseListWasNotSavedIsNotEmptied()

@@ -34,6 +34,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
+from .unicode_collation import locale_sort_key
 from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
 from . import user_account_data, user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
@@ -810,7 +811,7 @@ def edit_user_table():
         .join(db.Books) \
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag')) \
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     if config.config_restricted_column:
         try:
             if restricted_column_datatype(config.config_restricted_column) == "bool":
@@ -1005,9 +1006,9 @@ def edit_list_user(param):
                 if param == 'name':
                     if user.name == "Guest":
                         raise Exception(_("Guest Name can't be changed"))
-                    user.name = check_username(vals['value'])
+                    user.name = check_username(vals['value'], user.id)
                 elif param == 'email':
-                    user.email = check_email(vals['value'])
+                    user.email = check_email(vals['value'], user.id)
                 elif param == 'kobo_only_shelves_sync':
                     old_state = user.kobo_only_shelves_sync
                     user.kobo_only_shelves_sync = int(vals['value'] == 'true')
@@ -3806,12 +3807,12 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         if not new_email:
             raise Exception(_("Email can't be empty and has to be a valid Email"))
         if new_email != content.email:
-            content.email = check_email(new_email)
+            content.email = check_email(new_email, content.id)
         # Query username, if not existing, change
         if to_save.get("name", content.name) != content.name:
             if to_save.get("name") == "Guest":
                 raise Exception(_("Guest Name can't be changed"))
-            content.name = check_username(to_save["name"])
+            content.name = check_username(to_save["name"], content.id)
         if "allow_additional_ereader_emails" in to_save:
             content.allow_additional_ereader_emails = to_save.get("allow_additional_ereader_emails") == "on"
         else:
@@ -3824,29 +3825,12 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
 
     except Exception as ex:
         log.error(ex)
+        # Nothing from a rejected form is saved. Returning nothing lets
+        # edit_user render the page with its full context; a second, partial
+        # render here missed the shelf lists and turned the message into a 500.
+        ub.session.rollback()
         flash(str(ex), category="error")
-        opds_context = _build_opds_context(content)
-        magic_shelf_context = _build_magic_shelf_order_context(content)
-        return render_title_template("user_edit.html",
-                                     translations=translations,
-                                     languages=languages,
-                                     mail_configured=config.get_mail_server_configured(),
-                                     kobo_support=kobo_support,
-                                     new_user=0,
-                                     content=content,
-                                 cc_visibility=get_custom_column_visibility_options(content),
-                                     config=config,
-                                     restriction_is_bool=(restricted_column_datatype(
-                                         config.config_restricted_column) == "bool"),
-                                     registered_oauth=oauth_bb.oauth_check,
-                                     opds_root_order_string=opds_context["opds_root_order_string"],
-                                     opds_hidden_entries_string=opds_context["opds_hidden_entries_string"],
-                                     opds_root_labels=opds_context["opds_root_labels"],
-                                     magic_shelf_order_string=magic_shelf_context["magic_shelf_order_string"],
-                                     magic_shelf_order_labels=magic_shelf_context["magic_shelf_order_labels"],
-                                     magic_shelf_order_mode=magic_shelf_context["magic_shelf_order_mode"],
-                                     title=_("Edit User %(nick)s", nick=content.name),
-                                     page="edituser")
+        return None
     try:
         user_library.set_library_mode(
             content,

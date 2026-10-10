@@ -291,3 +291,6 @@ body.blur .cwa-settings-actions {
     background-color: var(--cwa-settings-save-bg-interactive);
     border-color: var(--cwa-settings-save-border-interactive);
 }
+
+/* Bootstrap button display must not reveal inactive rating error controls. */
+#personal-rating [hidden] { display: none !important; }

@@ -11373,6 +11373,10 @@ msgstr "Bron niet beschikbaar"
 msgid "Save Discover source"
 msgstr "Bron voor ontdekken opslaan"
 
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "Bron voor ontdekken wijzigen"
+
 #: cps/spa_strings.py cps/web.py
 msgid "Discover source saved."
 msgstr "Bron voor ontdekken opgeslagen."

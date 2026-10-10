@@ -7,7 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useT } from '../lib/i18n';
 import styles from './NativeReader.module.css';
-import { withLookupMode } from '../lib/readerTarget';
+import { withLookupMode, withViewerHash } from '../lib/readerTarget';
 
 const AUDIO = new Set(['mp3', 'mp4', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav', 'aac']);
 const COMIC = new Set(['cbz', 'cbr', 'cbt']);
@@ -28,7 +28,16 @@ export function NativeReader({ id, format }: { id: string; format: string }) {
   // one and nothing else on iPad. The bundled pdf.js viewer (what the classic
   // reader has always used) paints to <canvas> and behaves the same on every
   // engine. url_for inside that template keeps it correct behind a subpath.
-  const pdfSrc = apiUrl(withLookupMode(`/read/${id}/pdf`, lookupMode));
+  // #2537 — the page's own #page=…/#zoom=… belongs to pdf.js, which reads it
+  // from the iframe's hash. Follow later edits too: a fragment-only change of
+  // the iframe src is a same-document navigation pdf.js answers on hashchange.
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onHashChange = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+  const pdfSrc = apiUrl(withViewerHash(withLookupMode(`/read/${id}/pdf`, lookupMode), hash));
   const [text, setText] = useState<string | null>(null);
   const [textErr, setTextErr] = useState(false);
 

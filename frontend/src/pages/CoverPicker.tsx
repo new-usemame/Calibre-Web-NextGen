@@ -5,6 +5,7 @@ import {
   Image as ImageIcon, AlertTriangle, KeyRound, Smartphone, Loader2, Sparkles, Search as SearchIcon,
 } from 'lucide-react';
 import { useBook, useClearMyCover, useMe } from '../lib/queries';
+import { refreshBookCoverViews } from '../lib/bookCoverCache';
 import {
   useCoverState, useCandidates, useProviderKeys, coverApi,
   EREADER_ASPECTS, EREADER_FILL_MODES,
@@ -78,8 +79,7 @@ export function CoverPicker({ id }: { id: string }) {
       ? `/api/v1/books/${id}/my-cover/image?ts=${Date.now()}`
       : `/cover/${id}/og?ts=${Date.now()}`));
     setBanner({ ok: true, text: personal ? t('Your cover was updated.') : t('Cover updated.') });
-    qc.invalidateQueries({ queryKey: ['book', id] });
-    qc.invalidateQueries({ queryKey: ['book-meta', id] });
+    void refreshBookCoverViews(qc, id);
   }, [id, personal, qc, t]);
 
   const onError = useCallback((err: unknown) => {

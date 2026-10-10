@@ -638,10 +638,6 @@ class LibraryConverter:
         # The caller passes Path(file).suffix, which keeps the dot (".epub").
         if import_format.lstrip(".").lower() == "epub":
             print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) File already in epub format, converting directly to kepub...")
-
-            if self.cwa_settings['auto_backup_conversions']:
-                self.backup(filepath, backup_type="converted")
-
             epub_filepath = filepath
             epub_ready = True
         else:

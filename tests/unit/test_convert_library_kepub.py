@@ -59,7 +59,9 @@ def kepub_converter(tmp_path, monkeypatch):
     _write_tool(bin_dir, "ebook-convert", f'echo ebook-convert >> "{calls}"\n'
                 'case "$1" in *Locked*) echo "Locked.mobi is DRM locked"; exit 1;; esac\n'
                 'echo converted > "$2"\n')
-    _write_tool(bin_dir, "kepubify", f'echo kepubify >> "{calls}"\n')
+    # Called as: kepubify --inplace --calibre --output <dir> <epub>; write where real kepubify would.
+    _write_tool(bin_dir, "kepubify", f'echo kepubify >> "{calls}"\n'
+                'echo kepub > "$4/$(basename "$5" .epub).kepub"\n')
     converter.calibre_env = {"PATH": f"{bin_dir}:/usr/bin:/bin"}
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
     return converter, calls
@@ -74,6 +76,8 @@ def test_epub_source_goes_straight_to_kepubify(kepub_converter, tmp_path, log_li
 
     assert ok
     assert target.endswith("Book.kepub")
+    assert os.path.isfile(target) and target.startswith(converter.tmp_conversion_dir)
+    assert book.read_text(encoding="utf-8") == "x", "the library's own epub must be left untouched"
     assert calls.read_text().split() == ["kepubify"], "an epub must not be run through ebook-convert first"
     assert any("already in epub format" in line for line in log_lines)
 

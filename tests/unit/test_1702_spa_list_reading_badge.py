@@ -54,6 +54,9 @@ def readbook_db():
     # Favorite badges are another per-page app.db lookup. Keep this tiny test
     # database representative of the serializer's current optional metadata.
     ub.FavoriteBook.__table__.create(engine)
+    # Personal/household ratings are two more page-level app.db projections.
+    ub.BookRating.__table__.create(engine)
+    ub.User.__table__.create(engine)
     session = sessionmaker(bind=engine)()
     try:
         yield ub, engine, session
@@ -112,7 +115,7 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
         session.commit()
         # Read status, personal covers, shelf membership (#1254), and favorite
         # ids each resolve once for the page, never once per book.
-        expected_queries = 4
+        expected_queries = 6
     else:
         rows = [
             SimpleNamespace(
@@ -130,7 +133,12 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
         ]
         # Cover preferences, shelf membership (#1254), and favorite ids are
         # app.db state and each resolve once per page.
-        expected_queries = 3
+        expected_queries = 5
+
+    # This budget measures per-page work, excluding the real one-time SQLite
+    # JSON capability probe, which production caches for the process.
+    from cps import db
+    db._sqlite_json_available(session, session)
 
     statements = []
 

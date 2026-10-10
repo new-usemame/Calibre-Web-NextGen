@@ -1,14 +1,17 @@
 import type { ReaderBookmark } from "./readerResume";
 import type { ReaderFontCatalog } from './readerFonts';
-import { keepPreviousData, useQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useInfiniteQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, apiPostDownload, ApiError,
-  navigateToLogout, noteSessionIdentity,
+  navigateToLogout, noteSessionIdentity, TASK_FINISHED,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
+import type { PickerBook } from './shelfPicker';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
+import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
@@ -104,33 +107,17 @@ export function useUpdateSidebar() {
  * the server with an older request winning the race. */
 export function useUpdateNamedPreferences() {
   const queryClient = useQueryClient();
-  return useMutation({
-    scope: { id: 'named-user-preferences' },
-    mutationFn: (preferences: Record<string, boolean>) =>
-      apiPost<{ preferences: Record<string, boolean | null> }>(
-        '/api/v1/account/preferences', { preferences }),
-    onMutate: async (preferences) => {
-      await queryClient.cancelQueries({ queryKey: ['me'] });
-      const previous = queryClient.getQueryData<Me | null>(['me']);
-      queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
-        ...current,
-        preferences: { ...(current.preferences ?? {}), ...preferences },
-      } : current);
-      return { previous };
-    },
-    onError: (_error, _preferences, context) => {
-      if (context) queryClient.setQueryData(['me'], context.previous);
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
-        ...current,
-        preferences: { ...(current.preferences ?? {}), ...data.preferences },
-      } : current);
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-    },
-  });
+  const owner = captureNamedPreferencesOwner(queryClient);
+  const mutation = useMutation(namedPreferencesMutationOptions(queryClient, update =>
+    apiPost<{ preferences: Record<string, boolean | null> }>(
+      '/api/v1/account/preferences', { preferences: update.preferences, expected_user_id: update.ownerId })));
+  return {
+    ...mutation,
+    mutate: (preferences: Record<string, boolean>, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ preferences, ...owner }, options),
+    mutateAsync: (preferences: Record<string, boolean>, options?: Parameters<typeof mutation.mutateAsync>[1]) =>
+      mutation.mutateAsync({ preferences, ...owner }, options),
+  };
 }
 
 export interface CatalogCustomFieldsUpdate {
@@ -363,7 +350,7 @@ export function useBooks(q: BooksQuery) {
   else if (readFilter !== 'all') params.set('filter', readFilter);
   if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
   if (entityKind && entityId !== undefined && entityId !== '') {
-    params.set(entityKind, String(entityId));
+    params.set(entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind, String(entityId));
   }
   const query = useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
@@ -408,7 +395,7 @@ const LIBRARY_VIEW_QUERIES = new Set([
   'discover-strip', 'account', 'me', 'about',
 ]);
 
-async function refreshLibraryViews(qc: QueryClient): Promise<void> {
+export async function refreshLibraryViews(qc: QueryClient): Promise<void> {
   const catalogQuery = (query: { queryKey: readonly unknown[] }) =>
     query.queryKey[0] === 'books' || query.queryKey[0] === 'adv-search';
   // Cancel before changing revision: an old request must not land beside the
@@ -595,10 +582,11 @@ export function useCcBooks(
 /** Fetch an entity-browse list (authors/series/tags/publishers/languages).
  *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
-  return useQuery<EntityList>(createEntityListQueryOptions(
-    plural,
-    () => apiGet<EntityList>(`/api/v1/${plural}`),
-  ));
+  const me = useMe().data;
+  const endpoint = plural === 'ratings' && me && !me.role.anonymous ? 'personal-ratings' : plural;
+  const options = createEntityListQueryOptions(endpoint,
+    () => apiGet<EntityList>(`/api/v1/${endpoint}`));
+  return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
 }
 
 /** The tag a rename collided with, carried on the 409 so the caller can offer
@@ -820,6 +808,32 @@ export function useShelf(id: string | number | undefined, page = 1, sort = 'stor
       && prevQuery.queryKey[2] === sort
         ? prev
         : undefined,
+  });
+}
+
+interface ShelfAvailableBooksPage {
+  items: PickerBook[];
+  page: number;
+  total: number;
+  has_more: boolean;
+}
+
+/** Paged, searchable library list for the shelf "Add books" picker. */
+export function useShelfAvailableBooks(shelfId: string | number, query: string, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['shelf-available-books', String(shelfId), query],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }): Promise<ShelfAvailableBooksPage> => {
+      const params = new URLSearchParams({ page: String(pageParam) });
+      if (query) params.set('query', query);
+      return apiGet<ShelfAvailableBooksPage>(
+        `/api/v1/shelves/${shelfId}/available-books?${params.toString()}`, { signal });
+    },
+    getNextPageParam: (last) => (last.has_more ? last.page + 1 : undefined),
+    enabled,
+    // Always re-check shelf membership when the picker is reopened.
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -1402,12 +1416,36 @@ export function useAddFormat(id: string | number) {
   });
 }
 
-/** Queue a format conversion (from -> to). */
+/** Queue a format conversion (from -> to). `task_id` names the queued task
+ *  in /api/v1/tasks (#1110). */
 export function useConvertFormat(id: string | number) {
   return useMutation({
     mutationFn: (v: { from: string; to: string }) =>
-      apiPost<{ ok: boolean; message: string }>(`/api/v1/books/${id}/convert`, v),
+      apiPost<{ ok: boolean; message: string; task_id?: string | null }>(`/api/v1/books/${id}/convert`, v),
   });
+}
+
+/** Follow one queued conversion until it ends (#1110: a finished conversion
+ *  used to look stalled until the reader refreshed the page). Returns the
+ *  task's row while it is listed; when it finishes, the book is refetched so
+ *  the new format appears in the file list. */
+export function useConversionTask(bookId: string | number, taskId: string | null, queuedAt = 0) {
+  const qc = useQueryClient();
+  const query = useQuery<{ items: TaskItem[] }>({
+    queryKey: ['tasks'],
+    queryFn: () => apiGet<{ items: TaskItem[] }>('/api/v1/tasks'),
+    enabled: !!taskId,
+    refetchInterval: 3000,
+  });
+  const task = taskId ? query.data?.items.find((it) => String(it.task_id) === taskId) : undefined;
+  // A list fetched after the task was queued that no longer holds it means the
+  // worker already pruned it; stop following it rather than polling forever.
+  const gone = !!taskId && !task && query.isSuccess && query.dataUpdatedAt > queuedAt;
+  const finished = task?.stat === TASK_FINISHED || gone;
+  useEffect(() => {
+    if (finished) void qc.invalidateQueries({ queryKey: ['book', String(bookId)] });
+  }, [finished, bookId, qc]);
+  return { task, gone };
 }
 
 /** Search online metadata providers (reuses the legacy /metadata/search).

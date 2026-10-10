@@ -248,6 +248,9 @@
 
 {% block js %}
 <script>
+// Translated strings go through |tojson: Flask-Babel marks them safe, so
+// a quote in a translation ("Échec de l'application…") would otherwise end
+// the JS string literal and stop this whole script from running.
 $(document).ready(function() {
   // Handle accept match button
   $('.accept-match-btn').click(function() {
@@ -255,7 +258,7 @@ $(document).ready(function() {
     var resultId = $(this).data('result-id');
     var btn = $(this);
         
-    btn.prop('disabled', true).text('{{_("Processing...")}}');
+    btn.prop('disabled', true).text({{ _("Processing...")|tojson }});
         
     $.ajax({
       url: '{{url_for("admin.hardcover_review_action")}}',
@@ -276,17 +279,17 @@ $(document).ready(function() {
             }
           });
         } else {
-          alert('{{_("Error")}}: ' + data.error);
-          btn.prop('disabled', false).text('{{_("✓ Select This Match")}}');
+          alert({{ _("Error")|tojson }} + ': ' + data.error);
+          btn.prop('disabled', false).text({{ _("✓ Select This Match")|tojson }});
         }
       },
       error: function(xhr) {
-        var errorMsg = '{{_("Failed to apply match")}}';
+        var errorMsg = {{ _("Failed to apply match")|tojson }};
         if (xhr.responseJSON && xhr.responseJSON.error) {
           errorMsg = xhr.responseJSON.error;
         }
-        alert('{{_("Error")}}: ' + errorMsg);
-        btn.prop('disabled', false).text('{{_("✓ Select This Match")}}');
+        alert({{ _("Error")|tojson }} + ': ' + errorMsg);
+        btn.prop('disabled', false).text({{ _("✓ Select This Match")|tojson }});
       }
     });
   });
@@ -296,11 +299,11 @@ $(document).ready(function() {
     var queueId = $(this).data('queue-id');
     var btn = $(this);
         
-    if (!confirm('{{_("Are you sure you want to reject all matches for this book? This cannot be undone.")}}')) {
+    if (!confirm({{ _("Are you sure you want to reject all matches for this book? This cannot be undone.")|tojson }})) {
       return;
     }
         
-    btn.prop('disabled', true).text('{{_("Processing...")}}');
+    btn.prop('disabled', true).text({{ _("Processing...")|tojson }});
         
     $.ajax({
       url: '{{url_for("admin.hardcover_review_action")}}',
@@ -320,17 +323,17 @@ $(document).ready(function() {
             }
           });
         } else {
-          alert('{{_("Error")}}: ' + data.error);
-          btn.prop('disabled', false).text('{{_("✗ Reject All Matches")}}');
+          alert({{ _("Error")|tojson }} + ': ' + data.error);
+          btn.prop('disabled', false).text({{ _("✗ Reject All Matches")|tojson }});
         }
       },
       error: function(xhr) {
-        var errorMsg = '{{_("Failed to reject match")}}';
+        var errorMsg = {{ _("Failed to reject match")|tojson }};
         if (xhr.responseJSON && xhr.responseJSON.error) {
           errorMsg = xhr.responseJSON.error;
         }
-        alert('{{_("Error")}}: ' + errorMsg);
-        btn.prop('disabled', false).text('{{_("✗ Reject All Matches")}}');
+        alert({{ _("Error")|tojson }} + ': ' + errorMsg);
+        btn.prop('disabled', false).text({{ _("✗ Reject All Matches")|tojson }});
       }
     });
   });
@@ -339,11 +342,11 @@ $(document).ready(function() {
   $('.reject-all-pending-btn').click(function() {
     var btn = $(this);
 
-    if (!confirm('{{_("Are you sure you want to reject all pending matches? This cannot be undone.")}}')) {
+    if (!confirm({{ _("Are you sure you want to reject all pending matches? This cannot be undone.")|tojson }})) {
       return;
     }
 
-    btn.prop('disabled', true).text('{{_("Processing...")}}');
+    btn.prop('disabled', true).text({{ _("Processing...")|tojson }});
 
     $.ajax({
       url: '{{url_for("admin.hardcover_review_reject_all")}}',
@@ -357,17 +360,17 @@ $(document).ready(function() {
             location.reload();
           });
         } else {
-          alert('{{_("Error")}}: ' + data.error);
-          btn.prop('disabled', false).text('{{_("✗ Reject All Pending")}}');
+          alert({{ _("Error")|tojson }} + ': ' + data.error);
+          btn.prop('disabled', false).text({{ _("✗ Reject All Pending")|tojson }});
         }
       },
       error: function(xhr) {
-        var errorMsg = '{{_("Failed to reject all pending matches")}}';
+        var errorMsg = {{ _("Failed to reject all pending matches")|tojson }};
         if (xhr.responseJSON && xhr.responseJSON.error) {
           errorMsg = xhr.responseJSON.error;
         }
-        alert('{{_("Error")}}: ' + errorMsg);
-        btn.prop('disabled', false).text('{{_("✗ Reject All Pending")}}');
+        alert({{ _("Error")|tojson }} + ': ' + errorMsg);
+        btn.prop('disabled', false).text({{ _("✗ Reject All Pending")|tojson }});
       }
     });
   });
@@ -377,7 +380,7 @@ $(document).ready(function() {
     var queueId = $(this).data('queue-id');
     var btn = $(this);
         
-    btn.prop('disabled', true).text('{{_("Processing...")}}');
+    btn.prop('disabled', true).text({{ _("Processing...")|tojson }});
         
     $.ajax({
       url: '{{url_for("admin.hardcover_review_action")}}',
@@ -397,17 +400,17 @@ $(document).ready(function() {
             }
           });
         } else {
-          alert('{{_("Error")}}: ' + data.error);
-          btn.prop('disabled', false).text('{{_("→ Skip for Now")}}');
+          alert({{ _("Error")|tojson }} + ': ' + data.error);
+          btn.prop('disabled', false).text({{ _("→ Skip for Now")|tojson }});
         }
       },
       error: function(xhr) {
-        var errorMsg = '{{_("Failed to skip match")}}';
+        var errorMsg = {{ _("Failed to skip match")|tojson }};
         if (xhr.responseJSON && xhr.responseJSON.error) {
           errorMsg = xhr.responseJSON.error;
         }
-        alert('{{_("Error")}}: ' + errorMsg);
-        btn.prop('disabled', false).text('{{_("→ Skip for Now")}}');
+        alert({{ _("Error")|tojson }} + ': ' + errorMsg);
+        btn.prop('disabled', false).text({{ _("→ Skip for Now")|tojson }});
       }
     });
   });

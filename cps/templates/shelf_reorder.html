@@ -80,12 +80,12 @@
         data: JSON.stringify({ order_mode: mode, order: ids }),
         success: function () {
           feedback.style.color = 'green';
-          feedback.textContent = '{{ _("Order saved. The sidebar reflects the new order on next page load.") }}';
+          feedback.textContent = {{ _("Order saved. The sidebar reflects the new order on next page load.")|tojson }};
           saveBtn.disabled = false;
         },
         error: function (xhr) {
           feedback.style.color = 'red';
-          var msg = '{{ _("Could not save order.") }}';
+          var msg = {{ _("Could not save order.")|tojson }};
           if (xhr && xhr.responseJSON && xhr.responseJSON.error) {
             msg += ' (' + xhr.responseJSON.error + ')';
           }

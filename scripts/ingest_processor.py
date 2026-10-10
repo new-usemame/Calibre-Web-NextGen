@@ -1066,6 +1066,29 @@ def _run_converter_streaming(cmd, env, timeout=None, *, owned_process_group=Fals
 _NOT_A_BOOK_FORMATS = frozenset({'acsm', 'lcpl'})
 
 
+# Convert Library's working dirs (PRIVATE_TMP_PREFIX in convert_library.py). It runs
+# under its own lock, so a run may be converting a book in one of them right now.
+CONVERT_LIBRARY_TMP_PREFIX = ".cwa_convert_library_"
+
+
+def empty_tmp_conversion_dir(tmp_conversion_dir) -> None:
+    """Remove what ingest left in the shared conversion dir, but not Convert Library's dirs."""
+    try:
+        entries = list(os.scandir(tmp_conversion_dir))
+    except FileNotFoundError:
+        return
+    for entry in entries:
+        if entry.name.startswith(CONVERT_LIBRARY_TMP_PREFIX):
+            continue
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path, ignore_errors=True)
+        else:
+            try:
+                os.unlink(entry.path)
+            except OSError:
+                pass  # as rmtree(ignore_errors=True) did: one stuck file must not stop the rest
+
+
 def is_a_book_format(input_format) -> bool:
     """False for formats that are tickets/licences rather than books."""
     return (input_format or '').lower() not in _NOT_A_BOOK_FORMATS
@@ -3503,7 +3526,7 @@ def main(filepath=None):
 
             try:
                 # Cleanup the temp conversion folder, which now contains the staging dir
-                shutil.rmtree(nbp.tmp_conversion_dir, ignore_errors=True)
+                empty_tmp_conversion_dir(nbp.tmp_conversion_dir)
             except Exception as e:
                 print(f"[ingest-processor] Error cleaning up temp conversion directory: {e}", flush=True)
 

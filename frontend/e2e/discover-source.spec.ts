@@ -67,6 +67,14 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await page.goto('/app'); await page.reload();
       const strip = page.getByTestId('discover-section');
       const select = strip.getByLabel('Discover source', { exact: true });
+      // #2531: the picker is a set-once preference, kept behind the gear next to Shuffle.
+      const gear = strip.getByRole('button', { name: 'Change Discover source', exact: true });
+      // Picks load only once the saved source is known, so a hidden picker here is a choice, not a load race.
+      await expect(strip.locator('a[href*="/book/"]').first()).toBeVisible();
+      await expect(select).toHaveCount(0);
+      await expect(gear).toHaveAttribute('aria-expanded', 'false');
+      await gear.click();
+      await expect(gear).toHaveAttribute('aria-expanded', 'true');
       await select.selectOption(source);
       await page.route(`**${endpoint}`, route => route.request().method() === 'PUT'
         ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'unavailable', message: 'Test outage' } }) }) : route.continue());
@@ -79,13 +87,16 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await page.screenshot({ path: testInfo.outputPath(`new-error-${width}.jpg`), type: 'jpeg', quality: 75 });
       await page.unroute(`**${endpoint}`);
       await strip.getByRole('button', { name: 'Save Discover source', exact: true }).click();
-      await expect(strip.getByText('Discover source saved.', { exact: true })).toBeVisible();
+      await expect(select).toHaveCount(0);
+      await expect(gear).toHaveAttribute('aria-expanded', 'false');
+      await expect(gear).toBeFocused();
       await expect.poll(() => discoverIds(page)).toEqual([chosen]);
       await expect.poll(() => discoverSelection(page)).toEqual({ ids: [chosen], total: 1 });
       await expect(strip.locator('a[href*="/book/"]').filter({ hasText: book.title }).first()).toBeVisible();
       await strip.getByRole('button', { name: 'Shuffle picks' }).click();
       await expect(strip.getByRole('button', { name: 'Shuffle picks' })).toBeEnabled();
-      await page.reload(); await expect(select).toHaveValue(source);
+      await page.reload(); await expect(select).toHaveCount(0);
+      await gear.click(); await expect(select).toHaveValue(source);
       await page.screenshot({ path: testInfo.outputPath(`new-shelf-${width}.jpg`), type: 'jpeg', quality: 75 });
       await page.goto('/app/discover');
       await expect(page.getByLabel('Discover source', { exact: true })).toHaveValue(source);
@@ -183,7 +194,7 @@ test('cold Discover waits for the saved source before showing an empty state', a
   await page.goto('/app', { waitUntil: 'domcontentloaded' });
   await landingGate.started;
   const strip = page.getByTestId('discover-section');
-  await expect(strip.getByRole('status').filter({ hasText: 'Loading…' })).toBeVisible();
+  await expect(strip.getByRole('status', { name: 'Loading', exact: true })).toBeVisible();
   await expect(strip.getByText('No unread books in this Discover source.', { exact: true })).toHaveCount(0);
   landingGate.release();
   await expect.poll(async () => strip.locator('a[href*="/book/"]').count()).toBeGreaterThan(0);

@@ -19,12 +19,15 @@ pytestmark = pytest.mark.unit
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 _FRONTEND = _ROOT / "frontend" / "src"
 _UNSET_PREFERENCES = {
+    "show_library_rating": None,
+    "share_book_ratings": None,
     "discover_hidden": None,
     "show_hidden_books": None,
     "card_actions_hidden": None,
     "reading_tags_hidden": None,
     "show_original_filename": None,
     "shelf_badges_hidden": None,
+    "shelf_drag_handles_hidden": None,
 }
 
 
@@ -58,12 +61,15 @@ def test_me_serializes_named_preference_and_unset_state():
             "reading_tags_hidden": False,
         },
     }))["preferences"] == {
+        "show_library_rating": None,
+        "share_book_ratings": None,
         "discover_hidden": True,
         "show_hidden_books": False,
         "card_actions_hidden": True,
         "reading_tags_hidden": False,
         "show_original_filename": None,
         "shelf_badges_hidden": None,
+        "shelf_drag_handles_hidden": None,
     }
 
 
@@ -80,6 +86,18 @@ def test_shelf_badge_preference_is_the_classic_grid_toggle():
     response, _session = _call({"preferences": {"shelf_badges_hidden": True}}, user)
     assert _status(response) == 200
     assert user.view_settings == {"cover": {"hide_shelf_badges": True}}
+
+
+def test_shelf_drag_handle_preference_saves_and_reads_back():
+    """#2475: hiding the grip on book cards follows the account, so the
+    View settings switch survives a reload and another browser."""
+    from cps.api.serializers import serialize_user
+
+    user = _FakeUser()
+    response, _session = _call({"preferences": {"shelf_drag_handles_hidden": True}}, user)
+    assert _status(response) == 200
+    assert serialize_user(_serializable_user(user.view_settings))["preferences"][
+        "shelf_drag_handles_hidden"] is True
 
 
 def test_me_ignores_malformed_stored_preference():
@@ -286,3 +304,19 @@ def test_frontend_uses_generic_named_preference_hook_for_catalog_preferences():
     assert "/account/preferences" in queries_src
     assert "role?.anonymous" in state_src
     assert "localStorage" in hook_src
+
+
+def test_preference_owner_mismatch_rejects_before_consent_or_commit():
+    user = _FakeUser()
+    user.id = 2
+    for owner, expected_status in [(1, 409), (True, 400)]:
+        response, session = _call({"expected_user_id": owner,
+            "preferences": {"share_book_ratings": True}}, user)
+        assert _status(response) == expected_status
+        assert user.view_settings == {}
+        session.commit.assert_not_called()
+    response, session = _call({"expected_user_id": 2,
+        "preferences": {"share_book_ratings": True}}, user)
+    assert _status(response) == 200
+    assert user.view_settings["preferences"]["share_book_ratings"] is True
+    session.commit.assert_called_once_with()

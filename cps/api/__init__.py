@@ -195,6 +195,17 @@ def health():
 
 
 # Route modules attach their views to api_v1 on import; import LAST so api_v1 exists.
+@api_v1.after_request
+def _private_book_projections(response):
+    if request.endpoint in {'api_v1.list_books', 'api_v1.book_detail',
+                            'api_v1.list_global_library', 'api_v1.advanced_search',
+                            'api_v1.shelf_detail', 'api_v1.magic_shelf_books'}:
+        response.headers['Cache-Control'] = 'private, no-store'
+        response.vary.add('Cookie')
+        response.vary.add('Authorization')
+    return response
+
+
 from . import auth     # noqa: E402,F401
 from . import i18n     # noqa: E402,F401
 from . import books    # noqa: E402,F401
@@ -206,6 +217,7 @@ from . import account  # noqa: E402,F401
 from . import reader   # noqa: E402,F401
 from . import reader_fonts  # noqa: E402,F401
 from . import book_reviews  # noqa: E402,F401
+from . import book_ratings  # noqa: E402,F401
 from . import ingest_folder_labels  # noqa: E402,F401
 from . import edit     # noqa: E402,F401
 from . import upload   # noqa: E402,F401

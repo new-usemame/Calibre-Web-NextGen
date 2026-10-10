@@ -3772,6 +3772,11 @@ msgid "Convert failed."
 msgstr "Conversie mislukt."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{format} is ready."
+msgstr "{format} is klaar."
+
+#: cps/spa_strings.py
 msgid "Convert to"
 msgstr "Converteren naar"
 
@@ -7581,7 +7586,7 @@ msgid "Loading reading positions…"
 msgstr "Leesposities laden…"
 
 #: cps/spa_strings.py cps/templates/book_review.html
-#: cps/templates/cover_picker.html
+#: cps/templates/cover_picker.html cps/templates/personal_rating.html
 msgid "Loading…"
 msgstr "Bezig met laden…"
 
@@ -8466,10 +8471,6 @@ msgstr "Vorige pagina"
 msgid "Progress"
 msgstr "Voortgang"
 
-#: cps/spa_strings.py cps/templates/_reader_lookup_banner.html
-msgid "Progress is not being saved."
-msgstr "Voortgang wordt niet opgeslagen."
-
 #: cps/spa_strings.py
 msgid "Published after"
 msgstr "Gepubliceerd na"
@@ -8815,6 +8816,7 @@ msgid "Resume at {percent} from another device"
 msgstr "Verder lezen bij {percent} vanaf een ander apparaat"
 
 #: cps/spa_strings.py cps/templates/book_review.html
+#: cps/templates/personal_rating.html
 msgid "Retry"
 msgstr "Opnieuw proberen"
 
@@ -9321,6 +9323,10 @@ msgstr "Wachtwoord tonen"
 #: cps/spa_strings.py
 msgid "Show shelf tags"
 msgstr "Boekenplanklabels tonen"
+
+#: cps/spa_strings.py
+msgid "Show shelf drag handles"
+msgstr "Sleepgrepen voor boekenplanken tonen"
 
 #: cps/spa_strings.py
 msgid ""
@@ -11035,6 +11041,46 @@ msgid "← Library"
 msgstr "← Bibliotheek"
 
 #: cps/spa_strings.py
+msgid "Add books"
+msgstr "Boeken toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr "Boeken aan boekenplank toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add selected"
+msgstr "Selectie toevoegen"
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr ""
+"De geselecteerde boeken konden niet worden toegevoegd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr "Boeken konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr "Op boekenplank"
+
+#: cps/spa_strings.py
+msgid "Search library"
+msgstr "Bibliotheek doorzoeken"
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr "Zoek op titel, auteur, reeks…"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{failed} of {total} books could not be added. They remain selected."
+msgstr ""
+"{failed} van {total} boeken konden niet worden toegevoegd. Ze blijven "
+"geselecteerd."
+
+#: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
 "shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
@@ -11327,6 +11373,10 @@ msgstr "Bron niet beschikbaar"
 msgid "Save Discover source"
 msgstr "Bron voor ontdekken opslaan"
 
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "Bron voor ontdekken wijzigen"
+
 #: cps/spa_strings.py cps/web.py
 msgid "Discover source saved."
 msgstr "Bron voor ontdekken opgeslagen."
@@ -11597,6 +11647,87 @@ msgstr ""
 "instellingen zijn van toepassing; zonder conversie kan MOBI worden "
 "gedownload, maar niet worden geopend in de weblezer."
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not load your rating."
+msgstr "Je beoordeling kan niet worden geladen."
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not save your rating."
+msgstr "Je beoordeling kan niet worden opgeslagen."
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Household average"
+msgstr "Gemiddelde van het huishouden"
+
+#: cps/spa_strings.py cps/templates/detail.html
+#: cps/templates/library_rating.html
+msgid "Library rating"
+msgstr "Bibliotheekbeoordeling"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. If "
+"you are the only person sharing a rating for a book, the average is your "
+"score."
+msgstr ""
+"Standaard uitgeschakeld. Alleen beoordelingen die met toestemming worden "
+"gedeeld tellen mee, en namen worden nooit getoond. Als u als enige een "
+"beoordeling voor een boek deelt, is het gemiddelde uw score."
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Save rating"
+msgstr "Beoordeling opslaan"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Share my ratings in the household average"
+msgstr "Mijn beoordelingen meetellen in het gemiddelde van het huishouden"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show library rating"
+msgstr "Bibliotheekbeoordeling tonen"
+
+#: cps/spa_strings.py
+msgid "Show the labelled Calibre score alongside your own rating."
+msgstr "De herkenbare Calibre-beoordeling naast je eigen beoordeling tonen."
+
+#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
+#: cps/web.py
+msgid "Unrated"
+msgstr "Niet beoordeeld"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating"
+msgstr "Je beoordeling"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating saved."
+msgstr "Je beoordeling is opgeslagen."
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, highest first"
+msgstr "Je beoordeling, hoogste eerst"
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, lowest first"
+msgstr "Je beoordeling, laagste eerst"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid ""
+"Your score does not change the Calibre library rating. Sharing is off unless "
+"you opt in in your account."
+msgstr ""
+"Je beoordeling verandert de beoordeling in de Calibre-bibliotheek niet. "
+"Delen staat uit totdat je het in je account inschakelt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{rating} out of 5"
+msgstr "{rating} van 5"
+
+#: cps/spa_strings.py
+msgid "Your rating (stars)"
+msgstr "Je beoordeling (sterren)"
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Wachten"
@@ -11682,6 +11813,11 @@ msgstr "Uitgever: %(name)s"
 #, python-format
 msgid "Series: %(serie)s"
 msgstr "Reeks: %(serie)s"
+
+#: cps/web.py
+#, python-format
+msgid "Your rating: %(rating)s stars"
+msgstr "Je beoordeling: %(rating)s sterren"
 
 #: cps/web.py
 msgid "Rating: None"
@@ -11832,6 +11968,10 @@ msgstr "Fout bij zichtbaar maken boekenplank"
 #: cps/templates/admin.html cps/templates/cwa_stats_i18n.html cps/web.py
 msgid "Downloads"
 msgstr "Downloads"
+
+#: cps/web.py
+msgid "Your ratings"
+msgstr "Je beoordelingen"
 
 #: cps/web.py
 msgid "File formats list"
@@ -16732,16 +16872,6 @@ msgstr "‘%(title)s’ uit je bibliotheek verwijderen?"
 msgid "It also leaves these shelves: %(shelves)s."
 msgstr "Het verdwijnt ook van deze boekenplanken: %(shelves)s."
 
-#: cps/templates/detail.html
-#, fuzzy
-msgid "Rating updated"
-msgstr "E-mailserver-instellingen bijgewerkt"
-
-#: cps/templates/detail.html
-#, fuzzy
-msgid "Rating cleared"
-msgstr "Met beoordeling hoger dan"
-
 #: cps/templates/detail.html cps/templates/listenmp3.html
 #, fuzzy, python-format
 msgid "Book %(index)s of %(range)s"
@@ -17857,6 +17987,11 @@ msgstr "Oké"
 msgid "Calibre-Web NextGen eBook Catalog"
 msgstr "Calibre-Web - e-boekcatalogus"
 
+#: cps/templates/personal_rating.html
+#, python-format
+msgid "%(rating)s out of 5"
+msgstr "%(rating)s van 5"
+
 #: cps/templates/read.html
 msgid "epub Reader"
 msgstr "EPUB lezer"
@@ -18123,8 +18258,16 @@ msgid "Exclude Extensions"
 msgstr "Extenties uitsluiten"
 
 #: cps/templates/search_form.html
+msgid "Your rating above"
+msgstr "Je beoordeling hoger dan"
+
+#: cps/templates/search_form.html
 msgid "Rating Above"
 msgstr "Met beoordeling hoger dan"
+
+#: cps/templates/search_form.html
+msgid "Your rating below"
+msgstr "Je beoordeling lager dan"
 
 #: cps/templates/search_form.html
 msgid "Rating Below"
@@ -18919,6 +19062,17 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Progress is not being saved."
+#~ msgstr "Voortgang wordt niet opgeslagen."
+
+#, fuzzy
+#~ msgid "Rating updated"
+#~ msgstr "E-mailserver-instellingen bijgewerkt"
+
+#, fuzzy
+#~ msgid "Rating cleared"
+#~ msgstr "Met beoordeling hoger dan"
 
 #, fuzzy
 #~ msgid "Magic Shelves"
@@ -20033,3 +20187,6 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#~ msgid "Calibre library rating (1-10)"
+#~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"

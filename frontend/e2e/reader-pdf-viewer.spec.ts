@@ -61,3 +61,22 @@ test('pdf.js paints every page, not just the first (#1584)', async ({ page }) =>
     .poll(() => viewer.locator('#viewer.pdfViewer .page').count(), { timeout: 20_000 })
     .toBeGreaterThan(1);
 });
+
+/*
+ * #2537 — "PDF.js GET parameters are not forwarded": the reporter bookmarks
+ * pages as /app/view/<id>/pdf#page=N. pdf.js reads page/zoom/search from its
+ * own location hash, and the reader built the iframe URL without the page's
+ * fragment, so every bookmark opened on page 1.
+ */
+test('a #page= fragment on the reader URL opens pdf.js on that page (#2537)', async ({ page }) => {
+  const id = await pdfBookId(page);
+  await page.goto(`/app/view/${id}/pdf#page=2`);
+
+  const viewer = page.frameLocator('iframe');
+  await expect(viewer.locator('#viewerContainer')).toBeVisible({ timeout: 20_000 });
+  await expect(viewer.locator('#pageNumber')).toHaveValue('2', { timeout: 20_000 });
+
+  // Editing the fragment in the address bar moves the open viewer too.
+  await page.evaluate(() => { window.location.hash = 'page=1'; });
+  await expect(viewer.locator('#pageNumber')).toHaveValue('1', { timeout: 20_000 });
+});

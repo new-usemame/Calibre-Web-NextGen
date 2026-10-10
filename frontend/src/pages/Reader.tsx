@@ -890,11 +890,16 @@ export function Reader({ id }: { id: string }) {
         position_type: created?.position_type ?? 'cfi',
       }]);
       paintHighlight(cfiRange, color, newId, !!note);
-    } catch { /* surfaced as no-op; user can retry */ }
-    try {
-      (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
-    } catch { /* noop */ }
-  }, [id, paintHighlight]);
+      return true;
+    } catch {
+      announce(t('Could not save that note.'), { assertive: true });
+      return false;
+    } finally {
+      try {
+        (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
+      } catch { /* noop */ }
+    }
+  }, [id, paintHighlight, announce, t]);
 
   const createHighlight = useCallback((color: string) => {
     const sel = pendingSel;
@@ -965,8 +970,8 @@ export function Reader({ id }: { id: string }) {
     c: NonNullable<typeof composer>, rawNote: string,
   ) => {
     const note = rawNote.trim();
-    setComposer(null);
     if (c.mode === 'standalone') {
+      setComposer(null);
       // An empty standalone note is nothing at all — the backend rejects it, and
       // silently discarding is kinder than an error for a field the reader
       // simply left blank.
@@ -989,10 +994,12 @@ export function Reader({ id }: { id: string }) {
       return;
     }
     if (c.mode === 'create') {
-      await persistHighlight(c.cfiRange, c.text, c.color, note);
+      if (!await persistHighlight(c.cfiRange, c.text, c.color, note)) return;
+      setComposer(null);
       announce(note ? t('Note saved') : t('Highlight saved'));
       return;
     }
+    setComposer(null);
     if (!c.annotationId) return;
     try {
       if (c.unanchored && !note) {

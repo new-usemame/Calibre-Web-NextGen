@@ -12,6 +12,8 @@ import { BookDetail } from './pages/BookDetail';
 import { BrowseList } from './pages/BrowseList';
 import { NotFound } from './pages/NotFound';
 import { Shelves } from './pages/Shelves';
+import { ShelfEditor } from './pages/ShelfEditor';
+import { MagicShelves } from './pages/MagicShelves';
 import { Shelf } from './pages/Shelf';
 import { AdvancedSearch } from './pages/AdvancedSearch';
 import { Account } from './pages/Account';
@@ -22,10 +24,13 @@ import { CoverPicker } from './pages/CoverPicker';
 import { Upload } from './pages/Upload';
 import { Admin } from './pages/Admin';
 import { AdminDevices } from './pages/AdminDevices';
+import { AdminAcquisition } from './pages/AdminAcquisition';
+import { FindBooks } from './pages/FindBooks';
 import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
 import { Duplicates } from './pages/Duplicates';
+import { CcBrowse } from './pages/CcBrowse';
 import { Annotations } from './pages/Annotations';
 import { Reflow } from './pages/Reflow';
 import { WhatsNew } from './pages/WhatsNew';
@@ -248,7 +253,15 @@ export function App() {
             {(p) => <Catalog entityKind="format" entityId={decodeURIComponent(p.id)} />}
           </Route>
 
+          {/* Custom columns (tag-like text/enumeration; a hierarchical one
+              renders as a tree, a flat one as a plain list of atomic values) —
+              SPA parity with the classic /custom_column views. */}
+          <Route path={SPA_ROUTES.ccList}>{() => <CcBrowse />}</Route>
+          <Route path={SPA_ROUTES.cc}>{(p) => <CcBrowse id={p.id} />}</Route>
+
           {/* Shelves */}
+          <Route path={SPA_ROUTES.shelfNew}>{() => <ShelfEditor />}</Route>
+          <Route path={SPA_ROUTES.shelfEdit}>{(p) => <ShelfEditor key={p.id} id={p.id} />}</Route>
           <Route path={SPA_ROUTES.shelves}>{() => <Shelves />}</Route>
           <Route path={SPA_ROUTES.shelf}>{(p) => <Shelf id={p.id} />}</Route>
 
@@ -275,7 +288,16 @@ export function App() {
           <Route path={SPA_ROUTES.adminDevices}>
             {() => me.role?.admin ? <AdminDevices /> : <NotFound />}
           </Route>
+          <Route path={SPA_ROUTES.adminAcquisition}>
+            {() => me.role?.admin ? <AdminAcquisition /> : <NotFound />}
+          </Route>
           <Route path={SPA_ROUTES.admin}>{() => <Admin />}</Route>
+
+          {/* Virtual library — hidden entirely unless the server says this
+              account may use it (feature on AND granted). */}
+          <Route path={SPA_ROUTES.findBooks}>
+            {() => me.acquisition_access ? <FindBooks /> : <NotFound />}
+          </Route>
 
           {/* Info pages */}
           <Route path={SPA_ROUTES.whatsNew}>{() => <WhatsNew />}</Route>
@@ -283,9 +305,10 @@ export function App() {
           <Route path={SPA_ROUTES.tasks}>{() => <Tasks />}</Route>
           <Route path={SPA_ROUTES.table}>{() => <Table />}</Route>
           <Route path={SPA_ROUTES.duplicates}>{() => <Duplicates />}</Route>
-          <Route path={SPA_ROUTES.magicEdit}>{(p) => <MagicShelf editId={p.id} />}</Route>
+          <Route path={SPA_ROUTES.magicNew}>{() => <MagicShelf />}</Route>
+          <Route path={SPA_ROUTES.magicEdit}>{(p) => <MagicShelf key={p.id} editId={p.id} />}</Route>
           <Route path={SPA_ROUTES.magicView}>{(p) => <MagicShelfView id={p.id} />}</Route>
-          <Route path={SPA_ROUTES.magic}>{() => <MagicShelf />}</Route>
+          <Route path={SPA_ROUTES.magic}>{() => <MagicShelves />}</Route>
 
           <Route path={SPA_ROUTES.library}>{() => (
             <LibraryLanding

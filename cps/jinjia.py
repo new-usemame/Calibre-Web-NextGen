@@ -23,6 +23,14 @@ from .clean_html import clean_string
 jinjia = Blueprint('jinjia', __name__)
 log = logger.create()
 
+@jinjia.app_template_filter('catalog_initial')
+def catalog_initial(value):
+    """Use the same initial as SQLite's request-bound catalog grouping."""
+    from .unicode_collation import unicode_initial
+    from .cw_babel import get_collation_locale
+    return unicode_initial(value, get_collation_locale()) or ''
+
+
 
 # pagination links in jinja
 @jinjia.app_template_filter('url_for_other_page')
@@ -30,7 +38,8 @@ def url_for_other_page(page):
     args = request.view_args.copy()
     args['page'] = page
     for get, val in request.args.items():
-        args[get] = val
+        if get != 'page':
+            args[get] = val
     return url_for(request.endpoint, **args)
 
 

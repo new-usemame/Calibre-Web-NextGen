@@ -7,19 +7,23 @@
 
 import os
 import math
+
+from copy import copy
 import re
 import json
+import ipaddress
 import operator
 import sys
 import string
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from datetime import time as datetime_time
 from functools import wraps
 from urllib.parse import urlparse
 import shutil  # noqa: F401 -- test/extension monkeypatch compatibility
 import subprocess
 import tempfile
+from types import SimpleNamespace
 
 from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
@@ -32,17 +36,20 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
+from .unicode_collation import locale_sort_key
 from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
-from . import user_book_data
+from . import user_account_data, user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
     kobo_sync_status, schedule
 from .helper import check_valid_domain, send_test_mail, reset_password, generate_password_hash, check_email, \
     valid_email, check_username, send_broadcast_email
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
-from .render_template import render_title_template, get_sidebar_config
+from .render_template import render_title_template, get_sidebar_config, get_custom_column_visibility_options
+from .custom_column_visibility import save_cc_visibility
 from .services import file_lock
 from .services.worker import WorkerThread
+from .services.opds_filename import validate_template as validate_opds_filename_template
 from .services.kobo_import import (
     KoboContentDatabaseError,
     KoboUploadError,
@@ -55,14 +62,23 @@ from .services.kobo_reconcile import (
     build_reconciliation_preview,
     scan_from_candidates,
 )
+from .services.support_policy import validate_support_settings
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults, validate_default_font_updates
 from .cw_babel import (get_available_locale,
                        get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
+from . import content_server
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
 from .custom_column_sort import load_eligible_columns, persist_configured_columns
+from .services.restriction_columns import (
+    BOOL_CHOICES,
+    RESTRICTION_DATATYPES,
+    bool_tokens_valid,
+    normalize_bool_token,
+)
 
 log = logger.create()
 
@@ -667,10 +683,21 @@ def configuration():
             hardcover_status["expires_label"] = _("Hardcover token expires")
         except Exception:
             log.debug("Unable to inspect Hardcover token status", exc_info=True)
+    providers = [dict(provider) for provider in oauth_bb.get_oauth_blueprints()]
+    environment = current_app.extensions.get("cps_generic_oauth_environment", {})
+    for provider in providers:
+        if provider.get("provider_name") == "generic" and provider.get("environment_managed"):
+            # The runtime descriptor must retain the secret for Flask-Dance,
+            # but an admin page never needs the value.
+            provider["oauth_client_secret"] = ""
+
     return render_title_template("config_edit.html",
                                  config=config,
-                                 provider=oauth_bb.get_oauth_blueprints(),
+                                 provider=providers,
                                  feature_support=feature_support,
+                                 generic_oauth_environment_managed=bool(environment.get("managed")),
+                                 generic_oauth_environment_active=bool(environment.get("active")),
+                                 generic_oauth_environment_error=environment.get("error"),
                                  kobo_two_way_emergency_disabled=(
                                      os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
                                      in {"0", "false", "off", "no"}
@@ -716,19 +743,58 @@ def calibreweb_alive():
     return "", 200
 
 
+def _view_configuration_draft(form):
+    """Render an invalid submission without persisting or losing its edits."""
+    draft = copy(config)
+    if hasattr(draft, 'dirty'):
+        object.__setattr__(draft, 'dirty', [])
+    for key, value in form.items():
+        if not key.startswith('config_') or not hasattr(config, key):
+            continue
+        original = getattr(config, key)
+        if isinstance(original, bool):
+            value = bool(value)
+        elif isinstance(original, int):
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                continue
+        elif not isinstance(original, (str, type(None))):
+            continue
+        setattr(draft, key, value)
+    draft.config_default_role = (constants.selected_roles(form)
+                                 | constants.preserved_roles(form, config.config_default_role))
+    draft.config_default_role &= ~constants.ROLE_ANONYMOUS
+    draft.config_default_show = sum(int(k[5:]) for k in form
+                                   if k.startswith('show_') and k[5:].isdigit())
+    if 'Show_detail_random' in form:
+        draft.config_default_show |= constants.DETAIL_RANDOM
+    if form.get('support_settings_present') == '1':
+        draft.config_show_project_support = 'config_show_project_support' in form
+    if hasattr(config, 'config_sortable_custom_columns'):
+        draft.config_sortable_custom_columns = ','.join(form.getlist('config_sortable_custom_columns'))
+    return draft
+
+
 @admi.route("/admin/viewconfig")
 @user_login_required
 @admin_required
-def view_configuration():
+def view_configuration(opds_filename_template=None, opds_filename_error=None, draft_config=None):
     read_column = calibre_db.session.query(db.CustomColumns) \
         .filter(and_(db.CustomColumns.datatype == 'bool', db.CustomColumns.mark_for_delete == 0)).all()
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
-        .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all()
+        .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
+        .filter(db.CustomColumns.mark_for_delete == 0).all()
+    # Display-ignore policy hides reader fields, not the administrator's choices.
     sortable_columns = load_eligible_columns() or []
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
-    return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
+    return render_title_template("config_view_edit.html", conf=draft_config or config,
+                                 opds_filename_template=opds_filename_template,
+                                 opds_filename_error=opds_filename_error, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     (draft_config or config).config_restricted_column) == "bool"),
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -747,10 +813,16 @@ def edit_user_table():
         .join(db.Books) \
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag')) \
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     if config.config_restricted_column:
         try:
-            custom_values = calibre_db.session.query(db.cc_classes[config.config_restricted_column]).all()
+            if restricted_column_datatype(config.config_restricted_column) == "bool":
+                custom_values = [
+                    SimpleNamespace(id=token, name=_(label))
+                    for token, label in BOOL_CHOICES
+                ]
+            else:
+                custom_values = calibre_db.session.query(db.cc_classes[config.config_restricted_column]).all()
         except (KeyError, AttributeError, IndexError):
             custom_values = []
             log.error("Custom Column No.{} does not exist in calibre database".format(
@@ -767,6 +839,8 @@ def edit_user_table():
                                  users=all_user.all(),
                                  tags=tags,
                                  custom_values=custom_values,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  translations=translations,
                                  languages=languages,
                                  visiblility=visibility,
@@ -912,6 +986,16 @@ def edit_list_user(param):
         vals['value'] = vals['value'][0]
     elif 'value[]' not in vals:
         return _("Malformed request"), 400
+    if (param in ('allowed_column_value', 'denied_column_value')
+            and restricted_column_datatype(config.config_restricted_column) == "bool"):
+        try:
+            if 'value[]' in vals:
+                vals['value[]'] = [_canonical_boolean_restriction(value)
+                                   for value in vals['value[]']]
+            else:
+                vals['value'] = _canonical_boolean_restrictions_csv(vals['value'])
+        except ValueError as ex:
+            return str(ex), 400
     for user in users:
         try:
             if param in ['denied_tags', 'allowed_tags', 'allowed_column_value', 'denied_column_value']:
@@ -924,9 +1008,9 @@ def edit_list_user(param):
                 if param == 'name':
                     if user.name == "Guest":
                         raise Exception(_("Guest Name can't be changed"))
-                    user.name = check_username(vals['value'])
+                    user.name = check_username(vals['value'], user.id)
                 elif param == 'email':
-                    user.email = check_email(vals['value'])
+                    user.email = check_email(vals['value'], user.id)
                 elif param == 'kobo_only_shelves_sync':
                     old_state = user.kobo_only_shelves_sync
                     user.kobo_only_shelves_sync = int(vals['value'] == 'true')
@@ -1049,9 +1133,65 @@ def update_table_settings():
 @admin_required
 def update_view_configuration():
     to_save = request.form.to_dict()
+    if "config_opds_filename_template" in to_save:
+        try:
+            validate_opds_filename_template(to_save["config_opds_filename_template"])
+        except ValueError as error:
+            return view_configuration(opds_filename_template=to_save["config_opds_filename_template"],
+                                      opds_filename_error=_("Invalid OPDS filename template: %(error)s", error=str(error)),
+                                      draft_config=_view_configuration_draft(request.form))
+
+    # Validate a switch to Boolean restrictions before changing any settings:
+    # these persisted fields are comma-separated literals, so silently changing
+    # their meaning would either hide the whole library (fail-closed) or damage
+    # existing restrictions. Keep every saved value intact and require the
+    # administrator to correct or clear incompatible entries first.
+    selected_restriction_column = to_save.get("config_restricted_column", "0")
+    if (restricted_column_datatype(selected_restriction_column) == "bool"
+            and str(selected_restriction_column) != str(config.config_restricted_column)
+            and not boolean_restrictions_compatible()):
+        flash(_("Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."),
+              category="error")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    # This settings card is optional on legacy/partial POST clients. Validate
+    # its complete submitted value before mutating any other configuration.
+    support_settings_submitted = request.form.get("support_settings_present") == "1"
+    support_url = support_label = None
+    if support_settings_submitted:
+        try:
+            support_url, support_label = validate_support_settings(
+                request.form.get("config_support_url", ""),
+                request.form.get("config_support_label", ""),
+            )
+        except ValueError:
+            flash(_("Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."), category="error")
+            return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    # Validate both presets before any other form fields mutate the config.
+    # This keeps a stale/manual POST from partially applying unrelated settings.
+    try:
+        font_updates = validate_default_font_updates(to_save)
+    except ValueError as ex:
+        message = (_("Invalid default body font option")
+                   if "body" in str(ex)
+                   else _("Invalid default display font option"))
+        flash(message, category="error")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    if not check_valid_read_column(to_save.get("config_read_column", "0")):
+        flash(_("Invalid Read Column"), category="error")
+        log.debug("Invalid Read column")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
+
+    if not check_valid_restricted_column(to_save.get("config_restricted_column", "0")):
+        flash(_("Invalid Restricted Column"), category="error")
+        log.debug("Invalid Restricted Column")
+        return view_configuration(draft_config=_view_configuration_draft(request.form))
 
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
+    # Preserve valid choices across temporary hides and invalid ignore patterns.
     persist_configured_columns(
         config,
         request.form.getlist("config_sortable_custom_columns"),
@@ -1076,16 +1216,7 @@ def update_view_configuration():
                     "library failed — books may keep their previous order until "
                     "you retry or edit them."), category="error")
 
-    if not check_valid_read_column(to_save.get("config_read_column", "0")):
-        flash(_("Invalid Read Column"), category="error")
-        log.debug("Invalid Read column")
-        return view_configuration()
     _config_int(to_save, "config_read_column")
-
-    if not check_valid_restricted_column(to_save.get("config_restricted_column", "0")):
-        flash(_("Invalid Restricted Column"), category="error")
-        log.debug("Invalid Restricted Column")
-        return view_configuration()
     _config_int(to_save, "config_restricted_column")
 
     _config_int(to_save, "config_theme")
@@ -1094,7 +1225,10 @@ def update_view_configuration():
     _config_int(to_save, "config_authors_max")
     _config_string(to_save, "config_default_language")
     _config_string(to_save, "config_default_locale")
+    for key, value in font_updates.items():
+        setattr(config, key, value)
     _config_string(to_save, "config_opds_default_locale")
+    _config_string(to_save, "config_opds_filename_template")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
     # Configuration page, not buried under Logfile Configuration on the Basic
@@ -1104,12 +1238,20 @@ def update_view_configuration():
     # Fork #323 (@olskar): admin-set custom CSS injected site-wide.
     _config_string(to_save, "config_custom_css")
 
-    config.config_default_role = constants.selected_roles(to_save)
+    # The classic page has no checkbox for the acquisition grants, and a legacy
+    # Store upgrade can have remapped them into this template.
+    config.config_default_role = (constants.selected_roles(to_save)
+                                  | constants.preserved_roles(to_save, config.config_default_role))
     config.config_default_role &= ~constants.ROLE_ANONYMOUS
 
     config.config_default_show = sum(int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_'))
     if "Show_detail_random" in to_save:
         config.config_default_show |= constants.DETAIL_RANDOM
+
+    if support_settings_submitted:
+        config.config_show_project_support = "config_show_project_support" in request.form
+        config.config_support_url = support_url
+        config.config_support_label = support_label
 
     config.save()
     flash(_("Calibre-Web NextGen configuration updated"), category="success")
@@ -1226,6 +1368,12 @@ def list_domain(allow):
 @admin_required
 def edit_restriction(res_type, user_id):
     element = request.form.to_dict()
+    if res_type in (1, 3) and restricted_column_datatype(
+            config.config_restricted_column) == "bool":
+        try:
+            element["Element"] = _canonical_boolean_restriction(element["Element"])
+        except (KeyError, ValueError) as ex:
+            return str(ex), 400
     if element['id'].startswith('a'):
         if res_type == 0:  # Tags as template
             elementlist = config.list_allowed_tags()
@@ -1299,6 +1447,12 @@ def add_user_0_restriction(res_type):
 @admin_required
 def add_restriction(res_type, user_id):
     element = request.form.to_dict()
+    if res_type in (1, 3) and restricted_column_datatype(
+            config.config_restricted_column) == "bool":
+        try:
+            element["add_element"] = _canonical_boolean_restriction(element["add_element"])
+        except (KeyError, ValueError) as ex:
+            return str(ex), 400
     if res_type == 0:  # Tags as template
         if 'submit_allow' in element:
             config.config_allowed_tags = restriction_addition(element, config.list_allowed_tags)
@@ -1350,6 +1504,8 @@ def delete_user_0_restriction(res_type):
 @admin_required
 def delete_restriction(res_type, user_id):
     element = request.form.to_dict()
+    bool_column_restriction = (res_type in (1, 3) and restricted_column_datatype(
+        config.config_restricted_column) == "bool")
     if res_type == 0:  # Tags as template
         if element['id'].startswith('a'):
             config.config_allowed_tags = restriction_deletion(element, config.list_allowed_tags)
@@ -1359,10 +1515,16 @@ def delete_restriction(res_type, user_id):
             config.save()
     elif res_type == 1:  # CustomC as template
         if element['id'].startswith('a'):
-            config.config_allowed_column_value = restriction_deletion(element, config.list_allowed_column_values)
+            config.config_allowed_column_value = (
+                restriction_delete_by_id(element, config.list_allowed_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, config.list_allowed_column_values))
             config.save()
         elif element['id'].startswith('d'):
-            config.config_denied_column_value = restriction_deletion(element, config.list_denied_column_values)
+            config.config_denied_column_value = (
+                restriction_delete_by_id(element, config.list_denied_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, config.list_denied_column_values))
             config.save()
     elif res_type == 2:  # Tags per user
         if isinstance(user_id, int):
@@ -1381,11 +1543,17 @@ def delete_restriction(res_type, user_id):
         else:
             usr = current_user
         if element['id'].startswith('a'):
-            usr.allowed_column_value = restriction_deletion(element, usr.list_allowed_column_values)
+            usr.allowed_column_value = (
+                restriction_delete_by_id(element, usr.list_allowed_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, usr.list_allowed_column_values))
             ub.session_commit("Deleted allowed columns of user {}: {}".format(usr.name, usr.list_allowed_column_values()))
 
         elif element['id'].startswith('d'):
-            usr.denied_column_value = restriction_deletion(element, usr.list_denied_column_values)
+            usr.denied_column_value = (
+                restriction_delete_by_id(element, usr.list_denied_column_values)
+                if bool_column_restriction else
+                restriction_deletion(element, usr.list_denied_column_values))
             ub.session_commit("Deleted denied columns of user {}: {}".format(usr.name, usr.list_denied_column_values()))
     return ""
 
@@ -1395,6 +1563,8 @@ def delete_restriction(res_type, user_id):
 @user_login_required
 @admin_required
 def list_restriction(res_type, user_id):
+    is_bool_column = (res_type in (1, 3) and restricted_column_datatype(
+        config.config_restricted_column) == "bool")
     if res_type == 0:  # Tags as template
         restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(config.list_denied_tags()) if x != '']
@@ -1402,9 +1572,9 @@ def list_restriction(res_type, user_id):
                  for i, x in enumerate(config.list_allowed_tags()) if x != '']
         json_dumps = restrict + allow
     elif res_type == 1:  # CustomC as template
-        restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
+        restrict = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(config.list_denied_column_values()) if x != '']
-        allow = [{'Element': x, 'type': _('Allow'), 'id': 'a' + str(i)}
+        allow = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Allow'), 'id': 'a' + str(i)}
                  for i, x in enumerate(config.list_allowed_column_values()) if x != '']
         json_dumps = restrict + allow
     elif res_type == 2:  # Tags per user
@@ -1422,9 +1592,9 @@ def list_restriction(res_type, user_id):
             usr = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
         else:
             usr = current_user
-        restrict = [{'Element': x, 'type': _('Deny'), 'id': 'd' + str(i)}
+        restrict = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Deny'), 'id': 'd' + str(i)}
                     for i, x in enumerate(usr.list_denied_column_values()) if x != '']
-        allow = [{'Element': x, 'type': _('Allow'), 'id': 'a' + str(i)}
+        allow = [{'Element': display_boolean_restriction(x, is_bool_column), 'type': _('Allow'), 'id': 'a' + str(i)}
                  for i, x in enumerate(usr.list_allowed_column_values()) if x != '']
         json_dumps = restrict + allow
     else:
@@ -1456,6 +1626,18 @@ def ajax_pathchooser():
 
 
 def do_full_kobo_sync(userid):
+    count, _committed = reset_kobo_sync_state(userid)
+    message = _("{} sync entries deleted").format(count)
+    return Response(json.dumps([{"type": "success", "message": message}]), mimetype='application/json')
+
+
+def reset_kobo_sync_state(userid):
+    """Forget what every one of the user's Kobos has been sent.
+
+    The next sync then delivers the whole library again, each book as New.
+    Returns ``(synced_book_rows_deleted, committed)``; shared by the classic
+    profile button and the SPA device page (#2334).
+    """
     device_ids = ub.session.query(ub.Device.id).filter(
         ub.Device.user_id == userid).scalar_subquery()
     ub.session.query(ub.KoboDeviceBookEntitlement).filter(
@@ -1464,16 +1646,23 @@ def do_full_kobo_sync(userid):
     ub.session.query(ub.KoboDeviceDeletedEntitlement).filter(
         ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
-    ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
-        ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
-    ).delete(synchronize_session=False)
+    # A reset has already decided that everything goes out New.  Leave every
+    # Kobo sealed and audited, or the next sync's one-time audit would turn a
+    # saved reading position into a row that announces its book Changed.
+    from .kobo import ENTITLEMENT_CLASSIFICATION_VERSION
+    kobo_ids = [row.id for row in ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid, ub.Device.kind == "kobo",
+    ).all()]
+    kobo_sync_status.mark_device_entitlement_ledgers_seeded(kobo_ids)
+    kobo_sync_status.mark_device_entitlement_classification(
+        kobo_ids, ENTITLEMENT_CLASSIFICATION_VERSION,
+    )
     ub.session.query(ub.KoboDevicePendingSyncPage).filter(
         ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
     count = ub.session.query(ub.KoboSyncedBooks).filter(userid == ub.KoboSyncedBooks.user_id).delete()
-    message = _("{} sync entries deleted").format(count)
-    ub.session_commit(message)
-    return Response(json.dumps([{"type": "success", "message": message}]), mimetype='application/json')
+    committed = ub.session_commit("Kobo full sync: {} sync entries deleted for user {}".format(count, userid))
+    return count, committed
 
 
 @admi.route("/ajax/kobo_resend/<int:userid>/<int:bookid>", methods=["POST"])
@@ -1487,47 +1676,24 @@ def ajax_kobo_resend(userid, bookid):
 
 
 def do_kobo_resend(userid, bookid):
-    # Force re-delivery of one book to one user's Kobo on the next sync.
-    #
-    # Three writes across the two databases, and only the timestamp bump does
-    # what it says on its own:
-    #
-    #   * bump Books.last_modified, so the sync filter
-    #     (Books.last_modified > sync_token.books_last_modified) picks the book
-    #     up regardless of where the device's cursor sits;
-    #   * clear the (user_id, book_id) row from kobo_synced_books;
-    #   * clear every per-device entitlement fingerprint for this user/book,
-    #     otherwise Layer 2 can suppress the requested replay as an exact
-    #     match even though last_modified selected it for delivery.
-    #
-    # ⚠️ This comment used to say the deletion is what makes the sync emit
-    # NewEntitlement. It is not, and believing so is what made the only
-    # regression test for this helper assert a causal chain the code cannot
-    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
-    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
-    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
-    # query deliberately does not filter on that table either because it is
-    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
-    # the comments around the changed-book query).
-    #
-    # The deletion still matters, by a different route: HandleSyncRequest resets
-    # the WHOLE sync token — books_last_created included — to datetime.min when
-    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
-    # books synced don't respect sync_token"). So removing the user's LAST row
-    # does produce NewEntitlement, which is the single-book case anyone would
-    # test by hand and is presumably how the wrong explanation survived. With
-    # any other synced row remaining, this emits ChangedEntitlement.
-    #
-    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
-    # UNOBSERVED (F-3e383a). The success message below tells the requester the
-    # device "will re-receive the book"; that claim is only established for the
-    # empty-table case above. Do not strengthen it without measuring on
-    # hardware.
+    # Re-deliver one book to the user's Kobos on the next sync.  Clearing its
+    # ledger rows is enough: the sync's recovery arm reselects a book missing
+    # from a Kobo's ledger wherever the cursor sits, and classifies it New.
+    # Never touch Books.last_modified: that clock is the library's, and every
+    # other account's Kobo holding the book would get it as Changed.  Run the
+    # one-time upgrade audit first: run later, it would give a book with a
+    # saved reading position a sentinel row and announce it Changed, which a
+    # reader that no longer holds the book can drop.
+    from .kobo import (_migrate_device_entitlement_classification,
+                       _seed_existing_device_entitlement_ledgers)
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)
         return Response(json.dumps([{"type": "danger", "message": message}]),
                         mimetype='application/json')
+    if (not _seed_existing_device_entitlement_ledgers(userid)
+            or not _migrate_device_entitlement_classification(userid)):
+        abort(503)
     device_ids = ub.session.query(ub.Device.id).filter(
         ub.Device.user_id == userid,
     ).scalar_subquery()
@@ -1545,15 +1711,12 @@ def do_kobo_resend(userid, bookid):
         ub.KoboSyncedBooks.user_id == userid,
         ub.KoboSyncedBooks.book_id == bookid,
     ).delete()
-    book.last_modified = datetime.now(timezone.utc)
-    calibre_db.session.commit()
     if deleted or ledger_deleted:
         message = _("Cleared sync state for book {0} (user {1}); the device "
                     "will re-receive the book on next sync").format(bookid, userid)
     else:
-        message = _("Book {0} was not in the sync record for user {1}; "
-                    "last_modified bumped so the device will receive on next "
-                    "sync").format(bookid, userid)
+        message = _("Book {0} was not in the sync record for user {1}; the "
+                    "device will receive it on next sync").format(bookid, userid)
     ub.session_commit(message)
     return Response(json.dumps([{"type": "success", "message": message}]),
                     mimetype='application/json')
@@ -1711,9 +1874,70 @@ def check_valid_read_column(column):
 def check_valid_restricted_column(column):
     if column != "0":
         if not calibre_db.session.query(db.CustomColumns).filter(db.CustomColumns.id == column) \
-          .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all():
+          .filter(db.CustomColumns.datatype.in_(RESTRICTION_DATATYPES)) \
+          .filter(db.CustomColumns.mark_for_delete == 0).all():
             return False
     return True
+
+
+def restricted_column_datatype(column):
+    """Return the active custom-column datatype selected for restrictions."""
+    if not column or str(column) == "0":
+        return None
+    custom_column = calibre_db.session.query(db.CustomColumns).filter(
+        db.CustomColumns.id == column,
+        db.CustomColumns.mark_for_delete == 0,
+    ).first()
+    return custom_column.datatype if custom_column else None
+
+
+def _canonical_boolean_restriction(value):
+    token = normalize_bool_token(value)
+    if token is None:
+        raise ValueError(_("Boolean restrictions must be Yes, No, or Undefined."))
+    return token
+
+
+def _canonical_boolean_restrictions_csv(value):
+    if value == "":
+        return ""
+    values = value.split(",")
+    if not bool_tokens_valid(values):
+        raise ValueError(_("Boolean restrictions must be Yes, No, or Undefined."))
+    return ",".join(_canonical_boolean_restriction(item) for item in values)
+
+
+def display_boolean_restriction(value, is_bool_column=None):
+    """Show canonical Boolean tokens while preserving legacy bad values for repair."""
+    if is_bool_column is None:
+        is_bool_column = restricted_column_datatype(
+            config.config_restricted_column) == "bool"
+    if not is_bool_column:
+        return value
+    return normalize_bool_token(value) or value
+
+
+def restriction_delete_by_id(element, list_func):
+    """Delete a Boolean state by its stored list index, including legacy aliases."""
+    values = list_func()
+    if values == [""]:
+        values = []
+    index = int(element["id"][1:])
+    if 0 <= index < len(values):
+        del values[index]
+    return ",".join(values)
+
+
+def boolean_restrictions_compatible():
+    """Whether every saved global and user restriction is a Boolean state."""
+    if not all(bool_tokens_valid(values) for values in (
+            config.list_allowed_column_values(),
+            config.list_denied_column_values())):
+        return False
+    users = ub.session.query(ub.User.allowed_column_value,
+                             ub.User.denied_column_value).all()
+    return all(bool_tokens_valid(allowed) and bool_tokens_valid(denied)
+               for allowed, denied in users)
 
 
 def restriction_addition(element, list_func):
@@ -1739,15 +1963,18 @@ def prepare_tags(user, action, tags_name, id_list):
             raise Exception(_("Tag not found"))
         new_tags_list = [x.name for x in tags]
     else:
-        try:
-            tags = calibre_db.session.query(db.cc_classes[config.config_restricted_column]) \
-                .filter(db.cc_classes[config.config_restricted_column].id.in_(id_list)).all()
-        except (KeyError, AttributeError, IndexError):
-            log.error("Custom Column No.{} does not exist in calibre database".format(
-                config.config_restricted_column))
-            raise Exception(_("Custom Column No.%(column)d does not exist in calibre database",
-                    column=config.config_restricted_column))
-        new_tags_list = [x.value for x in tags]
+        if restricted_column_datatype(config.config_restricted_column) == "bool":
+            new_tags_list = [_canonical_boolean_restriction(value) for value in id_list]
+        else:
+            try:
+                tags = calibre_db.session.query(db.cc_classes[config.config_restricted_column]) \
+                    .filter(db.cc_classes[config.config_restricted_column].id.in_(id_list)).all()
+            except (KeyError, AttributeError, IndexError):
+                log.error("Custom Column No.{} does not exist in calibre database".format(
+                    config.config_restricted_column))
+                raise Exception(_("Custom Column No.%(column)d does not exist in calibre database",
+                        column=config.config_restricted_column))
+            new_tags_list = [x.value for x in tags]
     saved_tags_list = user.__dict__[tags_name].split(",") if len(user.__dict__[tags_name]) else []
     if action == "remove":
         saved_tags_list = [x for x in saved_tags_list if x not in new_tags_list]
@@ -1948,6 +2175,10 @@ def _configuration_oauth_helper(to_save):
     for element in oauth_bb.get_oauth_blueprints():
         update = {}
         if element["provider_name"] == "generic":
+            if element.get("environment_managed"):
+                # Deployment owns every Generic OIDC setting, including the
+                # secret and activation state. Ignore even forged POST values.
+                continue
             if to_save["config_generic_oauth_client_id"] != element["oauth_client_id"]:
                 reboot_required = True
                 update["oauth_client_id"] = to_save["config_generic_oauth_client_id"]
@@ -2179,6 +2410,7 @@ def simulatedbchange():
 @admin_required
 def new_user():
     content = ub.User()
+    content.kobo_only_shelves_sync = 1
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     kobo_support = feature_support['kobo'] and config.config_kobo_sync
@@ -2187,6 +2419,7 @@ def new_user():
         _handle_new_user(to_save, content, languages, translations, kobo_support)
     else:
         content.role = config.config_default_role
+        content.share_shelfs = True
         content.sidebar_view = config.config_default_show
         content.locale = config.config_default_locale
         content.default_language = config.config_default_language
@@ -2194,6 +2427,8 @@ def new_user():
     magic_shelf_context = _build_magic_shelf_order_context(content)
     return render_title_template("user_edit.html", new_user=1, content=content,
                                  config=config, translations=translations,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  languages=languages, title=_("Add New User"), page="newuser",
                                  kobo_support=kobo_support, registered_oauth=oauth_bb.oauth_check,
                                  opds_root_order_string=opds_context["opds_root_order_string"],
@@ -2552,7 +2787,10 @@ def edit_user(user_id):
                                  languages=languages,
                                  new_user=0,
                                  content=content,
+                                 cc_visibility=get_custom_column_visibility_options(content),
                                  config=config,
+                                 restriction_is_bool=(restricted_column_datatype(
+                                     config.config_restricted_column) == "bool"),
                                  registered_oauth=oauth_bb.oauth_check,
                                  mail_configured=config.get_mail_server_configured(),
                                  kobo_support=kobo_support,
@@ -2750,6 +2988,7 @@ def ldap_import_create_user(user, user_data):
     # path. Without this the column default (dark) silently wins over whatever
     # the admin configured.
     content.theme = config_theme_code(config.config_theme)
+    seed_new_user_ui_font_defaults(content, config)
     ub.session.add(content)
     try:
         ub.session.commit()
@@ -2842,10 +3081,22 @@ def _db_simulate_change():
     return db_change, db_valid
 
 
+def _library_busy_configuration_result():
+    return _configuration_result(_("Library maintenance is running; try again when it finishes."))
+
+
+def _library_busy_db_configuration_result():
+    return _db_configuration_result(_("Library maintenance is running; try again when it finishes."))
+
+
+@content_server.configuration_update(on_busy=_library_busy_db_configuration_result)
 def _db_configuration_update_helper():
     db_change = False
     to_save = request.form.to_dict()
     gdrive_error = None
+    server_before = content_server.configuration_identity()
+    if to_save.get("config_calibre_split") == "on" and content_server.setting("config_calibre_server_enabled"):
+        return _db_configuration_result(_("Disable the Calibre content server before enabling split library mode."), gdrive_error)
 
     incoming = to_save.get('config_calibre_dir')
     if incoming is None:
@@ -2911,12 +3162,66 @@ def _db_configuration_update_helper():
             flash(_("DB is not Writeable"), category="warning")
     calibre_db.update_config(config)
     config.save()
+    if content_server.configuration_identity() != server_before:
+        content_server.start()
     return _db_configuration_result(None, gdrive_error)
 
 
+def _content_server_settings_error(to_save):
+    """Validate the submitted server draft before any shared settings change."""
+    if to_save.get("config_calibre_server_enabled") == "on" and not content_server.platform_supported():
+        return _('The managed Calibre content server requires a POSIX platform. Use the Linux container on Windows.')
+    server_username = to_save.get("config_calibre_server_username", content_server.setting("config_calibre_server_username"))
+    server_password = to_save.get("config_calibre_server_password_e") or content_server.setting("config_calibre_server_password_e")
+    if (to_save.get("config_calibre_server_enabled") == "on"
+            and to_save.get("config_calibre_server_anonymous_writes") != "on"
+            and not (server_username and server_password)):
+        return (_('Please enter a content server username and password, or allow anonymous writes'))
+    problem = content_server.settings_problem(
+        to_save.get("config_calibre_server_port", content_server.setting("config_calibre_server_port")),
+        server_username, to_save.get("config_calibre_server_password_e"),
+        (web_server.listen_port or constants.DEFAULT_PORT)
+        if to_save.get("config_calibre_server_enabled") == "on" else None)
+    if problem:
+        return ({
+            "port": _('Content server port must be a number from 1 to 65535'),
+            "port-in-use": _('Content server port must differ from the port this server listens on'),
+            "username": _('Content server username may only use the letters A-Z, numbers, spaces, '
+                          'underscores and hyphens'),
+            "password": _('Content server password must use only ASCII (English) characters'),
+        }[problem])
+    listen_address = strip_whitespaces(to_save.get("config_calibre_server_listen", ""))
+    if listen_address:
+        try:
+            ipaddress.ip_address(listen_address)
+        except ValueError:
+            return (_('Invalid content server listen address: %(address)s',
+                                           address=listen_address))
+    trusted_ips = []
+    for entry in to_save.get("config_calibre_server_trusted_ips", "").split(","):
+        entry = strip_whitespaces(entry)
+        if not entry:
+            continue
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            return (_('Invalid content server trusted IP/CIDR entry: %(entry)s', entry=entry))
+        trusted_ips.append(entry)
+    to_save["config_calibre_server_trusted_ips"] = ",".join(trusted_ips)
+    return None
+
+
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
 def _configuration_update_helper():
     reboot_required = False
+    content_server_changed = False
     to_save = request.form.to_dict()
+    server_before = content_server.configuration_identity()
+    if to_save.get("config_calibre_server_enabled") == "on" and content_server.setting("config_calibre_split"):
+        return _configuration_result(_("Disable split library mode before enabling the Calibre content server."))
+    server_error = _content_server_settings_error(to_save)
+    if server_error:
+        return _configuration_result(server_error)
     prev_hardcover_sync = config.hardcover_sync_enabled()
     prev_kobo_prefer_kepub = bool(config.config_kobo_prefer_kepub)
     queue_kepub_backfill = False
@@ -2999,7 +3304,9 @@ def _configuration_update_helper():
             to_save["config_converterpath"] = get_calibre_binarypath("ebook-convert")
             _config_string(to_save, "config_converterpath")
 
-        reboot_required |= _config_int(to_save, "config_login_type")
+        env_oauth = current_app.extensions.get("cps_generic_oauth_environment", {})
+        if not (env_oauth.get("managed") and env_oauth.get("active")):
+            reboot_required |= _config_int(to_save, "config_login_type")
 
         # LDAP configurator
         if config.config_login_type == constants.LOGIN_LDAP:
@@ -3120,6 +3427,16 @@ def _configuration_update_helper():
         reboot_required |= _config_string(to_save, "config_limiter_uri")
         reboot_required |= _config_string(to_save, "config_limiter_options")
 
+        # Calibre content server configuration (validated before mutation)
+        content_server_changed |= _config_checkbox(to_save, "config_calibre_server_enabled")
+        content_server_changed |= _config_int(to_save, "config_calibre_server_port")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_listen")
+        content_server_changed |= _config_checkbox(to_save, "config_calibre_server_anonymous_writes")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_trusted_ips")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_username")
+        if to_save.get("config_calibre_server_password_e"):
+            content_server_changed |= _config_string(to_save, "config_calibre_server_password_e")
+
         # Rarfile Content configuration
         _config_string(to_save, "config_rarfile_location")
         unrar_warning = None
@@ -3134,6 +3451,11 @@ def _configuration_update_helper():
         _configuration_result(_("Oops! Database Error: %(error)s.", error=e.orig))
 
     config.save()
+    if content_server_changed or content_server.configuration_identity() != server_before:
+        if content_server.setting("config_calibre_server_enabled"):
+            content_server.start()
+        else:
+            content_server.stop()
     if queue_kepub_backfill:
         from .tasks.kepub_backfill import enqueue_kepub_backfill
         if not enqueue_kepub_backfill(current_user.name):
@@ -3154,6 +3476,22 @@ def _configuration_update_helper():
     return _configuration_result(None, reboot_required, " ".join(filter(None, [unrar_warning, arch_warning])))
 
 
+@admi.route("/admin/config/clear_calibre_server_password", methods=['POST'])
+@user_login_required
+@admin_required
+@content_server.configuration_update(on_busy=_library_busy_configuration_result)
+def clear_calibre_server_password():
+    config.config_calibre_server_password_e = ""
+    config.save()
+    if content_server.setting("config_calibre_server_enabled") and not content_server.setting("config_calibre_server_anonymous_writes"):
+        # No password means no authentication; the server stays down until a
+        # new one is saved rather than restarting open (#2210 review).
+        content_server.stop()
+    elif content_server.setting("config_calibre_server_enabled"):
+        content_server.start()
+    return _configuration_result()
+
+
 def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
     resp = {}
     if error_flash:
@@ -3168,6 +3506,8 @@ def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
             resp['result'].append({'type': "warning", 'message': warning_flash})
     resp['reboot'] = reboot
     resp['config_upload'] = config.config_upload_formats
+    resp['calibre_server_password_set'] = bool(content_server.setting("config_calibre_server_password_e"))
+    resp['calibre_server_password_env'] = getattr(config, 'config_calibre_server_env', {}).get('password', False)
     return Response(json.dumps(resp), mimetype='application/json')
 
 
@@ -3193,6 +3533,7 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
     return render_title_template("config_db.html",
                                  config=config,
                                  backup_root=constants.config_path("backup"),
+                                 library_location_locked=constants.library_location_is_automounted(),
                                  show_authenticate_google_drive=gdrive_authenticate,
                                  gdriveError=gdrive_error,
                                  gdrivefolders=gdrivefolders,
@@ -3213,6 +3554,7 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.sidebar_view |= constants.DETAIL_RANDOM
 
     content.role = constants.selected_roles(to_save)
+    content.share_shelfs = to_save.get("share_shelfs") == "on"
     # Seed the account with the instance default theme (Admin -> Theme). The
     # account owns its theme from here on, via Account -> Theme in the New UI.
     try:
@@ -3238,6 +3580,8 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         magic_shelf_context = _build_magic_shelf_order_context(content)
         return render_title_template("user_edit.html", new_user=1, content=content,
                                      config=config,
+                                     restriction_is_bool=(restricted_column_datatype(
+                                         config.config_restricted_column) == "bool"),
                                      translations=translations,
                                      languages=languages, title=_("Add new user"), page="newuser",
                                      kobo_support=kobo_support, registered_oauth=oauth_bb.oauth_check,
@@ -3252,12 +3596,18 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.denied_tags = config.config_denied_tags
         content.allowed_column_value = config.config_allowed_column_value
         content.denied_column_value = config.config_denied_column_value
-        # No default value for kobo sync shelf setting
-        content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync", 0) == "on"
+        # An unchecked, visible checkbox is an explicit whole-library choice.
+        # When Kobo is disabled the form has no control: retain the new-user
+        # default so enabling Kobo later cannot unexpectedly send everything.
+        if kobo_support:
+            content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync") == "on"
+        else:
+            content.kobo_only_shelves_sync = 1
         content.kobo_two_way_annotation_sync = (
             to_save.get("kobo_two_way_annotation_sync", 0) == "on"
         )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
+        seed_new_user_ui_font_defaults(content, config)
         ub.session.add(content)
         ub.session.commit()
         flash(_("User '%(user)s' created", user=content.name), category="success")
@@ -3277,24 +3627,16 @@ def _delete_user(content):
     if ub.session.query(ub.User).filter(ub.User.role.op('&')(constants.ROLE_ADMIN) == constants.ROLE_ADMIN,
                                         ub.User.id != content.id).count():
         if content.name != "Guest":
-            # Per-user-book rows (read status, downloads, bookmarks,
-            # annotations + their on-disk backup files, Kobo state…) go
-            # through the single enumerator (D4). The old hand-written list
-            # here left the user's annotation rows and backup gzips behind
-            # (PII surviving the account deletion).
-            user_book_data.purge_user_book_data(user_id=content.id)
-            # UserLibraryBook is included in that enumerator because SQLite
-            # foreign-key cascades are not enabled. User-scoped (not
-            # per-book) rows + the user itself stay here.
-            for us in ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id):
-                ub.session.query(ub.BookShelf).filter(us.id == ub.BookShelf.shelf).delete()
-            ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id).delete()
-            ub.session.query(ub.User).filter(ub.User.id == content.id).delete()
-            ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == content.id).delete()
-            ub.session.query(ub.User_Sessions).filter(ub.User_Sessions.user_id == content.id).delete()
+            # Everything app.db holds for the account — per-user-book rows,
+            # devices and their ledgers, KOReader progress, shelves and magic
+            # shelves, credentials — goes through the single enumerator. The
+            # hand-written list that used to live here fell behind the schema
+            # and left devices, reading positions and magic shelves behind.
+            name = content.name
+            user_account_data.purge_user_account(content.id)
             ub.session_commit()
-            log.info("User {} deleted".format(content.name))
-            return _("User '%(nick)s' deleted", nick=content.name)
+            log.info("User {} deleted".format(name))
+            return _("User '%(nick)s' deleted", nick=name)
         else:
             # log.warning(_("Can't delete Guest User"))
             raise Exception(_("Can't delete Guest User"))
@@ -3340,7 +3682,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             flash(str(ex), category="error")
             return "", 400
 
-    val = [int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_')]
+    val = [int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_') and not k.startswith('show_cc_')]
     sidebar, __ = get_sidebar_config()
     for element in sidebar:
         value = element['visibility']
@@ -3503,7 +3845,13 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.locale = validated_locale
     try:
         anonymous = content.is_anonymous
-        content.role = constants.selected_roles(to_save)
+        # Book-source access is granted on the admin Book sources page, which
+        # this form knows nothing about. Rebuilding the mask from the posted
+        # checkboxes alone silently revoked it on any edit, even an email change.
+        content.role = (constants.selected_roles(to_save)
+                        | constants.preserved_roles(to_save, content.role))
+        if "share_shelfs_present" in to_save:
+            content.share_shelfs = to_save.get("share_shelfs") == "on"
         if anonymous:
             content.role |= constants.ROLE_ANONYMOUS
         else:
@@ -3514,12 +3862,12 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         if not new_email:
             raise Exception(_("Email can't be empty and has to be a valid Email"))
         if new_email != content.email:
-            content.email = check_email(new_email)
+            content.email = check_email(new_email, content.id)
         # Query username, if not existing, change
         if to_save.get("name", content.name) != content.name:
             if to_save.get("name") == "Guest":
                 raise Exception(_("Guest Name can't be changed"))
-            content.name = check_username(to_save["name"])
+            content.name = check_username(to_save["name"], content.id)
         if "allow_additional_ereader_emails" in to_save:
             content.allow_additional_ereader_emails = to_save.get("allow_additional_ereader_emails") == "on"
         else:
@@ -3528,29 +3876,16 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.kindle_mail = valid_email(to_save["kindle_mail"]) if to_save["kindle_mail"] else ""
         if to_save.get("kindle_mail_subject") is not None:
             content.kindle_mail_subject = (to_save.get("kindle_mail_subject", "") or "").strip()
+        save_cc_visibility(content, get_custom_column_visibility_options(content), to_save)
 
     except Exception as ex:
         log.error(ex)
+        # Nothing from a rejected form is saved. Returning nothing lets
+        # edit_user render the page with its full context; a second, partial
+        # render here missed the shelf lists and turned the message into a 500.
+        ub.session.rollback()
         flash(str(ex), category="error")
-        opds_context = _build_opds_context(content)
-        magic_shelf_context = _build_magic_shelf_order_context(content)
-        return render_title_template("user_edit.html",
-                                     translations=translations,
-                                     languages=languages,
-                                     mail_configured=config.get_mail_server_configured(),
-                                     kobo_support=kobo_support,
-                                     new_user=0,
-                                     content=content,
-                                     config=config,
-                                     registered_oauth=oauth_bb.oauth_check,
-                                     opds_root_order_string=opds_context["opds_root_order_string"],
-                                     opds_hidden_entries_string=opds_context["opds_hidden_entries_string"],
-                                     opds_root_labels=opds_context["opds_root_labels"],
-                                     magic_shelf_order_string=magic_shelf_context["magic_shelf_order_string"],
-                                     magic_shelf_order_labels=magic_shelf_context["magic_shelf_order_labels"],
-                                     magic_shelf_order_mode=magic_shelf_context["magic_shelf_order_mode"],
-                                     title=_("Edit User %(nick)s", nick=content.name),
-                                     page="edituser")
+        return None
     try:
         user_library.set_library_mode(
             content,
@@ -3759,6 +4094,7 @@ def _acquire_restore_service_locks():
 def restore_calibre_db():
     """Restore Calibre metadata.db and clean app.db book-linked tables (last resort recovery)."""
     lock_handles = []
+    content_server_hold = None
     try:
         restore_lock = _acquire_restore_lock()
         if restore_lock is None:
@@ -3793,6 +4129,10 @@ def restore_calibre_db():
             return redirect(url_for("admin.db_configuration"))
         lock_handles.extend(service_lock_handles)
 
+        # calibredb's check_library/restore_database need the library path
+        # itself, which a running content server holds open (#2210 review).
+        content_server_hold = content_server.hold_library(exclusive=True)
+
         # 1. Backup both DBs
         backup_dir = constants.config_path(
             "backup", f"restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -3817,7 +4157,8 @@ def restore_calibre_db():
             calibredb_binary, "check_library",
             "--with-library", config.config_calibre_dir
         ]
-        check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300)
+        check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300,
+                                      **content_server_hold.child_ownership())
         log.info("calibredb check_library (pre) output: %s\n%s", check_result.stdout, check_result.stderr)
         if check_result.returncode != 0:
             log.warning("calibredb check_library (pre) returned code %s", check_result.returncode)
@@ -3832,7 +4173,8 @@ def restore_calibre_db():
             "--with-library", config.config_calibre_dir,
             "--really-do-it"
         ]
-        result = subprocess.run(restore_cmd, capture_output=True, text=True, timeout=1200)
+        result = subprocess.run(restore_cmd, capture_output=True, text=True, timeout=1200,
+                                **content_server_hold.child_ownership())
         log.info("calibredb restore_database output: %s\n%s", result.stdout, result.stderr)
         with open(log_path, "a", encoding="utf-8") as log_file:
             log_file.write("\n[restore_database]\n")
@@ -3863,7 +4205,8 @@ def restore_calibre_db():
             return redirect(url_for("admin.db_configuration"))
 
         # 5. Run calibredb check_library (post)
-        check_result_post = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300)
+        check_result_post = subprocess.run(check_cmd, capture_output=True, text=True, timeout=300,
+                                      **content_server_hold.child_ownership())
         log.info("calibredb check_library (post) output: %s\n%s", check_result_post.stdout, check_result_post.stderr)
         if check_result_post.returncode != 0:
             log.warning("calibredb check_library (post) returned code %s", check_result_post.returncode)
@@ -3886,3 +4229,5 @@ def restore_calibre_db():
         return redirect(url_for("admin.db_configuration"))
     finally:
         _release_restore_locks(lock_handles)
+        if content_server_hold is not None:
+            content_server_hold.release()

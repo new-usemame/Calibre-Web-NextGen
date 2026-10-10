@@ -1,0 +1,4 @@
+{# Shared Calibre metadata is always labelled and follows the account choice. #}
+{% if library_rating > 0 and current_user.get_view_property('preferences', 'show_library_rating') is not sameas false %}
+<p class="library-rating">{{ _('Library rating') }}: {{ library_rating / 2 }}/5</p>
+{% endif %}

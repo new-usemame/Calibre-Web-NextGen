@@ -139,7 +139,7 @@ function storeCfi(cfi, dirty) {
 // percentage the caller has already validated against generated locations
 // (a pre-generate() sample is a meaningless 0 — CWA #1364).
 function persistCfi(cfi, keepalive, percentage) {
-    if (!cfi || !window.calibre || !window.calibre.bookmarkUrl) return Promise.resolve();
+    if (!cfi || !window.calibre || window.calibre.lookupMode || !window.calibre.bookmarkUrl) return Promise.resolve();
     let token = window.calibre.csrfToken || document.querySelector("input[name='csrf_token']")?.value;
     let body = 'bookmark=' + encodeURIComponent(cfi);
     if (typeof percentage === 'number' && isFinite(percentage) && percentage > 0) {
@@ -147,10 +147,10 @@ function persistCfi(cfi, keepalive, percentage) {
     }
     return fetch(window.calibre.bookmarkUrl, {
         method: 'POST',
-        headers: {
+        headers: new Headers({
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': token || ''
-        },
+        }),
         body: body,
         credentials: 'same-origin',
         keepalive: !!keepalive
@@ -228,28 +228,24 @@ window.addEventListener('locationchange',()=>{
         }
     }
     // CWA #1364 root-cause fix: only save to localStorage AFTER
-    // `epub.locations.generate()` has resolved. Before that point,
-    // `calculateProgress()` returns 0 because there are no locations
-    // to map the current CFI against — saving that fake 0 wipes the
-    // user's prior valid position. The qFinished/restore path then
-    // reads localStorage=0, calls `display(cfiFromPercentage(0))`, and
-    // the user lands at the beginning of the book even though they
-    // were reading at e.g. 35% before. This is the headline symptom
-    // in the upstream report: "opens at the correct cached position
-    // then immediately snaps back to the beginning".
+    // `epub.locations.generate()` has resolved. Lookup mode may read
+    // existing local/server progress to start at the current place, but it
+    // must not update either saved carrier while the user inspects the book.
     if (window.calibre && window.calibre.bookUrl
             && epub && epub.locations
             && Array.isArray(epub.locations._locations)
             && epub.locations._locations.length > 0) {
-        let bookKey = window.calibre.bookUrl;
-        localStorage.setItem("calibre.reader.progress." + bookKey, newPos);
-        let cfi = reader && reader.rendition && reader.rendition.currentLocation
-            ? reader.rendition.currentLocation()?.start?.cfi : null;
-        // This branch already required generated locations, which is the guard
-        // that makes the percentage real and not the pre-generate() 0 that CWA
-        // #1364 was about. Send the UNROUNDED value — newPos is the rounded
-        // display figure and would turn 98.5% into a finished book.
-        if (cfi) scheduleCfiSave(cfi, calculateProgressExact());
+        if (!window.calibre.lookupMode) {
+            let bookKey = window.calibre.bookUrl;
+            localStorage.setItem("calibre.reader.progress." + bookKey, newPos);
+            let cfi = reader && reader.rendition && reader.rendition.currentLocation
+                ? reader.rendition.currentLocation()?.start?.cfi : null;
+            // This branch already required generated locations, which is the guard
+            // that makes the percentage real and not the pre-generate() 0 that CWA
+            // #1364 was about. Send the UNROUNDED value — newPos is the rounded
+            // display figure and would turn 98.5% into a finished book.
+            if (cfi) scheduleCfiSave(cfi, calculateProgressExact());
+        }
     }
 });
 

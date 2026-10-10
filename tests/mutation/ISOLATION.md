@@ -69,9 +69,18 @@ removal; its writers must be accounted for before manually removing it.
 
 Container scratch defaults to `/tmp`, independently of pytest's external-volume scratch.
 Override it with `--scratch-dir DIR` (CLI) or `CWNG_DOCKER_SCRATCH` (CLI and tests), choosing
-a writable directory shared with Docker. An unresponsive create fails after five seconds
-with advice to check sharing. Each created container is labelled and removed at phase end.
-The daemon must remain available for cleanup; do not forcibly kill the host runner.
+a writable directory shared with Docker. A create that Docker has not answered within two
+minutes fails with advice to check the daemon's load and the directory's sharing; other
+Docker calls also allow two minutes. (A busy shared daemon has taken 48 seconds to create a
+container and 23 seconds to remove one.)
+
+Each phase container carries a unique `org.cwng.mutation-phase` label and is removed at phase
+end by that label, never by name. Stopping the CLI does not cancel a create: Docker has
+finished creates 43 seconds after the harness gave up. After a lost create reply the harness
+keeps looking for the label for another minute and removes what appears; if nothing appears,
+the error names the command that removes it later. SIGTERM stops a sweep cleanly and removes
+the in-flight container. SIGKILL cannot, so never kill the runner that way. List leftovers with
+`docker ps -a --filter label=org.cwng.mutation-phase`.
 
 `--timeout` bounds each test phase (default 1800 seconds). JSON results go to
 `--evidence-dir DIR`, outside the source checkout; the default is temporary storage.

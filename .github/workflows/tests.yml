@@ -148,12 +148,16 @@ jobs:
           touch /config/cwa.db
       
       - name: Run smoke and unit tests
-        timeout-minutes: 10  # Last-resort kill; --timeout below is the real gate.
+        # Last-resort kill; --timeout below is the real gate. 15, not 10: by
+        # 2026-09-24 a healthy run of this step took 8.4-8.7 min on main, and a
+        # PR whose tests had all passed was killed at the 10-min wall. Still
+        # inside the job's 25-min cap with the installs that precede it.
+        timeout-minutes: 15
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
         run: |
           # --timeout=120 + --timeout-method=thread converts hung tests into named
-          # test failures instead of opaque step-level 10-min step timeouts. Without
+          # test failures instead of opaque step-level timeouts. Without
           # this, a stuck test on one xdist worker only manifests as a step timeout
           # with no indication of which test or worker stalled.
           #
@@ -170,7 +174,7 @@ jobs:
           # notes/fix-udf-gil-deadlock-DESIGN.md). faulthandler's watchdog
           # writes every thread's stack WITHOUT needing the GIL, so a freeze
           # that starves pytest-timeout still produces named stacks in the
-          # log instead of a silent 10-minute step wall. 90 < the 120s
+          # log instead of a silent step-timeout wall. 90 < the 120s
           # pytest-timeout on purpose: a hung test logs stacks first, then
           # pytest-timeout attempts the interrupt.
           pytest -m "smoke or unit" \
@@ -402,7 +406,7 @@ jobs:
         env:
           CWA_TEST_PORT: "8083"  # CI uses production default port
           CWA_TEST_IMAGE: "crocodilestick/calibre-web-automated:latest"
-        timeout-minutes: 30  # Kill if stuck
+        timeout-minutes: 45  # Expanded Calibre acquisition matrix; individual subprocesses remain bounded
       
       - name: Upload test results
         uses: actions/upload-artifact@v7
@@ -832,6 +836,42 @@ jobs:
             | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower() in ("cbz","cbr","cbt") for f in b.get("formats",[]))))')
           echo "books with a comic format: $comics"
           [ "${comics:-0}" -ge 1 ] || { echo "::error::no comic-format book after seeding"; exit 1; }
+
+      - name: Seed twenty-book shelf-drag fixture
+        run: |
+          # #946 drags twenty distinct real books and checks persisted membership.
+          # The normal five EPUBs plus PDF/comic supply only seven. Small EPUBs
+          # keep that real-write invariant runnable without large ingest inputs.
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location("synthetic", "tests/fixtures/generate_synthetic.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.create_minimal_epub(Path("/tmp/shelf-drag-fixture.epub"))
+          PY
+          docker cp /tmp/shelf-drag-fixture.epub cwn-e2e:/tmp/shelf-drag-fixture.epub
+          for number in $(seq 1 13); do
+            added=$(docker exec cwn-e2e calibredb add /tmp/shelf-drag-fixture.epub \
+              --title "Shelf drag fixture $number" --authors "CWA Shelf Drag Suite" --duplicates \
+              --with-library /calibre-library | tee /dev/stderr \
+              | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+            [ -n "$added" ] || { echo "::error::shelf-drag fixture $number was not added"; exit 1; }
+            # Keep the established reader/RTL/PDF fixtures first in newest sort.
+            docker exec cwn-e2e calibredb set_metadata \
+              --field timestamp:2000-01-01T00:00:00+00:00 "$added" \
+              --with-library /calibre-library >/dev/null
+          done
+          jar=$(mktemp)
+          csrf=$(curl -fsS -c "$jar" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          curl -fsS -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+            -d '{"username":"admin","password":"admin123"}' -o /dev/null
+          count=$(curl -fsS -b "$jar" 'http://localhost:8083/api/v1/books?per_page=20&sort=new' \
+            | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["items"]))')
+          [ "$count" -eq 20 ] || { echo "::error::shelf-drag fixture exposes only $count of 20 books"; exit 1; }
+          rm -f "$jar" /tmp/shelf-drag-fixture.epub
 
       - name: Seed shelves and series
         run: |

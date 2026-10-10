@@ -264,7 +264,7 @@ def test_unmatched_count_does_not_miscount_a_non_array(wire, logs):
     ({"document": DIGEST, "annotations": [], "deleted": ["a"],
       "delete_source": "kobo"},
      {"error": "invalid_delete_source",
-      "message": "delete_source must be one of: koreader"}),
+      "message": "delete_source must be one of: koreader, textquote"}),
     ({"document": DIGEST,
       "annotations": [{"annotation_id": "x", "highlighted_text": 5}]},
      {"error": "invalid_annotation",
@@ -303,6 +303,26 @@ def test_skipped_annotations_are_logged_as_dropped(wire, logs):
     assert out, "a dropped (skipped) highlight logged nothing"
     assert "skipped" in out.lower()
 
+
+def test_a_highlight_sent_again_unchanged_is_not_reported_as_dropped(wire, logs):
+    """KOReader's native provider sends its complete set on every sync, so
+    every open of a book re-sends highlights the server already has exactly.
+    Counting those as skipped put "they were NOT stored" in the log each time,
+    which hid the real drops above among false ones."""
+    client, _s, _u = wire
+    first = client.put("/kosync/syncs/annotations", json={
+        "document": DIGEST, "annotations": [_valid_annotation()],
+    })
+    assert first.get_json()["created"] == 1
+    logs.clear()
+    again = client.put("/kosync/syncs/annotations", json={
+        "document": DIGEST, "annotations": [_valid_annotation()],
+    })
+    assert again.status_code == 200
+    assert not _lines(logs, logging.WARNING), "an unchanged highlight is not a lost one"
+    body = again.get_json()
+    assert (body.get("unchanged"), body["skipped"]) == (1, 0)
+    assert "unchanged=1" in " | ".join(_lines(logs, logging.INFO))
 
 # --- the happy paths need a line too, or "it worked" is unfalsifiable -------
 

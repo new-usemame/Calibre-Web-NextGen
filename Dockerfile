@@ -111,6 +111,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Then build. vite.config.ts outDir is ../cps/static/app => /build/cps/static/app.
 COPY frontend/ ./
+# The classic and SPA readers share the sandbox-safe selection bridge.
+COPY cps/static/js/reading/selection-observer.* /build/cps/static/js/reading/
 RUN npm run build
 
 # ==========================================================================
@@ -378,6 +380,11 @@ RUN \
   # STEP 7.1 - Move contents of /app/calibre-web-automated/root to / and delete the /app/calibre-web-automated/root directory
   cp -R /app/calibre-web-automated/root/* / && \
   rm -R /app/calibre-web-automated/root/ && \
+  # Install the intended ImageMagick policy while building the image. Runtime
+  # cwa-init repeats this for the root/PUID path; arbitrary non-root users
+  # cannot mutate /etc and should already see the same policy.
+  rm -f /etc/ImageMagick-6/policy.xml && \
+  ln -s /defaults/policy.xml /etc/ImageMagick-6/policy.xml && \
   # STEP 7.2 - Run CWA install script to make required dirs, set script permissions and add aliases for CLI commands  ect.
   chmod +x /app/calibre-web-automated/scripts/setup-cwa.sh && \
   /app/calibre-web-automated/scripts/setup-cwa.sh && \
@@ -387,14 +394,15 @@ RUN \
   cd /app/calibre-web-automated/koreader/plugins && \
   # Calculate digest of all files in the plugin for debugging purposes
   echo "Calculating digest of plugin files..." && \
-  PLUGIN_DIGEST=$(find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
+  PLUGIN_DIGEST=$(find cwngsync.koplugin -path cwngsync.koplugin/tests -prune -o -type f \( -name "*.lua" -o -name "*.json" \) -print | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
   echo "Plugin digest: $PLUGIN_DIGEST" && \
   # Create a file named after the digest inside the plugin folder
   echo "Plugin files digest: $PLUGIN_DIGEST" > cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
   echo "Build date: $(date)" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
   echo "Files included:" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
-  find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
-  zip -r koplugin.zip cwngsync.koplugin/ && \
+  find cwngsync.koplugin -path cwngsync.koplugin/tests -prune -o -type f \( -name "*.lua" -o -name "*.json" \) -print | sort >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  # The plugin's tests stay out of the zip users install.
+  zip -r koplugin.zip cwngsync.koplugin/ -x 'cwngsync.koplugin/tests/*' && \
   echo "Created koplugin.zip from cwngsync.koplugin folder with digest file: ${PLUGIN_DIGEST}.digest"; \
   else \
   echo "Warning: cwngsync.koplugin folder not found, skipping zip creation"; \

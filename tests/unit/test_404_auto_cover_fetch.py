@@ -132,6 +132,8 @@ def test_cover_is_downloaded_and_applied(harness):
     assert m._apply_metadata_to_book(book, _metadata(COVER_URL), cdb) is True
     assert harness["save_calls"] == [(COVER_URL, book.path)]
     assert book.has_cover == 1
+    # A new cover is a book change: Kobo sync and cover URLs follow it.
+    assert book.last_modified is not None
     assert cdb.session.commits == 1
     assert harness["thumb_calls"] == [book.id]
 

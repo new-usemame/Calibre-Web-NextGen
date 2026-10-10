@@ -6,7 +6,14 @@
  * format) that each had to agree on the same two-part rule, and the server-side
  * half of that rule was missing entirely. One predicate, one place to fix.
  */
-import type { Me } from './api';
+import type { Me, Shelf } from './api';
+
+/** Menus and donation prompts share the account's instance support policy. */
+export function showsProjectSupport(me: Me | undefined | null): boolean {
+  // Wait for policy. Older servers omit support and retain the existing
+  // destinations once the account is available.
+  return !!me && (!!me.role.admin || me.support?.show_project_links !== false);
+}
 
 /**
  * May this user add book files right now?
@@ -57,4 +64,34 @@ export function canDeleteBooks(me: Me | undefined | null): boolean {
  */
 export function canConvertWithReflow(me: Me | undefined | null): boolean {
   return !!me?.role?.edit || !!me?.role?.admin;
+}
+
+/**
+ * May this user open the cover editor for a book?
+ *
+ * Editors change the library cover of any book they can see
+ * (`cps/cover_picker.py::_load_book`). Everyone else edits a private cover,
+ * which the server keeps for a book in their library or, with Global Library
+ * access, any book they may browse (`cps/api/actions.py::_personal_cover_book`).
+ * A book reached only through a public shelf is neither, so the editor could
+ * only fail there. Guests have no private cover.
+ */
+export function canEditBookCover(me: Me | undefined | null, inLibrary: boolean): boolean {
+  if (!me || me.role?.anonymous) return false;
+  return inLibrary || !!(me.role?.edit || me.role?.admin || me.role?.browse_global);
+}
+
+/**
+ * May this user add books to this shelf, or take them off it?
+ *
+ * Mirrors cps/shelf.py::check_shelf_edit_permissions: signed-in owners retain
+ * control of private and public shelves. The "Edit public shelves" role grants
+ * changes to another reader's public shelf. Guests cannot edit shelves.
+ */
+export function canEditShelf(
+  me: Me | undefined | null,
+  shelf: Pick<Shelf, 'is_public' | 'is_owner'>,
+): boolean {
+  if (!me || me.role?.anonymous) return false;
+  return shelf.is_owner || (shelf.is_public && !!me.role?.edit_shelfs);
 }

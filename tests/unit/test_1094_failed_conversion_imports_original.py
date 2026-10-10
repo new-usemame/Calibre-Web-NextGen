@@ -59,6 +59,7 @@ import os
 import subprocess
 import sys
 import time
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -206,6 +207,29 @@ def _run_main(
     rc = ingest_processor.main(str(source))
     assert rc == 0
     return holder["fake"], str(source)
+
+
+@pytest.mark.parametrize('vanished', [False, True])
+def test_processor_readiness_expiry_retries_remaining_source(monkeypatch, tmp_path, vanished):
+    source = tmp_path / 'Reopened writer.pdf'
+    source.write_bytes(b'original partial bytes')
+    fake = _FakeProcessor(str(source), convert_result=(False, ''))
+    def not_ready(timeout=None):
+        if vanished:
+            source.unlink()
+        return False
+    fake.is_file_in_use = not_ready
+    monkeypatch.setattr(ingest_processor, 'NewBookProcessor', lambda _: fake)
+    monkeypatch.setattr(ingest_processor, '_acquire_process_lock_or_exit', lambda: None)
+    monkeypatch.setattr(ingest_processor, 'check_maintenance', lambda: None)
+    monkeypatch.setattr(ingest_processor, 'initialize_runtime', lambda: True)
+
+    assert ingest_processor.main(str(source)) == (0 if vanished else 2)
+    assert fake.convert_book_calls == 0
+    assert fake.imported == []
+    assert fake.delete_current_file_calls == 0
+    if not vanished:
+        assert source.read_bytes() == b'original partial bytes'
 
 
 class TestFailedConversionStillImports:
@@ -450,18 +474,26 @@ class TestConversionBudgetIsSharedAcrossStages:
             "against converter time unless the message says otherwise"
         )
 
-    def test_kepubify_also_receives_the_shared_budget(self):
-        """Both converters must draw on the same allowance; a source-pin here
-        because the two callsites are what the sharing property depends on."""
-        source = INGEST_PROCESSOR_PATH.read_text()
-        assert source.count("timeout=conversion_budget_remaining()") == 2, (
-            "both ebook-convert and kepubify must use the shared budget, not "
-            "a fresh per-subprocess deadline"
-        )
-        assert "timeout=conversion_deadline_seconds()" not in source, (
-            "the raw total must not be handed to a subprocess — that is the "
-            "per-stage deadline this class exists to prevent"
-        )
+    def test_kepubify_also_receives_the_shared_budget(self, monkeypatch, tmp_path):
+        processor = _conversion_processor(tmp_path)
+        processor.db = type('DB', (), {'conversion_add_entry': lambda *args: None})()
+        monkeypatch.setenv('CWA_CONVERSION_DEADLINE_SECONDS', '10')
+        clock = [100.0]
+        monkeypatch.setattr(ingest_processor, '_PROCESS_START_MONOTONIC', 100.0)
+        monkeypatch.setattr(ingest_processor.time, 'monotonic', lambda: clock[0])
+        observed = []
+        def convert(cmd, **kw):
+            observed.append((cmd[0], kw['timeout']))
+            Path(cmd[2]).write_bytes(b'intermediate epub')
+            clock[0] += 4
+            return ''
+        monkeypatch.setattr(ingest_processor, '_run_converter_streaming', convert)
+        def kepub(cmd, **kw):
+            observed.append((cmd[0], kw['timeout']))
+            return subprocess.CompletedProcess(cmd, 0)
+        monkeypatch.setattr(subprocess, 'run', kepub)
+        assert processor.convert_to_kepub()[0] is True
+        assert observed == [('ebook-convert', 10.0), ('kepubify', 6.0)]
 
 
 class TestShellDeadlineArithmetic:
@@ -472,19 +504,32 @@ class TestShellDeadlineArithmetic:
 
     @staticmethod
     def _derive(safety_timeout):
-        """Run the real derivation block out of the shipped script."""
-        body = _shell_function_body(INGEST_SERVICE_RUN.read_text(),
-                                    "run_processor_with_timeout")
-        lines = body.splitlines()
-        start = next(i for i, l in enumerate(lines)
-                     if 'safety_timeout" -gt 0' in l)
-        end = next(i for i in range(start, len(lines))
-                   if lines[i].strip() == "fi")
-        block = "\n".join(lines[start:end + 1]).replace("local ", "")
-        script = f'safety_timeout={safety_timeout}\n{block}\necho "${{CWA_CONVERSION_DEADLINE_SECONDS:-unset}}"'
-        out = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
-        assert out.returncode == 0, out.stderr
-        return out.stdout.strip()
+        """Observe the real wrapper, without extracting its source blocks.
+
+        Nested budget-selection logic exposed the old source-text extractor:
+        it stopped at the first inner fi and executed an incomplete shell.
+        A timeout command seam observes the actual exported deadline instead.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            tmp = Path(directory)
+            timeout = tmp / 'timeout'
+            timeout.write_text('#!/usr/bin/env bash\nprintf "CWNG_DEADLINE=%s\\n" "${CWA_CONVERSION_DEADLINE_SECONDS:-unset}"\n')
+            timeout.chmod(0o755)
+            env = dict(os.environ, PATH=str(tmp) + os.pathsep + str(Path(sys.executable).parent) + os.pathsep + os.environ['PATH'],
+                       WATCH_FOLDER=str(tmp), CWA_INGEST_SERVICE_TEST_MODE='1',
+                       CWA_INGEST_RETRY_QUEUE=str(tmp / 'queue'),
+                       CWA_INGEST_STATUS_FILE=str(tmp / 'status'),
+                       CWA_INGEST_PROCESSING_DIR=str(tmp / 'processing'),
+                       CWA_INGEST_RECENT_DIR=str(tmp / 'recent'),
+                       CWA_INGEST_PROCESSOR_CMD='/observation-only',
+                       CWA_INGEST_BUDGET_HELPER=str(INGEST_SERVICE_RUN.parents[5] / 'scripts/ingest_budget.py'))
+            out = subprocess.run(['bash', '-c',
+                                  'source "$1" >/dev/null; run_processor_with_timeout "$2" "$3"',
+                                  'test', str(INGEST_SERVICE_RUN), str(safety_timeout), str(tmp / 'plain.txt')],
+                                 env=env, capture_output=True, text=True, timeout=15)
+            assert out.returncode == 0, out.stderr
+            return next(line.split('=', 1)[1] for line in out.stdout.splitlines()
+                        if line.startswith('CWNG_DEADLINE='))
 
     def test_deadline_is_monotonic_in_the_hard_timeout(self):
         previous = -1
@@ -631,6 +676,7 @@ class TestNotABookFormatsAreNotRescued:
         def _factory(filepath):
             fake = _FakeProcessor(filepath, convert_result=(False, ""))
             fake.input_format = "acsm"
+            fake.ingest_acsm = lambda: ingest_processor._fail_not_a_book_input(fake, filepath)
             holder["fake"] = fake
             return fake
 
@@ -759,6 +805,8 @@ class TestFailedTicketFulfilmentDoesNotImportTickets:
                 return False, ""
 
             fake.convert_book = _failed_ticket_conversion
+            if fmt == 'acsm':
+                fake.ingest_acsm = _failed_ticket_conversion
             holder["fake"] = fake
             return fake
 

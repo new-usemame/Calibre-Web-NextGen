@@ -71,13 +71,14 @@ def test_second_app_preserves_live_runtime(real_app):
 
 
 def test_real_bootstrap(real_app):
-    from cps.reverseproxy import ReverseProxied
+    from cps.reverseproxy import ReverseProxied, TrustedProxyPeers
 
     import cps
 
     assert cps.config.db_configured
     assert real_app.blueprints
-    assert isinstance(real_app.wsgi_app, ReverseProxied)
+    assert isinstance(real_app.wsgi_app, TrustedProxyPeers)
+    assert isinstance(real_app.wsgi_app.app, ReverseProxied)
     assert "csrf" in real_app.extensions
     assert real_app.error_handler_spec
     response = real_app.test_client().get("/login")
@@ -208,14 +209,19 @@ def test_native_lock_stalls_greenlets(real_app):
 
     assert not monkey.is_module_patched("threading")
     held = threading.Event()
+    contending = threading.Event()
     release = threading.Event()
     events = []
 
     def owner():
         with cps._process_runtime_lock:
             held.set()
-            # Bounded OS wait guarantees release even if the hub is blocked.
-            release.wait(timeout=0.2)
+            # The bounded wait starts once the contender is at the lock, so a
+            # slow scheduler cannot let it run out first. It is bounded so the
+            # lock is released even though the blocked hub never runs the
+            # observer that would release it.
+            contending.wait(timeout=5)
+            release.wait(timeout=0.5)
             events.append("os_release")
 
     thread = threading.Thread(target=owner)
@@ -224,6 +230,7 @@ def test_native_lock_stalls_greenlets(real_app):
 
     def contender():
         events.append("lock_wait")
+        contending.set()
         with cps._process_runtime_lock:
             events.append("lock_acquired")
 

@@ -43,14 +43,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SET_OWNERSHIP = REPO_ROOT / "scripts" / "set_ownership.sh"
 ROOT_EQUIVALENT_PATHS = ("/", "/./", "//", "///./")
 
-CHOWN_STUB = """#!/bin/sh
-# Records every invocation, one line per call, then succeeds.
-echo "$@" >> "$CWA_TEST_CHOWN_LOG"
+CHOWN_STUB = r"""#!/bin/sh
+# Preserve argument boundaries, including spaces in sandbox paths.
+printf '%s\0' "$@" >> "$CWA_TEST_CHOWN_LOG"
+printf '\0' >> "$CWA_TEST_CHOWN_LOG"
 exit 0
 """
 
-FAILING_CHOWN_STUB = """#!/bin/sh
-echo "$@" >> "$CWA_TEST_CHOWN_LOG"
+FAILING_CHOWN_STUB = r"""#!/bin/sh
+printf '%s\0' "$@" >> "$CWA_TEST_CHOWN_LOG"
+printf '\0' >> "$CWA_TEST_CHOWN_LOG"
 exit 1
 """
 
@@ -134,8 +136,8 @@ class Harness:
         if not self.chown_log.exists():
             return []
         paths = []
-        for line in self.chown_log.read_text().splitlines():
-            parts = line.split()
+        for invocation in self.chown_log.read_bytes().split(b"\0\0"):
+            parts = [os.fsdecode(arg) for arg in invocation.split(b"\0")]
             if "-R" not in parts:
                 continue  # the marker's own non-recursive chown
             path = parts[-1]
@@ -151,7 +153,7 @@ class Harness:
 
 @pytest.fixture()
 def harness(tmp_path: Path) -> Harness:
-    return Harness(tmp_path)
+    return Harness(tmp_path / "container with spaces")
 
 
 def test_set_ownership_script_exists_and_is_executable():

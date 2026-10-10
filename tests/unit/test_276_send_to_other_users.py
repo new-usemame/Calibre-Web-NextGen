@@ -88,26 +88,30 @@ def test_other_users_with_kindle_is_admin_gated():
     )
 
 
-def test_other_users_excludes_current_user_and_unfconfigured():
-    """The build must filter (a) current_user themselves and (b) users
-    with empty / None kindle_mail."""
-    src = _web_src()
-    # show_book is the last function in cps/web.py — match through EOF.
-    match = re.search(
-        r"(def show_book\(book_id\):.*)",
-        src, re.DOTALL,
-    )
-    body = match.group(1)
-    var_idx = body.find("other_users_with_kindle")
-    block = body[var_idx:var_idx + 1500]
-    # Self-exclusion: filter on ub.User.id != current_user.id (or similar).
-    assert re.search(r"User\.id\s*!=\s*current_user\.id|user\.id\s*!=\s*current_user\.id|\.id\s*!=\s*int\(current_user\.id\)", block), (
-        "must exclude current_user from the other-users list"
-    )
-    # Kindle-mail filter: query rejects empty / None.
-    assert re.search(r"kindle_mail.*!=|kindle_mail.*is_not\(None\)|kindle_mail", block), (
-        "must filter by kindle_mail being set"
-    )
+def test_other_users_excludes_current_user_and_unconfigured(monkeypatch, tmp_path):
+    """The classic book page, the classic send allow-set and the New UI's
+    recipient list all come from ``other_users_with_ereader`` (#2296): the
+    sender and anyone without an eReader address are never offered."""
+    from cps import ub
+    from cps.services.ereader_send import other_users_with_ereader
+    from tests.unit.koreader_library_world import LibraryWorld
+
+    world = LibraryWorld(monkeypatch, tmp_path)
+    try:
+        sender = world.add_user("sender")
+        sender.kindle_mail = "sender@kindle.com"
+        world.add_user("zed").kindle_mail = "zed@kindle.com"
+        world.add_user("amy").kindle_mail = "amy@kindle.com"
+        world.add_user("blank").kindle_mail = ""
+        world.add_user("unset")
+        world.session.commit()
+
+        offered = other_users_with_ereader(sender.id)
+
+        assert [user.name for user in offered] == ["amy", "zed"]
+        assert all(isinstance(user, ub.User) for user in offered)
+    finally:
+        world.close()
 
 
 # ---------------------------------------------------------------------------

@@ -1433,6 +1433,135 @@ def test_container_setup_failure_removes_owned_container(tmp_path, docker_scratc
         sweep.run_phase(['true'], output=out)
 
 
+def _phase_containers_under(root):
+    """Phase containers (any owner) whose output mount lies under root: this test's own."""
+    ids = subprocess.run(['docker', 'ps', '-aq', '--no-trunc', '--filter', 'label=org.cwng.mutation-phase'],
+                         check=True, capture_output=True, text=True, timeout=120).stdout.split()
+    if not ids:
+        return []
+    # Another session may remove one of these meanwhile; inspect still reports the rest.
+    found = subprocess.run(['docker', 'container', 'inspect', *ids], capture_output=True,
+                           text=True, timeout=120).stdout
+    return [item['Id'] for item in json.loads(found or '[]')
+            if any(mount.get('Source', '').startswith(str(root)) for mount in item.get('Mounts', []))]
+
+
+def test_container_lost_create_reply_leaves_no_container(tmp_path, docker_scratch, container_backend, monkeypatch):
+    # Real daemon, real container: the shim hands the create to Docker detached,
+    # so killing the CLI loses only the reply, as it did on a loaded daemon.
+    import shutil
+    repo, seed = _committed_repo(tmp_path)
+    shim, late = tmp_path / 'shim', tmp_path / 'late-create'
+    shim.mkdir()
+    real = shutil.which('docker')
+    (shim / 'docker').write_text(
+        '#!/bin/sh\n'
+        'if [ "$1" = create ]; then\n'
+        f'  ( sleep 2; "{real}" "$@" > "{late}.tmp" 2>&1; mv "{late}.tmp" "{late}" ) </dev/null >/dev/null 2>&1 &\n'
+        '  exec sleep 600\n'
+        'fi\n'
+        f'exec "{real}" "$@"\n')
+    (shim / 'docker').chmod(0o755)
+    monkeypatch.setenv('PATH', f'{shim}{os.pathsep}{os.environ["PATH"]}')
+    monkeypatch.setattr(container_backend, 'CREATE_TIMEOUT', 1)
+    sweep = container_backend.ContainerSweep(repo, seed)
+    out = docker_scratch / 'out'
+    out.mkdir()
+    try:
+        with pytest.raises(container_backend.ContainerError, match='--scratch-dir /tmp'):
+            sweep.run_phase(['true'], output=out)
+        deadline = time.monotonic() + 180
+        while not late.exists():
+            assert time.monotonic() < deadline, 'the detached create never answered'
+            time.sleep(0.2)
+        created = late.read_text().strip()
+        assert len(created) == 64 and int(created, 16) >= 0, created
+        assert _phase_containers_under(out) == [], 'the late-created phase container was left behind'
+    finally:
+        for cid in _phase_containers_under(out):
+            subprocess.run([real, 'rm', '-f', cid], capture_output=True, timeout=120)
+
+
+# A daemon-free Docker CLI: one state file per container, holding its label token.
+_FAKE_DOCKER = r"""
+import hashlib, json, os, pathlib, sys, time
+state, args = pathlib.Path(os.environ['FAKE_DOCKER_STATE']), sys.argv[1:]
+live = {path.name: path.read_text() for path in state.iterdir() if not path.name.startswith('waiting-')}
+def option(name):
+    return args[args.index(name) + 1]
+if args[0] == 'info':
+    print('linux')
+elif args[0] == 'image':
+    print('sha256:fixture')
+elif args[0] == 'create':
+    token = option('--label').split('=', 1)[1]
+    cid = hashlib.sha256(token.encode()).hexdigest()
+    (state / cid).write_text(token)
+    print(cid)
+elif args[0] == 'cp':
+    sys.stdin.buffer.read()
+elif args[0] == 'wait':
+    (state / ('waiting-' + args[1])).touch()
+    deadline = time.monotonic() + 120
+    while (state / args[1]).exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    print(0)
+elif args[0] == 'ps':
+    token = option('--filter').rsplit('=', 1)[1]
+    for cid, owner in live.items():
+        if owner == token:
+            print(cid if '--no-trunc' in args else cid[:12])
+elif args[0] == 'container':
+    match = [{'Id': cid, 'Config': {'Labels': {'org.cwng.mutation-phase': token}}}
+             for cid, token in live.items() if args[-1] in (cid, 'cwng-mutation-' + token)]
+    print(json.dumps(match))
+    sys.exit(0 if match else 1)
+elif args[0] == 'rm':
+    for cid in live:
+        if cid.startswith(args[-1]):
+            (state / cid).unlink()
+elif args[0] not in ('start', 'logs'):
+    sys.exit('unexpected docker ' + args[0])
+"""
+
+
+def test_container_sigterm_mid_phase_removes_the_phase_container(tmp_path):
+    # A test's subprocess timeout killed the CLI mid-phase three times in one run;
+    # a signal the harness can see must still remove the in-flight container.
+    import shutil
+    repo, seed = _committed_repo(tmp_path)
+    state, binaries = tmp_path / 'daemon', tmp_path / 'bin'
+    state.mkdir()
+    binaries.mkdir()
+    (binaries / 'git').symlink_to(shutil.which('git'))
+    (tmp_path / 'fake_docker.py').write_text(_FAKE_DOCKER)
+    (binaries / 'docker').write_text(f'#!/bin/sh\nexec "{sys.executable}" "{tmp_path / "fake_docker.py"}" "$@"\n')
+    (binaries / 'docker').chmod(0o755)
+    process = subprocess.Popen([sys.executable, str(_HARNESS), '--backend', 'container',
+        '--repo', str(repo), '--seed', seed, '--file', 'victim.py', '--old', '1', '--new', '2',
+        '--test', 'test_probe.py', '--evidence-dir', str(tmp_path / 'evidence'),
+        '--scratch-dir', str(tmp_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        env={**os.environ, 'PATH': str(binaries), 'FAKE_DOCKER_STATE': str(state)})
+    try:
+        deadline = time.monotonic() + 60
+        while not list(state.glob('waiting-*')):
+            assert process.poll() is None, process.communicate()
+            assert time.monotonic() < deadline, 'the phase never reached docker wait'
+            time.sleep(0.1)
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=60)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate()
+        leaked = sorted(path.name for path in state.iterdir() if not path.name.startswith('waiting-'))
+        for name in leaked:
+            (state / name).unlink()  # Releases a red run's orphaned fake docker wait.
+    assert leaked == [], 'SIGTERM left the in-flight phase container behind'
+    assert process.returncode == 128 + signal.SIGTERM, stdout + stderr
+    assert 'caught' not in stdout and 'SURVIVED' not in stdout
+
+
 @pytest.mark.parametrize('mode', ['clean_control', 'absent_control', 'startup_rewrite',
                                  'frame_forge', 'meta_transform', 'loader_transform'])
 def test_container_leg7_execution_provenance_limit(tmp_path, docker_scratch, container_backend, mode):
@@ -1508,6 +1637,25 @@ def test_container_presentation_rejects_forged_authority(container_backend, shap
         container_backend.present_observation(result)
 
 
+def _run_container_cli(command, timeout=600):
+    """Bound a real sweep without SIGKILLing it: a killed harness cannot remove its container.
+
+    A 60 s subprocess.run timeout did exactly that on a loaded daemon, three times in one run.
+    """
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=300)
+        pytest.fail(f'sweep exceeded {timeout}s; stopped with SIGTERM\n{stdout}{stderr}')
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate()
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
 @pytest.mark.parametrize('kind', ['caught', 'survived', 'baseline_error', 'spec'])
 def test_container_cli_runs_real_sweep(tmp_path, docker_scratch, container_backend, kind):
     repo, seed = _committed_repo(tmp_path)
@@ -1531,7 +1679,7 @@ def test_container_cli_runs_real_sweep(tmp_path, docker_scratch, container_backe
         command += ['--spec', str(spec)]
     else:
         command += ['--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py']
-    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    result = _run_container_cli(command)
     assert result.returncode == {'caught': 0, 'survived': 1, 'baseline_error': 2, 'spec': 0}[kind], result.stdout + result.stderr
     reports = [json.loads(path.read_text()) for path in evidence.glob('*.json')]
     assert len(reports) == (2 if kind == 'spec' else 1)
@@ -1866,54 +2014,64 @@ def test_container_scratch_does_not_follow_pytest_tmp_path(tmp_path, request, mo
     assert scratch.is_relative_to(pathlib.Path('/tmp').resolve())
 
 
-def test_container_unshareable_scratch_fails_fast(container_module, monkeypatch):
-    def blocked(command, **kwargs):
-        assert kwargs['timeout'] <= 5, 'unshareable scratch can hang for 30 seconds'
-        raise subprocess.TimeoutExpired(command, kwargs['timeout'])
-
-    monkeypatch.setattr(container_module.subprocess, 'run', blocked)
-    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
-        container_module._docker('create', '--mount', 'type=bind,src=/unshared,dst=/out')
-    print(str(error.value))
-
-
-def test_container_create_timeout_removes_container_if_created(tmp_path, docker_scratch, container_module, monkeypatch):
+@pytest.mark.parametrize('late', [0, 1.5, None], ids=['exists-at-first-look', 'daemon-finishes-later', 'never-appears'])
+def test_container_create_timeout_removes_container_if_created(tmp_path, docker_scratch, container_module, monkeypatch, late):
+    # A killed create CLI does not cancel the request: on a loaded daemon the
+    # container appeared up to 43 s after the harness had looked for it once.
     repo, seed = _committed_repo(tmp_path)
     original = subprocess.run
-    created, removed = [], []
-    token = None
+    containers, removed = {}, []
+    monkeypatch.setattr(container_module, 'SETTLE_TIMEOUT', 3, raising=False)
+
+    def present():
+        now = time.monotonic()
+        return {cid: token for cid, (token, ready) in containers.items()
+                if ready is not None and ready <= now and cid not in removed}
 
     def engine(command, **kwargs):
-        nonlocal token
         if command[0] != 'docker':
             return original(command, **kwargs)
-        action = command[1]
+        action, found = command[1], present()
         if action == 'info':
             output = b'linux\n'
         elif action == 'image':
             output = b'sha256:fixture\n'
         elif action == 'create':
             token = command[command.index('--label') + 1].split('=', 1)[1]
-            created.append('a' * 64)
-            # Model Docker creating the object but losing the CLI reply.
+            containers['a' * 64] = (token, None if late is None else time.monotonic() + late)
+            # The daemon accepted the request; the CLI's reply is lost.
             raise subprocess.TimeoutExpired(command, kwargs['timeout'])
         elif action == 'container':
-            output = json.dumps([{'Id': created[0], 'Config': {'Labels': {
-                container_module.LABEL: token}}}]).encode()
+            match = [{'Id': cid, 'Config': {'Labels': {container_module.LABEL: token}}}
+                     for cid, token in found.items() if command[-1] in (cid, 'cwng-mutation-' + token)]
+            if not match:
+                return subprocess.CompletedProcess(command, 1, b'[]', b'No such container')
+            output = json.dumps(match).encode()
         elif action == 'rm':
-            removed.append(command[-1])
+            removed.extend(cid for cid in found if cid.startswith(command[-1]))
             output = b''
         elif action == 'ps':
-            output = b''
+            label = command[command.index('--filter') + 1]
+            assert label.startswith('label=' + container_module.LABEL + '='), label
+            ids = [cid for cid, token in found.items() if label == f'label={container_module.LABEL}={token}']
+            output = '\n'.join(ids if '--no-trunc' in command else [c[:12] for c in ids]).encode()
         else:
             pytest.fail('unexpected Docker operation: ' + action)
         return subprocess.CompletedProcess(command, 0, output, b'')
 
     monkeypatch.setattr(container_module.subprocess, 'run', engine)
     sweep = container_module.ContainerSweep(repo, seed)
-    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp'):
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
         sweep.run_phase(['true'], output=docker_scratch)
-    assert created == removed == ['a' * 64]
+    if late is None:
+        token, _ = containers['a' * 64]
+        assert f'label={container_module.LABEL}={token}' in str(error.value), \
+            'an unconfirmed create must name the command that finds it later'
+        assert removed == []
+        return
+    time.sleep(max(0, containers['a' * 64][1] - time.monotonic()))
+    assert removed == ['a' * 64]
+    assert present() == {}, 'the late container outlived the phase'
 
 
 def test_container_scratch_timeout_message_with_real_wait(tmp_path, container_module, monkeypatch):
@@ -1925,11 +2083,13 @@ def test_container_scratch_timeout_message_with_real_wait(tmp_path, container_mo
     docker.write_text('#!/bin/sh\nexec /bin/sleep 60\n')
     docker.chmod(0o755)
     monkeypatch.setenv('PATH', str(binaries))
+    monkeypatch.setattr(container_module, 'CREATE_TIMEOUT', 2)
     start = time.monotonic()
     with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
         container_module._docker('create', '--mount', 'type=bind,src=/unshared,dst=/out')
     elapsed = time.monotonic() - start
-    assert elapsed < 8, 'scratch failure exceeded the short create timeout'
+    assert elapsed < 5, 'a stalled create outlived its timeout'
+    assert 'within 2 seconds' in str(error.value)
     print(f'Simulated stalled create: {elapsed:.2f}s; {error.value}')
 
 

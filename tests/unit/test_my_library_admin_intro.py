@@ -108,6 +108,7 @@ def test_intro_state_defaults_to_not_enabled_without_row(
     payload = response.get_json()
     assert payload == {
         "status": "not_enabled", "dismissed": False, "snapshot_accounts": 0,
+        "pending_accounts": 0, "failed_accounts": [],
     }
 
 
@@ -169,9 +170,11 @@ def test_enable_snapshots_then_switches_every_non_guest_account(
     snapshot = json.loads(row.snapshot_json)
     assert snapshot[str(reader.id)] == {
         "browse_global": False, "has_own_library": False,
+        "name": reader.name, "complete": True,
     }
     assert snapshot[str(already.id)] == {
         "browse_global": True, "has_own_library": True,
+        "name": already.name, "complete": True,
     }
     assert str(guest.id) not in snapshot
 
@@ -310,6 +313,7 @@ def test_undo_restores_snapshot_and_leaves_selections_dormant(
     snapshot = json.loads(row.snapshot_json)
     assert snapshot[str(reader.id)] == {
         "browse_global": False, "has_own_library": False,
+        "name": reader.name, "complete": True,
     }
 
 
@@ -375,6 +379,7 @@ def test_dismiss_marks_permanent_and_undo_resets_it(
     payload = response.get_json()
     assert payload == {
         "status": "enabled", "dismissed": True, "snapshot_accounts": 1,
+        "pending_accounts": 0, "failed_accounts": [],
     }
     # The dismissal is durable server-side state, not per-browser.
     response = _call(api_admin.admin_my_library_intro_state,
@@ -389,6 +394,7 @@ def test_dismiss_marks_permanent_and_undo_resets_it(
                      "/api/v1/admin/my-library/intro")
     assert response.get_json() == {
         "status": "not_enabled", "dismissed": False, "snapshot_accounts": 0,
+        "pending_accounts": 0, "failed_accounts": [],
     }
 
 

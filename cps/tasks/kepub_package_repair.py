@@ -368,14 +368,16 @@ class TaskKepubPackageRepair(CalibreTask):
             if self.failed:
                 self._handleError(N_(u"%(count)d KEPUB repair(s) failed", count=self.failed))
             else:
-                previous_version = config.config_kobo_kepub_package_repair_version
-                config.config_kobo_kepub_package_repair_version = REPAIR_VERSION
+                # Not config.save(): on WorkerThread that commits the session
+                # web requests share (a request mid-query fails with a 500).
+                # save_fields() updates memory only after its own commit, so a
+                # failed write leaves the version below REPAIR_VERSION and the
+                # next boot scans again.
                 try:
-                    config.save()
-                except Exception:
-                    config.config_kobo_kepub_package_repair_version = previous_version
-                    raise
-                if config.config_kobo_kepub_package_repair_version != REPAIR_VERSION:
+                    config.save_fields(
+                        config_kobo_kepub_package_repair_version=REPAIR_VERSION)
+                except Exception as error:
+                    log.error("KEPUB repair could not save its completion marker: %s", error)
                     self._handleError(N_(
                         u"KEPUB repair finished, but the completion marker could not "
                         u"be saved; the scan will run again"

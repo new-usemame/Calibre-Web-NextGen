@@ -105,6 +105,12 @@ test('View settings radios use the active theme accent', async ({ page }) => {
   expect(bounds[1]!.y + bounds[1]!.height)
     .toBeLessThanOrEqual(bounds[0]!.y + bounds[0]!.height);
 
+  // The row-count change refetches the list, which briefly disables Export in
+  // this menu (#2475). Grade the settled colours, not a frame of the fade back.
+  await expect(menu.getByRole('button', { name: 'Export CSV' })).toBeEnabled();
+  await menu.evaluate(element => Promise.all(element.getAnimations({ subtree: true })
+    .filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+    .map(animation => animation.finished)));
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
@@ -162,16 +168,22 @@ test('book detail exposes imported name, tag disclosure, and semantic progress',
     detail.tags = Array.from({ length: 25 }, (_, i) => ({ id: i + 1000, name: `SP2 tag ${i + 1}` }));
     await route.fulfill({ response, json: detail });
   });
-  await page.goto(`/app/book/${book.id}`);
-  await expect(page.getByText('reader-selected-name.epub')).toBeVisible();
-  const progress = page.getByRole('progressbar', { name: 'Reading progress' });
-  await expect(progress).toHaveAttribute('aria-valuenow', '42');
-  const disclosure = page.locator('button[aria-controls="book-tags"]');
-  await expect(disclosure).toHaveAccessibleName('Show all 25 tags');
-  await expect(page.getByText('SP2 tag 25')).toHaveCount(0);
-  await disclosure.click();
-  await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByText('SP2 tag 25')).toBeVisible();
+  try {
+    await page.goto(`/app/book/${book.id}`);
+    await expect(page.getByText('reader-selected-name.epub')).toBeVisible();
+    const progress = page.getByRole('progressbar', { name: 'Reading progress' });
+    await expect(progress).toHaveAttribute('aria-valuenow', '42');
+    const disclosure = page.locator('button[aria-controls="book-tags"]');
+    await expect(disclosure).toHaveAccessibleName('Show all 25 tags');
+    await expect(page.getByText('SP2 tag 25')).toHaveCount(0);
+    await disclosure.click();
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByText('SP2 tag 25')).toBeVisible();
+  } finally {
+    // The detail can revalidate while its disclosures change. Settle this
+    // test's interceptors before the context disposes route.fetch responses.
+    await page.unrouteAll({ behavior: 'wait' });
+  }
 });
 
 test('Customize panel can restore hidden Table view', async ({ page }) => {

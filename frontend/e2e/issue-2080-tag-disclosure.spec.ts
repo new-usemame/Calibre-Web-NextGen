@@ -15,13 +15,21 @@ async function firstBookId(page: Page): Promise<number | null> {
 
 async function showBookWithTags(page: Page, bookId: number, count: number) {
   await page.route(`**/api/v1/books/${bookId}`, async (route) => {
-    const response = await route.fetch();
-    const book = await response.json();
-    book.tags = Array.from({ length: count }, (_, index) => ({
-      id: 992_080_000 + index,
-      name: `Issue 2080 tag ${String(index + 1).padStart(2, '0')}`,
-    }));
-    await route.fulfill({ response, json: book });
+    // The page can abandon a book request mid-intercept and ask again; the
+    // fetched response is then disposed ("Response has been disposed"). Let
+    // that one go: its replacement is intercepted too, and a book that never
+    // gets its tags fails the counts below.
+    try {
+      const response = await route.fetch();
+      const book = await response.json();
+      book.tags = Array.from({ length: count }, (_, index) => ({
+        id: 992_080_000 + index,
+        name: `Issue 2080 tag ${String(index + 1).padStart(2, '0')}`,
+      }));
+      await route.fulfill({ response, json: book });
+    } catch (error) {
+      if (!String(error).includes('disposed')) throw error;
+    }
   });
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });

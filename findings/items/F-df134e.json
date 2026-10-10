@@ -1,0 +1,17 @@
+{
+  "area": "kobo",
+  "body": "OBSERVED 2026-09-26 by the independent review of #2313 (probe through the real sync handler at\n3b46f2353): changing only cover.jpg's file mtime re-sent the book to the Kobo as a\nChangedEntitlement. The entitlement payload carries a cover identifier derived from the cover\nfile's time, and the per-device ledger fingerprints the payload.\n\nConsequence: a library copied or restored without preserving file times (rsync without -t,\nsome backup restores, a move between volumes) makes every book with a cover look Changed to\nevery Kobo once. Each held book is re-downloaded and its reading position is lost (the #1925\nclass). The Kobo-facing host name is in the payload as well, so changing the external URL has\nthe same effect.\n\nNot yet measured: which exact field (CoverImageId vs the image URL) carries the mtime, and\nwhether the host is inside the fingerprinted part. Start from create_book_entitlement /\nget_metadata in cps/kobo.py. Fix shape: exclude transport-only values from\n_fingerprint_projection, as DownloadUrls[].Size already is, behind a declared schema\ntransition so the reseed path suppresses the one-time mismatch.",
+  "created": "2026-09-26",
+  "id": "F-df134e",
+  "refs": [],
+  "resolution": {
+    "commit": "bac76ce5e",
+    "date": "2026-09-26",
+    "note": "Fixed by #2320: fingerprint schema 3 leaves BookMetadata.CoverImageId and DownloadUrls[].Url out of the projection (Size already was), and the declared transition re-stamps unchanged rows so no device sees a one-time resend.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "A cover file's modification time reaches the Kobo entitlement fingerprint"
+}

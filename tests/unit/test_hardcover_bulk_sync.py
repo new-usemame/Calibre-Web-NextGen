@@ -230,6 +230,19 @@ class TestBulkSyncBehaviour:
         assert task.stat == 3 and task.progress == 1
         assert session.closed, "the task must close its thread-local session"
 
+    def test_shelf_name_reaches_the_tasks_table_as_text(self):
+        # The success summary becomes task.message, which /tasks renders as
+        # HTML; the shelf name is whatever the user typed (#1076).
+        _RecordingClient.instances = []
+        _RecordingClient.existing = set()
+        books = _books((1, [("hardcover-id", "42")]))
+        module, _session = _load_task_module(books)
+        task = module.TaskHardcoverBulkSync("tok", [1], '<img src=x onerror="x()">Faves')
+        task.run(None)
+        assert task.stat == 3
+        assert "<img" not in str(task.message)
+        assert "&lt;img src=x onerror=&#34;x()&#34;&gt;Faves" in str(task.message)
+
     def test_books_without_hardcover_identifiers_skip_api(self):
         _RecordingClient.instances = []
         _RecordingClient.existing = set()
@@ -374,6 +387,9 @@ class TestShelfCallSitePins:
         )
 
     def test_task_creates_one_client_for_the_batch(self):
-        assert TASK_SRC.count("hardcover.HardcoverClient(") == 1, (
+        # Scoped to the bulk task: the web-reader progress task (#2289) makes
+        # its own single client in the same module.
+        bulk_src = TASK_SRC.split("class TaskHardcoverBulkSync", 1)[1].split("\nclass ", 1)[0]
+        assert bulk_src.count("hardcover.HardcoverClient(") == 1, (
             "the task must create one client per batch, not per book"
         )

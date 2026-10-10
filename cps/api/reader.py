@@ -17,9 +17,10 @@ from sqlalchemy.orm.attributes import flag_modified
 from . import api_v1
 from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
-from ..services import reading_position, reading_sources, storyteller_source
+from ..services import reading_position, reading_sources, storyteller_source, reader_fonts
+from ..services.browser_source import BROWSER_ALIAS
 from ..usermanagement import login_required_if_no_ano
-from ..reader_settings import merged_reader_settings, resolved_reader_settings
+from ..reader_settings import READER_FONTS, merged_reader_settings, resolved_reader_settings
 
 log = logger.create()
 
@@ -48,6 +49,21 @@ def _bookmark_filter(book_id, fmt):
         ub.Bookmark.book_id == book_id,
         ub.Bookmark.format == fmt,
     )
+
+
+def _reader_font_id_set_for(settings, patch=None, *, required=False):
+    """Read optional upload metadata only when a custom choice is involved."""
+    raw = settings if isinstance(settings, dict) else {}
+    values = [raw.get("font")]
+    if isinstance(patch, dict):
+        values.append(patch.get("font"))
+    if not any(isinstance(value, str) and value.startswith("custom:") for value in values):
+        return set()
+    try:
+        return reader_fonts.custom_font_ids()
+    except Exception:
+        log.warning("Could not read uploaded reader-font catalog", exc_info=True)
+        return None if required else set()
 
 
 @api_v1.route("/books/<int:book_id>/bookmark")
@@ -162,19 +178,26 @@ def get_reading_sources(book_id):
         return guard
     # Match the authorized reader/book-detail surface: hidden and archived are
     # listing states, while a curator may deep-link into the global catalogue.
+    # A book on a public shelf opens in the reader without membership, so its
+    # reader gets its own places here too; every row below is that user's own.
     # common_filters() still enforces language/content/role restrictions.
     book = calibre_db.get_filtered_book(
         book_id,
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=_can_browse_global(),
+        allow_public_shelf_books=True,
     )
     if book is None:
         return _err("not_found", "Book not found", 404)
 
     user_id = int(current_user.id)
+    # A browser alias was folded into the account's one Browser source, which
+    # already holds its latest position; listing it would offer a stale second
+    # browser as a place to open.
     devices = (ub.session.query(ub.Device)
-               .filter(ub.Device.user_id == user_id)
+               .filter(ub.Device.user_id == user_id,
+                       ub.Device.created_by != BROWSER_ALIAS)
                .order_by(ub.Device.active.desc(), ub.Device.id)
                .all())
     positions = (ub.session.query(ub.DeviceReadingPosition)
@@ -231,7 +254,8 @@ def get_reader_settings():
     if guard:
         return guard
     current = (getattr(current_user, "view_settings", None) or {}).get("reader", {})
-    return jsonify({"reader": resolved_reader_settings(current)})
+    custom_ids = _reader_font_id_set_for(current)
+    return jsonify({"reader": resolved_reader_settings(current, custom_ids)})
 
 
 @api_v1.route("/reader/settings", methods=["POST"])
@@ -244,8 +268,28 @@ def save_reader_settings():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _err("invalid_settings", "Reader settings must be an object", 400)
+    font = payload.get("font")
     view_settings = dict(getattr(current_user, "view_settings", None) or {})
-    merged = merged_reader_settings(view_settings.get("reader", {}), payload)
+    current = view_settings.get("reader", {})
+    if font is not None and (not isinstance(font, str) or
+                             (font not in READER_FONTS and not font.startswith("custom:"))):
+        return _err("invalid_font", "Choose a font that is available on this server", 400)
+    # A partial update must preserve a saved custom font. If its catalog cannot
+    # be read, fail before changing any settings rather than silently deleting
+    # that existing choice while saving an unrelated control.
+    current_font = current.get("font") if isinstance(current, dict) else None
+    custom_font_required = (
+        isinstance(font, str) and font.startswith("custom:")
+    ) or (
+        isinstance(current_font, str) and current_font.startswith("custom:")
+        and font not in READER_FONTS
+    )
+    custom_ids = _reader_font_id_set_for(current, payload, required=custom_font_required)
+    if custom_ids is None:
+        return _err("font_catalog_unavailable", "Uploaded fonts are temporarily unavailable", 503)
+    if isinstance(font, str) and font.startswith("custom:") and font not in custom_ids:
+        return _err("invalid_font", "Choose a font that is available on this server", 400)
+    merged = merged_reader_settings(current, payload, custom_ids)
     view_settings["reader"] = merged
     current_user.view_settings = view_settings
     flag_modified(current_user, "view_settings")
@@ -254,4 +298,4 @@ def save_reader_settings():
     except Exception:
         ub.session.rollback()
         return _err("save_failed", "Could not save reader settings", 500)
-    return jsonify({"reader": resolved_reader_settings(merged)})
+    return jsonify({"reader": resolved_reader_settings(merged, custom_ids)})

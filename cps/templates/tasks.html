@@ -32,6 +32,7 @@
 <div class="discover" style="padding-inline: 2rem !important;">
   <h3>{{ _('Upcoming scheduled sends') }}</h3>
   <table class="table table-no-bordered" id="upcomingtable"
+       data-escape="true"
        data-url="{{ url_for('cwa_stats.cwa_scheduled_upcoming') }}"
        data-response-handler="upcomingResponse"
        data-locale="{{ current_user.locale }}"
@@ -54,6 +55,7 @@
 <div class="discover" style="padding-inline: 2rem !important;">
   <h3>{{ _('Upcoming scheduled operations') }}</h3>
   <table class="table table-no-bordered" id="upcomingopstable"
+       data-escape="true"
        data-url="{{ url_for('cwa_stats.cwa_scheduled_upcoming_ops') }}"
        data-response-handler="upcomingOpsResponse"
        data-locale="{{ current_user.locale }}"
@@ -163,14 +165,14 @@
     if (!row || row.state !== 'scheduled') return '';
     const id = row.id;
     return `
-      <button class="btn btn-xs btn-danger" onclick="cancelScheduled(${id})">{{ _("Cancel") }}</button>
+      <button class="btn btn-xs btn-danger" onclick="cancelScheduled(${id})">${ {{ _("Cancel")|tojson }} }</button>
     `;
   }
   function UpcomingOpsActions(value, row) {
     if (!row || row.state !== 'scheduled') return '';
     const id = row.id;
     return `
-      <button class="btn btn-xs btn-danger" onclick="cancelScheduled(${id})">{{ _("Cancel") }}</button>
+      <button class="btn btn-xs btn-danger" onclick="cancelScheduled(${id})">${ {{ _("Cancel")|tojson }} }</button>
     `;
   }
   function cancelScheduled(id) {
@@ -189,12 +191,12 @@
       return r.json();
     })
     .then(data => {
-      showNotification('{{ _("Scheduled item cancelled successfully") }}', 'success');
+      showNotification({{ _("Scheduled item cancelled successfully")|tojson }}, 'success');
       $('#upcomingtable').bootstrapTable('refresh');
       $('#upcomingopstable').bootstrapTable('refresh');
     })
     .catch(err => {
-      showNotification('{{ _("Error cancelling scheduled item") }}: ' + err.message, 'danger');
+      showNotification({{ _("Error cancelling scheduled item")|tojson }} + ': ' + err.message, 'danger');
       // Refresh anyway to sync state
       $('#upcomingtable').bootstrapTable('refresh');
       $('#upcomingopstable').bootstrapTable('refresh');

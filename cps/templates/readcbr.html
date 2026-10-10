@@ -185,7 +185,8 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <script>
     window.calibre = {
-        bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=comicfile, book_format=extension.upper()) }}",
+        bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=comicfile, book_format=extension.upper(), lookup=1 if lookup_mode else None) }}",
+        lookupMode: {{ lookup_mode|default(false)|tojson }},
         bookmark: "{{ bookmark.bookmark_key if bookmark != None }}",
         useBookmarks: "{{ current_user.is_authenticated | tojson }}",
         annotationsApiBase: "{{ url_for('annotations.annotations_view', book_id=comicfile) }}"

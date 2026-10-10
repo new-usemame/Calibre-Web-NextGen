@@ -42,12 +42,14 @@ local function newHarness(options)
         claims = 0,
         installs = {},
         completions = {},
+        arrivals = {},
     }
     local pending = {
         network = {},
         inventory = {},
         claims = {},
         ticks = {},
+        delays = {},
     }
     local wait_for_network = options.wait_for_network or false
     local client = {}
@@ -65,6 +67,7 @@ local function newHarness(options)
             return server ~= nil and server ~= ""
         end,
         InfoMessage = { new = function(_, value) return value end },
+        Home = { bookArrived = function(path) table.insert(calls.arrivals, path) end },
         logger = {
             dbg = function() end,
             info = function() end,
@@ -89,6 +92,11 @@ local function newHarness(options)
             show = function() end,
             nextTick = function(_, callback)
                 table.insert(pending.ticks, callback)
+                table.insert(pending.delays, 0)
+            end,
+            scheduleIn = function(_, seconds, callback)
+                table.insert(pending.ticks, callback)
+                table.insert(pending.delays, seconds)
             end,
         },
         Delivery = {
@@ -159,7 +167,7 @@ local function newHarness(options)
         return 1024 * 1024, 2 * 1024 * 1024
     end
     function self_stub:getDeliveryReceipt() return nil end
-    function self_stub:getDocumentDigest() return "checksum" end
+    function self_stub:getDocumentContentDigest() return "checksum" end
     function self_stub:persistDeliveryReceipt() return true end
     function self_stub:clearDeliveryReceipt() end
     function self_stub:refreshLibraryViews() end
@@ -208,9 +216,15 @@ local function testOverlappingExternalTriggerIsRejectedButContinuationsRun()
         "the overlapping triggers must install one copy of the delivery")
     assertEqual(harness.calls.completions[delivery.id], 1,
         "the overlapping triggers must acknowledge the delivery once")
+    assertEqual(#harness.calls.arrivals, 1, "the home is told once that the book arrived")
 
     assertEqual(#harness.pending.ticks, 1,
         "a successful delivery schedules its pagination continuation")
+    -- #2329: KOReader runs every due task before it reads a tap, and each
+    -- claim, download and acknowledgement blocks, so a continuation due at
+    -- once chains up to 20 book downloads with the screen frozen.
+    assert(harness.pending.delays[1] > 0,
+        "the next book waits until KOReader has had a chance to read input")
     harness.pending.ticks[1]()
     assertEqual(harness.calls.claims, 2,
         "the owner's pagination continuation must remain admissible")

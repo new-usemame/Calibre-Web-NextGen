@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { Link } from 'wouter';
 import { BookCopy, Check, Plus, Globe, Lock } from 'lucide-react';
 import {
@@ -6,6 +6,7 @@ import {
   useAddToMyLibrary,
 } from '../lib/queries';
 import { useT } from '../lib/i18n';
+import { canEditShelf } from '../lib/permissions';
 import { Spinner } from './Spinner';
 import styles from './AddToShelf.module.css';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -14,6 +15,7 @@ import { useAnnouncer } from '../lib/a11y/announcer';
  *  editable shelves and can create a new shelf inline. */
 export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLibrary?: boolean }) {
   const t = useT();
+  const panelId = useId();
   const announce = useAnnouncer();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -47,10 +49,7 @@ export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLib
     };
   }, [open]);
 
-  const canEditPublic = !!me?.role?.edit_shelfs;
-  const editable = (shelvesData?.items ?? []).filter(
-    (s) => s.is_owner || (s.is_public && canEditPublic),
-  );
+  const editable = (shelvesData?.items ?? []).filter((s) => canEditShelf(me, s));
   const onShelf = new Set(membership?.shelf_ids ?? []);
 
   const ensureLibraryMembership = async () => {
@@ -102,7 +101,7 @@ export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLib
   };
 
   return (
-    <div className={styles.wrap} ref={wrapRef}>
+    <div className={`${styles.wrap} ${open ? styles.expanded : ''}`} ref={wrapRef}>
       <button
         ref={triggerRef}
         type="button"
@@ -110,6 +109,7 @@ export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLib
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
       >
         <BookCopy size={15} aria-hidden="true" focusable={false} />
         {t('Add to shelf')}
@@ -118,7 +118,7 @@ export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLib
       {open && (
         // Disclosure, not an ARIA menu: it holds toggles + a form + a link, which
         // a menu can't contain (S8). Toggles use aria-pressed.
-        <div className={styles.panel}>
+        <div id={panelId} className={styles.panel}>
           {!inLibrary && <p className={styles.empty}>{t('Adding this book to a shelf also adds it to your library.')}</p>}
           {isLoading ? (
             <div className={styles.loading}>

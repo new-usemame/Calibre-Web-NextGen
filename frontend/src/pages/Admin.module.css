@@ -227,6 +227,7 @@
 }
 .libraryAddForm .field { max-width: 10rem; }
 .fieldError { color: var(--danger); font-size: var(--fs-sm); }
+.fieldOk { color: var(--success); font-size: var(--fs-sm); }
 
 @media (max-width: 520px) {
   .libraryAddForm { align-items: stretch; flex-direction: column; }

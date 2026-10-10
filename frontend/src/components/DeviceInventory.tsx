@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../lib/api';
@@ -27,6 +27,8 @@ export interface Device {
   first_seen: string | null;
   last_seen: string | null;
   annotation_count: number;
+  origin_annotation_count?: number | null;
+  browser_identity?: 'account' | null;
   highlights?: number;
   notes?: number;
   dogears?: number;
@@ -65,6 +67,15 @@ export function DeviceInventory({ device }: { device: Device }) {
   const announce = useAnnouncer();
   const [requested, setRequested] = useState<Set<number>>(() => new Set());
   const [offset, setOffset] = useState(0);
+  // Paging unmounts the list and its pager while the next window loads, which
+  // drops focus to <body> and leaves the page scrolled wherever the pager was.
+  // Once the new window is in, land on its status line at the top of the card.
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const [paged, setPaged] = useState(false);
+  const goToOffset = (next: number) => {
+    setPaged(true);
+    setOffset(next);
+  };
   const { data, isLoading, error } = useQuery<InventoryPayload>({
     queryKey: ['device-inventory', device.public_id, offset],
     queryFn: () => apiGet(
@@ -78,6 +89,14 @@ export function DeviceInventory({ device }: { device: Device }) {
   useEffect(() => {
     if (stalePage) setOffset(correctedOffset);
   }, [correctedOffset, stalePage]);
+  useEffect(() => {
+    if (!paged || isLoading || stalePage) return;
+    setPaged(false);
+    const status = statusRef.current;
+    if (!status) return;
+    status.focus({ preventScroll: true });
+    (status.closest('li') ?? status).scrollIntoView({ block: 'start' });
+  }, [paged, isLoading, stalePage]);
   const deletion = useMutation({
     mutationFn: (book: InventoryBook) => apiPost(
       `/api/annotations/devices/${device.public_id}/inventory/${book.inventory_item_id}/delete`,
@@ -100,6 +119,8 @@ export function DeviceInventory({ device }: { device: Device }) {
     ? t('Loading device library…')
     : error
       ? t('Could not load this device library.')
+      : !data?.observed_at
+        ? t('This device has not reported its inventory yet.')
       : books.length === 0
         ? t('No books were reported in the latest device inventory.')
         : t('Showing {shown} of {total} books from the latest device inventory.', {
@@ -108,7 +129,7 @@ export function DeviceInventory({ device }: { device: Device }) {
         });
   return (
     <>
-      <p role={error ? 'alert' : 'status'}
+      <p role={error ? 'alert' : 'status'} ref={statusRef} tabIndex={-1}
         className={error ? styles.inventoryAlert : styles.inventoryStatus}>{status}</p>
       {!isLoading && !stalePage && !error && books.length > 0 && (
         <ul className={styles.inventoryList} role="list">
@@ -144,7 +165,7 @@ export function DeviceInventory({ device }: { device: Device }) {
       {!isLoading && !stalePage && !error && (data?.total ?? 0) > DEVICE_INVENTORY_WINDOW && (
         <nav className={styles.pagination} aria-label={t('Device library')}>
           <button type="button" disabled={offset === 0}
-            onClick={() => setOffset(Math.max(0, offset - DEVICE_INVENTORY_WINDOW))}>
+            onClick={() => goToOffset(Math.max(0, offset - DEVICE_INVENTORY_WINDOW))}>
             {t('Previous')}
           </button>
           <span>{t('Page {page} of {pages}', {
@@ -153,7 +174,7 @@ export function DeviceInventory({ device }: { device: Device }) {
           })}</span>
           <button type="button"
             disabled={offset + DEVICE_INVENTORY_WINDOW >= (data?.total ?? 0)}
-            onClick={() => setOffset(offset + DEVICE_INVENTORY_WINDOW)}>
+            onClick={() => goToOffset(offset + DEVICE_INVENTORY_WINDOW)}>
             {t('Next')}
           </button>
         </nav>

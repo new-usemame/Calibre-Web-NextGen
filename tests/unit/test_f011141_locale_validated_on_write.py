@@ -134,7 +134,7 @@ class TestTheReadPathIsTheBoundary:
 
     def test_get_locale_coerces_the_stored_value_not_just_the_lang_param(self):
         source = inspect.getsource(cw_babel.get_locale)
-        assert "_coerce_locale(current_user.locale" in source, (
+        assert "_coerce_locale(user.locale" in source, (
             "get_locale() must coerce the STORED locale against the available "
             "set. Without it, any row written by a missed or future writer -- "
             "or written before this validation existed -- is returned verbatim "
@@ -143,7 +143,7 @@ class TestTheReadPathIsTheBoundary:
 
     def test_an_unusable_stored_locale_falls_through_rather_than_pinning_the_user(self):
         source = inspect.getsource(cw_babel.get_locale)
-        stored_at = source.index("_coerce_locale(current_user.locale")
+        stored_at = source.index("_coerce_locale(user.locale")
         assert "request.accept_languages" in source[stored_at:], (
             "an unusable stored locale must fall through to negotiation; "
             "returning it, or raising, strands the user in a language they "

@@ -55,9 +55,8 @@ from functools import wraps
 from flask import g, Blueprint, abort, request
 from .cw_login import login_user, current_user
 from flask_babel import gettext as _
-from flask_limiter import RateLimitExceeded
 
-from . import logger, ub, lm, limiter
+from . import logger, ub, lm, limiter, rate_limits
 from .render_template import render_title_template
 from .usermanagement import user_login_required
 
@@ -178,13 +177,7 @@ def requires_kobo_auth(f):
     def inner(*args, **kwargs):
         auth_token = get_auth_token()
         if auth_token is not None:
-            try:
-                limiter.check()
-            except RateLimitExceeded:
-                return abort(429)
-            except (ConnectionError, Exception) as e:
-                log.error("Connection error to limiter backend: %s", e)
-                return abort(429)
+            rate_limits.pace(limiter)
             user = (
                 ub.session.query(ub.User)
                 .join(ub.RemoteAuthToken)
@@ -205,7 +198,7 @@ def requires_kobo_auth(f):
                     return abort(409, description=str(error))
                 except Exception:
                     log.warning("Best-effort Kobo device observation failed", exc_info=True)
-                [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+                rate_limits.clear_current_limits(limiter)
                 return f(*args, **kwargs)
         log.debug("Received Kobo request without a recognizable auth token.")
         return abort(401)

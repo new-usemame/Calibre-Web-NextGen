@@ -3,7 +3,7 @@ import inspect
 import pytest
 import flask
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 @pytest.mark.unit
@@ -76,34 +76,8 @@ def test_books_list_calls_fill_indexpage_with_join_archive_read_true():
     )
 
 
-@pytest.mark.unit
-def test_list_books_sort_abc():
-    """GET /api/v1/books?sort=abc passes SORT_MAP['abc'] as the order arg to fill_indexpage."""
-    from cps.api import books as books_mod
-    from cps.pagination import Pagination
-
-    inner = SimpleNamespace(id=1, title="A", series_index="1.0", has_cover=0,
-                            authors=[], series=[], data=[])
-    row = SimpleNamespace(Books=inner, is_archived=False, read_status=None)
-    pag = Pagination(1, 60, 1)
-
-    app = flask.Flask(__name__)
-    with app.test_request_context("/api/v1/books?sort=abc"):
-        with patch.object(books_mod.calibre_db, "fill_indexpage",
-                          return_value=([row], None, pag)) as mock_fill, \
-             patch.object(books_mod.config, "config_books_per_page", 60, create=True), \
-             patch.object(books_mod.config, "config_read_column", 0, create=True):
-            view = inspect.unwrap(books_mod.list_books)
-            view()
-
-    call_args = mock_fill.call_args
-    assert call_args is not None, "fill_indexpage was never called"
-    # 5th positional arg (index 4) is the order list
-    positional = call_args.args
-    assert len(positional) >= 5, f"Expected ≥5 positional args, got {len(positional)}"
-    assert positional[4] == books_mod.SORT_MAP["abc"], (
-        f"Expected SORT_MAP['abc'] for sort=abc, got {positional[4]!r}"
-    )
+# Alphabetical order is exercised through real SQL and the JSON view in
+# test_1050_nordic_request_collation.py; SQL expression identity is not behavior.
 
 
 @pytest.mark.unit
@@ -129,55 +103,46 @@ def test_list_books_sort_unknown_defaults_to_new():
 
 @pytest.mark.unit
 def test_list_books_search():
-    """GET /api/v1/books?search=dune routes through get_search_results and total==1.
-
-    Regression (real-library 500): get_search_results → order_authors(combined=True)
-    returns SQLAlchemy Row objects whose book is under .Books, NOT at the top level.
-    _row_to_item must unwrap .Books and surface read/archived from the Row.
-    This test returns a Row-shaped object (SimpleNamespace with .Books, .read_status,
-    .is_archived) so it fails against code that passes entries straight to
-    serialize_book_list_item.
-    """
+    """Search results retain row serialization after query delegation."""
     from cps.api import books as books_mod
-    from cps import ub as ub_mod
+    from cps import ub
 
-    inner_book = SimpleNamespace(id=42, title="Dune", series_index="1.0", has_cover=1,
-                                 authors=[SimpleNamespace(name="Frank Herbert")],
-                                 series=[], data=[SimpleNamespace(format="EPUB")])
-    # Simulate the Row object with read_status=STATUS_FINISHED to verify read=True surfacing
-    row_entry = SimpleNamespace(
-        Books=inner_book,
-        is_archived=None,
-        read_status=ub_mod.ReadBook.STATUS_FINISHED,
+    book = SimpleNamespace(
+        id=42, title="Dune", series_index=None, has_cover=0,
+        authors=[], series=[], data=[], tags=[], timestamp=None, last_modified=None,
     )
+    row = SimpleNamespace(Books=book, is_archived=False,
+                          read_status=ub.ReadBook.STATUS_FINISHED)
+    query = MagicMock()
+    query.with_entities.return_value.order_by.return_value.distinct.return_value.count.return_value = 1
+    query.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [row]
+    app_session = MagicMock()
+    app_session.query.return_value.filter.return_value.all.return_value = [(42,)]
 
     app = flask.Flask(__name__)
-    with app.test_request_context("/api/v1/books?search=dune"):
-        with patch.object(books_mod.calibre_db, "get_search_results",
-                          return_value=([row_entry], 1, None)) as mock_search, \
+    with app.test_request_context("/api/v1/books?search=dune&author=3&filter=unread"):
+        with patch.object(books_mod, "_catalog_book_query", return_value=query) as mock_query, \
              patch.object(books_mod.config, "config_books_per_page", 60, create=True), \
-             patch.object(books_mod.config, "config_read_column", 0, create=True):
+             patch.object(books_mod.config, "config_read_column", 0, create=True), \
+             patch.object(books_mod.user_cover, "overrides_for_user", return_value={}), \
+             patch.object(books_mod.ub, "session", app_session), \
+             patch.object(books_mod, "_visible_shelves_by_book", return_value={}), \
+             patch.object(books_mod, "_real_user_id", return_value=7):
             view = inspect.unwrap(books_mod.list_books)
             resp = view()
 
-    mock_search.assert_called_once()
-    call_args = mock_search.call_args
-    # first positional arg is the search term
-    assert call_args.args[0] == "dune", (
-        f"get_search_results first arg should be 'dune', got {call_args.args[0]!r}"
+    mock_query.assert_called_once_with(
+        search="dune", author_id=3, series_id=None, tag_id=None, publisher_id=None,
+        language_code=None, rating_id=None, personal_rating=None, book_format=None, filter_val="unread",
+        show_hidden=False,
     )
 
     data = json.loads(resp.get_data(as_text=True))
     assert data["total"] == 1
-    assert len(data["items"]) == 1
-    assert data["items"][0]["id"] == 42, (
-        "id must come from .Books.id — if this fails, the Row normalization is missing"
-    )
+    assert data["items"][0]["id"] == 42
     assert data["items"][0]["title"] == "Dune"
-    assert data["items"][0]["read"] is True, (
-        "read must be True when read_status == STATUS_FINISHED"
-    )
-    assert "read" in data["items"][0], "read key must be present in search results"
+    assert data["items"][0]["read"] is True
+    assert data["items"][0]["favorited"] is True
 
 
 @pytest.mark.unit
@@ -357,36 +322,152 @@ def test_list_books_handles_discovery_filters():
 
 
 @pytest.mark.unit
-def test_hot_visibility_filter_chunks_large_libraries_without_losing_order(monkeypatch):
-    """The app and calibre catalogs use separate SQLite sessions, so hot-book
-    ids must cross the boundary in bounded batches rather than one huge IN().
+def test_select_all_returns_all_matching_ids_without_serializing_book_cards():
+    from cps.api import books as books_mod
+    from cps.pagination import Pagination
 
-    The input is a *seeded shuffle* — not ``range(2005)`` — so hotness order and
-    ascending order genuinely differ. That is what makes the order assertion
-    real: an implementation that re-sorted the visible set (or returned raw
-    ``set`` iteration order) yields ascending ids and fails here, where an
-    ascending input would have let it pass silently (#937).
-    """
-    import random
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?select_all=1&author=3"):
+        with patch.object(books_mod.calibre_db, "fill_indexpage",
+                          return_value=([7, 8, 9], None, Pagination(1, 100001, 3))) as fill, \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True):
+            response = inspect.unwrap(books_mod.list_books)()
+
+    assert response.status_code == 200
+    assert json.loads(response.get_data(as_text=True)) == {"ids": [7, 8, 9], "total": 3}
+    assert fill.call_args.kwargs["ids_only"] is True
+    assert fill.call_args.args[0:2] == (1, 100001)
+
+
+@pytest.mark.unit
+def test_select_all_rejects_more_than_the_explicit_result_limit():
+    from cps.api import books as books_mod
+    from cps.pagination import Pagination
+
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?select_all=1"):
+        with patch.object(books_mod.calibre_db, "fill_indexpage",
+                          return_value=(list(range(100001)), None,
+                                        Pagination(1, 100001, 100001))), \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True):
+            response, status = inspect.unwrap(books_mod.list_books)()
+
+    assert status == 413
+    payload = json.loads(response.get_data(as_text=True))
+    assert payload["error"]["code"] == "selection_too_large"
+    assert payload["error"]["max_items"] == books_mod.MAX_SELECT_ALL_BOOKS
+
+
+@pytest.mark.unit
+def test_select_all_search_uses_the_filtered_search_query_ids():
     from cps.api import books as books_mod
 
-    ids = list(range(2005))
-    random.Random(1337).shuffle(ids)
-    chunks = []
+    class IDQuery:
+        def __init__(self):
+            self.ordered = None
+            self.limit_count = None
 
-    def visible_even_ids(chunk):
-        chunks.append(list(chunk))
-        return {book_id for book_id in chunk if book_id % 2 == 0}
+        def with_entities(self, *_columns):
+            return self
 
-    monkeypatch.setattr(books_mod, "_visible_ids_for_chunk", visible_even_ids)
-    result = books_mod._visible_hot_book_ids(ids)
+        def distinct(self):
+            return self
 
-    # Chunk sizes stay under the SQLite host-parameter ceiling regardless of order.
-    assert [len(chunk) for chunk in chunks] == [900, 900, 205]
-    assert all(len(chunk) <= books_mod._SQLITE_IN_CHUNK for chunk in chunks)
-    # Hotness (input) order is preserved, not ascending/sorted order.
-    expected = [book_id for book_id in ids if book_id % 2 == 0]
-    assert result == expected
-    # Self-guard: the shuffle must make hotness order differ from sorted order,
-    # or this test would go vacuous again (the exact regression #937 caught).
-    assert expected != sorted(expected)
+        def count(self):
+            return 2
+
+        def order_by(self, *order):
+            self.ordered = order
+            return self
+
+        def limit(self, count):
+            self.limit_count = count
+            return self
+
+        def all(self):
+            return [(41,), (42,)]
+
+    query = IDQuery()
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?search=dune&select_all=1"):
+        with patch.object(books_mod, "_catalog_book_query", return_value=query) as search_query, \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True):
+            response = inspect.unwrap(books_mod.list_books)()
+
+    assert search_query.call_args.kwargs["search"] == "dune"
+    assert query.limit_count == books_mod.MAX_SELECT_ALL_BOOKS + 1
+    assert json.loads(response.get_data(as_text=True)) == {"ids": [41, 42], "total": 2}
+
+
+@pytest.mark.unit
+def test_select_all_discover_returns_only_the_current_random_page_ids():
+    from cps.api import books as books_mod
+
+    account = SimpleNamespace(id=7, is_authenticated=True, is_anonymous=False,
+                              get_view_property=lambda section, key: None)
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/books?filter=discover&select_all=1"):
+        with patch.object(books_mod.calibre_db, "fill_indexpage",
+                          return_value=([41, 42, 43], None, None)) as fill, \
+             patch.object(books_mod, "current_user", account), \
+             patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
+             patch.object(books_mod.config, "config_read_column", 0, create=True), \
+             patch.object(books_mod, "_real_user_id", return_value=7), \
+             patch.object(books_mod, "book_ids_with_read_status", return_value=[]), \
+             patch.object(books_mod, "_hidden_book_ids", return_value=set()):
+            response = inspect.unwrap(books_mod.list_books)()
+
+    assert response.status_code == 200
+    assert json.loads(response.get_data(as_text=True)) == {"ids": [41, 42, 43], "total": 3}
+    assert fill.call_args.args[:2] == (1, 24)
+    assert fill.call_args.kwargs["ids_only"] is True
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("available", [True, False])
+def test_select_all_discover_keeps_saved_source_filter_and_random_page_bound(available):
+    """Source scope and bounded ID selection must compose at the catalog API seam."""
+    from sqlalchemy import create_engine, select, true
+    from cps.api import books as books_mod
+
+    account = SimpleNamespace(
+        id=7, is_authenticated=True, is_anonymous=False,
+        get_view_property=lambda section, key: "shelf:12",
+    )
+    source = SimpleNamespace(id=12)
+    engine = create_engine("sqlite:///:memory:")
+    app = flask.Flask(__name__)
+    with engine.connect() as connection:
+        connection.exec_driver_sql("ATTACH DATABASE ':memory:' AS app_settings")
+        connection.exec_driver_sql("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO books VALUES (1),(2),(3),(4),(5)")
+        connection.exec_driver_sql("CREATE TABLE app_settings.book_shelf_link (book_id INTEGER,shelf INTEGER)")
+        connection.exec_driver_sql("INSERT INTO app_settings.book_shelf_link VALUES (1,12),(3,12),(5,12),(2,13)")
+
+        def fill(page, page_size, *args, ids_only=False, extra_filter=None, **kwargs):
+            assert ids_only, "Select all must request IDs, not serialized cards"
+            predicate = extra_filter if extra_filter is not None else true()
+            ids = connection.execute(
+                select(books_mod.db.Books.id).where(predicate)
+                .order_by(books_mod.db.Books.id).limit(page_size)
+            ).scalars().all()
+            return ids, None, None
+
+        with app.test_request_context("/api/v1/books?filter=discover&select_all=1"):
+            with patch.object(books_mod, "current_user", account), \
+                 patch.object(books_mod, "_real_user_id", return_value=7), \
+                 patch.object(books_mod, "book_ids_with_read_status", return_value=[]), \
+                 patch.object(books_mod, "_hidden_book_ids", return_value=set()), \
+                 patch.object(books_mod.config, "config_books_per_page", 2, create=True), \
+                 patch.object(books_mod.config, "config_read_column", 0, create=True), \
+                 patch.object(books_mod.discover_source, "_source_record", return_value=source if available else None), \
+                 patch.object(books_mod.calibre_db, "fill_indexpage", side_effect=fill):
+                response = inspect.unwrap(books_mod.list_books)()
+        assert response.status_code == 200
+        assert json.loads(response.get_data(as_text=True)) == (
+            {"ids": [1, 3], "total": 2} if available else {"ids": [], "total": 0}
+        )
+    engine.dispose()

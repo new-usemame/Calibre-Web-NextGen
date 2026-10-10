@@ -277,6 +277,7 @@ def test_opds_download_link_404s_for_hidden_book(monkeypatch):
 
 def test_feed_search_passes_opds_filter_to_search_results(monkeypatch):
     captured = {}
+    basic_user = types.SimpleNamespace(id=22)
 
     class FakeSearchQuery:
         def filter(self, value):
@@ -289,15 +290,17 @@ def test_feed_search_passes_opds_filter_to_search_results(monkeypatch):
         def all(self):
             return [types.SimpleNamespace(Books=types.SimpleNamespace(id=1))]
 
-    def fake_search_query(term, config):
+    def fake_search_query(term, config, *, user=None):
         captured["term"] = term
+        captured["user"] = user
         return FakeSearchQuery()
 
     monkeypatch.setattr(opds.calibre_db, "search_query", fake_search_query)
-    monkeypatch.setattr(opds, "get_opds_book_filter", lambda user=None: "FILTER")
+    monkeypatch.setattr(opds, "get_opds_restricted_common_filter", lambda user=None: "FILTER")
+    monkeypatch.setattr(opds.auth, "current_user", lambda: basic_user)
     monkeypatch.setattr(opds, "render_xml_template", lambda *_args, **kwargs: kwargs)
 
     result = opds.feed_search("space")
 
-    assert captured == {"term": "space", "extra_filter": "FILTER"}
+    assert captured == {"term": "space", "user": basic_user, "extra_filter": "FILTER"}
     assert result["searchterm"] == "space"

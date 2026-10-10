@@ -48,7 +48,7 @@ it per request instead; the callers that iterate the map (the #1331 invariants,
 ``custom_column_sort``'s magic-shelf allowlist) therefore never see a sort whose
 meaning depends on who is asking. See ``recent_sort_order``.
 """
-from sqlalchemy import String, select, type_coerce
+from sqlalchemy import String, case, exists, select, type_coerce
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.expression import func
 from sqlalchemy.sql.functions import coalesce
@@ -183,20 +183,59 @@ def _reading_activity(user_id):
     # row is decoded as on the way back, and a datetime claim turns the first
     # never-read book on the page into ``Invalid isoformat string: ''`` --
     # which that caller catches and logs, serving an empty library.
+    #
+    # A finished book has no activity, however recently it was finished: it is
+    # not one of the books being read, and it keeps its stored position and
+    # clocks, so without this every book the user ever finished led the list
+    # and a long reading history buried everything unread (#2360).
     return type_coerce(
-        func.max(
-            coalesce(read_activity, _NO_ACTIVITY),
-            coalesce(kobo_activity, _NO_ACTIVITY),
-            coalesce(web_activity, _NO_ACTIVITY),
+        case(
+            (_finished(user_id), _NO_ACTIVITY),
+            else_=func.max(
+                coalesce(read_activity, _NO_ACTIVITY),
+                coalesce(kobo_activity, _NO_ACTIVITY),
+                coalesce(web_activity, _NO_ACTIVITY),
+            ),
         ),
         String,
     )
 
 
-def recent_sort_order(user_id):
-    """"Recent": what this user has been reading, then everything else.
+def _finished(user_id):
+    """Whether ``user_id`` has finished each book -- what the Read filter shows.
 
-    Books with reading activity come first, newest activity first. Books with
+    Mirrors ``api/books.py::_build_read_filter``: when an admin keeps read
+    status in a Calibre Yes/No column, that column is the answer (it is shared,
+    not per user, exactly as the filter treats it); otherwise the reader's own
+    ``book_read_link`` row. A configured column that no longer exists falls back
+    to the per-user row rather than failing the whole list.
+
+    Re-reading: a KOReader sync below the end moves a finished book back to in
+    progress. The web reader's furthest-wins save does not, so there the way to
+    restart a book is "Mark unread" (#683), which returns it here at once.
+    """
+    from . import config
+
+    column_id = getattr(config, "config_read_column", 0) or 0
+    read_column = db.cc_classes.get(column_id) if column_id else None
+    if read_column is not None:
+        return (exists()
+                .where(read_column.book == db.Books.id,
+                       read_column.value == True)  # noqa: E712
+                .correlate(db.Books))
+    read = aliased(ub.ReadBook)
+    return (exists()
+            .where(read.user_id == user_id,
+                   read.book_id == db.Books.id,
+                   read.read_status == ub.ReadBook.STATUS_FINISHED)
+            .correlate(db.Books))
+
+
+def recent_sort_order(user_id):
+    """"Recent": what this user is reading, then everything else.
+
+    Books with reading activity come first, newest activity first; a finished
+    book is not being read and takes its date-added place with the rest. Books with
     none evaluate to ``_NO_ACTIVITY``, which is below every real timestamp, so
     they tie there and fall through to the date-added order — the whole unread
     half of the library reads exactly like "Newest". Ends on ``Books.id``
@@ -239,6 +278,19 @@ def book_sort_order(sort_param, user_id=None):
         orders degrade to the default rather than sorting by nobody's history.
     :return: A list of SQLAlchemy order expressions, never empty.
     """
+    if sort_param in ('ratingdesc', 'ratingasc') and user_id is not None:
+        from .personal_ratings import personal_rating_order
+        return personal_rating_order(user_id, descending=sort_param == 'ratingdesc')
     if sort_param == RECENT_SORT and user_id is not None:
         return recent_sort_order(user_id)
+    if sort_param in ('abc', 'zyx', 'authaz', 'authza'):
+        from .unicode_collation import locale_sort_key
+        descending = sort_param in ('zyx', 'authza')
+        if sort_param in ('abc', 'zyx'):
+            order = [locale_sort_key(db.Books.sort), db.Books.sort, db.Books.id]
+        else:
+            order = [locale_sort_key(db.Books.author_sort), db.Books.author_sort,
+                     locale_sort_key(db.Series.name), db.Series.name,
+                     db.Books.series_index, db.Books.id]
+        return [column.desc() for column in order] if descending else order
     return BOOK_SORT_ORDERS.get(sort_param, BOOK_SORT_ORDERS[DEFAULT_SORT])

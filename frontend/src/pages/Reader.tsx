@@ -1,9 +1,10 @@
+import { observeReaderSelections } from '../../../cps/static/js/reading/selection-observer.js';
 import {
   archiveMatchesFingerprint, chapterProgressCfi, resumeCfi, resumeForArchive,
   withResumeTimeout,
 } from "../lib/readerResume";
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link } from 'wouter';
+import { useEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
+import { Link, useSearch } from 'wouter';
 import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
-  useReadingSources, useSaveBookmark, useSaveReaderSettings, type ReadingSource,
+  useReadingSources, useSaveBookmark, useSaveReaderSettings, useReaderFonts, type ReadingSource,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
 import { Button } from '../components/Button';
@@ -25,12 +26,16 @@ import {
   DEFAULT_HIT_CAP, MIN_QUERY_LENGTH, searchBook, type SearchHit,
 } from '../lib/reader/searchBook';
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
+import { flattenToc, tocFromNavigation, type TocItem } from '../lib/reader/toc';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
-import { getReaderContentUrl } from '../lib/readerTarget';
+import { getReaderContentUrl, withLookupMode } from '../lib/readerTarget';
 import {
   classifyHref, inBookTarget, isNoteElement, isNoterefAnchor, isOpenableHref,
   sanitizeNoteElement,
 } from '../lib/readerLinks';
+import { hasNativeAnchor, resolveNativeAnnotations } from '../lib/reader/nativeAnnotations';
+import { readerFontFaceCss, readerFontFamily, BUILTIN_READER_FONTS, type ReaderFont } from '../lib/readerFonts';
+import { restoreBookAttributeNamespaces } from '../lib/reader/attributeNamespaces';
 import styles from './Reader.module.css';
 
 /*
@@ -95,26 +100,26 @@ const UNKNOWN_FILL = '#d0cbc2';
 
 type ReaderTheme = 'light' | 'sepia' | 'dark' | 'black';
 
-interface TocItem {
-  label: string;
-  href: string;
-}
-
 /** A saved highlight as the reader needs it: enough to list, jump to and edit. */
 interface AnnRow {
   annotation_id: string;
   cfi_range: string | null;
+  start_kobospan?: string | null;
+  end_kobospan?: string | null;
+  content_id?: string | null;
+  start_offset?: number | null;
+  end_offset?: number | null;
   highlighted_text: string | null;
   note_text: string | null;
   highlight_color: string | null;
-  /** 'webreader' | 'kobo' | 'koreader' | null — shown so a device highlight is
+  /** 'webreader' | 'kobo' | 'koreader' | 'textquote' | null — shown so a device highlight is
    *  identifiable, and because only some origins carry a usable CFI. */
   source: string | null;
   /** Public id of the device that MADE this highlight, or null. Resolved
    *  against the `devices` map in the same response — never rendered raw, and
    *  never used to filter: see the loader below. */
   origin_device_id?: string | null;
-  /** 'cfi' | 'pdf_quad' | 'comic_page' | 'koreader_xpointer' | 'unanchored' |
+  /** 'cfi' | 'pdf_quad' | 'comic_page' | 'koreader_xpointer' | 'unanchored' | 'text_quote' |
    *  null. Only 'unanchored' concerns this list: such a row is a note ABOUT the
    *  book with no passage attached, so it must not be drawn as a highlight that
    *  has lost its anchor. NULL means legacy EPUB CFI. */
@@ -215,10 +220,63 @@ const THEME_TO_READER: Record<ReaderSettings['theme'], ReaderTheme> = {
 const READER_TO_THEME: Record<ReaderTheme, ReaderSettings['theme']> = {
   light: 'lightTheme', sepia: 'sepiaTheme', dark: 'darkTheme', black: 'blackTheme',
 };
-const FONT_FAMILY: Record<ReaderSettings['font'], string> = {
-  default: '', Yahei: 'Microsoft YaHei, sans-serif', SimSun: 'SimSun, serif',
-  KaiTi: 'KaiTi, serif', Arial: 'Arial, sans-serif',
-};
+
+// Bundled reading-optimised serif. Content only gets font-family applied via
+// CSS (fontCssFamily / rendition.themes.font) — without an actual @font-face
+// declared inside each chapter iframe's own document, 'Literata' silently
+// falls back to a system font. resourceUrl() keeps this correct behind a
+// reverse-proxy mount prefix, same as every other server asset here.
+const LITERATA_FONT_FACE_CSS = ([
+  ['normal', 'normal', 'Literata-Regular'],
+  ['normal', 'italic', 'Literata-Italic'],
+  ['bold', 'normal', 'Literata-Bold'],
+  ['bold', 'italic', 'Literata-BoldItalic'],
+] as const).map(([weight, style, file]) =>
+  `@font-face{font-family:'Literata';font-weight:${weight};font-style:${style};` +
+  `font-display:swap;src:url('${resourceUrl(`/static/fonts/literata/${file}.woff2`)}') format('woff2');}`
+).join('');
+
+/** The table of contents as nested lists, so every level is reachable and a
+ *  screen reader announces where each entry sits in the book's outline. */
+function TocList({ items, onPick, untitled, nested = false }: {
+  items: TocItem[];
+  onPick: (href: string) => void;
+  untitled: string;
+  nested?: boolean;
+}) {
+  return (
+    <ul role="list" className={nested ? styles.tocNested : undefined}>
+      {items.map((item, i) => (
+        <li key={`${item.href}-${i}`}>
+          <button className={styles.tocItem} onClick={() => onPick(item.href)}>{item.label || untitled}</button>
+          {item.subitems.length > 0 && (
+            <TocList items={item.subitems} onPick={onPick} untitled={untitled} nested />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function applyDocumentTheme(doc: Document, theme: ReaderTheme) {
+  const bg = THEMES[theme].body.background.replace(' !important', '');
+  const fg = THEMES[theme].body.color.replace(' !important', '');
+  doc.documentElement.style.setProperty('background', bg, 'important');
+  if (doc.body) {
+    doc.body.style.setProperty('background', bg, 'important');
+    doc.body.style.setProperty('color', fg, 'important');
+  }
+}
+
+function applyDocumentTypography(doc: Document, settings: {
+  fontPct: number; fontCssFamily: string; margin: number; lineHeight: number;
+}) {
+  if (!doc.body) return;
+  doc.body.style.setProperty('font-size', `${settings.fontPct}%`);
+  doc.body.style.setProperty('font-family',
+    settings.fontCssFamily, 'important');
+  doc.body.style.setProperty('line-height', String(settings.lineHeight / 100), 'important');
+}
 
 function loadTheme(): ReaderTheme {
   const v = safeLocalStorageGet(LS_THEME);
@@ -248,14 +306,29 @@ function readingSourcePercent(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 }
 
+/** True when a book frame holds a non-empty text selection right now. */
+function liveSelection(rendition: any): boolean {
+  try {
+    return (rendition?.getContents?.() || []).some((contents: any) => {
+      const selection = contents?.window?.getSelection?.();
+      return !!selection && !selection.isCollapsed && !!selection.toString().trim();
+    });
+  } catch { return false; /* a disposed frame has no selection */ }
+}
+
 export function Reader({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
-  const requestedSource = new URLSearchParams(window.location.search).get('source');
+  const search = useSearch();
+  const lookupMode = new URLSearchParams(search).get('lookup') === '1';
+  const lookupModeRef = useRef(lookupMode);
+  lookupModeRef.current = lookupMode;
+  const requestedSource = new URLSearchParams(search).get('source');
   const [placesOpen, setPlacesOpen] = useState(false);
   const { data: book, isLoading, error } = useBook(id);
   const { data: savedBookmark, isFetched: isBookmarkFetched } = useBookmark(id, 'epub');
   const { data: settingsData, isFetched: isSettingsFetched } = useReaderSettings();
+  const { data: fontCatalog, isFetched: isFontsFetched, error: fontsError } = useReaderFonts();
   const saveBookmark = useSaveBookmark(id);
   const saveSettings = useSaveReaderSettings();
   const readingSources = useReadingSources(id, placesOpen);
@@ -283,6 +356,8 @@ export function Reader({ id }: { id: string }) {
   // Highlights & notes drawer (#325) — the in-reader counterpart to the
   // standalone Highlights page, which until now you had to leave the book for.
   const annRef = useRef<HTMLElement>(null);
+  const annotationDescriptionId = useId();
+  const annTriggerRef = useRef<HTMLButtonElement>(null);
   // The element that goes fullscreen: the whole reader, not just the book, so
   // the top bar and page-turn zones come with it.
   const shellRef = useRef<HTMLDivElement>(null);
@@ -342,6 +417,34 @@ export function Reader({ id }: { id: string }) {
    * because at that point the reader really is reading there.
    */
   const previewingRef = useRef(false);
+  /*
+   * True while the book shows its start only as a placeholder: an automatic
+   * device resume is waiting for the locations index before it can jump. A
+   * page turn from that placeholder is not the reader choosing the start of the
+   * book (#2358) -- saving it stamped a web bookmark newer than the device sync,
+   * so the synced position was never used or offered again. Page turns keep the
+   * preview armed until the jump lands or is given up; any other navigation is
+   * an explicit choice and wins over the pending jump.
+   */
+  const autoResumePendingRef = useRef(false);
+  /*
+   * Set when the reader works with the text on the placeholder page while that
+   * jump is pending -- selecting a passage or tapping one of their highlights.
+   * That is acting on this page, like the highlight choice that already wins
+   * over the jump. Left armed, the late jump re-rendered the view under the
+   * open popover, so the selection and its "Add note" button vanished
+   * mid-gesture. The synced position becomes the "Resume at N%" offer instead.
+   */
+  const actedOnPlaceholderRef = useRef(false);
+  // Appearance changes retain the passage explicitly chosen for a preview,
+  // which may differ from the first word on its containing page.
+  const previewTargetRef = useRef<string | undefined>(undefined);
+  const appearanceAnchorRef = useRef<string | undefined>(undefined);
+  const captureReadingAnchor = useCallback((): string | undefined => {
+    if (previewingRef.current && previewTargetRef.current) return previewTargetRef.current;
+    const rendition = renditionRef.current;
+    return rendition?.manager?.isRendered() ? rendition.currentLocation()?.start?.cfi : undefined;
+  }, []);
 
   const [rendered, setRendered] = useState(false);
 
@@ -355,6 +458,9 @@ export function Reader({ id }: { id: string }) {
   // #1303: true for a right-to-left book; swaps which screen side turns forward.
   const [rtl, setRtl] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
+  // Search results are named after the first entry, at any level, that points
+  // into their document; a section in its own file is otherwise a raw path.
+  const tocEntries = useMemo(() => flattenToc(toc), [toc]);
   const [tocOpen, setTocOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -372,7 +478,17 @@ export function Reader({ id }: { id: string }) {
   // Every saved highlight for this book, kept in step locally on each write so
   // the drawer never needs a refetch to look right.
   const [annList, setAnnList] = useState<AnnRow[]>([]);
+  const preferredAnnotation = useRef(new Map<string, string>());
+  useEffect(() => {
+    setAnnList([]);
+    preferredAnnotation.current.clear();
+  }, [id]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsOpenRef = useRef(settingsOpen);
+  settingsOpenRef.current = settingsOpen;
+  useEffect(() => {
+    if (!settingsOpen) appearanceAnchorRef.current = undefined;
+  }, [settingsOpen]);
   const [theme, setTheme] = useState<ReaderTheme>(loadTheme);
   const [fontPct, setFontPct] = useState(loadFont);
   const [fontFamily, setFontFamily] = useState<ReaderSettings['font']>('default');
@@ -392,6 +508,18 @@ export function Reader({ id }: { id: string }) {
    * sane on a phone instead of forcing columns onto a 320px screen.
    */
   const [spread, setSpread] = useState<ReaderSettings['spread']>('spread');
+  // The rendition's render hook is registered once per book, yet it styles
+  // every section rendered after that. It reads the reader's current choices
+  // through this ref: a closure kept the values from when the book opened and
+  // put them back at the next chapter (#2254).
+  const fontChoices: ReaderFont[] = useMemo(() => fontCatalog?.items ?? BUILTIN_READER_FONTS, [fontCatalog]);
+  const fontCssFamily = readerFontFamily(fontChoices, fontFamily);
+  const fontFaceCss = useMemo(() => readerFontFaceCss(fontChoices, window.location.origin), [fontChoices]);
+  const appearanceRef = useRef({ theme, fontPct, fontFamily, fontCssFamily, fontFaceCss, margin, lineHeight, spread });
+  appearanceRef.current = { theme, fontPct, fontFamily, fontCssFamily, fontFaceCss, margin, lineHeight, spread };
+  useEffect(() => {
+    if (fontCatalog && !fontCatalog.items.some(font => font.id === fontFamily)) setFontFamily('default');
+  }, [fontCatalog, fontFamily]);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [progress, setProgress] = useState(0);
   // Pending text selection awaiting a highlight-color choice.
@@ -410,6 +538,7 @@ export function Reader({ id }: { id: string }) {
     cfiRange: string;
     text: string;
     annotationId?: string;
+    unanchored?: boolean;
     // A string, not HiliteColor: 'create' and 'standalone' seed it from the
     // four the palette offers, but 'edit' carries whatever the existing
     // highlight already is, which for an imported one can be pink or grey.
@@ -478,6 +607,7 @@ export function Reader({ id }: { id: string }) {
       }
       if (!target) throw new Error('No usable reading position');
       previewingRef.current = true;
+      previewTargetRef.current = target;
       await rendition.display(target);
       sourceModeRef.current = 'preview';
       setRemoteResume(null);
@@ -653,6 +783,7 @@ export function Reader({ id }: { id: string }) {
   // Open the edit/remove popover for a highlight the reader was tapped on (#782).
   // Closes the create-color popover so the two never show at once.
   const openHighlightEditor = useCallback((cfiRange: string, annotationId: string, color: string) => {
+    if (autoResumePendingRef.current) actedOnPlaceholderRef.current = true;
     setPendingSel(null);
     setComposer(null);
     setActiveHl({ cfiRange, id: annotationId, color, note: notesRef.current.get(annotationId) || '' });
@@ -664,15 +795,18 @@ export function Reader({ id }: { id: string }) {
   // className (4th arg) make tapping the highlight open the editor (#782).
   //
   // A highlight carrying a note is drawn with a dashed outline as well as the
-  // fill (#325). epub.js paints into an SVG layer *inside the book iframe*, so
-  // Reader.module.css cannot reach it — the distinction has to travel as inline
-  // SVG attributes here. It is a shape difference, not a hue one, so it survives
+  // fill (#325). epub.js paints into a parent-document SVG layer beside the
+  // book iframe. Pass the distinction as SVG attributes through its paint API.
+  // It is a shape difference, not a hue one, so it survives
   // SC 1.4.1 and reads on the light, sepia and dark page themes alike.
   const paintHighlight = useCallback((
     cfiRange: string, color: string, annotationId: string, hasNote = false,
   ) => {
     const fill = HILITE_FILL[color] || UNKNOWN_FILL;
     try {
+      // epub.js keys paint by CFI, not our annotation ID. Replacing a paint
+      // must remove its old SVG/listeners before registering the new owner.
+      renditionRef.current?.annotations?.remove(cfiRange, 'highlight');
       renditionRef.current?.annotations?.highlight(
         cfiRange,
         { id: annotationId, color, hasNote },
@@ -690,11 +824,31 @@ export function Reader({ id }: { id: string }) {
     } catch { /* epub.js throws on a stale/foreign CFI — ignore */ }
   }, [openHighlightEditor]);
 
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    const paints = new Map<string, AnnRow>();
+    for (const row of annList) {
+      if (row.cfi_range && (!paints.has(row.cfi_range)
+        || preferredAnnotation.current.get(row.cfi_range) === row.annotation_id)) {
+        paints.set(row.cfi_range, row);
+      }
+    }
+    paints.forEach((row) => paintHighlight(
+      row.cfi_range!, row.highlight_color ?? '', row.annotation_id, !!row.note_text?.trim(),
+    ));
+    return () => {
+      paints.forEach((row) => {
+        try { rendition?.annotations?.remove(row.cfi_range, 'highlight'); } catch { /* disposed */ }
+      });
+    };
+  }, [annList, paintHighlight]);
+
   // epub.js keys an annotation by (cfiRange + type), so changing how one is
   // drawn means removing the old paint and re-adding it.
   const repaintHighlight = useCallback((
     cfiRange: string, color: string, annotationId: string, hasNote: boolean,
   ) => {
+    if (!cfiRange) return; // Unresolved and standalone rows can still be edited.
     try { renditionRef.current?.annotations?.remove(cfiRange, 'highlight'); } catch { /* noop */ }
     paintHighlight(cfiRange, color, annotationId, hasNote);
   }, [paintHighlight]);
@@ -720,7 +874,7 @@ export function Reader({ id }: { id: string }) {
       const created = await apiPost<Partial<AnnRow>>(`/annotations/${id}`, {
         cfi_range: cfiRange, highlighted_text: text, highlight_color: color,
         ...(note ? { note_text: note } : {}),
-      }, { webreaderDevice: true });
+      });
       const newId = created?.annotation_id ?? '';
       if (note && newId) notesRef.current.set(newId, note);
       setAnnList((rows) => [...rows, {
@@ -768,6 +922,24 @@ export function Reader({ id }: { id: string }) {
     setComposer({ mode: 'standalone', cfiRange: '', text: '', color: 'yellow', note: '' });
   }, []);
 
+  // Editing does not require a resolved location or an event from the book
+  // iframe. Keep the painted text transparent to native text selection.
+  const editAnnotation = useCallback((row: AnnRow) => {
+    // The drawer row unmounts; give the next focus trap a persistent return target.
+    annTriggerRef.current?.focus();
+    setAnnOpen(false);
+    setPendingSel(null);
+    setActiveHl(null);
+    setComposer(null);
+    if (row.position_type === 'unanchored') {
+      setComposer({ mode: 'edit', unanchored: true, annotationId: row.annotation_id,
+        cfiRange: '', text: '', color: row.highlight_color ?? '', note: row.note_text ?? '' });
+    } else {
+      setActiveHl({ cfiRange: row.cfi_range ?? '', id: row.annotation_id,
+        color: row.highlight_color ?? '', note: row.note_text ?? '' });
+    }
+  }, []);
+
   // "Note" on an existing highlight — prefill from what we already hold.
   const startNoteForHighlight = useCallback(() => {
     const hl = activeHl;
@@ -802,7 +974,7 @@ export function Reader({ id }: { id: string }) {
       try {
         const created = await apiPost<Partial<AnnRow>>(`/annotations/${id}`, {
           position_type: 'unanchored', note_text: note,
-        }, { webreaderDevice: true });
+        });
         setAnnList((rows) => [...rows, {
           annotation_id: created?.annotation_id ?? '',
           cfi_range: null,
@@ -823,8 +995,15 @@ export function Reader({ id }: { id: string }) {
     }
     if (!c.annotationId) return;
     try {
-      await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note },
-        { webreaderDevice: true });
+      if (c.unanchored && !note) {
+        // An unanchored row has no passage to retain after its note is removed.
+        await apiDelete(`/annotations/${id}/${c.annotationId}`);
+        notesRef.current.delete(c.annotationId);
+        setAnnList((rows) => rows.filter((row) => row.annotation_id !== c.annotationId));
+        announce(t('Note removed'));
+        return;
+      }
+      await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note });
       if (note) notesRef.current.set(c.annotationId, note);
       else notesRef.current.delete(c.annotationId);
       setAnnList((rows) => rows.map((r) =>
@@ -846,11 +1025,16 @@ export function Reader({ id }: { id: string }) {
    */
   const goToAnnotation = useCallback((row: AnnRow) => {
     if (!row.cfi_range) return;
+    // Two devices can highlight the same passage. Their rows remain separate;
+    // the drawer entry the user chose owns the shared overlay's edit action.
+    preferredAnnotation.current.set(row.cfi_range, row.annotation_id);
+    paintHighlight(row.cfi_range, row.highlight_color ?? '', row.annotation_id, !!row.note_text?.trim());
     setAnnOpen(false);
     setPreviewSource(null);
     // Set BEFORE display(): epub.js can report the relocation synchronously, so
     // arming the flag afterwards would arm it too late to suppress anything.
     previewingRef.current = true;
+    previewTargetRef.current = row.cfi_range;
     try {
       Promise.resolve(renditionRef.current?.display(row.cfi_range)).catch(() => {
         // The jump never happened, so the book is still where the reader left
@@ -863,7 +1047,7 @@ export function Reader({ id }: { id: string }) {
       previewingRef.current = false;
       announce(t('Could not open that highlight.'));
     }
-  }, [announce, t]);
+  }, [announce, t, paintHighlight]);
 
   const goToSearchResult = useCallback((cfi: string) => {
     closeSearch();
@@ -881,6 +1065,7 @@ export function Reader({ id }: { id: string }) {
      * mark the book finished.
      */
     previewingRef.current = true;
+    previewTargetRef.current = cfi;
     try {
       Promise.resolve(renditionRef.current?.display(cfi)).catch(() => {
         previewingRef.current = false;
@@ -939,7 +1124,7 @@ export function Reader({ id }: { id: string }) {
     if (!hl) return;
     setActiveHl(null);
     try {
-      await apiDelete(`/annotations/${id}/${hl.id}`, { webreaderDevice: true });
+      await apiDelete(`/annotations/${id}/${hl.id}`);
       notesRef.current.delete(hl.id);
       setAnnList((rows) => rows.filter((r) => r.annotation_id !== hl.id));
       try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
@@ -956,8 +1141,7 @@ export function Reader({ id }: { id: string }) {
     setActiveHl(null);
     if (hl.color === color) return;
     try {
-      await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color },
-        { webreaderDevice: true });
+      await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color });
       setAnnList((rows) => rows.map((r) =>
         r.annotation_id === hl.id ? { ...r, highlight_color: color } : r));
       // Recolouring must not silently drop the note marker.
@@ -1022,6 +1206,7 @@ export function Reader({ id }: { id: string }) {
   // that runs on settle picks up wherever the reader has got to by then. One
   // request, always carrying the newest position, is both correct and less work.
   const flushCfiSave = useCallback(() => {
+    if (lookupModeRef.current) return;
     if (saveInFlight.current) { saveCoalesced.current = true; return; }
     const cfi = lastCfiRef.current;
     if (!cfi) return;
@@ -1072,6 +1257,9 @@ export function Reader({ id }: { id: string }) {
 
   const persistCfi = useCallback(
     (cfi: string, percentage?: number) => {
+      // Lookup is a session-long choice; page turns and transient preview
+      // exits must never arm the debounce or the unmount keepalive save.
+      if (lookupModeRef.current) return;
       lastCfiRef.current = cfi;
       // #324: the CFI is private to this reader; the percentage is what the
       // server can share with the user's Kobo and the book-detail row.
@@ -1107,8 +1295,6 @@ export function Reader({ id }: { id: string }) {
     // …and force it onto the currently-rendered iframe with inline styles, which
     // win unconditionally. epub.js can skip re-applying a theme it considers
     // already current (notably the initial 'dark'), leaving the prior background.
-    const bg = THEMES[t].body.background.replace(' !important', '');
-    const fg = THEMES[t].body.color.replace(' !important', '');
     // epub.js injects several equal-specificity `!important` body rules per theme;
     // the LAST one appended wins, so a previously-selected light/sepia rule beats
     // dark on re-select. An `!important` INLINE style sits above every stylesheet
@@ -1116,11 +1302,7 @@ export function Reader({ id }: { id: string }) {
     try {
       (rendition.getContents?.() || []).forEach((c: any) => {
         if (!c?.document) return;
-        c.document.documentElement.style.setProperty('background', bg, 'important');
-        if (c.document.body) {
-          c.document.body.style.setProperty('background', bg, 'important');
-          c.document.body.style.setProperty('color', fg, 'important');
-        }
+        applyDocumentTheme(c.document, t);
       });
     } catch { /* same-origin blob content; guard regardless */ }
   }, []);
@@ -1128,33 +1310,48 @@ export function Reader({ id }: { id: string }) {
   const applyTypography = useCallback(() => {
     const rendition = renditionRef.current;
     if (!rendition) return;
+    const currentCfi = appearanceAnchorRef.current || captureReadingAnchor();
+    // A sequence of slider changes is one appearance adjustment. Keep its
+    // original anchor while cleared views load and page boundaries move.
+    if (settingsOpenRef.current && currentCfi) appearanceAnchorRef.current = currentCfi;
+    // WebKit can retain old multicolumn geometry and SVG positions when an
+    // existing frame's gutter changes. Recreate the section through epub.js's
+    // normal lifecycle, retaining the book, annotations and reading anchor.
+    if (currentCfi) rendition.clear();
     rendition.themes.fontSize(`${fontPct}%`);
-    if (fontFamily === 'default') rendition.themes.font('initial');
-    else rendition.themes.font(FONT_FAMILY[fontFamily]);
+    rendition.themes.font(fontCssFamily);
     try {
       (rendition.getContents?.() || []).forEach((c: any) => {
         if (!c?.document?.body) return;
-        c.document.body.style.setProperty('padding-inline', `${margin}px`, 'important');
-        c.document.body.style.setProperty('line-height', String(lineHeight / 100), 'important');
+        applyDocumentTypography(c.document, { fontPct, fontCssFamily, margin, lineHeight });
       });
     } catch { /* same-origin blob content; guard regardless */ }
-  }, [fontPct, fontFamily, margin, lineHeight]);
+    // Recalculate the paginator after all typography changes, then keep the
+    // original reading location. Retaining a pixel offset across a changed
+    // gutter can silently move the passage off-screen, especially on Safari.
+    rendition.settings.gap = margin * 2;
+    if (rendition.manager) rendition.manager.settings.gap = margin * 2;
+    rendition.spread(spread === 'nonespread' ? 'none' : 'auto');
+    if (currentCfi) {
+      Promise.resolve(rendition.display(currentCfi)).catch(() => { /* disposed rendition */ });
+    }
+  }, [fontPct, fontCssFamily, margin, lineHeight, spread, captureReadingAnchor]);
 
   // A page turn is the reader moving themselves, so it ends any preview: from
-  // here on the relocations are theirs and the position saves again. This is the
-  // ONLY thing that clears the flag — see previewingRef's note.
+  // here on the relocations are theirs and the position saves again -- except
+  // while an automatic resume is still pending (see autoResumePendingRef).
   const goPrev = useCallback(() => {
     setRemoteResume(null);
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
-    previewingRef.current = false;
+    if (!autoResumePendingRef.current) previewingRef.current = false;
     return renditionRef.current?.prev();
   }, []);
   const goNext = useCallback(() => {
     setRemoteResume(null);
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
-    previewingRef.current = false;
+    if (!autoResumePendingRef.current) previewingRef.current = false;
     return renditionRef.current?.next();
   }, []);
 
@@ -1217,6 +1414,15 @@ export function Reader({ id }: { id: string }) {
   const syncLinkHits = useCallback(() => {
     const rendition = renditionRef.current;
     if (!rendition) { setLinkHits([]); return; }
+    const viewer = viewerRef.current?.getBoundingClientRect();
+    if (!viewer) { setLinkHits([]); return; }
+    // EPUB columns expand the iframe beyond the reader's visible page. Parent
+    // targets must use the clipped viewer/viewport, not that expanded width.
+    const visible = {
+      left: Math.max(0, viewer.left), top: Math.max(0, viewer.top),
+      right: Math.min(window.innerWidth, viewer.right),
+      bottom: Math.min(window.innerHeight, viewer.bottom),
+    };
     const anchors = new Map<string, { anchor: HTMLAnchorElement; contents: any }>();
     const hits: LinkHit[] = [];
     let sawAnchors = false;
@@ -1228,8 +1434,6 @@ export function Reader({ id }: { id: string }) {
       const frame = contents?.window?.frameElement as HTMLIFrameElement | undefined;
       if (!doc || !frame) return;
       const frameRect = frame.getBoundingClientRect();
-      const pageWidth = doc.documentElement?.clientWidth || frameRect.width;
-      const pageHeight = doc.documentElement?.clientHeight || frameRect.height;
       Array.from(doc.querySelectorAll('a[href]')).forEach((node, anchorIndex) => {
         const anchor = node as HTMLAnchorElement;
         sawAnchors = true;
@@ -1241,22 +1445,34 @@ export function Reader({ id }: { id: string }) {
           // are off-screen in some other column. Only what the reader can
           // actually see gets a hit target.
           if (rect.width <= 0 || rect.height <= 0) return;
-          if (rect.right <= 0 || rect.bottom <= 0) return;
-          if (rect.left >= pageWidth || rect.top >= pageHeight) return;
+          const bounds = {
+            left: Math.max(visible.left, frameRect.left),
+            top: Math.max(visible.top, frameRect.top),
+            right: Math.min(visible.right, frameRect.right),
+            bottom: Math.min(visible.bottom, frameRect.bottom),
+          };
+          const linkLeft = frameRect.left + rect.left;
+          const linkTop = frameRect.top + rect.top;
+          const linkRight = frameRect.left + rect.right;
+          const linkBottom = frameRect.top + rect.bottom;
+          // Test the original glyph before padding so adjacent hidden columns
+          // cannot become keyboard stops or cover the page-turn controls.
+          if (linkRight <= bounds.left || linkBottom <= bounds.top ||
+              linkLeft >= bounds.right || linkTop >= bounds.bottom) return;
           const padX = Math.max(0, (MIN_LINK_HIT_PX - rect.width) / 2);
           const padY = Math.max(0, (MIN_LINK_HIT_PX - rect.height) / 2);
-          const left = Math.max(0, rect.left - padX);
-          const top = Math.max(0, rect.top - padY);
-          const width = Math.min(pageWidth, rect.right + padX) - left;
-          const height = Math.min(pageHeight, rect.bottom + padY) - top;
+          const left = Math.max(bounds.left, linkLeft - padX);
+          const top = Math.max(bounds.top, linkTop - padY);
+          const width = Math.min(bounds.right, linkRight + padX) - left;
+          const height = Math.min(bounds.bottom, linkBottom + padY) - top;
           if (width <= 0 || height <= 0) return;
           const key = `${viewIndex}:${anchorIndex}:${rectIndex}`;
           anchors.set(key, { anchor, contents });
           hits.push({
             key,
             href: anchor.getAttribute('href') || '',
-            left: frameRect.left + left,
-            top: frameRect.top + top,
+            left,
+            top,
             width,
             height,
             label: (anchor.textContent || '').replace(/\s+/g, ' ').trim() || t('Untitled link'),
@@ -1313,7 +1529,37 @@ export function Reader({ id }: { id: string }) {
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
     previewingRef.current = false;
-    Promise.resolve(rendition.display(target)).catch(() => {
+    const displayTarget = async () => {
+      const section = bookRef.current?.spine.get(target);
+      const fragmentIndex = target.indexOf('#');
+      const fragment = fragmentIndex < 0 ? '' : target.slice(fragmentIndex);
+      const applyFragment = () => {
+        if (!section || target.startsWith('epubcfi(')) return false;
+        let prepared = false;
+        rendition.views().forEach((view: any) => {
+          const contents = view.contents;
+          if (!view.displayed || contents?.sectionIndex !== section.index || !contents.window) return;
+          if (contents.window.location.hash !== fragment) {
+            // epub.js scrolls to fragments without activating :target. Keep
+            // the publisher's reveal rules active before measuring the note.
+            contents.window.location.hash = fragment;
+          }
+          // Revealing a long note changes the paginated chapter's extent.
+          // Expand before display measures its destination; a later resize
+          // would otherwise reset the reader to an earlier column. This also
+          // applies when the fragment is already active.
+          view.expand();
+          prepared = true;
+        });
+        return prepared;
+      };
+      const prepared = applyFragment();
+      await rendition.display(target);
+      // A cross-chapter link creates its frame during display. Reveal and
+      // expand that new frame, then place its target in the final layout.
+      if (!prepared && applyFragment()) await rendition.display(target);
+    };
+    displayTarget().catch(() => {
       Promise.resolve(rendition.display(documentOnly)).catch(() => {/* give up quietly */});
     });
   }, []);
@@ -1398,10 +1644,15 @@ export function Reader({ id }: { id: string }) {
 
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
-    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
+    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !isFontsFetched || !settingsHydrated) return;
     let cancelled = false;
+    let stopSelectionObserver: (() => void) | undefined;
     setRendered(false);
     setRenderError(null);
+    previewTargetRef.current = undefined;
+    autoResumePendingRef.current = false;
+    actedOnPlaceholderRef.current = false;
+    appearanceAnchorRef.current = undefined;
     // Clear rather than carry: wouter reuses this component across an :id
     // change, so a stale RTL flag would invert the next book's page turns.
     setRtl(false);
@@ -1418,12 +1669,15 @@ export function Reader({ id }: { id: string }) {
 
         const epubBook = ePub(buf as any);
         bookRef.current = epubBook;
-        const rendition = epubBook.renderTo(viewerRef.current!, {
+        // epub.js forwards gap to its manager, but omits it from RenditionOptions.
+        const renditionOptions = {
           width: '100%',
           height: '100%',
           flow: 'paginated',
-          spread: spread === 'nonespread' ? 'none' : 'auto',
-        });
+          gap: appearanceRef.current.margin * 2,
+          spread: appearanceRef.current.spread === 'nonespread' ? 'none' : 'auto',
+        };
+        const rendition = epubBook.renderTo(viewerRef.current!, renditionOptions);
         renditionRef.current = rendition;
 
         /*
@@ -1459,9 +1713,37 @@ export function Reader({ id }: { id: string }) {
           void fonts?.ready?.then(() => scheduleLinkSync()).catch(() => {});
         });
 
+        rendition.hooks.content.register((contents: any) => {
+          try {
+            contents.addStylesheetCss(LITERATA_FONT_FACE_CSS, 'literata-font-face');
+          } catch {
+            // non-XHTML content may not support stylesheet injection
+          }
+        });
+
+        rendition.hooks.content.register((contents: any) => {
+          contents.addStylesheetCss(appearanceRef.current.fontFaceCss, 'cwng-reader-fonts');
+        });
+
         Object.entries(THEMES).forEach(([name, t]) => rendition.themes.register(name, t));
-        rendition.themes.select(theme);
-        rendition.themes.fontSize(`${fontPct}%`);
+        const initialAppearance = appearanceRef.current;
+        rendition.themes.select(initialAppearance.theme);
+        rendition.themes.fontSize(`${initialAppearance.fontPct}%`);
+        rendition.themes.font(initialAppearance.fontCssFamily);
+
+        // This synchronous hook runs before the manager measures a display()
+        // target. Late `rendered` styling reflowed a newly loaded chapter after
+        // that measurement, leaving first-click jumps on the previous spread.
+        rendition.hooks.render.register((view: any) => {
+          if (!view.contents?.document) return;
+          // Restore publisher attribute selectors before expanding the chapter,
+          // retaining HTML's established element structure and stored CFI paths.
+          restoreBookAttributeNamespaces(view.contents.document.documentElement);
+          const appearance = appearanceRef.current;
+          applyDocumentTheme(view.contents.document, appearance.theme);
+          applyDocumentTypography(view.contents.document, appearance);
+          view.expand();
+        });
 
         // C10 (SC 4.1.2): epub.js renders each section into an <iframe> with no
         // title — screen readers announce "frame" with no name. Title them as
@@ -1470,10 +1752,6 @@ export function Reader({ id }: { id: string }) {
           viewerRef.current?.querySelectorAll('iframe').forEach((f) => {
             f.setAttribute('title', t('Book content'));
           });
-          applyTheme(theme);
-          applyTypography();
-          // Typography reflows the page, so the link targets are measured after it.
-          scheduleLinkSync();
         });
 
         setRemoteResume(null);
@@ -1503,15 +1781,9 @@ export function Reader({ id }: { id: string }) {
             initialTarget = resumeCfi(epubBook.locations, resume);
           } catch { /* Keep opening the book when its index cannot be generated. */ }
         }
+        previewTargetRef.current = initialTarget;
+        autoResumePendingRef.current = !initialTarget && resume?.mode === 'automatic';
         await rendition.display(initialTarget);
-        if (cancelled) return;
-        if (!savedCfiRef.current && initialTarget && resume?.mode === 'automatic') {
-          // The rendered hook applies typography, which can reflow the target
-          // out of the initial spread. Place it again after that layout frame.
-          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-          if (cancelled) return;
-          await rendition.display(initialTarget);
-        }
         if (cancelled) return;
         // display() resolves only after the package document is parsed, so the
         // spine's page-progression-direction is readable by here.
@@ -1520,7 +1792,12 @@ export function Reader({ id }: { id: string }) {
 
         epubBook.loaded.navigation.then((nav: any) => {
           if (!cancelled) {
-            setToc(nav.toc.map((t: any) => ({ label: (t.label || '').trim(), href: t.href })));
+            const packaging = (epubBook as any).packaging;
+            setToc(tocFromNavigation(
+              nav.toc,
+              packaging?.navPath || packaging?.ncxPath,
+              (epubBook as any).path?.directory,
+            ));
           }
         });
 
@@ -1529,15 +1806,26 @@ export function Reader({ id }: { id: string }) {
           .then(async () => {
             if (cancelled) return;
             // A slow index may finish after first display. Still apply the
-            // percentage hint unless the reader has already chosen a position.
-            if (!readerMoved && previewingRef.current && !savedCfiRef.current && !initialTarget && resume?.mode === 'automatic') {
+            // percentage hint unless the reader has already chosen a position;
+            // page turns from the placeholder start are not a choice. When they
+            // did choose (a chapter, link, highlight or search hit, or they
+            // selected text on the placeholder page), keep the
+            // synced position as an offer rather than dropping it.
+            const pending = autoResumePendingRef.current;
+            autoResumePendingRef.current = false;
+            if (pending && resume?.mode === 'automatic') {
               const cfi = resumeCfi(epubBook.locations, resume);
-              if (cfi) {
+              // A selection still inside epub.js's 250ms debounce has not
+              // reached the 'selected' handler yet, so read the live one too:
+              // an index that lands mid-gesture must not re-render under it.
+              if (liveSelection(rendition)) actedOnPlaceholderRef.current = true;
+              if (cfi && !readerMoved && !actedOnPlaceholderRef.current
+                  && previewingRef.current && previewTargetRef.current === undefined) {
+                previewTargetRef.current = cfi;
                 await rendition.display(cfi);
-                // As with the initial target, typography may reflow this spread.
-                await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-                if (cancelled || readerMoved || !previewingRef.current) return;
-                await rendition.display(cfi);
+                if (cancelled) return;
+              } else if (cfi) {
+                setRemoteResume({ cfi, percentage: resume.percentage });
               }
             }
             if (!readerMoved && savedCfiRef.current && resume?.mode === 'offer') {
@@ -1549,7 +1837,11 @@ export function Reader({ id }: { id: string }) {
               setProgress(Math.round(epubBook.locations.percentageFromCfi(loc.start.cfi) * 100));
             }
           })
-          .catch(() => {/* locations are best-effort */});
+          .catch(() => {
+            // Locations are best-effort. Without them the jump cannot happen,
+            // so page turns must start saving again.
+            autoResumePendingRef.current = false;
+          });
 
         let lastRelocatedCfi: string | undefined;
         rendition.on('relocated', (location: any) => {
@@ -1594,7 +1886,7 @@ export function Reader({ id }: { id: string }) {
         // epub.js data param so a later tap can target the right row (#782).
         fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
           .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
+          .then(async (d) => {
             if (cancelled || !d) return;
             notesRef.current.clear();
             /*
@@ -1609,22 +1901,34 @@ export function Reader({ id }: { id: string }) {
              * highlight the reader made.
              */
             setDevices((d.devices || {}) as Record<string, { label?: string }>);
-            setAnnList((d.annotations || []) as AnnRow[]);
-            (d.annotations || []).forEach((a: any) => {
+            const sourceRows = (d.annotations || []) as AnnRow[];
+            // Never paint or jump using a KEPUB CFI in the original EPUB.
+            // These display copies are session-local; updates still identify
+            // the original annotation and preserve its native source anchor.
+            const displayRows = sourceRows.map((row) => hasNativeAnchor(row)
+              ? { ...row, cfi_range: null } : row);
+            setAnnList(displayRows);
+            displayRows.forEach((a) => {
               const note = (a.note_text || '').trim();
               if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
-              if (a.cfi_range) {
-                paintHighlight(a.cfi_range, a.highlight_color ?? '', a.annotation_id, !!note);
-              }
             });
+            const mapped = await resolveNativeAnnotations(epubBook as any, sourceRows, () => cancelled);
+            if (cancelled) return;
+            setAnnList((current) => current.map((row) => {
+              const cfi = mapped.get(row.annotation_id);
+              if (!cfi) return row;
+              return { ...row, cfi_range: cfi };
+            }));
           })
           .catch(() => { /* highlights are best-effort */ });
 
+        stopSelectionObserver = observeReaderSelections(rendition);
         // Capture a text selection → offer a highlight-color popover.
         rendition.on('selected', (cfiRange: string, contents: any) => {
           let text = '';
           try { text = (contents?.window?.getSelection?.().toString() || '').trim(); } catch { /* noop */ }
           if (cfiRange) {
+            if (autoResumePendingRef.current) actedOnPlaceholderRef.current = true;
             setActiveHl(null);
             setPendingSel({ cfiRange, text });
           }
@@ -1636,6 +1940,7 @@ export function Reader({ id }: { id: string }) {
 
     return () => {
       cancelled = true;
+      stopSelectionObserver?.();
       archiveRef.current = null;
       linkSyncTimers.current.forEach(clearTimeout); linkSyncTimers.current = [];
       linkAnchorsRef.current = new Map();
@@ -1645,13 +1950,13 @@ export function Reader({ id }: { id: string }) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
         const cfi = lastCfiRef.current;
-        if (cfi) {
+        if (cfi && !lookupModeRef.current) {
           const pct = lastPercentRef.current;
           void apiPost(
             `/api/v1/books/${id}/bookmark`,
             pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
                         : { format: 'epub', bookmark: cfi },
-            { keepalive: true, webreaderDevice: true },
+            { keepalive: true },
           );
         }
       }
@@ -1662,7 +1967,7 @@ export function Reader({ id }: { id: string }) {
     };
     // Re-render only when the source changes; theme/font are applied imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, settingsHydrated]);
+  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, isFontsFetched, settingsHydrated]);
 
   // Apply theme / font changes to a live rendition without rebuilding it, and
   // remember the preference across sessions.
@@ -1699,6 +2004,12 @@ export function Reader({ id }: { id: string }) {
   // Arrow-key navigation (the iframe also forwards keys via rendition).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Controls own their arrow keys (including a range input's keyup).
+      // Use closest rather than instanceof: book events come from an iframe.
+      const target = e.target as Element | null;
+      if (e.defaultPrevented || target?.closest?.(
+        'input, select, textarea, [contenteditable]:not([contenteditable="false"]), [role="dialog"]',
+      )) return;
       // Arrow keys follow the same physical convention as the zones: left is
       // forward in an RTL book.
       if (e.key === 'ArrowLeft') goLeft();
@@ -1730,13 +2041,21 @@ export function Reader({ id }: { id: string }) {
     // throw "No Section Found" when the toc href and spine href bases differ
     // (common when opening from an ArrayBuffer). spine.get() matches by href/id/
     // index and is robust; fall back to the raw href (sans fragment) if needed.
-    let target: string | number = href;
+    //
+    // A nested entry usually names a place inside its chapter (ch1.xhtml#s2),
+    // and the index alone opens the chapter's first page. So an href with a
+    // fragment is displayed as itself once the spine resolves it (epub.js runs
+    // the same lookup, then pages to the element), with the index as fallback.
+    // The render hook styles a new section before epub.js measures the
+    // fragment, so one display lands on it.
+    let index: number | null = null;
     try {
       const section = epubBook?.spine?.get(href);
-      if (section && typeof section.index === 'number') target = section.index;
+      if (section && typeof section.index === 'number') index = section.index;
     } catch { /* fall through to href */ }
+    const target = index !== null && !href.includes('#') ? index : href;
     Promise.resolve(rendition.display(target)).catch(() => {
-      Promise.resolve(rendition.display(href.split('#')[0])).catch(() => {/* give up quietly */});
+      Promise.resolve(rendition.display(index ?? href.split('#')[0])).catch(() => {/* give up quietly */});
     });
   };
 
@@ -1764,7 +2083,7 @@ export function Reader({ id }: { id: string }) {
       <div className={styles.fullCenter}>
         <EmptyState message={t('In-browser reading currently supports EPUB. Use download or the classic reader for other formats.')} />
         <div className={styles.fallbackRow}>
-          {other && <a className={styles.exitLink} href={resourceUrl(other.read_url)}>{t('Open classic reader')}</a>}
+          {other && <a className={styles.exitLink} href={resourceUrl(withLookupMode(other.read_url, lookupMode))}>{t('Open classic reader')}</a>}
           <Link href={`/book/${id}`} className={styles.exitLink}>{t('← Back to book')}</Link>
         </div>
       </div>
@@ -1789,7 +2108,7 @@ export function Reader({ id }: { id: string }) {
           <button className={styles.iconBtn} onClick={() => {
             setTocOpen(false); closeSearch(); setAnnOpen((o) => !o);
           }}
-            aria-label={t('Highlights and notes')} aria-expanded={annOpen} title={t('Highlights and notes')}>
+            ref={annTriggerRef} aria-label={t('Highlights and notes')} aria-expanded={annOpen} title={t('Highlights and notes')}>
             <Highlighter size={19} aria-hidden="true" focusable={false} />
             {annList.length > 0 && (
               <span className={styles.annCount} aria-hidden="true">{annList.length}</span>
@@ -1817,7 +2136,12 @@ export function Reader({ id }: { id: string }) {
                 : <Maximize size={19} aria-hidden="true" focusable={false} />}
             </button>
           )}
-          <button className={styles.iconBtn} onClick={() => { closeSearch(); setPlacesOpen(false); setSettingsOpen((o) => !o); }}
+          <button className={styles.iconBtn} onClick={() => {
+            closeSearch();
+            setPlacesOpen(false);
+            if (!settingsOpen) appearanceAnchorRef.current = captureReadingAnchor();
+            setSettingsOpen((o) => !o);
+          }}
             aria-label={t('Reading appearance')} aria-expanded={settingsOpen} title={t('Reading appearance')}>
             <SlidersHorizontal size={19} aria-hidden="true" focusable={false} />
           </button>
@@ -1838,13 +2162,7 @@ export function Reader({ id }: { id: string }) {
             {toc.length === 0 ? (
               <p className={styles.tocEmpty}>{t('No contents found.')}</p>
             ) : (
-              <ul role="list">
-                {toc.map((tocItem, i) => (
-                  <li key={`${tocItem.href}-${i}`}>
-                    <button className={styles.tocItem} onClick={() => goToc(tocItem.href)}>{tocItem.label || t('Untitled')}</button>
-                  </li>
-                ))}
-              </ul>
+              <TocList items={toc} onPick={goToc} untitled={t('Untitled')} />
             )}
           </nav>
         </>
@@ -1920,7 +2238,7 @@ export function Reader({ id }: { id: string }) {
         </>
       )}
 
-      {previewSource && (
+      {previewSource && !lookupMode && (
         <div className={styles.resumeNotice} role="status">
           <span>{t('Previewing {source}. Its saved position will not change.', {
             source: previewSource.label,
@@ -1943,11 +2261,12 @@ export function Reader({ id }: { id: string }) {
         </div>
       )}
 
-      {remoteResume && !requestedSource && !previewSource && (
+      {remoteResume && !lookupMode && !requestedSource && !previewSource && (
         <div className={styles.resumeNotice} role="status">
           <button onClick={() => {
             previewingRef.current = true;
             const target = remoteResume.cfi;
+            previewTargetRef.current = target;
             setRemoteResume(null);
             Promise.resolve(renditionRef.current?.display(target)).catch(() => {
               previewingRef.current = false;
@@ -1995,7 +2314,7 @@ export function Reader({ id }: { id: string }) {
                   <li key={`${hit.cfi}-${index}`}>
                     <button className={styles.searchResult} onClick={() => goToSearchResult(hit.cfi)}>
                       <span className={styles.searchChapter}>
-                        {chapterLabelForHref(hit.href, toc)}
+                        {chapterLabelForHref(hit.href, tocEntries)}
                       </span>
                       <span className={styles.searchExcerpt}>
                         {splitSearchExcerpt(hit.excerpt, searchQuery).map((part, partIndex) =>
@@ -2036,7 +2355,7 @@ export function Reader({ id }: { id: string }) {
               </p>
             ) : (
               <ul role="list">
-                {annList.map((row) => {
+                {annList.map((row, index) => {
                   const colour = HILITE_FILL[row.highlight_color ?? ''] ?? UNKNOWN_FILL;
                   /*
                    * A standalone note is a note ABOUT the book, with no passage
@@ -2058,6 +2377,7 @@ export function Reader({ id }: { id: string }) {
                         disabled={!jumpable}
                         title={jumpable ? t('Go to this highlight')
                           : unanchored ? t('A note about the book, not tied to a passage')
+                          : hasNativeAnchor(row) ? t('Location unavailable')
                           : t('This highlight has no saved position')}
                       >
                         {/* No colour bar on an unanchored note: there is no
@@ -2065,7 +2385,7 @@ export function Reader({ id }: { id: string }) {
                         {!unanchored && (
                           <span className={styles.annBar} style={{ background: colour }} aria-hidden="true" />
                         )}
-                        <span className={styles.annBody}>
+                        <span className={styles.annBody} id={`${annotationDescriptionId}-${index}`}>
                           {!unanchored && (
                             <span className={styles.annQuote}>
                               {row.highlighted_text || t('(no text captured)')}
@@ -2098,6 +2418,11 @@ export function Reader({ id }: { id: string }) {
                             return shown ? <span className={styles.annSource}>{shown}</span> : null;
                           })()}
                         </span>
+                      </button>
+                      <button type="button" className={styles.annEdit}
+                        aria-describedby={`${annotationDescriptionId}-${index}`}
+                        onClick={() => editAnnotation(row)}>
+                        {t('Edit')}
                       </button>
                     </li>
                   );
@@ -2148,12 +2473,6 @@ export function Reader({ id }: { id: string }) {
                     onClick={() => {
                       setSpread(value);
                       persistSetting('spread', value);
-                      // Re-layout the open book immediately rather than on the
-                      // next load — epub.js recalculates its columns in place,
-                      // so the reader sees the change while looking at it.
-                      try {
-                        renditionRef.current?.spread(value === 'nonespread' ? 'none' : 'auto');
-                      } catch { /* older epub.js builds ignore a live change */ }
                     }}>
                     {label}
                   </button>
@@ -2162,13 +2481,14 @@ export function Reader({ id }: { id: string }) {
             </fieldset>
             <label className={styles.settingField}>
               <span>{t('Font family')}</span>
+              {fontsError && <span role="status">{t('Could not load reader fonts.')}</span>}
               <select value={fontFamily} onChange={(e) => {
                 const value = e.target.value as ReaderSettings['font'];
                 setFontFamily(value); persistSetting('font', value);
               }}>
-                <option value="default">{t('Book default')}</option>
-                <option value="Arial">Arial</option><option value="Yahei">Microsoft YaHei</option>
-                <option value="SimSun">SimSun</option><option value="KaiTi">KaiTi</option>
+                {fontChoices.map(font => <option key={font.id} value={font.id}>
+                  {font.builtin ? t(font.label) : font.label}
+                </option>)}
               </select>
             </label>
             {([
@@ -2250,7 +2570,8 @@ export function Reader({ id }: { id: string }) {
                 <X size={20} aria-hidden="true" focusable={false} />
               </button>
             </div>
-            <div className={styles.noteSheetBody} dangerouslySetInnerHTML={{ __html: note.html }} />
+            <div className={styles.noteSheetBody} role="region" aria-label={t('Note')} tabIndex={0}
+              dangerouslySetInnerHTML={{ __html: note.html }} />
             <div className={styles.noteSheetActions}>
               <Button variant="primary" onClick={() => {
                 const target = note.target;
@@ -2343,7 +2664,7 @@ export function Reader({ id }: { id: string }) {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
             }} />
           <div className={styles.noteActions}>
-            {composer.mode === 'edit' && composer.note.trim() !== '' && (
+            {composer.mode === 'edit' && (composer.unanchored || composer.note.trim() !== '') && (
               <button className={styles.hiliteRemove} onClick={removeNote} title={t('Remove note')}>
                 <Trash2 size={15} aria-hidden="true" focusable={false} />
                 <span>{t('Remove note')}</span>

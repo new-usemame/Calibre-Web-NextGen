@@ -555,7 +555,7 @@ def test_epub_delivery_copy_embeds_only_requesting_users_cover(tmp_path, monkeyp
 
     monkeypatch.setattr(
         user_cover, "override_for_user",
-        lambda user_id, book_id: row if (user_id, book_id) == (7, 11) else None,
+        lambda user_id, book_id, session=None: row if (user_id, book_id) == (7, 11) else None,
     )
     from cps import helper
     monkeypatch.setattr(helper, "get_temp_dir", lambda: str(tmp_path / "deliveries"))

@@ -758,6 +758,30 @@
   color: var(--text-muted);
 }
 
+/* An admin's other-users eReader checkboxes (#2296), under the recipients. */
+.sendOthers {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sendOthers legend {
+  padding: 0;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.sendOthers label {
+  flex-wrap: wrap;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+
 .sendOk { color: var(--success); font-size: var(--fs-sm); }
 .sendErr { color: var(--danger); font-size: var(--fs-sm); }
 .sendHint { color: var(--text-muted); font-size: var(--fs-xs); }
@@ -894,3 +918,8 @@
 .reflowLine { margin: var(--sp-3) 0 0; color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
 .reflowLink { color: var(--accent-text); text-decoration: none; font-weight: var(--fw-medium); }
 .reflowLink:hover { text-decoration: underline; }
+
+.readingStatusControl { display:flex; flex-direction:column; gap:6px; margin-block:12px; max-width:26rem; }
+.readingStatusControl select { height:44px; min-height:44px; max-width:100%; padding:8px; color:var(--text); background:var(--surface-1); border:1px solid var(--border); border-radius:6px; font:inherit; }
+.readingStatusControl select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.readingStatusControl p { margin:0; font-size:var(--fs-sm); }

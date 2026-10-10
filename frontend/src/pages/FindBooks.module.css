@@ -1,0 +1,188 @@
+.container { max-width: 1100px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+
+.heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+.heading > svg { color: var(--accent); width: 22px; height: 22px; flex: none; }
+.heading h1 { margin: 0; font-family: var(--font-display); font-size: var(--fs-xl); }
+
+.lede { margin: 0 0 var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm); max-width: 68ch; }
+.muted { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.error { margin: 0 0 var(--sp-3); color: var(--danger); font-size: var(--fs-sm); }
+
+/* Runtime problems are the administrator's to fix, so name each one rather than
+   collapsing them into a single unactionable sentence. */
+.notice {
+  display: flex; gap: var(--sp-2); align-items: flex-start;
+  margin: 0 0 var(--sp-4); padding: var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.notice > svg { flex: none; margin-top: 2px; color: var(--danger); }
+.noticeTitle { margin: 0 0 var(--sp-1); font-weight: var(--fw-semi); font-size: var(--fs-sm); }
+/* list-style is restored explicitly: the global reset clears it, and the
+   padding-left here only ever made room for bullets that were not drawn. */
+.reasons {
+  margin: 0; padding-left: var(--sp-4); list-style: disc;
+  color: var(--text-muted); font-size: var(--fs-sm);
+}
+
+/* A read that failed, standing where its rows would have been. */
+.sectionError {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  align-items: center; justify-content: space-between;
+  margin: 0 0 var(--sp-3); padding: var(--sp-3);
+  border: 1px solid var(--danger); border-radius: var(--r-md); background: var(--surface-2);
+}
+.sectionError > p { margin: 0; color: var(--danger); font-size: var(--fs-sm); min-width: 0; }
+
+.controls {
+  display: flex; flex-wrap: wrap; gap: var(--sp-3);
+  align-items: flex-end; margin-bottom: var(--sp-3);
+}
+.field { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); min-width: 0; }
+.field > span { color: var(--text-muted); }
+.field select {
+  min-height: 40px; padding: 0 var(--sp-2); max-width: 100%;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-1); color: var(--text); font-size: var(--fs-sm);
+}
+
+.search { display: flex; gap: var(--sp-2); flex: 1 1 260px; min-width: 0; }
+.search input {
+  flex: 1 1 auto; min-width: 0; min-height: 40px; padding: 0 var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-1); color: var(--text); font-size: var(--fs-sm);
+}
+.search button { flex: none; }
+
+.srOnly {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.crumbs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1);
+  margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.crumb { display: inline-flex; align-items: center; gap: var(--sp-1); min-width: 0; max-width: 100%; }
+.crumbs button {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--accent); font: inherit;
+}
+.crumbs button:hover { text-decoration: underline; }
+.crumbs [aria-current='page'] { color: var(--text); font-weight: var(--fw-medium); min-width: 0; overflow-wrap: anywhere; }
+
+.checkbox {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text);
+}
+
+.section { margin-bottom: var(--sp-5); }
+.section > h2, .facet > h2 {
+  margin: 0 0 var(--sp-2); font-size: var(--fs-md); font-family: var(--font-display);
+}
+.facet { margin-bottom: var(--sp-4); }
+
+.navList { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); padding: 0; }
+.navList > li { min-width: 0; max-width: 100%; }
+.navChip {
+  display: inline-flex; align-items: center; min-height: 36px;
+  max-width: 100%; overflow-wrap: anywhere; text-align: start;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-full);
+  background: var(--surface-1); color: var(--text);
+  font-size: var(--fs-sm); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.navChip:hover { border-color: var(--border-strong); background: var(--surface-2); }
+
+.publications {
+  display: grid; gap: var(--sp-3); margin: 0; padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+.publication {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-4); min-width: 0;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface-1); box-shadow: var(--elev-1);
+}
+.publication h3 { margin: 0; font-size: var(--fs-md); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.authors { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.description {
+  margin: 0; color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-snug);
+  display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.offers { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: auto; }
+
+.primary, .secondary, .search button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  min-height: 40px; padding: 0 var(--sp-3);
+  border-radius: var(--r-md); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  cursor: pointer; white-space: nowrap;
+  transition: filter var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+/* --on-accent, not --accent-text: tokens.css defines --accent-text as amber
+   TEXT on a tinted surface and --on-accent as the foreground for amber
+   FILLS. Amber-on-amber measured 1.48:1 against a 4.5:1 requirement. */
+.primary, .search button { border: 1px solid transparent; background: var(--accent); color: var(--on-accent); }
+.primary:hover:not(:disabled), .search button:hover:not(:disabled) { filter: brightness(1.08); }
+.secondary { border: 1px solid var(--border); background: var(--surface-1); color: var(--text); }
+.secondary:hover:not(:disabled) { border-color: var(--border-strong); }
+.primary:disabled, .secondary:disabled, .search button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.primaryLink {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--sp-3);
+  border-radius: var(--r-md); background: var(--accent); color: var(--on-accent);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); white-space: nowrap;
+}
+.primaryLink:hover { filter: brightness(1.08); }
+
+.pagination { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-5); }
+
+.activity { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--border); }
+.activity > h2 { overflow-wrap: anywhere; margin: 0 0 var(--sp-3); font-size: var(--fs-md); font-family: var(--font-display); }
+.jobs { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; }
+.job {
+  display: flex; flex-wrap: wrap; gap: var(--sp-3);
+  align-items: center; justify-content: space-between;
+  padding: var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1);
+}
+.jobMain { min-width: 0; flex: 1 1 240px; }
+.jobTitle { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+.jobMeta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin: 0; }
+.jobActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+/* The tint carries the tone; the label text keeps full AA contrast on its own. */
+.pill {
+  display: inline-flex; align-items: center;
+  padding: 2px var(--sp-2); border-radius: var(--r-full);
+  border: 1px solid var(--border); background: var(--surface-3);
+  font-size: var(--fs-xs); color: var(--text); white-space: nowrap;
+}
+.pill[data-tone='ok'] { background: var(--success-soft); border-color: var(--success-border); }
+.pill[data-tone='bad'] { background: var(--danger-soft, var(--surface-3)); border-color: var(--danger); }
+.pill[data-tone='active'] { background: var(--accent-soft); border-color: var(--accent-ring); }
+.pill[data-tone='muted'] { color: var(--text-muted); }
+
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4) var(--sp-3); }
+  .controls { flex-direction: column; align-items: stretch; }
+  .field select, .search { width: 100%; }
+  /* `.search` carries `flex: 1 1 260px` so that on a wide screen it shares the
+     controls row and grows into the slack. A flex basis is measured along the
+     container's MAIN axis, and this block turns that axis vertical, so the
+     same 260px stopped meaning "at least this wide" and became the search
+     field's HEIGHT — a 260px slab, with the input and the button stretched to
+     fill it. Scope the basis to the axis it was written for. */
+  .search { flex: 0 0 auto; }
+  .publications { grid-template-columns: 1fr; }
+  .offers > .primary { flex: 1 1 140px; }
+  .job { align-items: flex-start; }
+  .jobActions { width: 100%; }
+}
+
+/* Error borders convey severity; body text must remain readable in every theme. */
+.searchFailure > p { color: var(--text); }
+
+/* Queries and configured catalog labels can contain long unbroken words. */
+.searchStatus { overflow-wrap: anywhere; }

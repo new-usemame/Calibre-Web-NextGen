@@ -419,6 +419,14 @@
 
 .tocItem:hover { background: var(--surface-2); color: var(--text); }
 
+/* #2253: a nested level is indented under its parent, with a rule down the
+ * side so a long run of sections still reads as belonging to one chapter. */
+.tocNested {
+  margin-left: var(--sp-3);
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--border);
+}
+
 /* Search shares the TOC drawer shell, then becomes a compact form + result
  * list. All content here is on the app surface, so use app tokens regardless of
  * the separately-selected reading-page theme. */
@@ -562,6 +570,12 @@
   font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
 }
 .annItem { margin-bottom: var(--sp-1); }
+.annEdit {
+  min-width: 44px; min-height: 44px; padding: var(--sp-2) var(--sp-3);
+  margin-inline-start: var(--sp-2); border-radius: var(--r-sm);
+  color: var(--text); background: var(--surface-2); cursor: pointer;
+}
+.annEdit:hover { background: var(--surface-3); }
 .annJump {
   display: flex; gap: var(--sp-2); width: 100%; text-align: left;
   padding: var(--sp-2); border-radius: var(--r-sm); cursor: pointer;

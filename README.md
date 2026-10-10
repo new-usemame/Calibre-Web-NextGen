@@ -276,6 +276,8 @@ corrected.
 
 The Admin → Settings panel has many optional toggles (auto-convert formats, automatic backups, EPUB fixer, KOReader sync, OAuth, etc.). The [upstream wiki](https://github.com/crocodilestick/Calibre-Web-Automated/wiki) is the source of truth for those; this fork doesn't change them.
 
+For deployment-managed Generic OIDC credentials and endpoint settings, see the [environment configuration guide](docs/OAUTH-ENVIRONMENT-CONFIGURATION.md).
+
 ---
 
 ## Updating
@@ -359,6 +361,10 @@ Users, settings, and shelves carry over. The first launch takes a few extra seco
 
 [Shelfmark](https://github.com/calibrain/shelfmark) by @calibrain is a self-hosted book search and request interface. Users search across torrent, usenet, IRC, and direct sources from a single UI; Shelfmark hands the download to your client of choice and drops the finished file straight into the CWA ingest folder, where this build picks it up automatically. Multi-user requests are built in, so you can share an instance with household readers and approve their picks.
 
+This release does not include a built-in Store / Discover page or an Anna's Archive download provider. Configure acquisition sources in the separate Shelfmark service.
+
+**With My Library enabled:** files delivered through the shared ingest folder enter the global library. The folder does not identify the Shelfmark requester, so the import does not automatically add the book to that person's selection. Readers with Global Library access can find and add it there; an administrator can add it for a managed account. Accounts using the whole-library mode continue to see permitted imports automatically.
+
 Add it alongside `calibre-web` in the same compose file:
 
 ```yaml
@@ -407,6 +413,21 @@ After Shelfmark starts, open it and pick **Settings → Security → Authenticat
 
 ## Common configurations
 
+### Writable cache storage
+
+The general derived cache defaults to `cache/` under the configured application
+config directory (`/config/cache` in Docker). Set `CACHE_DIR` to keep an explicit
+cache location; that directory must be writable by the service user. Existing
+thumbnail storage stays at `/config/thumbnails`, and metadata change logs and
+scratch storage keep their existing locations under the config directory.
+
+Upgrades regenerate disposable general cache entries in the new default location.
+The old `cps/cache` directory is left untouched; no user data or existing
+thumbnail cache is moved or deleted. Deployments that explicitly set `CACHE_DIR`
+keep that location. Startup no longer creates or changes ownership of the
+image-owned `cps/cache` directory.
+
+
 ### Network shares (NFS, SMB, ZFS)
 
 See [`examples/.env.example`](examples/.env.example) for the complete environment-variable reference and defaults.
@@ -428,20 +449,35 @@ Tested and supported. Ingest is a few seconds slower; everything else behaves th
 
 ### Calibre desktop coexistence
 
-If you want to open the same library in calibre desktop while calibre-web-nextgen is running, set both:
+**Docker Desktop on macOS: give native Mac Calibre exclusive access to a
+host-bind-mounted library.** Stop the calibre-web-nextgen container before
+opening that library in Mac Calibre, and fully quit Mac Calibre before starting
+the container again. This also applies to native Mac `calibredb` commands.
+Stopping ingest alone leaves other application and metadata writers active.
+
+The compatibility flags below do not make simultaneous Mac and Linux-container
+access safe. In a finite Docker Desktop bind-mount test, an exclusive byte-range
+lock held on either side blocked another process on the same side but did not
+block the opposite side. A separate concurrent library-write test produced a
+malformed database even with both flags enabled and library DELETE journal mode. Use
+exclusive access rather than relying on a lock wait across this boundary.
+
+For deployments where desktop and server processes share working filesystem
+locks, set both flags to release the web application's database connection
+between requests:
 
 ```yaml
 - NETWORK_SHARE_MODE=true
 - DESKTOP_COMPAT_MODE=true
 ```
 
-By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. That blocks calibre desktop from opening the library — on calibre 9.9.0 + macOS it crashes without an error dialog. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the file lock is released between web requests, letting calibre desktop open the database in the gaps.
+By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
 
-Changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
+On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
 
 Trade-offs:
 - Each web request pays a small extra overhead to open and close the database connection.
-- If calibre desktop is actively writing when a web request comes in, the request waits up to 60 seconds for the lock. Heavy simultaneous use can slow the web UI.
+- Where filesystem locks are shared correctly, a web request can wait up to 60 seconds for an active desktop writer. Heavy simultaneous use can slow the web UI.
 - Designed for home-server use where calibre desktop is opened occasionally for bulk edits, not for concurrent heavy use of both.
 
 ### Calibre plugins (DeDRM and others)
@@ -463,6 +499,12 @@ calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you i
    ```
 
 Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input wants an Adobe login) keep their settings in files next to the zips. Easiest path: configure the plugin in Calibre desktop on your computer first, then copy its settings files (e.g. `plugins/dedrm.json`, the `plugins/DeACSM/` folder) from your desktop Calibre configuration folder into the same container `plugins/` folder and restart.
+
+The book editor's conversion choices come from the configured Calibre install's active input and output plugins. For example, a KFX input plugin makes KFX books eligible as sources; a KFX output choice appears only when Calibre reports an installed output plugin that can write KFX. Plugins are not bundled, and a separate comic/KPF workflow does not by itself add an `ebook-convert` output format. The capability check uses the same `CWA_CALIBRE_USER_PLUGINS` setting as conversion jobs, refreshes at least once a minute, and hides Calibre conversion choices if the local capability probe is unavailable or invalid. Directory-only OEB output is excluded because book conversion stores one file. The separate EPUB-to-KEPUB option remains available when `kepubify` is configured.
+
+ACSM tickets use Calibre’s import hooks before ordinary book processing. Auto-Convert off imports the fulfilled EPUB/PDF as returned; when enabled, conversion applies to that resulting book. A failed optional conversion keeps the fulfilled book. A missing or unsuccessful ACSM plugin preserves the original ticket in the failed-books folder, and no raw ACSM format is added to the library. Successful source receipts prevent duplicate imports and repeated fulfillment after completion. Configure the plugin’s account authorization first; installing its zip alone cannot authorize Adobe fulfillment.
+
+Before import, the fulfilled book is stored under `processed_books/acsm_fulfilled/<ticket SHA-256>/` with its original ticket basename and a manifest binding the ticket and book bytes. If import fails, the original ticket and fulfilled book remain; retry uses the validated book without spending the ticket again. The recovery entry is removed only after a confirmed library import. An interrupted or damaged entry stops automatic fulfillment and prints its path for manual recovery: preserve these files, inspect the downloaded EPUB/PDF, and import that book directly if needed. Do not delete a recovery entry merely to retry an already consumed ticket.
 
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
@@ -552,6 +594,28 @@ The corresponding ProxyFix arguments are `x_for`, `x_proto`, and `x_host`.
 Count only proxies you control and that overwrite or sanitize the corresponding
 header.
 
+These headers are believed only when the connection comes from a trusted proxy
+network. By default that is this host, private networks (the docker network,
+your LAN), and Tailscale's `100.64.0.0/10`. A client that reaches CWNG directly
+from anywhere else is taken at its own address and scheme, whatever headers it
+sends. If your proxy connects from a public address, add it to
+`TRUSTED_PROXY_NETWORKS`. That includes Cloudflare's proxy forwarding straight
+to the container, with no proxy of your own in between: list Cloudflare's
+published IP ranges.
+
+Without the setting, CWNG sees every visitor as the proxy. Sign-in pacing is
+then shared by everyone, links come out as `http://` behind an HTTPS proxy,
+and sign-in providers may reject the callback address. The log says
+`Ignoring reverse-proxy headers from <address>` when this applies.
+
+```yaml
+- TRUSTED_PROXY_NETWORKS=private, 203.0.113.7, 198.51.100.0/24
+```
+
+Entries are addresses or networks, separated by commas or spaces. `private`
+stands for the default list, so keep it when you add your proxy. `*` trusts
+every peer, which was the behaviour before this setting existed.
+
 ### Hardcover metadata provider
 
 [Hardcover](https://hardcover.app/) is a free metadata provider. To enable it:
@@ -588,17 +652,19 @@ Accepted true values are `true`, `1`, `yes`, and `on`; false values are `false`,
 
 ### KOReader sync
 
-CWA has built-in KOReader progress sync; no separate kosync server is needed.
+CWA has built-in KOReader sync; no separate kosync server is needed. With the plugin, a Kindle or any KOReader e-reader opens on your library: covers of every book (or of the shelves you choose for e-readers), downloaded when you open them, with reading position, read status and highlights synced automatically. **Setup and daily use: [docs/koreader-kindle.md](docs/koreader-kindle.md).**
 
-1. In KOReader, install the CWA plugin: visit `http://your-cwa:8083/kosync` for download and install instructions.
-2. Point the plugin at `http://your-cwa:8083` and log in with your CWA username and password.
+1. In CWA open **E-readers ▸ Pair a Kobo or KOReader** and either download the **ready-made plugin** (copy one folder over USB; nothing to type on the e-reader) or **pair with a code** shown on the e-reader.
+2. To install the plain plugin by hand instead, visit `http://your-cwa:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
 3. Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.
 
 **Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.
 
 If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
 
-**Matching filenames across devices (OPDS downloads).** If you download books to KOReader over OPDS and sync progress by filename across several e-readers, turn on **Use server filenames** in KOReader's OPDS catalog settings (the checkbox when you add or edit the catalog). By default KOReader names a downloaded file `Author - Title.epub` from the catalog entry, which differs from the on-disk library name `Title - Author.epub` and forces a manual rename. CWA already sends the library name in the download's `Content-Disposition` header; with **Use server filenames** on, KOReader uses that name, so the file matches your library and your other devices without renaming.
+For matching OPDS filenames across devices, enable Use server filenames in KOReader's OPDS catalog configuration. KOReader normally builds `Author - Title.epub` from the feed. The server normally suggests `Title - Author.epub`, with only the first author. With Use server filenames enabled, KOReader uses the server's suggested name.
+
+Administrators can change that name through the OPDS download filename template preference. For fields, examples, and device limits, see [OPDS download filenames](docs/opds-filename-template.md). A blank preference keeps the existing naming behavior.
 
 ### Kobo sync
 
@@ -762,34 +828,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Italian (`it`) | `███████████████████░` 94% | 3117/3306 | 0 |
-| Swedish (`sv`) | `███████████████████░` 94% | 3119/3306 | 0 |
-| Spanish (`es`) | `███████████████████░` 94% | 3101/3306 | 0 |
-| Russian (`ru`) | `█████████████████░░░` 85% | 2809/3306 | 0 |
-| French (`fr`) | `█████████████████░░░` 84% | 2776/3306 | 125 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `████████████████░░░░` 81% | 2665/3306 | 181 |
-| Polish (`pl`) | `████████████████░░░░` 78% | 2571/3306 | 0 |
-| Dutch (`nl`) | `██████████████░░░░░░` 70% | 2323/3306 | 288 |
-| German (`de`) | `█████████████░░░░░░░` 65% | 2155/3306 | 12 |
-| Hungarian (`hu`) | `██████████░░░░░░░░░░` 50% | 1636/3306 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 42% | 1396/3306 | 305 |
-| Japanese (`ja`) | `████████░░░░░░░░░░░░` 40% | 1310/3306 | 244 |
-| Slovenian (`sl`) | `███████░░░░░░░░░░░░░` 36% | 1204/3306 | 312 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `███████░░░░░░░░░░░░░` 35% | 1167/3306 | 342 |
-| Korean (`ko`) | `██████░░░░░░░░░░░░░░` 28% | 939/3306 | 266 |
-| Arabic (`ar`) | `█████░░░░░░░░░░░░░░░` 24% | 784/3306 | 281 |
-| Slovak (`sk`) | `████░░░░░░░░░░░░░░░░` 22% | 745/3306 | 307 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 21% | 697/3306 | 354 |
-| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 20% | 673/3306 | 355 |
-| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 20% | 674/3306 | 356 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 15% | 505/3306 | 393 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 14% | 476/3306 | 402 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 14% | 445/3306 | 367 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 13% | 430/3306 | 430 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 13% | 423/3306 | 351 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 356/3306 | 382 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 9% | 290/3306 | 379 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 208/3306 | 339 |
+| Slovak (`sk`) | `████████████████████` 100% | 4078/4079 | 0 |
+| Russian (`ru`) | `██████████████████░░` 91% | 3728/4079 | 0 |
+| French (`fr`) | `█████████████████░░░` 87% | 3545/4079 | 123 |
+| Swedish (`sv`) | `████████████████░░░░` 81% | 3291/4079 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 76% | 3109/4079 | 279 |
+| Italian (`it`) | `███████████████░░░░░` 76% | 3102/4079 | 0 |
+| Spanish (`es`) | `███████████████░░░░░` 76% | 3086/4079 | 0 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 65% | 2664/4079 | 172 |
+| Polish (`pl`) | `█████████████░░░░░░░` 63% | 2567/4079 | 0 |
+| German (`de`) | `████████████░░░░░░░░` 59% | 2397/4079 | 11 |
+| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 43% | 1751/4079 | 118 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 35% | 1418/4079 | 296 |
+| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1324/4079 | 234 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1219/4079 | 302 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 29% | 1184/4079 | 330 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 24% | 961/4079 | 256 |
+| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 21% | 856/4079 | 221 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 723/4079 | 341 |
+| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 698/4079 | 342 |
+| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 699/4079 | 343 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 530/4079 | 381 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 502/4079 | 390 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 471/4079 | 357 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4079 | 417 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 449/4079 | 338 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 382/4079 | 371 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 316/4079 | 369 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 234/4079 | 330 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

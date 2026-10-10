@@ -532,10 +532,14 @@ test.describe('My Library', () => {
       )).toBeVisible();
       await card.getByRole('spinbutton', { name: 'Book ID' }).fill(String(book.id));
       await card.getByRole('button', { name: 'Add book to this library' }).click();
-      await expect(adminPage.getByText(
-        `Added book ${book.title} to ${secondaryUser.username}.`,
-        { exact: true },
-      )).toBeVisible();
+      // The confirmation has to be where the administrator is looking: in this
+      // user's card, on screen. A page-top banner passed toBeVisible() while
+      // sitting off-screen above the card, so the add looked silent (#1939).
+      const added = card.getByRole('status').filter({
+        hasText: `Added book ${book.title} to ${secondaryUser.username}.`,
+      });
+      await expect(added).toBeVisible();
+      await expect(added).toBeInViewport();
 
       const library = (await secondaryUser.page.request.get(
         '/api/v1/books?per_page=200',
@@ -583,7 +587,9 @@ test.describe('My Library', () => {
       // The retained highlight's origin device is the real recovery route to
       // a removed book: device view -> book annotations -> browser downloads.
       await page.goto('/app/account/devices');
-      await page.getByRole('link', { name: /^Web reader(?: \d+)?$/ }).first().click();
+      const browserSource = page.getByRole('link', { name: 'Browser', exact: true });
+      await expect(browserSource).toHaveCount(1);
+      await browserSource.click();
       const deviceRow = page.getByRole('listitem').filter({ hasText: marker });
       await expect(deviceRow).toBeVisible();
       await expect(deviceRow).toContainText(`${marker} note`);

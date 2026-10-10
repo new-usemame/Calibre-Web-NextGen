@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-from datetime import datetime, timezone
 from functools import wraps
 
 from sqlalchemy.sql.expression import func
@@ -16,8 +15,10 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.datastructures import Authorization
 from werkzeug.security import check_password_hash
 
-from . import lm, ub, config, logger, limiter, constants, services
+from . import lm, ub, config, logger, limiter, constants, services, rate_limits
+from .services import app_passwords
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 
 
 log = logger.create()
@@ -57,33 +58,41 @@ def _http_basic_auth_error(status=401):
     return response
 
 
-def _verify_app_password(user, password):
-    """Check the supplied password against any of the user's non-revoked
-    app passwords. Returns True on match (and stamps `last_used_at`),
-    False otherwise.
+def _used(row):
+    if row is None:
+        return False
+    app_passwords.note_use(row, session=ub.session)
+    return True
 
-    Constant-time per-row comparison via werkzeug; constant-time across
-    rows is best-effort (we still iterate, but the failure path takes
-    similar work as the success path).
 
-    See fork issue #95 and `notes/oauth-opds-app-passwords-DESIGN.md`.
+def _verify_app_password_digest(user, password):
+    """True when ``password`` is one of ``user``'s live app passwords, found by
+    its digest: one indexed lookup, no slow hash, so sign-in tries it first.
+    Stamps ``last_used_at`` (to the minute) on a match.
+
+    See fork issue #95, ``notes/oauth-opds-app-passwords-DESIGN.md`` and
+    ``cps/services/app_passwords.py``.
     """
     if not user or not password:
         return False
-    rows = ub.session.query(ub.UserAppPassword).filter(
-        ub.UserAppPassword.user_id == user.id,
-        ub.UserAppPassword.revoked == False,  # noqa: E712 — SQLAlchemy idiom
-    ).all()
-    for row in rows:
-        if check_password_hash(row.password_hash, password):
-            row.last_used_at = datetime.now(timezone.utc)
-            try:
-                ub.session.commit()
-            except Exception as ex:
-                log.debug("Failed to stamp UserAppPassword last_used_at: %s", ex)
-                ub.session.rollback()
-            return True
-    return False
+    return _used(app_passwords.find(user, password, session=ub.session))
+
+
+def _verify_app_password_older(user, password):
+    """True when ``password`` is one of ``user``'s live app passwords saved
+    before digests existed. Costs a werkzeug hash per such row, so sign-in
+    tries it after the account password; the match gets its digest and takes
+    :func:`_verify_app_password_digest` from then on.
+    """
+    if not user or not password:
+        return False
+    return _used(app_passwords.find_older(user, password, session=ub.session))
+
+
+def _verify_app_password(user, password):
+    """True when ``password`` is any of ``user``'s live app passwords."""
+    return (_verify_app_password_digest(user, password)
+            or _verify_app_password_older(user, password))
 
 
 def create_authenticated_user(username, email=None, auth_source="unknown"):
@@ -135,9 +144,10 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         # This used to hardcode dark, from when light was deprecated; #845
         # brought six themes back, so honour whatever the admin configured.
         user.theme = config_theme_code(getattr(config, 'config_theme', None))
+        seed_new_user_ui_font_defaults(user, config)
             
-        # Kobo sync setting defaults to 0 (disabled) for new users
-        user.kobo_only_shelves_sync = 0
+        # Match every other new account: send only selected shelves.
+        user.kobo_only_shelves_sync = 1
         user.opds_only_shelves_sync = 0
         
         ub.session.add(user)
@@ -149,6 +159,61 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         log.error("Failed to create authenticated user '%s': %s", username, e)
         ub.session.rollback()
         return None
+
+
+def _verify_slower_credentials(user, username, password):
+    """The account's directory or local password, then pre-digest app passwords.
+
+    With no account yet, a directory sign-in may create one (OPDS/API access).
+    Returns (user or None, wrong): wrong is True only when the checks said
+    the password is wrong. It is False when the directory could not be
+    asked, or accepted the password but the account could not be created.
+    """
+    if user:
+        wrong = True
+        if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
+            login_result, error = services.ldap.bind_user(user.name, password)
+            if login_result:
+                return user, True
+            if error is not None:
+                log.error(error)
+                wrong = False
+        else:
+            if check_password_hash(str(user.password), password):
+                return user, True
+        # App passwords saved before digests existed cost a slow hash each,
+        # so they come after the account password; each is slow only once.
+        if _verify_app_password_older(user, password):
+            return user, True
+        return None, wrong
+
+    # Handle new LDAP users (auto-creation for OPDS/API access)
+    if config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
+        try:
+            # Try LDAP authentication for new user
+            login_result, error = services.ldap.bind_user(username, password)
+            if login_result:
+                # Authentication successful, get user details and create account
+                ldap_user_details = services.ldap.get_object_details(username)
+                if ldap_user_details:
+                    from . import admin
+                    create_result, error_msg = admin.ldap_import_create_user(username, ldap_user_details)
+                    if create_result:
+                        # Get the newly created user
+                        user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
+                        if user:
+                            log.info("LDAP auto-created user for OPDS/API: '%s'", username)
+                            return user, True
+
+                log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
+                return None, False
+            elif error:
+                log.debug("LDAP authentication failed for new user '%s': %s", username, error)
+                return None, False
+        except Exception as ex:
+            log.error("LDAP auto-creation error for OPDS user '%s': %s", username, ex)
+            return None, False
+    return None, True
 
 
 @auth.verify_password
@@ -172,48 +237,31 @@ def verify_password(username, password):
         # OAuth users have no usable local password and cannot pass through
         # an OAuth redirect flow on OPDS / KOSync; LDAP users may prefer not
         # to expose their directory password to those clients. Try app
-        # passwords first — see fork issue #95.
-        if _verify_app_password(user, password):
-            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+        # passwords first — see fork issue #95. This is the digest lookup:
+        # no slow hash, and an app password never reaches LDAP as a bind.
+        if _verify_app_password_digest(user, password):
             return user
-        if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
-            login_result, error = services.ldap.bind_user(user.name, password)
-            if login_result:
-                [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
-                return user
-            if error is not None:
-                log.error(error)
-        else:
-            limiter.check()
-            if check_password_hash(str(user.password), password):
-                [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
-                return user
-    
-    # Handle new LDAP users (auto-creation for OPDS/API access)
-    elif config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
-        try:
-            # Try LDAP authentication for new user
-            login_result, error = services.ldap.bind_user(username, password)
-            if login_result:
-                # Authentication successful, get user details and create account
-                ldap_user_details = services.ldap.get_object_details(username)
-                if ldap_user_details:
-                    from . import admin
-                    create_result, error_msg = admin.ldap_import_create_user(username, ldap_user_details)
-                    if create_result:
-                        # Get the newly created user
-                        user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
-                        if user:
-                            log.info("LDAP auto-created user for OPDS/API: '%s'", username)
-                            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
-                            return user
-                
-                log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
-            elif error:
-                log.debug("LDAP authentication failed for new user '%s': %s", username, error)
-        except Exception as ex:
-            log.error("LDAP auto-creation error for OPDS user '%s': %s", username, ex)
-    
+
+    # Every slower check is a password guess. This client's new wrong
+    # passwords for this account are counted, and too many are refused with
+    # 429 before their password is looked at (rate_limits.BasicAuthPacing).
+    # A right password clears the count.
+    pacing = rate_limits.BasicAuthPacing(limiter, "opds")
+    pacing.refuse_if_paced(username)
+    if pacing.already_refused(username, password):
+        return None
+    user, wrong = _verify_slower_credentials(user, username, password)
+    if user:
+        pacing.succeeded(username)
+        return user
+    if not wrong:
+        # The directory could not say, or said yes but the account could not
+        # be created: remembering the password as wrong would refuse it once
+        # the directory or the import works again.
+        log.warning('OPDS Login for user "%s" could not be completed', username)
+        return None
+    pacing.failed(username, password)
+
     # Issue #121: only warn when a non-empty username actually failed to
     # authenticate. The empty-username probe case is filtered out at the
     # top of this function, so reaching here means real credentials were
@@ -313,7 +361,7 @@ def load_user_from_reverse_proxy_header(req):
     # Look for existing user first
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first()
     if user:
-        [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+        rate_limits.clear_current_limits(limiter)
         log.debug("Reverse proxy authentication: found existing user '%s'", user.name)
         return user
     
@@ -326,7 +374,7 @@ def load_user_from_reverse_proxy_header(req):
         
         user = create_authenticated_user(rp_header_username, email, "reverse proxy")
         if user:
-            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+            rate_limits.clear_current_limits(limiter)
             log.info("Reverse proxy authentication: successfully created user '%s'", user.name)
             return user
         else:

@@ -1,0 +1,19 @@
+{
+  "area": "spa",
+  "body": "Both Account and Help menus open on pointer hover, but their click handler toggled the visible open state rather than the separately tracked pinned state. Hover then click therefore closed the menu, contradicting the intended disclosure behavior. The fix toggles pinned state and cancels pending pointer-leave closure. Actual browser tests cover both disclosures, hover leave, hover-click pin, second-click close, touch taps, Enter/Space, Tab into the first item, Escape focus return, outside click and open-header accessibility. Seen red on the prior published artifact. Two broad mobile test retries had a matching closed-menu symptom, but their retained traces do not prove the precise event ordering; this finding is independently reproduced. Settled cross-platform accessibility checks also exposed insufficient dark-theme Sign out contrast (4.15:1 normal, 3.51:1 focused). A separate danger-text foreground preserves danger fills and provides 6.26:1 normal and 5.29:1 focused contrast. Tests scan every concrete theme after finite animations finish, preventing opacity animation from hiding text from axe.",
+  "created": "2026-09-09",
+  "id": "F-97d7b2",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Fixed and independently verified on the full candidate image: Chromium/WebKit desktop/mobile interactions and settled normal/focused contrast across all five palettes. Public release pending.",
+    "release": ""
+  },
+  "severity": "ux",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Clicking a hover-open top bar menu closes it instead of pinning it"
+}

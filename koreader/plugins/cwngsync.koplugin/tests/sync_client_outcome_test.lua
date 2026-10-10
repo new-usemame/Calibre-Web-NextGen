@@ -32,6 +32,9 @@ package.preload["logger"] = function()
         err = function() end,
     }
 end
+package.preload["gettext"] = function()
+    return function(text) return text end
+end
 package.preload["socketutil"] = function()
     return { set_timeout = function() end, reset_timeout = function() end }
 end
@@ -133,10 +136,57 @@ local function testNoSyncFailureIsWrittenAtDbg()
     assertTruthy(text:find("logger.warn(", 1, true), "failures are logged at warn")
 end
 
+local function testADownloadSaysWhetherTheServerAnswered()
+    -- A book the server refuses must not look like a server that is gone:
+    -- the library stops a sync only for the second.
+    local answer
+    package.loaded["socket.http"] = { request = function() return answer() end }
+    package.loaded["socket"] = { skip = function(n, ...) return select(n + 1, ...) end }
+    package.loaded["ltn12"] = { sink = { file = function(handle) return handle end } }
+    package.loaded["mime"] = { b64 = function(text) return text end }
+    local path = os.tmpname()
+    local function download()
+        local ok, _, _, reason, status = CWNGSyncClient.download_file({ service_url = "http://books" },
+            "reader", "secret", "Kindle", "device", "/syncs/library/books/7/placeholder", path, { 1, 1 })
+        return ok, reason, status
+    end
+    answer = function() return 1, 404, {}, "HTTP/1.1 404 NOT FOUND" end
+    local ok, reason, status = download()
+    assertEqual(ok, false, "a refusal is a failure")
+    assertEqual(status, 404, "that carries the server's status")
+    answer = function() return nil, "timeout" end
+    ok, reason, status = download()
+    assertEqual(ok, false, "no answer is a failure")
+    assertEqual(status, nil, "that carries no status")
+    assertTruthy(reason, "but still a reason")
+    os.remove(path)
+end
+
+local function testFailuresReadAsPlainWordsOnScreen()
+    local plain = CWNGSyncClient.plainReason
+    assertEqual(plain("common/Spore/Protocols.lua:85: timeout"), "the server took too long to answer",
+        "a transport timeout, as KOReader 2026.07 raises it on a Kindle")
+    assertEqual(plain("connection refused"), "nothing answered at that address", "nothing listening")
+    assertEqual(plain("host not found"), "that address could not be found", "a mistyped name")
+    assertEqual(plain("405 not expected"), "the server answered with error 405", "lua-Spore's unexpected status")
+    assertEqual(plain("HTTP 503"), "the server answered with error 503", "a status the spec allows")
+    assertEqual(plain(nil), "no response from server", "nothing to go on")
+    assertEqual(plain("common/Spore/Protocols.lua:85: wantread"), "that address does not answer over https",
+        "https sent to a plain http port, as seen on a Kindle")
+    assertEqual(plain("checksum mismatch"), "checksum mismatch", "anything else is shown as it is")
+    assertEqual(plain("common/Spore/Protocols.lua:85: closed"), "closed",
+        "without the place in KOReader's code it was raised")
+    assertEqual(CWNGSyncClient.statusOf("405 not expected"), 405, "status from lua-Spore's shape")
+    assertEqual(CWNGSyncClient.statusOf("HTTP 409"), 409, "status from finish()'s shape")
+    assertEqual(CWNGSyncClient.statusOf("common/Spore/Protocols.lua:85: timeout"), nil, "no status")
+end
+
 testDescribeFailureNamesEveryShape()
+testADownloadSaysWhetherTheServerAnswered()
 testNoSyncFailureIsWrittenAtDbg()
 testRaisedCallReportsAReasonAndWarns()
 testNon200ReportsItsStatus()
 testSuccessCarriesNoReason()
+testFailuresReadAsPlainWordsOnScreen()
 
 print("sync_client outcome-reporting tests passed")

@@ -3,28 +3,37 @@ import { useLocation } from 'wouter';
 import { Wand2, Plus, Trash2 } from 'lucide-react';
 import {
   useMagicShelfPreview, useCreateMagicShelf, useEditMagicShelf,
-  useMagicShelfBooks, useMagicShelfRuleSchema,
+  useMagicShelfBooks, useMagicShelfRuleSchema, useMe,
 } from '../lib/queries';
 import type { MagicRule, MagicRuleField, MagicRuleOperator } from '../lib/queries';
+import {
+  groupFromStored, groupToStored, leafCount, removeNode, ruleValueText, someLeaf, updateNode,
+} from '../lib/magicRuleTree';
+import type { RuleGroup, RuleLeaf } from '../lib/magicRuleTree';
+import { ShelfOptions } from '../components/ShelfOptions';
 import { Button } from '../components/Button';
 import { useT } from '../lib/i18n';
 import { ApiError } from '../lib/api';
 import styles from './MagicShelf.module.css';
 
 let _rid = 0;
-const newRule = (): MagicRule & { _k: number } => ({ _k: ++_rid, id: 'title', operator: 'contains', value: '' });
+const nextKey = () => ++_rid;
+const newRule = (): RuleLeaf => ({ kind: 'rule', key: nextKey(), id: 'title', operator: 'contains', value: '' });
+const newGroup = (): RuleGroup => ({ kind: 'group', key: nextKey(), condition: 'AND', rules: [newRule()] });
 
 const hasRuleValue = (value: MagicRule['value']) =>
-  Array.isArray(value) ? value.some((item) => item.trim()) : value.trim().length > 0;
+  Array.isArray(value) ? value.some((item) => ruleValueText(item ?? '').trim()) : ruleValueText(value ?? '').trim().length > 0;
 
 const blankValueFor = (operator?: MagicRuleOperator): MagicRule['value'] =>
   operator?.nb_inputs === 2 ? ['', ''] : '';
 
 /** Native smart-collection (magic shelf) rule builder: name + icon, AND/OR
- *  match, a list of field/operator/value rules, live preview, save. Consumes the
- *  legacy /magicshelf/preview + /magicshelf endpoints (rule engine stays server-side). */
+ *  match, field/operator/value rules and nested rule groups, live preview, save.
+ *  Consumes the legacy /magicshelf/preview + /magicshelf endpoints (rule engine
+ *  stays server-side). */
 export function MagicShelf({ editId }: { editId?: string }) {
   const t = useT();
+  const me = useMe().data;
   const [, navigate] = useLocation();
   const preview = useMagicShelfPreview();
   const create = useCreateMagicShelf();
@@ -36,36 +45,34 @@ export function MagicShelf({ editId }: { editId?: string }) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('🪄');
   const [isSystem, setIsSystem] = useState(false);
-  const [condition, setCondition] = useState<'AND' | 'OR'>('AND');
-  const [rules, setRules] = useState<(MagicRule & { _k: number })[]>([newRule()]);
+  const [isPublic, setPublic] = useState(false);
+  const [koboSync, setKobo] = useState(false);
+  const [opdsExpose, setOpds] = useState(false);
+  const [tree, setTree] = useState<RuleGroup>(() => ({ kind: 'group', key: nextKey(), condition: 'AND', rules: [newRule()] }));
   const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
     if (!editId || seeded || !existing.data) return;
-    const d = existing.data as unknown as { name: string; icon: string; is_system?: boolean; rules?: { condition?: 'AND' | 'OR'; rules?: MagicRule[] } };
+    const d = existing.data;
     setName(d.name || '');
     setIcon(d.icon || '🪄');
     setIsSystem(Boolean(d.is_system));
-    setCondition(d.rules?.condition === 'OR' ? 'OR' : 'AND');
-    const loaded = (d.rules?.rules || []).map((r) => ({
-      _k: ++_rid,
-      id: r.id,
-      operator: r.operator,
-      value: Array.isArray(r.value) ? r.value.map(String) : String(r.value ?? ''),
-    }));
-    setRules(loaded.length ? loaded : [newRule()]);
+    setPublic(d.is_public);
+    setKobo(!!d.kobo_sync);
+    setOpds(!!d.opds_expose);
+    const loaded = groupFromStored(d.rules, nextKey);
+    setTree(loaded.rules.length ? loaded : { ...loaded, rules: [newRule()] });
     setSeeded(true);
   }, [editId, seeded, existing.data]);
   const [previewData, setPreviewData] = useState<{ count: number; sample: string[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const ruleSet = () => ({ condition, rules: rules.map(({ id, operator, value }) => ({ id, operator, value })) });
+  const ruleSet = () => groupToStored(tree);
 
   // Live preview (debounced) whenever the rules change and have at least one value.
   useEffect(() => {
-    const filled = rules.filter((r) => hasRuleValue(r.value) || r.operator.includes('empty'));
-    if (filled.length === 0) { setPreviewData(null); return; }
+    if (!someLeaf(tree, (r) => hasRuleValue(r.value) || r.operator.includes('empty'))) { setPreviewData(null); return; }
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
       preview.mutate(ruleSet(), {
@@ -75,7 +82,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
     }, 500);
     return () => { if (debounce.current) clearTimeout(debounce.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(rules), condition]);
+  }, [JSON.stringify(tree)]);
 
   const fields = schemaQuery.data?.fields ?? [];
   const operatorMap = new Map((schemaQuery.data?.operators ?? []).map((operator) => [operator.type, operator]));
@@ -90,14 +97,34 @@ export function MagicShelf({ editId }: { editId?: string }) {
     return 'text';
   };
   const setRule = (k: number, patch: Partial<MagicRule>) =>
-    setRules((rs) => rs.map((r) => (r._k === k ? { ...r, ...patch } : r)));
+    setTree((current) => updateNode(current, k, (node) => ({ ...node, ...patch }) as RuleLeaf));
+  const setGroupCondition = (k: number, next: 'AND' | 'OR') =>
+    setTree((current) => updateNode(current, k, (node) => ({ ...node, condition: next }) as RuleGroup));
+  const appendTo = (k: number, node: RuleLeaf | RuleGroup) =>
+    setTree((current) => updateNode(current, k, (group) => ({ ...group, rules: [...(group as RuleGroup).rules, node] }) as RuleGroup));
+  const totalRules = leafCount(tree);
+  const rootAddRule = useRef<HTMLButtonElement>(null);
+  const focusAfterRemoval = useRef(false);
+  useEffect(() => {
+    if (!focusAfterRemoval.current) return;
+    focusAfterRemoval.current = false;
+    rootAddRule.current?.focus();
+  }, [tree]);
 
-  const renderRuleValue = (rule: MagicRule & { _k: number }, field: MagicRuleField, operator: MagicRuleOperator) => {
+  const removeUnsupportedRule = (key: number) => {
+    focusAfterRemoval.current = true;
+    setTree((current) => {
+      const next = removeNode(current, key);
+      return leafCount(next) ? next : { ...next, rules: [newRule()] };
+    });
+  };
+
+  const renderRuleValue = (rule: RuleLeaf, field: MagicRuleField, operator: MagicRuleOperator) => {
     if (operator.nb_inputs === 0) return <span className={styles.noValue} aria-hidden="true" />;
     if (field.input === 'select' || field.input === 'radio') {
       return (
-        <select aria-label={`${t(field.label)} ${t('value')}`} value={String(rule.value ?? '')}
-          onChange={(event) => setRule(rule._k, { value: event.target.value })}>
+        <select aria-label={`${t(field.label)} ${t('value')}`} value={ruleValueText(rule.value ?? '')}
+          onChange={(event) => setRule(rule.key, { value: event.target.value })}>
           {Object.entries(field.values ?? {}).map(([value, label]) => (
             <option key={value} value={value}>{t(String(label))}</option>
           ))}
@@ -109,12 +136,12 @@ export function MagicShelf({ editId }: { editId?: string }) {
       return (
         <span className={styles.rangeInputs} role="group" aria-label={`${t(field.label)} ${t(operator.label)}`}>
           {[0, 1].map((index) => (
-            <input key={index} value={values[index] ?? ''}
+            <input key={index} value={ruleValueText(values[index] ?? '')}
               aria-label={`${t(field.label)} ${index + 1}`}
               onChange={(event) => {
                 const next = [...values];
                 next[index] = event.target.value;
-                setRule(rule._k, { value: next });
+                setRule(rule.key, { value: next });
               }}
               type={inputType(field, operator)} />
           ))}
@@ -122,25 +149,105 @@ export function MagicShelf({ editId }: { editId?: string }) {
       );
     }
     return (
-      <input value={String(rule.value ?? '')}
-        onChange={(event) => setRule(rule._k, { value: event.target.value })}
+      <input value={ruleValueText(rule.value ?? '')}
+        onChange={(event) => setRule(rule.key, { value: event.target.value })}
         aria-label={`${t(field.label)} ${t('value')}`} placeholder={t('value')}
         type={inputType(field, operator)}
         min={operator.type === 'in_last_days' || operator.type === 'not_in_last_days' ? 1 : undefined} />
     );
   };
 
+  const renderRule = (r: RuleLeaf) => {
+    const ops = operatorsFor(r.id);
+    const field = fieldFor(r.id);
+    const operator = ops.find((candidate) => candidate.type === r.operator);
+    if (!field || !operator) {
+      return (
+        <div key={r.key} className={styles.unsupportedRule} role="group" aria-label={t('Unsupported rule')}>
+          <div className={styles.unsupportedDetails}>
+            <strong>{field ? t(field.label) : r.id}</strong>
+            <p>{t('This rule cannot be edited here. It will be kept unless you remove it.')}</p>
+            <dl>
+              <dt>{t('Rule field')}</dt><dd>{r.id}</dd>
+              <dt>{t('Rule operator')}</dt><dd>{r.operator}</dd>
+              <dt>{t('value')}</dt><dd>{ruleValueText(r.value)}</dd>
+            </dl>
+          </div>
+          <button className={styles.removeRule} onClick={() => removeUnsupportedRule(r.key)} aria-label={t('Remove rule')}>
+            <Trash2 size={15} aria-hidden="true" focusable={false} />
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div key={r.key} className={styles.ruleRow}>
+        <select aria-label={t('Rule field')} value={r.id} onChange={(e) => {
+          const id = e.target.value;
+          const nextOperator = operatorsFor(id)[0];
+          if (!nextOperator) return;
+          setRule(r.key, { id, operator: nextOperator.type, value: blankValueFor(nextOperator) });
+        }}>
+          {fields.map((f) => <option key={f.id} value={f.id}>{t(f.label)}</option>)}
+        </select>
+        <select aria-label={t('Rule operator')} value={operator.type} onChange={(e) => {
+          const nextOperator = operatorMap.get(e.target.value);
+          if (nextOperator) setRule(r.key, { operator: nextOperator.type, value: blankValueFor(nextOperator) });
+        }}>
+          {ops.map((o) => <option key={o.type} value={o.type}>{t(o.label)}</option>)}
+        </select>
+        {renderRuleValue(r, field, operator)}
+        <button className={styles.removeRule} onClick={() => setTree((current) => removeNode(current, r.key))}
+          disabled={totalRules === 1} aria-label={t('Remove rule')}>
+          <Trash2 size={15} aria-hidden="true" focusable={false} />
+        </button>
+      </div>
+    );
+  };
+
+  // Groups nest to any depth, as the classic builder allows; the root group's
+  // match selector lives in the row above the rules.
+  const renderGroup = (group: RuleGroup, nested: boolean) => (
+    <div key={group.key} className={nested ? styles.group : styles.rules}
+      role={nested ? 'group' : undefined} aria-label={nested ? t('Rule group') : undefined}>
+      {nested && (
+        <div className={styles.groupHeader}>
+          {t('Match')}
+          <select aria-label={t('Match condition')} value={group.condition}
+            onChange={(e) => setGroupCondition(group.key, e.target.value as 'AND' | 'OR')}>
+            <option value="AND">{t('all rules')}</option>
+            <option value="OR">{t('any rule')}</option>
+          </select>
+          <button className={styles.removeRule} onClick={() => setTree((current) => removeNode(current, group.key))}
+            disabled={leafCount(group) === totalRules} aria-label={t('Remove group')}>
+            <Trash2 size={15} aria-hidden="true" focusable={false} />
+          </button>
+        </div>
+      )}
+      {group.rules.map((node) => (node.kind === 'group' ? renderGroup(node, true) : renderRule(node)))}
+      <div className={styles.addRow}>
+        <button ref={nested ? undefined : rootAddRule} className={styles.addRule} onClick={() => appendTo(group.key, newRule())}>
+          <Plus size={15} aria-hidden="true" focusable={false} /> {t('Add rule')}
+        </button>
+        <button className={styles.addRule} onClick={() => appendTo(group.key, newGroup())}>
+          <Plus size={15} aria-hidden="true" focusable={false} /> {t('Add group')}
+        </button>
+      </div>
+    </div>
+  );
+
   const onCancel = () => {
     // Discard edits and go back where the user came from; fall back to the shelf
     // view (editing) or the shelves list (creating) on a direct/bookmarked load.
     if (window.history.length > 1) window.history.back();
-    else navigate(editId ? `/magic/${editId}` : '/shelves');
+    else navigate(editId ? `/magic/${editId}` : '/magic');
   };
 
   const onSave = () => {
     setErr(null);
     if (!name.trim()) { setErr(t('Give your smart shelf a name.')); return; }
-    const payload = { name: name.trim(), icon: icon || '🪄', rules: ruleSet() };
+    const owner = !editId || existing.data?.is_owner;
+    const payload = { name: name.trim(), icon: icon || '🪄', rules: ruleSet(), is_public: isPublic,
+      ...(owner ? { kobo_sync: koboSync } : {}), opds_expose: opdsExpose };
     if (editId) {
       edit.mutate(payload, {
         onSuccess: (d) => d.success ? navigate(`/magic/${editId}`) : setErr(d.message || t('Could not save the shelf.')),
@@ -155,7 +262,10 @@ export function MagicShelf({ editId }: { editId?: string }) {
   };
   const saving = create.isPending || edit.isPending;
 
-  if (schemaQuery.isLoading) {
+  if (editId && !existing.isLoading && (existing.error || !existing.data?.can_edit)) {
+    return <div className={styles.container}><p role="alert">{t('You are not allowed to edit this shelf')}</p></div>;
+  }
+  if (schemaQuery.isLoading || (editId && !seeded)) {
     return <div className={styles.container}><h1 className={styles.title}>{t('Loading…')}</h1></div>;
   }
   if (schemaQuery.isError || fields.length === 0) {
@@ -182,48 +292,21 @@ export function MagicShelf({ editId }: { editId?: string }) {
         </label>
       </div>
 
+      <ShelfOptions me={me} smart showSharing={!isSystem} owner={!editId || !!existing.data?.is_owner}
+        canShare={!editId || existing.data?.is_owner ? !!me?.role.share_shelfs : !!me?.role.edit_shelfs}
+        isPublic={isPublic} koboSync={koboSync} opdsExpose={opdsExpose}
+        onPublic={setPublic} onKobo={setKobo} onOpds={setOpds} />
+
       <div className={styles.matchRow}>
         {t('Match')}
-        <select aria-label={t('Match condition')} value={condition} onChange={(e) => setCondition(e.target.value as 'AND' | 'OR')}>
+        <select aria-label={t('Match condition')} value={tree.condition}
+          onChange={(e) => setGroupCondition(tree.key, e.target.value as 'AND' | 'OR')}>
           <option value="AND">{t('all rules')}</option>
           <option value="OR">{t('any rule')}</option>
         </select>
       </div>
 
-      <div className={styles.rules}>
-        {rules.map((r) => {
-          const ops = operatorsFor(r.id);
-          const field = fieldFor(r.id);
-          const operator = operatorMap.get(r.operator) ?? ops[0];
-          if (!field || !operator) return null;
-          return (
-            <div key={r._k} className={styles.ruleRow}>
-              <select aria-label={t('Rule field')} value={r.id} onChange={(e) => {
-                const id = e.target.value;
-                const nextOperator = operatorsFor(id)[0];
-                if (!nextOperator) return;
-                setRule(r._k, { id, operator: nextOperator.type, value: blankValueFor(nextOperator) });
-              }}>
-                {fields.map((f) => <option key={f.id} value={f.id}>{t(f.label)}</option>)}
-              </select>
-              <select aria-label={t('Rule operator')} value={operator.type} onChange={(e) => {
-                const nextOperator = operatorMap.get(e.target.value);
-                if (nextOperator) setRule(r._k, { operator: nextOperator.type, value: blankValueFor(nextOperator) });
-              }}>
-                {ops.map((o) => <option key={o.type} value={o.type}>{t(o.label)}</option>)}
-              </select>
-              {renderRuleValue(r, field, operator)}
-              <button className={styles.removeRule} onClick={() => setRules((rs) => rs.filter((x) => x._k !== r._k))}
-                disabled={rules.length === 1} aria-label={t('Remove rule')}>
-                <Trash2 size={15} aria-hidden="true" focusable={false} />
-              </button>
-            </div>
-          );
-        })}
-        <button className={styles.addRule} onClick={() => setRules((rs) => [...rs, newRule()])}>
-          <Plus size={15} aria-hidden="true" focusable={false} /> {t('Add rule')}
-        </button>
-      </div>
+      {renderGroup(tree, false)}
 
       <div className={previewData ? styles.preview : undefined} role="status">
         {previewData && (

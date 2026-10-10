@@ -65,3 +65,10 @@ test('a series listing still opens in series order', () => {
 test('an author, tag or discovery listing still opens on newest added', () => {
   assert.equal(defaultCatalogSort({ isSeries: false, isPlainLibrary: false }), 'new');
 });
+
+
+test('a custom choice made by the reader survives reload for server validation', () => {
+  assert.equal(resolveLibrarySort('cc-12-desc', null, VALUES), 'cc-12-desc');
+  assert.equal(resolveLibrarySort('cc-12-asc', null, VALUES), 'cc-12-asc');
+  assert.equal(resolveLibrarySort('cc-12-bad', null, VALUES), undefined);
+});

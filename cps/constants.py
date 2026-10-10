@@ -131,6 +131,24 @@ def calibre_library_dir():
     )
 
 
+AUTO_LIBRARY_UNIT_DIR = '/etc/s6-overlay/s6-rc.d/cwa-auto-library'
+
+
+def library_location_is_automounted(_isdir=os.path.isdir, _environ=os.environ):
+    """Whether the container's cwa-auto-library unit picks the library at boot.
+
+    Only then is the admin page's Calibre Database location read-only: a path
+    typed there would be replaced on the next start. A bare-metal or Windows
+    install has no such unit, and DISABLE_LIBRARY_AUTOMOUNT (same truthy
+    values as the unit's run script) switches it off inside the container, so
+    in both cases that field is the only way to set the location (#2343).
+    """
+    if not _isdir(AUTO_LIBRARY_UNIT_DIR):
+        return False
+    flag = _environ.get('DISABLE_LIBRARY_AUTOMOUNT') or ''
+    return not (flag.lower() in ('true', 'yes') or flag == '1')
+
+
 def tmp_conversion_dir():
     """Configured conversion scratch directory, without a trailing separator."""
     return _configured_dir(
@@ -138,10 +156,6 @@ def tmp_conversion_dir():
         'CWA_TMP_CONVERSION_DIR',
         DEFAULT_TMP_CONVERSION_DIR,
     )
-
-# Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
-DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
-CACHE_DIR           = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
 
 OAUTH_SSL_STRICT = os.environ.get('OAUTH_SSL_STRICT', "1").lower() in ("true", "1")
 
@@ -154,6 +168,13 @@ else:
     CONFIG_DIR = os.environ.get('CALIBRE_DBPATH', BASE_DIR)
     if getattr(sys, 'frozen', False):
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
+
+
+# Derived cache belongs with writable per-install state, not image-owned code.
+# Existing explicit CACHE_DIR deployments keep their chosen location. Thumbnail
+# cache already uses CONFIG_DIR/thumbnails and is deliberately unchanged.
+DEFAULT_CACHE_DIR = os.path.join(CONFIG_DIR, 'cache')
+CACHE_DIR = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
 
 
 def config_path(*parts, _join=os.path.join):
@@ -222,6 +243,10 @@ ROLE_VIEWER             = 1 << 8
 # The single whole-archive capability. It gates both Global Library and a
 # user's ability to switch their own account between the two library modes.
 ROLE_BROWSE_GLOBAL      = 1 << 9
+# Bit10 is reserved for the experimental Store's old auto-approval role.
+# Never reuse bits9/10 for acquisition: existing deployments use both layouts.
+ROLE_ACQUISITION_ACCESS = 1 << 11
+ROLE_ACQUISITION_AUTO_APPROVE = 1 << 12
 
 # #1939 user-facing library modes. ``has_own_library`` is the persisted
 # selector, but false is not "feature disabled": it is the named monolibrary
@@ -240,6 +265,8 @@ ALL_ROLES = {
                 "delete_role": ROLE_DELETE_BOOKS,
                 "viewer_role": ROLE_VIEWER,
                 "browse_global_role": ROLE_BROWSE_GLOBAL,
+                "acquisition_access_role": ROLE_ACQUISITION_ACCESS,
+                "acquisition_auto_approve_role": ROLE_ACQUISITION_AUTO_APPROVE,
             }
 
 DETAIL_RANDOM           = 1 <<  0
@@ -285,7 +312,10 @@ sidebar_settings = {
             }
 
 
-ADMIN_USER_ROLES        = sum(r for r in ALL_ROLES.values()) & ~ROLE_ANONYMOUS
+# Acquisition is explicitly opt-in, including for newly created admins.
+ADMIN_USER_ROLES        = (sum(r for r in ALL_ROLES.values())
+                          & ~(ROLE_ANONYMOUS | ROLE_ACQUISITION_ACCESS
+                              | ROLE_ACQUISITION_AUTO_APPROVE))
 ADMIN_USER_SIDEBAR      = (SIDEBAR_FAVORITES << 1) - 1
 
 UPDATE_STABLE       = 0 << 0
@@ -333,8 +363,29 @@ def has_flag(value, bit_flag):
     return bit_flag == (bit_flag & (value or 0))
 
 
+# Roles that no classic admin page draws a checkbox for. A classic form posts
+# only the boxes it renders, so rebuilding a whole mask from one would silently
+# clear any grant made elsewhere -- the acquisition grants are administered on
+# the Book sources page, not on the user edit form.
+ROLES_WITHOUT_CLASSIC_CHECKBOX = ("acquisition_access_role", "acquisition_auto_approve_role")
+
+
 def selected_roles(dictionary):
     return sum(v for k, v in ALL_ROLES.items() if k in dictionary)
+
+
+def preserved_roles(dictionary, current):
+    """Bits a classic form cannot express, carried over from the mask it edits.
+
+    A role with no checkbox keeps its current value unless the submitted form
+    actually carries its key, so adding the checkbox later starts working --
+    including unticking it -- without touching this function.
+    """
+    keep = 0
+    for key in ROLES_WITHOUT_CLASSIC_CHECKBOX:
+        if key not in dictionary:
+            keep |= (current or 0) & ALL_ROLES[key]
+    return keep
 
 
 # :rtype: BookMeta

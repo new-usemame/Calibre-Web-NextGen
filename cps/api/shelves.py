@@ -15,11 +15,12 @@ from sqlalchemy import or_, func
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
-from .serializers import serialize_shelf
-from .books import _rows_to_items
+from .serializers import serialize_shelf, cover_url_for
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
-from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id
+from ..services import ereader_scope, user_cover
+from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id, book_sort_order
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
     check_shelf_view_permissions,
@@ -34,6 +35,8 @@ from ..shelf import (
     queue_hardcover_sync,
     _shelf_book_count,
     sort_shelves_for_user,
+    shelf_picker_books,
+    SHELF_PICKER_PAGE_SIZE,
     SHELF_OK,
     SHELF_ALREADY_PRESENT,
     SHELF_INVALID_BOOK,
@@ -82,6 +85,8 @@ def list_shelves():
         serialize_shelf(s, _shelf_book_count(s, current_user), is_owner=(s.user_id == uid))
         for s in shelves
     ]
+    for shelf, item in zip(shelves, items):
+        item['can_edit'] = check_shelf_edit_permissions(shelf)
     return jsonify({"items": items})
 
 
@@ -96,8 +101,13 @@ def shelf_detail(shelf_id):
     if not check_shelf_view_permissions(shelf):
         return _err("forbidden", "You are not allowed to view this shelf", 403)
 
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", config.config_books_per_page, type=int)
+    select_all = request.args.get("select_all", "").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    page = 1 if select_all else request.args.get("page", 1, type=int)
+    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    ))
 
     # Shelf sorting is view-only: "stored", an unknown value, and the two
     # app-DB download-count sorts all retain the manual BookShelf order. Every
@@ -106,11 +116,14 @@ def shelf_detail(shelf_id):
     # anonymous guest has no history to sort by and falls back the way every
     # other unsupported sort does here — to the order the owner arranged.
     sort = request.args.get("sort", "stored")
-    if sort == RECENT_SORT:
+    if sort in ('ratingdesc', 'ratingasc'):
+        reader = viewer_id(current_user)
+        order = None if reader is None else book_sort_order(sort, user_id=reader)
+    elif sort == RECENT_SORT:
         reader = viewer_id(current_user)
         order = None if reader is None else recent_sort_order(reader)
     else:
-        order = BOOK_SORT_ORDERS.get(sort)
+        order = book_sort_order(sort) if sort in BOOK_SORT_ORDERS else None
     if order is None or sort in ("hotdesc", "hotasc"):
         order = [ub.BookShelf.order.asc()]
 
@@ -135,15 +148,23 @@ def shelf_detail(shelf_id):
         True, config.config_read_column,
         *joins,
         allow_public_shelf_books=bool(shelf.is_public),
+        ids_only=select_all,
     )
 
+    if select_all:
+        return _selection_response(entries, pagination.total_count)
+
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))
+    custom_column_definitions, _custom_values = _list_custom_column_data([])
     body.update({
         "items": _rows_to_items(entries),
+        "custom_column_definitions": custom_column_definitions,
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,
         "can_edit": check_shelf_edit_permissions(shelf),
+        "opds_expose": bool(getattr(current_user, 'opds_only_shelves_sync', False)
+                            and ub.is_opds_shelf_exposed_for_user(current_user.id, shelf.id)),
     })
     return jsonify(body)
 
@@ -178,17 +199,23 @@ def create_shelf_api():
     if not name:
         return _err("invalid_request", "Shelf name is required", 400)
 
+    if 'opds_expose' in data and not isinstance(data['opds_expose'], bool):
+        return _err("invalid_request", "opds_expose must be a boolean", 400)
     is_public = 1 if data.get("is_public") else 0
-    if is_public and not current_user.role_edit_shelfs():
+    if is_public and not current_user.role_share_shelfs():
         return _err("forbidden", "You are not allowed to create a public shelf", 403)
     if not check_shelf_is_unique(name, is_public):
         return _err("conflict", "A shelf with that name already exists", 409)
 
     shelf = ub.Shelf(name=name, is_public=is_public, user_id=int(current_user.id))
-    if data.get("kobo_sync") and config.config_kobo_sync:
+    if data.get("kobo_sync") and ereader_scope.shelf_marks_enabled(config):
         shelf.kobo_sync = True
     try:
         ub.session.add(shelf)
+        ub.session.flush()
+        if getattr(current_user, 'opds_only_shelves_sync', False):
+            ub.set_opds_shelf_exposed_for_user(current_user.id, shelf.id,
+                                              data.get('opds_expose') is True)
         ub.session.commit()
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
@@ -215,7 +242,8 @@ def update_shelf_api(shelf_id):
     target_public = shelf.is_public
     if "is_public" in data:
         target_public = 1 if data["is_public"] else 0
-        if target_public and not current_user.role_edit_shelfs():
+        if target_public and not shelf.is_public and not (current_user.role_share_shelfs()
+                                  if shelf.user_id == _uid() else current_user.role_edit_shelfs()):
             return _err("forbidden", "You are not allowed to make a shelf public", 403)
 
     if "name" in data:
@@ -229,7 +257,10 @@ def update_shelf_api(shelf_id):
     if "is_public" in data:
         shelf.is_public = target_public
 
-    if "kobo_sync" in data and config.config_kobo_sync:
+    if "kobo_sync" in data and shelf.user_id != _uid():
+        ub.session.rollback()
+        return _err("forbidden", "Only the shelf owner can change e-reader sync", 403)
+    if "kobo_sync" in data and ereader_scope.shelf_marks_enabled(config):
         shelf.kobo_sync = bool(data["kobo_sync"])
         if shelf.kobo_sync:
             # Clear any pending tombstone so a re-enabled shelf re-syncs to Kobo.
@@ -238,6 +269,12 @@ def update_shelf_api(shelf_id):
                 ub.ShelfArchive.uuid == shelf.uuid,
             ).delete()
 
+    if 'opds_expose' in data:
+        if not isinstance(data['opds_expose'], bool):
+            ub.session.rollback()
+            return _err("invalid_request", "opds_expose must be a boolean", 400)
+        if getattr(current_user, 'opds_only_shelves_sync', False):
+            ub.set_opds_shelf_exposed_for_user(current_user.id, shelf.id, data['opds_expose'])
     shelf.last_modified = datetime.now(timezone.utc)
     try:
         ub.session.merge(shelf)
@@ -267,6 +304,46 @@ def delete_shelf_api(shelf_id):
         ub.session.rollback()
         return _err("db_error", "Could not delete shelf: %s" % getattr(e, "orig", e), 500)
     return "", 204
+
+
+# ── Book picker (bulk add) ───────────────────────────────────────────────────
+
+@api_v1.route("/shelves/<int:shelf_id>/available-books")
+@login_required_if_no_ano
+def shelf_available_books_api(shelf_id):
+    """Searchable, paged book list for the shelf page's "Add books" picker.
+
+    The query is ``cps.shelf.shelf_picker_books``, shared with the classic
+    modal: the caller's browsing visibility minus archived books, which the
+    add path refuses. Each row says whether the book is already on this
+    shelf so the picker can disable it; the write path stays the per-book
+    ``POST /shelves/<id>/books/<book_id>`` endpoint, which owns permission,
+    de-duplication and library-membership checks.
+    """
+    shelf = ub.session.query(ub.Shelf).filter(ub.Shelf.id == shelf_id).first()
+    if shelf is None:
+        return _err("not_found", "Shelf not found", 404)
+    if not check_shelf_edit_permissions(shelf):
+        return _err("forbidden", "You are not allowed to add to this shelf", 403)
+
+    query = (request.args.get("query") or "").strip()
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    offset = (page - 1) * SHELF_PICKER_PAGE_SIZE
+    books, total, in_shelf = shelf_picker_books(shelf_id, query, offset, SHELF_PICKER_PAGE_SIZE)
+    overrides = user_cover.overrides_for_user(_uid(), [book.id for book in books])
+    items = [{
+        "id": book.id,
+        "title": book.title,
+        "authors": [a.name for a in book.authors] if book.authors else [],
+        "cover_url": cover_url_for(book, "sm", cover_override=overrides.get(int(book.id))),
+        "in_shelf": book.id in in_shelf,
+    } for book in books]
+    return jsonify({
+        "items": items,
+        "page": page,
+        "total": total,
+        "has_more": offset + len(items) < total,
+    })
 
 
 # ── Add / remove a book ──────────────────────────────────────────────────────

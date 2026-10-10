@@ -21,6 +21,7 @@ See notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md §4.1.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Collection, Optional, Tuple
 
@@ -32,7 +33,7 @@ from .annotation_types import to_storage_type
 
 log = logger.create()
 
-_VALID_SOURCES = {"kobo", "webreader", "koreader"}
+_VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote"}
 
 
 def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
@@ -57,6 +58,16 @@ def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
             return f"{field} must be an integer or null"
     if "hidden" in payload and not isinstance(payload.get("hidden"), bool):
         return "hidden must be a boolean"
+    if payload.get("text_quote") is not None:
+        from .text_anchor import parse_quote
+        if parse_quote(payload.get("text_quote")) is None:
+            return ("text_quote must be an object with a non-empty string exact and "
+                    "optional string prefix/suffix, within the published limits")
+    if payload.get("percentage") is not None:
+        value = payload.get("percentage")
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not 0.0 <= value <= 1.0):
+            return "percentage must be a number from 0 to 1 or null"
     if "content_id" in payload and payload.get("content_id") is not None:
         from .annotation_content_id import ContentIdError, normalize_content_id
         try:
@@ -68,6 +79,31 @@ def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
 
 def _now():
     return datetime.now(timezone.utc)
+
+
+def _stored_quote(row) -> Optional[dict]:
+    """The row's stored text quote, or None when absent or unreadable."""
+    raw = getattr(row, "text_quote", None)
+    if not raw:
+        return None
+    from .text_anchor import parse_quote
+    try:
+        return parse_quote(json.loads(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _anchor(row) -> tuple:
+    return (row.start_xpointer, row.end_xpointer, row.start_container_path,
+            row.start_offset, row.end_container_path, row.end_offset)
+
+
+def _iso(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)  # SQLite drops the zone
+    return value.isoformat()
 
 
 def to_portable(row) -> dict:
@@ -103,6 +139,12 @@ def to_portable(row) -> dict:
         "hidden": bool(row.hidden),
         "device_origin_id": row.device_origin_id,
         "last_synced": row.last_synced.isoformat() if row.last_synced else None,
+        # The edit clock. ``last_synced`` also moves when the server merely
+        # re-derives an anchor; these move only when the content changes, so a
+        # client can tell a remote edit from its own last-known copy.
+        "content_revision": getattr(row, "content_revision", None),
+        "server_modified_at": _iso(getattr(row, "server_modified_at", None)),
+        "text_quote": _stored_quote(row),
     }
 
 
@@ -121,7 +163,10 @@ def apply_portable(payload, *, user_id, book, session, commit,
     ``device_origin_id`` is recorded so the next pull won't echo the row back to
     the device. ``hidden: true`` soft-deletes.
 
-    Returns ``(row, action)`` where action ∈ {created, updated, deleted, skipped}.
+    Returns ``(row, action)`` where action ∈ {created, updated, deleted,
+    unchanged, skipped}. ``unchanged`` is a row sent again exactly as stored,
+    which a device retrying its complete set does on every sync; ``skipped``
+    is a change the server did not store.
     """
     from cps import ub
 
@@ -197,8 +242,10 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row.position_type, row.start_xpointer, row.end_xpointer,
         row.start_container_path, row.start_offset,
         row.end_container_path, row.end_offset,
-        row.device_origin_id, bool(row.hidden),
+        row.device_origin_id, bool(row.hidden), row.text_quote,
     )
+
+    anchor_before = _anchor(row)
 
     # Content fields (only overwrite when present in the payload).
     if "highlighted_text" in payload:
@@ -229,6 +276,23 @@ def apply_portable(payload, *, user_id, book, session, commit,
             row.start_xpointer = start_xpointer
             row.end_xpointer = end_xpointer if isinstance(end_xpointer, str) else None
 
+    # A quote is how its own client names a highlight; on another reader's row
+    # it would be served in place of the words that row's anchor holds.
+    if payload.get("text_quote") is not None and row.source == "textquote":
+        from .text_anchor import parse_quote
+        quote = parse_quote(payload.get("text_quote"))
+        if quote is not None:
+            row.text_quote = json.dumps(quote, ensure_ascii=False, sort_keys=True)
+            # Placed, the quote became the XPointer pair above. Unplaced, it is
+            # the only anchor the row has -- but it never replaces one: a later
+            # push that cannot be placed (the book was replaced) must not
+            # erase the place an earlier push found.
+            if (payload.get("position_type") == "text_quote"
+                    and row.position_type in (None, "text_quote")
+                    and not row.start_xpointer and not row.start_container_path
+                    and not row.cfi_range):
+                row.position_type = "text_quote"
+
     # Position — build the Kobo-native selector form from the KoboSpan anchor.
     start_span = payload.get("start_kobospan")
     if start_span:
@@ -240,8 +304,15 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row.end_container_child_index = -99
         row.end_offset = int(payload.get("end_offset") or 0)
 
-    if payload.get("device_origin_id"):
+    if payload.get("device_origin_id") and not row.device_origin_id:
+        # Where the highlight was made; another device editing it later does
+        # not become its origin.
         row.device_origin_id = payload.get("device_origin_id")
+
+    if payload.get("text_quote") is None and not created and _anchor(row) != anchor_before:
+        # The stored quote named the old place. Served after another reader
+        # moved the highlight, it would be sent back and move it back.
+        row.text_quote = None
 
     if hidden_requested and hidden_permitted:
         row.hidden = True
@@ -261,12 +332,22 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row.position_type, row.start_xpointer, row.end_xpointer,
         row.start_container_path, row.start_offset,
         row.end_container_path, row.end_offset,
-        row.device_origin_id, bool(row.hidden),
+        row.device_origin_id, bool(row.hidden), row.text_quote,
     )
     if not created and before == after:
-        return row, "skipped"
+        # A hide this sender may not make changed nothing because it was
+        # refused, not because it was already so.
+        refused = hidden_requested and not hidden_permitted
+        return row, "skipped" if refused else "unchanged"
 
-    row.last_synced = _now()
+    now = _now()
+    row.last_synced = now
+    # Every other writer advances the edit clock; without it a device edit
+    # was invisible to a client comparing revisions, and Kobo replayed the
+    # sidecar it held from before the edit (kobo_annotation_authority).
+    row.server_modified_at = now
+    if not created:
+        row.content_revision = (row.content_revision or 1) + 1
     try:
         # Keep the commit contract shared with every annotation writer. Import
         # at call time so this dependency-light service does not pull in the

@@ -48,6 +48,15 @@ def readbook_db():
 
     engine = create_engine("sqlite:///:memory:")
     ub.ReadBook.__table__.create(engine)
+    # Shelf tables back the per-page shelf-tag lookup (#1254).
+    ub.Shelf.__table__.create(engine)
+    ub.BookShelf.__table__.create(engine)
+    # Favorite badges are another per-page app.db lookup. Keep this tiny test
+    # database representative of the serializer's current optional metadata.
+    ub.FavoriteBook.__table__.create(engine)
+    # Personal/household ratings are two more page-level app.db projections.
+    ub.BookRating.__table__.create(engine)
+    ub.User.__table__.create(engine)
     session = sessionmaker(bind=engine)()
     try:
         yield ub, engine, session
@@ -104,9 +113,9 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
             ub.ReadBook(user_id=9, book_id=2, read_status=ub.ReadBook.STATUS_IN_PROGRESS),
         ])
         session.commit()
-        # One read-status lookup plus one bulk personal-cover lookup. The
-        # latter stays one query for the page, never one per book.
-        expected_queries = 2
+        # Read status, personal covers, shelf membership (#1254), and favorite
+        # ids each resolve once for the page, never once per book.
+        expected_queries = 6
     else:
         rows = [
             SimpleNamespace(
@@ -122,8 +131,14 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
                 read_status=ub.ReadBook.STATUS_UNREAD,
             ),
         ]
-        # Cover preferences are app.db state and resolve once per page.
-        expected_queries = 1
+        # Cover preferences, shelf membership (#1254), and favorite ids are
+        # app.db state and each resolve once per page.
+        expected_queries = 5
+
+    # This budget measures per-page work, excluding the real one-time SQLite
+    # JSON capability probe, which production caches for the process.
+    from cps import db
+    db._sqlite_json_available(session, session)
 
     statements = []
 
@@ -175,7 +190,12 @@ def test_anonymous_list_never_queries_or_exposes_in_progress(readbook_db):
         event.remove(engine, "before_cursor_execute", count_statement)
 
     assert body["items"][0]["in_progress"] is False
-    assert statements == []
+    # The per-user read table is never touched for the shared guest row. The
+    # one query is the shelf-tag lookup (#1254), and it asks for public shelves
+    # only -- never shelves owned by whichever user id the guest row carries.
+    assert not any("book_read_link" in statement for statement in statements)
+    assert len(statements) == 1 and "shelf.is_public" in statements[0]
+    assert "shelf.user_id =" not in statements[0]
 
 
 def test_custom_read_column_chunks_oversized_in_progress_lookup(readbook_db):
@@ -312,12 +332,13 @@ def test_shelf_detail_items_expose_in_progress():
     assert body["items"][0]["read"] is False
 
 
-def test_advanced_search_items_expose_in_progress():
+def test_advanced_search_items_expose_in_progress(readbook_db):
     """Advanced-search cards carry the same tri-state as the library grid."""
     from cps import ub
     from cps.api import books as books_mod
     from cps.api import search as search_mod
 
+    _ub, _engine, app_session = readbook_db
     user = SimpleNamespace(id=9, is_authenticated=True, is_anonymous=False)
     row = SimpleNamespace(
         Books=_book(3),
@@ -336,7 +357,7 @@ def test_advanced_search_items_expose_in_progress():
     with app.test_request_context(
         "/api/v1/search/advanced", method="POST", json={"title": "Book"}
     ):
-        with patch.object(search_mod, "current_user", user), patch.object(
+        with patch.object(
             books_mod, "current_user", user
         ), patch.object(
             search_mod.config, "config_books_per_page", 60, create=True
@@ -344,6 +365,8 @@ def test_advanced_search_items_expose_in_progress():
             search_mod.config, "config_read_column", 0, create=True
         ), patch.object(
             search_mod, "build_adv_search_query", return_value=(query, "")
+        ), patch.object(
+            ub, "session", app_session
         ):
             response = inspect.unwrap(search_mod.advanced_search)()
 

@@ -79,6 +79,8 @@
 }
 
 .segmented {
+  flex-wrap: wrap;
+  max-width: 100%;
   display: inline-flex;
   background: var(--surface-3);
   border: 1px solid var(--border);
@@ -94,6 +96,8 @@
   color: var(--text-muted);
   font-family: var(--font-body);
   font-size: var(--fs-sm);
+  min-height: 44px;
+  min-width: 44px;
   padding: calc(var(--sp-2) - 2px) var(--sp-3);
   border-radius: calc(var(--r-md) - 3px);
   cursor: pointer;

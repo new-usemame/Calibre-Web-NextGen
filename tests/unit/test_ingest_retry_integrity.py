@@ -85,7 +85,10 @@ def test_calibre_helper_rechecks_and_marks_inside_one_transaction():
 
 def test_transaction_prose_limits_atomicity_to_database_state():
     helper = HELPER.read_text()
-    changelog = (REPO_ROOT / "changelog.d/ingest-integrity-retry-stable-overwrite.md").read_text()
+    # The fragment is folded into CHANGELOG.md when a release is cut, so read
+    # whichever holds the entry now.
+    fragment = REPO_ROOT / "changelog.d/ingest-integrity-retry-stable-overwrite.md"
+    changelog = fragment.read_text() if fragment.exists() else (REPO_ROOT / "CHANGELOG.md").read_text()
     retry_finding = (REPO_ROOT / "findings/items/F-1fdb7c.json").read_text()
     overwrite_finding = (REPO_ROOT / "findings/items/F-1b2fdd.json").read_text()
 

@@ -5,6 +5,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+import threading
+import time
+
 from . import db, ub, logger
 from .cw_login import current_user
 from flask_babel import lazy_gettext as N_
@@ -100,9 +103,9 @@ _NATIVE_RULE_FIELDS = (
     {'id': 'language', 'label': 'Language', 'type': 'string', 'input': 'select',
      'description': 'Book language', 'operators': _SELECT_OPERATORS,
      '_binding': (db.Languages, 'lang_code')},
-    {'id': 'rating', 'label': 'Rating', 'type': 'integer', 'input': 'select',
+    {'id': 'rating', 'label': 'Library rating', 'type': 'integer', 'input': 'select',
      'values': {value: value for value in range(1, 11)},
-     'description': 'Book rating (1-10)', 'operators': _NUMBER_OPERATORS,
+     'description': 'Calibre library rating (1-10)', 'operators': _NUMBER_OPERATORS,
      '_binding': (db.Ratings, 'rating')},
     {'id': 'pubdate', 'label': 'Publication Date', 'type': 'datetime',
      'validation': {'format': 'YYYY-MM-DD'}, 'description': 'Original publication date',
@@ -110,6 +113,9 @@ _NATIVE_RULE_FIELDS = (
     {'id': 'timestamp', 'label': 'Date Added', 'type': 'datetime',
      'validation': {'format': 'YYYY-MM-DD'}, 'description': 'When the book was added',
      'operators': _DATE_OPERATORS, '_binding': (db.Books, 'timestamp')},
+    {'id': 'last_modified', 'label': 'Last Modified', 'type': 'datetime',
+     'validation': {'format': 'YYYY-MM-DD'}, 'description': 'When the book was last modified',
+     'operators': _DATE_OPERATORS, '_binding': (db.Books, 'last_modified')},
     {'id': 'has_cover', 'label': 'Has Cover', 'type': 'integer', 'input': 'radio',
      'values': {1: 'Yes', 0: 'No'}, 'description': 'Whether the book has cover art',
      'operators': _SELECT_OPERATORS, '_binding': (db.Books, 'has_cover')},
@@ -120,7 +126,8 @@ _NATIVE_RULE_FIELDS = (
      'description': 'Book description/comments', 'operators': _TEXT_OPERATORS,
      '_binding': (db.Comments, 'text')},
     {'id': 'read_status', 'label': 'Read Status', 'type': 'integer', 'input': 'radio',
-     'values': {0: 'Unread', 2: 'Currently Reading', 1: 'Read'},
+     'values': {0: 'Unread', 2: 'Currently Reading', 1: 'Read',
+                3: 'Did not finish', 4: 'On hold'},
      'description': 'Book reading status', 'operators': _SELECT_OPERATORS,
      '_binding': ('custom_column', 'read_status')},
     {'id': 'hardcover_id', 'label': 'Has Hardcover ID', 'type': 'integer', 'input': 'radio',
@@ -221,6 +228,7 @@ def get_rule_custom_columns():
 def build_rule_schema_for_locale(locale):
     """Build the request-ready schema, including library-specific choices."""
     from . import calibre_db, isoLanguages
+    from flask_babel import gettext
 
     language_map = {}
     for language in calibre_db.session.query(db.Languages).all():
@@ -229,7 +237,11 @@ def build_rule_schema_for_locale(locale):
                 locale, language.lang_code)
         except Exception:
             language_map[language.lang_code] = language.lang_code
-    return build_rule_schema(language_map, get_rule_custom_columns())
+    schema = build_rule_schema(language_map, get_rule_custom_columns())
+    for field in schema['fields']:
+        if field['id'] == 'read_status':
+            field['values'] = {key: gettext(label) for key, label in field['values'].items()}
+    return schema
 
 
 def normalize_magic_shelf_order(order_list, available_ids):
@@ -370,10 +382,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'timestamp',
                     'field': 'timestamp',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=30)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '30'
                 }
             ]
         }
@@ -449,6 +461,40 @@ SYSTEM_SHELF_TEMPLATES = {
             }]
         }
     },
+    'did_not_finish': {
+        'name': 'Did not finish',
+        'display_name': N_('Did not finish'),
+        'icon': '⏭️',
+        'description': 'Books you chose not to finish',
+        'rules': {
+            'condition': 'AND',
+            'rules': [{
+                'id': 'read_status',
+                'field': 'read_status',
+                'type': 'integer',
+                'input': 'radio',
+                'operator': 'equal',
+                'value': ub.ReadBook.STATUS_DID_NOT_FINISH,
+            }]
+        }
+    },
+    'on_hold': {
+        'name': 'On hold',
+        'display_name': N_('On hold'),
+        'icon': '⏸️',
+        'description': 'Books you have paused for later',
+        'rules': {
+            'condition': 'AND',
+            'rules': [{
+                'id': 'read_status',
+                'field': 'read_status',
+                'type': 'integer',
+                'input': 'radio',
+                'operator': 'equal',
+                'value': ub.ReadBook.STATUS_ON_HOLD,
+            }]
+        }
+    },
     'recent_publications': {
         'name': 'Recent Publications',
         'display_name': N_('Recent Publications'),
@@ -460,10 +506,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'pubdate',
                     'field': 'pubdate',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=730)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '730'
                 }
             ]
         }
@@ -523,6 +569,14 @@ def system_magic_shelf_display_name(shelf):
 # field cannot silently leave one UI behind.
 FIELD_MAP = {definition['id']: definition['_binding'] for definition in _NATIVE_RULE_FIELDS}
 
+# Native fields the engine can filter "in the last N days" on: offered by the
+# schema and stored directly on Books. Derived from the same definitions, so a
+# date field added there is filtered rather than silently dropped.
+_RELATIVE_DATE_FIELDS = frozenset(
+    definition['id'] for definition in _NATIVE_RULE_FIELDS
+    if 'in_last_days' in definition['operators'] and definition['_binding'][0] is db.Books
+)
+
 # Mapping from UI operators to SQLAlchemy functions/operators
 OPERATOR_MAP = {
     # 'equals': lambda col, val: col == val,  # Not used by QueryBuilder
@@ -578,7 +632,7 @@ def build_filter_from_rule(rule, user_id=None):
     # Relative date windows requested in #467. Store the duration, not a
     # frozen date, so the shelf keeps moving without an edit or migration.
     if operator_name in ('in_last_days', 'not_in_last_days'):
-        if field_name not in ('pubdate', 'timestamp'):
+        if field_name not in _RELATIVE_DATE_FIELDS:
             return None
         if isinstance(value, bool):
             return None
@@ -734,40 +788,40 @@ def build_filter_from_rule(rule, user_id=None):
                 try:
                     status_value = int(value)
                 except (ValueError, TypeError):
-                    status_value = 0
+                    return None
+                if status_value not in (ub.ReadBook.STATUS_UNREAD,
+                                        ub.ReadBook.STATUS_FINISHED,
+                                        ub.ReadBook.STATUS_IN_PROGRESS,
+                                        ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                        ub.ReadBook.STATUS_ON_HOLD):
+                    return None
 
-                if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
-                    # Currently reading: match STATUS_IN_PROGRESS
-                    matching_books = ub.session.query(ub.ReadBook).filter(
+                if status_value == ub.ReadBook.STATUS_UNREAD:
+                    # Preserve the historical unread meaning (including
+                    # in-progress) while excluding the two explicit paused
+                    # states so they do not fall into Yet to Read.
+                    matching_books = ub.session.query(ub.ReadBook.book_id).filter(
                         ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
+                        ub.ReadBook.read_status.in_((
+                            ub.ReadBook.STATUS_FINISHED,
+                            ub.ReadBook.STATUS_DID_NOT_FINISH,
+                            ub.ReadBook.STATUS_ON_HOLD,
+                        )),
                     ).all()
-                elif status_value == ub.ReadBook.STATUS_FINISHED:
-                    # Finished reading
-                    matching_books = ub.session.query(ub.ReadBook).filter(
-                        ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED
-                    ).all()
+                    matching_book_ids = [rb[0] for rb in matching_books]
+                    condition = ~db.Books.id.in_(matching_book_ids)
                 else:
-                    # Unread: books with no ReadBook entry or STATUS_UNREAD
-                    matching_books = ub.session.query(ub.ReadBook).filter(
+                    matching_books = ub.session.query(ub.ReadBook.book_id).filter(
                         ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED
+                        ub.ReadBook.read_status == status_value
                     ).all()
-
-                matching_book_ids = [rb.book_id for rb in matching_books]
+                    matching_book_ids = [rb[0] for rb in matching_books]
+                    condition = db.Books.id.in_(matching_book_ids)
 
                 if operator_name == 'equal':
-                    if status_value == ub.ReadBook.STATUS_UNREAD:
-                        # Unread = NOT in finished list
-                        return ~db.Books.id.in_(matching_book_ids)
-                    else:
-                        return db.Books.id.in_(matching_book_ids)
+                    return condition
                 elif operator_name == 'not_equal':
-                    if status_value == ub.ReadBook.STATUS_UNREAD:
-                        return db.Books.id.in_(matching_book_ids)
-                    else:
-                        return ~db.Books.id.in_(matching_book_ids)
+                    return ~condition
                 else:
                     return None
             else:
@@ -786,11 +840,24 @@ def build_filter_from_rule(rule, user_id=None):
         try:
             status_value = int(value)
         except (ValueError, TypeError):
-            status_value = 0
+            return None
+        if status_value not in (ub.ReadBook.STATUS_UNREAD,
+                                ub.ReadBook.STATUS_FINISHED,
+                                ub.ReadBook.STATUS_IN_PROGRESS,
+                                ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                ub.ReadBook.STATUS_ON_HOLD):
+            return None
 
         # "Marked read" in custom-column mode means a truthy column row exists.
         cc_read = getattr(db.Books, cc_relationship).any(column == True)  # noqa: E712
 
+        paused_ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+            ub.ReadBook.user_id == user_id,
+            ub.ReadBook.read_status.in_((
+                ub.ReadBook.STATUS_DID_NOT_FINISH,
+                ub.ReadBook.STATUS_ON_HOLD,
+            )),
+        ).all()] if user_id is not None else []
         if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
             # The in-progress tri-state exists only in ub.ReadBook — KOReader/
             # Kobo sync writes it there regardless of the configured read
@@ -807,13 +874,25 @@ def build_filter_from_rule(rule, user_id=None):
                 ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
             ).all()]
             condition = and_(db.Books.id.in_(in_progress_ids), ~cc_read)
+        elif status_value == ub.ReadBook.STATUS_DID_NOT_FINISH:
+            ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_DID_NOT_FINISH,
+            ).all()] if user_id is not None else []
+            condition = db.Books.id.in_(ids)
+        elif status_value == ub.ReadBook.STATUS_ON_HOLD:
+            ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_ON_HOLD,
+            ).all()] if user_id is not None else []
+            condition = db.Books.id.in_(ids)
         elif status_value == ub.ReadBook.STATUS_FINISHED:
-            condition = cc_read
+            condition = and_(cc_read, ~db.Books.id.in_(paused_ids))
         else:
             # Unread: no truthy column row. Books never touched have no row
             # at all, so match on absence-of-read rather than value == False
             # (the old shape hid every never-marked book from "Yet to Read").
-            condition = ~cc_read
+            condition = and_(~cc_read, ~db.Books.id.in_(paused_ids))
 
         if operator_name == 'equal':
             return condition
@@ -946,21 +1025,10 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
         from . import calibre_db
         if calibre_db._desktop_compat:
             bypass_cache = True
-        if not bypass_cache and current_user.is_authenticated:
-            cache = ub.session.query(ub.MagicShelfCache).filter_by(
-                shelf_id=shelf_id,
-                user_id=current_user.id,
-                sort_param=sort_param,
-            ).first()
-            if cache:
-                created_at = cache.created_at
-                if created_at.tzinfo is None:
-                    created_at = created_at.replace(tzinfo=timezone.utc)
-                is_expired = (datetime.now(timezone.utc) - created_at) > timedelta(minutes=30)
-                if not is_expired:
-                    log.debug(f"Magic shelf {shelf_id} ID list served from cache ({cache.total_count} books)")
-                    return cache.book_ids, cache.total_count
-
+        # Cached membership is a Kobo generation ledger, not permission to
+        # serve an old result. Re-evaluate the live query before using it:
+        # membership, mode, content policy and rule data can change through
+        # multiple writers, including external Calibre edits.
         query, magic_shelf = build_book_query_for_magic_shelf(
             shelf_id, sort_order=sort_order, sort_join=sort_join
         )
@@ -1002,6 +1070,13 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
                 for cache_row in existing_rows
                 if cache_row.created_at is not None
             ), default=None) if membership_unchanged else None
+            if membership_unchanged and any(
+                row.sort_param == sort_param and row.book_ids == all_ids
+                and row.total_count == total_count
+                for row in existing_rows
+            ):
+                # A read/no-op must not write or advance the device watermark.
+                return all_ids, total_count
             stale_cache_query = ub.session.query(ub.MagicShelfCache).filter_by(
                 shelf_id=shelf_id,
                 user_id=current_user.id,
@@ -1142,6 +1217,39 @@ def get_books_for_magic_shelf(shelf_id, page=1, page_size=None, sort_order=None,
         if raise_on_error:
             raise
         return [], 0
+
+
+# Sidebar counts for the classic layout, cached per (user, shelf) on the server.
+# They used to live in the session cookie, which changed the cookie whenever a
+# count expired; covers are cached with ``Vary: Cookie``, so every library visit
+# more than a few minutes after the last one downloaded every cover again (#2386).
+BOOK_COUNT_CACHE_SECONDS = 300
+_book_count_cache = {}
+_book_count_cache_lock = threading.Lock()
+
+
+def cached_book_count_for_magic_shelf(user_id, shelf_id, now=None):
+    """``get_book_count_for_magic_shelf`` for ``user_id``, reused for a few minutes."""
+    now = time.time() if now is None else now
+    key = (user_id, shelf_id)
+    with _book_count_cache_lock:
+        cached = _book_count_cache.get(key)
+    if cached and now - cached[1] < BOOK_COUNT_CACHE_SECONDS:
+        return cached[0]
+    count = get_book_count_for_magic_shelf(shelf_id)
+    with _book_count_cache_lock:
+        _book_count_cache[key] = (count, now)
+    return count
+
+
+def forget_book_counts(shelf_id=None):
+    """Drop cached counts for one shelf (every user), or all of them."""
+    with _book_count_cache_lock:
+        if shelf_id is None:
+            _book_count_cache.clear()
+        else:
+            for key in [k for k in _book_count_cache if k[1] == shelf_id]:
+                del _book_count_cache[key]
 
 
 def get_book_count_for_magic_shelf(shelf_id):

@@ -195,6 +195,12 @@ class HardcoverClient:
 
     # TODO Add option for autocreate if missing books instead of forcing it.
     def update_reading_progress(self, identifiers, progress_percent):
+        # Our devices and the web reader finish a book at 99% (the tail is notes
+        # and index), so Hardcover must agree or a finished book stays Reading
+        # there (#2289). Imported here: kosync imports cps.kobo, which imports us.
+        from ..progress_syncing.protocols.kosync import FINISHED_PERCENT_THRESHOLD
+        if progress_percent >= FINISHED_PERCENT_THRESHOLD:
+            progress_percent = MAX_PROGRESS_PERCENTAGE
         ids = self.parse_identifiers(identifiers)
         if len(ids) != 0:
             book = self.get_user_book(ids)
@@ -216,6 +222,12 @@ class HardcoverClient:
             edition = book.get("edition") or {}
             pages = edition.get("pages") or 0
             if not pages:
+                if progress_percent == MAX_PROGRESS_PERCENTAGE:
+                    # Finishing needs no page count (#2289). Without an edition
+                    # the page progress below cannot be written, but a finished
+                    # book is still Read, and it used to stay "Reading" forever.
+                    self.change_book_status(book, STATUS_READ)
+                    return
                 log.info("Hardcover user_book has no edition page count; progress not synced. "
                          "Pick an edition for the book on Hardcover to enable page-based progress.")
             if pages:
@@ -255,6 +267,21 @@ class HardcoverClient:
             return
         else:
             return
+
+    def mark_book_read(self, identifiers):
+        """Mirror a manual "mark as read" into the user's Hardcover library (#2289).
+
+        A book that is not on Hardcover yet is added as Read; one that is there
+        in any other status moves to Read. Returns the user_book, or None when
+        Hardcover could not match or add the book.
+        """
+        ids = self.parse_identifiers(identifiers)
+        book = self.get_user_book(ids)
+        if not book:
+            return self.add_book(ids, status=STATUS_READ)
+        if book.get("status_id") == STATUS_READ:
+            return book
+        return self.change_book_status(book, STATUS_READ) or None
 
     def change_book_status(self, book, status):
         mutation = (

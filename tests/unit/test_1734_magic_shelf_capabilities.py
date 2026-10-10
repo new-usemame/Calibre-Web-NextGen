@@ -29,8 +29,10 @@ def _user(user_id=7, *, admin=False, edit_shelfs=False, authenticated=True):
     return SimpleNamespace(
         id=user_id,
         is_authenticated=authenticated,
+        is_anonymous=not authenticated,
         role_admin=lambda: admin,
         role_edit_shelfs=lambda: edit_shelfs,
+        role_share_shelfs=lambda: True,
         opds_only_shelves_sync=False,
     )
 
@@ -119,7 +121,7 @@ def classic_route_app():
     return app
 
 
-def _dispatch_classic_route(app, path, method, shelf, user):
+def _dispatch_classic_route(app, path, method, shelf, user, json_data=None):
     from cps import web
 
     session = _RouteSession(shelf)
@@ -129,11 +131,12 @@ def _dispatch_classic_route(app, path, method, shelf, user):
          patch.object(web.ub, "is_opds_magic_shelf_exposed_for_user",
                       return_value=False), \
          patch.object(web, "render_title_template", return_value="edit form"), \
+         patch.object(web, "flag_modified", lambda *_args: None), \
          patch.object(web.config, "config_kobo_sync_magic_shelves", False,
                       create=True), \
          patch.object(web.magic_shelf, "build_rule_schema_for_locale",
                       return_value=[]):
-        response = app.test_client().open(path, method=method)
+        response = app.test_client().open(path, method=method, json=json_data)
     return response, session
 
 
@@ -181,6 +184,38 @@ def test_non_owner_admin_cannot_toggle_magic_shelf_kobo_sync():
     data = _serialize(_shelf(), _user(admin=True, edit_shelfs=True))
     assert data["can_kobo_sync"] is False
     assert data["is_owner"] is False
+
+
+@pytest.mark.unit
+def test_non_owner_admin_cannot_change_magic_shelf_kobo_sync(classic_route_app):
+    shelf = _shelf(kobo_sync=False)
+    response, session = _dispatch_classic_route(
+        classic_route_app,
+        f"/magicshelf/{shelf.id}/edit",
+        "POST",
+        shelf,
+        _user(admin=True),
+        json_data={"name": shelf.name, "rules": shelf.rules, "kobo_sync": True},
+    )
+    assert response.status_code == 403
+    assert shelf.kobo_sync is False
+    assert session.commits == 0
+
+
+@pytest.mark.unit
+def test_non_owner_admin_partial_edit_preserves_magic_shelf_kobo_sync(classic_route_app):
+    shelf = _shelf(kobo_sync=True)
+    response, session = _dispatch_classic_route(
+        classic_route_app,
+        f"/magicshelf/{shelf.id}/edit",
+        "POST",
+        shelf,
+        _user(admin=True),
+        json_data={"name": shelf.name, "rules": shelf.rules},
+    )
+    assert response.status_code == 200
+    assert shelf.kobo_sync is True
+    assert session.commits == 1
 
 
 @pytest.mark.unit
@@ -325,4 +360,18 @@ def test_spa_gates_each_control_on_its_matching_capability():
     assert "{data.can_edit && (" in source
     assert "{data.can_duplicate && (" in source
     assert "{data.can_delete && (" in source
-    assert "data.can_kobo_sync && me?.features?.kobo_sync" in source
+    # The e-reader sync mark also reaches the KOReader library, so the control
+    # shows once either sync is on (frontend/src/lib/ereaderWording.ts).
+    assert "data.can_kobo_sync && shelfMarksReachDevices(me?.features)" in source
+
+
+@pytest.mark.unit
+def test_system_shelf_visibility_cannot_be_changed_by_direct_request(classic_route_app):
+    shelf = _shelf(is_system=True, is_public=0)
+    response, session = _dispatch_classic_route(
+        classic_route_app, "/magicshelf/17/edit", "POST", shelf,
+        _user(user_id=41), {"is_public": True},
+    )
+    assert response.status_code == 403
+    assert shelf.is_public == 0
+    assert session.commits == 0

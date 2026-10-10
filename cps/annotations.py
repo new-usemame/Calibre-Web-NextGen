@@ -178,16 +178,18 @@ def _device_inventory_pagination():
 
 
 def _owned_device(public_id, user_id, session):
-    return session.query(ub.Device).filter(
+    from .services.browser_source import canonical_browser
+    device = session.query(ub.Device).filter(
         ub.Device.public_id == public_id, ub.Device.user_id == user_id,
     ).first()
+    return canonical_browser(device, session, ub)
 
 
 def _device_kind_label(kind):
     return {
         "kobo": "Kobo",
         "koreader": "KOReader",
-        "webreader": "Web reader",
+        "webreader": "Browser",
     }.get(kind, "E-reader")
 
 
@@ -214,7 +216,8 @@ def _empty_authority_rollup():
 def _device_json(device, annotation_count=0, inventory_report=None, storage_snapshot=None,
                  annotation_counts=None, authority_rollup=None, seeded_books=0,
                  unseeded_books=0, inventory_count=None, books_with_position=0,
-                 last_position_at=None):
+                 last_position_at=None, origin_annotation_count=None,
+                 browser_identity=None):
     annotation_counts = annotation_counts or {}
     return {
         "public_id": device.public_id,
@@ -227,6 +230,8 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "first_seen": _device_timestamp_json(device.first_seen_at),
         "last_seen": _device_timestamp_json(device.last_seen_at),
         "annotation_count": int(annotation_count),
+        "origin_annotation_count": origin_annotation_count,
+        "browser_identity": browser_identity,
         "highlights": int(annotation_counts.get("highlight", 0)),
         "notes": int(annotation_counts.get("note", 0)),
         "dogears": int(annotation_counts.get("dogear", 0)),
@@ -516,6 +521,7 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
     device_id_set = set(device_ids)
 
     assigned_counts = {device_id: 0 for device_id in device_ids}
+    origin_totals = {device_id: 0 for device_id in device_ids}
     origin_counts = {
         device_id: {kind: 0 for kind in DEVICE_ANNOTATION_TYPES}
         for device_id in device_ids
@@ -540,6 +546,8 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
         ub.Annotation.annotation_type,
     ).all()
     for origin_id, assigned_id, annotation_type, count in annotation_groups:
+        if origin_id in origin_totals:
+            origin_totals[origin_id] += int(count)
         if assigned_id in assigned_counts:
             assigned_counts[assigned_id] += int(count)
         if origin_id in origin_counts and annotation_type in DEVICE_ANNOTATION_TYPES:
@@ -740,6 +748,8 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
             inventory_count=inventory_counts.get(device.id, 0),
             books_with_position=books_with_position,
             last_position_at=last_position,
+            origin_annotation_count=origin_totals[device.id],
+            browser_identity="account" if device.kind == "webreader" else None,
         ))
     return rows
 
@@ -748,7 +758,9 @@ def list_annotation_devices(*, user_id, session, active_only=False,
                             limit=DEFAULT_DEVICE_LIST_LIMIT, offset=0,
                             return_total=False):
     """List one bounded page with SQL-aggregated, owner-filtered counts."""
-    query = session.query(ub.Device).filter(ub.Device.user_id == user_id)
+    query = session.query(ub.Device).filter(
+        ub.Device.user_id == user_id, ub.Device.created_by != "browser-alias",
+    )
     if active_only:
         query = query.filter(ub.Device.active.is_(True))
     total = query.count()
@@ -1169,10 +1181,12 @@ def annotation_admin_devices():
         if error_response is not None:
             return error_response, error_status
         limit, offset = pagination
-        total = ub.session.query(func.count(ub.Device.id)).scalar() or 0
+        total = ub.session.query(func.count(ub.Device.id)).filter(
+            ub.Device.created_by != "browser-alias",
+        ).scalar() or 0
         page = ub.session.query(ub.Device, ub.User).outerjoin(
             ub.User, ub.User.id == ub.Device.user_id,
-        ).order_by(
+        ).filter(ub.Device.created_by != "browser-alias").order_by(
             ub.User.name, ub.User.id, ub.Device.display_name, ub.Device.id,
         ).offset(offset).limit(limit).all()
         devices = [device for device, _owner in page]
@@ -2015,36 +2029,76 @@ def _resolve_book_or_404(book_id: int):
     return book
 
 
+def _book_format_path(book, book_format) -> Optional[str]:
+    """On-disk file of one EPUB-family format (``EPUB``/``KEPUB``) of a book,
+    mirroring ``cps/web.py``'s serve_book lookup; ``None`` when absent."""
+    from . import config
+
+    wanted = (book_format or "").upper()
+    if wanted not in ("EPUB", "KEPUB"):
+        return None
+    for fmt in getattr(book, "data", None) or []:
+        if (fmt.format or "").upper() != wanted:
+            continue
+        path = os.path.join(config.get_book_path(), book.path, fmt.name + "." + wanted.lower())
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def _resolve_epub_path(book) -> Optional[str]:
-    """Find the on-disk EPUB file for a book — mirrors the lookup
-    pattern in ``cps/web.py``'s serve_book. Returns ``None`` if no
+    """Find the on-disk EPUB file for a book. Returns ``None`` if no
     EPUB/KEPUB format exists or the file is missing on disk.
 
     Prefers KEPUB: Kobo highlights anchor on KoboSpan ids, which only
     exist in the kepub. A plain EPUB has no KoboSpans, so computing a
     CFI against it would never resolve the anchor."""
-    from . import config
+    return _book_format_path(book, "KEPUB") or _book_format_path(book, "EPUB")
 
-    def _disk_path(fmt):
-        ext = (fmt.format or "").upper()
-        if ext not in ("EPUB", "KEPUB"):
-            return None
-        path = os.path.join(config.get_book_path(), book.path, fmt.name + "." + ext.lower())
-        return path if os.path.isfile(path) else None
 
-    data = book.data or []
-    # KEPUB first (carries KoboSpans), then any EPUB as a fallback.
-    for fmt in data:
-        if (fmt.format or "").upper() == "KEPUB":
-            p = _disk_path(fmt)
-            if p:
-                return p
-    for fmt in data:
-        if (fmt.format or "").upper() == "EPUB":
-            p = _disk_path(fmt)
-            if p:
-                return p
-    return None
+def _has_native_kobo_anchor(row) -> bool:
+    """True when the row's CFI is derived server-side from a Kobo anchor."""
+    from .services.kobo_position import _extract_kobospan_id, KOBO_SELECTOR_SENTINEL
+    if (_extract_kobospan_id(row.start_container_path or "")
+            and _extract_kobospan_id(row.end_container_path or "")):
+        return True
+    start_child = getattr(row, "start_container_child_index", None)
+    end_child = getattr(row, "end_container_child_index", None)
+    return (start_child is not None and end_child is not None
+            and start_child != KOBO_SELECTOR_SENTINEL
+            and end_child != KOBO_SELECTOR_SENTINEL)
+
+
+def _cfi_source_path(row, book) -> Optional[str]:
+    """The file a row's ``cfi_range`` is expressed against.
+
+    A Kobo-anchored row's CFI is computed here from the KEPUB when there is
+    one; every other CFI comes from the web reader, which renders the EPUB.
+    """
+    if _has_native_kobo_anchor(row):
+        return _resolve_epub_path(book)
+    return _book_format_path(book, "EPUB")
+
+
+def _compute_koreader_cfi(row, book) -> Optional[str]:
+    """Web-reader CFI for a KOReader highlight (crengine XPointers, #324).
+
+    Resolved against the EPUB the web reader renders, and only when the
+    passage between the two points is the row's highlighted text: XPointers
+    taken from a KEPUB or an older copy of the book give ``None``.
+    """
+    if not row.start_xpointer or not row.end_xpointer:
+        return None
+    epub_path = _book_format_path(book, "EPUB")
+    if not epub_path:
+        return None
+    from .services.koreader_xpointer import derive_cfi_range
+    try:
+        return derive_cfi_range(epub_path, row.start_xpointer, row.end_xpointer,
+                                row.highlighted_text)
+    except Exception as e:
+        log.warning("annotations: xpointer->cfi failed for %s: %s", row.annotation_id, e)
+        return None
 
 
 def _compute_annotation_cfi(row, book) -> Optional[str]:
@@ -2118,19 +2172,17 @@ def _resolve_annotation_anchor(row, book):
         return None, "ok" if row.pdf_page is not None and row.pdf_quad_json else "unresolved"
     if position_type == "comic_page":
         return None, "ok" if row.comic_page is not None else "unresolved"
+    if position_type == "koreader_xpointer":
+        # A KOReader highlight's native anchor is its XPointer pair. Like a
+        # KoboSpan anchor it is re-resolved on every read, so a replaced EPUB
+        # cannot keep serving a CFI that frames other words.
+        current_cfi = _compute_koreader_cfi(row, book)
+        if current_cfi:
+            _persist_cfi_range(row, current_cfi)
+            return current_cfi, "ok"
+        return row.cfi_range, "unresolved"
 
-    from .services.kobo_position import _extract_kobospan_id, KOBO_SELECTOR_SENTINEL
-    has_selector = bool(
-        _extract_kobospan_id(row.start_container_path or "")
-        and _extract_kobospan_id(row.end_container_path or "")
-    )
-    start_child = getattr(row, "start_container_child_index", None)
-    end_child = getattr(row, "end_container_child_index", None)
-    has_child_anchor = (
-        start_child is not None and end_child is not None
-        and start_child != KOBO_SELECTOR_SENTINEL and end_child != KOBO_SELECTOR_SENTINEL
-    )
-    if has_selector or has_child_anchor:
+    if _has_native_kobo_anchor(row):
         current_cfi = _compute_annotation_cfi(row, book)
         if current_cfi:
             _persist_cfi_range(row, current_cfi)
@@ -2188,7 +2240,9 @@ def _annotation_device_payload(user_id, session, device_ids=None, include_assign
     """Return an owned, bounded lookup, optionally including assignment choices."""
     if device_ids is not None and not device_ids and not include_assignable:
         return {}, {}
-    query = session.query(ub.Device).filter(ub.Device.user_id == user_id)
+    query = session.query(ub.Device).filter(
+        ub.Device.user_id == user_id, ub.Device.created_by != "browser-alias",
+    )
     if device_ids is not None:
         referenced = ub.Device.id.in_(tuple(device_ids))
         query = query.filter(or_(referenced, ub.Device.active.is_(True)) if include_assignable else referenced)
@@ -2705,7 +2759,7 @@ def _fanout_to_sync_targets(row, book):
 
 
 def _observe_webreader_request_device():
-    """Resolve this browser without ever exposing its installation id."""
+    """Attribute browser edits to the authenticated account’s shared source."""
     try:
         from .services.device_registry import (
             WEBREADER_INSTALLATION_ID_HEADER,

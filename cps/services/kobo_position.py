@@ -41,12 +41,14 @@ not part of the import-contract.
 from __future__ import annotations
 
 import logging
+import posixpath
 import re
 import zipfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
+from urllib.parse import unquote, urlsplit
 from xml.etree import ElementTree as ET
 
 from lxml import html as lxml_html
@@ -142,6 +144,9 @@ def compute_cfi_range(epub_path: Path, position: KoboPosition) -> Optional[str]:
         )
         return None
     spine_step = f"/6/{2 * (spine_index + 1)}"
+    # Use the very same resolved member for the DOM and the spine index.
+    # Independently searching ZIP suffixes can select a different chapter.
+    chapter_file = spine[spine_index]
 
     start_id = _extract_kobospan_id(position.start_container_path)
     end_id = _extract_kobospan_id(position.end_container_path)
@@ -413,7 +418,7 @@ def _resume_snapshot(epub_path, source, location_type, value):
             # Decode, normalize AND compare once per distinct href. Caching
             # just the decoded string would still repeat long comparisons for
             # every itemref in a highly compressed, repetitive spine.
-            decoded_source = unquote(source)
+            source_candidates = _native_chapter_candidates(source)
             opf_dir = posixpath.dirname(opf_path)
             href_matches = {}
             manifest = {}
@@ -426,7 +431,7 @@ def _resume_snapshot(epub_path, source, location_type, value):
                     if href and "#" not in href:
                         decoded_href = unquote(href)
                         candidate = posixpath.normpath(posixpath.join(opf_dir, decoded_href))
-                        if decoded_source in (candidate, decoded_href):
+                        if source_candidates.intersection((candidate, decoded_href)):
                             member = candidate
                     href_matches[href] = member
                 manifest[item.get("id")] = href_matches[href]
@@ -476,8 +481,11 @@ def _get_spine(cache_key: tuple, epub_path_arg: Path) -> list[str]:
 
 
 def parse_spine(epub_path: Path) -> list[str]:
-    """Return the EPUB's spine — a list of chapter HTML hrefs in
-    reading order. Used to compute the ``/6/2N`` part of the CFI."""
+    """Return ZIP-relative chapter paths in reading order.
+
+    Manifest hrefs are URIs relative to the package document, not the ZIP
+    root. Empty entries preserve the index of unresolvable item references.
+    """
     if not isinstance(epub_path, Path):
         epub_path = Path(epub_path)
 
@@ -501,16 +509,50 @@ def parse_spine(epub_path: Path) -> list[str]:
 
     root = ET.fromstring(opf)
     manifest = {
-        it.attrib["id"]: it.attrib.get("href", "")
+        it.attrib["id"]: _archive_member(it.attrib.get("href", ""), posixpath.dirname(opf_path))
         for it in root.findall(".//opf:manifest/opf:item", _OPF_NS)
     }
     spine_refs = root.findall(".//opf:spine/opf:itemref", _OPF_NS)
     out = []
     for ref in spine_refs:
         idref = ref.get("idref")
-        if idref and idref in manifest:
-            out.append(manifest[idref])
+        out.append(manifest.get(idref, ""))
     return out
+
+
+def _archive_member(href: str, base: str = "") -> str:
+    """Resolve a local publication URI without permitting external resources
+    or paths outside the archive. Decode once, after splitting URI components.
+    """
+    try:
+        uri = urlsplit(href)
+        if uri.scheme or uri.netloc or uri.query or uri.fragment:
+            return ""
+        path = unquote(uri.path)
+        if not path or path.startswith("/") or "\\" in path or "\x00" in path:
+            return ""
+        member = posixpath.normpath(posixpath.join(base, path))
+        if member in (".", "..") or member.startswith("../"):
+            return ""
+        return member
+    except (TypeError, ValueError):
+        return ""
+
+
+def _native_chapter_candidates(chapter: str) -> set[str]:
+    """Kobo sends raw ZIP names as well as escaped URI paths. Keep both
+    interpretations; callers must reject them if they name different chapters.
+    """
+    if not isinstance(chapter, str):
+        return set()
+    candidates = set()
+    for path in (chapter, unquote(chapter)):
+        if not path or path.startswith("/") or "\\" in path or "\x00" in path:
+            continue
+        member = posixpath.normpath(path)
+        if member not in (".", "..") and not member.startswith("../"):
+            candidates.add(member)
+    return candidates
 
 
 # ---------------------------------------------------------------------------
@@ -625,12 +667,17 @@ def _child_index_to_cfi_step(child_index: Optional[int]) -> Optional[str]:
 
 
 def _resolve_spine_index(spine: list[str], chapter_file: str) -> Optional[int]:
-    """Match the ``chapter_file`` (a bare basename) against entries in
-    ``spine`` (which may have ``OEBPS/`` or other prefixes)."""
-    for i, href in enumerate(spine):
-        if href == chapter_file or href.endswith("/" + chapter_file):
-            return i
-    return None
+    """Prefer an exact archive path; accept historical shortened paths only
+    when they identify exactly one spine entry. Never guess by basename.
+    """
+    candidates = _native_chapter_candidates(chapter_file)
+    if not candidates:
+        return None
+    matches = [i for i, href in enumerate(spine) if href in candidates]
+    if not matches:
+        matches = [i for i, href in enumerate(spine)
+                   if any(href.endswith("/" + member) for member in candidates)]
+    return matches[0] if len(matches) == 1 else None
 
 
 def _fallback_via_context(
@@ -680,16 +727,12 @@ def _get_chapter_dom(cache_key: tuple, epub_path_arg: Path, chapter_file: str):
     same ``cache_key`` ``(path, mtime_ns)`` as ``_get_spine`` so
     re-uploads bust both caches together."""
     with zipfile.ZipFile(epub_path_arg) as zf:
-        candidates = [chapter_file] + [
-            n for n in zf.namelist() if n.endswith("/" + chapter_file)
-        ]
-        for name in candidates:
-            try:
-                raw = zf.read(name)
-            except KeyError:
-                continue
-            try:
-                return lxml_html.fromstring(raw)
-            except Exception:
-                continue
+        # The caller resolves through the package first. Duplicate ZIP members
+        # are ambiguous too, even when they share an identical member name.
+        if sum(info.filename == chapter_file for info in zf.infolist()) != 1:
+            return None
+        try:
+            return lxml_html.fromstring(zf.read(chapter_file))
+        except (KeyError, ValueError, lxml_html.etree.ParserError):
+            return None
     return None

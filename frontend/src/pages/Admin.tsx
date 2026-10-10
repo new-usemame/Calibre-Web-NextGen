@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Shield, Trash2, Mail, UserPlus, Settings, Lock, RefreshCw, KeyRound, Info, AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 import {
@@ -11,11 +11,14 @@ import {
 import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { IngestFolderLabels } from '../components/IngestFolderLabels';
 import { MyLibraryIntro } from '../components/MyLibraryIntro';
+import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
 import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { THEMES, DEFAULT_THEME } from '../lib/themes';
+import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
 import styles from './Admin.module.css';
 
 // Default-role checkboxes auto-granted to new OAuth users. Keys MUST match
@@ -38,6 +41,7 @@ const ROLE_FIELDS: { key: string; label: string }[] = [
   { key: 'download', label: 'Download' },
   { key: 'delete_books', label: 'Delete books' },
   { key: 'edit_shelfs', label: 'Edit public shelves' },
+  { key: 'share_shelfs', label: 'Allow sharing your own shelves' },
   { key: 'passwd', label: 'Change password' },
   { key: 'viewer', label: 'Viewer' },
   { key: 'browse_global', label: 'Browse global library' },
@@ -57,6 +61,10 @@ export function Admin() {
   const [form, setForm] = useState({ name: '', password: '', email: '', upload: false });
   const [libraryBookIds, setLibraryBookIds] = useState<Record<number, string>>({});
   const [libraryBookErrors, setLibraryBookErrors] = useState<Record<number, string>>({});
+  // The add-book confirmation belongs to the card whose form caused it. The
+  // page banner sits above every card, so by the time an administrator has
+  // scrolled to a user's form it is off-screen and the add looked silent (#1939).
+  const [libraryBookAdded, setLibraryBookAdded] = useState<Record<number, string>>({});
   const [modeHelpOpen, setModeHelpOpen] = useState<Record<number, boolean>>({});
 
   if (isLoading) return <SpinnerCentered size={40} />;
@@ -87,7 +95,7 @@ export function Admin() {
         name: form.name.trim(),
         password: form.password,
         email: form.email.trim() || undefined,
-        roles: { download: true, viewer: true, upload: form.upload },
+        roles: { download: true, viewer: true, upload: form.upload, share_shelfs: true },
       },
       {
         onSuccess: (u) => {
@@ -143,6 +151,7 @@ export function Admin() {
   const addBookForUser = (e: React.FormEvent, user: AdminUser) => {
     e.preventDefault();
     const bookId = Number(libraryBookIds[user.id]);
+    setLibraryBookAdded((added) => ({ ...added, [user.id]: '' }));
     if (!Number.isInteger(bookId) || bookId < 1) {
       setBanner(null);
       setLibraryBookErrors((errors) => ({
@@ -155,9 +164,9 @@ export function Admin() {
     addBookToLibrary.mutate({ userId: user.id, bookId }, {
       onSuccess: (result) => {
         setLibraryBookIds((values) => ({ ...values, [user.id]: '' }));
-        setBanner({ ok: true, text: t('Added book {book} to {name}.', {
+        setLibraryBookAdded((added) => ({ ...added, [user.id]: t('Added book {book} to {name}.', {
           book: result.book_title, name: user.name,
-        }) });
+        }) }));
       },
       onError: (err) => {
         setLibraryBookErrors((errors) => ({
@@ -332,6 +341,11 @@ export function Admin() {
                                   ...errors, [user.id]: '',
                                 }));
                               }
+                              if (libraryBookAdded[user.id]) {
+                                setLibraryBookAdded((added) => ({
+                                  ...added, [user.id]: '',
+                                }));
+                              }
                             }} />
                         </label>
                         <button type="submit" className={styles.submitBtn}
@@ -341,6 +355,8 @@ export function Admin() {
                         {libraryBookErrors[user.id] &&
                           <span id={`library-book-error-${user.id}`} className={styles.fieldError}
                             role="alert">{libraryBookErrors[user.id]}</span>}
+                        <span className={libraryBookAdded[user.id] ? styles.fieldOk : undefined}
+                          role="status">{libraryBookAdded[user.id]}</span>
                       </form>
                     </>}
                 </fieldset>
@@ -350,7 +366,9 @@ export function Admin() {
         })}
       </div>
 
+      <IngestFolderLabels />
       <AdminConfigForm />
+      <ReaderFontsAdmin />
       <MailConfigForm />
       <SecurityConfigForm />
     </div>
@@ -366,6 +384,8 @@ function AdminConfigForm() {
   const update = useUpdateAdminConfig();
   const [form, setForm] = useState<Record<string, string | number>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [filenameError, setFilenameError] = useState<string | null>(null);
+  const filenameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!cfg) return;
@@ -377,7 +397,10 @@ function AdminConfigForm() {
       config_theme: cfg.config_theme,
       config_default_language: cfg.config_default_language,
       config_default_locale: cfg.config_default_locale,
+      config_default_ui_font_body: cfg.config_default_ui_font_body,
+      config_default_ui_font_display: cfg.config_default_ui_font_display,
       config_server_announcement: cfg.config_server_announcement,
+      config_opds_filename_template: cfg.config_opds_filename_template,
     });
   }, [cfg]);
 
@@ -387,9 +410,20 @@ function AdminConfigForm() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
+    setFilenameError(null);
     update.mutate(form, {
       onSuccess: () => setMsg({ ok: true, text: t('Settings saved.') }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
+      onError: (err) => {
+        if (err instanceof ApiError && err.detail?.code === 'invalid_opds_filename_template') {
+          setFilenameError(err.message);
+          requestAnimationFrame(() => {
+            filenameInput.current?.focus({ preventScroll: true });
+            filenameInput.current?.scrollIntoView({ block: 'center' });
+          });
+        } else {
+          setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') });
+        }
+      },
     });
   };
 
@@ -446,7 +480,47 @@ function AdminConfigForm() {
             {cfg.languages.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         </label>
+        <label className={styles.field}>
+          <span>{t('Default UI body font for new users')}</span>
+          <select value={String(form.config_default_ui_font_body ?? '')}
+            aria-describedby="default-ui-font-help"
+            onChange={(e) => set('config_default_ui_font_body', e.target.value)}>
+            {UI_BODY_FONTS.map((font) => <option key={font.key || 'default'} value={font.key}>{t(font.label)}</option>)}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>{t('Default UI display font for new users')}</span>
+          <select value={String(form.config_default_ui_font_display ?? '')}
+            aria-describedby="default-ui-font-help"
+            onChange={(e) => set('config_default_ui_font_display', e.target.value)}>
+            {UI_DISPLAY_FONTS.map((font) => <option key={font.key || 'default'} value={font.key}>{t(font.label)}</option>)}
+          </select>
+          <p id="default-ui-font-help" className={styles.fieldHint}>
+            {t('Applies to accounts created from now on. Each user can change these fonts under Account settings.')}
+          </p>
+        </label>
       </div>
+      <div className={styles.field}>
+        <label htmlFor="opds-filename-template">{t('OPDS download filename template')}</label>
+        <input id="opds-filename-template" ref={filenameInput} value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
+          placeholder="{author_sort} - {title} ({id})"
+          aria-invalid={filenameError ? true : undefined}
+          aria-describedby={`opds-filename-help${filenameError ? ' opds-filename-error' : ''}`}
+          onChange={(e) => { set('config_opds_filename_template', e.target.value); setFilenameError(null); }} />
+        {filenameError && <p id="opds-filename-error" className={styles.fieldError} role="alert">{filenameError}</p>}
+        <p id="opds-filename-help" className={styles.fieldHint}>
+          {t('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}
+          {' '}{t('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}
+        </p>
+      </div>
+      <details>
+        <summary>{t('Filename template fields and examples')}</summary>
+        <p><code>{'{author_sort}, {authors}, {id}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {#custom_field}'}</code></p>
+        <p>{t('First character:')} <code>{'{author_sort[0]}'}</code>.{' '}
+          {t('Padded series number:')} <code>{'{series_index:0>3s}'}</code>.</p>
+        <p>{t('Example:')} <code>{'{series:|| - }{series_index:0>3s|| - }{title}'}</code></p>
+        <p>{t('In KOReader, enable Use server filenames for the OPDS catalog.')}</p>
+      </details>
       <label className={styles.field}>
         <span>{t('Server announcement (shown to all users)')}</span>
         <input value={String(form.config_server_announcement ?? '')}

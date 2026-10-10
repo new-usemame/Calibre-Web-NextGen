@@ -52,8 +52,8 @@ test('highlight assignment is keyboard named, mobile-safe, and axe-clean', async
   await stubAnnotations(page, 20);
   if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/book/2/annotations');
-  await expect(page.getByText('Not in current file', { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Warning: this highlight can’t be shown in the book")).toBeVisible();
+  await expect(page.getByText('Location unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Warning: the saved highlight could not be located in the current book. Its text is preserved.")).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Device: unknown' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Import and export' }).click();
   await expect(page.getByRole('link', { name: 'Markdown' })).toBeVisible();
@@ -129,7 +129,7 @@ test('a standalone note is drawn as a note, not as a highlight that lost its tex
   await expect(note.locator('blockquote')).toHaveCount(0);
   // 'unanchored' is not 'unresolved': nothing failed to resolve, so the row must
   // not claim the book can't show it.
-  await expect(note).not.toContainText('Not in current file');
+  await expect(note).not.toContainText('Location unavailable');
 
   // The ordinary highlight in the same list is unaffected — a guard that hid the
   // swatch for everything would pass every assertion above.

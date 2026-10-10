@@ -1,0 +1,7 @@
+# EPUB publisher styles and notes
+
+The New UI EPUB reader applies publisher CSS selectors for declared attribute namespaces, including the standard `epub:type` attribute. This works in both linked stylesheets and chapter style blocks; a stylesheet can use a different prefix for the same namespace URI. A chapter's nested declarations apply locally.
+
+Some books hide their footnotes until a reader follows a reference. The note popup shows the note without changing the reading position. **Go to note** opens the destination and activates its publisher `:target` reveal rule, including when the note is in another chapter. Long popup notes are a labeled keyboard focus target: Tab from Close into the note, use normal scrolling keys, and press Escape to return to the reference. With larger text, turn the page until a reference is visible before opening it. Keyboard link targets follow the visible page, so later-column references do not create invisible tab stops. Ordinary asides remain governed by their own book's CSS.
+
+This happens while displaying the book; the EPUB file is not rewritten. Existing HTML parsing, saved location paths, reading appearance and script restrictions are retained. Styles using escaped literal attributes such as `[epub\:type]` continue to work alongside namespaced selectors. Arbitrary uppercase XML attribute names and prefix declarations that differ only in case remain subject to the existing HTML parser's case folding.

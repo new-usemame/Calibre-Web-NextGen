@@ -1,0 +1,20 @@
+[
+ {
+  "id": 638,
+  "book_id": 221,
+  "highlighted_text": "shudder",
+  "cfi_range": null,
+  "position_type": "koreader_xpointer",
+  "start_xpointer": "/body/DocFragment[3]/body/div/p[4]/text().845",
+  "end_xpointer": "/body/DocFragment[3]/body/div/p[4]/text().852"
+ },
+ {
+  "id": 639,
+  "book_id": 221,
+  "highlighted_text": "Alth",
+  "cfi_range": "epubcfi(/6/8!/4/2[pgepubid00003]/22,/1:1,/1:5)",
+  "position_type": "cfi",
+  "start_xpointer": null,
+  "end_xpointer": null
+ }
+]

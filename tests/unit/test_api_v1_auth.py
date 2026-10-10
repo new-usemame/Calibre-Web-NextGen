@@ -449,10 +449,14 @@ def test_auth_login_fails_open_when_limiter_extension_is_unavailable():
 
 @pytest.mark.unit
 def test_login_standard_login_disabled_returns_403():
-    """When config_disable_standard_login is True, auth_login must return 403
-    with code='standard_login_disabled' and must NOT call login_user."""
+    """When standard login is disabled on an OAuth instance with a provider to
+    sign in with, auth_login must return 403 with code='standard_login_disabled'
+    and must NOT call login_user. (#2272 covers the settings where it may not.)"""
+    from cps import constants
     app = _app()
     with patch("cps.api.auth.config.config_disable_standard_login", True, create=True), \
+         patch("cps.api.auth.config.config_login_type", constants.LOGIN_OAUTH, create=True), \
+         patch.dict("cps.oauth_bb.oauth_check", {3: "generic"}, clear=True), \
          patch("cps.api.auth.login_user") as lu:
         resp = app.test_client().post(
             "/api/v1/auth/login",
@@ -474,7 +478,7 @@ def test_auth_config_is_public_and_shaped():
         cfg.config_public_reg = True
         cfg.config_register_email = False
         cfg.get_mail_server_configured.return_value = True
-        cfg.config_disable_standard_login = False
+        cfg.standard_login_disabled.return_value = False
         cfg.config_calibre_web_title = "Calibre-Web NextGen"
         resp = app.test_client().get("/api/v1/auth/config")
     assert resp.status_code == 200
@@ -627,7 +631,7 @@ def test_auth_config_endpoint_never_leaks_oauth_secrets():
         cfg.get_mail_server_configured.return_value = False
         cfg.config_public_reg = False
         cfg.config_register_email = False
-        cfg.config_disable_standard_login = False
+        cfg.standard_login_disabled.return_value = False
         cfg.config_remote_login = False
         cfg.config_calibre_web_title = "Calibre-Web NextGen"
         with app.test_client() as c:
@@ -790,7 +794,7 @@ def test_auth_config_exposes_remote_login():
         cfg.config_public_reg = False
         cfg.config_register_email = False
         cfg.get_mail_server_configured.return_value = True
-        cfg.config_disable_standard_login = False
+        cfg.standard_login_disabled.return_value = False
         cfg.config_remote_login = True
         cfg.config_calibre_web_title = "Calibre-Web NextGen"
         d = app.test_client().get("/api/v1/auth/config").get_json()

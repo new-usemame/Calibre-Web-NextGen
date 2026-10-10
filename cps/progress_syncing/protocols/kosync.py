@@ -25,7 +25,7 @@ Security:
     - All API endpoints use HTTP Basic Authentication
     - Document identifiers validated to prevent injection attacks
     - Session management via SQLAlchemy with proper isolation
-    - Rate limiting should be applied at reverse proxy level
+    - Wrong passwords are paced per client and account (authenticate_user)
 
 Integration:
     - Syncs with Calibre library via BookFormatChecksum table
@@ -38,6 +38,7 @@ Reference: https://github.com/koreader/koreader-sync-server
 """
 
 import base64
+import math
 import os
 import re
 from datetime import datetime, timezone
@@ -54,9 +55,9 @@ from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
 from sqlalchemy import func, desc, cast, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, HTTPException
 
-from ... import logger, ub, csrf, config, constants, services, usermanagement
+from ... import logger, ub, csrf, config, constants, services, usermanagement, limiter, rate_limits
 from ...render_template import render_title_template
 from ..models import KOSyncProgress
 from ..settings import is_koreader_sync_enabled
@@ -107,6 +108,9 @@ _CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{32}$")
 # of ':' for internal use.
 PERCENTAGE_ONLY_LOCATOR = "cwng:percentage"
 
+# ``KOSyncProgress.device`` of a row the web reader wrote (#1366).
+WEB_READER_DEVICE = "Web reader"
+
 # Query parameter a client sends on GET to say which position encodings it can
 # act on. Absent means "locator only", which is every plugin released before
 # percentage-only rows existed, so those rows stay invisible to them.
@@ -129,6 +133,24 @@ POSITION_KIND_LOCATOR = "locator"
 # keys — so such a client still resolves this to "no progress", exactly as it
 # resolves the bare ``{}`` it gets today.
 POSITION_KINDS_AVAILABLE_FIELD = "position_kinds_available"
+
+# A client that keeps its place as words rather than as an engine locator
+# (``services/text_anchor``) asks for this kind on GET to receive ``anchor``,
+# the words at the winning position, and may send one on a percentage PUT.
+POSITION_KIND_ANCHOR = "anchor"
+
+# Optional behaviour beyond the KOSync protocol, named on the auth response so
+# a client can tell this server from a stock one before relying on any of it.
+# KOReader's own plugin reads only the auth status, so the field is inert to it.
+#   position_kinds    GET honours ?position_kinds= (percentage-only rows, #1445)
+#   percentage_push   PUT accepts position_kind "percentage" with no progress
+#   anchor            text anchors on a percentage PUT and on GET
+#   book_id_document  a decimal Calibre book id is accepted as ``document``
+#   annotations_text_quote  /kosync/syncs/annotations places pushed
+#                     ``text_quote`` highlights and names pulled ones by their
+#                     words on ``?text_quote=1`` (koreader_annotations)
+SERVER_CAPABILITIES = ("position_kinds", "percentage_push", "anchor", "book_id_document",
+                       "annotations_text_quote")
 
 
 def is_percentage_only(progress_record) -> bool:
@@ -173,6 +195,15 @@ def _withheld_position_hint(user_id, document, book_id,
     return {POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]}
 
 
+def _advertised_position_kinds() -> set:
+    """The position kinds named by the request's ``position_kinds`` parameter."""
+    try:
+        raw = request.args.get(POSITION_KINDS_PARAM, "") or ""
+    except RuntimeError:  # outside a request context
+        return set()
+    return {k.strip().lower() for k in raw.split(",")}
+
+
 def client_accepts_percentage_only() -> bool:
     """True when the requesting client advertised percentage-only support.
 
@@ -181,11 +212,35 @@ def client_accepts_percentage_only() -> bool:
     it saw before percentage-only rows existed: it never receives one, so it
     can neither mis-seek on it nor show a sync error for it.
     """
+    return POSITION_KIND_PERCENTAGE in _advertised_position_kinds()
+
+
+def _book_for_numeric_document(response_data, document, user):
+    """Resolve a ``document`` that is a decimal Calibre book id, for ``user``.
+
+    A client that downloaded a book over OPDS knows its book id even when it
+    kept no copy of the file to digest. GET already found the book-id-keyed
+    row for such a key; without resolving it, though, a PUT under it reached
+    neither the Kobo bookmark nor the read status. Only a book this user may
+    open resolves, so the response never names a book hidden from them.
+
+    Returns ``(response_data, book_id)``; ``book_id`` is None when unresolved.
+    """
+    if not isinstance(document, str) or not _is_ascii_book_id(document):
+        return response_data, None
+    from ... import calibre_db
     try:
-        raw = request.args.get(POSITION_KINDS_PARAM, "") or ""
-    except RuntimeError:  # outside a request context
-        return False
-    return POSITION_KIND_PERCENTAGE in {k.strip().lower() for k in raw.split(",")}
+        book = calibre_db.get_filtered_book(
+            int(document), allow_show_archived=True, allow_show_hidden=True, user=user,
+        )
+    except Exception:
+        log.warning("KOReader sync: could not resolve book id %s", document, exc_info=True)
+        return response_data, None
+    if book is None:
+        return response_data, None
+    response_data["calibre_book_id"] = book.id
+    response_data["calibre_book_title"] = book.title
+    return response_data, book.id
 
 
 def _require_kosync_enabled():
@@ -305,20 +360,71 @@ def authenticate_user() -> Optional[ub.User]:
         log.error(f"Database error during user lookup: {e}")
         return None
 
+    # App passwords first (fork issues #586, #95), found by their digest: one
+    # indexed lookup, no slow hash, and never an LDAP bind. KOReader sends
+    # its credentials with every request; when this check came last, each
+    # request from a device paid the LDAP bind (a failed login on the
+    # directory) and the account hash before its own password was looked at.
+    # An app password is a random token, so it is let in before the pacing
+    # below: a device using one is never refused for another's guesses.
+    # Successful sign-ins log at DEBUG: a library sync is a burst of requests,
+    # each signed in. Refused ones stay at INFO (#312).
+    if user and usermanagement._verify_app_password_digest(user, password):
+        log.debug("KOReader auth: authenticated via app password: %s", username)
+        return user
+
+    # Every slower check is a password guess. This client's new wrong
+    # passwords for this account are counted, and too many are refused with
+    # 429 before their password is looked at (rate_limits.BasicAuthPacing).
+    pacing = rate_limits.BasicAuthPacing(limiter, "kosync")
+    pacing.refuse_if_paced(username)
+    if pacing.already_refused(username, password):
+        log.info("KOReader auth: Invalid password for user: %s (repeated)", username)
+        return None
+
     if not user:
         # Fork issue #312: promoted from DEBUG so kosync auth failures
         # are visible in default-INFO logs. Includes the username so a
         # typo or stale device config is identifiable from one line.
         log.info("KOReader auth: User not found: %s", username)
+        pacing.failed(username, password)
         return None
 
+    signed_in, answered = _verify_slower_credentials(user, username, password)
+    if signed_in:
+        pacing.succeeded(username)
+        return user
+    if not answered:
+        # The directory could not say, so the password is neither right nor
+        # wrong: remembering it as wrong would refuse it once the directory
+        # is back.
+        log.info("KOReader auth: could not check the password for user: %s "
+                 "(directory unavailable)", username)
+        return None
+
+    # Fork issue #312: promoted from DEBUG. Invalid-password attempts
+    # for a real user are exactly the signal needed to diagnose stale
+    # device-side credentials after a password change.
+    log.info("KOReader auth: Invalid password for user: %s", username)
+    pacing.failed(username, password)
+    return None
+
+
+def _verify_slower_credentials(user, username, password) -> Tuple[bool, bool]:
+    """The directory, the account password, then pre-digest app passwords.
+
+    Returns (signed in, answered): answered is False when the directory
+    could not be asked and nothing else accepted the password.
+    """
+    answered = True
     # Check if LDAP authentication is enabled
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
         # Try LDAP authentication
         login_result, error = services.ldap.bind_user(user.name, password)
         if login_result:
-            log.info(f"authenticate_user: Successfully authenticated user via LDAP: {user.name}")
-            return user
+            log.debug("KOReader auth: authenticated via LDAP: %s", user.name)
+            return True, True
+        answered = error is None
 
         # Log LDAP failure but continue to local check (fallback)
         # We use debug level here because failure is expected if the user is using a local password
@@ -328,23 +434,16 @@ def authenticate_user() -> Optional[ub.User]:
     # Verify password using constant-time comparison
     # Check if user has a local password set before attempting verification
     if user.password and check_password_hash(str(user.password), password):
-        log.info(f"User authenticated successfully: {username}")
-        return user
+        log.debug("KOReader auth: authenticated: %s", username)
+        return True, True
 
-    # Fork issue #586: OAuth / LDAP-only users have no usable local password,
-    # so the check above always fails for them. Accept per-user app passwords
-    # here the same way the OPDS / web Basic-auth path already does
-    # (usermanagement.verify_password -> _verify_app_password). This login path
-    # is shared by KOReader progress AND annotation sync, so both are covered.
-    if usermanagement._verify_app_password(user, password):
-        log.info("KOReader auth: authenticated via app password: %s", username)
-        return user
-
-    # Fork issue #312: promoted from DEBUG. Invalid-password attempts
-    # for a real user are exactly the signal needed to diagnose stale
-    # device-side credentials after a password change.
-    log.info("KOReader auth: Invalid password for user: %s", username)
-    return None
+    # App passwords saved before digests existed cost a slow hash each, so
+    # they come last; the first sign-in with one gives it its digest. This
+    # login path is shared by KOReader progress, annotation and library sync.
+    if usermanagement._verify_app_password_older(user, password):
+        log.debug("KOReader auth: authenticated via app password: %s", username)
+        return True, True
+    return False, answered
 
 
 def create_sync_response(data: Dict[str, Any], status_code: int = 200) -> tuple:
@@ -605,27 +704,11 @@ def update_book_read_status(user, book_id: int, percentage: float):
         # churn the parent feed clock; existing derived state may still be
         # reconciled from the bookmark that survived arbitration below.
         _ensure_visible_reading_state(book_read, user_id, book_id)
+    from ...services.reading_status import update_automatic_read_status
     new_status = read_status_for_percentage(accepted_percentage)
-    old_status = book_read.read_status
-
-    if new_status == ub.ReadBook.STATUS_IN_PROGRESS and (
-            is_new or old_status != ub.ReadBook.STATUS_IN_PROGRESS):
-        book_read.times_started_reading = (book_read.times_started_reading or 0) + 1
-        book_read.last_time_started_reading = datetime.now(timezone.utc)
-        log.info(
-            "User %s started reading book %s (times started: %s)",
-            user_id, book_id, book_read.times_started_reading,
-        )
-    if old_status != new_status:
-        book_read.read_status = new_status
-        book_read.last_modified = datetime.now(timezone.utc)
-        log.info(
-            "User %s book %s status changed: %s -> %s "
-            "(accepted progress: %.1f%%)",
-            user_id, book_id, old_status, new_status, accepted_percentage,
-        )
-    elif outcome.accepted:
-        book_read.last_modified = datetime.now(timezone.utc)
+    status_accepted = update_automatic_read_status(
+        book_read, new_status, touch_unchanged=outcome.accepted,
+    )
 
     if not outcome.accepted:
         log.info(
@@ -633,9 +716,6 @@ def update_book_read_status(user, book_id: int, percentage: float):
             "user=%s, book=%s, incoming=%.2f%%, accepted=%.2f%%",
             user_id, book_id, percentage, accepted_percentage,
         )
-
-    # Merge the record (caller commits)
-    ub.session.merge(book_read)
 
     # Mirror the web read-status path (helper.edit_book_read_status): when an admin has
     # designated a Calibre custom column as the read marker, the book detail page reads
@@ -645,7 +725,8 @@ def update_book_read_status(user, book_id: int, percentage: float):
     # custom-column subset). Sticky semantics: we only SET the marker on FINISHED and never
     # clear it from a sync, so re-opening a finished book in KOReader can't silently un-read
     # it — un-marking stays a manual web toggle, matching "mark as read" intent.
-    if config.config_read_column and new_status == ub.ReadBook.STATUS_FINISHED:
+    if (config.config_read_column and status_accepted
+            and new_status == ub.ReadBook.STATUS_FINISHED):
         _mark_custom_read_column(book_id)
     return outcome
 
@@ -816,6 +897,144 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
     return outcome if _return_outcome else True
 
 
+def _exact_xpointer(user_id, book_id, progress_record, document):
+    """XPointer of a web reader's or Kobo's position in the requesting device's file.
+
+    Best-effort: any failure leaves the row served as a percentage.
+    """
+    try:
+        from ...services.koreader_position import (kobo_position_for_device,
+                                                   web_position_for_device)
+        for place in (web_position_for_device, kobo_position_for_device):
+            xpointer = place(user_id=user_id, book_id=book_id,
+                             record=progress_record, document=document)
+            if xpointer:
+                return xpointer
+    except Exception:
+        log.warning("Could not place the %s position exactly for book %s",
+                    getattr(progress_record, "device", None), book_id, exc_info=True)
+    return None
+
+
+def _readable_epub(book_id, user):
+    """Path of the library EPUB whose text ``user`` may read, or None.
+
+    An anchor is the book's own words, and pushing anchors and reading them
+    back walks the text, so both directions are content reads: the user
+    must be able to see the book and hold the viewer or download role,
+    exactly what reading or downloading it in the web UI requires.
+    """
+    from ... import calibre_db
+    from ...annotations import _book_format_path
+    if not (getattr(user, "role_viewer", lambda: False)()
+            or getattr(user, "role_download", lambda: False)()):
+        return None
+    book = calibre_db.get_filtered_book(int(book_id), allow_show_archived=True,
+                                        allow_show_hidden=True, user=user)
+    return _book_format_path(book, "EPUB") if book is not None else None
+
+
+def _locate_anchor(user, book_id, anchor, percentage):
+    """``(xpointer, library digest, percent)`` of a text anchor in the library EPUB, or None.
+
+    ``percent`` is how far into the library EPUB's text the words are
+    (``text_anchor.place``), the figure the push is then compared and shared
+    with.
+
+    Best-effort: a book with no EPUB, words that are not found or that repeat
+    ambiguously, or any failure leaves the push percentage-only.
+    """
+    from ...services import text_anchor
+    from ...services.koreader_position import file_digest
+    from ...services.parallel import run_blocking
+    try:
+        epub_path = _readable_epub(book_id, user)
+        if not epub_path:
+            return None
+
+        def place():
+            digest = file_digest(epub_path)
+            found = text_anchor.place(epub_path, anchor, percentage)
+            return (found[0], digest, found[1]) if found and digest else None
+        return run_blocking(place)
+    except Exception:
+        log.warning("Could not place a text anchor in book %s", book_id, exc_info=True)
+        return None
+
+
+def _anchor_for_record(user, book_id, record):
+    """The words at ``record``'s position in the library EPUB, or None.
+
+    The position must first be provably a place in the library EPUB itself:
+    an XPointer some device reported while holding that very file (its
+    journal names the file's digest), or a web reader's or Kobo's place that
+    converts exactly into it (``_exact_xpointer`` with the library digest as
+    the requesting file). Anything else stays a percentage.
+    """
+    from ...services import text_anchor
+    from ...services.koreader_position import (KOREADER_LOCATION_TYPE, file_digest,
+                                               is_xpointer)
+    from ...services.parallel import run_blocking
+    try:
+        user_id = user.id
+        epub_path = _readable_epub(book_id, user)
+        if not epub_path or record is None:
+            return None
+        digest = run_blocking(lambda: file_digest(epub_path))
+        if not digest:
+            return None
+        xpointer = None
+        if is_xpointer(record.progress):
+            reported = ub.session.query(ub.DeviceReadingPosition.id).join(
+                ub.Device, ub.Device.id == ub.DeviceReadingPosition.device_id,
+            ).filter(
+                ub.Device.user_id == int(user_id),
+                ub.Device.kind == "koreader",
+                ub.DeviceReadingPosition.book_id == int(book_id),
+                ub.DeviceReadingPosition.location_type == KOREADER_LOCATION_TYPE,
+                ub.DeviceReadingPosition.location_value == record.progress,
+                func.lower(ub.DeviceReadingPosition.location_source) == digest,
+            ).first()
+            xpointer = record.progress if reported is not None else None
+        elif is_percentage_only(record):
+            xpointer = _exact_xpointer(user_id, book_id, record, digest)
+        if not xpointer:
+            return None
+        return run_blocking(lambda: text_anchor.anchor_at(epub_path, xpointer))
+    except Exception:
+        log.warning("Could not derive a text anchor for book %s", book_id, exc_info=True)
+        return None
+
+
+def _journal_koreader_report(user_id, internal_device_id, book_id, document,
+                             progress, percentage, observed_at):
+    """Keep this device's own report, and which file it addresses (#324).
+
+    The shared row is keyed by book id, so it cannot say which file its
+    XPointer belongs to; the per-device journal keeps the digest the device
+    reported under. Best-effort, after the progress commit.
+    """
+    from ...services import kobo_resume, koreader_position
+    try:
+        koreader_position.journal_report(
+            ub.session, device_id=internal_device_id, book_id=book_id,
+            document=document, progress=progress, percentage=percentage,
+            observed_at=observed_at,
+        )
+        ub.session.commit()
+    except Exception:
+        ub.session.rollback()
+        log.warning("Could not journal the KOReader position of user %s book %s",
+                    user_id, book_id, exc_info=True)
+        return
+    if koreader_position.is_xpointer(progress):
+        # Start the web reader's exact conversion now, off this request, so
+        # the browser opened right after the device finds it ready.
+        kobo_resume.exact_resume(book_id, document,
+                                 koreader_position.KOREADER_LOCATION_TYPE,
+                                 progress, wait=False)
+
+
 def _conditional_kosync_progress(
     *, user_id, document, progress, percentage, device, device_id, timestamp,
     equal_accepts, same_device_rewind=False,
@@ -898,10 +1117,8 @@ def auth_user():
     Returns:
         200: {"authorized": "OK"} if authentication succeeds
         401: {"error": 2001, "message": "Unauthorized"} if authentication fails
-
-    Note:
-        Rate limiting should be applied at reverse proxy level to prevent
-        brute force attacks (suggested: 10 requests per minute per IP).
+        429: too many different wrong passwords from this client for this
+             account in the last minute (see authenticate_user)
     """
     blocked = _require_kosync_enabled()
     if blocked:
@@ -909,7 +1126,8 @@ def auth_user():
 
     user = authenticate_user()
     if user:
-        return create_sync_response({"authorized": "OK"})
+        return create_sync_response({"authorized": "OK",
+                                     "capabilities": list(SERVER_CAPABILITIES)})
     else:
         return create_sync_response({
             "error": ERROR_UNAUTHORIZED_USER,
@@ -969,6 +1187,8 @@ def get_progress(document: str):
         response_data, book_id, book_format, book_title, _ = enrich_response_with_book_info(
             {}, document
         )
+        if not book_id:
+            response_data, book_id = _book_for_numeric_document(response_data, document, user)
 
         # A client that did not advertise percentage-only support gets exactly
         # what it got before those rows existed: they are excluded from the
@@ -992,21 +1212,35 @@ def get_progress(document: str):
         percentage_decimal = progress_record.percentage / 100.0
 
         percentage_only = is_percentage_only(progress_record)
+        # The sentinel is an internal marker, never a position — send null
+        # so no client can mistake it for an xpointer.
+        progress_value = None if percentage_only else progress_record.progress
+        if percentage_only and book_id:
+            # The web reader's or Kobo's own place, when it can be expressed
+            # exactly in the very file this device holds (#324); otherwise the
+            # percentage.
+            exact = _exact_xpointer(user.id, book_id, progress_record, document)
+            if exact:
+                progress_value, percentage_only = exact, False
 
         response_updates = {
             "document": document,
-            # The sentinel is an internal marker, never a position — send null
-            # so no client can mistake it for an xpointer.
-            "progress": None if percentage_only else progress_record.progress,
+            "progress": progress_value,
             "position_kind": (POSITION_KIND_PERCENTAGE if percentage_only
                               else POSITION_KIND_LOCATOR),
             "percentage": percentage_decimal,
             "device": progress_record.device,
             "device_id": progress_record.device_id,
-            "timestamp": int(progress_record.timestamp.timestamp())
+            # Stored as naive UTC: read as local time, a server with TZ set
+            # would serve every position hours in the future.
+            "timestamp": int(_aware_datetime(progress_record.timestamp).timestamp())
         }
 
         response_data = {**response_data, **response_updates}
+        if book_id and POSITION_KIND_ANCHOR in _advertised_position_kinds():
+            anchor = _anchor_for_record(user, book_id, progress_record)
+            if anchor:
+                response_data["anchor"] = anchor
 
         log.debug(endpoint + f" Response: {response_data}")
 
@@ -1014,6 +1248,8 @@ def get_progress(document: str):
 
     except KOSyncError as e:
         return handle_sync_error(e)
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error(f"get_progress: Database error: {str(e)}")
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Database error"))
@@ -1220,6 +1456,9 @@ def _delivery_identity(data, allowed_fields):
     return device_name, raw_device_id
 
 
+DEVICE_IDENTITY_UNAVAILABLE = "Device identity could not be registered for this account"
+
+
 def _registered_delivery_device(user, device_name, raw_device_id):
     from ...services.device_registry import register_koreader_device_best_effort
     internal_id = register_koreader_device_best_effort(
@@ -1228,9 +1467,7 @@ def _registered_delivery_device(user, device_name, raw_device_id):
         device_name=device_name,
     )
     if internal_id is None:
-        raise device_delivery.DeliveryValidationError(
-            "Device identity could not be registered for this account"
-        )
+        raise device_delivery.DeliveryValidationError(DEVICE_IDENTITY_UNAVAILABLE)
     return internal_id
 
 
@@ -1324,7 +1561,7 @@ def claim_delivery():
     except device_delivery.DeliveryValidationError as error:
         ub.session.rollback()
         message = str(error)
-        if message == "Device identity could not be registered for this account":
+        if message == DEVICE_IDENTITY_UNAVAILABLE:
             return _delivery_error(message, 409, "device_identity_unavailable")
         return _delivery_error(message)
     except device_capabilities.CapabilityValidationError as error:
@@ -1410,7 +1647,11 @@ def claim_device_deletion():
         })
     except (BadRequest, device_delivery.DeliveryValidationError) as error:
         ub.session.rollback()
-        return _delivery_error(str(error))
+        message = str(error)
+        if message == DEVICE_IDENTITY_UNAVAILABLE:
+            # Same contract as the delivery claim: the request was well formed.
+            return _delivery_error(message, 409, "device_identity_unavailable")
+        return _delivery_error(message)
 
 
 @csrf.exempt
@@ -1910,6 +2151,8 @@ def export_progress():
 
         return jsonify(result)
 
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error("export_progress: database error: %s", e)
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Database error"))
@@ -1985,12 +2228,34 @@ def update_progress():
         device = data.get("device")
         device_id = data.get("device_id")
 
+        # A client with no engine locator (``services/text_anchor``) reports
+        # ``position_kind: "percentage"`` and leaves ``progress`` out, which
+        # KOSync otherwise requires; it may name its place by words instead.
+        position_kind = data.get("position_kind")
+        if position_kind not in (None, POSITION_KIND_LOCATOR, POSITION_KIND_PERCENTAGE):
+            raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid position_kind field")
+        percentage_push = position_kind == POSITION_KIND_PERCENTAGE
+        anchor = None
+        if percentage_push:
+            if progress not in (None, ""):
+                raise KOSyncError(ERROR_INVALID_FIELDS,
+                                  "progress must be omitted for a percentage position")
+            if data.get("anchor") is not None:
+                from ...services import text_anchor
+                anchor = text_anchor.parse_anchor(data.get("anchor"))
+                if anchor is None:
+                    raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid anchor field")
+        elif data.get("anchor") is not None:
+            raise KOSyncError(ERROR_INVALID_FIELDS,
+                              "anchor requires position_kind percentage")
+
         # Validate required fields
-        if not progress or percentage is None or not device:
+        if (not percentage_push and not progress) or percentage is None or not device:
             raise KOSyncError(ERROR_INVALID_FIELDS, "Missing required fields")
 
         # Validate field lengths
-        if not is_valid_field(progress) or len(progress) > MAX_PROGRESS_LENGTH:
+        if not percentage_push and (
+                not is_valid_field(progress) or len(progress) > MAX_PROGRESS_LENGTH):
             raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid progress field")
         # `progress` is client-controlled, and PERCENTAGE_ONLY_LOCATOR is the
         # only value whose meaning is decided by the server rather than the
@@ -2010,7 +2275,11 @@ def update_progress():
         # KOReader sends percentage as a decimal fraction (0.9411 = 94.11%)
         # Convert to actual percentage (0-100 range)
         try:
+            if isinstance(percentage, bool):
+                raise ValueError("not a number")
             percentage_float = float(percentage)
+            if not math.isfinite(percentage_float):
+                raise ValueError("not a finite number")
             if percentage_float <= 1.0:
                 percentage_float *= 100.0
             if percentage_float < 0 or percentage_float > 100:
@@ -2019,6 +2288,8 @@ def update_progress():
             raise KOSyncError(ERROR_INVALID_FIELDS, f"Invalid percentage value: {e}")
 
         timestamp = datetime.now(timezone.utc)
+        received_at = timestamp
+        reported_document = document
 
         response_data = {
             "document": document,
@@ -2029,6 +2300,35 @@ def update_progress():
         response_data, book_id, book_format, book_title, _ = enrich_response_with_book_info(
             response_data, document
         )
+        if not book_id:
+            response_data, book_id = _book_for_numeric_document(response_data, document, user)
+
+        # What is stored, and what the device journal records. A percentage
+        # push stores the sentinel unless its anchor places it in the library
+        # EPUB, in which case it stores that XPointer -- a locator into the
+        # library file, journalled under that file's digest exactly as a
+        # KOReader holding it would report, so every reader that already
+        # consumes such a report lands on the same words.
+        stored_progress, journal_document, journal_progress = progress, document, progress
+        if percentage_push:
+            stored_progress, journal_progress = PERCENTAGE_ONLY_LOCATOR, None
+            if anchor and book_id:
+                located = _locate_anchor(user, book_id, anchor, percentage_float)
+                if located:
+                    stored_progress, journal_document, placed_percent = located
+                    journal_progress = stored_progress
+                    # Who is furthest is decided on one scale: where these
+                    # words are in the library EPUB, not each client's own
+                    # count. Finished stays the client's call both ways: the
+                    # conversion neither finishes a book the client has not
+                    # (back matter makes the last words < 100%) nor unfinishes
+                    # one it has.
+                    if percentage_float < FINISHED_PERCENT_THRESHOLD:
+                        placed_percent = min(placed_percent,
+                                             math.nextafter(FINISHED_PERCENT_THRESHOLD, 0.0))
+                    else:
+                        placed_percent = max(placed_percent, percentage_float)
+                    percentage_float = placed_percent
 
         # Prefer the book_id as the identifier (if we have it) to ensure that all documents associated with the same
         # Calibre book share the same progress record even if they have different checksums.
@@ -2059,12 +2359,14 @@ def update_progress():
         outcome = _conditional_kosync_progress(
             user_id=user.id,
             document=canonical_document,
-            progress=progress,
+            progress=stored_progress,
             percentage=percentage_float,
             device=device,
             device_id=device_id,
             timestamp=timestamp,
-            equal_accepts=True,
+            # An unplaced percentage at the same percentage as another
+            # device's exact locator must not replace it with less.
+            equal_accepts=stored_progress != PERCENTAGE_ONLY_LOCATOR,
             same_device_rewind=True,
         )
         if not outcome.accepted:
@@ -2102,11 +2404,12 @@ def update_progress():
         # this optional side effect outside that session and outside the endpoint
         # contract. A missing device_id has no stable identity to fingerprint.
         if device_id:
+            internal_device_id = None
             try:
                 from ...services.device_registry import (
                     register_koreader_device_best_effort,
                 )
-                register_koreader_device_best_effort(
+                internal_device_id = register_koreader_device_best_effort(
                     user_id=user.id,
                     device_id=device_id,
                     device_name=device,
@@ -2115,6 +2418,11 @@ def update_progress():
                 log.warning(
                     "Best-effort KOReader device registration from progress failed",
                     exc_info=True,
+                )
+            if internal_device_id and book_id:
+                _journal_koreader_report(
+                    user.id, internal_device_id, book_id, journal_document,
+                    journal_progress, proposed_percentage, received_at,
                 )
 
         # Update user's ReadBook status if we matched a book
@@ -2164,6 +2472,8 @@ def update_progress():
 
     except KOSyncError as e:
         return handle_sync_error(e)
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error(f"update_progress: Database error: {str(e)}")
         ub.session.rollback()
@@ -2196,6 +2506,17 @@ def handle_unauthorized(error):
     }, 401)
 
 
+@kosync.errorhandler(429)
+def handle_too_many_attempts(error):
+    """Too many wrong passwords from this client for this account."""
+    body, status = create_sync_response({
+        "error": ERROR_UNAUTHORIZED_USER,
+        "message": "Too many sign-in attempts; try again in a minute"
+    }, 429)
+    retry_after = getattr(error, "retry_after", None)
+    return body, status, ({"Retry-After": str(retry_after)} if isinstance(retry_after, int) else {})
+
+
 @kosync.errorhandler(500)
 def handle_internal_error(error):
     """Handle HTTP 500 Internal Server errors"""
@@ -2210,3 +2531,10 @@ def handle_internal_error(error):
 # Imported at the bottom so kosync is fully defined first (the module imports
 # helpers from here). See koreader_annotations.py.
 from . import koreader_annotations  # noqa: E402,F401
+
+# The KOReader library (manifest, placeholders, book files, read status).
+# Imported at the bottom for the same reason as the annotation routes above.
+from . import kosync_library  # noqa: E402,F401
+
+# Connecting a device with a code (pairing). Same reason again.
+from . import kosync_pairing  # noqa: E402,F401

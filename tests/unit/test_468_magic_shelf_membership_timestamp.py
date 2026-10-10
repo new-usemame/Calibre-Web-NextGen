@@ -39,22 +39,13 @@ preserve the existing created_at instead of stamping a new one. T_magic then
 advances only when membership actually changes — which is the only time the
 Kobo arm should re-deliver the shelf.
 
-These tests pin two layers, matching the repo's established pattern
-(behavioral model + AST/source pin for the app-init-bound function — cf.
-test_kobo_magic_shelf_sub_cursor_large_shelves.py and
-test_magic_shelf_currently_reading.py):
-
-  1. A faithful pure-Python model of the membership-arm decision across two
-     consecutive syncs. Driven once with the OLD always-advance timestamp
-     (reproduces the bug at a SUB-100 shelf) and once with the FIXED
-     preserve-on-unchanged timestamp (no re-fire), plus the back-to-back
-     control. Pins the mechanism and the reporter's two clues.
-  2. AST pins that get_book_ids_for_magic_shelf actually compares the rebuilt
-     ids against the cached row and conditionally preserves created_at.
+The model tests below exercise the sync timestamp contract. Actual cache-row
+preservation and live membership changes are exercised against SQLite in
+``test_magic_shelf_sort_cache_timestamp.py`` and
+``test_shared_book_continuation.py``; the former source-string pins have been
+replaced by those behavioral checks.
 """
 
-import ast
-import inspect
 import pathlib
 
 import pytest
@@ -206,55 +197,3 @@ class TestMembershipTimestampDrivesRefire:
         magic_ids2 = set(range(1, 52))
         second = _run_sync(token, magic_ids2, t_magic="2026-06-18 11:00:00.000000")
         assert 51 in set(second), "a genuinely added book must still be delivered"
-
-
-# ---------------------------------------------------------------------------
-# Layer 2 — AST/source pin on the actual fix in get_book_ids_for_magic_shelf.
-# The function reaches into current_user / calibre_db / db.Books at runtime
-# and is awkward to invoke without full app init (same precedent as
-# test_magic_shelf_currently_reading.py / test_magic_shelf_language_bypass_461.py),
-# so we pin the fix structurally: a future edit that drops the preserve-
-# created_at logic re-introduces #468 and trips these.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestCachePreservesCreatedAtOnUnchangedMembership:
-    @staticmethod
-    def _function_source(name):
-        from cps import magic_shelf
-        return inspect.getsource(getattr(magic_shelf, name))
-
-    def test_rebuild_reads_existing_row_before_replacing(self):
-        src = self._function_source("get_book_ids_for_magic_shelf")
-        tree = ast.parse(src)
-        # There must be a query that fetches the existing cache row (a .first()
-        # against MagicShelfCache) BEFORE the delete/add, so created_at can be
-        # carried forward.
-        assert "MagicShelfCache" in src
-        assert ".first()" in src, (
-            "the rebuild must read the existing cache row (.first()) so it can "
-            "preserve created_at on unchanged membership (#468)."
-        )
-
-    def test_compares_membership_as_sets(self):
-        src = self._function_source("get_book_ids_for_magic_shelf")
-        assert "set(" in src and "all_ids" in src, (
-            "membership equality must be compared as SETS (set(existing.book_ids) "
-            "== set(all_ids)) so a browse re-sort does not advance the Kobo "
-            "membership timestamp (#468)."
-        )
-
-    def test_preserves_created_at_conditionally(self):
-        src = self._function_source("get_book_ids_for_magic_shelf")
-        assert "created_at" in src, (
-            "get_book_ids_for_magic_shelf must reference created_at to preserve "
-            "it on an unchanged-membership rebuild (#468)."
-        )
-        # The preserved value must only be assigned when membership is unchanged
-        # — i.e. there is a conditional guarding the created_at carry-forward.
-        assert "preserved_created_at" in src, (
-            "expected a 'preserved_created_at' carry-forward of the existing "
-            "row's created_at, assigned to the new cache row only when the "
-            "membership set is unchanged (#468)."
-        )

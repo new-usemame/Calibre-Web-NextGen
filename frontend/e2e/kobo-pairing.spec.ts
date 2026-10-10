@@ -5,15 +5,19 @@ import { assertNoHorizontalOverflow } from './utils';
 const syncUrl = 'https://books.example.test/kobo/0123456789abcdef0123456789abcdef';
 const serverUrl = 'https://books.example.test';
 
-async function enableKoboFeature(page: Page) {
+async function syncFeatures(page: Page, features: { kobo_sync: boolean; koreader_sync: boolean }) {
   await page.route('**/api/v1/auth/me', async (route) => {
     const response = await route.fetch();
     const me = await response.json();
     await route.fulfill({ response, json: {
       ...me,
-      features: { ...(me.features ?? {}), kobo_sync: true },
+      features: { ...(me.features ?? {}), ...features },
     } });
   });
+}
+
+async function enableKoboFeature(page: Page) {
+  await syncFeatures(page, { kobo_sync: true, koreader_sync: true });
 }
 
 test('user generates settings, copies them, and confirms the first device check-in', async ({ page, context }) => {
@@ -53,8 +57,15 @@ test('user generates settings, copies them, and confirms the first device check-
   await expect(pairing.getByText(syncUrl, { exact: true })).toBeVisible();
   await expect(pairing.getByText(`api_endpoint=${syncUrl}`, { exact: true })).toBeVisible();
   await expect(pairing.getByText(serverUrl, { exact: true })).toBeVisible();
+  // A copy button must not squeeze the settings into a few characters per
+  // line inside the desktop pairing columns. This also protects translations.
+  for (const address of [syncUrl, serverUrl]) {
+    const box = await pairing.getByText(address, { exact: true }).boundingBox();
+    expect(box?.width, `readable address width for ${address}`).toBeGreaterThanOrEqual(160);
+  }
   await expect(pairing).toContainText('.kobo/Kobo/Kobo eReader.conf');
-  await expect(pairing).toContainText('the plugin adds /kosync itself');
+  // The manual KOReader route stays one click away under the two easy ones.
+  await pairing.getByText('Set up by hand', { exact: true }).click();
   await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
     .toHaveAttribute('href', '/kosync');
 
@@ -76,25 +87,42 @@ test('user generates settings, copies them, and confirms the first device check-
   await assertNoHorizontalOverflow(page);
 });
 
+test('account distinguishes loading sources from an empty account', async ({ page }) => {
+  let releaseDevices!: () => void;
+  const devicesReady = new Promise<void>((resolve) => { releaseDevices = resolve; });
+  await page.route('**/api/annotations/devices?*', async (route) => {
+    await devicesReady;
+    await route.fulfill({ json: { devices: [], limit: 100, offset: 0, total: 0 } });
+  });
+  try {
+    await page.goto('/app/account');
+    const sources = page.getByRole('region', { name: 'Devices and browsers' });
+    await expect(sources.getByRole('status')).toBeVisible();
+    await expect(sources.getByText('No devices or browser reading data yet.')).toHaveCount(0);
+    releaseDevices();
+    await expect(sources.getByText('No devices or browser reading data yet.')).toBeVisible();
+  } finally {
+    releaseDevices();
+  }
+});
+
 test('account links directly to the SPA pairing section', async ({ page }) => {
   await enableKoboFeature(page);
   await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
     devices: [], limit: 100, offset: 0, total: 0,
   } }));
   await page.goto('/app/account');
-  await expect(page.getByRole('link', { name: 'Pair a Kobo or KOReader' }))
-    .toHaveAttribute('href', '/app/account/devices#kobo-pairing');
+  const pair = page.getByRole('link', { name: 'Pair a Kobo or KOReader' });
+  await expect(pair).toHaveAttribute('href', '/app/account/devices#kobo-pairing');
+  await pair.click();
+  const pairing = page.getByRole('region', { name: 'Pair a Kobo or KOReader' });
+  await expect(pairing.getByRole('heading', { name: 'Pair a Kobo or KOReader' })).toBeInViewport();
+  await expect(pairing.getByRole('heading', { name: 'Stock Kobo', exact: true })).toBeVisible();
+  await expect(pairing.getByRole('heading', { name: 'KOReader', exact: true })).toBeVisible();
 });
 
 test('KOReader setup remains discoverable without stock Kobo sync or a token', async ({ page }) => {
-  await page.route('**/api/v1/auth/me', async (route) => {
-    const response = await route.fetch();
-    const me = await response.json();
-    await route.fulfill({ response, json: {
-      ...me,
-      features: { ...(me.features ?? {}), kobo_sync: false },
-    } });
-  });
+  await syncFeatures(page, { kobo_sync: false, koreader_sync: true });
   await page.route('**/api/v1/account/kobo-sync-token', (route) => route.fulfill({ json: {
     user_id: 1,
     configured: false,
@@ -111,12 +139,46 @@ test('KOReader setup remains discoverable without stock Kobo sync or a token', a
   await expect(pairing.getByRole('heading', {
     level: 3, name: 'KOReader', exact: true,
   })).toBeVisible();
-  await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
-    .toHaveAttribute('href', '/kosync');
+  await expect(pairing.getByRole('button', { name: 'Download ready-made plugin' })).toBeVisible();
+  await expect(pairing.getByLabel('Code on the e-reader')).toBeVisible();
   await expect(pairing.getByText(serverUrl, { exact: true })).toBeVisible();
   await expect(pairing.getByRole('button', { name: 'Copy server address' })).toBeVisible();
+  await pairing.getByText('Set up by hand', { exact: true }).click();
+  await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
+    .toHaveAttribute('href', '/kosync');
   await expect(pairing.getByRole('button', { name: 'Generate sync URL' })).toHaveCount(0);
   await expect(pairing.getByRole('status').filter({
     hasText: /^Kobo sync is not enabled on this server\.$/,
   })).toHaveText('Kobo sync is not enabled on this server.');
+});
+
+test('a paired user can force a full Kobo sync, and cancelling sends nothing (#2334)', async ({ page }) => {
+  await enableKoboFeature(page);
+  await page.route('**/api/v1/account/kobo-sync-token', (route) => route.fulfill({ json: {
+    user_id: 1, configured: true, sync_url: syncUrl, server_url: serverUrl, is_localhost: false,
+  } }));
+  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
+    devices: [], limit: 100, offset: 0, total: 0,
+  } }));
+  const resets: string[] = [];
+  await page.route('**/api/v1/account/kobo-full-sync', async (route) => {
+    resets.push(route.request().method());
+    await route.fulfill({ json: { user_id: 1, sync_entries_deleted: 12 } });
+  });
+
+  await page.goto('/app/account/devices#kobo-pairing');
+  const pairing = page.getByRole('region', { name: 'Pair a Kobo or KOReader' });
+  const force = pairing.getByRole('button', { name: 'Force full kobo sync' });
+  await expect(force).toBeVisible();
+
+  page.once('dialog', (dialog) => void dialog.dismiss());
+  await force.click();
+  await expect(pairing.getByText('Full sync requested.', { exact: false })).toHaveCount(0);
+  expect(resets).toEqual([]);
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await force.click();
+  await expect(pairing.getByRole('status').filter({ hasText: 'Full sync requested.' }))
+    .toHaveText('Full sync requested. Sync your Kobo to receive your library again.');
+  expect(resets).toEqual(['POST']);
 });

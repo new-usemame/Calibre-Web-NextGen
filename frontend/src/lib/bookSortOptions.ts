@@ -5,6 +5,8 @@
 // is a sort the client can only ask for, never compute (cps/sort_orders.py).
 export const SORT_OPTIONS = [
   { label: 'Recent', value: 'recent' },
+  { label: 'Your rating, highest first', value: 'ratingdesc' },
+  { label: 'Your rating, lowest first', value: 'ratingasc' },
   { label: 'Newest', value: 'new' },
   { label: 'Oldest', value: 'old' },
   { label: 'Title A–Z', value: 'abc' },
@@ -67,7 +69,9 @@ export function resolveLibrarySort(
   legacy: string | null | undefined,
   allowed: readonly string[],
 ): string | undefined {
-  if (stored && allowed.includes(stored)) return stored;
+  // A remembered custom key must reach the server so it can validate the live
+  // allowlist, or preserve it during a temporary definition outage.
+  if (stored && (allowed.includes(stored) || /^cc-[0-9]{1,19}-(asc|desc)$/.test(stored))) return stored;
   if (legacy && legacy !== LEGACY_SELF_SEEDED_SORT && allowed.includes(legacy)) return legacy;
   return undefined;
 }

@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% block body %}
+{% include "cwa_stats_i18n.html" %}
 
 <script src="{{ url_for('static', filename='js/libs/echarts.min.js') }}"></script>
 
@@ -7,6 +8,7 @@
     .stats-tabs {
         display: flex;
         gap: 10px;
+        flex-wrap: wrap;
         margin-bottom: 30px;
         border-bottom: 2px solid #3a4451;
         padding-bottom: 0;
@@ -58,20 +60,20 @@
     <!-- Tab Navigation -->
     <div class="stats-tabs">
         <button class="stats-tab {{ 'active' if active_tab == 'activity' else '' }}" 
-                onclick="switchTab('activity')">
-            📊 User Activity
+                onclick="switchTab('activity', this)">
+            📊 {{ _('User Activity') }}
         </button>
         <button class="stats-tab {{ 'active' if active_tab == 'library' else '' }}" 
-                onclick="switchTab('library')">
-            📚 Library Stats
+                onclick="switchTab('library', this)">
+            📚 {{ _('Library Stats') }}
         </button>
         <button class="stats-tab {{ 'active' if active_tab == 'api' else '' }}" 
-                onclick="switchTab('api')">
-            📱 API Usage
+                onclick="switchTab('api', this)">
+            📱 {{ _('API Usage') }}
         </button>
         <button class="stats-tab {{ 'active' if active_tab == 'system' else '' }}" 
-                onclick="switchTab('system')">
-            ⚙️ System Stats
+                onclick="switchTab('system', this)">
+            ⚙️ {{ _('System Stats') }}
         </button>
     </div>
 
@@ -100,12 +102,12 @@
 </div>
 
 <script>
-function switchTab(tabName) {
+function switchTab(tabName, button) {
     // Update tab buttons
     document.querySelectorAll('.stats-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    event.target.classList.add('active');
+    button.classList.add('active');
     
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {

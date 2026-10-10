@@ -1,6 +1,6 @@
 /* Positioning root: the link/toggle button fills it. The remove control and the
    cover badges overlay it as siblings of that control (never nested inside the
-   <a>); the read + edit actions sit below it in `.actionRow`. */
+   <a>); the action disclosure stays inside the cover rectangle. */
 .wrap {
   position: relative;
   display: flex;
@@ -24,7 +24,8 @@
   container: book-card / inline-size;
 }
 
-/* The single focusable control (a <Link> or a toggle <button>). */
+/* The book-detail link or selection toggle fills the card area. In browse mode,
+   the series link is a separate sibling immediately below it. */
 .card, .cardSelected {
   display: flex;
   flex-direction: column;
@@ -153,10 +154,55 @@
      when you read the stylesheet fails when you measure the pixels — static
      contrast math on the token says 5.71 and never sees it. */
   color: var(--text-muted);
+  /* A flex row, not a one-line clamp of the whole string (#2051): the clamp
+     cut the position off together with a long name. Only .seriesName shrinks. */
+  display: flex;
+  min-width: 0;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+}
+
+.seriesLink {
+  /* 25px leaves a little room for fractional grid/layout rounding at 375px; a
+     nominal 24px measured just under the WCAG target on desktop Chromium. */
+  min-height: 25px;
+  align-items: center;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+}
+
+.seriesLink:hover .seriesName {
+  text-decoration: underline;
+}
+
+.seriesLink:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.seriesName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* pre, not nowrap: the translated text around the name starts or ends with the
+   separating space, and a flex item drops leading whitespace otherwise. */
+.seriesIndex {
+  flex: none;
+  white-space: pre;
+}
+
+/* User-selected scalar Calibre fields. They deliberately share the card's
+ * one-line overflow rule: metadata is scannable in the grid, while the detail
+ * page remains the place for unabridged values. */
+.customField {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Cover badges live in ONE bottom-left row. Previously .readBadge sat at
@@ -249,6 +295,57 @@
   white-space: nowrap;
 }
 
+/* Shelf tags (#1254): which shelves hold the book, as the classic grid showed.
+   Top-right and stacked. .shelfRowInset reserves the top-left 24px control
+   lane (checkbox / remove) on cards that can show one, so a long name
+   ellipsises instead of sliding under it.
+   Same self-contained cover-control colours as .hiddenBadge, so it reads on
+   any cover art in every theme. */
+.shelfRow {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  left: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  pointer-events: none;
+}
+
+.shelfRowInset {
+  left: calc(var(--sp-2) * 2 + 24px);
+}
+
+.shelfBadge {
+  max-width: 100%;
+  min-height: 20px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--cover-control-bg);
+  color: var(--cover-control-fg);
+  border: 1px solid var(--cover-control-border);
+  box-shadow: var(--elev-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semi);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.shelfBadge > svg {
+  flex: none;
+}
+
+.shelfBadgeName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Series position (#573). Sits in .badgeRow; shown only in a series view. */
 .seriesBadge {
   min-width: 24px;
@@ -301,120 +398,25 @@
   border-color: var(--danger);
 }
 
-/* Quick-edit pencil (fork #572). Lives in `.actionRow`, in normal flow beside
-   the read link — NOT absolutely positioned over the card (#1166). It uses
-   on-surface tokens here; --cover-control-* is reserved for controls over
-   unpredictable cover artwork. Hover/focus-reveal like the remove button, but
-   always reachable via keyboard focus. */
-.quickEditBtn {
-  flex: 0 0 auto;
-  /* A card with no readable format has no "Read now" link, so the pencil is
-     alone in the row and would otherwise flex-start to the LEFT edge — moving
-     a control users have always found at bottom-right, on exactly the
-     MOBI/AZW3 cards this fix was meant to help. */
-  margin-left: auto;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--r-full);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  box-shadow: var(--elev-1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Only the global catalog's explicit Add action uses a row. Ordinary card
+   actions occupy the fixed cover rectangle, never the metadata below it. */
+.actionRow { display: flex; margin-top: auto; padding-top: var(--sp-2); min-height: 44px; }
+.readNow { display: flex; align-items: center; justify-content: center; gap: var(--sp-1); width: 100%; min-height: 44px; color: var(--accent-text); }
+.readNowLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.coverActions {
+  position: absolute;
+  inset: 0 0 auto;
+  aspect-ratio: 2 / 3;
+  padding: var(--sp-2);
+  pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease),
-              background var(--dur-fast) var(--ease),
-              color var(--dur-fast) var(--ease);
 }
-
-.wrap:hover .quickEditBtn,
-.wrap:focus-within .quickEditBtn,
-.quickEditBtn:focus-visible {
-  opacity: 1;
+.wrap:hover .coverActions, .wrap:focus-within .coverActions { opacity: 1; }
+.favoriteBadge {
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-full); background: var(--cover-control-bg); color: var(--cover-control-fg);
+  border: 1px solid var(--cover-control-border); pointer-events: none;
 }
-
-.quickEditBtn:hover {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-color: var(--accent);
-}
-
-/* The card's bottom action row: read link + edit pencil, side by side in normal
-   flow (#1166).
-
-   This replaces the reserved-corner approach from #1112, where the pencil was
-   absolutely positioned over the bottom-right and `.readNow` carried a fixed
-   `padding-right: calc(44px + sp-2 * 2)` to keep its label clear of it.
-   Reserving space works only while the card is wider than the reservation. On
-   the 4-column 375px grid the card is ~80px and the reservation 60px, leaving
-   the label ~20px: it wrapped to two lines, which grew the row, which pushed
-   the 44px pencil (bottom: 8px, so top at wrap.bottom - 52) up through the
-   44px label band and into the series line above.
-
-   A flex row makes the browser allocate the width, so no control can sit on
-   card text at any width, density or locale. Measured at 375px dense before the
-   fix: 8px of the pencil over the series/author line on every card with an edit
-   control; after: 0. */
-.actionRow {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  margin-top: auto;
-  /* Below ~60px of card the two controls cannot both hold their 24px floor on
-     one line (see .readNow). Wrapping keeps each one tappable instead of
-     shrinking one under the floor or pushing it out of the card. Inert at every
-     realistic width: a 4-column dense grid is 82px at 375px, 68px at 320px. */
-  flex-wrap: wrap;
-}
-
-.readNow {
-  /* Takes the space the pencil does not, down to a floor of 24px — WCAG 2.2
-     SC 2.5.8's minimum target size. It used to floor at 0, which let the link
-     shrink without limit: on a 280px screen (Galaxy Fold, folded) a dense card
-     is 58px and the link measured 22px, a target too small to reliably hit.
-     The label keeps its own min-width: 0, so text still ellipsises inside. */
-  flex: 1 1 auto;
-  min-width: 24px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-1);
-  border-radius: var(--r-md);
-  color: var(--accent-text);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
-  /* One line, always. Two-line labels are what grew the row into the metadata. */
-  white-space: nowrap;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
-}
-
-.readNow svg {
-  flex: 0 0 auto;
-}
-
-/* min-width: 0 is load-bearing: a flex item's automatic minimum size is its
-   min-content width, so without this the label refuses to shrink and the
-   parent's overflow:hidden hard-clips it mid-word instead of ellipsising. The
-   gap is widest just above the container-query threshold, where a 44px touch
-   pencil leaves ~85px for a long localized string ("Jetzt lesen", "Nu lezen"). */
-.readNowLabel {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.wrap:hover .readNow,
-.wrap:focus-within .readNow,
-.readNow:focus-visible { opacity: 1; }
-
-.readNow:hover,
-.readNow:focus-visible { background: var(--accent-soft); }
 
 .addToLibrary {
   opacity: 1;
@@ -426,46 +428,42 @@
 
 .addToLibrary:disabled { cursor: wait; opacity: .7; }
 
-/* Coarse pointers carry no card actions at all. Operator ruling 2026-09-12:
-   even one visible disclosure per cover was too much chrome on a phone, and
-   all three actions already live on the book's own page, which the cover links
-   to. The legacy controls are REMOVED FROM LAYOUT rather than made transparent
-   — PR #2028's finding stands: a real iPad tap applies synthetic hover before
-   click, so an opacity:0 control reveals AND activates under the same finger.
-   Fine pointers keep the established hover/focus treatment unchanged. */
-@media (any-hover: none), (any-pointer: coarse) {
-  .readNow, .removeBtn, .quickEditBtn { display: none; }
+@media (hover: none), (pointer: coarse) {
+  .coverActions { opacity: 1; }
+  .removeBtn { display: none; }
   .addToLibrary { display: flex; min-height: 44px; }
-  /* Bigger where legibility is worst — a phone held at arm's length is the
-     case the reporter was describing. */
-  .readBadge, .readingBadge, .hiddenBadge, .libraryBadge {
-    min-height: 28px;
-    font-size: var(--fs-sm);
-  }
+  .readBadge, .readingBadge, .hiddenBadge, .libraryBadge { min-height: 28px; font-size: var(--fs-sm); }
   .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
 }
 
-/* Narrow cards — the Compact and Dense grids, which are 3 and 4 columns on a
-   phone. Measured at 375px: comfortable 164px, compact 106px, dense 82px per
-   card. @HLRobius reported that the edit button "doesn't resize on mobile with
-   the different settings": a 44px control keeps its full size while the card
-   shrinks around it, so by Dense it is most of the card and the read label has
-   nowhere to go.
 
-   Scale the control with the card and drop the label wording, keeping the icon.
-   Queried on the card's own inline size rather than the viewport, because the
-   same BookCard renders in the catalog grid, shelves, search and the
-   "More by author" rail, each with its own column width at any given viewport
-   (the rails are a fixed 132px / 116px regardless of screen).
+/* Long labels must fit the cover in every locale. The full aria-label remains
+   available even when a visible label needs ellipsis. */
+.readBadge, .readingBadge, .hiddenBadge, .libraryBadge { max-width: 100%; min-width: 0; }
+.readBadge > svg, .readingBadge > svg, .hiddenBadge > svg, .libraryBadge > svg { flex: none; }
+.badgeLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shelfLabels { display: contents; }
+.shelfSummary { display: none; }
 
-   32px stays above the 24x24 CSS-px floor in WCAG 2.2 SC 2.5.8 Target Size
-   (Minimum, AA); the row keeps its 44px min-height, so the read link's touch
-   area is unchanged. */
-@container book-card (max-width: 132px) {
-  /* Only a row that also carries the pencil is tight enough to lose the
-     wording. A rail card at the same width has the whole row to itself, and
-     "Read now" fits there — hiding it would be a regression bought with a
-     threshold that has nothing to do with the rail. */
-  .actionRowEdit .readNowLabel { display: none; }
-  .removeBtn, .quickEditBtn { width: 32px; height: 32px; }
+/* A 68px dense cover cannot fit several labelled pills beside its action.
+   Keep the four status icons in a 2x2 block at the bottom and one shelf count
+   at top-right. Each img retains its complete accessible name. */
+@container book-card (max-width: 126px) {
+  .readBadge, .readingBadge, .hiddenBadge, .libraryBadge, .favoriteBadge {
+    width: 24px; height: 24px; min-height: 24px; min-width: 24px;
+    flex: 0 0 24px; padding: 0; gap: 0; justify-content: center;
+  }
+  .badgeLabel { display: none; }
+  .seriesBadge { width: 24px; height: 24px; min-width: 24px; padding: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* Some cards have no disclosure at all (for example when actions are
+     disabled). Only compact labels when the disclosure actually rendered. */
+  .wrap:has(.coverActions button[aria-expanded]) .shelfLabels { display: none; }
+  .wrap:has(.coverActions button[aria-expanded]) .shelfRow { left: auto; right: 2px; max-width: 24px; }
+  .wrap:has(.coverActions button[aria-expanded]) .shelfSummary {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; flex: none;
+    background: var(--cover-control-bg); color: var(--cover-control-fg);
+    border: 1px solid var(--cover-control-border); border-radius: var(--r-full);
+    font-size: var(--fs-xs); font-weight: var(--fw-semi); line-height: 1;
+  }
 }

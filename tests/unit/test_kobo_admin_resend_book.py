@@ -6,22 +6,15 @@
 """Regression tests for A2 — per-book "Resend to Kobo" action.
 
 Goal:
-    Admin clicks "Resend" on user_edit.html, the (user_id, book_id)
-    row in kobo_synced_books is cleared, and Books.last_modified is
-    bumped to NOW. On the user's next Kobo sync, the device receives
-    the book again (as NewEntitlement since the synced-row is gone)
-    and re-downloads the file.
+    Admin clicks "Resend" on user_edit.html; the book's rows in the
+    user's Kobo ledgers and kobo_synced_books are cleared. On each of the
+    user's Kobos' next sync the ledger-recovery arm reselects the book,
+    whatever the cursor, and announces it New.  The book itself, and so
+    every other account's Kobo, is left alone
+    (test_resend_reaches_only_the_requesting_accounts_kobos in
+    test_1925_kobo_sync_dedownload.py executes this).
 
-Why both:
-    The row deletion alone isn't enough — if the cursor has advanced
-    past Books.last_modified, the sync filter
-    ``Books.last_modified > sync_token.books_last_modified`` excludes
-    the book and the device never sees it again. The fix must do
-    both: clear the per-user sync record AND bump last_modified.
-
-These tests pin the implementation at the source-text level (route
-shape, function shape) so a future refactor that drops one of the
-two writes silently re-introduces a partial-fix bug.
+These tests pin the route and function shape at the source-text level.
 """
 
 import inspect
@@ -63,9 +56,7 @@ class TestRouteRegistered:
 
 @pytest.mark.unit
 class TestDoKoboResendShape:
-    """Source-pinned: the helper must perform two writes — clear the
-    sync row AND bump last_modified. Either one alone is a partial fix
-    that doesn't restore device-side delivery."""
+    """Source-pinned shape of the helper's writes."""
 
     def test_clears_kobo_synced_books_row_for_pair(self):
         from cps.admin import do_kobo_resend
@@ -95,24 +86,6 @@ class TestDoKoboResendShape:
             "book is remove_synced_book(all=True)."
         )
 
-    def test_bumps_last_modified_with_aware_datetime(self):
-        from cps.admin import do_kobo_resend
-        src = inspect.getsource(do_kobo_resend)
-        assert "last_modified" in src, (
-            "do_kobo_resend must bump Books.last_modified so the sync "
-            "filter `Books.last_modified > books_last_modified` picks "
-            "up the book even when the cursor has advanced past the "
-            "book's original mtime."
-        )
-        # Use timezone-aware UTC datetime to match the cps/editbooks
-        # canonical writer pattern (datetime.now(timezone.utc)).
-        assert "datetime.now(timezone.utc)" in src, (
-            "do_kobo_resend must bump last_modified using "
-            "datetime.now(timezone.utc) for parity with editbooks.py "
-            "writers — naive timestamps drift across DST boundaries "
-            "and can land in the past relative to the sync cursor."
-        )
-
     def test_validates_book_exists_before_writing(self):
         from cps.admin import do_kobo_resend
         src = inspect.getsource(do_kobo_resend)
@@ -120,21 +93,13 @@ class TestDoKoboResendShape:
         # invalid book ID gets feedback rather than a silent no-op.
         assert "calibre_db.session.query(db.Books)" in src, (
             "do_kobo_resend must verify the book exists in the calibre "
-            "library before bumping last_modified — otherwise an "
+            "library before clearing sync state — otherwise an "
             "invalid book ID silently no-ops."
         )
 
-    def test_commits_both_sessions(self):
+    def test_commits_the_app_session(self):
         from cps.admin import do_kobo_resend
         src = inspect.getsource(do_kobo_resend)
-        # Both writes go to different SQLAlchemy sessions — calibre_db
-        # for Books.last_modified, ub for KoboSyncedBooks — so both
-        # need explicit commits.
-        assert "calibre_db.session.commit()" in src, (
-            "do_kobo_resend must commit calibre_db.session — without "
-            "the commit the Books.last_modified bump is lost on the "
-            "next session expire/rollback."
-        )
         assert "ub.session_commit" in src, (
             "do_kobo_resend must commit ub.session — without the "
             "commit the KoboSyncedBooks deletion is rolled back."
@@ -228,12 +193,7 @@ class TestWhatActuallyDecidesTheEntitlementType:
         )
 
     def test_bumping_last_modified_alone_does_not_move_the_creation_stamp(self):
-        """This is what `do_kobo_resend` does to the book, and it is not enough.
-
-        It bumps `Books.last_modified` only. The creation stamp the entitlement
-        type is derived from is untouched, so a book the device has already seen
-        still classifies as Changed.
-        """
+        """A `Books.last_modified` bump leaves the creation stamp untouched."""
         from datetime import datetime
         from types import SimpleNamespace
 

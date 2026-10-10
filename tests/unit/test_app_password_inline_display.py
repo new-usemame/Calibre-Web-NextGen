@@ -48,107 +48,37 @@ def _init_py_source():
     return (REPO_ROOT / "cps" / "__init__.py").read_text()
 
 
-def test_app_password_create_writes_session_not_flash_token():
-    """``app_password_create`` must put the cleartext into the session,
-    not into a Flask flash message.
+def test_created_app_password_is_shown_inline_once_and_stored_only_as_a_hash(
+        monkeypatch, tmp_path):
+    """Points 1 and 2 above, by running the real ``/me/app-passwords`` route.
 
-    The previous shape `flash(...token...)` produced the 10-second toast
-    that @droM4X reported. Removing the token from the flash string and
-    routing it through the session is the user-visible behavior change.
+    The cleartext and label land in ``session["pending_app_password"]`` for the
+    inline box, never in a flash message (the 10-second toast @droM4X could not
+    copy from), and the token signs in while app.db holds only its hash.
     """
-    src = _web_py_source()
-    # Find the function.
-    func_match = re.search(
-        r"def app_password_create\(\):(.*?)(?=^def |^@\w)",
-        src,
-        re.DOTALL | re.MULTILINE,
-    )
-    assert func_match, "Could not locate app_password_create in cps/web.py."
-    body = func_match.group(1)
-
-    # The pre-fix flash contained the token. The post-fix path must store
-    # cleartext in session keyed by 'pending_app_password' and the flash
-    # must not include the token variable.
-    assert "session[" in body and "pending_app_password" in body, (
-        "app_password_create must write the cleartext + label to "
-        "session['pending_app_password'] so the profile template can "
-        "render it inline. Current body did not reference "
-        "session['pending_app_password']."
-    )
-    # The flashed token form is gone — no `flash(...token...` line with
-    # the cleartext variable.
-    bad_flash = re.search(
-        r"flash\([^)]*token=cleartext[^)]*\)",
-        body,
-    )
-    assert not bad_flash, (
-        "Cleartext token must NOT appear in a flash() call anymore — the "
-        "whole point of fork #223 is to remove the bottom-toast surface. "
-        "Use session['pending_app_password'] + the inline template "
-        "render instead."
-    )
-
-
-def test_session_payload_includes_label_and_token():
-    """The session value must carry both the label (so the inline box
-    can say "for 'Kobo Forma'") and the token (the user-visible string
-    they need to copy). A future refactor that drops one or the other
-    breaks the UX promise.
-    """
-    src = _web_py_source()
-    func_match = re.search(
-        r"def app_password_create\(\):(.*?)(?=^def |^@\w)",
-        src,
-        re.DOTALL | re.MULTILINE,
-    )
-    body = func_match.group(1)
-    # Both 'label' and 'cleartext' (or 'token') must appear within the
-    # session assignment. Pin by proximity to the session write.
-    session_write = re.search(
-        r"session\[['\"]pending_app_password['\"]\]\s*=\s*(\{[^}]+\}|[^\n]+)",
-        body,
-    )
-    assert session_write, (
-        "Could not find a `session['pending_app_password'] = ...` "
-        "assignment in app_password_create. Add one carrying both "
-        "the label and the cleartext token."
-    )
-    payload = session_write.group(1)
-    assert "label" in payload, (
-        f"session['pending_app_password'] must carry the label so the "
-        f"inline box can identify which password was just created. "
-        f"Current payload: {payload}"
-    )
-    assert "cleartext" in payload or "token" in payload, (
-        f"session['pending_app_password'] must carry the cleartext "
-        f"token. Current payload: {payload}"
-    )
-
-
-def test_cleartext_never_persisted_to_db():
-    """The DB row must store only the hash. The cleartext only ever
-    lives in session + the inline render — never on disk.
-    """
-    src = _web_py_source()
-    func_match = re.search(
-        r"def app_password_create\(\):(.*?)(?=^def |^@\w)",
-        src,
-        re.DOTALL | re.MULTILINE,
-    )
-    body = func_match.group(1)
-    # Pin generate_password_hash(cleartext) is what goes to the DB row.
-    assert "generate_password_hash(cleartext)" in body, (
-        "The DB row must be created with `generate_password_hash(cleartext)` "
-        "(only the hash on disk). Current body did not show this exact call."
-    )
-    # And the raw cleartext is not passed to UserAppPassword constructor.
-    assert not re.search(
-        r"UserAppPassword\([^)]*password_hash\s*=\s*cleartext\b",
-        body,
-    ), (
-        "UserAppPassword must NEVER be constructed with the raw cleartext "
-        "in password_hash. Hash it first via generate_password_hash()."
-    )
+    from cps import ub
+    from cps.web import web
+    from tests.unit.koreader_library_world import LibraryWorld
+    world = LibraryWorld(monkeypatch, tmp_path)
+    world.enable_web()
+    world.app.register_blueprint(web)
+    try:
+        world.add_user("alice")
+        browser = world.browser("alice")
+        created = browser.post("/me/app-passwords", data={"label": "Kobo Forma"})
+        assert created.status_code == 302
+        with browser.session_transaction() as session:
+            pending = session["pending_app_password"]
+            flashed = [message for _category, message in session.get("_flashes", [])]
+        assert pending["label"] == "Kobo Forma"
+        token = pending["token"]
+        assert not any(token in message for message in flashed)
+        assert world.client.get("/kosync/users/auth",
+                                headers=world.basic("alice", token)).status_code == 200
+        row = world.session.query(ub.UserAppPassword).one()
+        assert token not in (row.password_hash, row.label)
+    finally:
+        world.close()
 
 
 def test_profile_route_passes_pending_app_password_to_template():

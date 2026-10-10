@@ -1,6 +1,7 @@
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local socketutil = require("socketutil")
+local _ = require("gettext")
 
 -- Push/Pull
 local PROGRESS_TIMEOUTS = { 2,  5 }
@@ -45,6 +46,45 @@ local function describeFailure(err)
 end
 
 CWNGSyncClient.describeFailure = describeFailure
+
+-- The HTTP status inside a reason, in either shape it arrives: "HTTP 409" from
+-- finish(), or "405 not expected" when lua-Spore meets a status the spec omits.
+function CWNGSyncClient.statusOf(reason)
+    if type(reason) ~= "string" then return nil end
+    return tonumber(reason:match("^HTTP (%d%d%d)$") or reason:match("^(%d%d%d) not expected"))
+end
+
+-- The same reason in words for the screen. crash.log keeps the exact text.
+-- The secure connection failed because the other end does not speak TLS:
+-- an https request sent to a plain http port. LuaSec says "wantread" when the
+-- reply to its hello never parses as a handshake.
+function CWNGSyncClient.notHttps(reason)
+    local lower = type(reason) == "string" and reason:lower() or ""
+    return lower:find("wantread", 1, true) ~= nil or lower:find("wantwrite", 1, true) ~= nil
+        or lower:find("wrong version number", 1, true) ~= nil or lower:find("unknown protocol", 1, true) ~= nil
+end
+
+function CWNGSyncClient.plainReason(reason)
+    if type(reason) ~= "string" or reason == "" then return _("no response from server") end
+    local lower = reason:lower()
+    if lower:find("timeout", 1, true) or lower:find("timed out", 1, true) then
+        return _("the server took too long to answer")
+    elseif CWNGSyncClient.notHttps(reason) then
+        return _("that address does not answer over https")
+    elseif lower:find("refused", 1, true) then
+        return _("nothing answered at that address")
+    elseif lower:find("host not found", 1, true) or lower:find("name or service", 1, true) then
+        return _("that address could not be found")
+    elseif lower:find("unreachable", 1, true) or lower:find("no route", 1, true) then
+        return _("this device could not reach that address")
+    end
+    local status = CWNGSyncClient.statusOf(reason)
+    if status then
+        return (_("the server answered with error %1"):gsub("%%1", tostring(status)))
+    end
+    -- Where in KOReader's code it was raised means nothing to a reader.
+    return (reason:gsub("^[^%s:]+%.lua:%d+:%s*", ""))
+end
 
 
 -- Report a completed call. `reason` is nil when it succeeded, and otherwise
@@ -135,6 +175,13 @@ function CWNGSyncClient:init()
 
         local base64_credentials = base64_encode(credentials)
         req.headers["Authorization"] = "Basic " .. base64_credentials
+    end
+    package.loaded["Spore.Middleware.CWNGDeviceHeaders"] = {}
+    require("Spore.Middleware.CWNGDeviceHeaders").call = function(args, req)
+        -- GET calls carry no body, so device identity rides in headers, the
+        -- same ones the delivery download already sends.
+        if args.device_id then req.headers["X-CWNG-Device-ID"] = args.device_id end
+        if args.device then req.headers["X-CWNG-Device-Name"] = args.device end
     end
     package.loaded["Spore.Middleware.AsyncHTTP"] = {}
     require("Spore.Middleware.AsyncHTTP").call = function(args, req)
@@ -485,6 +532,126 @@ function CWNGSyncClient:download_delivery(
         nil
 end
 
+-- The library manifest: which books this device should show, one page at a
+-- time. `if_revision` lets an unchanged library answer in one small response.
+function CWNGSyncClient:get_library(
+        username, password, device, device_id, cursor, if_revision, limit, callback)
+    self.client:reset_middlewares()
+    self.client:enable("Format.JSON")
+    self.client:enable("GinClient")
+    self.client:enable("CWNGSyncAuth", { username = username, password = password })
+    self.client:enable("CWNGDeviceHeaders", { device = device, device_id = device_id })
+    socketutil:set_timeout(INVENTORY_TIMEOUTS[1], INVENTORY_TIMEOUTS[2])
+    local co = coroutine.create(function()
+        local ok, res = pcall(function()
+            return self.client:get_library({
+                device = device,
+                device_id = device_id,
+                cursor = cursor,
+                limit = limit,
+                if_revision = if_revision,
+            })
+        end)
+        finish(callback, ok, res, "CWNGSyncClient:get_library")
+    end)
+    self.client:enable("AsyncHTTP", { thread = co })
+    coroutine.resume(co)
+    if UIManager.looper then UIManager:setInputTimeout() end
+    socketutil:reset_timeout()
+end
+
+function CWNGSyncClient:update_read_status(
+        username, password, device, device_id, book_id, document, status, callback)
+    jsonRequest(self, function()
+        return self.client:update_read_status({
+            device = device,
+            device_id = device_id,
+            book_id = book_id,
+            document = document,
+            status = status,
+        })
+    end, username, password, callback, "CWNGSyncClient:update_read_status")
+end
+
+-- Pairing runs before the device has any credentials, so these two calls go
+-- out without the auth middleware.
+local function publicJsonRequest(self, operation, callback, label)
+    self.client:reset_middlewares()
+    self.client:enable("Format.JSON")
+    self.client:enable("GinClient")
+    socketutil:set_timeout(AUTH_TIMEOUTS[1], AUTH_TIMEOUTS[2])
+    local co = coroutine.create(function()
+        local ok, res = pcall(operation)
+        finish(callback, ok, res, label)
+    end)
+    self.client:enable("AsyncHTTP", { thread = co })
+    coroutine.resume(co)
+    if UIManager.looper then UIManager:setInputTimeout() end
+    socketutil:reset_timeout()
+end
+
+function CWNGSyncClient:pair_start(device, device_id, callback)
+    publicJsonRequest(self, function()
+        return self.client:pair_start({ device = device, device_id = device_id })
+    end, callback, "CWNGSyncClient:pair_start")
+end
+
+function CWNGSyncClient:pair_poll(device_code, callback)
+    publicJsonRequest(self, function()
+        return self.client:pair_poll({ device_code = device_code })
+    end, callback, "CWNGSyncClient:pair_poll")
+end
+
+-- Stream one library file (a placeholder or the real book) to `local_path`.
+-- Synchronous on purpose: callers either run it between UI ticks one file at a
+-- time, or while the reader is waiting for the book it just tapped. Returns
+-- ok, content_length, checksum, reason, and the HTTP status when the server
+-- answered with an error.
+function CWNGSyncClient:download_file(
+        username, password, device, device_id, url_path, local_path, timeouts)
+    local http = require("socket.http")
+    local ltn12 = require("ltn12")
+    local mime = require("mime")
+    local socket = require("socket")
+    if type(url_path) ~= "string" or url_path:sub(1, 1) ~= "/" then
+        return false, nil, nil, "invalid download path"
+    end
+    local handle, open_error = io.open(local_path, "wb")
+    if not handle then
+        return false, nil, nil, open_error or "could not open temporary file"
+    end
+    timeouts = timeouts or { socketutil.FILE_BLOCK_TIMEOUT, socketutil.FILE_TOTAL_TIMEOUT }
+    socketutil:set_timeout(timeouts[1], timeouts[2])
+    local credentials = mime.b64(username .. ":" .. password):gsub("%s", "")
+    local ok, code, headers, status = pcall(function()
+        return socket.skip(1, http.request {
+            url = self.service_url .. url_path,
+            method = "GET",
+            headers = {
+                ["Accept-Encoding"] = "identity",
+                ["Authorization"] = "Basic " .. credentials,
+                ["X-CWNG-Device-ID"] = device_id,
+                ["X-CWNG-Device-Name"] = device,
+            },
+            sink = ltn12.sink.file(handle),
+        })
+    end)
+    pcall(handle.close, handle)
+    socketutil:reset_timeout()
+    if not ok then
+        os.remove(local_path)
+        return false, nil, nil, describeFailure(code)
+    end
+    if code ~= 200 then
+        os.remove(local_path)
+        return false, nil, nil, status or ("HTTP " .. tostring(code)), tonumber(code)
+    end
+    return true,
+        tonumber(responseHeader(headers, "content-length")),
+        responseHeader(headers, "x-cwng-checksum"),
+        nil
+end
+
 -- Phase 2: pull annotations for a document (server -> device).
 function CWNGSyncClient:pull_annotations(username, password, document, callback)
     self.client:reset_middlewares()
@@ -530,7 +697,9 @@ end
 --     every delete cycle died inside the plugin and no request went out (#920).
 -- Declaring one and not the other is not caught by review or by a server-side
 -- HTTP test; tests/unit/test_cwngsync_plugin_wire_contract.py pins both.
-function CWNGSyncClient:push_annotations(username, password, document, annotations, deleted, callback)
+-- `device` and `device_id` name the e-reader, so the website can say which one
+-- a highlight came from.
+function CWNGSyncClient:push_annotations(username, password, document, annotations, deleted, device, device_id, callback)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
     self.client:enable("GinClient")
@@ -546,6 +715,8 @@ function CWNGSyncClient:push_annotations(username, password, document, annotatio
                 annotations = annotations,
                 deleted = (deleted and #deleted > 0) and deleted or nil,
                 delete_source = (deleted and #deleted > 0) and "koreader" or nil,
+                device = device,
+                device_id = device_id,
             })
         end)
         finish(callback, ok, res, "CWNGSyncClient:push_annotations")

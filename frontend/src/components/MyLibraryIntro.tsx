@@ -31,19 +31,20 @@ export function MyLibraryIntro() {
   const state = intro.data;
   if (!state || state.dismissed) return null;
   const enabled = state.status === 'enabled';
+  const incomplete = state.status === 'incomplete';
   const busy = enable.isPending || undo.isPending || dismiss.isPending;
 
   const failText = (err: unknown) =>
     err instanceof ApiError ? err.message : t('Could not complete the action.');
 
   const onTry = () => {
-    if (!window.confirm(t('Set up My Library for every non-anonymous account? Each account starts with every book it can currently see—not only books it has shelved, read, or downloaded. Users can curate from there by removing books. Accounts already set up are never reseeded.'))) return;
+    if (!incomplete && !window.confirm(t('Set up My Library for every non-anonymous account? Each account starts with every book it can currently see—not only books it has shelved, read, or downloaded. Users can curate from there by removing books. Accounts already set up are never reseeded.'))) return;
     setError('');
     enable.mutate(undefined, {
       onSuccess: (data) => {
-        announce(data.errors > 0
-          ? t('My Library is on for {accounts} accounts; {errors} accounts failed.', {
-            accounts: data.accounts - data.errors, errors: data.errors,
+        announce(data.status === 'incomplete'
+          ? t('My Library setup is incomplete for {accounts} account(s). You can retry or undo.', {
+            accounts: data.pending_accounts,
           })
           : t('My Library is now on for {accounts} accounts.', { accounts: data.accounts }));
       },
@@ -103,19 +104,40 @@ export function MyLibraryIntro() {
         <h2 id="mylib-intro-title" className={styles.title}>{t('New Feature!')}</h2>
       </div>
 
-      {enabled ? (
+      {enabled || incomplete ? (
         <>
           <p className={styles.body}>
-            {t('Explore the changes, you can always undo later.')}
+            {incomplete
+              ? t('My Library setup is incomplete for {accounts} account(s). You can retry or undo.', {
+                accounts: state.pending_accounts,
+              })
+              : t('Explore the changes, you can always undo later.')}
           </p>
+          {incomplete && <>
+            <p className={styles.body}>
+              {t('Retry finishes the remaining accounts without changing completed selections. Undo restores the settings from before setup began.')}
+            </p>
+            {(state.failed_accounts ?? []).length > 0 && (
+              <ul>
+                {state.failed_accounts.map((account) => (
+                  <li key={account.user_id}>{account.name}: {account.error}</li>
+                ))}
+              </ul>
+            )}
+          </>}
           <div className={styles.actions}>
+            {incomplete && (
+              <button type="button" className={styles.primary} onClick={onTry} disabled={busy}>
+                {enable.isPending ? t('Setting up…') : t('Retry')}
+              </button>
+            )}
             <button type="button" className={styles.soft} onClick={onUndo} disabled={busy}>
               <RotateCcw size={15} aria-hidden="true" focusable={false} />
               {undo.isPending ? t('Undoing…') : t('Undo')}
             </button>
-            <button type="button" className={styles.soft} onClick={onDismiss} disabled={busy}>
+            {enabled && <button type="button" className={styles.soft} onClick={onDismiss} disabled={busy}>
               {t('Close')}
-            </button>
+            </button>}
           </div>
         </>
       ) : (

@@ -14,7 +14,7 @@ from urllib.parse import quote
 import unidecode
 from weakref import WeakSet, WeakKeyDictionary
 from uuid import uuid4
-
+import time
 import sqlite3
 from sqlalchemy import create_engine, event
 from sqlalchemy import Table, Column, ForeignKey, CheckConstraint
@@ -29,7 +29,7 @@ try:
 except ImportError:
     from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.sql.expression import and_, true, false, text, func, literal, or_, select, union_all
+from sqlalchemy.sql.expression import and_, true, false, text, func, literal, or_, select, union_all, bindparam
 try:
     # Scope key for the session registry, see _make_session_factory. greenlet is
     # a pinned dependency (pyproject.toml) and a hard dependency of gevent;
@@ -44,17 +44,30 @@ from flask_babel import gettext as _
 from flask_babel import get_locale
 from flask import flash, url_for, has_request_context, g
 
-from . import logger, ub, isoLanguages
+from . import logger, ub, isoLanguages, hierarchy
 from .pagination import Pagination
-from .string_helper import strip_whitespaces
+from .string_helper import strip_whitespaces, title_sort_name
 from .sqlite_utils import network_share_mode_enabled
 from .unicode_collation import unicode_initial, unicode_sort_key
+from .services.restriction_columns import restriction_predicate
 
 log = logger.create()
 
 
 class FilteredBookVisibilityUnavailable(RuntimeError):
     """The configured filtered-library policy could not be resolved safely."""
+
+
+def _restriction_datatype(value_model):
+    """Return the policy-relevant datatype for a dynamic custom column.
+
+    Text and enumeration columns both retain their literal-string matching;
+    only Boolean columns need three-state interpretation.
+    """
+    return "bool" if isinstance(
+        value_model.value.property.columns[0].type, Boolean
+    ) else "text"
+
 
 # Rate-limit author-sort drift diagnostics. Books.author_sort is denormalized
 # from Authors.sort and can drift after an Authors edit; the divergence is
@@ -137,6 +150,28 @@ def public_shelf_book_filter(app_session, metadata_session):
     return Books.id.in_(book_ids)
 
 
+def _cross_database_book_id_filter(metadata_session, app_session, values, *, include):
+    """Filter metadata IDs from another DB without expanding large ID lists.
+
+    Keep the legacy literal predicate on SQLite builds without JSON1. When
+    JSON1 is available, consume each nonempty cross-database set through one
+    bind. The statement may contain both archived and hidden exclusions, so a
+    per-list threshold would not bound their combined bind count.
+    """
+    values = sorted({int(value) for value in values if value is not None})
+    if not values:
+        return false() if include else true()
+    if _sqlite_json_available(app_session, metadata_session):
+        json_values = json.dumps(values, separators=(",", ":"))
+        value_table = func.json_each(
+            bindparam("cross_database_book_ids", json_values, unique=True)
+        ).table_valued("value").alias("cross_database_book_ids")
+        ids = select(value_table.c.value)
+    else:
+        ids = values
+    return Books.id.in_(ids) if include else Books.id.notin_(ids)
+
+
 def _register_sqlite_udfs(dbapi_connection, _connection_record):
     """Register Python UDFs (lower, uuid4, title_sort) once per SQLite
     connection — installed as a SQLAlchemy ``connect`` event listener.
@@ -172,24 +207,15 @@ def _register_sqlite_udfs(dbapi_connection, _connection_record):
     try:
         dbapi_connection.create_function("ng_sort_key", 1, unicode_sort_key)
         dbapi_connection.create_function("ng_initial", 1, unicode_initial)
+        dbapi_connection.create_function("ng_sort_key", 2, unicode_sort_key)
+        dbapi_connection.create_function("ng_initial", 2, unicode_initial)
     except Exception:
         pass
 
     def _title_sort(title):
-        if title is None:
-            return ''
         cfg = CalibreDB.config
-        try:
-            regex = getattr(cfg, 'config_title_regex', None) if cfg is not None else None
-            if regex:
-                title_pat = re.compile(regex, re.IGNORECASE)
-                match = title_pat.search(title)
-                if match:
-                    prep = match.group(1)
-                    title = title[len(prep):] + ', ' + prep
-        except Exception:
-            pass
-        return strip_whitespaces(title)
+        regex = getattr(cfg, 'config_title_regex', None) if cfg is not None else None
+        return title_sort_name(title, regex)
 
     try:
         dbapi_connection.create_function("title_sort", 1, _title_sort)
@@ -881,7 +907,9 @@ class AlchemyEncoder(json.JSONEncoder):
                         for ele in data:
                             if hasattr(ele, 'value'):       # converter for custom_column values
                                 if isinstance(ele.value, datetime):
-                                    el.append(ele.value.date().isoformat())
+                                    el.append(ele.value.date().isoformat() if ele.value.year > 101 else "")
+                                elif ele.value is None:
+                                    el.append("")
                                 else:
                                     el.append(str(ele.value))
                             elif ele.get:
@@ -980,6 +1008,12 @@ def rank_typeahead_names(names, query):
     return sorted(names, key=sort_key)
 
 
+# How often a request may stat metadata.db for an outside replacement, and how
+# old a replacement must be before it is trusted to be completely written.
+METADATA_DB_REPLACEMENT_CHECK_SECONDS = 5.0
+METADATA_DB_SETTLE_SECONDS = 2.0
+
+
 class CalibreDB:
     _init = False
     engine = None
@@ -990,6 +1024,14 @@ class CalibreDB:
     # instances alive once they reach the end of their respective scopes
     instances = WeakSet()
     _reconnect_lock = threading.RLock()  # Reentrant lock to prevent concurrent reconnect operations
+    # The metadata.db this process opened, as (path, (st_dev, st_ino)). A sync tool
+    # that swaps in a new file leaves the open connection on the old one (#2291).
+    _metadata_db_path = None
+    _metadata_db_identity = None
+    _metadata_db_content = None
+    _replacement_checked_at = None
+    _replacement_candidate = None
+    _replacement_check_gate = threading.Lock()
 
     def __init__(self, expire_on_commit=True, init=False):
         """ Initialize a new CalibreDB session
@@ -1537,8 +1579,76 @@ class CalibreDB:
                 except Exception:
                     pass
 
+            try:
+                st = os.stat(dbpath)
+                cls._metadata_db_identity = (st.st_dev, st.st_ino)
+                cls._metadata_db_content = (st.st_size, st.st_mtime_ns)
+                cls._metadata_db_path = dbpath
+            except OSError:
+                cls._metadata_db_identity = None
+            cls._replacement_candidate = None
+
             cls._init = True
         # End of with cls._reconnect_lock
+
+    @classmethod
+    def reconnect_if_metadata_db_replaced(cls, app_db_path):
+        """Reconnect when metadata.db on disk is no longer the file we opened.
+
+        Copy and sync tools (rsync, Syncthing, most NAS sync apps) write a new
+        file and rename it over metadata.db. The engine's connection stays on
+        the replaced file, so new books stay invisible until a manual
+        "Reconnect Calibre Database" (#2291). SQLite itself never replaces the
+        file, so a changed device/inode always means an outside copy.
+
+        Cheap enough for every request: one stat per interval, and requests
+        that arrive while another one is checking skip the check. A file that
+        was modified in the last few seconds may still be being written, so it
+        is only adopted once it is seen unchanged on a later check.
+        """
+        path = cls._metadata_db_path
+        if not path or cls._metadata_db_identity is None or cls.config is None:
+            return False
+        now = time.monotonic()
+        checked_at = cls._replacement_checked_at
+        if checked_at is not None and now - checked_at < METADATA_DB_REPLACEMENT_CHECK_SECONDS:
+            return False
+        if not cls._replacement_check_gate.acquire(blocking=False):
+            return False
+        try:
+            cls._replacement_checked_at = now
+            try:
+                st = os.stat(path)
+            except OSError:
+                # Mid-swap (deleted, not yet recreated): look again next time.
+                cls._replacement_candidate = None
+                return False
+            content = (st.st_size, st.st_mtime_ns)
+            if (st.st_dev, st.st_ino) == cls._metadata_db_identity:
+                cls._metadata_db_content = content
+                cls._replacement_candidate = None
+                return False
+            if content == cls._metadata_db_content:
+                # Same bytes under a new inode number: SMB mounts with
+                # noserverino renumber files the client re-looks-up.
+                cls._metadata_db_identity = (st.st_dev, st.st_ino)
+                return False
+            observation = (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns)
+            settled = (observation == cls._replacement_candidate
+                       or time.time() - st.st_mtime >= METADATA_DB_SETTLE_SECONDS)
+            if not settled:
+                cls._replacement_candidate = observation
+                return False
+            log.info("metadata.db at %s was replaced on disk (e.g. by a sync tool); "
+                     "reconnecting to the new file", path)
+            cls._reconnect(cls.config, app_db_path)
+            if cls._metadata_db_identity != observation[:2]:
+                # setup_db could not open the new file and logged why. Stop
+                # retrying this file every interval; a later swap is new work.
+                cls._metadata_db_identity = observation[:2]
+            return True
+        finally:
+            cls._replacement_check_gate.release()
 
     def get_book(self, book_id):
         self.ensure_session()
@@ -1546,7 +1656,7 @@ class CalibreDB:
 
     def get_filtered_book(self, book_id, allow_show_archived=False,
                           allow_show_hidden=False, allow_show_global=False,
-                          user=None):
+                          user=None, allow_public_shelf_books=False):
         self.ensure_session()
         # Eagerly load all relationships to prevent detached instance errors during editing
         # allow_show_hidden=True: covers/read/edit/download flows for a user's
@@ -1569,6 +1679,7 @@ class CalibreDB:
                     allow_show_hidden=allow_show_hidden,
                     allow_show_global=allow_show_global,
                     user=user,
+                    allow_public_shelf_books=allow_public_shelf_books,
                 ))
                 .first())
 
@@ -1636,14 +1747,17 @@ class CalibreDB:
                     values = cc_classes[self.config.config_restricted_column]
                     allowed_values = filter_user.list_allowed_column_values()
                     denied_values = filter_user.list_denied_column_values()
-                    allowed_column_filter = (
-                        true() if allowed_values == [""]
-                        else column.any(values.value.in_(allowed_values))
+                    column_policy = restriction_predicate(
+                        column,
+                        values,
+                        _restriction_datatype(values),
+                        allowed_values,
+                        denied_values,
                     )
-                    denied_column_filter = (
-                        false() if denied_values == [""]
-                        else column.any(values.value.in_(denied_values))
-                    )
+                    # Invalid persisted Boolean values fail closed inside the
+                    # shared predicate rather than broadening this user's view.
+                    allowed_column_filter = column_policy
+                    denied_column_filter = false()
                 except (KeyError, AttributeError, IndexError):
                     log.error(
                         "Custom Column No.%s does not exist in calibre database",
@@ -1704,6 +1818,7 @@ class CalibreDB:
         allow_show_archived=False,
         allow_show_hidden=False,
         allow_show_global=False,
+        allow_public_shelf_books=False,
     ):
         self.ensure_session()
         if not read_column:
@@ -1729,6 +1844,7 @@ class CalibreDB:
                     allow_show_archived,
                     allow_show_hidden=allow_show_hidden,
                     allow_show_global=allow_show_global,
+                    allow_public_shelf_books=allow_public_shelf_books,
                 )).first())
 
     def get_book_by_uuid(self, book_uuid):
@@ -1822,7 +1938,9 @@ class CalibreDB:
                               .filter(ub.ArchivedBook.is_archived.is_(True))
                               .all())
             archived_book_ids = [archived_book.book_id for archived_book in archived_books]
-            archived_filter = Books.id.notin_(archived_book_ids)
+            archived_filter = _cross_database_book_id_filter(
+                self.session, ub.session, archived_book_ids, include=False
+            )
         else:
             archived_filter = true()
 
@@ -1833,7 +1951,9 @@ class CalibreDB:
                             .filter(ub.UserHiddenBook.user_id == int(filter_user.id))
                             .all())
             hidden_book_ids = [h.book_id for h in hidden_books]
-            hidden_filter = Books.id.notin_(hidden_book_ids)
+            hidden_filter = _cross_database_book_id_filter(
+                self.session, ub.session, hidden_book_ids, include=False
+            )
         else:
             hidden_filter = true()
 
@@ -1856,14 +1976,20 @@ class CalibreDB:
         pos_content_tags_filter = true() if postags_list == [''] else Books.tags.any(Tags.name.in_(postags_list))
         if self.config.config_restricted_column:
             try:
-                pos_cc_list = filter_user.allowed_column_value.split(',')
-                pos_content_cc_filter = true() if pos_cc_list == [''] else \
-                    getattr(Books, 'custom_column_' + str(self.config.config_restricted_column)). \
-                    any(cc_classes[self.config.config_restricted_column].value.in_(pos_cc_list))
-                neg_cc_list = filter_user.denied_column_value.split(',')
-                neg_content_cc_filter = false() if neg_cc_list == [''] else \
-                    getattr(Books, 'custom_column_' + str(self.config.config_restricted_column)). \
-                    any(cc_classes[self.config.config_restricted_column].value.in_(neg_cc_list))
+                column = getattr(
+                    Books,
+                    'custom_column_' + str(self.config.config_restricted_column),
+                )
+                values = cc_classes[self.config.config_restricted_column]
+                column_policy = restriction_predicate(
+                    column,
+                    values,
+                    _restriction_datatype(values),
+                    filter_user.allowed_column_value,
+                    filter_user.denied_column_value,
+                )
+                pos_content_cc_filter = column_policy
+                neg_content_cc_filter = false()
             except (KeyError, AttributeError, IndexError):
                 pos_content_cc_filter = false()
                 neg_content_cc_filter = true()
@@ -1933,14 +2059,15 @@ class CalibreDB:
                     pos_content_cc_filter, ~neg_content_cc_filter, archived_filter,
                     hidden_filter, membership_filter, extra_filter)
 
-    def generate_linked_query(self, config_read_column, database):
+    def generate_linked_query(self, config_read_column, database, user=None):
         # Safety: session can be briefly None during DB reconnects
         self.ensure_session()
+        linked_user = user or current_user
         if not config_read_column:
             query = (self.session.query(database, ub.ArchivedBook.is_archived, ub.ReadBook.read_status)
                      .select_from(Books)
                      .outerjoin(ub.ReadBook,
-                                and_(ub.ReadBook.user_id == int(current_user.id), ub.ReadBook.book_id == Books.id)))
+                                and_(ub.ReadBook.user_id == int(linked_user.id), ub.ReadBook.book_id == Books.id)))
         else:
             try:
                 read_column = cc_classes[config_read_column]
@@ -1952,7 +2079,7 @@ class CalibreDB:
                 # Skip linking read column and return None instead of read status
                 query = self.session.query(database, None, ub.ArchivedBook.is_archived)
         return query.outerjoin(ub.ArchivedBook, and_(Books.id == ub.ArchivedBook.book_id,
-                                                     int(current_user.id) == ub.ArchivedBook.user_id))
+                                                     int(linked_user.id) == ub.ArchivedBook.user_id))
 
     @staticmethod
     def get_checkbox_sorted(inputlist, state, offset, limit, order, combo=False):
@@ -1987,14 +2114,26 @@ class CalibreDB:
     def fill_indexpage_with_archived_books(self, page, database, pagesize, db_filter, order, allow_show_archived,
                                            join_archive_read, config_read_column, *join, **kwargs):
         self.ensure_session()
+        ids_only = kwargs.pop('ids_only', False)
         viewing_tag_id = kwargs.get('viewing_tag_id')
         allow_show_hidden = kwargs.get('allow_show_hidden', False)
         allow_show_global = kwargs.get('allow_show_global', False)
         allow_public_shelf_books = kwargs.get('allow_public_shelf_books', False)
         extra_filter = kwargs.get('extra_filter')
         pagesize = pagesize or self.config.config_books_per_page
-        if current_user.show_detail_random():
+        if current_user.show_detail_random() and not ids_only:
             random_query = self.generate_linked_query(config_read_column, database)
+            random_extra_filter = extra_filter
+            if database == Books:
+                # Every Classic random strip is a Discover feed. Keep it on
+                # the same per-user source as /discover without changing the
+                # listing filter or granting extra visibility.
+                from .services import discover_source
+                discover_filter, _source_available = discover_source.filter_for(current_user)
+                random_extra_filter = and_(
+                    discover_filter,
+                    extra_filter if extra_filter is not None else true(),
+                )
             # Eagerly load template relationships to prevent detached lazy-load
             # failures if another request tears down the shared scoped session.
             if database == Books:
@@ -2010,7 +2149,7 @@ class CalibreDB:
                                                              allow_show_hidden=allow_show_hidden,
                                                              allow_show_global=allow_show_global,
                                                              allow_public_shelf_books=allow_public_shelf_books,
-                                                             extra_filter=extra_filter))
+                                                             extra_filter=random_extra_filter))
                      .order_by(func.random())
                      .limit(self.config.config_random_books).all())
         else:
@@ -2022,7 +2161,7 @@ class CalibreDB:
         
         # Eagerly load template relationships to prevent DetachedInstanceError
         # during rendering under concurrent status/notification requests.
-        if database == Books:
+        if database == Books and not ids_only:
             query = query.options(
                 joinedload(Books.authors),
                 joinedload(Books.tags),
@@ -2063,9 +2202,23 @@ class CalibreDB:
             else:
                 total_count = query.count()
             pagination = Pagination(page, pagesize, total_count)
+            if ids_only:
+                entries = [row[0] for row in query.with_entities(database.id).distinct()
+                           .order_by(*order).offset(off).limit(pagesize).all()]
+                return entries, false(), pagination
             entries = query.order_by(*order).offset(off).limit(pagesize).all()
         except Exception as ex:
             log.error_or_exception(ex)
+            # Selection is an all-or-nothing operation. Returning the empty
+            # fallback used by legacy browse callers could silently turn a
+            # failed ID query into a partial selection.
+            # A Python SQLite function failure invalidates the whole ordered
+            # cohort. Reporting an empty library hides a collation/key fault.
+            udf_failed = (isinstance(ex, OperationalError) and
+                          isinstance(ex.orig, sqlite3.OperationalError) and
+                          str(ex.orig) == 'user-defined function raised exception')
+            if ids_only or udf_failed:
+                raise
         # display authors in right order
         entries = self.order_authors(entries, True, join_archive_read)
         return entries, randm, pagination
@@ -2209,17 +2362,20 @@ class CalibreDB:
         return self.session.query(Books) \
             .filter(and_(Books.authors.any(and_(*q)), func.lower(Books.title).ilike("%" + title + "%"))).first()
 
-    def search_query(self, term, config, *join, allow_show_hidden=False):
+    def search_query(self, term, config, *join, allow_show_hidden=False, user=None,
+                     eager_data=True, viewing_tag_id=None):
         self.ensure_session()
         strip_whitespaces(term).lower()
         q = list()
         author_terms = re.split("[, ]+", term)
         for author_term in author_terms:
             q.append(Books.authors.any(func.lower(Authors.name).ilike("%" + author_term + "%")))
-        query = self.generate_linked_query(config.config_read_column, Books)
+        query = self.generate_linked_query(config.config_read_column, Books, user=user)
         if len(join) == 6:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4]).outerjoin(join[5])
-        if len(join) == 3:
+        elif len(join) == 5:
+            query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4])
+        elif len(join) == 3:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2])
         elif len(join) == 2:
             query = query.outerjoin(join[0], join[1])
@@ -2238,13 +2394,22 @@ class CalibreDB:
                     getattr(Books,
                             'custom_column_' + str(c.id)).any(
                         func.lower(cc_classes[c.id].value).ilike("%" + term + "%")))
-        # Eagerly load the data relationship to prevent session errors
-        query = query.options(joinedload(Books.data))
-        return query.filter(self.common_filters(True, allow_show_hidden=allow_show_hidden)) \
+        # Eagerly load the data relationship to prevent session errors.
+        # Bounded export iterators use selectinload instead: joinedload on a
+        # collection requires result uniquing and is incompatible with yield_per.
+        if eager_data:
+            query = query.options(joinedload(Books.data))
+        return query.filter(self.common_filters(
+            True, allow_show_hidden=allow_show_hidden, user=user,
+            viewing_tag_id=viewing_tag_id,
+        )) \
             .filter(or_(*filter_expression))
 
-    def get_cc_columns(self, config, filter_config_custom_read=False):
+    def get_cc_columns(self, config, filter_config_custom_read=False, fail_on_error=False):
         """Custom-column display definitions, or ``[]`` if they can't be read.
+
+        Primary browse and upgrade callers use fail_on_error to retry a failed
+        read. Optional metadata callers retain the historical empty-list fallback.
 
         Degrading here rather than at each callsite is deliberate: five callers
         (book detail page, book detail API, books table, and both search
@@ -2278,6 +2443,8 @@ class CalibreDB:
             # `session` is None whenever session_factory is (before init_db, or
             # after an explicit `session = None`), and None.query() is an
             # AttributeError rather than a SQLAlchemyError.
+            if fail_on_error:
+                raise
             log.warning("Custom-column definitions unavailable; continuing without them",
                         exc_info=True)
             return []
@@ -2294,6 +2461,191 @@ class CalibreDB:
             cc.append(col)
 
         return cc
+
+    def hierarchical_cc_filter(self, col_id, node):
+        """SQLAlchemy filter matching a hierarchy node and all of its descendants.
+
+        Matches the exact stored spellings the tree counted under ``node``
+        (see hierarchy.subtree_values), so ``Computers..DB`` or
+        ``Fiction . Mystery`` list the same books the tree counts, a
+        different-case ``computers.DB`` stays under its own node, and
+        ``ComputersX`` never matches ``Computers``.
+        """
+        cc = cc_classes[col_id]
+        return cc.value.in_(hierarchy.subtree_values(node))
+
+    def flat_cc_filter(self, col_id, value):
+        """SQLAlchemy filter matching one exact stored value of a flat column.
+
+        The counterpart to ``hierarchical_cc_filter``: a flat column's stored
+        value is an opaque atomic string. Dewey ``778.3`` is ONE
+        classification, not a ``778`` node with a ``3`` child, so there is
+        deliberately no prefix expansion and no LIKE here. A node that happens
+        to be a valid hierarchical path (``778.3`` where ``778`` also exists)
+        must not pull in its "descendants".
+        """
+        return cc_classes[col_id].value == value
+
+    def is_flat_cc_column(self, col_id, fail_on_error=False):
+        """Whether a registered tag-like column uses exact atomic values."""
+        return (col_id in cc_classes
+                and col_id not in self.get_hierarchical_column_ids(fail_on_error=fail_on_error))
+
+    def get_hierarchical_column_ids(self, ttl=300, fail_on_error=False):
+        """Resolve mode once per request, scoped to the active library engine."""
+        self.ensure_session()
+        engine = self.session.get_bind()
+        cache = getattr(g, '_cc_hierarchy_modes', {}) if has_request_context() else {}
+        if engine in cache:
+            return cache[engine]
+        try:
+            ids = self._read_hierarchical_column_ids(ttl)
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
+            # Supplementary metadata must not break a book detail page. An
+            # unreadable setting is no evidence of a configured hierarchy.
+            log.warning("Calibre hierarchy preferences unavailable", exc_info=True)
+            return set()
+        if has_request_context():
+            cache[engine] = ids
+            g._cc_hierarchy_modes = cache
+        return ids
+
+    def _read_hierarchical_column_ids(self, ttl=300):
+        """Read Calibre's hierarchy configuration, without changing its schema.
+
+        Calibre stores category names such as ``#subjects`` in the JSON
+        ``categories_using_hierarchy`` preference. Book values do not decide
+        the mode: an empty configured tree stays a tree and dotted identifiers
+        stay atomic. Read the small preference on each request so a Calibre
+        setting change or a library switch cannot reuse a stale process cache.
+        Libraries predating the preferences table retain legacy detection.
+        """
+        self.ensure_session()
+        attached = self.session.execute(text("PRAGMA database_list")).all()
+        # Runtime sessions attach metadata.db as calibre to an in-memory main
+        # database. Bare-library sessions use main instead. The schema comes
+        # only from this fixed allowlist, never from user input.
+        schema = "calibre" if any(row[1] == "calibre" for row in attached) else "main"
+        has_preferences = self.session.execute(text(
+            "SELECT 1 FROM " + schema + ".sqlite_master WHERE type='table' AND name='preferences'"
+        )).first()
+        if not has_preferences:
+            return self.get_legacy_hierarchical_column_ids(ttl, fail_on_error=True)
+        raw = self.session.execute(text(
+            "SELECT val FROM " + schema + ".preferences WHERE key='categories_using_hierarchy'"
+        )).scalar()
+        try:
+            categories = json.loads(raw) if raw is not None else []
+        except (TypeError, ValueError):
+            log.warning("Invalid Calibre categories_using_hierarchy preference")
+            return set()
+        if not isinstance(categories, list):
+            return set()
+        configured = {value for value in categories if isinstance(value, str)}
+        return {row.id for row in self.session.query(CustomColumns).filter(
+            CustomColumns.datatype.in_(('text', 'enumeration')),
+            or_(CustomColumns.mark_for_delete == 0, CustomColumns.mark_for_delete.is_(None)),
+        ) if '#' + row.label in configured and row.id in cc_classes}
+
+    def get_legacy_hierarchical_column_ids(self, ttl=300, fail_on_error=False):
+        """Compatibility scan for old libraries and one-time visibility upgrade."""
+        now = time.monotonic()
+        library = self.session.get_bind()
+        cached = getattr(self, '_legacy_hier_cache', None)
+        if cached is not None and cached[0] is library and now - cached[1] < ttl:
+            return cached[2]
+        ids = set()
+        try:
+            text_ids = {row.id for row in self.session.query(CustomColumns.id).filter(
+                CustomColumns.datatype.in_(('text', 'enumeration')))}
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
+            return set()
+        for cid in text_ids:
+            cc = cc_classes.get(cid)
+            if cc is None:
+                continue
+            try:
+                values = [r[0] for r in self.session.query(cc.value).distinct()]
+            except SQLAlchemyError:
+                if fail_on_error:
+                    raise
+                continue
+            if hierarchy.is_hierarchical_value_set(values):
+                ids.add(cid)
+        self._legacy_hier_cache = (library, now, ids)
+        return ids
+
+    def get_hierarchical_tree(self, col_id, apply_common_filters=True, book_filter=None, fail_on_error=False):
+        """Return the nested tree (list of root nodes) for custom column `col_id`,
+        honouring user visibility filters (``book_filter`` replaces the default
+        ``common_filters()``, e.g. OPDS's shelf restriction). See
+        cps/hierarchy.py for the node shape.
+        """
+        cc = cc_classes.get(col_id)
+        if cc is None:
+            return []
+        rel = getattr(Books, 'custom_column_' + str(col_id))
+        q = (self.session.query(Books.id, cc.value)
+            .select_from(Books)
+            .join(rel)
+            .distinct())
+        if book_filter is not None:
+            q = q.filter(book_filter)
+        elif apply_common_filters:
+            q = q.filter(self.common_filters())
+        try:
+            rows = q.all()
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
+            log.error("Failed to read custom column %s for hierarchy tree", col_id)
+            return []
+        return hierarchy.parse_tag_hierarchy([(r[0], r[1]) for r in rows])
+
+    def get_cc_flat_list(self, col_id, apply_common_filters=True, book_filter=None, fail_on_error=False):
+        """Return the distinct ``(value, book_count)`` rows of a flat column.
+
+        The flat counterpart to ``get_hierarchical_tree``, shaped so the same
+        node contract serves both modes: each entry carries ``path == name ==
+        value`` and ``children == []``, so the existing hierarchy macros render
+        it as a plain list without ever splitting anything. Dewey ``778.3`` is
+        one entry -- never a ``778`` parent with a ``3`` child.
+
+        Sorted lexically by the complete stored value, ignoring case.
+
+        ``book_filter`` replaces the default ``common_filters()`` (OPDS's
+        shelf restriction). Omitting it would leak books from a restricted
+        shelf into a value list, so every caller must pass the same filter
+        its book queries use.
+        """
+        cc = cc_classes.get(col_id)
+        if cc is None:
+            return []
+        rel = getattr(Books, 'custom_column_' + str(col_id))
+        q = (self.session.query(cc.value, func.count(func.distinct(Books.id)))
+            .select_from(Books)
+            .join(rel)
+            .group_by(cc.value))
+        if book_filter is not None:
+            q = q.filter(book_filter)
+        elif apply_common_filters:
+            q = q.filter(self.common_filters())
+        try:
+            rows = q.all()
+        except SQLAlchemyError:
+            if fail_on_error:
+                raise
+            log.error("Failed to read custom column %s for flat list", col_id)
+            return []
+        entries = [{'name': r[0], 'path': r[0], 'count': r[1],
+                    'total_count': r[1], 'children': []}
+                   for r in rows if r[0] is not None and str(r[0]).strip()]
+        entries.sort(key=lambda e: e['name'].lower())
+        return entries
 
     # read search results from calibre-database and return it (function is used for feed and simple search
     def get_search_results(self, term, config, offset=None, order=None, limit=None, *join,
@@ -2409,26 +2761,30 @@ class CalibreDB:
                     Base.metadata.remove(table)
 
     def reconnect_db(self, config, app_db_path):
+        self._reconnect(config, app_db_path)
+
+    @classmethod
+    def _reconnect(cls, config, app_db_path):
         # Use lock to ensure atomic reconnect operation
-        with self._reconnect_lock:
+        with cls._reconnect_lock:
             # Be resilient if database wasn't initialized yet
             try:
-                self.dispose()
+                cls.dispose()
             except Exception:
                 # Ignore dispose errors during reconnect
                 pass
 
             # engine is a class-level attribute that may be None before first setup
             try:
-                if getattr(self, 'engine', None) is not None:
-                    self.engine.dispose()
+                if getattr(cls, 'engine', None) is not None:
+                    cls.engine.dispose()
             except Exception:
                 # Ignore engine dispose errors; we'll rebuild below
                 pass
 
             # Rebuild engine/session factory and update config
-            self.setup_db(config.config_calibre_dir, app_db_path)
-            self.update_config(config)
+            cls.setup_db(config.config_calibre_dir, app_db_path)
+            cls.update_config(config)
 
     @classmethod
     def refresh_for_new_data(cls):

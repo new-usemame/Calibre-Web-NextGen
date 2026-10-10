@@ -22,8 +22,10 @@ except ImportError:  # pragma: no cover - unit/minimal environments
     _HAVE_GEVENT_POOL = False
 
 from .file_helper import get_temp_dir
+from .services.calibre_db_lock import metadata_db_write_lock
 from .subproc_wrapper import process_open
-from . import logger, config
+from .calibre_library_target import calibredb_command
+from . import logger, config, content_server
 from .constants import SUPPORTED_CALIBRE_BINARIES
 
 log = logger.create()
@@ -73,7 +75,6 @@ def _kill_export_tree(p):
 def _do_calibre_export_blocking(book_id, book_format):
     """Run and reap one calibre export on an OS worker thread."""
     try:
-        quotes = [4, 6]
         tmp_dir = get_temp_dir()
         calibredb_binarypath = get_calibre_binarypath("calibredb")
         temp_file_name = str(uuid4())
@@ -86,22 +87,32 @@ def _do_calibre_export_blocking(book_id, book_format):
         if config.config_calibre_split:
             my_env['CALIBRE_OVERRIDE_DATABASE_PATH'] = os.path.join(config.config_calibre_dir, "metadata.db")
         library_path = config.get_book_path()
-        opf_command = [calibredb_binarypath, 'export', '--dont-write-opf', '--dont-save-cover',
-                       '--with-library', library_path,
-                       '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
-                       str(book_id)]
-        p = process_open(opf_command, quotes, my_env)
         embed_timeout = _embed_timeout()
-        try:
-            _, err = p.communicate(timeout=embed_timeout)
-        except subprocess.TimeoutExpired:
-            _kill_export_tree(p)
-            log.error('Metadata embed timed out after %ss for book %s (%s); '
-                      'falling back to the original file without embedded metadata',
-                      embed_timeout, book_id, book_format)
-            return None, None
+        # Calibre takes an exclusive library lock even for export. Coordinate
+        # with other exports and ingest/metadata writers, on this OS worker so
+        # waiting never parks the request hub.
+        with metadata_db_write_lock(timeout=embed_timeout):
+            target = content_server.library_target()
+            library_args = target.args or ['--with-library', library_path]
+            opf_command = ([calibredb_binarypath, 'export', '--dont-write-opf', '--dont-save-cover']
+                           + library_args
+                           + ['--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
+                              str(book_id)])
+            p = process_open(calibredb_command(opf_command, target), env=my_env, stdin_payload=target.stdin)
+            try:
+                _, err = p.communicate(timeout=embed_timeout)
+            except subprocess.TimeoutExpired:
+                _kill_export_tree(p)
+                log.error('Metadata embed timed out after %ss for book %s (%s); '
+                          'falling back to the original file without embedded metadata',
+                          embed_timeout, book_id, book_format)
+                return None, None
         if err:
             log.error('Metadata embedder encountered an error: %s', err)
+        if getattr(p, "returncode", 0):
+            log.warning('Metadata export failed for book %s (%s); using original file',
+                        book_id, book_format)
+            return None, None
 
         # calibredb export with --template may create either:
         # 1. A subdirectory with the template name containing the file
@@ -129,9 +140,10 @@ def _do_calibre_export_blocking(book_id, book_format):
 
             log.warning(f'No file named {expected_filename} found in {tmp_dir}')
 
-        # Fallback to original behavior
-        return tmp_dir, temp_file_name
-    except OSError as ex:
+        # Never advertise a path Calibre did not create. Callers use this
+        # failure value to deliver the original instead of returning a 404.
+        return None, None
+    except (OSError, RuntimeError) as ex:
         # ToDo real error handling
         log.error_or_exception(ex)
         return None, None

@@ -176,14 +176,16 @@ class TaskKepubBackfill(CalibreTask):
 
     @staticmethod
     def _persist_completion(completed):
-        """Persist the rollback-compatibility marker with safe in-memory state."""
-        config.config_kobo_kepub_backfill_completed = completed
-        try:
-            config.save()
-        except Exception:
-            # A failed write must never leave this process claiming completion.
-            config.config_kobo_kepub_backfill_completed = False
-            raise
+        """Persist the rollback-compatibility marker with safe in-memory state.
+
+        This runs on WorkerThread, so it must not call ``config.save()``: that
+        commits the session every web request shares, and a request using it at
+        that moment fails with a 500 (every eligible boot runs this, so right
+        after startup).  ``save_fields`` writes only this column through a
+        session of its own and updates memory only once the commit has landed:
+        a failed write raises, and memory keeps agreeing with app.db.
+        """
+        config.save_fields(config_kobo_kepub_backfill_completed=completed)
 
     def _finish_failure(self, error):
         """Publish a failed terminal state only after clearing completion."""
@@ -303,9 +305,8 @@ class TaskKepubBackfill(CalibreTask):
             # Clear the persisted compatibility marker here as well so failures
             # before the per-book loop (or while saving success) cannot retain a
             # stale True value from an earlier run.
-            config.config_kobo_kepub_backfill_completed = False
             try:
-                config.save()
+                self._persist_completion(False)
             except Exception as error:
                 log.error(
                     "KEPUB backfill could not persist its incomplete state: %s",

@@ -186,13 +186,13 @@ async function coldLoad(page: Page, seed: Record<string, string> = {}) {
  * has already loaded /app in this tab.
  */
 async function authorListingSort(page: Page, authorId: number) {
-  const sorts: string[] = [];
+  const sorts: Array<string | null> = [];
   await page.goto('about:blank');
   page.on('response', (response) => {
     if (!response.url().includes('/api/v1/books?') || response.status() !== 200) return;
     const params = new URL(response.url()).searchParams;
     const sort = params.get('sort');
-    if (sort === null || !params.has('author')) return;
+    if (!params.has('author')) return;
     sorts.push(sort);
   });
   await page.goto(`/app/authors/${authorId}`);
@@ -346,9 +346,31 @@ test.describe('Recent library sort', () => {
     // The instrument check: this listing does contain the book the reader has
     // been reading, so opening on Recent here would have been visible — the
     // assertion above is not passing because the case cannot arise.
+    // Newest order puts this intentionally oldest fixture beyond the first
+    // measured phone page. Follow real paging controls before checking that
+    // the author contains it; cold-load sort/menu assertions above stay intact.
+    for (let loaded = 0; loaded < 250 && !(await renderedIds(page)).includes(readBookId); loaded++) {
+      const before = JSON.stringify(await renderedIds(page));
+      const more = page.getByRole('button', { name: 'Load more', exact: true });
+      await expect(more, `${readBookTitle} must remain reachable through the author's pages`).toBeVisible();
+      const nextPage = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname.endsWith('/api/v1/books') && url.searchParams.get('author') === String(author.id)
+          && Number(url.searchParams.get('page')) > 1
+          && response.request().method() === 'GET' && response.status() === 200;
+      });
+      await more.press('Enter');
+      const loadedPage = await nextPage;
+      expect(new URL(loadedPage.url()).searchParams.get('sort'), 'each author page must request newest added').toBe('new');
+      // The final response may remove Load more before the book paints.
+      // Wait on the actual cards, without waiting again on that removed control.
+      await expect.poll(async () => JSON.stringify(await renderedIds(page)),
+        { message: 'Load more must display the next author page' }).not.toBe(before);
+    }
     await expect.poll(async () => (await renderedIds(page)).includes(readBookId),
       { message: `${readBookTitle} must be in this author's listing for the check to bite` })
       .toBe(true);
+    expect(sorts.filter((sort) => sort !== 'new'), 'paging must keep the author on newest added').toEqual([]);
 
     // Worth a picture: this is the surface the Library's new default would have
     // changed without being asked to, so the evidence that it did not should be

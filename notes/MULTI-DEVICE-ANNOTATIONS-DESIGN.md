@@ -80,6 +80,14 @@ old aliases after every active device has returned. A global uniqueness constrai
 the fingerprint is instance-HMACed; an attempted cross-user match must be rejected rather than
 silently reassigning a registered device.
 
+Key version 2 (Kobo and KOReader) mixes the account id into the HMAC input, so one physical reader
+used by two accounts on the same server has one `Device` per account. Version 1 fingerprinted the
+hardware server-wide, which meant the second account to pair a household reader was refused a device
+row for good (no Send to device, no inventory, no deletion claims). A version-1 identity still
+resolves for the account that owns it and gains a version-2 sibling on the same `Device`; the legacy
+row stays, so a rolled-back server still finds the device. A version-1 identity owned by another
+account is never returned or modified, and no account can resolve another account's row.
+
 Recommended indexes:
 
 - `ix_device_user_active_last_seen(user_id, active, last_seen_at)` for dropdown/list ordering;
@@ -124,8 +132,9 @@ Rules:
 1. Missing/malformed identity does not create an “unknown Kobo” registry row shared by many
    devices. The request proceeds under existing behavior with `request_device=None` and a warning
    that contains no raw ID.
-2. A new fingerprint creates one device for the authenticated user. A fingerprint already bound to
-   another user is a security event and does not migrate ownership.
+2. A new fingerprint creates one device for the authenticated user. Fingerprints are per account
+   (key version 2), so the same hardware under another account is a separate device; ownership of
+   an existing row never migrates between accounts.
 3. `last_seen_at` advances on every authenticated request. Model/firmware/platform update only from
    non-empty, length-bounded, control-character-free values and only when the observation is newer
    than `last_metadata_at`.

@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { webreaderInstallationId } from '../src/lib/deviceIdentity';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../src/lib/safeStorage';
 import { DEFAULT_THEME, resolveTheme } from '../src/lib/themes';
 
@@ -12,7 +11,7 @@ test.describe('theme logic', () => {
     expect(resolveTheme('not-a-theme')).toBe(DEFAULT_THEME);
   });
 
-  test('storage SecurityError degrades reader preferences and identity safely', () => {
+  test('storage SecurityError degrades reader preferences safely', () => {
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -27,7 +26,6 @@ test.describe('theme logic', () => {
     try {
       expect(safeLocalStorageGet('cwng.reader.theme')).toBeNull();
       expect(safeLocalStorageSet('cwng.reader.font', '100')).toBe(false);
-      expect(webreaderInstallationId()).toBeNull();
     } finally {
       if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
       else delete (globalThis as { window?: unknown }).window;
@@ -82,7 +80,10 @@ test.describe('per-user theme picker', () => {
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
       await page.goto('/app/admin');
-      const adminSelect = page.locator('main select').first();
+      // Ingest settings also contain a themed select, but it deliberately uses
+      // the smaller surface-2 control style. Keep this assertion scoped to the
+      // Library settings form whose theme tokens are under test.
+      const adminSelect = page.locator('#library-settings select').first();
       await expect(adminSelect).toBeVisible();
       expect(await adminSelect.evaluate((el) => {
         const style = getComputedStyle(el);

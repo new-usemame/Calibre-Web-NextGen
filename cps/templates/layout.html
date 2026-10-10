@@ -1,5 +1,6 @@
 {% from 'modal_dialogs.html' import restrict_modal, delete_book, filechooser_modal, delete_confirm_modal, change_confirm_modal %}
 {% import 'image.html' as image %}
+{% from 'support_links.html' import support_link %}
 
 <!DOCTYPE html>
 <html lang="{{ current_user.locale }}">
@@ -249,7 +250,7 @@
                     <li><a id="logout" href="{{url_for('web.logout', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}"><span class="glyphicon glyphicon-log-out"></span> <span class="hidden-sm">{{_('Logout')}}</span></a></li>
                     {% endif %}
                     <li role="separator" class="divider"></li>
-                    <li><a id="top_support" href="https://ko-fi.com/calibrewebnextgen" target="_blank" rel="noopener noreferrer"><span class="glyphicon glyphicon-heart"></span> <span class="hidden-sm">{{_('Support Calibre-Web NextGen')}}</span></a></li>
+                    {{ support_link(support_destinations) }}
                 </ul>
               </li>
               {% endif %}
@@ -282,7 +283,7 @@
                 {# Support link lives in BOTH themes: the caliBlur profile dropdown
                    renders only when g.current_theme == 1, so a single placement
                    there would be invisible to everyone on the default theme. #}
-                <li><a id="top_support" data-text="{{_('Support')}}" href="https://ko-fi.com/calibrewebnextgen" target="_blank" rel="noopener noreferrer"><span class="glyphicon glyphicon-heart"></span> <span class="hidden-sm">{{_('Support Calibre-Web NextGen')}}</span></a></li>
+                {{ support_link(support_destinations, compact=True) }}
                 {% if not current_user.is_anonymous %}
                 <li><a id="logout" href="{{url_for('web.logout', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}"><span class="glyphicon glyphicon-log-out"></span> <span class="hidden-sm">{{_('Logout')}}</span></a></li>
                 {% endif %}
@@ -487,7 +488,7 @@
               {% for element in sidebar %}
                 {% if current_user.check_visibility(element['visibility']) and element['public'] %}
                     <li id="nav_{{element['id']}}" {% if page == element['page'] %}class="active"{% endif %} style="{% if element['id'] == 'duplicates' %}position: relative;{% endif %}">
-                      <a href="{{url_for(element['link'], data=element['page'], sort_param='stored')}}">
+                      <a href="{% if element['href'] %}{{ element['href'] }}{% else %}{{url_for(element['link'], data=element['page'], sort_param='stored')}}{% endif %}">
                         <span class="glyphicon {{element['glyph']}}"></span> {{_(element['text'])}}
                         {% if element['id'] == 'duplicates' %}
                           {% set dup_count = duplicate_notification.count if duplicate_notification is defined else 0 %}
@@ -514,12 +515,12 @@
               {% endif %}
               {% endif %}
               {% if current_user.is_authenticated and magic_shelf_routes.render %}
-                <li class="nav-head hidden-xs" style="margin-top: 1rem;">{{_('Magic Shelves ✨')}}</li>
+                <li class="nav-head hidden-xs" style="margin-top: 1rem;">{{_('Smart shelves')}} ✨</li>
                   {% for shelf in g.magic_shelves_access %}
                     <li><a href="{{url_for('web.render_magic_shelf', shelf_id=shelf.id)}}" title="{{shelf.name}} ({{shelf.book_count}})"><span style="font-size: 14px;">{{shelf.icon}}</span> {{shelf.name|shortentitle(40)}}{% if shelf.is_public == 1 %} {{_('(Public)')}}{% endif %} <span style="font-size: 80%; color: #888;">({{shelf.book_count}})</span></a></li>
                   {% endfor %}
                 {% if magic_shelf_routes.create %}
-                  <li id="nav_createmagicshelf" class="create-shelf"><a href="{{url_for('web.create_magic_shelf')}}" style="display: flex; align-items: center;">{{_('Create Magic Shelf')}}</a></li>
+                  <li id="nav_createmagicshelf" class="create-shelf"><a href="{{url_for('web.create_magic_shelf')}}" style="display: flex; align-items: center;">{{_('Create smart shelf')}}</a></li>
                 {% endif %}
               {% endif %}
               <!-- {% if not current_user.is_anonymous %}
@@ -861,16 +862,16 @@
     </div>
     <script>
       window.bookOrganizerI18n = {
-        addedToShelf: "{{ _('Added {n} books to {shelf}') }}",
-        addedToShelfPartial: "{{ _('Added {ok} of {n} books to {shelf} (rest were already there)') }}",
-        allAlreadyOnShelf: "{{ _('All {n} book(s) were already on {shelf}.') }}",
-        markedRead: "{{ _('Marked {n} books as read') }}",
-        markedUnread: "{{ _('Marked {n} books as unread') }}",
-        deleted: "{{ _('Deleted {n} books') }}",
-        confirmDeleteTitle: "{{ _('Delete books?') }}",
-        confirmDeleteBody: "{{ _('This will permanently delete {n} book(s) from your library. This cannot be undone.') }}",
-        nothingSelected: "{{ _('Select at least one book first.') }}",
-        requestFailed: "{{ _('Request failed: {err}') }}"
+        addedToShelf: {{ _('Added {n} books to {shelf}')|tojson }},
+        addedToShelfPartial: {{ _('Added {ok} of {n} books to {shelf} (rest were already there)')|tojson }},
+        allAlreadyOnShelf: {{ _('All {n} book(s) were already on {shelf}.')|tojson }},
+        markedRead: {{ _('Marked {n} books as read')|tojson }},
+        markedUnread: {{ _('Marked {n} books as unread')|tojson }},
+        deleted: {{ _('Deleted {n} books')|tojson }},
+        confirmDeleteTitle: {{ _('Delete books?')|tojson }},
+        confirmDeleteBody: {{ _('This will permanently delete {n} book(s) from your library. This cannot be undone.')|tojson }},
+        nothingSelected: {{ _('Select at least one book first.')|tojson }},
+        requestFailed: {{ _('Request failed: {err}')|tojson }}
       };
     </script>
     <script src="{{ url_for('static', filename='js/book_organizer.js') }}"></script>

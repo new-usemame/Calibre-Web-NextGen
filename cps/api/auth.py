@@ -5,17 +5,20 @@ import json
 from datetime import datetime
 
 from flask import jsonify, request, url_for
+from flask_babel import gettext as _
 from sqlalchemy import func
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
 from .serializers import serialize_user
-from .. import ub, config, constants, limiter, services, logger
+from .. import ub, config, constants, limiter, services, logger, rate_limits
 from ..config_sql import uploads_enabled
+from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
 from ..ui_themes import config_theme_code
+from ..ui_font_preferences import seed_new_user_ui_font_defaults
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
@@ -151,13 +154,7 @@ def _check_rate_limit():
 
 def _clear_current_rate_limits():
     """Clear every bucket evaluated for the successful request, best-effort."""
-    if limiter is None:
-        return
-    try:
-        for request_limit in limiter.current_limits:
-            limiter.limiter.storage.clear(request_limit.key)
-    except Exception as ex:
-        log.error("Connection error clearing limiter backend after login: %s", ex)
+    rate_limits.clear_current_limits(limiter)
 
 
 @api_v1.route("/auth/csrf")
@@ -188,6 +185,9 @@ def _server_features():
         "public_registration": bool(getattr(config, "config_public_reg", False)),
         "anon_browse": bool(getattr(config, "config_anonbrowse", False)),
         "kobo_sync": bool(getattr(config, "config_kobo_sync", False)),
+        # The admin's KOReader sync switch (CWA settings). Pairing a KOReader
+        # by code and the ready-made plugin download both follow it.
+        "koreader_sync": is_koreader_sync_enabled(),
         # Smart shelves only reach a Kobo when the admin has turned the
         # magic-shelf half of Kobo sync on (cps/kobo.py gates the whole
         # collection materialisation on it). Surfaced so the SPA can hide a
@@ -230,13 +230,32 @@ def _me_payload(user):
     from .. import user_library
     user_library.mark_response_user_specific()
     payload = serialize_user(user)
+    payload["opds_only_shelves_sync"] = bool(
+        getattr(user, "opds_only_shelves_sync", False)
+    )
     payload["features"] = _server_features()
+    from ..services.acquisition.admission import instance_enabled, account_allowed
+    payload["acquisition_access"] = bool(
+        getattr(user, "is_authenticated", False)
+        and not getattr(user, "is_anonymous", True)
+        and instance_enabled(ub.app_DB_path)
+        and account_allowed(ub.app_DB_path, user.id)
+    )
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
     catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})
     default_filter = catalog_settings.get("default_filter") if isinstance(catalog_settings, dict) else None
+    custom_field_ids = catalog_settings.get("custom_field_ids") if isinstance(catalog_settings, dict) else None
+    custom_field_labels = catalog_settings.get("custom_field_labels") if isinstance(catalog_settings, dict) else None
     payload["catalog"] = {
         "default_filter": default_filter if isinstance(default_filter, dict) else None,
+        "custom_field_ids": (custom_field_ids if isinstance(custom_field_ids, list)
+                             and all(type(column_id) is int for column_id in custom_field_ids)
+                             else None),
+        "custom_field_labels": (custom_field_labels if isinstance(custom_field_labels, dict)
+                                and all(type(key) is str and type(value) is str
+                                        for key, value in custom_field_labels.items())
+                                else None),
     }
     payload["display"] = {
         # Some auth tests and bootstrap paths intentionally provide a minimal
@@ -244,6 +263,18 @@ def _me_payload(user):
         "books_per_page": int(getattr(config, "config_books_per_page", 60) or 60),
         "random_books": int(getattr(config, "config_random_books", 4) or 4),
     }
+    from ..services.support_policy import support_policy
+    role_admin = getattr(user, "role_admin", None)
+    try:
+        contact_support_label = _("Contact support")
+    except (KeyError, RuntimeError):
+        # Minimal Flask apps used by auth bootstrap/tests may not install Babel.
+        contact_support_label = "Contact support"
+    payload["support"] = support_policy(
+        config,
+        is_admin=bool(role_admin()) if callable(role_admin) else False,
+        contact_support_label=contact_support_label,
+    )
     return payload
 
 
@@ -274,14 +305,17 @@ def auth_login():
     if rate_limit_error is not None:
         return rate_limit_error
 
-    # I2: Honour config_disable_standard_login.
-    if config.config_disable_standard_login:
+    # I2: Honour "Disable Standard Login" while SSO can replace it.
+    if config.standard_login_disabled():
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
 
     data = _request_data()
     username = _normalized_username(data)
-    password = data.get("password") or ""
+    password = data.get("password")
+    # Same rule as the username: a malformed value is a missing one, so it
+    # fails like any wrong password instead of raising inside the hash check.
+    password = password if isinstance(password, str) else ""
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
 
     # ── LDAP authentication ────────────────────────────────────────────
@@ -298,12 +332,31 @@ def auth_login():
                 login_result, error = services.ldap.bind_user(user.name, password)
                 if login_result:
                     login_user(user, remember=bool(data.get("remember")))
+                    _clear_current_rate_limits()
                     return jsonify(_me_payload(user))
                 if error is not None:
                     log.error("LDAP bind error for '%s': %s", username, error)
             except Exception as ex:
                 log.error("LDAP authentication error for '%s': %s", username, ex)
-            # LDAP bind failed — fall through to 401 below.
+            # The directory did not sign this user in — rejection, an
+            # account it does not know, or an unreachable server. Fall back
+            # to the stored local password, as the classic /login form does
+            # (#1930 completed that fallback): a local-only account
+            # (typically an administrator) must still reach an LDAP-enabled
+            # instance when the directory is down or does not know the
+            # account. Directory-sourced accounts are created with an empty
+            # local hash and fail this check until someone gives them a
+            # local password (password reset, profile form, admin edit);
+            # after that, as on /login, a directory rejection no longer
+            # revokes it.
+            if user.password and check_password_hash(str(user.password), password):
+                log.info("Local Fallback Login as: '%s' (directory did not "
+                         "authenticate this account)", user.name)
+                login_user(user, remember=bool(data.get("remember")))
+                _clear_current_rate_limits()
+                return jsonify(_me_payload(user))
+            # LDAP bind failed and the stored local password is wrong —
+            # fall through to 401 below.
         elif getattr(config, 'config_ldap_auto_create_users', True):
             # User not found locally — try LDAP bind and auto-create if
             # the directory recognises the credentials (needed for OPDS /
@@ -313,7 +366,7 @@ def auth_login():
                 if login_result:
                     ldap_user_details = services.ldap.get_object_details(username)
                     if ldap_user_details:
-                        from . import admin as admin_mod
+                        from .. import admin as admin_mod
                         create_result, error_msg = admin_mod.ldap_import_create_user(
                             username, ldap_user_details)
                         if create_result:
@@ -323,6 +376,7 @@ def auth_login():
                                 log.info("LDAP auto-created user '%s' via SPA login",
                                          username)
                                 login_user(user, remember=bool(data.get("remember")))
+                                _clear_current_rate_limits()
                                 return jsonify(_me_payload(user))
                     log.warning("LDAP auth succeeded but user creation failed for '%s'",
                                 username)
@@ -368,7 +422,7 @@ def auth_config():
         "public_registration": bool(getattr(config, "config_public_reg", False)),
         "register_email": bool(getattr(config, "config_register_email", False)),
         "mail_configured": mail_ok,
-        "standard_login_disabled": bool(getattr(config, "config_disable_standard_login", False)),
+        "standard_login_disabled": config.standard_login_disabled(),
         "oauth_providers": _oauth_providers(),
         "remote_login": remote_login,
         "remote_login_url": remote_login_url,
@@ -516,6 +570,7 @@ def auth_register():
         content.theme = config_theme_code(getattr(config, "config_theme", None))
     except Exception:
         pass
+    seed_new_user_ui_font_defaults(content, config)
     try:
         ub.session.add(content)
         ub.session.commit()

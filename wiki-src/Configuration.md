@@ -2,12 +2,17 @@
 
 Reading-sync setups have their own pages: **[[KOReader Sync]]** and **[[Kobo Sync]]**.
 
+- [Writable cache storage](#writable-cache-storage)
 - [Network shares (NFS, SMB, ZFS)](#network-shares-nfs-smb-zfs)
 - [Calibre desktop coexistence](#calibre-desktop-coexistence)
 - [Calibre plugins (DeDRM and others)](#calibre-plugins-dedrm-and-others)
 - [Reverse proxy / Cloudflare Tunnel](#reverse-proxy--cloudflare-tunnel)
 - [Reverse proxy with a prefix](#reverse-proxy-with-a-prefix)
 - [Hardcover metadata provider](#hardcover-metadata-provider)
+
+---
+
+{{repo:README.md#writable-cache-storage|heading}}
 
 ---
 

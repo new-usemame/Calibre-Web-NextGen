@@ -104,3 +104,21 @@ def delete_kobo_sync_token(user_id=None):
     if not ub.session_commit():
         return _err("db_error", "Could not delete the Kobo sync URL", 500)
     return "", 204
+
+
+@api_v1.route("/account/kobo-full-sync", methods=["POST"])
+@api_v1.route("/admin/users/<int:user_id>/kobo-full-sync", methods=["POST"])
+def force_kobo_full_sync(user_id=None):
+    """The SPA's "Force full sync" (#2334): same reset as the classic button.
+
+    Deliberately not gated on config_kobo_sync, like revocation: forgetting
+    what a Kobo was sent only ever makes the next sync send more.
+    """
+    target_id, error = _target_user_id(user_id)
+    if error:
+        return error
+    from ..admin import reset_kobo_sync_state
+    count, committed = reset_kobo_sync_state(target_id)
+    if not committed:
+        return _err("db_error", "Could not reset Kobo sync", 500)
+    return jsonify({"user_id": target_id, "sync_entries_deleted": count})

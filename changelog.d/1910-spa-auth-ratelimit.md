@@ -1,5 +1,0 @@
-### Security
-
-- **SPA login, registration, magic-link, and password-reset requests now enforce their declared rate limits.** They were decorated with limits that nothing ever evaluated, so the new UI's auth endpoints accepted unlimited attempts. Successful password logins clear the caller's login buckets so legitimate users are not locked out by earlier attempts, and a breached limit returns a JSON 429 that reveals nothing about whether the account exists.
-- **A login bucket is now scoped to one client address plus one normalized username.** Keying on the username alone let anyone lock a named account out of the instance from any address; a malformed username (for example a JSON list) previously raised inside the key function, fell into the fail-open path, and left the endpoint unmetered entirely.
-- **Magic-link polling is sized for four full 10-minute sessions per shared address**, and the browser stops with a visible error instead of silently retrying a fatal response — while still retrying genuinely transient ones (network failures, 408, 425, and 5xx).

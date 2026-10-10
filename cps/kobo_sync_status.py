@@ -8,7 +8,8 @@
 from .cw_login import current_user
 from . import logger, ub
 from datetime import datetime, timedelta, timezone
-from sqlalchemy.sql.expression import and_, true
+from sqlalchemy import func
+from sqlalchemy.sql.expression import and_, bindparam, true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 # from sqlalchemy import exc
 
@@ -133,6 +134,35 @@ def stage_device_entitlement_fingerprints(
         ub.session.execute(statement)
 
 
+def stamp_device_entitlement_change_bases(device_id, change_bases):
+    """Stage a proven change basis onto rows that carry none.
+
+    Only ``change_basis`` is written.  The fingerprint and
+    ``payload_schema_version`` stay as they were, so the declared-shape
+    transition re-fingerprints each row the next time its book is selected,
+    and ``updated_at`` keeps the clock the row was written at.  A row that
+    already has a basis is never overwritten.  Returns the number of bases
+    offered; the writes stay in the caller's transaction.
+    """
+    if not device_id or not change_bases:
+        return 0
+    table = ub.KoboDeviceBookEntitlement.__table__
+    statement = table.update().where(
+        table.c.device_id == int(device_id),
+        table.c.book_id == bindparam("stamp_book_id"),
+        table.c.change_basis.is_(None),
+    ).values(change_basis=bindparam("stamp_change_basis"))
+    items = list(change_bases.items())
+    for offset in range(0, len(items), _LEDGER_UPSERT_BATCH_SIZE):
+        ub.session.execute(statement, [
+            {"stamp_book_id": int(book_id), "stamp_change_basis": basis}
+            for book_id, basis in items[
+                offset:offset + _LEDGER_UPSERT_BATCH_SIZE
+            ]
+        ])
+    return len(items)
+
+
 def get_device_deleted_entitlement_fingerprints(
     device_id, book_uuids, *, _session=None,
 ):
@@ -206,6 +236,81 @@ def get_unseeded_kobo_device_ids(user_id):
         ).all()
     }
     return sorted(device_ids - seeded)
+
+
+def get_kobo_device_ids_awaiting_history_seed(user_id, unseeded_device_ids):
+    """Return which unsealed Kobos wait for their own first sync to seed them.
+
+    Only an account with flat ``KoboSyncedBooks`` history has such Kobos: it
+    crossed onto the per-device ledger from a release before v4.1.43.  A Kobo
+    it had before its first seal, and that has no ledger rows, stays unsealed
+    until its own first sync, whose token says how far it walked the library.
+    A Kobo first seen after the account's first seal is new to the server and
+    is sealed without history, whatever cursor it presents: a token from
+    another server must not vouch for this one's history.  A Kobo that already
+    has ledger rows is sealed and audited as it is.  Retired Kobos count:
+    removal is a soft delete.
+    """
+    unseeded_device_ids = sorted({int(device_id) for device_id in unseeded_device_ids})
+    if not unseeded_device_ids:
+        return []
+    has_flat_history = ub.session.query(ub.KoboSyncedBooks.id).filter(
+        ub.KoboSyncedBooks.user_id == int(user_id),
+    ).first() is not None
+    if not has_flat_history:
+        return []
+    with_rows = {
+        row.device_id for row in ub.session.query(
+            ub.KoboDeviceBookEntitlement.device_id,
+        ).filter(
+            ub.KoboDeviceBookEntitlement.device_id.in_(unseeded_device_ids),
+        ).distinct().all()
+    }
+    unseeded_device_ids = [
+        device_id for device_id in unseeded_device_ids
+        if device_id not in with_rows
+    ]
+    if not unseeded_device_ids:
+        return []
+    first_sealed_at = ub.session.query(
+        func.min(ub.KoboDeviceEntitlementSeed.seeded_at),
+    ).join(
+        ub.Device,
+        ub.Device.id == ub.KoboDeviceEntitlementSeed.device_id,
+    ).filter(
+        ub.Device.user_id == int(user_id),
+        ub.Device.kind == "kobo",
+    ).scalar()
+    if first_sealed_at is None:
+        return unseeded_device_ids
+    first_sealed_at = _naive_utc(first_sealed_at)
+    return [
+        row.id for row in ub.session.query(
+            ub.Device.id, ub.Device.first_seen_at,
+        ).filter(ub.Device.id.in_(unseeded_device_ids)).all()
+        if _naive_utc(row.first_seen_at) < first_sealed_at
+    ]
+
+
+def count_user_kobo_devices(user_id):
+    """How many Kobos this account has paired, retired ones included.
+
+    More than one means the account's flat ``KoboSyncedBooks`` history is a
+    union no single Kobo can be assumed to hold.  Device removal is a soft
+    delete (``active = False``) and a retired Kobo's deliveries stay in that
+    history, so do not add an ``active`` filter here.
+    """
+    return ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == int(user_id),
+        ub.Device.kind == "kobo",
+    ).count()
+
+
+def _naive_utc(value):
+    """Put a stored clock on the naive-UTC basis SQLite returns."""
+    if value is not None and value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 def user_has_completed_entitlement_seed(user_id):
@@ -478,7 +583,12 @@ def change_archived_books(book_id, state=None, message=None, session=None, commi
     if not archived_book:
         archived_book = ub.ArchivedBook(user_id=current_user.id, book_id=book_id)
 
-    archived_book.is_archived = state if state else not archived_book.is_archived
+    # None toggles (the single-book buttons); True and False set the state, so
+    # "unarchive" never archives a selected book that was not archived.
+    if state is None:
+        archived_book.is_archived = not archived_book.is_archived
+    else:
+        archived_book.is_archived = bool(state)
     archived_book.last_modified = datetime.now(timezone.utc)        # toDo. Check utc timestamp
 
     s.merge(archived_book)

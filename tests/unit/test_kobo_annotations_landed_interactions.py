@@ -327,7 +327,7 @@ def test_live_highlight_portable_round_trip_preserves_user_state(
         commit=session.commit,
     )
 
-    assert summary == {"created": 1, "updated": 0, "deleted": 0, "skipped": 0}
+    assert summary == {"created": 1, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0}
     destination = session.query(ub.Annotation).filter_by(book_id=43).one()
     expected = {
         "annotation_id": source.annotation_id,

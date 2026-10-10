@@ -46,7 +46,8 @@ def reader_client(monkeypatch):
         ordered_authors=[],
     )
     calibre_db = SimpleNamespace(
-        get_filtered_book=lambda book_id, allow_show_hidden=False: book,
+        get_filtered_book=lambda book_id, allow_show_hidden=False,
+        allow_public_shelf_books=False: book,
         order_authors=lambda books, *args, **kwargs: [],
     )
     monkeypatch.setattr(web, "calibre_db", calibre_db)

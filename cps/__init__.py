@@ -9,9 +9,12 @@ import sys
 import os
 import mimetypes
 import threading
+import time
 from functools import wraps
 
 from flask import Flask, current_app, g, has_app_context, session
+from flask.sessions import SecureCookieSessionInterface
+from itsdangerous import BadSignature
 from .MyLoginManager import MyLoginManager
 from flask_principal import Principal
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -19,7 +22,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from . import logger
 from . import constants
 from .cli import CliParameter
-from .reverseproxy import ReverseProxied
+from .reverseproxy import ReverseProxied, TrustedProxyPeers, parse_trusted_networks
 from .server import WebServer
 from .updater import Updater
 from . import config_sql
@@ -77,7 +80,14 @@ def protect_user_specific_catalog_responses(response):
     """Prevent a shared cache from crossing account-specific catalog views."""
     if not getattr(g, "_common_filters_user_specific", False):
         return response
-    response.headers["Cache-Control"] = "private, no-store"
+    # A response that already declares a private policy keeps it. `private` is
+    # what keeps a shared cache out, which is all this hook guarantees; covers,
+    # comic pages and fonts set their own private lifetimes on versioned URLs,
+    # and replacing those with no-store made every library visit re-download
+    # every cover (#2386). Anything shareable or unstated still becomes no-store.
+    cache_control = response.cache_control
+    if not cache_control.private or cache_control.public:
+        response.headers["Cache-Control"] = "private, no-store"
     response.vary.add("Cookie")
     response.vary.add("Authorization")
     runtime_config = current_app.extensions.get("cps_config", config)
@@ -88,8 +98,74 @@ def protect_user_specific_catalog_responses(response):
     return response
 
 
+class StableSessionCookieInterface(SecureCookieSessionInterface):
+    """Flask's signed-cookie sessions, minus the new cookie on every response.
+
+    "Remember me" makes the session permanent, and Flask re-signs a permanent
+    session on every response, so its value changes every second. Covers are
+    cached with ``Vary: Cookie``; a browser reuses a stored response only while
+    the ``Cookie`` header still matches, so the churn made every library visit
+    download every cover again (#2386). The cookie is now re-issued when the
+    session changed, or once it is past half its lifetime, which keeps the
+    sliding expiry: a session used at least every half-lifetime never lapses.
+    """
+
+    def open_session(self, app, request):
+        serializer = self.get_signing_serializer(app)
+        if serializer is None:
+            return None
+        value = request.cookies.get(self.get_cookie_name(app))
+        if not value:
+            return self.session_class()
+        max_age = int(app.permanent_session_lifetime.total_seconds())
+        try:
+            data, issued_at = serializer.loads(value, max_age=max_age, return_timestamp=True)
+        except BadSignature:
+            return self.session_class()
+        session = self.session_class(data)
+        session.cookie_issued_at = issued_at
+        return session
+
+    def should_set_cookie(self, app, session):
+        if session.modified:
+            return True
+        if not (session.permanent and app.config["SESSION_REFRESH_EACH_REQUEST"]):
+            return False
+        issued_at = getattr(session, "cookie_issued_at", None)
+        if issued_at is None:
+            return True
+        age = time.time() - issued_at.timestamp()
+        return age >= app.permanent_session_lifetime.total_seconds() / 2
+
+
 _BASE_HOOK_MARKER = "cps_base_after_request_registered"
 _PROXY_FIX_MARKER = "cps_proxy_fix_registered"
+_READER_FONT_UPLOAD_LIMITER_MARKER = "cps_reader_font_upload_limiter_registered"
+
+
+def _limit_reader_font_upload_request():
+    """Bound multipart parsing for the font-upload route before CSRF reads it."""
+    from flask import jsonify, request
+
+    if request.endpoint != "api_v1.admin_upload_reader_font":
+        return None
+    from .services import reader_fonts
+
+    max_request_bytes = reader_fonts.MAX_FONT_FILE_BYTES + 256 * 1024
+    request.max_content_length = max_request_bytes
+    if request.content_length is not None and request.content_length > max_request_bytes:
+        return jsonify({"error": {
+            "code": "font_too_large",
+            "message": "Font upload exceeds the 8 MiB limit",
+        }}), 413
+    return None
+
+
+def _register_reader_font_upload_limiter(application):
+    if application.extensions.get(_READER_FONT_UPLOAD_LIMITER_MARKER):
+        return
+    application.before_request(_limit_reader_font_upload_request)
+    application.extensions[_READER_FONT_UPLOAD_LIMITER_MARKER] = True
 
 
 def _configure_base_app(application, runtime_config=None):
@@ -106,6 +182,8 @@ def _configure_base_app(application, runtime_config=None):
     if runtime_config is not None:
         application.extensions["cps_config"] = runtime_config
 
+    application.session_interface = StableSessionCookieInterface()
+
     if not application.extensions.get(_BASE_HOOK_MARKER):
         application.after_request(protect_user_specific_catalog_responses)
         application.extensions[_BASE_HOOK_MARKER] = True
@@ -115,7 +193,8 @@ def _configure_base_app(application, runtime_config=None):
 
     # Fix for running behind reverse proxy (e.g. nginx, apache, caddy, ...)
     # Without it, url_for will generate http:// urls even if https:// is used.
-    # Preserve the existing defaults exactly; PROXY-01 changes them in P2.02.
+    # The hops are believed only from a trusted peer: create_app puts
+    # TrustedProxyPeers in front of this and ReverseProxied.
     application.wsgi_app = ProxyFix(application.wsgi_app, **proxyfix_hops)
     application.extensions[_PROXY_FIX_MARKER] = True
     if len(set(proxyfix_hops.values())) == 1:
@@ -130,7 +209,7 @@ def _configure_base_app(application, runtime_config=None):
 
 
 # These values intentionally remain import-time environment reads. Moving the
-# read to saved configuration would alter PROXY-01 rather than expose a seam.
+# read to saved configuration would change who is trusted, not add a seam.
 num_proxies = int(os.environ.get('TRUSTED_PROXY_COUNT', '1'))
 proxyfix_hops = {
     'x_for': int(os.environ.get('PROXYFIX_X_FOR', num_proxies)),
@@ -138,6 +217,9 @@ proxyfix_hops = {
     'x_host': int(os.environ.get('PROXYFIX_X_HOST', num_proxies)),
     'x_prefix': num_proxies,
 }
+# The peers those hops are believed from (cps/reverseproxy.py); a client that
+# reaches the listener from anywhere else is taken at its own address.
+trusted_proxy_networks = parse_trusted_networks(os.environ.get('TRUSTED_PROXY_NETWORKS'))
 
 # Compatibility singleton: imports of ``cps.app`` keep the same hook and
 # middleware they had before the factory seam. Explicit factory callers use
@@ -163,7 +245,12 @@ web_server = WebServer()
 updater_thread = Updater()
 
 if limiter_present:
-    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False)
+    # An admin can put the limits in Redis or Memcached. If that store stops
+    # answering, the limits carry on in this process's memory until it
+    # recovers: no sign-in is refused or answered 500 because of the store,
+    # and wrong passwords are still paced.
+    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False,
+                      in_memory_fallback_enabled=True)
 else:
     limiter = None
 
@@ -410,6 +497,12 @@ def create_app(config=None, services=None):
     if not first_process_initialization:
         _assert_process_runtime_compatible(runtime_config, runtime_services)
 
+    # CSRFProtect inspects request.form before blueprint route handlers run,
+    # which parses multipart uploads before a route-local limit can take effect.
+    # Bound only the reader-font endpoint here so other existing upload routes
+    # retain their own size policies.
+    _register_reader_font_upload_limiter(application)
+
     if csrf:
         csrf.init_app(application)
 
@@ -425,6 +518,12 @@ def create_app(config=None, services=None):
         runtime_config.init_config(ub.session, encrypt_key, cli_param)
         state.config_fingerprint = _process_config_fingerprint(runtime_config)
         state.goodreads_support = getattr(runtime_services, "goodreads_support", None)
+
+    # Resolve declarative Generic OIDC before cookie policy and route setup.
+    # A complete environment-owned provider selects OAuth for this process
+    # without persisting config_login_type to app.db.
+    from . import oauth_config
+    oauth_config.prepare_application(application, runtime_config)
 
     # Intelligent Security Configuration
     # Force SESSION_COOKIE_SECURE if OAuth is enabled OR if "Use via HTTPS" is checked.
@@ -467,10 +566,13 @@ def create_app(config=None, services=None):
         calibre_db.init_db()
         # A process can die after staging or after committing cover metadata but
         # before publication. The stage alone cannot tell us which occurred, so
-        # startup logs and removes it rather than guessing at publication.
+        # startup logs and removes it rather than guessing at publication. Only
+        # registered stages are visited here; stages from earlier versions get
+        # one background sweep so a large library never delays the server (#2509).
         try:
             from . import helper
             helper.scavenge_staged_cover_files()
+            helper.start_legacy_cover_stage_sweep()
         except Exception as ex:
             log.error("Cover stage startup scavenging failed: %s", ex)
         # The annotation content-id backfill needs both databases: app.db owns the
@@ -479,6 +581,16 @@ def create_app(config=None, services=None):
             ub.session.bind,
             lambda book_id: getattr(calibre_db.get_book(book_id), "uuid", None),
         )
+        # The custom-column visibility seed needs both databases too: the
+        # browsable column set and each column's hierarchy come from
+        # metadata.db, the per-user values live in app.db. Runs once, gated on
+        # a settings flag, and writes missing keys only -- a user who already
+        # saved a choice keeps it.
+        try:
+            from .custom_column_visibility import backfill_existing_users
+            backfill_existing_users()
+        except Exception as ex:
+            log.error("Custom column visibility seed failed: %s", ex)
 
         updater_thread.init_updater(runtime_config, web_server)
     # Perform dry run of updater and exit afterward
@@ -488,11 +600,14 @@ def create_app(config=None, services=None):
     if first_process_initialization:
         updater_thread.start()
     if not application.extensions.get("cps_reverse_proxy_registered"):
-        application.wsgi_app = ReverseProxied(application.wsgi_app)
+        # TrustedProxyPeers goes outermost: it decides whether the proxy
+        # headers ReverseProxied and ProxyFix read may be believed at all.
+        application.wsgi_app = TrustedProxyPeers(
+            ReverseProxied(application.wsgi_app), trusted_proxy_networks)
+        log.info("Reverse-proxy headers are believed from: %s", application.wsgi_app.describe())
         application.extensions["cps_reverse_proxy_registered"] = True
 
-    if os.environ.get('FLASK_DEBUG'):
-        cache_buster.init_cache_busting(application)
+    cache_buster.init_cache_busting(application)
     log.info('Starting Calibre Web...')
     Principal(application)
     app_login_manager.init_app(application)
@@ -635,29 +750,12 @@ def create_app(config=None, services=None):
                 _log_magic_shelf_counts(current_user.id, total_shelves, len(filtered_shelves),
                                         hidden_template_hits, hidden_public_hits)
 
-                # Magic Shelf Count Caching
-                if 'magic_shelf_counts' not in session:
-                    session['magic_shelf_counts'] = {}
-                
-                counts = session['magic_shelf_counts']
-                cache_updated = False
-                now = time.time()
-                CACHE_DURATION = 300  # 5 minutes
-                
+                # Counts are cached server-side; drop the copy older versions
+                # kept in the session cookie (#2386).
+                session.pop('magic_shelf_counts', None)
                 for shelf in g.magic_shelves_access:
-                    shelf_id_str = str(shelf.id)
-                    cached_data = counts.get(shelf_id_str)
-                    
-                    if cached_data and (now - cached_data.get('timestamp', 0) < CACHE_DURATION):
-                        shelf.book_count = cached_data['count']
-                    else:
-                        count = magic_shelf.get_book_count_for_magic_shelf(shelf.id)
-                        counts[shelf_id_str] = {'count': count, 'timestamp': now}
-                        shelf.book_count = count
-                        cache_updated = True
-                
-                if cache_updated:
-                    session.modified = True
+                    shelf.book_count = magic_shelf.cached_book_count_for_magic_shelf(
+                        current_user.id, shelf.id)
 
                 try:
                     magic_shelf.sort_magic_shelves_for_user(g.magic_shelves_access, current_user)
@@ -714,6 +812,16 @@ def create_app(config=None, services=None):
             session.pop("pending_app_password", None)
 
     @application.before_request
+    def _adopt_replaced_metadata_db():
+        from flask import request
+        if request.endpoint == 'static':
+            return
+        try:
+            calibre_db.reconnect_if_metadata_db_replaced(ub.app_DB_path)
+        except Exception as e:
+            log.warning("Could not reconnect to a replaced metadata.db: %s", e)
+
+    @application.before_request
     def _desktop_compat_fresh_snapshot():
         from flask import request
         # Rollback ends the SERIALIZABLE snapshot so the next query sees Calibre desktop's writes.
@@ -725,8 +833,9 @@ def create_app(config=None, services=None):
                 calibre_db.session.expire_all()
             except Exception as e:
                 log.debug("DESKTOP_COMPAT_MODE: rollback failed, snapshot may be stale: %s", e)
-        # Clear the Flask-session shelf count cache so sidebar counts stay fresh.
-        session.pop('magic_shelf_counts', None)
+        # Clear the shelf count cache so sidebar counts stay fresh.
+        from . import magic_shelf
+        magic_shelf.forget_book_counts()
 
     @application.teardown_appcontext
     def shutdown_session(exception=None):

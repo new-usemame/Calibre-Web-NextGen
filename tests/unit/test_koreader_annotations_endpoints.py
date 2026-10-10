@@ -187,7 +187,7 @@ def test_push_skips_rows_without_id(env):
 def test_push_rejects_non_array_annotation_collections(env, value):
     s, user = env
     summary = apply_push(value, user=user, book=_book(), session=s, commit=s.commit)
-    assert summary == {"created": 0, "updated": 0, "deleted": 0, "skipped": 0}
+    assert summary == {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0}
 
 
 @pytest.fixture
@@ -235,7 +235,8 @@ def test_exact_koreader_auth_push_pull_conflict_and_duplicate_sequence(wire):
     })
     assert merged.status_code == 200
     assert merged.get_json()["created"] == 1
-    assert merged.get_json()["skipped"] == 1
+    assert merged.get_json()["unchanged"] == 1
+    assert merged.get_json()["skipped"] == 0
 
     final = client.get("/kosync/syncs/annotations/digest-699").get_json()
     assert final["annotation_count"] == 2

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import errno
 import inspect
 import io
+import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -322,7 +323,10 @@ def test_startup_scavenger_logs_and_removes_only_cover_stages(tmp_path, monkeypa
     monkeypatch.setattr(helper, "get_temp_dir", lambda: str(temp_dir))
     monkeypatch.setattr(helper.log, "warning", lambda message, *args: warnings.append(message % args))
 
-    assert helper.scavenge_staged_cover_files() == 2
+    monkeypatch.setattr(helper.constants, "CONFIG_DIR", str(tmp_path / "config"))
+    # Hand-planted stages carry no registry marker: the shape an earlier
+    # version leaves behind, which the one-time background sweep owns (#2509).
+    assert helper.sweep_unregistered_cover_stages(time.time() + 1) == 2
     assert not local_stage.exists()
     assert not drive_stage.exists()
     assert unrelated.exists()

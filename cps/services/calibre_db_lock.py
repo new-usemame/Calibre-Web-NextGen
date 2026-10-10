@@ -110,12 +110,15 @@ def metadata_db_write_lock(
         Seconds between non-blocking flock attempts. Lower is more
         responsive but burns more CPU. Default 0.1s is a fine balance.
     """
-    if not HAS_FCNTL:
-        # Windows / no-fcntl platforms — no-op fallback. The lock is
-        # advisory anyway; on platforms without fcntl, the deployment
-        # is not a Docker container where the contention matters.
-        yield
-        return
+    try:
+        from . import file_lock as lock_files
+    except ImportError:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_cwng_metadata_file_lock", Path(__file__).with_name("file_lock.py"))
+        lock_files = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lock_files)
+    windows_locks = None if HAS_FCNTL else lock_files
 
     lock_path = _resolve_lock_path(lock_dir)
 
@@ -123,12 +126,15 @@ def metadata_db_write_lock(
     # directory on demand — that would mask a misconfiguration (e.g.
     # configured directory not mounted). If the directory is missing, the
     # ENOENT-from-open below surfaces clearly.
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    fd = lock_files.open_lock(lock_path, mode=0o644)
     try:
         deadline = time.monotonic() + timeout
         while True:
             try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if windows_locks is None:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                elif not windows_locks.acquire(fd, blocking=False):
+                    raise BlockingIOError(errno.EAGAIN, "metadata writer owns the lock")
                 break
             except OSError as e:
                 if e.errno not in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES):
@@ -155,10 +161,13 @@ def metadata_db_write_lock(
                 os.write(fd, f"{os.getpid()}\n".encode("utf-8"))
             except OSError:
                 pass
-            yield
+            yield fd
         finally:
             try:
-                fcntl.flock(fd, fcntl.LOCK_UN)
+                if windows_locks is None:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                else:
+                    windows_locks.release(fd)
             except OSError:
                 pass
     finally:

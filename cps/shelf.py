@@ -12,13 +12,14 @@ from flask import Blueprint, flash, redirect, request, url_for, abort, jsonify
 from flask_babel import gettext as _
 from .cw_login import current_user
 from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func, true
 
 from . import calibre_db, config, constants, db, logger, ub, user_library
 from .render_template import render_title_template
 from .sort_orders import BOOK_SORT_ORDERS
 from .usermanagement import login_required_if_no_ano, user_login_required
-from .services import hardcover
+from .services import ereader_scope, hardcover
 from .services.worker import WorkerThread
 from .tasks.hardcover_sync import TaskHardcoverBulkSync
 log = logger.create()
@@ -189,6 +190,50 @@ def _classic_shelf_add_refusal_response(ex, xhr):
     return message, 403
 
 
+def _actor_browses_global():
+    try:
+        return bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        return False
+
+
+def _actor_owns(owner_id):
+    return owner_id is not None and owner_id == int(current_user.id)
+
+
+def _placeable_book(book_id, actor_owns_shelf):
+    """Return the book if the actor may put it on the shelf, else ``None``.
+
+    A shelf never lets its editor place a book the editor cannot open. For the
+    owner, that is the owner's own catalogue. Any account may read a book on a
+    public shelf, so an editor of someone else's public shelf could otherwise
+    share itself a book its administrator never gave it. A non-owner may place
+    only books it can open itself: those in its own library, or in the global
+    library when it may browse that. A monolibrary account's filter has no
+    membership term, so this changes nothing for it.
+    """
+    if actor_owns_shelf:
+        visibility_filter = calibre_db.common_filters()
+    else:
+        visibility_filter = calibre_db.common_filters(
+            allow_show_global=_actor_browses_global())
+    return (calibre_db.session.query(db.Books)
+            .filter(db.Books.id == book_id)
+            .filter(visibility_filter).one_or_none())
+
+
+def _refuse_book_outside_managed_actor_library():
+    """A non-owner whose library an administrator manages is refused uniformly.
+
+    Every book outside its library gets the same answer, so the refusal does
+    not reveal which ids exist in the global library.
+    """
+    if (user_library.mode_for_user(current_user) == constants.LIBRARY_MODE_PERSONAL
+            and not _actor_browses_global()):
+        raise ShelfAddRefusal(SHELF_ADD_REFUSAL_SELF_MANAGED,
+                              SHELF_MANAGED_MEMBERSHIP_REFUSAL)
+
+
 def prepare_user_shelf_add(shelf_obj, book_id):
     """Establish owner membership for an explicit regular-shelf add gesture.
 
@@ -198,7 +243,9 @@ def prepare_user_shelf_add(shelf_obj, book_id):
     actor. Smart shelves never reach this path, and the type guard keeps that
     invariant intact if a future caller passes one explicitly. Ownerless
     shelves remain usable without granting anyone membership; invalid non-NULL
-    owners fail closed.
+    owners fail closed. Nothing is granted for an add the actor may not make:
+    ``add_book_to_shelf`` refuses it, and a grant committed and then reverted
+    would still reach the owner's Kobo sync in between.
     """
     owner_id, shelf_owner = _resolve_shelf_owner(shelf_obj)
     if shelf_owner is None:
@@ -209,6 +256,8 @@ def prepare_user_shelf_add(shelf_obj, book_id):
                   .filter(ub.UserLibraryBook.user_id == owner_id,
                           ub.UserLibraryBook.book_id == int(book_id)).first())
     if membership is not None:
+        return None
+    if not _actor_owns(owner_id) and _placeable_book(book_id, False) is None:
         return None
     if not shelf_owner.role_browse_global():
         if owner_id == int(current_user.id):
@@ -278,16 +327,11 @@ def add_book_to_shelf(shelf_obj, book_id):
         return SHELF_ALREADY_PRESENT, "Book is already part of the shelf: %s" % shelf_obj.name
 
     owner_id, _shelf_owner = _resolve_shelf_owner(shelf_obj)
-    actor_owns_shelf = owner_id is not None and owner_id == int(current_user.id)
-    visibility_filter = (
-        calibre_db.common_filters()
-        if actor_owns_shelf
-        else calibre_db.common_filters(allow_show_global=True)
-    )
-    book = (calibre_db.session.query(db.Books)
-            .filter(db.Books.id == book_id)
-            .filter(visibility_filter).one_or_none())
+    actor_owns_shelf = _actor_owns(owner_id)
+    book = _placeable_book(book_id, actor_owns_shelf)
     if not book:
+        if not actor_owns_shelf:
+            _refuse_book_outside_managed_actor_library()
         visible_global_book = (calibre_db.session.query(db.Books.id)
                                .filter(db.Books.id == book_id)
                                .filter(calibre_db.common_filters(
@@ -724,13 +768,18 @@ def order_shelf(shelf_id):
 
 
 def check_shelf_edit_permissions(cur_shelf):
-    if not cur_shelf.is_public and not cur_shelf.user_id == int(current_user.id):
+    if getattr(current_user, "is_anonymous", False):
+        return False
+    if cur_shelf.user_id == int(current_user.id):
+        return True
+    if cur_shelf.is_public and current_user.role_edit_shelfs():
+        return True
+    if not cur_shelf.is_public:
         log.error("User {} not allowed to edit shelf: {}".format(current_user.id, cur_shelf.name))
         return False
-    if cur_shelf.is_public and not current_user.role_edit_shelfs():
+    if cur_shelf.is_public:
         log.info("User {} not allowed to edit public shelves".format(current_user.id))
-        return False
-    return True
+    return False
 
 
 def check_shelf_view_permissions(cur_shelf):
@@ -753,11 +802,24 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
     # calibre_db.session.query(ub.Shelf).filter(ub.Shelf.user_id == current_user.id).filter(ub.Shelf.kobo_sync).count()
     if request.method == "POST":
         to_save = request.form.to_dict()
-        if not current_user.role_edit_shelfs() and to_save.get("is_public") == "on":
+        can_share_own = current_user.role_share_shelfs()
+        can_edit_public = current_user.role_edit_shelfs()
+        requested_public = to_save.get("is_public") == "on"
+        if shelf_id and not can_share_own and shelf.user_id == int(current_user.id) and not to_save.get('_visibility_present'):
+            # A hidden checkbox must not turn an existing public shelf private
+            # during an unrelated edit. Keep its current state when sharing is
+            # disabled for this account.
+            is_public = bool(shelf.is_public)
+        else:
+            is_public = requested_public
+        if requested_public and not (can_share_own if not shelf_id or shelf.user_id == int(current_user.id) else can_edit_public) and not (shelf_id and shelf.is_public):
             flash(_("Sorry you are not allowed to create a public shelf"), category="error")
             return redirect(url_for('web.index'))
-        is_public = 1 if to_save.get("is_public") == "on" else 0
-        if config.config_kobo_sync:
+        is_public = 1 if is_public else 0
+        is_owner = not shelf_id or shelf.user_id == int(current_user.id)
+        if not is_owner and 'kobo_sync' in to_save:
+            abort(403)
+        if is_owner and ereader_scope.shelf_marks_enabled(config):
             shelf.kobo_sync = True if to_save.get("kobo_sync") else False
             if shelf.kobo_sync:
                 ub.session.query(ub.ShelfArchive).filter(ub.ShelfArchive.user_id == current_user.id).filter(
@@ -795,9 +857,10 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
                 flash(_("There was an error"), category="error")
     return render_title_template('shelf_edit.html',
                                  shelf=shelf,
+                                 shelf_id=bool(shelf_id),
                                  title=page_title,
                                  page=page,
-                                 kobo_sync_enabled=config.config_kobo_sync,
+                                 kobo_sync_enabled=ereader_scope.shelf_marks_enabled(config),
                                  sync_only_selected_shelves=sync_only_selected_shelves,
                                  sync_only_selected_opds_shelves=sync_only_selected_opds_shelves,
                                  opds_expose_checked=opds_expose_checked)
@@ -1022,6 +1085,38 @@ def add_selected_to_shelf():
         }), 200
 
 
+SHELF_PICKER_PAGE_SIZE = 30
+
+
+def shelf_picker_books(shelf_id, query, offset, limit):
+    """Books for a shelf's "Add books" picker, shared by the classic modal and
+    ``GET /api/v1/shelves/<id>/available-books``.
+
+    A non-empty ``query`` matches like the library search (sorted by title) and
+    an empty one lists the most recently added books; both orders end in the
+    book id so offset paging is stable. Both apply the plain
+    ``common_filters()``: unlike browsing search results, the picker leaves out
+    archived books, because the add path refuses them. Paging happens in SQL,
+    and the user's stored search results are left alone. Returns ``(books,
+    total, in_shelf_ids)`` where ``books`` are ``db.Books`` rows for this page.
+    """
+    if query:
+        base = (calibre_db.search_query(query, config, eager_data=False)
+                .filter(calibre_db.common_filters()))
+        order = [db.Books.sort, db.Books.id]
+    else:
+        base = calibre_db.session.query(db.Books).filter(calibre_db.common_filters())
+        order = BOOK_SORT_ORDERS["new"]
+    total = base.count()
+    # Search rows wrap the book in `.Books`; the plain query yields it directly.
+    page = (base.options(selectinload(db.Books.authors))
+            .order_by(*order).offset(offset).limit(limit).all())
+    books = [getattr(entry, 'Books', entry) for entry in page]
+    in_shelf = {row.book_id for row in
+                ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()}
+    return books, total, in_shelf
+
+
 @shelf.route("/shelf/<int:shelf_id>/available_books", methods=["GET"])
 @user_login_required
 def shelf_available_books(shelf_id):
@@ -1041,28 +1136,11 @@ def shelf_available_books(shelf_id):
         return jsonify({'status': 'error',
                         'message': 'You are not allowed to add books to this shelf'}), 403
 
-    query = (request.args.get('query') or '').strip()
-    limit = 30
-    in_shelf = {row.book_id for row in
-                ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()}
-
-    if query:
-        # get_search_results returns author-ordered rows that wrap the book in a
-        # `.Books` attribute (the shape the list/search templates consume).
-        entries, __, ___ = calibre_db.get_search_results(query, config, 0, None, limit)
-    else:
-        # A plain Books query returns Books instances directly (no `.Books`).
-        entries = (calibre_db.session.query(db.Books)
-                   .filter(calibre_db.common_filters())
-                   .order_by(*BOOK_SORT_ORDERS["new"])
-                   .limit(limit).all())
-
-    # Normalise the two shapes: search rows expose the book at `.Books`; the plain
-    # query yields the book itself.
-    books = []
-    for entry in entries:
-        book = getattr(entry, 'Books', entry)
-        books.append({
+    books, __, in_shelf = shelf_picker_books(
+        shelf_id, (request.args.get('query') or '').strip(), 0, SHELF_PICKER_PAGE_SIZE)
+    rows = []
+    for book in books:
+        rows.append({
             'id': book.id,
             'title': book.title,
             'authors': ' & '.join(author.name for author in book.authors) if book.authors else '',
@@ -1071,7 +1149,7 @@ def shelf_available_books(shelf_id):
         })
 
     return jsonify({'status': 'ok', 'shelf_id': shelf_id,
-                    'shelf_name': shelf.name, 'books': books})
+                    'shelf_name': shelf.name, 'books': rows})
 
 
 # ---------------------------------------------------------------------------

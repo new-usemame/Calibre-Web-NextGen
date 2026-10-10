@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "OBSERVED 2026-09-26 on origin/main d065c8767 (a clean detached worktree): the 47 tests/unit files\nthat mention limiter / kobo_auth / usermanagement / handle_login_user / api.auth, run with\n`pytest -n 6`, failed 28, 65 and 54 tests in three consecutive runs. The same set run serially\npassed (628 passed, 19 skipped), and so did one -n 6 run.\n\nThe errors are import-state pollution, not assertions: \"cannot import name 'limiter' from 'cps'\n(unknown location)\", \"module 'cps' has no attribute 'cw_login'\", \"module 'cps.ub' has no\nattribute 'User'\", \"<module 'cps'> has no attribute 'calibre_db'\". Some test evidently removes\nor replaces `cps` / `cps.*` in sys.modules and does not restore it, and xdist's load\ndistribution decides which worker inherits the damage.\n\nCI's full-suite run is not affected in practice (Fast Tests is green), which is why this is\ninvisible: it only bites a developer running a focused subset in parallel, who then sees\ndozens of unrelated failures.\nSuspects to bisect first: tests that reload cps (test_application_factory,\ntest_1882_bare_metal_hardening, test_1931_spa_reverse_proxy_auth) and any fixture that pops\nsys.modules entries.",
+  "created": "2026-09-26",
+  "id": "F-6e71c4",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "An ad hoc tests/unit subset under xdist fails with import-state errors on main"
+}

@@ -16,7 +16,8 @@ const device = {
   active: true,
 };
 
-async function stubDeviceDetail(page: Page) {
+async function stubDeviceDetail(page: Page, deviceOverride = device) {
+  const device = deviceOverride;
   const annotationRequests: URL[] = [];
   let releaseNotes = () => {};
   const notesPending = new Promise<void>((resolve) => { releaseNotes = resolve; });
@@ -56,7 +57,11 @@ async function stubDeviceDetail(page: Page) {
         chapter_progress: 0.42, source: 'kobo', created_at: '2026-08-29T12:00:00',
         origin_device_id: 'device-1', assigned_device_id: 'device-1',
         book: { id: 5, title: 'A Test Book' },
-      }],
+      }, ...(!url.searchParams.has('type') ? [{
+        annotation_id: 'historical-1', book_id: 5, annotation_type: null,
+        highlighted_text: 'A historical untyped annotation', note_text: null,
+        book: { id: 5, title: 'A Test Book' },
+      }] : [])],
       devices: { 'device-1': { label: device.label, model: device.model, type: device.type } },
       page: 1, pages: 1, page_size: 50, total: 1,
       role: url.searchParams.get('role'), type,
@@ -106,6 +111,39 @@ test('device detail exposes typed tabs, assignment view, inventory, and position
   ))).toEqual([]);
 });
 
+test('browser source detail keeps annotations and keyboard navigation without hardware controls', async ({ page }) => {
+  const { releaseNotes } = await stubDeviceDetail(page, {
+    ...device, type: 'webreader', kind: 'webreader', kind_label: 'Web reader', label: 'My browser',
+  });
+  await page.goto('/app/account/devices/device-1');
+  await expect(page.getByRole('heading', { name: 'My browser', exact: true })).toBeVisible();
+  await expect(page.getByText('A highlighted passage')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Device library' })).toHaveCount(0);
+  await expect(page.getByText('Seeded books', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Authoritative books', { exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Highlights' }).focus();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: 'Dog-ears' })).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'All annotations' })).toBeFocused();
+  releaseNotes();
+  const scan = await new AxeBuilder({ page }).analyze();
+  expect(scan.violations.filter(v => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
+});
+
+test('all source annotations includes historical rows without an annotation type', async ({ page }) => {
+  const { requests } = await stubDeviceDetail(page);
+  await page.goto('/app/account/devices/device-1');
+  await expect(page.getByRole('tab', { name: 'All annotations' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('A historical untyped annotation')).toBeVisible();
+  expect(requests[0].searchParams.has('type')).toBe(false);
+  await page.getByRole('tab', { name: 'Highlights' }).click();
+  await expect(page.getByText('A historical untyped annotation')).toBeHidden();
+  await expect(page.getByText('A highlighted passage')).toBeVisible();
+  await page.getByRole('tab', { name: 'All annotations' }).click();
+  await expect(page.getByText('A historical untyped annotation')).toBeVisible();
+});
+
 test('admin device board reuses the device summaries', async ({ page }) => {
   await page.route('**/api/admin/devices*', (route) => route.fulfill({ json: {
     devices: [{ ...device, user: { id: 7, name: 'e2e' } }],
@@ -121,4 +159,33 @@ test('admin device board reuses the device summaries', async ({ page }) => {
   await expect(card).not.toContainText('Partially seeded books');
   await card.getByRole('button', { name: 'Show device details' }).click();
   await expect(card).toContainText('Partially seeded books');
+});
+
+test('legacy source URL resolves its canonical response and never retains it for a denied source', async ({ page }) => {
+  const browser = { ...device, public_id: 'canonical-browser', type: 'webreader',
+    kind: 'webreader', label: 'Browser', browser_identity: 'account' };
+  await page.route('**/api/annotations/devices', route => route.fulfill({ json: {
+    devices: [], total: 0, limit: 100, offset: 0,
+  } }));
+  await page.route('**/api/annotations/devices/legacy-browser/**', async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/positions')) return route.fulfill({ json: {
+      device: browser, positions: [], total: 0, limit: 100, offset: 0,
+    } });
+    if (url.pathname.endsWith('/annotations')) return route.fulfill({ status: 403, json: {
+      error: { code: 'forbidden', message: 'Annotations unavailable' },
+    } });
+    return route.fulfill({ json: { highlights: 0, notes: 0, dogears: 0, books_with_position: 0 } });
+  });
+  await page.route('**/api/annotations/devices/denied-source/**', route => route.fulfill({
+    status: 404, json: { error: { code: 'not_found', message: 'Device not found' } },
+  }));
+  await page.goto('/app/account/devices/legacy-browser');
+  await expect(page.getByRole('heading', { name: 'Browser', exact: true })).toBeVisible();
+  await expect(page.getByText('Browser reading source', { exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Device library', exact: true })).toHaveCount(0);
+  // Wouter observes pushState, exercising a route change in this same SPA.
+  await page.evaluate(() => history.pushState(null, '', '/app/account/devices/denied-source'));
+  await expect(page.getByRole('heading', { name: 'E-reader not found', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browser', exact: true })).toHaveCount(0);
 });

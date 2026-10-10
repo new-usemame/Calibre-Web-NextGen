@@ -15,6 +15,7 @@ of four callers crash with TypeError when handed (None, None).
 from __future__ import annotations
 
 import ast
+from contextlib import nullcontext
 import importlib.util
 import subprocess
 import sys
@@ -69,6 +70,11 @@ def _load_embed_helper(monkeypatch_modules=None):
     plugins_mod.apply_to_env = lambda env: None
     services_pkg.calibre_user_plugins = plugins_mod
 
+    lock_mod = types.ModuleType("cps.services.calibre_db_lock")
+    lock_mod.metadata_db_write_lock = lambda **kw: nullcontext()
+    content_server_mod = types.ModuleType("cps.content_server")
+    content_server_mod.library_target = lambda: types.SimpleNamespace(args=[], stdin=None)
+
     shims = {
         "cps": cps_pkg,
         "cps.logger": logger_mod,
@@ -77,6 +83,8 @@ def _load_embed_helper(monkeypatch_modules=None):
         "cps.subproc_wrapper": subproc_mod,
         "cps.services": services_pkg,
         "cps.services.calibre_user_plugins": plugins_mod,
+        "cps.services.calibre_db_lock": lock_mod,
+        "cps.content_server": content_server_mod,
     }
     if monkeypatch_modules:
         shims.update(monkeypatch_modules)
@@ -306,3 +314,16 @@ def test_convert_kepubify_degrades_to_original():
         "helper.do_calibre_export(self.book_id, format_old_ext[1:])",
         "if tmp_dir and temp_file_name:",
     )
+
+
+@pytest.mark.parametrize('error', [RuntimeError('managed owner unready'), TimeoutError('writer busy')])
+def test_managed_owner_failure_keeps_original_download_available(monkeypatch, error):
+    """Optional metadata export may fail closed without failing the acquisition."""
+    module = _load_embed_helper()
+    calls = []
+    def unavailable():
+        raise error
+    monkeypatch.setattr(module.content_server, 'library_target', unavailable)
+    monkeypatch.setattr(module, 'process_open', lambda *_a, **_kw: calls.append(True))
+    assert module._do_calibre_export_blocking(1, 'epub') == (None, None)
+    assert calls == []

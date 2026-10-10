@@ -128,6 +128,7 @@ async function openReaderOnEpub(page: Page, offset: number): Promise<number | nu
     // noted highlight on the page" is someone else's — which is exactly how this
     // spec once tapped a stale highlight and read its older note.
     await clearAnnotationsViaApi(page, candidate.id);
+    await clearReadingPositionViaApi(page, candidate.id);
     // Retry the same book once before moving on: the first reader render in a
     // fresh context pays for the epub.js chunk and the book download at once.
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -242,6 +243,34 @@ async function clearAnnotationsViaApi(page: Page, bookId: number) {
       headers: { 'X-CSRFToken': csrf },
     });
   }
+}
+
+/*
+ * Start the book with no reading position on ANY carrier.
+ *
+ * Sibling specs "put the book back" by clearing the web bookmark, but the web
+ * reader also mirrors its progress into the Kobo/KOReader position. With the
+ * web bookmark gone, the next open treats that mirror as a synced device
+ * position and resumes there automatically -- a deferred jump that lands after
+ * the locations index is built. Since #2359 a page turn no longer cancels it,
+ * so it teleported the reader mid-test: measured on CI 2026-09-30 (run
+ * 36748302126), the jump after the reload landed while pageUntilNotedPainted
+ * was paging, and "the noted highlight is repainted after a reload" read 0.
+ *
+ * Marking the book unread is the product's own full reset (#683:
+ * reset_reading_position clears the web bookmark and nulls the device
+ * progress), so no resume is offered and the book opens at its start.
+ */
+async function clearReadingPositionViaApi(page: Page, bookId: number) {
+  const csrf = (await (await page.request.get('/api/v1/auth/csrf')).json()).csrf_token;
+  const res = await page.request.post(`/api/v1/books/${bookId}/read`, {
+    data: { read: false },
+    headers: { 'X-CSRFToken': csrf },
+  });
+  expect(res.ok(), 'reset the test book\'s reading position').toBe(true);
+  const saved = await (await page.request.get(`/api/v1/books/${bookId}/bookmark?format=epub`)).json();
+  expect(saved, 'the test book opens with no saved or synced position')
+    .toMatchObject({ bookmark: null, resume: null });
 }
 
 async function restoreAnnotations(page: Page, bookId: number, keep: string[]) {
@@ -452,7 +481,7 @@ test.describe('reader highlights & notes drawer (#325)', () => {
     await expect(rows).toHaveCount(preExisting.length + 1);
 
     // Jumping closes the drawer and moves the book.
-    await rows.last().locator('button').click();
+    await rows.last().getByRole('button', { name: new RegExp(NOTE) }).click();
     await expect(drawer(page)).toBeHidden();
 
     // Survives a reload — the drawer is populated from the server, not memory.
@@ -653,23 +682,40 @@ test.describe('reader column count (#325)', () => {
         const doc = frame?.contentDocument;
         if (!doc) return null;
         const el = doc.querySelector('body') || doc.documentElement;
-        return doc.defaultView!.getComputedStyle(el).columnWidth;
+        const container = document.querySelector('.epub-container');
+        // Changing columns replaces the frame. Its document can exist before
+        // it has a root element; keep polling until a layout can be measured.
+        if (!el || !doc.defaultView || !container) return null;
+        return {
+          column: parseFloat(doc.defaultView.getComputedStyle(el).columnWidth),
+          viewport: container.clientWidth,
+        };
       });
 
       await page.getByRole('button', { name: 'Reading appearance' }).click();
       await expect(page.getByRole('button', { name: 'Two columns' })).toBeVisible();
 
       await page.getByRole('button', { name: 'Two columns' }).click();
-      await expect.poll(layout).not.toBe(null);
-      const twoUp = await layout();
+      let twoUp = 0;
+      await expect.poll(async () => {
+        const measured = await layout();
+        if (!measured || !(measured.column > 0)
+          || measured.column >= measured.viewport * 0.7) return false;
+        twoUp = measured.column;
+        return true;
+      }, { message: 'Two columns must actually fit beside each other' }).toBe(true);
 
       await page.getByRole('button', { name: 'One column' }).click();
-      // Poll rather than sleep: epub.js re-lays-out asynchronously.
-      await expect.poll(layout, { timeout: 15_000 }).not.toBe(twoUp);
-      const oneUp = await layout();
-
-      expect(oneUp, 'one column should be wider than a two-up column')
-        .not.toBe(twoUp);
+      // A temporarily absent frame is not a changed layout. Capture the same
+      // measurement that proves the one-column layout has finished applying.
+      let oneUp = 0;
+      await expect.poll(async () => {
+        const measured = await layout();
+        if (!measured || !(measured.column > 0) || measured.column <= twoUp * 1.5
+          || measured.column < measured.viewport * 0.8) return false;
+        oneUp = measured.column;
+        return true;
+      }, { timeout: 15_000, message: 'One column must occupy the reader width' }).toBe(true);
 
       // The preference is persisted server-side, so it must come back.
       await waitForSavedSetting(page, 'spread', 'nonespread');
@@ -679,7 +725,7 @@ test.describe('reader column count (#325)', () => {
       await expect(page.getByRole('button', { name: 'One column' }))
         .toHaveAttribute('aria-pressed', 'true');
       // ...and be APPLIED, not merely remembered by the button.
-      await expect.poll(layout, { timeout: 15_000 }).toBe(oneUp);
+      await expect.poll(async () => (await layout())?.column, { timeout: 15_000 }).toBe(oneUp);
     });
 });
 
@@ -747,9 +793,8 @@ test.describe('reader black page theme (#325)', () => {
  * a note that never had one — and nothing in the row let a reader tell which
  * they were looking at. A deliberate state reported as a failure.
  *
- * Created through the API because the reader has no UI for making one yet; the
- * backend landed first on purpose. That is also why this is worth a test: the
- * rows can already exist before anything in the reader can produce them.
+ * Created through the API to verify that existing standalone notes render
+ * correctly independently of the reader's creation flow, covered separately.
  */
 test.describe('reader drawer: standalone notes (#325)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -781,7 +826,7 @@ test.describe('reader drawer: standalone notes (#325)', () => {
     // It must NOT claim a lost position or a missing quote — those describe a
     // damaged highlight, which this is not.
     await expect(row).not.toContainText('(no text captured)');
-    const jump = row.getByRole('button');
+    const jump = row.getByRole('button', { name: new RegExp(NOTE) });
     await expect(jump).toBeDisabled();
     await expect(jump).toHaveAttribute('title', 'A note about the book, not tied to a passage');
 

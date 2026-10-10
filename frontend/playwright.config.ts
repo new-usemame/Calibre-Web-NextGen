@@ -42,7 +42,12 @@ const CATALOG_LAYOUT_SPECS = [CATALOG_LAYOUT_SPEC, CATALOG_WATCHDOG_CLASSIFIER_S
 // which CI invokes as a separate, serialized step (E2E_SERVER_STATE=1).
 // shelf-count-refresh archives a book for the shared seed login, hiding it from
 // every lane's catalog for the length of the spec, so it lives here too.
-const SERVER_STATE_SPECS = [/my-library-admin-intro\.spec\.ts/, /shelf-count-refresh\.spec\.ts/];
+const SERVER_STATE_SPECS = [
+  /my-library-admin-intro\.spec\.ts/,
+  /shelf-count-refresh\.spec\.ts/,
+  /font-defaults-751\.spec\.ts/,
+  /ingest-folder-labels\.spec\.ts/,
+];
 const VISUAL_REGRESSION_SPEC = /visual-regression\.spec\.ts/;
 const hostileLoadEnabled = process.env.E2E_HOSTILE_LOAD === '1';
 const visualRegressionEnabled = process.env.E2E_VISUAL_REGRESSION === '1';
@@ -56,7 +61,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 2 : undefined,
+  // Every test in the dedicated server-state invocation mutates the same
+  // all-account setup state. Separating the invocation from broad tests is
+  // insufficient if its own scenarios can still run on two CI workers.
+  workers: serverStateEnabled ? 1 : isCI ? 2 : undefined,
   timeout: 45_000,
   expect: {
     timeout: 10_000,
@@ -193,6 +201,8 @@ export default defineConfig({
       // with anything — including a second project running it. It creates a
       // reader of its own per test instead, and therefore runs here too.
       testIgnore: [
+        // Desktop wrapping is covered by desktop and native Safari lanes.
+        /catalog-settings-wrap\.spec\.ts/,
         /subpath\.spec\.ts/,
         /default-library-view\.spec\.ts/,
         /series-sort-order\.spec\.ts/,
@@ -202,6 +212,25 @@ export default defineConfig({
         ...CATALOG_LAYOUT_SPECS,
         ...SERVER_STATE_SPECS,
       ],
+    },
+
+    {
+      name: 'catalog-settings-webkit', testMatch: /catalog-settings-wrap\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    // Shelf dragging uses native desktop drag and a keyboard/tap alternative.
+    {
+      name: 'shelf-drag-webkit', testMatch: /(?:grid-shelf-drag|shelf-drag-source-scope)\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'shelf-picker-webkit-phone', testMatch: /(?:grid-shelf-drag|shelf-drag-source-scope)\.spec\.ts/,
+      // Trusted touch dragging is exercised through Chromium's input protocol;
+      // this lane covers the actual Safari engine's picker, retry and focus.
+      grepInvert: /twenty selected/,
+      use: { ...devices['iPhone 13'], storageState: STORAGE }, dependencies: ['setup'],
     },
 
     // 4. iPad-class touch viewport — card actions remain persistent and the
@@ -266,12 +295,37 @@ export default defineConfig({
     //    Keep this project narrow: the broad suite remains Chromium-backed.
     {
       name: 'webkit-reader',
-      testMatch: WEBKIT_READER_SPEC,
+      testMatch: [/paused-reading-states\.spec\.ts/, WEBKIT_READER_SPEC, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
       use: {
         ...devices['Desktop Safari'],
         viewport: { width: 1280, height: 800 },
         storageState: STORAGE,
       },
+      dependencies: ['setup'],
+    },
+
+    {
+      name: 'webkit-reader-mobile',
+      testMatch: [/paused-reading-states\.spec\.ts/, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
+      use: { ...devices['iPhone 13'], storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    ...[
+      { name: 'topbar-webkit', profile: devices['Desktop Safari'] },
+      { name: 'topbar-webkit-mobile', profile: devices['iPhone 13'] },
+    ].map(({ name, profile }) => ({
+      name,
+      testMatch: /topbar-menu-interaction\.spec\.ts/,
+      use: { ...profile, storageState: STORAGE },
+      dependencies: ['setup'],
+    })),
+
+    // Only WebKit let the narrowed Account selects widen the page; Chromium
+    // clipped them. The spec sets its own phone widths.
+    {
+      name: 'account-form-webkit-mobile',
+      testMatch: /account-form-phone-layout\.spec\.ts/,
+      use: { ...devices['iPhone 13'], storageState: STORAGE },
       dependencies: ['setup'],
     },
 

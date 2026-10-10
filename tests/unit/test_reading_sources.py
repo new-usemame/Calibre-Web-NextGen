@@ -19,6 +19,20 @@ def _clock(day, hour):
     return datetime(2026, 9, day, hour, 0, tzinfo=timezone.utc)
 
 
+@pytest.fixture
+def patient_chapter_resume(monkeypatch):
+    """Let the chapter worker finish, however loaded the machine is.
+
+    The production budget is 50 ms, so a slow disk can never stall the hub.
+    These tests assert what the worker decides; under that budget a busy
+    runner times the worker out, which fails the fallback test and makes the
+    refusal test pass without deciding anything.
+    """
+    from cps.services import kobo_resume
+
+    monkeypatch.setattr(kobo_resume, "RESUME_TIMEOUT_SECONDS", 10.0)
+
+
 def test_device_sources_remain_distinct_and_are_last_reports(monkeypatch):
     from cps.services import reading_sources
 
@@ -93,7 +107,8 @@ def test_resolved_source_does_not_invent_device_provenance():
     assert row["resume"]["exact"] is True
 
 
-def test_kobo_span_falls_back_to_fingerprinted_chapter_progress(monkeypatch, tmp_path):
+def test_kobo_span_falls_back_to_fingerprinted_chapter_progress(
+        monkeypatch, tmp_path, patient_chapter_resume):
     from cps.services import reading_sources
 
     epub = tmp_path / "book.epub"
@@ -126,7 +141,8 @@ def test_kobo_span_falls_back_to_fingerprinted_chapter_progress(monkeypatch, tmp
     }
 
 
-def test_kobo_chapter_fallback_rejects_unmatched_or_unsafe_href(monkeypatch, tmp_path):
+def test_kobo_chapter_fallback_rejects_unmatched_or_unsafe_href(
+        monkeypatch, tmp_path, patient_chapter_resume):
     from cps.services import reading_sources
 
     epub = tmp_path / "book.epub"
@@ -144,12 +160,17 @@ def test_kobo_chapter_fallback_rejects_unmatched_or_unsafe_href(monkeypatch, tmp
         id=2, public_id="clara-public", kind="kobo",
         display_name="Kobo Clara", active=True,
     )
-    for source in ("OEBPS/missing.xhtml", "../OEBPS/chapter001.xhtml"):
+    def resume_for(source):
         position = SimpleNamespace(location_source=source, **base)
-        row = reading_sources.device_source_rows(
+        return reading_sources.device_source_rows(
             [device], [position], book_id=540, epub_path=epub,
-        )[0]
-        assert row["resume"] == {"percentage": 8.0, "exact": False}
+        )[0]["resume"]
+
+    # The same archive and worker do admit the chapter that exists, so the
+    # refusals below are decisions about the href, not an idle worker.
+    assert resume_for("OEBPS/chapter001.xhtml")["chapter_href"] == "OEBPS/chapter001.xhtml"
+    for source in ("OEBPS/missing.xhtml", "../OEBPS/chapter001.xhtml"):
+        assert resume_for(source) == {"percentage": 8.0, "exact": False}
 
 
 def test_storyteller_source_requires_exact_archive_hash(monkeypatch, tmp_path):

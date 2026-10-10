@@ -1,0 +1,14 @@
+[
+ {
+  "s": "/body/DocFragment[4]/body/div/p[10]/text().1",
+  "e": "/body/DocFragment[4]/body/div/p[10]/text().5",
+  "valid": true,
+  "text": "Alth"
+ },
+ {
+  "s": "/body/DocFragment[3]/body/div/p[4]/text().845",
+  "e": "/body/DocFragment[3]/body/div/p[4]/text().852",
+  "valid": true,
+  "text": "shudder"
+ }
+]

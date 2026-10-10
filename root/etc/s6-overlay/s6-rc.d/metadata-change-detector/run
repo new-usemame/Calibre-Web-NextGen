@@ -3,14 +3,13 @@
 
 echo "========== STARTING METADATA CHANGE DETECTOR ==========="
 
-# The dispatcher runs cover_enforcer as root, and that script shells out to
-# calibredb/ebook-polish. Give those tools a uid-private config rather than
-# root's implicit home or abc's runtime files. The explicit user-plugin opt-in
-# can still override this in cover_enforcer's per-subprocess environment.
-if [ -z "${CALIBRE_CONFIG_DIRECTORY:-}" ]; then
-        export CALIBRE_CONFIG_DIRECTORY="/tmp/cwa-calibre-config-$(id -u)"
-        install -d -m 0700 "$CALIBRE_CONFIG_DIRECTORY"
-fi
+# The dispatcher runs cover_enforcer through cwa-as-abc (#2518): a root enforcer
+# cannot write a library on a root-squashed network share. cwa-as-abc changes
+# only uid/gid, not HOME, so point its calibredb/ebook-polish children at the
+# abc-owned, plugin-free runtime config prepared by cwa-init, like the ingest
+# service. The explicit user-plugin opt-in can still override this in
+# cover_enforcer's per-subprocess environment.
+export CALIBRE_CONFIG_DIRECTORY="${CALIBRE_CONFIG_DIRECTORY:-/config/.config/calibre-runtime}"
 
 # Folder to monitor. This has to resolve to the same path the writer uses, or the writer
 # writes where nobody is watching and metadata enforcement stops with nothing in the logs

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Globe, KeyRound, Check, CheckCheck, Smartphone, Trash2, Copy, PenLine } from 'lucide-react';
+import { Mail, Globe, KeyRound, Check, CheckCheck, ChevronRight, Smartphone, Trash2, Copy, PenLine } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
@@ -7,7 +7,9 @@ import {
   useCreateAppPassword, useRevokeAppPassword,
   useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
   useUpdateLibraryMode,
+  useUpdateNamedPreferences,
 } from '../lib/queries';
+import type { Device } from '../components/DeviceInventory';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
@@ -18,6 +20,7 @@ import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
 import { THEMES, resolveTheme } from '../lib/themes';
 import { useT } from '../lib/i18n';
 import { authorityLabel, authorityTone, opaqueLabel } from '../lib/koboTwoWay';
+import { shelfMarkAudience } from '../lib/ereaderWording';
 import styles from './Account.module.css';
 import { useAnnouncer } from '../lib/a11y/announcer';
 
@@ -46,10 +49,11 @@ export function Account() {
   const changePassword = useChangePassword();
   const createAppPw = useCreateAppPassword();
   const revokeAppPw = useRevokeAppPassword();
-  const devices = useQuery<{ devices: { public_id: string; label: string; annotation_count: number }[] }>({
+  const devices = useQuery<{ devices: Device[] }>({
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
   const updateLibraryMode = useUpdateLibraryMode();
+  const updateNamedPreferences = useUpdateNamedPreferences();
   const [libraryModeError, setLibraryModeError] = useState('');
 
   // Kobo two-way annotation sync (Stage 0 — a preference surface over a
@@ -189,6 +193,7 @@ export function Account() {
 
   const activeRoles = Object.entries(account.role).filter(([, v]) => v);
   const selectedTheme = THEMES.find((o) => o.slug === theme);
+  const showOriginalFilename = me?.preferences?.show_original_filename !== false;
 
   /* Non-optimistic on purpose: this preference guards a feature that can
    * destroy device-side annotations once it goes live, so the control shows
@@ -231,15 +236,48 @@ export function Account() {
       <h1 className={styles.title}>{t('Account')}</h1>
 
       <section className={styles.card} aria-labelledby="account-ereaders-title">
-        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('E-readers')}</h2>
-        {devices.data?.devices.length ? (
-          <ul className={styles.deviceSummary}>
-            {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
+        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('Devices and browsers')}</h2>
+        {devices.isLoading ? (
+          <p className={styles.muted} role="status">{t('Loading devices and browsers…')}</p>
+        ) : devices.isError ? (
+          <>
+            <p className={styles.muted} role="alert">{t('Could not load devices and browsers.')}</p>
+            <button type="button" className={styles.retryButton} disabled={devices.isFetching}
+              onClick={() => void devices.refetch()}>{t('Try again')}</button>
+          </>
+        ) : devices.data?.devices.length ? (
+          <ul className={styles.sourceList} role="list">
+            {devices.data!.devices.map((device) => (
+              <li key={device.public_id} className={styles.sourceRow}>
+                {device.type === 'webreader'
+                  ? <Globe size={18} aria-hidden="true" focusable={false} className={styles.sourceIcon} />
+                  : <Smartphone size={18} aria-hidden="true" focusable={false} className={styles.sourceIcon} />}
+                <p className={styles.sourceLine}>
+                  <strong>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</strong>
+                  {' · '}
+                  {device.origin_annotation_count != null
+                    ? (device.origin_annotation_count === 1
+                      ? t('1 annotation from this source')
+                      : t('{n} annotations from this source', { n: device.origin_annotation_count }))
+                    : (device.annotation_count === 1
+                      ? t('1 annotation assigned to this source')
+                      : t('{n} annotations assigned to this source', { n: device.annotation_count }))}
+                </p>
+              </li>
+            ))}
           </ul>
-        ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
-        <div className={styles.deviceLinks}>
-          <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
-          <Link href="/account/devices#kobo-pairing" className={styles.manageDevices}>
+        ) : (
+          <>
+            <p className={styles.muted}>{t('No devices or browser reading data yet.')}</p>
+            <p className={styles.hint}>{t('Devices appear after their first sync. Browser appears after saving reading progress or annotations.')}</p>
+          </>
+        )}
+        <div className={styles.deviceActions}>
+          <Link href="/account/devices" className={styles.manageLink}>
+            {t('Manage devices and browsers')}
+            <ChevronRight size={16} aria-hidden="true" focusable={false} />
+          </Link>
+          <Link href="/account/devices#kobo-pairing" className={styles.pairLink}>
             {t('Pair a Kobo or KOReader')}
           </Link>
         </div>
@@ -268,6 +306,38 @@ export function Account() {
           ) : <p className={styles.muted}>{t('Your library contents are managed by an administrator.')}</p>}
         </fieldset>
         <span className={libraryModeError ? styles.msgErr : undefined} role="alert">{libraryModeError}</span>
+      </section>
+
+      <section className={styles.card} aria-labelledby="book-details-title">
+        <fieldset className={styles.scopeGroup}>
+          <legend id="book-details-title" className={styles.cardTitle}>{t('Book details')}</legend>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={showOriginalFilename}
+              disabled={updateNamedPreferences.isPending}
+              onChange={(event) => updateNamedPreferences.mutate({
+                show_original_filename: event.currentTarget.checked,
+              })} />
+            <span className={styles.scopeText}><strong>{t('Show original filename')}</strong>
+              <small>{t('Keep the imported file name visible on book detail pages.')}</small></span>
+          </label>
+          {updateNamedPreferences.isError && (
+            <p className={styles.msgErr} role="alert">{t('Could not save.')}</p>
+          )}
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.show_library_rating !== false}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ show_library_rating: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Show library rating')}</strong>
+              <small>{t('Show the labelled Calibre score alongside your own rating.')}</small></span>
+          </label>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.share_book_ratings === true}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ share_book_ratings: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Share my ratings in the household average')}</strong>
+              <small>{t('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}</small></span>
+          </label>
+        </fieldset>
       </section>
 
       {/* Kobo two-way annotation sync — Stage 0 (BETA). Both server gates stay
@@ -456,9 +526,14 @@ export function Account() {
 
         <div className={styles.field}>
           <label className={styles.toggle}>
-            <input type="checkbox" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
-            {t('Sync only selected shelves to Kobo')}
+            <input type="checkbox" aria-describedby="acc-kobo-sync-help" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
+            {shelfMarkAudience(me?.features) === 'ereader'
+              ? t('Sync only selected shelves to e-readers (Kobo and KOReader)')
+              : t('Sync only selected shelves to Kobo')}
           </label>
+          <p id="acc-kobo-sync-help" className={styles.hint}>
+            {t('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library.')}
+          </p>
           <label className={styles.toggle}>
             <input type="checkbox" checked={opdsSync} onChange={(e) => setOpdsSync(e.target.checked)} />
             {t('Expose only selected shelves over OPDS')}

@@ -30,9 +30,15 @@ case "$WATCH_FOLDER" in
 esac
 echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
 
+# Internal lifecycle state is initialized before the consumer function uses it.
+SHUTDOWN_PENDING=0
+
 # Persistent retry state. Each physical row is one path. As before, this
 # line-oriented format cannot represent a path containing a newline.
 QUEUE_FILE="${CWA_INGEST_RETRY_QUEUE:-/config/cwa_ingest_retry_queue}"
+# Only busy inputs get timer retries. Other failures keep the existing startup
+# and successful-ingest triggers. A restart reclassifies the durable queue.
+declare -A BUSY_RETRY_PATHS=()
 
 cleanup_queue_transaction_temps() {
         python3 - "$QUEUE_FILE" <<'PY'
@@ -291,6 +297,41 @@ queue_retry_file() {
         fi
 }
 
+consume_ingest_events() {
+        # Retry in the same consumer that writes the queue. A background
+        # drain could race its durable read/replace transaction with an event.
+        local interval pending="" fragment line events filepath read_status
+        interval=$(non_negative_integer_or_default "$INGEST_BATCH_QUIET_SECONDS" 5)
+        [ "$interval" -ge 1 ] || interval=1
+        local next_retry=$((SECONDS + interval))
+        while true; do
+                if [ "$SECONDS" -ge "$next_retry" ]; then
+                        process_retry_queue busy-only < /dev/null
+                        next_retry=$((SECONDS + interval))
+                fi
+                fragment=""
+                if IFS= read -r -t "$interval" fragment; then
+                        line="${pending}${fragment}"
+                        pending=""
+                        events="${line%% *}"
+                        filepath="${line#* }"
+                        handle_event "$filepath" "$events"
+                else
+                        read_status=$?
+                        [ "$SHUTDOWN_PENDING" = "0" ] || return 0
+                        # Bash consumes partial bytes on timeout. Preserve
+                        # them until the watcher finishes the same event line.
+                        pending="${pending}${fragment}"
+                        if [ "$read_status" -gt 128 ]; then
+                                process_retry_queue busy-only < /dev/null
+                                next_retry=$((SECONDS + interval))
+                        else
+                                return 0
+                        fi
+                fi
+        done
+}
+
 run_fallback() {
         echo "[cwa-ingest-service] Falling back to polling watcher" >&2
         cwa-as-abc python3 /app/calibre-web-automated/scripts/watch_fallback.py --path "$WATCH_FOLDER" --interval 5 |
@@ -299,9 +340,7 @@ run_fallback() {
                 # sweep here: watch_fallback.py walks the whole tree on its
                 # first pass, so pre-existing files already arrive as events.
                 process_retry_queue < /dev/null
-                while read -r events filepath; do
-                        handle_event "$filepath" "$events"
-                done
+                consume_ingest_events
         }
 }
 
@@ -417,6 +456,31 @@ is_recent_duplicate_event() {
 run_processor_with_timeout() {
         local safety_timeout="$1"
         local filepath="$2"
+        local readiness_timeout="${3:-$(( safety_timeout / 3 ))}"
+        local budget_helper="${CWA_INGEST_BUDGET_HELPER:-/app/calibre-web-automated/scripts/ingest_budget.py}"
+        local selected_budget
+        local helper_exit=0
+        # Both fresh events and retries use this one budget selection. Keep
+        # the DB setting and the processor's file-stability wait unchanged.
+        if [ "$safety_timeout" -gt 0 ] 2>/dev/null; then
+                if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
+                        selected_budget=$(python3 "$budget_helper" "$safety_timeout" "$filepath" "$readiness_timeout") || helper_exit=$?
+                else
+                        selected_budget=$(cwa-as-abc python3 "$budget_helper" "$safety_timeout" "$filepath" "$readiness_timeout") || helper_exit=$?
+                fi
+                if [ "$helper_exit" -eq 75 ]; then
+                        echo "[cwa-ingest-service] PDF did not become ready within the configured wait; retaining for retry: $filepath" >&2
+                        return 2
+                fi
+                if [ "$helper_exit" -eq 0 ] && [ -n "$selected_budget" ] && \
+                        [ "$selected_budget" = "$(non_negative_integer_or_default "$selected_budget" invalid)" ] && \
+                        [ "${#selected_budget}" -le 10 ] && [ "$selected_budget" -ge "$safety_timeout" ]; then
+                        safety_timeout="$selected_budget"
+                else
+                        echo "[cwa-ingest-service] WARN: page-budget helper failed; keeping base budget ${safety_timeout}s" >&2
+                fi
+        fi
+        echo "[cwa-ingest-service] Selected safety timeout: ${safety_timeout}s (base $1s) for $filepath"
         # Give the processor its own conversion deadline just inside the hard
         # one, so a slow conversion ends as a normal Python failure -- which
         # imports the original instead of losing it (#1094) -- rather than as
@@ -448,9 +512,9 @@ run_processor_with_timeout() {
         # is for test environments where the harness already manages
         # the uid context (and the binary may not exist in /app/...).
         if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
-                timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
+                CWA_INGEST_READINESS_TIMEOUT_SECONDS="$readiness_timeout" timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
         else
-                timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
+                CWA_INGEST_READINESS_TIMEOUT_SECONDS="$readiness_timeout" timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
         fi
 }
 
@@ -548,7 +612,6 @@ post_batch_follow_up_loop() {
 POST_BATCH_FOLLOW_UP_PID=""
 STALE_TEMP_CLEANUP_PID=""
 MAIN_WATCHER_PID=""
-SHUTDOWN_PENDING=0
 
 stop_process_group() {
         local pid="$1"
@@ -642,6 +705,11 @@ pause_before_pid_publication_for_test() {
 }
 
 process_retry_queue() {
+        local retry_scope="${1:-all}" succeeded=0
+        if [ "$retry_scope" = "busy-only" ] && [ "${#BUSY_RETRY_PATHS[@]}" -eq 0 ]; then
+                maybe_run_post_batch_follow_up
+                return 0
+        fi
         if [ -s "$QUEUE_FILE" ]; then
                 echo "[cwa-ingest-service] Processing retry queue..."
                 local temp_queue commit_status
@@ -654,6 +722,14 @@ process_retry_queue() {
 
                 while IFS= read -r queued_file || [ -n "$queued_file" ]; do
                         [ -n "$queued_file" ] || continue
+                        if [ "$retry_scope" = "busy-only" ] && [ "${BUSY_RETRY_PATHS["$queued_file"]:-0}" != "1" ]; then
+                                if ! append_retry_entry_to_file "$temp_queue" "$queued_file"; then
+                                        rewrite_ok=0
+                                        break
+                                fi
+                                continue
+                        fi
+                        unset 'BUSY_RETRY_PATHS[$queued_file]'
                         if [ -f "$queued_file" ]; then
                                 echo "[cwa-ingest-service] Retrying: $queued_file"
                                 local configured_timeout=$(get_timeout_from_db)  # Get configured timeout from database
@@ -662,12 +738,15 @@ process_retry_queue() {
                                 processing_marker=$(processing_marker_for_path "$queued_file")
                                 mkdir -p "$PROCESSING_DIR"
                                 : > "$processing_marker"
-                                run_processor_with_timeout "$safety_timeout" "$queued_file"
+                                # Busy retries probe once so one open writer
+                                # cannot repeatedly monopolize this worker.
+                                run_processor_with_timeout "$safety_timeout" "$queued_file" 0 < /dev/null
                                 local retry_exit=$?
                                 rm -f "$processing_marker" 2>/dev/null || true
 
                                 if [ $retry_exit -eq 2 ]; then
                                         # Still busy, keep in queue
+                                        BUSY_RETRY_PATHS["$queued_file"]=1
                                         if ! append_retry_entry_to_file "$temp_queue" "$queued_file"; then
                                                 rewrite_ok=0
                                                 break
@@ -684,6 +763,7 @@ process_retry_queue() {
                                         mark_recent_path "$queued_file"
                                 elif [ $retry_exit -eq 0 ]; then
                                         echo "[cwa-ingest-service] Successfully processed retry: $queued_file"
+                                        succeeded=1
                                         mark_recent_path "$queued_file"
                                         touch "$INGEST_BATCH_LAST_SUCCESS_FILE" 2>/dev/null || true
                                 elif [ $retry_exit -eq 3 ]; then
@@ -721,6 +801,14 @@ process_retry_queue() {
                 if [ -s "$QUEUE_FILE" ]; then
                         echo "[cwa-ingest-service] $(wc -l < "$QUEUE_FILE") files remain in retry queue"
                 fi
+        fi
+        # A timer retry that imports a book has the same after-success trigger
+        # as handle_event. Commit its removals first, then give ordinary queued
+        # failures one opportunity. The all-scope pass never recurses, and a
+        # failure remains ineligible for later idle timer ticks.
+        if [ "$retry_scope" = "busy-only" ] && [ "$succeeded" -eq 1 ] && [ -s "$QUEUE_FILE" ]; then
+                process_retry_queue all
+                return $?
         fi
         maybe_run_post_batch_follow_up
 }
@@ -772,6 +860,18 @@ startup_ingest_sweep() {
         if [ "$found" -gt 0 ]; then
                 echo "[cwa-ingest-service] Startup sweep complete ($found pre-existing file(s) processed)"
         fi
+}
+
+record_acquisition_failure() {
+        # A requested book (Book sources) is imported by a job that waits for
+        # the processor's receipt. A terminal failure writes no receipt, so
+        # leave the job an explicit result beside the book; the acquisition
+        # worker fails the job and removes the book, its sidecar and this file.
+        # `.cwa.failed.json` is a name the watcher and the processor ignore.
+        local filepath="$1" exit_code="$2"
+        [[ "$(basename "$filepath")" == cwng-acquisition-* ]] || return 0
+        printf '{"exit_code": %d}\n' "$exit_code" > "$filepath.cwa.failed.json" 2>/dev/null || \
+                echo "[cwa-ingest-service] ERROR: could not record acquisition failure for $filepath" >&2
 }
 
 handle_event() {
@@ -849,20 +949,21 @@ handle_event() {
         processing_marker=$(processing_marker_for_path "$filepath")
 
         echo "[cwa-ingest-service] New file detected - $filepath - Starting Ingest Processor..."
-        echo "[cwa-ingest-service] Configured timeout: ${configured_timeout}s, Safety timeout: ${safety_timeout}s"
+        echo "[cwa-ingest-service] File-stability timeout: ${configured_timeout}s, Base safety timeout: ${safety_timeout}s"
         echo "processing:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
 
         # Use safety timeout as last resort - processor should handle its own timeout internally
         mkdir -p "$PROCESSING_DIR"
         : > "$processing_marker"
-        run_processor_with_timeout "$safety_timeout" "$filepath"
+        run_processor_with_timeout "$safety_timeout" "$filepath" < /dev/null
         local exit_code=$?
+        unset 'BUSY_RETRY_PATHS[$filepath]'
         rm -f "$processing_marker" 2>/dev/null || true
 
         if [ $exit_code -eq 124 ]; then
-                echo "[cwa-ingest-service] SAFETY TIMEOUT: $filepath took longer than safety timeout of ${safety_timeout} seconds"
-                echo "[cwa-ingest-service] This is the only limit on conversion time - a large or image-heavy book can legitimately need longer."
-                echo "[cwa-ingest-service] Raise 'Ingest Timeout' in CWA Settings to increase it (safety timeout is 3x that value)."
+                echo "[cwa-ingest-service] SAFETY TIMEOUT: $filepath exceeded the selected safety timeout logged above"
+                echo "[cwa-ingest-service] The processor normally ends conversion earlier to leave time for importing the original."
+                echo "[cwa-ingest-service] Raise 'Ingest Timeout' in CWA Settings to increase the base budget; PDFs above 500 pages receive an automatic extension."
                 echo "safety_timeout:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
                 # Move problematic file to failed backup with timestamp
                 if [ -d "/config/processed_books/failed" ]; then
@@ -871,17 +972,20 @@ handle_event() {
                         echo "[cwa-ingest-service] Moving $filename to /config/processed_books/failed/$failed_filename"
                         cp "$filepath" "/config/processed_books/failed/$failed_filename" 2>/dev/null || true
                 fi
+                record_acquisition_failure "$filepath" "$exit_code"
                 rm -f "$filepath" 2>/dev/null || true
                 mark_recent_path "$filepath"
         elif [ $exit_code -eq 2 ]; then
                 echo "[cwa-ingest-service] Processor busy, adding to retry queue: $filepath"
                 echo "queued:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
+                BUSY_RETRY_PATHS["$filepath"]=1
 
                 queue_retry_file "$filepath" || \
                         echo "[cwa-ingest-service] ERROR: failed to persist retry entry: $filepath" >&2
         elif [ $exit_code -eq 3 ]; then
                 echo "[cwa-ingest-service] Terminal ingest failure; source retained: $filepath" >&2
                 echo "error:$filename:source_retained:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
+                record_acquisition_failure "$filepath" "$exit_code"
         elif [ $exit_code -ne 0 ]; then
                 echo "[cwa-ingest-service] Error processing $filepath (exit code: $exit_code)"
                 echo "error:$filename:$exit_code:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
@@ -997,9 +1101,7 @@ run_inotify_with_fallback() {
                         # poll already walks the tree, so sweeping there too would
                         # double-process every pending file.
                         startup_ingest_sweep < /dev/null
-                        while read -r events filepath; do
-                                handle_event "$filepath" "$events"
-                        done
+                        consume_ingest_events
                 }
         ) || run_fallback
 }

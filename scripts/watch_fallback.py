@@ -89,6 +89,11 @@ def get_stat(path: str) -> Optional[Tuple[int, int]]:
 # polling-only setups (NETWORK_SHARE_MODE, Docker Desktop, inotify-ENOSPC fallback).
 FIRED_SENTINEL = -999999
 
+# Directory stat can lag readdir on Docker Desktop/network mounts. Also,
+# replacing file contents need not change directory mtime on any filesystem.
+# The signature is an I/O-saving hint, never proof that the tree is unchanged.
+FULL_SCAN_INTERVAL_SECONDS = 30.0
+
 
 def print_event(event: str, path: str) -> None:
     # Emit in a format the shell while-read loop can parse: "EVENT PATH"
@@ -252,6 +257,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             index[FileKey(fp)] = FileStat(size=size, mtime_ns=mtime_ns, stable_count=1)
 
     last_dir_sig: Optional[Tuple[int, int]] = None
+    last_full_scan_at = time.monotonic()
 
     try:
         while True:
@@ -260,6 +266,15 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             if last_scan_at and now - last_scan_at < args.interval:
                 time.sleep(max(0.0, args.interval - (now - last_scan_at)))
             last_scan_at = time.time()
+
+            # Bound the metadata-cache blind spot while retaining cheap polls
+            # between reconciliations. Monotonic time keeps the bound intact
+            # across wall-clock corrections. Passing no prior signature forces
+            # a walk and refreshes file stats without resetting fired markers.
+            monotonic_now = time.monotonic()
+            if monotonic_now - last_full_scan_at >= FULL_SCAN_INTERVAL_SECONDS:
+                last_dir_sig = None
+                last_full_scan_at = monotonic_now
 
             last_dir_sig = scan_once(root, args.recursive, exts, index,
                                      args.stabilize, print_event,

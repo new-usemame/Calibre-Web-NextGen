@@ -89,6 +89,9 @@ app.db
 # above: a developer's tree must not end up inside the image.
 .venv
 .claude
+# Agent state can also sit in a subfolder, e.g. inside the KOReader plugin
+# folder that the image zips whole into the plugin download.
+**/.claude
 .coverage
 calibre-web.log
 

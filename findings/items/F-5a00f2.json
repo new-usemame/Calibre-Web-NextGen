@@ -1,0 +1,19 @@
+{
+  "area": "auth",
+  "body": "P1. Audited main 1ec1bfe677 vs v4.1.43. cps/api/auth.py:316 imports cps.api.admin, but ldap_import_create_user lives in cps.admin. Successful LDAP bind and directory details then throw AttributeError and become HTTP401. Real Flask route probe with mocked directory/user-query seams observed zero calls to the actual provisioning helper. New default SPA has no working first-login provisioning for these directory users. Import the parent-package helper; add HTTP provisioning success and rejection cases. Existing API auth tests have no LDAP login case. See pre-release audit 2026-09-08; independently reproduced twice.",
+  "created": "2026-09-08",
+  "id": "F-5a00f2",
+  "refs": [
+    "#2012"
+  ],
+  "resolution": {
+    "commit": "959dd5a4c4",
+    "date": "2026-09-08",
+    "note": "Corrected parent-package provisioning import. Real SPA HTTP + SQLite provisioning/session regression fails on audited base and passes with fix; rejection and administrator disable switches covered. Auth regression suite: 63 passed. Not released; independent candidate verification follows.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "LDAP auto-provisioning imports the wrong admin module and rejects valid first logins"
+}

@@ -818,3 +818,56 @@ select.cwa-settings-select {
   width: -webkit-fill-available;
   justify-content: space-evenly;
 }
+
+/* ---- Hierarchical custom columns -------------------------------------- */
+.hierarchy-details {
+  padding-left: 1.2em;
+}
+
+.hierarchy-details > summary {
+  cursor: pointer;
+}
+
+.hierarchy-details > summary .badge {
+  font-size: .7em;
+  margin-left: .4em;
+}
+
+.hierarchy-breadcrumb {
+  padding: .4em 0;
+}
+
+.hierarchy-breadcrumb .sep {
+  margin: 0 .3em;
+  opacity: .6;
+}
+
+.hierarchy-hint {
+  opacity: .75;
+}
+
+.hierarchy-subcategories h3 {
+  margin-top: .4em;
+}
+
+.hierarchy-sublist {
+  margin: .3em 0;
+}
+
+.hierarchy-sublist li {
+  padding: .15em 0;
+}
+
+.hierarchy-sublist li a {
+  display: inline-block;
+}
+
+/* Keep OPDS field errors readable on both Classic theme backgrounds. */
+.settings-container .opds-filename-error {
+  color: #8c2020;
+  background-color: #fce8e8;
+  border: 1px solid #b14040;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}

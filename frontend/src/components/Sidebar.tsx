@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, Globe, BookCopy,
-  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
+  Library, Globe, BookCopy, BookPlus, Tag,
+  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff, ChevronDown, Plus,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
 import { useT } from '../lib/i18n';
@@ -15,6 +15,8 @@ import {
   resolveSidebarOrder, ORDERABLE_ENTRIES, DEFAULT_SIDEBAR_ORDER, type SidebarEntryDef,
 } from '../lib/sidebarEntries';
 import { SidebarEditList } from './SidebarEditList';
+import { useShelfDrag } from './ShelfDrag';
+import { canEditShelf } from '../lib/permissions';
 import styles from './Sidebar.module.css';
 
 // Lower-frequency info pages (pinned; not customizable).
@@ -41,6 +43,8 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const [location] = useLocation();
+  const shelfDrag = useShelfDrag();
+  const dragging = !!shelfDrag?.drag;
   const t = useT();
   const isDrawerMode = useIsDrawerMode();
   const announce = useAnnouncer();
@@ -99,16 +103,21 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     return () => window.removeEventListener('pointermove', trackPointerJourney, true);
   }, [hoverSuppressed]);
 
-  useFocusTrap(navRef, { onClose, active: isDrawerMode && open });
+  useFocusTrap(navRef, { onClose, active: isDrawerMode && open && !dragging });
   const { data: shelvesData } = useShelves();
   const shelves = shelvesData?.items ?? [];
+  const [shelvesExpanded, setShelvesExpanded] = usePersistentBool('cwng:shelves-expanded', true);
+  const [smartExpanded, setSmartExpanded] = usePersistentBool('cwng:smart-shelves-expanded', true);
   const magicShelves = useMagicShelves().data?.items ?? [];
   const me = useMe().data;
   const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
-  const isAuthed = !!me?.id;
+  const isAuthed = !!me?.id && !me.role.anonymous;
   const personalLibrary = me?.library_mode === 'personal_library';
   const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
+  // Server-derived: the feature is on AND this account is granted. A fresh or
+  // upgraded install answers false, so the entry simply is not there.
+  const showFindBooks = !!me?.acquisition_access;
   const pinActive = isDesktopRail && sidebarPinned;
   const pinLabel = sidebarPinned ? t('Unpin sidebar') : t('Pin sidebar');
 
@@ -168,7 +177,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   // ── normal-mode ordered region (browse/discovery + Shelves block, in order) ─
   const renderShelvesBlock = () => (
     <Fragment key="shelves-block">
-      <div>
+      <div className={styles.sectionHeader}>
         <Link
           href="/shelves"
           className={isActive(location, '/shelves', true) ? styles.itemActive : styles.item}
@@ -177,7 +186,15 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
           <span>{t('Shelves')}</span>
         </Link>
+        <button className={styles.sectionControl} aria-label={t('Toggle shelf list')}
+          aria-expanded={shelvesExpanded} aria-controls="sidebar-shelves" onClick={() => setShelvesExpanded(!shelvesExpanded)}>
+          <ChevronDown size={16} aria-hidden="true" focusable={false} style={{ transform: shelvesExpanded ? undefined : 'rotate(-90deg)' }} />
+        </button>
+        {isAuthed && <Link href="/shelves/new" className={styles.sectionControl} aria-label={t('Create shelf')} onClick={onNavigate}>
+          <Plus size={16} aria-hidden="true" focusable={false} />
+        </Link>}
       </div>
+      <div id="sidebar-shelves" hidden={!shelvesExpanded && !dragging}>
       {shelves.length > 0 && (
         <ul className={styles.shelfList} role="list">
           {shelves.map((s) => {
@@ -187,11 +204,15 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
               <li key={s.id}>
                 <Link
                   href={href}
-                  className={active ? styles.shelfItemActive : styles.shelfItem}
+                  className={`${active ? styles.shelfItemActive : styles.shelfItem}${dragging && canEditShelf(me, s) ? ` ${styles.dropTarget}` : ''}${shelfDrag?.drag?.shelfId === s.id ? ` ${styles.dropOver}` : ''}`}
+                  data-shelf-drop={canEditShelf(me, s) ? s.id : undefined}
+                  onDragOver={event => shelfDrag?.nativeOver(s.id, event)}
+                  onDrop={event => shelfDrag?.nativeDrop(s.id, event)}
                   aria-current={active ? 'page' : undefined}
                   onClick={onNavigate}
                   title={s.name}
                 >
+                  <span className={styles.shelfInitials} aria-hidden="true">{s.name}</span>
                   <span className={styles.shelfName}>{s.name}</span>
                   <span className={styles.shelfCount}>{s.count}</span>
                 </Link>
@@ -200,6 +221,46 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           })}
         </ul>
       )}
+      </div>
+      <div className={styles.sectionHeader}>
+                <Link
+                  href="/magic"
+                  className={isActive(location, '/magic', true) ? styles.itemActive : styles.item}
+                  aria-current={isActive(location, '/magic', true) ? 'page' : undefined}
+                  onClick={onNavigate}
+                >
+                  <Wand2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                  <span>{t('Smart shelves')}</span>
+                </Link>
+                <button className={styles.sectionControl} aria-label={t('Toggle smart shelf list')}
+                  aria-expanded={smartExpanded} aria-controls="sidebar-smart-shelves" onClick={() => setSmartExpanded(!smartExpanded)}>
+                  <ChevronDown size={16} aria-hidden="true" focusable={false} style={{ transform: smartExpanded ? undefined : 'rotate(-90deg)' }} />
+                </button>
+                {isAuthed && <Link href="/magic/new" className={styles.sectionControl} aria-label={t('Create smart shelf')} onClick={onNavigate}>
+                  <Plus size={16} aria-hidden="true" focusable={false} />
+                </Link>}
+      </div>
+      <div id="sidebar-smart-shelves" hidden={!smartExpanded}><ul className={styles.shelfList} role="list">
+              {magicShelves.map((ms) => {
+                const href = `/magic/${ms.id}`;
+                const active = location === href;
+                return (
+                  <li key={`ms-${ms.id}`}>
+                    <Link
+                      href={href}
+                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={ms.name}
+                      onClick={onNavigate}
+                      title={ms.name}
+                    >
+                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
+                      <span className={styles.magicShelfName}>{ms.name}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+      </ul></div>
     </Fragment>
   );
 
@@ -246,10 +307,11 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   return (
     <>
       {open && <div className={styles.scrim} onClick={onClose} aria-hidden="true" />}
-      <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}`}>
+      <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}${dragging ? ` ${styles.bookDragging}` : ''}`}>
         <nav
           ref={navRef}
-          className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}${pinActive ? ` ${styles.pinned}` : ''}`}
+          data-shelf-drag-nav
+          className={`${open ? styles.navOpen : styles.nav}${(hoverSuppressed && !dragging) ? ` ${styles.hoverSuppressed}` : ''}${pinActive || dragging ? ` ${styles.pinned}` : ''}${dragging ? ` ${styles.bookDragging}` : ''}`}
           aria-label={t('Browse')}
           tabIndex={-1}
           onClickCapture={(event) => {
@@ -263,24 +325,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
         <button type="button" className={styles.drawerClose} onClick={onClose} aria-label={t('Close menu')}>
           <X size={20} aria-hidden="true" focusable={false} />
         </button>
-
-        {isDesktopRail && (
-          <div className={styles.pinRow}>
-            <button
-              type="button"
-              className={styles.pinButton}
-              onClick={toggleSidebarPin}
-              aria-label={pinLabel}
-              aria-pressed={sidebarPinned}
-              title={pinLabel}
-            >
-              {sidebarPinned
-                ? <PinOff size={16} aria-hidden="true" focusable={false} />
-                : <Pin size={16} aria-hidden="true" focusable={false} />}
-              <span>{pinLabel}</span>
-            </button>
-          </div>
-        )}
 
         {/* #585 v3: liquid-glass Customize capsule, pinned at the top. Tapping it
             turns the sidebar into an editable list (reorder + hide entries). */}
@@ -301,7 +345,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           </div>
         )}
 
-        {editMode ? (
+        {editMode && !dragging ? (
           <>
             <p className={styles.editHint}>
               {t('Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle.')}
@@ -340,43 +384,43 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   </Link>
                 </li>
               )}
+              {showFindBooks && (
+                <li>
+                  <Link href="/find-books"
+                    className={isActive(location, '/find-books', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/find-books', true) ? 'page' : undefined}
+                    onClick={onNavigate}>
+                    <BookPlus size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Find books')}</span>
+                  </Link>
+                </li>
+              )}
             </ul>
 
             {/* Customizable region (browse-by + discovery + Shelves), in saved order. */}
             {renderOrderedRegion()}
 
+            {/* Custom columns (tag-like text/enumeration; a hierarchical one
+                renders as a tree, a flat one as a plain list of values) —
+                SPA parity with the classic sidebar's per-column entries. */}
+            {me?.sidebar?.category && (
+              <ul className={styles.list} role="list">
+                <li>
+                  <Link
+                    href="/cc"
+                    className={isActive(location, '/cc') ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/cc') ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Tag size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Custom columns')}</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
+
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">
-              <li>
-                <Link
-                  href="/magic"
-                  className={isActive(location, '/magic', true) ? styles.itemActive : styles.item}
-                  aria-current={isActive(location, '/magic', true) ? 'page' : undefined}
-                  onClick={onNavigate}
-                >
-                  <Wand2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                  <span>{t('Smart shelves')}</span>
-                </Link>
-              </li>
-              {magicShelves.map((ms) => {
-                const href = `/magic/${ms.id}`;
-                const active = location === href;
-                return (
-                  <li key={`ms-${ms.id}`}>
-                    <Link
-                      href={href}
-                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
-                      aria-current={active ? 'page' : undefined}
-                      aria-label={ms.name}
-                      onClick={onNavigate}
-                      title={ms.name}
-                    >
-                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
-                      <span className={styles.magicShelfName}>{ms.name}</span>
-                    </Link>
-                  </li>
-                );
-              })}
               {showList && (
                 <li>
                   <Link
@@ -440,6 +484,25 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
               </div>
             )}
           </>
+        )}
+        {/* #2341: the pin control lives at the foot of the rail. At the top it
+            left an empty slot above Library whenever the rail was collapsed. */}
+        {isDesktopRail && (
+          <div className={styles.pinRow}>
+            <button
+              type="button"
+              className={styles.pinButton}
+              onClick={toggleSidebarPin}
+              aria-label={pinLabel}
+              aria-pressed={sidebarPinned}
+              title={pinLabel}
+            >
+              {sidebarPinned
+                ? <PinOff size={16} aria-hidden="true" focusable={false} />
+                : <Pin size={16} aria-hidden="true" focusable={false} />}
+              <span>{pinLabel}</span>
+            </button>
+          </div>
         )}
         </nav>
       </div>

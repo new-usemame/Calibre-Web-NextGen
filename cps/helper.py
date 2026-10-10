@@ -10,7 +10,9 @@ import random
 import io
 import mimetypes
 import tempfile
+import threading
 import time
+import hashlib
 import re
 import regex
 import shutil
@@ -31,8 +33,9 @@ from flask_babel import get_locale
 from .cw_login import current_user
 from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from werkzeug.datastructures import Headers
+from werkzeug.http import parse_options_header
 from werkzeug.security import generate_password_hash
 from markupsafe import escape
 from urllib.parse import quote
@@ -52,11 +55,13 @@ from .tasks.convert import TaskConvert
 from . import logger, config, db, ub, fs
 from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
-                        SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
+                        SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait
 from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
+from .services.conversion_capabilities import get_conversion_capabilities
+from .services.opds_filename import render_filename as render_opds_filename
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -372,7 +377,7 @@ def send_broadcast_email(subject, body_html, recipients, sender_name):
                 attachment=None,
                 settings=settings,
                 recipient=email,
-                task_message=N_("Announcement Email to %(email)s", email=email),
+                task_message=N_("Announcement Email to %(email)s", email=escape(email)),
                 text=text_fallback,
                 html=wrapped_html,
             ))
@@ -383,11 +388,12 @@ def send_broadcast_email(subject, body_html, recipients, sender_name):
 def get_convert_options(book):
     """Return the allowed source and target conversion formats for a book.
 
-    Mirrors the logic in ``editbooks.render_edit_book`` so the SPA and the
-    legacy edit page agree on what can be converted to what. Source formats are
-    book formats present on the book that calibre's converter can read; target
-    formats depend on whether the calibre converter and/or kepubify are
-    configured and exclude formats the book already has.
+    The configured Calibre installation's active plugin registry determines
+    the formats that its converter can read and write. This keeps the SPA,
+    legacy edit page and conversion API aligned, including explicitly enabled
+    user-installed format plugins. If the bounded capability probe is
+    unavailable, Calibre formats fail closed; independently configured
+    kepubify remains available for EPUB books.
     """
     converter_path = getattr(config, "config_converterpath", "")
     kepubify_path = getattr(config, "config_kepubifypath", "")
@@ -395,20 +401,37 @@ def get_convert_options(book):
     allowed_conversion_formats = list()
     kepub_possible = None
     if converter_path:
+        input_formats, output_formats = get_conversion_capabilities(
+            converter_path,
+            getattr(config, "config_binariesdir", "") or "",
+        )
+        # OEB writes a directory tree, while conversion tasks store one file.
+        # It is a real Calibre output plugin but not a supported library format.
+        output_formats = output_formats.difference({"oeb"})
         for file in book.data:
-            if file.format.lower() in EXTENSIONS_CONVERT_FROM:
-                valid_source_formats.append(file.format.lower())
+            file_format = (file.format or "").lower().lstrip(".")
+            if file_format in input_formats and file_format not in {"zip", "rar"}:
+                valid_source_formats.append(file_format)
     if kepubify_path and 'epub' in [file.format.lower() for file in book.data]:
         kepub_possible = True
-        if not converter_path:
+        if 'epub' not in valid_source_formats:
             valid_source_formats.append('epub')
 
     if converter_path:
-        allowed_conversion_formats = EXTENSIONS_CONVERT_TO[:]
+        # Keep the familiar built-in order, then append custom plugin outputs
+        # deterministically. The historical constants remain an ordering hint,
+        # not an assertion that every Calibre build supports those formats.
+        allowed_conversion_formats = [
+            file_format
+            for file_format in dict.fromkeys(EXTENSIONS_CONVERT_TO)
+            if file_format in output_formats
+        ]
+        allowed_conversion_formats.extend(sorted(output_formats.difference(allowed_conversion_formats)))
         for file in book.data:
-            if file.format.lower() in allowed_conversion_formats:
-                allowed_conversion_formats.remove(file.format.lower())
-    if kepub_possible:
+            file_format = (file.format or "").lower().lstrip(".")
+            if file_format in allowed_conversion_formats:
+                allowed_conversion_formats.remove(file_format)
+    if kepub_possible and 'kepub' not in allowed_conversion_formats:
         allowed_conversion_formats.append('kepub')
     return valid_source_formats, allowed_conversion_formats
 
@@ -416,7 +439,7 @@ def get_convert_options(book):
 # Convert existing book entry to new format
 def convert_book_format(book_id, calibre_path, old_book_format, new_book_format, user_id,
                         ereader_mail=None, subject=None, blocking=False, timeout=120,
-                        cover_user_id=None):
+                        cover_user_id=None, queued_tasks=None):
     book = calibre_db.get_book(book_id)
     data = calibre_db.get_book_format(book.id, old_book_format)
     if not data:
@@ -455,6 +478,9 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
         user=user_id, cover_user_id=cover_user_id,
     )
     WorkerThread.add(user_id, task)
+    if queued_tasks is not None:
+        # The caller watches this task in the task list (#1110).
+        queued_tasks.append(task)
     if blocking:
         # Only the context-free Event wait crosses onto the bounded native
         # thread pool. url_for(), translations, DB access, and task creation
@@ -496,7 +522,7 @@ def send_registration_mail(e_mail, user_name, default_password, resend=False):
         attachment=None,
         settings=config.get_mail_settings(),
         recipient=e_mail,
-        task_message=N_("Registration Email for user: %(name)s", name=user_name),
+        task_message=N_("Registration Email for user: %(name)s", name=escape(user_name)),
         text=txt
     ))
     return
@@ -566,6 +592,19 @@ def check_read_formats(entry):
 # 1: If epub file is existing, it's directly send to eReader email,
 # 2: If mobi file is existing, it's converted and send to eReader email,
 # 3: If Pdf file is existing, it's directly send to eReader email
+def get_sendable_book(book_id, user=None):
+    """Return the book ``send_mail`` sends for ``user``, else ``None``.
+
+    Sending follows the account's own library view, including its own hidden
+    and archived books. A book reached only through a public shelf can be read
+    and downloaded without membership, but it is not sent, so the book pages
+    must not offer to send it.
+    """
+    return calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True, user=user,
+    )
+
+
 def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
               subject=None, user=None):
     """Send email with attachments"""
@@ -575,10 +614,7 @@ def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
     filter_user = user if user is not None else (
         current_user if has_request_context() else None
     )
-    book = calibre_db.get_filtered_book(
-        book_id, allow_show_archived=True, allow_show_hidden=True,
-        user=filter_user,
-    )
+    book = get_sendable_book(book_id, filter_user)
     if not book:
         return _("Book not found")
 
@@ -723,6 +759,51 @@ def get_sorted_author(value):
 SQLITE_IN_CHUNK_SIZE = 900
 
 
+def hot_books_page(visibility_filter, order, offset, limit, ids_only=False):
+    """One page of the downloaded books the viewer can see, and their count.
+
+    Returns ``(entries, total)``: read-status rows (``generate_linked_query``)
+    in ``order``, and how many books the viewer can page through.  Filtering
+    before paging keeps pages full and the count true.
+
+    Download records are each account's own history, and the Kobo upgrade
+    audit reads them as proof that an account took delivery of a book, so a
+    book the viewer cannot see keeps every account's records.  Only the
+    records of a book the library deleted go: an id below the library's
+    highest one that no book answers to.  A higher id is not a deletion; the
+    library may be an older copy.
+    """
+    ranked = [row[0] for row in ub.session.query(ub.Downloads.book_id)
+              .group_by(ub.Downloads.book_id).order_by(*order)]
+    highest = calibre_db.session.query(func.max(db.Books.id)).scalar() or 0
+    visible = []
+    for start in range(0, len(ranked), SQLITE_IN_CHUNK_SIZE):
+        chunk = ranked[start:start + SQLITE_IN_CHUNK_SIZE]
+        present, shown = _present_and_visible_book_ids(chunk, visibility_filter)
+        visible.extend(book_id for book_id in chunk if book_id in shown)
+        for book_id in chunk:
+            if book_id not in present and book_id < highest:
+                ub.delete_download(book_id)
+    page_ids = visible[offset:offset + limit]
+    if ids_only:
+        return page_ids, len(visible)
+    entries = []
+    if page_ids:
+        rows = (calibre_db.generate_linked_query(config.config_read_column, db.Books)
+                .filter(visibility_filter).filter(db.Books.id.in_(page_ids)).all())
+        by_id = {row.Books.id: row for row in rows}
+        entries = [by_id[book_id] for book_id in page_ids if book_id in by_id]
+    return entries, len(visible)
+
+
+def _present_and_visible_book_ids(book_ids, visibility_filter):
+    present = {row[0] for row in calibre_db.session.query(db.Books.id)
+               .filter(db.Books.id.in_(book_ids))}
+    visible = {row[0] for row in calibre_db.session.query(db.Books.id)
+               .filter(visibility_filter).filter(db.Books.id.in_(book_ids))}
+    return present, visible
+
+
 def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     """Return the sync-driven "currently reading" ids from a batch of books.
 
@@ -781,10 +862,162 @@ def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     }
 
 
+def canonical_read_status(status):
+    """Return the stable API/UI name for a stored status value."""
+    return {
+        ub.ReadBook.STATUS_UNREAD: "unread",
+        ub.ReadBook.STATUS_FINISHED: "finished",
+        ub.ReadBook.STATUS_IN_PROGRESS: "in_progress",
+        ub.ReadBook.STATUS_DID_NOT_FINISH: "did_not_finish",
+        ub.ReadBook.STATUS_ON_HOLD: "on_hold",
+    }.get(status, "unread")
+
+
+def read_status_code(status_name):
+    """Parse a canonical reading-state string, or return None."""
+    return {
+        "unread": ub.ReadBook.STATUS_UNREAD,
+        "finished": ub.ReadBook.STATUS_FINISHED,
+        "in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+        "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+        "on_hold": ub.ReadBook.STATUS_ON_HOLD,
+    }.get(status_name)
+
+
+def book_ids_with_read_status(user_id, *statuses):
+    """Book ids whose exact reading state belongs to one app user."""
+    if user_id is None or not statuses:
+        return []
+    return [int(book_id) for (book_id,) in ub.session.query(
+        ub.ReadBook.book_id).filter(
+            ub.ReadBook.user_id == int(user_id),
+            ub.ReadBook.read_status.in_(statuses),
+        ).all()]
+
+
+def read_statuses_for_books(book_read_statuses, read_column_configured, user):
+    """Resolve a batch of legacy read carriers to the exact per-user status.
+
+    In custom-column mode DNF/on-hold rows are personal overlays on the
+    library-wide boolean. They take precedence for their owner without changing
+    what another user sees. Existing finished-column precedence over a stale
+    in-progress row is retained.
+    """
+    carriers = {int(book_id): value for book_id, value in book_read_statuses}
+    if not carriers:
+        return {}
+
+    personal_statuses = {}
+    try:
+        authenticated = (user is not None and user.is_authenticated
+                         and not getattr(user, "is_anonymous", False))
+    except (AttributeError, RuntimeError):
+        authenticated = False
+    if read_column_configured and authenticated:
+        ids = sorted(carriers)
+        for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+            chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+            rows = ub.session.query(ub.ReadBook.book_id, ub.ReadBook.read_status).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk),
+                ub.ReadBook.read_status.in_((
+                    ub.ReadBook.STATUS_IN_PROGRESS,
+                    ub.ReadBook.STATUS_DID_NOT_FINISH,
+                    ub.ReadBook.STATUS_ON_HOLD,
+                )),
+            ).all()
+            personal_statuses.update(
+                (int(book_id), status) for book_id, status in rows)
+
+    resolved = {}
+    for book_id, carrier in carriers.items():
+        exact = personal_statuses.get(book_id)
+        if exact in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                     ub.ReadBook.STATUS_ON_HOLD):
+            status = exact
+        elif read_column_configured:
+            if carrier:
+                status = ub.ReadBook.STATUS_FINISHED
+            elif exact == ub.ReadBook.STATUS_IN_PROGRESS:
+                status = ub.ReadBook.STATUS_IN_PROGRESS
+            else:
+                status = ub.ReadBook.STATUS_UNREAD
+        else:
+            status = carrier if carrier is not None else ub.ReadBook.STATUS_UNREAD
+        resolved[book_id] = canonical_read_status(status)
+    return resolved
+
+
 def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
     """Return True for one book using the shared batch read-state derivation."""
     return int(book_id) in book_in_progress_ids(
         ((book_id, read_status_value),), read_column_configured, user)
+
+
+def set_explicit_book_read_status(book_id, status_name, sync_hardcover=True):
+    """Set one of the five explicit user reading states without bool coercion.
+
+    DNF and on-hold are personal states even when a library-wide Calibre bool
+    read column is configured. They never write that shared marker and never
+    reset or rewrite any position/history rows. The existing Read/Unread action
+    remains the owner of the legacy reset and custom-column semantics.
+    """
+    statuses = {
+        "unread": ub.ReadBook.STATUS_UNREAD,
+        "finished": ub.ReadBook.STATUS_FINISHED,
+        "in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+        "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+        "on_hold": ub.ReadBook.STATUS_ON_HOLD,
+    }
+    if status_name not in statuses:
+        return _("Invalid reading status")
+
+    status = statuses[status_name]
+    if status == ub.ReadBook.STATUS_UNREAD:
+        return edit_book_read_status(book_id, False, sync_hardcover=sync_hardcover)
+    if status == ub.ReadBook.STATUS_FINISHED:
+        return edit_book_read_status(book_id, True, sync_hardcover=sync_hardcover)
+
+    uid = int(current_user.id)
+    if (status == ub.ReadBook.STATUS_IN_PROGRESS and config.config_read_column
+            and not set_custom_read_column_value(
+                book_id, False, source="explicit reading status")):
+        return _("Read status could not be set")
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == uid,
+        ub.ReadBook.book_id == book_id,
+    ).first()
+    if row is None:
+        row = ub.ReadBook(user_id=uid, book_id=book_id,
+                          read_status=ub.ReadBook.STATUS_UNREAD,
+                          times_started_reading=0)
+        ub.session.add(row)
+
+    now = datetime.now(timezone.utc)
+    previous = row.read_status
+    row.read_status_choice_at = now
+    if previous != status:
+        if status == ub.ReadBook.STATUS_IN_PROGRESS:
+            row.times_started_reading = (row.times_started_reading or 0) + 1
+            row.last_time_started_reading = now
+        row.read_status = status
+        row.last_modified = now
+
+    # The reading-state graph carries status changes to Kobo without touching
+    # any existing position. New rows get empty bookmark/statistics carriers.
+    state = row.kobo_reading_state
+    if state is None:
+        state = ub.KoboReadingState(user_id=uid, book_id=book_id)
+        row.kobo_reading_state = state
+    if state.current_bookmark is None:
+        state.current_bookmark = ub.KoboBookmark()
+    if state.statistics is None:
+        state.statistics = ub.KoboStatistics()
+
+    if not ub.session_commit("Reading status updated for book {}".format(book_id)):
+        return _("Read status could not be set")
+    return ""
 
 
 def reset_reading_position(session, user_id, book_id):
@@ -967,22 +1200,21 @@ def mirror_read_status_to_readbook(session, user_id, book_id, finished):
     deliberately sticky — a sync must not un-read a book — whereas this one
     follows the toggle both ways, because here the user is the one asking.
 
-    Only ``read_status`` is touched. ``times_started_reading`` and the position
+    Status and its explicit choice clock are touched. ``times_started_reading`` and the position
     rows belong to ``reset_reading_position``, which the caller runs on clear.
 
-    Marking unread when no row exists writes nothing: absent already means
-    unread, and inventing a row per never-read book is just churn.
+    Even an explicit Unread choice needs a row: its intent must survive a
+    future merge with a paused duplicate. It adds no start or position.
     """
     uid = int(user_id)
     row = session.query(ub.ReadBook).filter(
         ub.ReadBook.user_id == uid,
         ub.ReadBook.book_id == book_id).first()
     if row is None:
-        if not finished:
-            return
         row = ub.ReadBook(user_id=uid, book_id=book_id)
         session.add(row)
     row.read_status = ub.ReadBook.STATUS_FINISHED if finished else ub.ReadBook.STATUS_UNREAD
+    row.read_status_choice_at = datetime.now(timezone.utc)
 
 
 def custom_read_column_value(book):
@@ -1035,7 +1267,63 @@ def set_custom_read_column_value(book_id, value, source="read-status"):
     return False
 
 
-def edit_book_read_status(book_id, read_status=None):
+def queue_hardcover_mark_read(book_ids):
+    """Queue the background Hardcover "mark as read" for books the current user
+    just marked read (#2289). Same gate as the Kobo and KOReader progress push:
+    the server-wide Hardcover switch, the user's own token, and the per-book
+    reading-progress blacklist. The token is captured here because the worker
+    thread has no request context. Never raises: Hardcover is best-effort and
+    must not fail the read-status change that already committed."""
+    try:
+        from .services import hardcover
+        if not (book_ids and config.hardcover_sync_enabled() and bool(hardcover)):
+            return
+        token = getattr(current_user, "hardcover_token", None)
+        if not token:
+            log.info("User %s has no Hardcover token, not marking books read on Hardcover",
+                     current_user.name)
+            return
+        blocked = {row.book_id for row in ub.session.query(ub.HardcoverBookBlacklist).filter(
+            ub.HardcoverBookBlacklist.book_id.in_(book_ids),
+            ub.HardcoverBookBlacklist.blacklist_reading_progress.is_(True))}
+        wanted = [book_id for book_id in book_ids if book_id not in blocked]
+        if not wanted:
+            return
+        from .tasks.hardcover_sync import TaskHardcoverMarkRead
+        WorkerThread.add(current_user.name, TaskHardcoverMarkRead(token, wanted))
+    except Exception as ex:
+        log.warning("Could not queue Hardcover mark-read for books %s: %s", book_ids, ex)
+
+
+def queue_hardcover_reading_progress(user, book_id, percentage):
+    """Queue the web reader's accepted position for Hardcover (#2289), behind
+    the same gate as ``queue_hardcover_mark_read``. The push is coalesced per
+    book on the worker (``queue_reading_progress``), so page turns never wait
+    on Hardcover. Never raises: the bookmark save must not fail over it."""
+    try:
+        from .services import hardcover
+        if not (config.hardcover_sync_enabled() and bool(hardcover)):
+            return
+        token = getattr(user, "hardcover_token", None)
+        if not token:
+            return
+        blocked = ub.session.query(ub.HardcoverBookBlacklist).filter(
+            ub.HardcoverBookBlacklist.book_id == book_id,
+            ub.HardcoverBookBlacklist.blacklist_reading_progress.is_(True)).first()
+        if blocked:
+            return
+        from .tasks.hardcover_sync import queue_reading_progress
+        queue_reading_progress(user.name, token, user.id, book_id, percentage)
+    except Exception as ex:
+        log.warning("Could not queue Hardcover progress for book %s: %s", book_id, ex)
+
+
+def edit_book_read_status(book_id, read_status=None, sync_hardcover=True):
+    """Set or toggle the current user's read status for one book.
+
+    ``sync_hardcover=False`` lets a bulk caller queue one Hardcover task for the
+    whole selection instead of one per book (see ``queue_hardcover_mark_read``).
+    """
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),
                                                          ub.ReadBook.book_id == book_id)).first()
@@ -1060,6 +1348,7 @@ def edit_book_read_status(book_id, read_status=None):
                                      else ub.ReadBook.STATUS_UNREAD)
             book = read_book
         now_unread = book.read_status == ub.ReadBook.STATUS_UNREAD
+        book.read_status_choice_at = datetime.now(timezone.utc)
         if not book.kobo_reading_state:
             kobo_reading_state = ub.KoboReadingState(user_id=current_user.id, book_id=book_id)
             kobo_reading_state.current_bookmark = ub.KoboBookmark()
@@ -1116,6 +1405,8 @@ def edit_book_read_status(book_id, read_status=None):
         # keeps owning the position rows and its own accounting.
         mirror_read_status_to_readbook(ub.session, current_user.id, book_id, not now_unread)
         ub.session_commit("Read status updated for book {}".format(book_id))
+    if sync_hardcover and not now_unread:
+        queue_hardcover_mark_read([book_id])
     return ""
 
 
@@ -1689,17 +1980,32 @@ def uniq(inpt):
     return output
 
 
-def check_email(email):
+def _taken_by_another_user(column, value, user_id):
+    # Uniqueness is case-insensitive, so the account being edited must not count
+    # as a clash with itself: renaming "myname" to "MyName" is not a collision.
+    query = ub.session.query(ub.User.id).filter(func.lower(column) == value.lower())
+    if user_id is not None:
+        query = query.filter(ub.User.id != user_id)
+    return query.first() is not None
+
+
+def check_email(email, user_id=None):
+    """Return the normalized address, or raise if another account already uses it.
+
+    Pass ``user_id`` when changing an existing account's address."""
     email = valid_email(email)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.email) == email.lower()).first():
+    if _taken_by_another_user(ub.User.email, email, user_id):
         log.error("Found an existing account for this Email address")
         raise Exception(_("Found an existing account for this Email address"))
     return email
 
 
-def check_username(username):
+def check_username(username, user_id=None):
+    """Return the stripped name, or raise if another account already uses it.
+
+    Pass ``user_id`` when renaming an existing account."""
     username = strip_whitespaces(username)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).scalar():
+    if _taken_by_another_user(ub.User.name, username, user_id):
         log.error("This username is already taken")
         raise Exception(_("This username is already taken"))
     return username
@@ -1910,6 +2216,7 @@ def get_book_cover(book_id, resolution=None):
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
     )
     return get_book_cover_internal(book, resolution=resolution)
 
@@ -2354,6 +2661,7 @@ class StagedCoverWrite:
         try:
             os.replace(self.staged_path, self.target_path)
             self._published = True
+            _forget_cover_stage(self.staged_path)
         except (IOError, OSError) as ex:
             log.error(
                 "Publishing staged cover failed target=%s: %s: %s",
@@ -2377,10 +2685,14 @@ class StagedCoverWrite:
         return True, None
 
     def discard(self):
-        if self._published or not os.path.exists(self.staged_path):
+        if self._published:
+            return True, None
+        if not os.path.exists(self.staged_path):
+            _forget_cover_stage(self.staged_path)
             return True, None
         try:
             os.remove(self.staged_path)
+            _forget_cover_stage(self.staged_path)
             return True, None
         except OSError as ex:
             log.error("Removing staged cover %s failed: %s", self.staged_path, ex)
@@ -2428,6 +2740,7 @@ class InPlaceStagedCoverWrite(StagedCoverWrite):
             return False, str(ex)
         try:
             os.remove(self.staged_path)
+            _forget_cover_stage(self.staged_path)
         except OSError as ex:
             log.warning("Could not remove published cover stage %s: %s", self.staged_path, ex)
         return True, None
@@ -2466,6 +2779,7 @@ class GDriveStagedCoverWrite(StagedCoverWrite):
 
         try:
             os.remove(self.staged_path)
+            _forget_cover_stage(self.staged_path)
         except OSError as ex:
             # Remote publication has committed. Local cleanup cannot roll it
             # back and is left to the startup scavenger.
@@ -2536,6 +2850,62 @@ def _server_uid():
     return os.geteuid() if hasattr(os, "geteuid") else "?"
 
 
+def _cover_stage_registry_dir():
+    return os.path.join(constants.CONFIG_DIR, "cover-stages")
+
+
+def _cover_stage_marker(staged_path):
+    digest = hashlib.sha256(
+        os.path.abspath(staged_path).encode("utf-8", "surrogateescape")).hexdigest()
+    return os.path.join(_cover_stage_registry_dir(), digest + ".pending")
+
+
+def _is_cover_stage_name(filename):
+    global_stage = filename.startswith(".cover.jpg.cwng-") and filename.endswith(".stage")
+    personal_stage = re.fullmatch(r"\.\d+(?:-\d+)?\.jpg\.cwng-.+\.stage", filename) is not None
+    return global_stage or personal_stage
+
+
+def _create_cover_stage(directory, prefix):
+    """Create a stage file whose path is registered before the file exists.
+
+    The registry under CONFIG_DIR is what lets startup find the stages a dead
+    process left without walking the whole library (#2509: a 36-minute walk of
+    a 129,000-book library before the web server could listen). The marker is
+    written first, so a crash between the two steps leaves a marker naming a
+    file that does not exist, which the scavenger simply drops.
+    """
+    staged_path = os.path.join(directory, "{}{}.stage".format(prefix, uuid4().hex))
+    marker = _cover_stage_marker(staged_path)
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w", encoding="utf-8", errors="surrogateescape") as marker_file:
+            marker_file.write(staged_path)
+            marker_file.flush()
+            os.fsync(marker_file.fileno())
+    except OSError as ex:
+        # An unwritable registry must not cost the user their cover; the
+        # stage is then only found by a full sweep.
+        log.error("Could not register cover stage %s: %s", staged_path, ex)
+    try:
+        fd = os.open(staged_path,
+                     os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    except BaseException:
+        _forget_cover_stage(staged_path)
+        raise
+    return fd, staged_path
+
+
+def _forget_cover_stage(staged_path):
+    """Drop the registry marker once the stage has been published or removed."""
+    try:
+        os.remove(_cover_stage_marker(staged_path))
+    except FileNotFoundError:
+        pass
+    except OSError as ex:
+        log.warning("Could not drop cover stage marker for %s: %s", staged_path, ex)
+
+
 def _open_cover_stage(filepath, saved_filename):
     """Create the stage file, beside the target when the folder allows it.
 
@@ -2549,7 +2919,7 @@ def _open_cover_stage(filepath, saved_filename):
     prefix = ".{}.cwng-".format(saved_filename)
     target = os.path.join(filepath, saved_filename)
     try:
-        fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=filepath)
+        fd, staged_path = _create_cover_stage(filepath, prefix)
         return fd, staged_path, False
     except PermissionError as ex:
         # A symlinked target is never rewritten in place: the rename path
@@ -2563,7 +2933,7 @@ def _open_cover_stage(filepath, saved_filename):
             "Give the folder the server's uid to restore the atomic path.",
             filepath, _describe_owner(filepath), _server_uid(), ex,
         )
-    fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=get_temp_dir())
+    fd, staged_path = _create_cover_stage(get_temp_dir(), prefix)
     return fd, staged_path, True
 
 
@@ -2670,8 +3040,12 @@ def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=No
     if staged_path:
         try:
             os.remove(staged_path)
+        except FileNotFoundError:
+            _forget_cover_stage(staged_path)
         except OSError:
             pass
+        else:
+            _forget_cover_stage(staged_path)
     return None, message
 
 
@@ -2695,41 +3069,126 @@ def save_cover(img, book_path):
 
 
 def scavenge_staged_cover_files():
-    """Log and remove orphan cover stages without attempting publication."""
+    """Log and remove orphan cover stages without attempting publication.
+
+    Only registered stages are visited (see ``_create_cover_stage``), so the
+    cost is the number of interrupted writes, not the size of the library.
+    This runs before the web server listens; it must never walk the library.
+    """
+    registry = _cover_stage_registry_dir()
+    try:
+        names = os.listdir(registry)
+    except FileNotFoundError:
+        return 0
+    except OSError as ex:
+        log.error("Could not read cover stage registry %s: %s", registry, ex)
+        return 0
+
+    removed = 0
+    for name in names:
+        if not name.endswith(".pending"):
+            continue
+        marker = os.path.join(registry, name)
+        try:
+            with open(marker, encoding="utf-8", errors="surrogateescape") as marker_file:
+                staged_path = marker_file.read()
+        except OSError as ex:
+            log.error("Could not read cover stage marker %s: %s", marker, ex)
+            continue
+        # A torn or foreign marker never names anything but a cover stage.
+        if (staged_path and _is_cover_stage_name(os.path.basename(staged_path))
+                and os.path.lexists(staged_path)):
+            log.warning(
+                "Removing orphan cover stage after interrupted update; metadata may "
+                "already reference an unpublished cover: %s",
+                staged_path,
+            )
+            try:
+                os.remove(staged_path)
+                removed += 1
+            except OSError as ex:
+                log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+                continue
+        try:
+            os.remove(marker)
+        except OSError as ex:
+            log.warning("Could not drop cover stage marker %s: %s", marker, ex)
+    return removed
+
+
+_LEGACY_STAGE_SWEEP_FLAG = ".legacy-sweep-done"
+
+
+def sweep_unregistered_cover_stages(started_before):
+    """Remove stages written before the registry existed; runs once per install.
+
+    Earlier versions found orphan stages by walking the library at every
+    startup. Stages such a version left behind have no marker, so one full walk
+    is still owed -- in the background, never before the server listens. A
+    stage that is registered, or newer than ``started_before``, may belong to a
+    live write and is left alone.
+    """
+    registry = _cover_stage_registry_dir()
+    flag = os.path.join(registry, _LEGACY_STAGE_SWEEP_FLAG)
+    if os.path.exists(flag):
+        return 0
     roots = []
-    # Global covers stage beside the Calibre file (or in the temporary Drive
-    # upload directory). Per-user covers use the same StagedCoverWrite
-    # primitive below CONFIG_DIR, so an interrupted personal write needs the
-    # same startup cleanup without ever scanning or changing its live JPEG.
     personal_cover_root = os.path.join(constants.CONFIG_DIR, "user-covers")
     for root in (config.get_book_path(), get_temp_dir(), personal_cover_root):
         if root and os.path.isdir(root) and root not in roots:
             roots.append(root)
 
+    began = time.monotonic()
+    log.info("Sweeping %s for cover stages left by an earlier version", ", ".join(roots))
     removed = 0
     for root in roots:
         for directory, _subdirs, filenames in os.walk(root):
             for filename in filenames:
-                global_stage = (
-                    filename.startswith(".cover.jpg.cwng-")
-                    and filename.endswith(".stage")
-                )
-                personal_stage = re.fullmatch(
-                    r"\.\d+(?:-\d+)?\.jpg\.cwng-.+\.stage", filename) is not None
-                if not (global_stage or personal_stage):
+                if not _is_cover_stage_name(filename):
                     continue
                 staged_path = os.path.join(directory, filename)
+                try:
+                    if os.path.exists(_cover_stage_marker(staged_path)):
+                        continue
+                    if os.lstat(staged_path).st_mtime >= started_before:
+                        continue
+                    os.remove(staged_path)
+                except FileNotFoundError:
+                    continue
+                except OSError as ex:
+                    log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+                    continue
+                removed += 1
                 log.warning(
                     "Removing orphan cover stage after interrupted update; metadata may "
                     "already reference an unpublished cover: %s",
                     staged_path,
                 )
-                try:
-                    os.remove(staged_path)
-                    removed += 1
-                except OSError as ex:
-                    log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+    try:
+        os.makedirs(registry, exist_ok=True)
+        with open(flag, "w", encoding="utf-8") as flag_file:
+            flag_file.write(datetime.now(timezone.utc).isoformat())
+    except OSError as ex:
+        log.error("Could not record the cover stage sweep: %s", ex)
+    log.info("Cover stage sweep finished in %.1fs; removed %d", time.monotonic() - began, removed)
     return removed
+
+
+def start_legacy_cover_stage_sweep():
+    """Run the one-time legacy sweep on a daemon thread, off the startup path."""
+    if os.path.exists(os.path.join(_cover_stage_registry_dir(), _LEGACY_STAGE_SWEEP_FLAG)):
+        return None
+    started_before = time.time()
+
+    def run():
+        try:
+            sweep_unregistered_cover_stages(started_before)
+        except Exception as ex:
+            log.error("Cover stage sweep failed: %s", ex)
+
+    worker = threading.Thread(target=run, name="cover-stage-sweep", daemon=True)
+    worker.start()
+    return worker
 
 
 def trigger_thumbnail_generation_for_book(book_id):
@@ -2869,23 +3328,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                 download_name = book_name
                 metadata_was_embedded = False
 
-            # Rename the exported file to match the expected download name (from Content-Disposition)
-            # This ensures KOReader calculates the checksum on the same file we calculated it on
-            if filename and download_name:
-                uuid_file = os.path.join(filename, download_name + "." + book_format)
-                expected_file = os.path.join(filename, book_name + "." + book_format)
-
-                if os.path.exists(uuid_file) and uuid_file != expected_file:
-                    try:
-                        # Remove the target file if it already exists
-                        if os.path.exists(expected_file):
-                            os.remove(expected_file)
-                        # Rename UUID file to expected name
-                        os.rename(uuid_file, expected_file)
-                        download_name = book_name
-                        log.info(f'Renamed exported file to match expected name: {book_name}.{book_format}')
-                    except Exception as e:
-                        log.error(f'Failed to rename exported file: {e}')
+            # Keep Calibre's unique staging name. Renaming every export to
+            # the shared library basename lets concurrent downloads overwrite
+            # and unlink one another. Checksum registration receives the client
+            # filename separately below.
         else:
             download_name = book_name
 
@@ -2936,7 +3382,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                     calculate_and_store_checksum(
                         book_id=book.id,
                         book_format=book_format,
-                        file_path=exported_file
+                        file_path=exported_file,
+                        filename_for_matching=parse_options_header(
+                            headers.get("Content-Disposition", "")
+                        )[1].get("filename", book_name + "." + book_format),
                     )
         except Exception as e:
             checksum_source = "embedded" if metadata_was_embedded else "original"
@@ -3016,7 +3465,7 @@ def check_unrar(unrar_location):
 
 def check_architecture():
     arch = platform.machine()
-    if arch not in ['x86_64', 'aarch64']:
+    if arch.lower() not in ['x86_64', 'aarch64', 'amd64', 'arm64']:
         return _("Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is optimized for x86_64 and aarch64.", arch=arch)
     return None
 
@@ -3097,7 +3546,8 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
-def get_download_link(book_id, book_format, client):
+def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,
+                      filename_template=None):
     # Route/DB format identifiers are case-insensitive; Calibre stores lowercase
     # filename extensions. Keep delivery paths, MIME and format branches aligned.
     book_format = book_format.split(".")[0].lower()
@@ -3105,7 +3555,10 @@ def get_download_link(book_id, book_format, client):
     # allow_show_hidden=True: a user's own hidden book is still downloadable
     # through Send-to-eReader and OPDS — hidden hides from listings, not from
     # the user's own access (#319 pushback).
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        allow_public_shelf_books=allow_public_shelf_books,
+    )
 
     # If not found but user is admin, fall back to unfiltered direct lookup
     if not book and getattr(current_user, 'role_admin', lambda: False)():
@@ -3196,8 +3649,22 @@ def get_download_link(book_id, book_format, client):
             log.error(f"Failed to log download stats: {e}")
 
     file_name = book.title
-    if len(book.authors) > 0:
-        file_name = file_name + ' - ' + book.authors[0].name
+    first_author = next((author for author in book.authors if author is not None), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + (first_author.name or '')
+    if isinstance(filename_template, str):
+        filename_template = strip_whitespaces(filename_template)
+    if filename_template:
+        try:
+            file_name = render_opds_filename(
+                filename_template, book, calibre_db.session,
+                title_regex=config.config_title_regex,
+                unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
+            )
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+            # A corrupt or manually changed setting must not prevent downloads.
+            log.warning("Invalid OPDS filename template; using the default filename")
     file_name = get_valid_filename(file_name, replace_whitespace=False)
     headers = Headers()
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")

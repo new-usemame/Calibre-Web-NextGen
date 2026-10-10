@@ -1,0 +1,19 @@
+{
+  "area": "spa",
+  "body": "P2. Live container built from main1ec1bfe677. (1) Open catalog, click first book, Remove from my library, click Library backlink: server/API excludes ID, card still exists after10s. (2) Remove book from personal selection, switch to whole library and view catalog, navigate through account menu and choose saved MyLibrary, return by sidebar: server excludes ID, previous whole-library card remains. Both repeat with control: before reload1 card, after reload0. queries.ts:344 removal and391 mode hooks leave scrollCache; Catalog.tsx:471 resetKey lacks membership generation,573-584 dedupAppend cannot remove missing IDs. Existing e2e uses page.goto and misses same-document continuation. Repair query, snapshot and page accumulator coherently without breaking loaded pages or public shelf visibility. Final aggregate review reproduced the same stale-snapshot defect after a single-book DELETE committed but its response was lost: the API excluded the book while Back restored its card. Follow-up432b4b98be reconciles single mutations after success or error; the real browser regression forwards the write, aborts the response and checks API plus Back navigation.",
+  "created": "2026-09-08",
+  "id": "F-ea392f",
+  "refs": [
+    "#2126"
+  ],
+  "resolution": {
+    "commit": "00f6a07b54",
+    "date": "2026-09-08",
+    "note": "Shared library revision resets query pages, restored snapshots and mounted accumulators after membership/mode changes. Both original same-document failures seen red; desktop/mobile navigation and pagination pass. Independent lost-response transport regression also red then green. Follow-up432b4b98be covers the confirmed single-book lost-response path with a real committed-write/browser regression; see docs/my-library-lost-response-verification.md.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Catalog snapshots resurrect removed books and the previous whole-library view"
+}

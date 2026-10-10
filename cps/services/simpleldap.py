@@ -147,6 +147,11 @@ def bind_user(username, password):
 
     :returns: True if login succeeded, False if login failed, None if server unavailable.
     '''
+    # flask-simpleldap leaves this check to its caller (see its bind_user),
+    # and every sign-in path reaches the directory here.
+    if not password:
+        log.debug("LDAP login '%s' refused: empty password", username)
+        return False, None
     # Escape LDAP special characters to prevent LDAP injection in search filters
     safe_username = _escape_ldap_filter(username)
     try:

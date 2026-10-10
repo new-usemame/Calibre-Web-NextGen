@@ -177,7 +177,8 @@ fi
 (
     cd "$tmp/repo"
     rm -f cwngsync.koplugin.zip
-    zip -qr cwngsync.koplugin.zip cwngsync.koplugin
+    # The repository keeps the plugin's tests; the zip users install does not.
+    zip -qr cwngsync.koplugin.zip cwngsync.koplugin -x 'cwngsync.koplugin/tests/*'
     # Read the listing once, then match — piping unzip into `grep -q` trips SIGPIPE
     # under `set -o pipefail` (grep exits on first match, unzip dies 141) and aborts.
     zip_listing=$(unzip -Z1 cwngsync.koplugin.zip)

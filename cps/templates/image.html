@@ -16,15 +16,18 @@
    of looking identical to an unread one. Older callers passed a boolean is_read;
    that flattened 2→falsey and dropped the in-progress state. #}
 {% macro cover_badges(book, read_status=0) -%}
+{% if g.paused_read_statuses is defined %}{% set read_status = g.paused_read_statuses.get(book.id, read_status) %}{% endif %}
 {% set shelves_here = g.book_shelves_map.get(book.id, []) if g.book_shelves_map is defined else [] %}
 {% set is_favorited = (g.favorite_book_ids is defined and book.id in g.favorite_book_ids) %}
 {% set is_read = (read_status == 1) %}
 {% set is_in_progress = (read_status == 2) %}
-{% if is_read or is_in_progress or shelves_here or is_favorited %}
+{% set is_paused = (read_status == 3 or read_status == 4) %}
+{% if is_read or is_in_progress or is_paused or shelves_here or is_favorited %}
 <div class="cover-badges">
   {% if is_favorited %}<span class="cover-badge cover-badge-favorite" title="{{ _('Favorite') }}"><span class="glyphicon glyphicon-star" style="color:#f5c518" aria-hidden="true"></span></span>{% endif %}
   {% if is_read %}<span class="cover-badge cover-badge-read" title="{{ _('Read') }}"><span class="glyphicon glyphicon-check" aria-hidden="true"></span><span class="cover-badge-read-label">{{ _('Read') }}</span></span>{% endif %}
   {% if is_in_progress %}<span class="cover-badge cover-badge-in-progress" title="{{ _('Currently reading') }}"><span class="glyphicon glyphicon-book" aria-hidden="true"></span><span class="cover-badge-in-progress-label">{{ _('Reading') }}</span></span>{% endif %}
+  {% if is_paused %}<span class="cover-badge cover-badge-paused"><span class="glyphicon {% if read_status == 3 %}glyphicon-fast-forward{% else %}glyphicon-pause{% endif %}" aria-hidden="true"></span><span>{{ _('Did not finish') if read_status == 3 else _('On hold') }}</span></span>{% endif %}
   {% set max_shown = 3 %}
   {% set extra = shelves_here|length - max_shown %}
   {% for sh in shelves_here[:max_shown] %}

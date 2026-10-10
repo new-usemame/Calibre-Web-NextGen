@@ -721,23 +721,27 @@ class TaskClearCoverThumbnailCache(CalibreTask):
         self.cache = fs.FileSystem()
 
     def run(self, worker_thread):
-        if self.app_db_session:
-            if self.book_id == 0:  # delete superfluous thumbnails
-                calibre_db = db.CalibreDB(expire_on_commit=False, init=True)
-                thumbnails = (calibre_db.session.query(ub.Thumbnail)
-                              .join(db.Books, ub.Thumbnail.entity_id == db.Books.id, isouter=True)
-                              .filter(db.Books.id==None)
-                              .all())
-                calibre_db.session.close()
-            elif self.book_id > 0:  # make sure single book is selected
-                thumbnails = self.get_thumbnails_for_book(self.book_id)
-            if self.book_id < 0:
-                self.delete_all_thumbnails()
-            else:
-                for thumbnail in thumbnails:
-                    self.delete_thumbnail(thumbnail)
-        self._handleSuccess()
-        self.app_db_session.remove()
+        try:
+            if self.app_db_session:
+                if self.book_id == 0:  # delete superfluous thumbnails
+                    calibre_db = db.CalibreDB(expire_on_commit=False, init=True)
+                    thumbnails = (calibre_db.session.query(ub.Thumbnail)
+                                  .join(db.Books, ub.Thumbnail.entity_id == db.Books.id, isouter=True)
+                                  .filter(db.Books.id==None)
+                                  .all())
+                    calibre_db.session.close()
+                elif self.book_id > 0:  # make sure single book is selected
+                    thumbnails = self.get_thumbnails_for_book(self.book_id)
+                if self.book_id < 0:
+                    self.delete_all_thumbnails()
+                else:
+                    for thumbnail in thumbnails:
+                        self.delete_thumbnail(thumbnail)
+            self._handleSuccess()
+        finally:
+            # The worker keeps finished tasks; an escaping error must not
+            # keep this one's app.db connection open with it.
+            self.app_db_session.remove()
 
     def get_thumbnails_for_book(self, book_id):
         return self.app_db_session \

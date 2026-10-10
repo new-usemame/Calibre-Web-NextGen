@@ -1,0 +1,11 @@
+{
+  "area": "koreader",
+  "body": "OBSERVED 2026-09-26 by the independent review of #2313 (code-read, with the renderer bytes measured\nin the image): cps/services/koreader_library.py iso_z uses strftime, so a year below 1000 comes\nout \"101-...\" on the image (Python 3.13 glibc) and \"0101-...\" on macOS and Python 3.14.\n\nIt feeds the manifest's `added` field and, through last_modified, `book_rev` / `rev`, as well\nas the placeholder EPUB's `modified` (cps/services/koreader_placeholder.py). The plugin's isoToTime accepts\nonly 4-digit years, so the image's \"101-...\" never parses, and sorting `added` as a string puts\n3-digit years out of order. `revision` excludes `added`, so there is no whole-library churn.\n\nRelated sites, where only the output bytes vary per interpreter and nothing is fingerprinted:\n- cps/db.py atom_timestamp (the OPDS updated/mtime values)\n- cps/templates/feed.xml published (real pubdates before 1000)\n- cps/db.py custom datetime columns embedded in downloaded EPUB metadata\n\nFix shape: format by hand to 4 digits here. Unlike Kobo, the manifest is not fingerprinted by\nthe server, so the pinned-bytes constraint of #2313 does not apply.\n\nMEASURED on the image: the plugin's isoToTime rejects \"101-...\" and falls back gracefully (the book still lists; only its added-date sort is off). Padding to 4 digits would hand year 101 to the device's os.time, which is unmeasured and may raise there. The case needs a book whose date-added is undefined (a year-101 sentinel), so it is rare. Left open until a device run shows what os.time does with year 101.",
+  "created": "2026-09-26",
+  "id": "F-36e2b1",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "KOReader library manifest renders years below 1000 per interpreter and unparseable"
+}

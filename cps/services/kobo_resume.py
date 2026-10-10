@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import unquote
 import zipfile
 
+from .koreader_position import KOREADER_LOCATION_TYPE
 from .parallel import cooperative_sleep
 from .kobo_position import (
     MAX_RESUME_ARCHIVE_BYTES,
@@ -129,9 +130,20 @@ def _chapter_snapshot(epub_path, source, chapter_percent):
     }
 
 
-def exact_resume(book_id, source, kind, value):
+# Device locators this module can place exactly in the library EPUB: a Kobo
+# span (``source`` = chapter href) and a KOReader XPointer (``source`` = the
+# partial MD5 of the file it was reported from, see ``koreader_position``).
+_EXACT_KINDS = ('KoboSpan', KOREADER_LOCATION_TYPE)
+
+
+def exact_resume(book_id, source, kind, value, *, wait=True):
+    """``{'cfi', 'epub_sha256'}`` for a device locator, or ``None``.
+
+    With ``wait=False`` the conversion only starts (when a slot is free) so a
+    later call finds it cached; nothing is waited for or returned.
+    """
     deadline = time.monotonic() + RESUME_TIMEOUT_SECONDS
-    if kind != 'KoboSpan' or not source or not value:
+    if kind not in _EXACT_KINDS or not source or not value:
         return None
     from .. import config
     # Only in-memory settings here: no stat, path resolution, or DB lookup on
@@ -184,6 +196,8 @@ def exact_resume(book_id, source, kind, value):
         _SLOTS.release()
         log.debug('Could not start reader resume conversion', exc_info=True)
         return None
+    if not wait:
+        return None
     while not done.is_set():
         remaining = deadline - time.monotonic()
         if remaining <= 0:
@@ -215,6 +229,9 @@ def _resolve(book_id, source, kind, value):
     path = (root / row[0] / (row[1] + '.epub')).resolve()
     if not path.is_relative_to(root):
         return None
+    if kind == KOREADER_LOCATION_TYPE:
+        from .koreader_position import web_resume
+        return web_resume(path, value, (source,))
     snapshot = _resume_snapshot(path, source, kind, value)
     if snapshot:
         cfi, fingerprint = snapshot

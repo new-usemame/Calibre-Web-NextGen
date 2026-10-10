@@ -11,12 +11,14 @@ from datetime import datetime, timezone
 from flask import jsonify, request
 from flask_babel import get_locale
 from flask_babel import gettext as _
+from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
-from .books import _rows_to_items
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
+from ..services import ereader_scope
 from ..custom_column_sort import (
     custom_sort_options,
     load_configured_columns,
@@ -33,6 +35,13 @@ def _err(code, message, status):
 
 def _uid():
     return int(current_user.id) if current_user.is_authenticated else None
+
+
+def _system_template_key(shelf):
+    if not getattr(shelf, 'is_system', False):
+        return None
+    return next((key for key, template in magic_shelf.SYSTEM_SHELF_TEMPLATES.items()
+                 if template['name'] == shelf.name), None)
 
 
 def _shelf_item(shelf, viewer):
@@ -56,6 +65,11 @@ def _shelf_item(shelf, viewer):
         "can_delete": magic_shelf.can_delete_magic_shelf(shelf, viewer),
         "can_duplicate": magic_shelf.can_duplicate_magic_shelf(shelf, viewer),
         "can_kobo_sync": magic_shelf.can_kobo_sync_magic_shelf(shelf, viewer),
+        "opds_expose": bool(getattr(viewer, 'opds_only_shelves_sync', False)
+                            and ub.is_opds_magic_shelf_exposed_for_user(viewer.id, shelf.id)),
+        "can_hide": bool(viewer.is_authenticated and (
+            (is_owner and _system_template_key(shelf) is not None)
+            or (not is_owner and shelf.is_public))),
     }
 
 
@@ -73,11 +87,17 @@ def list_magic_shelves():
     uid = _uid()
     if uid is not None:
         shelves = magic_shelf.get_visible_magic_shelves_for_user(uid)
+        visible_ids = {shelf.id for shelf in shelves}
+        if request.args.get('manage') == '1':
+            shelves = ub.session.query(ub.MagicShelf).filter(or_(
+                ub.MagicShelf.user_id == uid, ub.MagicShelf.is_public == 1)).all()
         shelves.sort(key=lambda s: (s.name or "").casefold())
     else:
         shelves = ub.session.query(ub.MagicShelf).filter(
             ub.MagicShelf.is_public == 1).order_by(ub.MagicShelf.name).all()
-    items = [_shelf_item(s, current_user) for s in shelves]
+    items = [{**_shelf_item(s, current_user),
+              "is_hidden": uid is not None and s.id not in visible_ids}
+             for s in shelves]
     return jsonify({"items": items})
 
 
@@ -99,8 +119,13 @@ def magic_shelf_books(shelf_id):
     if shelf.user_id != uid and not shelf.is_public:
         return _err("forbidden", "You are not allowed to view this shelf", 403)
 
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", config.config_books_per_page, type=int)
+    select_all = request.args.get("select_all", "").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    page = 1 if select_all else request.args.get("page", 1, type=int)
+    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    ))
     configured_sort_columns = load_configured_columns(config)
     resolved_sort = resolve_magic_shelf_sort(
         request.args.get("sort", "new"), config, configured_sort_columns
@@ -114,7 +139,11 @@ def magic_shelf_books(shelf_id):
         query_filter = None
     shelf_item = _shelf_item(shelf, current_user)
     if query_filter is None:
-        return jsonify({**shelf_item, "items": [], "page": 1,
+        if select_all:
+            return _selection_response([], 0)
+        return jsonify({**shelf_item,
+                        "rules": shelf.rules or {"condition": "AND", "rules": []},
+                        "items": [], "page": 1,
                         "per_page": per_page, "total": 0,
                         "sort": resolved_sort.key,
                         "sort_persistable": resolved_sort.persistable,
@@ -123,12 +152,17 @@ def magic_shelf_books(shelf_id):
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books, query_filter, list(resolved_sort.order_by),
-        True, config.config_read_column, *series_join, *resolved_sort.join)
+        True, config.config_read_column, *series_join, *resolved_sort.join,
+        ids_only=select_all)
+    if select_all:
+        return _selection_response(entries, pagination.total_count)
+    custom_column_definitions, _custom_values = _list_custom_column_data([])
     return jsonify({
         **shelf_item,
         # rules included so the builder can load this shelf for editing
         "rules": shelf.rules or {"condition": "AND", "rules": []},
         "items": _rows_to_items(entries),
+        "custom_column_definitions": custom_column_definitions,
         "sort": resolved_sort.key,
         "sort_persistable": resolved_sort.persistable,
         "custom_sort_options": sort_options,
@@ -158,8 +192,8 @@ def set_magic_shelf_kobo_sync(shelf_id):
         return _err("not_found", "Smart shelf not found", 404)
     if not magic_shelf.can_kobo_sync_magic_shelf(shelf, current_user):
         return _err("forbidden", "You are not allowed to edit this shelf", 403)
-    if not config.config_kobo_sync:
-        return _err("forbidden", "Kobo sync is not enabled on this server", 403)
+    if not ereader_scope.shelf_marks_enabled(config):
+        return _err("forbidden", "E-reader sync is not enabled on this server", 403)
 
     data = request.get_json(silent=True)
     # A JSON boolean, not Python truthiness: bool("false") is True, so coercing
@@ -190,7 +224,37 @@ def set_magic_shelf_kobo_sync(shelf_id):
     # Mirror of the classic edit route: intent is stored, but it stays inert
     # until an admin enables the magic-shelf half of Kobo sync (#359).
     if enabled and not config.config_kobo_sync_magic_shelves:
-        body["warning"] = _("Kobo sync for Magic Shelves is disabled globally — "
-                            "this shelf won't reach your Kobo until 'Sync Magic "
-                            "Shelves to Kobo' is enabled in CWA Settings.")
+        body["warning"] = ereader_scope.magic_shelves_off_warning()
     return jsonify(body)
+
+
+@api_v1.route("/magicshelves/<int:shelf_id>/visibility", methods=["POST"])
+@user_login_required
+def set_magic_shelf_visibility(shelf_id):
+    """Use the Classic profile preference, with restoration from the overview."""
+    shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
+    if shelf is None:
+        return _err("not_found", _("Smart shelf not found."), 404)
+    owner = magic_shelf.is_magic_shelf_owner(shelf, current_user)
+    if not owner and not shelf.is_public:
+        return _err("forbidden", _("You are not allowed to view this shelf"), 403)
+    template_key = _system_template_key(shelf) if owner else None
+    if owner and template_key is None:
+        return _err("invalid_request", _("You cannot hide your own shelves. Delete them instead if you don't want them."), 400)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('visible'), bool):
+        return _err("invalid_request", _("visible must be a boolean"), 400)
+    identity = {"template_key": template_key} if template_key else {"shelf_id": shelf_id}
+    rows = ub.session.query(ub.HiddenMagicShelfTemplate).filter_by(
+        user_id=current_user.id, **identity)
+    try:
+        if data['visible']:
+            rows.delete(synchronize_session=False)
+        elif rows.first() is None:
+            ub.session.add(ub.HiddenMagicShelfTemplate(user_id=current_user.id, **identity))
+        ub.session.commit()
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.exception("Could not save smart-shelf visibility")
+        return _err("db_error", _("Could not update shelf."), 500)
+    return jsonify({"id": shelf_id, "is_hidden": not data['visible']})

@@ -578,6 +578,7 @@ class TestMigrationPreservesAllUserData:
         ub.migrate_device_management_slice(engine, session)
         ub.migrate_kobo_annotation_seed_pipeline(engine, session)
         ub.migrate_kobo_two_way_annotation_sync(engine, session)
+        ub.migrate_annotation_text_quote(engine, session)
 
         # Fresh session: ORM read must work on every row.
         s2 = session_maker()

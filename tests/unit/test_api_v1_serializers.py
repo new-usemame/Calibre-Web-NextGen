@@ -8,22 +8,24 @@ def test_serialize_book_list_item_full():
     book = SimpleNamespace(
         id=7, title="Dune", series_index="1.0", has_cover=1,
         authors=[SimpleNamespace(name="Frank Herbert")],
-        series=[SimpleNamespace(name="Dune Chronicles")],
+        series=[SimpleNamespace(id=17, name="Dune Chronicles")],
         data=[SimpleNamespace(format="EPUB"), SimpleNamespace(format="PDF")],
     )
     assert serialize_book_list_item(book) == {
         "id": 7, "title": "Dune",
         "authors": ["Frank Herbert"],
-        "series": "Dune Chronicles", "series_index": "1.0",
+        "series": "Dune Chronicles", "series_id": 17, "series_index": "1.0",
         "cover_url": "/cover/7/sm",
         "formats": ["EPUB", "PDF"],
         "tags": [],
         "date_added": None,
         "last_modified": None,
         "read": False,
+        "read_status": "unread",
         "in_progress": False,
         "archived": False,
         "hidden": False,
+        "custom_columns": {},
     }
 
 
@@ -57,6 +59,7 @@ def test_serialize_book_list_item_no_cover_no_series():
     out = serialize_book_list_item(book)
     assert out["cover_url"] is None
     assert out["series"] is None
+    assert out["series_id"] is None
     assert out["authors"] == []
     assert out["formats"] == []
     assert out["read"] is False

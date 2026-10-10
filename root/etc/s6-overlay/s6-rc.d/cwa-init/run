@@ -27,10 +27,11 @@ done
 echo "[cwa-init] Environment verification complete"
 
 # FROM lscio/docker-calibre-web - init-calibre-web-config.sh
-# create symlinks for imagemagick policy.xml
+# create symlinks for imagemagick policy.xml. This is image-level state, so an
+# arbitrary non-root container user leaves the shipped policy in place.
 echo "[cwa-init] Setting up ImageMagick policy..."
-rm -rf /etc/ImageMagick-6/policy.xml
-ln -s /defaults/policy.xml /etc/ImageMagick-6/policy.xml
+/app/calibre-web-automated/scripts/configure_image_policy.sh \
+  /etc/ImageMagick-6/policy.xml /defaults/policy.xml
 
 # create Google drive client_secrets.json file
 if [[ ! -f /config/client_secrets.json ]]; then
@@ -39,13 +40,16 @@ fi
 
 # check if kepubify is present and if so make executable
 if [[ -f /usr/bin/kepubify ]] && [[ ! -x /usr/bin/kepubify ]]; then
-    chmod +x /usr/bin/kepubify
+    if [ "$(id -u)" = "0" ]; then
+        chmod +x /usr/bin/kepubify
+    else
+        echo "[cwa-init] running as uid $(id -u) (not root); cannot change /usr/bin/kepubify permissions"
+    fi
 fi
 
-# Pre-stage some files & directories for permissions purposes
-mkdir -p /app/calibre-web-automated/cps/cache
+# Writable cache is created by the runtime user under /config, or CACHE_DIR.
 
-# permissions (skip chown on network shares for bind mounts, but still fix /app)
+# Config ownership (skip chown on network-share bind mounts).
 #
 # When the container is started as an arbitrary non-root user (`--user`,
 # `--userns=keep-id`), LSIO's init-adduser is skipped, `abc` keeps its
@@ -57,11 +61,8 @@ if [ "$(id -u)" != "0" ]; then
   echo "[cwa-init] running as uid $(id -u) (not root); skipping chown — files keep their current owner"
 elif [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
   echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping initial chown of /config"
-  chown -R abc:abc /app/calibre-web-automated/cps/cache
 else
-  chown -R abc:abc \
-    /config \
-    /app/calibre-web-automated/cps/cache
+  chown -R abc:abc /config
 fi
 
 export CALIBRE_DBPATH=/config
@@ -116,13 +117,21 @@ fi
 #  Make sure required directories exist
 #------------------------------------------------------------------------------------------------------------------------
 
-install -d -o abc -g abc /config/processed_books/converted
-install -d -o abc -g abc /config/processed_books/imported
-install -d -o abc -g abc /config/processed_books/failed
-install -d -o abc -g abc /config/processed_books/fixed_originals
-install -d -o abc -g abc /config/processed_books/duplicate_resolutions
-install -d -o abc -g abc /config/log_archive
-install -d -o abc -g abc /config/.cwa_conversion_tmp
+ensure_runtime_dirs() {
+  if ! /app/calibre-web-automated/scripts/ensure_runtime_dirs.sh "$@"; then
+    echo "[cwa-init] ERROR: could not prepare required runtime directories"
+    exit 1
+  fi
+}
+
+ensure_runtime_dirs \
+  /config/processed_books/converted \
+  /config/processed_books/imported \
+  /config/processed_books/failed \
+  /config/processed_books/fixed_originals \
+  /config/processed_books/duplicate_resolutions \
+  /config/log_archive \
+  /config/.cwa_conversion_tmp
 
 # The metadata dirs moved out of the app tree into /config (#995). They have to be created
 # HERE, at runtime, not in setup-cwa.sh: that script runs at image build time, so on the
@@ -134,8 +143,8 @@ install -d -o abc -g abc /config/.cwa_conversion_tmp
 # operator set. Reading it here would only introduce a way for these to disagree.
 CWA_CHANGE_LOGS_DIR="${CWA_METADATA_CHANGE_LOGS_DIR:-/config/metadata_change_logs}"
 CWA_TEMP_DIR="${CWA_METADATA_TEMP_DIR:-/config/metadata_temp}"
-install -d -o abc -g abc "${CWA_CHANGE_LOGS_DIR}"
-install -d -o abc -g abc "${CWA_TEMP_DIR}"
+ensure_runtime_dirs \
+  "${CWA_CHANGE_LOGS_DIR}" "${CWA_TEMP_DIR}"
 
 # Pre-#995 installs kept these inside the app tree, which an upgrade replaces wholesale.
 # Move anything still sitting there so a change log written just before the upgrade is
@@ -206,10 +215,12 @@ fi
 # discovering operator-supplied plugins. cwa-init is a dependency of both abc
 # services before their run scripts execute, so the directory is writable at
 # the moment they first launch a Calibre child (#1764).
-install -d -o abc -g abc /config/.config/calibre-runtime
+ensure_runtime_dirs \
+  /config/.config/calibre-runtime
 
 # For explicitly enabled Calibre Plugins
-install -d -o abc -g abc /config/.config/calibre/plugins
+ensure_runtime_dirs \
+  /config/.config/calibre/plugins
 # ln -sf /config/.config/calibre/plugins /config/calibre_plugins
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -310,11 +321,19 @@ HOST_KERNEL="${HOST_KERNEL_RAW%%-*}"
 version_ge() { [ "$(printf '%s\n' "$2" "$1" | sort -V | tail -n1)" = "$1" ]; }
 
 CALIBRE_DIR="/opt/calibre"
-QT_SENTINEL="$CALIBRE_DIR/.qt6_processed"
+if [ "$(id -u)" = "0" ]; then
+  QT_SENTINEL="$CALIBRE_DIR/.qt6_processed"
+else
+  # The installed Calibre tree is image-owned. Persist the non-root check in
+  # the writable config volume instead of trying to touch /opt/calibre.
+  QT_SENTINEL="/config/.qt6_processed"
+fi
 if [ ! -f "$QT_SENTINEL" ]; then
   echo "[cwa-init][qt6] Starting Qt6 compatibility check..."
 
-  if version_ge "$HOST_KERNEL" "$MIN_KERNEL"; then
+  if [ "$(id -u)" != "0" ] && ! version_ge "$HOST_KERNEL" "$MIN_KERNEL"; then
+    echo "[cwa-init][qt6] Running as uid $(id -u) without root; cannot modify image-owned Qt libraries, leaving them unchanged."
+  elif version_ge "$HOST_KERNEL" "$MIN_KERNEL"; then
     echo "[cwa-init][qt6] Host kernel $HOST_KERNEL_RAW >= $MIN_KERNEL: leaving Qt6 libs intact for full functionality." \
          "(PDF/WebEngine features enabled)"
   else

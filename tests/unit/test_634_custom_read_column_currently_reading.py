@@ -26,7 +26,6 @@ ub.ReadBook session — mocks would pin the call shape, not the SQL semantics.
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest import mock
 
@@ -165,23 +164,12 @@ class TestCurrentlyReadingWithCustomColumn:
 
 
 class TestDetailPagePillCustomColumnOverlay:
-    """show_book reaches deep into the request stack, so pin the overlay at
-    source level (same convention as test_magic_shelf_currently_reading)."""
-
-    def _src(self):
-        from cps import web
-        return inspect.getsource(web.show_book)
-
-    def test_show_book_branches_on_read_column(self):
-        src = self._src()
-        assert "config.config_read_column" in src, (
-            "show_book must branch on config_read_column: the raw column "
-            "value is a boolean and read_status_raw derived from it can "
-            "never be 2, hiding the currently-reading badge (fork #634)")
-
-    def test_show_book_overlays_in_progress_from_readbook(self):
-        src = self._src()
-        assert "ub.ReadBook.STATUS_IN_PROGRESS" in src, (
-            "show_book must overlay STATUS_IN_PROGRESS from ub.ReadBook in "
-            "custom-column mode so the detail badge (fork #509) renders")
-        assert "read_status_raw" in src
+    def test_detail_derivation_overlays_sync_row_but_retains_finished_column_precedence(self, harness):
+        """Exercise the same per-user derivation used by detail and lists."""
+        from cps.helper import read_statuses_for_books
+        user = SimpleNamespace(id=USER_A, is_authenticated=True, is_anonymous=False)
+        statuses = read_statuses_for_books(
+            [(BOOK_READING, False), (BOOK_READ_STALE, True), (BOOK_UNTOUCHED, False)],
+            CC_ID, user)
+        assert statuses == {BOOK_READING: "in_progress", BOOK_READ_STALE: "finished",
+                            BOOK_UNTOUCHED: "unread"}

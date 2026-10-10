@@ -7,7 +7,7 @@
 from babel import negotiate_locale
 from flask_babel import Babel, Locale
 from babel.core import UnknownLocaleError
-from flask import request, has_request_context
+from flask import request, has_request_context, current_app
 from .cw_login import current_user
 
 from . import logger
@@ -37,10 +37,18 @@ def _coerce_locale(raw, available):
     return None
 
 
-def get_locale():
+def get_locale(user=None):
+    """The locale this request is served in.
+
+    ``user`` defaults to the request's own account, which is how Flask-Babel
+    calls it. The SPA's /me serializer passes the account it is describing, so
+    the New UI loads the same language the classic pages render (#2247).
+    """
     # If no request context (e.g. background thread), fall back to English
     if not has_request_context():
         return 'en'
+    if user is None:
+        user = current_user
 
     available = get_available_translations()
 
@@ -55,9 +63,9 @@ def get_locale():
         return coerced
 
     # if a user is logged in, use the locale from the user settings
-    if current_user is not None and hasattr(current_user, "locale"):
+    if user is not None and hasattr(user, "locale"):
         # if the account is the guest account bypass the config lang settings
-        if current_user.name != 'Guest':
+        if user.name != 'Guest':
             # F-011141: coerce the STORED value too, not just ?lang=. This is
             # the security boundary, deliberately placed on the read side:
             #   - it repairs rows written before validation existed;
@@ -67,7 +75,7 @@ def get_locale():
             #   - it survives a server dropping a translation it used to ship.
             # Write-time validation still exists, but for data hygiene; a
             # missed writer must not be able to break locale resolution.
-            stored = _coerce_locale(current_user.locale, available)
+            stored = _coerce_locale(user.locale, available)
             if stored:
                 return stored
             # An unusable stored locale falls through to negotiation rather
@@ -112,6 +120,69 @@ def get_user_locale_language(user_language):
     return Locale.parse(user_language).get_language_name(get_locale())
 
 
+def _nordic_locale(raw):
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        language = Locale.parse(raw.replace('-', '_')).language
+    except (UnknownLocaleError, ValueError):
+        return None
+    if language == 'no':
+        return 'nb'
+    return language if language in ('sv', 'fi', 'da', 'nb', 'nn') else None
+
+
+def get_collation_locale(user=None):
+    """Sort in the reader's language even if its UI catalog is unavailable.
+
+    UI language validation remains in get_locale. Nordic sorting also accepts
+    the existing explicit ?lang mechanism for Danish/Nynorsk and normalizes
+    Norwegian 'no' to ICU's Bokmål locale. OPDS passes its Basic Auth viewer.
+    """
+    if not has_request_context():
+        return 'en'
+    if 'babel' not in current_app.extensions:
+        return 'en'
+    if user is None:
+        user = current_user
+    requested = _nordic_locale(request.args.get('lang'))
+    if requested:
+        return requested
+    # A valid translated non-Nordic override continues to win over the account.
+    available = get_available_translations()
+    override = _coerce_locale(request.args.get('lang'), available)
+    if override:
+        return override
+    if user is not None and getattr(user, 'name', None) != 'Guest':
+        stored = getattr(user, 'locale', None)
+        language = _nordic_locale(stored)
+        if language:
+            return language
+        translated = _coerce_locale(stored, available)
+        if translated:
+            return translated
+    for language, quality in request.accept_languages:
+        if quality > 0:
+            nordic = _nordic_locale(language)
+            if nordic:
+                return nordic
+            translated = _coerce_locale(language, available)
+            if not translated:
+                try:
+                    candidate = str(Locale.parse(language.replace('-', '_')))
+                except (UnknownLocaleError, ValueError):
+                    continue
+                translated = negotiate_locale([candidate], available)
+            if translated:
+                return translated
+    if request.path.startswith('/opds'):
+        from . import config
+        nordic = _nordic_locale(getattr(config, 'config_opds_default_locale', ''))
+        if nordic:
+            return nordic
+    return get_locale(user)
+
+
 def sanitize_locale_for_write(raw):
     """Best-effort hygiene for a locale about to be stored.
 
@@ -136,7 +207,7 @@ def sanitize_locale_for_write(raw):
     return _coerce_locale(raw, available)
 
 
-def effective_locale(raw):
+def effective_locale(raw, user=None):
     """The locale a caller will actually be served, for reporting back.
 
     Serializers hand this the stored value so a client form can only ever hold
@@ -146,7 +217,7 @@ def effective_locale(raw):
     look one up.
     """
     try:
-        return get_locale()
+        return get_locale(user)
     except Exception as e:
         log.debug('Locale resolution unavailable (%s); reporting stored value', e)
         return raw

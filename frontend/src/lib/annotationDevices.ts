@@ -13,10 +13,13 @@ export function effectiveDevice(row: DeviceAttribution, override = row.assigned_
 }
 
 export function annotationDeviceLabel(
-  id: string | null, devices: Record<string, { label: string }>,
-  unknown: string, deleted: string,
+  id: string | null, devices: Record<string, { label: string; type?: string }>,
+  unknown: string, deleted: string, browser = 'Browser',
 ) {
-  return id ? devices[id]?.label ?? deleted : unknown;
+  if (!id) return unknown;
+  const device = devices[id];
+  return device?.type === 'webreader' && device.label === 'Browser'
+    ? browser : device?.label ?? deleted;
 }
 
 export interface AssignmentToast {

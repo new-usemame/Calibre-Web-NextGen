@@ -242,7 +242,7 @@ def test_global_detail_hides_member_state_for_non_member():
         patch.object(books_mod, "current_user", editor), \
         patch.object(books_mod, "count_user_annotations") as annotations, \
         patch.object(books_mod, "get_kosync_progress_display") as progress, \
-        patch.object(books_mod, "book_is_in_progress") as in_progress, \
+        patch.object(books_mod, "read_statuses_for_books") as statuses, \
         patch.object(books_mod, "_original_filename", return_value=None), \
         patch.object(books_mod, "get_convert_options", return_value=([], [])), \
         patch.object(books_mod.user_cover, "override_for_user", return_value=None), \
@@ -259,19 +259,21 @@ def test_global_detail_hides_member_state_for_non_member():
     assert body["favorited"] is False
     assert body["hidden"] is False
     assert body["in_progress"] is False
+    assert body["read_status"] == "unread"
     assert body["annotation_count"] == 0
     assert body["kosync_progress"] is None
     assert body["kosync_progress_timestamp"] is None
     assert body["kosync_progress_created_at"] is None
     annotations.assert_not_called()
     progress.assert_not_called()
-    in_progress.assert_not_called()
+    statuses.assert_not_called()
     get_book.assert_called_once_with(
         42,
         0,
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=True,
+        allow_public_shelf_books=True,
     )
 
 
@@ -328,6 +330,7 @@ def test_non_global_viewer_cannot_open_an_unowned_global_detail():
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=False,
+        allow_public_shelf_books=True,
     )
 
 
@@ -428,3 +431,18 @@ def test_read_toggle_default_is_true():
     mock_toggle.assert_called_once_with(42, True)
     data = json.loads(resp.get_data(as_text=True))
     assert data["read"] is True
+
+
+@pytest.fixture(autouse=True)
+def no_public_shelf_in_presentation_fixture(monkeypatch):
+    """These detail fixtures model unshared books; SQL authorization is covered
+    by test_1939_public_shelf_listing and test_shared_book_continuation.
+    Keep the new Calibre access lookup separate from the app-state query mocks.
+    """
+    from cps.api import books
+    from sqlalchemy import false
+
+    monkeypatch.setattr(books.db, "public_shelf_book_filter", lambda *_: false())
+    session = MagicMock()
+    session.query.return_value.filter.return_value.first.return_value = None
+    monkeypatch.setattr(books.calibre_db, "session", session)

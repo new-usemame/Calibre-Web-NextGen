@@ -54,6 +54,7 @@ from __future__ import annotations
 import argparse
 import os
 import select
+import shutil
 import subprocess
 import sys
 import time
@@ -151,6 +152,28 @@ class ChangeLogDispatcher:
             self._dispatch(filename)
 
 
+def _will_drop(euid: Optional[int], which: Optional[Callable[[str], Optional[str]]]) -> bool:
+    euid = os.geteuid() if euid is None else euid
+    which = shutil.which if which is None else which
+    return euid == 0 and bool(which("cwa-as-abc"))
+
+
+def enforcer_command(enforcer: str, filename: str, *, euid: Optional[int] = None,
+                     which: Optional[Callable[[str], Optional[str]]] = None) -> list[str]:
+    """Command that runs one enforcement pass.
+
+    This service starts as root, but the enforcer edits the library and, on a
+    network share, root is usually squashed to an unprivileged user that cannot
+    write there: calibredb fails opening the library with ``PermissionError``
+    on its case-sensitivity probe file. The ingest service and the web
+    app already run as the app user for the same reason, so drop to it here
+    too. ``cwa-as-abc`` drops only when we are root and otherwise leaves the
+    uid alone, and is absent outside the image, so a bare run is the fallback.
+    """
+    command = ["python3", enforcer, "--log", filename]
+    return ["cwa-as-abc"] + command if _will_drop(euid, which) else command
+
+
 def _default_dispatch(watch_folder: str, enforcer: str) -> Callable[[str], None]:
     """Build the production dispatch callback: log + run the enforcer once."""
 
@@ -158,7 +181,7 @@ def _default_dispatch(watch_folder: str, enforcer: str) -> Callable[[str], None]
         # Preserve the historical log line so existing log-scrapers keep working.
         print(f"[metadata-change-detector] New file detected: {filename}", flush=True)
         subprocess.run(
-            ["python3", enforcer, "--log", filename],
+            enforcer_command(enforcer, filename),
             check=False,
         )
 

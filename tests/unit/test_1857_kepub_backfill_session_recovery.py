@@ -48,13 +48,12 @@ def _wire_common(monkeypatch, kepub_backfill, calibre_db, book_ids):
         raising=False)
     monkeypatch.setattr(
         kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
-    monkeypatch.setattr(
-        kepub_backfill.config,
-        "save",
-        lambda: saved.append(
-            kepub_backfill.config.config_kobo_kepub_backfill_completed),
-        raising=False,
-    )
+    def save_fields(**values):
+        # Like ConfigSQL.save_fields: record the write, then publish it.
+        saved.append(values["config_kobo_kepub_backfill_completed"])
+        kepub_backfill.config.__dict__.update(values)
+
+    monkeypatch.setattr(kepub_backfill.config, "save_fields", save_fields, raising=False)
     return saved
 
 

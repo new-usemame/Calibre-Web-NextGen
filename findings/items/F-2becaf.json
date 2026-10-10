@@ -1,0 +1,19 @@
+{
+  "area": "reader",
+  "body": "Production did not initialize the existing static content-hash URL helper. Classic reader assets consequently retained bare URLs across upgrades, allowing a browser or CDN cache lifetime to preserve prior reader code. Origin no-cache headers alone cannot revoke a browser copy already marked fresh; an edge purge also does not clear downstream browser caches.\n\nCandidate correction enables the existing helper in all environments and registers it once per application. Generated static URLs change with the file bytes while the origin keeps unversioned paths revalidating. A production factory regression was seen failing before the change and verifies release-byte rollover, correct HTTP response bytes and idempotent initialization. Application-factory and cover/static-cache suites:45passed. Full image browser and CI verification follows before promotion.",
+  "created": "2026-09-09",
+  "id": "F-2becaf",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Resolved in candidate, not released: production content query URLs with per-app registration guard; original-red/fixed-green factory proof and45adjacent tests. Published-image and CI promotion gates remain required.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Classic reader assets retain release-old URLs in production"
+}

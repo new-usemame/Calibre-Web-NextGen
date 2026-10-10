@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
  * soft-deletes its own row. It exists specifically because route.fulfill()
  * cannot prove an origin producer is wired.
  */
-test('two real browser contexts persist separate non-null origin devices', async ({ browser, page }) => {
+test('two real browser contexts share one account Browser origin', async ({ browser, page }) => {
   const storageState = await page.context().storageState();
   const installationHeader = 'X-CWNG-Webreader-Installation-Id';
   const firstContext = await browser.newContext({
@@ -90,7 +90,7 @@ test('two real browser contexts persist separate non-null origin devices', async
       expect(row!.origin_device_id, 'origin must be populated, not absent').toBeTruthy();
       expect(payload.devices[row!.origin_device_id!]?.type).toBe('webreader');
     }
-    expect(rows[0]!.origin_device_id).not.toBe(rows[1]!.origin_device_id);
+    expect(rows[0]!.origin_device_id).toBe(rows[1]!.origin_device_id);
   } finally {
     await Promise.all(createdIds.map(({ request: requestContext, csrf, id }) =>
       requestContext.delete(`/annotations/${bookId}/${encodeURIComponent(id)}`, {

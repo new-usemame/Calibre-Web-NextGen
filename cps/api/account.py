@@ -8,8 +8,6 @@ rules can't drift. Unlike the legacy form, the password change requires the
 current password (defence against a hijacked session silently changing it) —
 flag for /security-review before this branch merges.
 """
-import secrets
-
 from flask import jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -20,20 +18,15 @@ from ..cw_babel import sanitize_locale_for_write, effective_locale
 from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
+from ..services import app_passwords
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
+from ..ui_font_preferences import ALLOWED_UI_FONT_BODY, ALLOWED_UI_FONT_DISPLAY
 from ..user_preferences import (NAMED_BOOLEAN_PREFERENCE_PATHS,
                                 serialize_named_preferences,
                                 set_named_preferences)
+from ..custom_column_sort import load_configured_columns, visible_columns
 from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
                           serialize_sidebar_visibility, serialize_sidebar_order)
-
-# #701 — allowed UI font preset KEYS. The keys (not CSS stacks) are stored;
-# the stacks live in the SPA (frontend/src/lib/fonts.ts). These sets MUST match
-# the keys in that module (UI_BODY_FONTS / UI_DISPLAY_FONTS). "" = theme default.
-ALLOWED_UI_FONT_BODY = frozenset({"", "system-sans", "serif", "mono"})
-# #641 — 'serif' is now a valid DISPLAY preset too: once the display default
-# flipped from bookish serif to System sans, serif has to stay reachable here.
-ALLOWED_UI_FONT_DISPLAY = frozenset({"", "system-sans", "serif", "mono"})
 
 log = logger.create()
 
@@ -177,7 +170,7 @@ def update_profile():
                 return _err("invalid_request", "Email can't be empty", 400)
             if new_email != current_user.email:
                 # check_email raises if the address is already taken
-                current_user.email = check_email(new_email)
+                current_user.email = check_email(new_email, current_user.id)
         if "kindle_mail" in data:
             current_user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "kindle_mail_subject" in data:
@@ -285,10 +278,7 @@ def create_app_password():
     label = (data.get("label") or "").strip()
     if not label or len(label) > 64:
         return _err("invalid_request", "Label must be 1-64 characters", 400)
-    cleartext = secrets.token_urlsafe(32)
-    row = ub.UserAppPassword(user_id=current_user.id, label=label,
-                             password_hash=generate_password_hash(cleartext))
-    ub.session.add(row)
+    row, cleartext = app_passwords.mint(current_user.id, label)
     try:
         ub.session.commit()
     except Exception as ex:
@@ -407,6 +397,11 @@ def update_named_preferences():
         return guard
 
     data = request.get_json(silent=True) or {}
+    if "expected_user_id" in data:
+        if type(data["expected_user_id"]) is not int:
+            return _err("invalid_request", "expected_user_id must be an integer", 400)
+        if data["expected_user_id"] != current_user.id:
+            return _err("account_changed", "The signed-in account changed. Reload your preferences.", 409)
     updates = data.get("preferences")
     if not isinstance(updates, dict) or not updates:
         return _err(
@@ -433,3 +428,85 @@ def update_named_preferences():
         return _err("db_error", "Could not save preferences: %s" % ex, 500)
 
     return jsonify({"preferences": serialize_named_preferences(current_user)})
+
+
+@api_v1.route("/account/catalog-custom-fields", methods=["POST"])
+def update_catalog_custom_fields():
+    """Persist the signed-in reader's selected grid/table custom fields."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _err("invalid_request", "Custom fields must be an object", 400)
+    if "expected_user_id" in data:
+        if type(data["expected_user_id"]) is not int:
+            return _err("invalid_request", "expected_user_id must be an integer", 400)
+        if data["expected_user_id"] != current_user.id:
+            return _err("account_changed", "The signed-in account changed. Reload your preferences.", 409)
+    selected = data.get("custom_column_ids")
+    labels = data.get("custom_column_labels", {})
+    if (not isinstance(selected, list)
+            or any(type(column_id) is not int for column_id in selected)):
+        return _err("invalid_request", "custom_column_ids must be an array of integers", 400)
+    if not isinstance(labels, dict):
+        return _err("invalid_request", "custom_column_labels must be an object", 400)
+    known = data.get("known_custom_column_ids")
+    if "known_custom_column_ids" in data and (not isinstance(known, list)
+            or any(type(column_id) is not int for column_id in known)):
+        return _err("invalid_request", "known_custom_column_ids must be an array of integers", 400)
+    columns = load_configured_columns(config, include_hidden=True)
+    if columns is None:
+        return _err("unavailable", "Custom columns are currently unavailable", 503)
+    live_ids = {column.id for column in columns}
+    allowed = {column.id for column in visible_columns(columns, config)}
+    if known is not None:
+        if len(known) > len(live_ids) or any(column_id not in live_ids for column_id in known):
+            return _err("invalid_request", "Unknown custom column snapshot", 400)
+        allowed.intersection_update(known)
+    if len(selected) > len(live_ids) or len(labels) > len(allowed):
+        return _err("invalid_request", "Too many custom fields", 400)
+    if any(column_id not in allowed for column_id in selected):
+        return _err("invalid_request", "Unknown custom column", 400)
+    selected = list(dict.fromkeys(selected))
+    cleaned_labels = {}
+    for raw_id, raw_label in labels.items():
+        try:
+            column_id = int(raw_id)
+        except (TypeError, ValueError):
+            return _err("invalid_request", "Invalid custom column label", 400)
+        if (str(column_id) != str(raw_id) or column_id not in allowed
+                or not isinstance(raw_label, str)):
+            return _err("invalid_request", "Invalid custom column label", 400)
+        label = raw_label.strip()
+        if len(label) > 80:
+            return _err("invalid_request", "Custom column labels may not exceed 80 characters", 400)
+        if label:
+            cleaned_labels[str(column_id)] = label
+    # Only visible fields the client knew about can be changed. Preserve this
+    # reader's existing choices outside that scope, including fields unhidden
+    # since the page loaded. Hidden fields still cannot be submitted.
+    retained_scope = live_ids - allowed
+    previous_ids = current_user.get_view_property("catalog", "custom_field_ids")
+    previous_labels = current_user.get_view_property("catalog", "custom_field_labels")
+    # /me reports malformed selections as null, meaning default-all.
+    if not isinstance(previous_ids, list) or any(type(column_id) is not int for column_id in previous_ids):
+        previous_ids = None
+    if previous_ids is None:
+        retained_ids = retained_scope
+    else:
+        retained_ids = retained_scope.intersection(previous_ids)
+    selected.extend(sorted(retained_ids))
+    if isinstance(previous_labels, dict):
+        for column_id in retained_scope:
+            label = previous_labels.get(str(column_id))
+            if isinstance(label, str) and label.strip() and len(label.strip()) <= 80:
+                cleaned_labels[str(column_id)] = label.strip()
+    try:
+        current_user.set_view_property("catalog", "custom_field_ids", selected, commit=False)
+        current_user.set_view_property("catalog", "custom_field_labels", cleaned_labels, commit=False)
+        ub.session.commit()
+    except Exception as ex:
+        ub.session.rollback()
+        return _err("db_error", "Could not save custom fields: %s" % ex, 500)
+    return jsonify({"custom_field_ids": selected, "custom_field_labels": cleaned_labels})

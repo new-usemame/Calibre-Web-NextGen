@@ -237,3 +237,43 @@ def route_error_records():
 
 def body_digest(body):
     return hashlib.sha256(body).hexdigest()
+
+
+STORE_METHODS = ("incr", "acquire_entry", "acquire_sliding_window_entry", "get",
+                 "get_expiry", "clear", "reset", "get_moving_window",
+                 "get_sliding_window")
+
+
+def store_dies(monkeypatch, *, at_first_clear):
+    """Make the limiter's own store fail, now or from the first clear on.
+
+    Dying at the first clear is the outage that lands between a counted
+    check and the rest of the request: the sign-in has succeeded, and its
+    clean-up and the rate-limit headers find the store gone.
+    """
+    from cps import limiter
+
+    storage = limiter.storage
+    state = {"dead": not at_first_clear}
+
+    def failing(name, real):
+        def method(*args, **kwargs):
+            if name == "clear":
+                state["dead"] = True
+            if state["dead"]:
+                raise ConnectionError("limiter store unreachable")
+            return real(*args, **kwargs)
+        return method
+
+    for name in STORE_METHODS:
+        if hasattr(storage, name):
+            monkeypatch.setattr(storage, name, failing(name, getattr(storage, name)))
+    monkeypatch.setattr(storage, "check", lambda: not state["dead"])
+
+
+def store_returns(monkeypatch):
+    """Undo the outage and put the limiter straight back on its own store."""
+    from cps import limiter
+
+    monkeypatch.undo()
+    limiter._storage_dead = False

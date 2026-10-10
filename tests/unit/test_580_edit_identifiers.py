@@ -146,3 +146,95 @@ def test_update_metadata_without_identifiers_key_does_not_touch_them():
             resp = inspect.unwrap(mod.update_metadata)(5)
     assert resp.status_code == 200
     session.commit.assert_not_called()
+
+
+@pytest.fixture
+def calibre_session():
+    import sqlite3
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+    from cps import db
+
+    def creator():
+        connection = sqlite3.connect(":memory:", check_same_thread=False)
+        connection.execute("ATTACH DATABASE ':memory:' AS calibre")
+        return connection
+
+    engine = create_engine("sqlite+pysqlite://", creator=creator, poolclass=StaticPool)
+    db.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def _seed_book_with_identifiers(session, identifiers):
+    from datetime import datetime, timezone
+    from cps import db
+    now = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    book = db.Books("T", "T", "Author, Test", now, now, "1.0", now, "test/t", False, [], [])
+    book.uuid = "uuid-t"
+    book.authors = [db.Authors("Test Author", "Author, Test")]
+    session.add(book)
+    session.commit()
+    session.add_all([db.Identifiers(val, typ, book.id) for typ, val in identifiers])
+    session.commit()
+    session.expire_all()
+    return book.id
+
+
+def _post_identifiers(session, book_id, identifiers):
+    from cps import db
+    from cps.api import edit as mod
+
+    def get_book(*_a, **_k):
+        return session.query(db.Books).filter(db.Books.id == book_id).one()
+
+    with _ctx(f"/api/v1/books/{book_id}/metadata", body={"identifiers": identifiers}):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod, "calibre_db",
+                          SimpleNamespace(get_filtered_book=get_book, session=session,
+                                          get_cc_columns=lambda *a, **k: [])), \
+             patch.object(mod, "get_locale", return_value="en"):
+            resp = inspect.unwrap(mod.update_metadata)(book_id)
+    # The request ends: anything left uncommitted is discarded, as the
+    # per-request session teardown does in production.
+    session.rollback()
+    session.expire_all()
+    return json.loads(resp.get_data())
+
+
+def _stored_identifiers(session, book_id):
+    from cps import db
+    rows = session.query(db.Identifiers).filter(db.Identifiers.book == book_id).all()
+    return sorted((r.type, r.val) for r in rows)
+
+
+def test_changing_an_existing_identifier_value_is_saved(calibre_session):
+    """Fork #2387: a value-only edit of an existing identifier type was echoed
+    back as saved but never committed, so a reload showed the old value."""
+    book_id = _seed_book_with_identifiers(
+        calibre_session, [("hardcover-id", "1893578"), ("isbn", "9780000000001")])
+
+    body = _post_identifiers(calibre_session, book_id, [
+        {"type": "hardcover-id", "val": "545675"},
+        {"type": "isbn", "val": "9780000000001"},
+    ])
+
+    assert "errors" not in body
+    assert _stored_identifiers(calibre_session, book_id) == [
+        ("hardcover-id", "545675"), ("isbn", "9780000000001")]
+
+
+def test_resubmitting_identical_identifiers_reports_no_change(calibre_session):
+    from cps import db, editbooks
+    book_id = _seed_book_with_identifiers(calibre_session, [("isbn", "9780000000001")])
+    book = calibre_session.query(db.Books).filter(db.Books.id == book_id).one()
+
+    changed, duplicate = editbooks.modify_identifiers(
+        [db.Identifiers("9780000000001", "isbn", book_id)], book.identifiers, calibre_session)
+
+    assert (changed, duplicate) == (False, False)

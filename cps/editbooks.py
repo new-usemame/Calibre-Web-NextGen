@@ -221,9 +221,24 @@ def convert_bookformat(book_id):
         flash(_("Source or destination format for conversion missing"), category="error")
         return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
 
+    # A form's select options are not an authorization or capability check.
+    # Validate again against the same installed-Calibre registry used to
+    # render the classic editor and the SPA conversion API, so an unsupported
+    # format cannot be queued by a crafted POST.
+    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    if not book:
+        flash(_("Book is unavailable for conversion"), category="error")
+        return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+    allowed_sources, allowed_targets = helper.get_convert_options(book)
+    source = book_format_from.strip().lower().lstrip('.')
+    target = book_format_to.strip().lower().lstrip('.')
+    if source not in allowed_sources or target not in allowed_targets or source == target:
+        flash(_("The selected conversion formats are not supported for this book"), category="error")
+        return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+
     log.info('converting: book id: %s from: %s to: %s', book_id, book_format_from, book_format_to)
-    rtn = helper.convert_book_format(book_id, config.get_book_path(), book_format_from.upper(),
-                                     book_format_to.upper(), current_user.name)
+    rtn = helper.convert_book_format(book_id, config.get_book_path(), source.upper(),
+                                     target.upper(), current_user.name)
 
     if rtn is None:
         flash(_("Book successfully queued for converting to %(book_format)s",
@@ -869,13 +884,18 @@ def read_selected_books():
     vals = request.get_json().get('selections')
     markAsRead = request.get_json().get('markAsRead')
     if vals:
+        marked_read = []
         try:
             for book_id in vals:
-                helper.edit_book_read_status(book_id, markAsRead)
+                if (helper.edit_book_read_status(book_id, markAsRead, sync_hardcover=False) == ""
+                        and markAsRead):
+                    marked_read.append(book_id)
 
         except (OperationalError, IntegrityError, StaleDataError) as e:
             calibre_db.session.rollback()
             log.error_or_exception("Database error: {}".format(e))
+        # One Hardcover task for the selection, not one per book (#2289).
+        helper.queue_hardcover_mark_read(marked_read)
 
         return json.dumps({'success': True})
     return ""
@@ -2645,8 +2665,11 @@ def modify_identifiers(input_identifiers, db_identifiers, db_session):
             changed = True
         else:
             input_identifier = input_dict[identifier_type]
-            identifier.type = input_identifier.type
-            identifier.val = input_identifier.val
+            if (identifier.type != input_identifier.type
+                    or identifier.val != input_identifier.val):
+                identifier.type = input_identifier.type
+                identifier.val = input_identifier.val
+                changed = True
     # add input identifiers not present in db
     for identifier_type, identifier in input_dict.items():
         if identifier_type not in db_dict.keys():

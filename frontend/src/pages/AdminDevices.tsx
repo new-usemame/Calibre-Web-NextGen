@@ -56,7 +56,7 @@ function AdminDeviceCard({ device, showAccount, titleLevel }: {
     >
       <header>
         <div>
-          <DeviceTitle>{device.label}</DeviceTitle>
+          <DeviceTitle>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</DeviceTitle>
           {showAccount && (
             <p className={styles.account}>
               <Users size={13} aria-hidden="true" focusable={false} />

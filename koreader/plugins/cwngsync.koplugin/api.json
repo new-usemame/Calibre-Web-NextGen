@@ -163,15 +163,78 @@
             ],
             "optional_params" : [
                 "deleted",
-                "delete_source"
+                "delete_source",
+                "device",
+                "device_id"
             ],
             "payload" : [
                 "document",
                 "annotations",
                 "deleted",
-                "delete_source"
+                "delete_source",
+                "device",
+                "device_id"
             ],
             "expected_status" : [200, 400, 401, 503]
+        },
+        "get_library" : {
+            "path" : "/syncs/library",
+            "method" : "GET",
+            "required_params" : [
+                "device",
+                "device_id"
+            ],
+            "optional_params" : [
+                "cursor",
+                "limit",
+                "if_revision"
+            ],
+            "expected_status" : [200, 401, 403, 503]
+        },
+        "update_read_status" : {
+            "path" : "/syncs/read_status",
+            "method" : "PUT",
+            "required_params" : [
+                "device",
+                "device_id",
+                "status"
+            ],
+            "optional_params" : [
+                "book_id",
+                "document"
+            ],
+            "payload" : [
+                "device",
+                "device_id",
+                "status",
+                "book_id",
+                "document"
+            ],
+            "expected_status" : [200, 400, 401, 404, 503]
+        },
+        "pair_start" : {
+            "path" : "/pair/start",
+            "method" : "POST",
+            "required_params" : [
+                "device",
+                "device_id"
+            ],
+            "payload" : [
+                "device",
+                "device_id"
+            ],
+            "expected_status" : [200, 400, 403, 409, 429, 503]
+        },
+        "pair_poll" : {
+            "path" : "/pair/poll",
+            "method" : "POST",
+            "required_params" : [
+                "device_code"
+            ],
+            "payload" : [
+                "device_code"
+            ],
+            "expected_status" : [200, 400, 404, 410, 429, 503]
         }
     }
 }

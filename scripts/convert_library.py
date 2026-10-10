@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import shutil
+import signal
 from pathlib import Path
 import subprocess
 import tempfile
@@ -21,7 +22,9 @@ import sqlite3
 
 import app_paths
 import service_user
+from calibre_library_target import ownership, operation
 from cwa_db import CWA_DB
+import script_lock
 from kindle_epub_fixer import EPUBFixer
 
 ### Global Variables
@@ -59,26 +62,136 @@ def print_and_log(string) -> None:
     print(string)
 
 
+LOCK_PATH = os.path.join(tempfile.gettempdir(), 'convert_library.lock')
+_LOCK_NAMES = ("convert_library",)
+
+
 # Defining function to delete the lock on script exit
-def removeLock():
-    try:
-        os.remove(tempfile.gettempdir() + '/convert_library.lock')
-    except FileNotFoundError:
-        ...
+def removeLock(path=None):
+    """Remove the lock, but only while it is still ours (see script_lock.release)."""
+    script_lock.release(path or LOCK_PATH)
+
+
+def acquire_lock(path=None):
+    """Take the lock, clearing one left by a run that was killed. False if another run holds it."""
+    return script_lock.acquire(path or LOCK_PATH, _LOCK_NAMES,
+                               on_stale=lambda message: print_and_log(f"[convert-library]: {message}"))
 
 
 def _acquire_lock_or_exit():
     """Single-instance guard. Run only when this module is executed as a
     script — never on import — so pytest-xdist workers (which share /tmp
     across processes) don't take each other out at import time."""
-    try:
-        lock = open(tempfile.gettempdir() + '/convert_library.lock', 'x')
-        lock.close()
-    except FileExistsError:
+    if not acquire_lock():
         print_and_log("[convert-library]: CANCELLING... convert-library was initiated but is already running")
         logger.info(f"\nNextGen Convert Library Service - Run Cancelled: {datetime.now()}")
         sys.exit(2)
     atexit.register(removeLock)
+    # A tool runs in its own session, so Ctrl-C at a terminal reaches only this
+    # script; both signals stop the tool the same way.
+    signal.signal(signal.SIGTERM, _stop_on_sigterm)
+    signal.signal(signal.SIGINT, _stop_on_sigterm)
+
+
+# The ebook-convert / kepubify / calibredb process currently running, if any.
+_current_child = None
+
+# Convert Library works in its own subdirectory of the shared tmp_conversion_dir.
+# The ingest processor cleared the shared dir after every book and Convert Library
+# emptied it after every book, under separate locks, so either could delete the file
+# the other was converting. Ingest's cleanup now leaves directories with this prefix
+# alone (ingest_processor.empty_tmp_conversion_dir), and Cancel removes the
+# "<prefix><pid>_" dirs of the run it stopped (cps/cwa_functions.py).
+PRIVATE_TMP_PREFIX = ".cwa_convert_library_"
+
+
+def make_private_tmp_dir(shared_tmp_dir):
+    """Create this run's working directory inside the shared one; return it with a trailing slash.
+
+    Staying inside keeps the scratch files on the volume CWA_TMP_CONVERSION_DIR
+    names. The name carries this process's PID so Cancel can remove exactly this
+    run's directory. Leftovers from runs that were killed are removed first, which
+    is safe because the caller holds the convert_library lock, so no other run is
+    using them. A run with nowhere to work ends with the lines the web status page
+    waits for, rather than crashing before them.
+    """
+    for leftover in Path(shared_tmp_dir).glob(PRIVATE_TMP_PREFIX + "*"):
+        shutil.rmtree(leftover, ignore_errors=True)
+    try:
+        if not os.path.isdir(shared_tmp_dir):
+            Path(shared_tmp_dir).mkdir(parents=True, exist_ok=True)
+            service_user.chown_to_service_user(
+                shared_tmp_dir, "[convert-library]:", recursive=False, log=print_and_log)
+        path = tempfile.mkdtemp(prefix=f"{PRIVATE_TMP_PREFIX}{os.getpid()}_", dir=shared_tmp_dir)
+    except OSError as error:
+        print_and_log(f"[convert-library]: ERROR - Could not create a working directory "
+                      f"in {shared_tmp_dir} ({error}). Nothing was converted.")
+        logger.info(f"\nNextGen Convert Library Service - Run Failed: {datetime.now()}")
+        logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
+        sys.exit(2)
+    atexit.register(shutil.rmtree, path, True)
+    return path + "/"
+
+
+# Tools left to finish on cancel: stopping calibredb part-way through add_format
+# can leave a file copied into the book folder that metadata.db never records.
+_FINISH_ON_CANCEL = ("calibredb",)
+
+
+def _signal_tool(child, sig):
+    """Signal the tool and anything it started (it runs in its own session)."""
+    try:
+        os.killpg(child.pid, sig)
+    except (ProcessLookupError, PermissionError, AttributeError):
+        child.send_signal(sig)
+
+
+# True while _run_streaming is starting a tool that is not yet in _current_child;
+# a stop signal arriving then is held in _pending_stop and acted on once it is.
+_launching = False
+_pending_stop = None
+
+
+def _stop_on_sigterm(signum, frame):
+    """Stop the running tool, then exit normally so atexit removes the lock.
+
+    The web UI's Cancel sends SIGTERM to this script. Python's default for
+    SIGTERM exits without running atexit and leaves the child running, so a
+    cancelled run kept converting in the background.
+    """
+    global _pending_stop
+    child = _current_child
+    if child is None and _launching:
+        _pending_stop = signum
+        return
+    _pending_stop = None
+    if child is not None and child.poll() is None:
+        if os.path.basename(str(child.args[0])) in _FINISH_ON_CANCEL:
+            # The main loop that reads its output is suspended in this handler, so
+            # keep draining it here or a chatty calibredb could block on a full pipe.
+            try:
+                print_and_log("[convert-library]: Cancel received; letting the library import that is running finish...")
+            except RuntimeError:
+                pass
+            try:
+                child.communicate(timeout=300)
+            except subprocess.TimeoutExpired:
+                _signal_tool(child, signal.SIGKILL)
+            except (OSError, ValueError, RuntimeError):
+                child.wait()
+        else:
+            _signal_tool(child, signal.SIGTERM)
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                _signal_tool(child, signal.SIGKILL)
+    try:
+        print_and_log("[convert-library]: Cancelled, stopping now...")
+    except RuntimeError:
+        # The signal interrupted a print in progress (reentrant BufferedWriter call);
+        # the exit below still has to happen.
+        pass
+    sys.exit(128 + signum)
 
 
 def _load_backup_destinations():
@@ -144,12 +257,10 @@ class LibraryConverter:
         self.hierarchy_of_success = {'epub', 'lit', 'mobi', 'azw', 'azw3', 'fb2', 'fbz', 'azw4', 'prc', 'odt', 'lrf', 'pdb',  'cbz', 'pml', 'rb', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'snb', 'tcr', 'pdf', 'docx', 'rtf', 'html', 'htmlz', 'txtz', 'txt', 'kfx', 'kfx-zip'}
 
         self.current_book = 1
-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
-        # ingest_processor.py removes this directory outright when it finishes and
-        # recreates it on its next run, so it is absent for every Convert Library
-        # run that follows an ingest. Own it here rather than depending on another
-        # service having left one behind.
-        self.ensure_tmp_conversion_dir()
+        self.ingest_folder, self.library_dir, shared_tmp_dir = self.get_dirs(str(app_paths.dirs_json()))
+        # Never the shared directory itself: ingest clears it after every book, and
+        # emptying it here deleted the book an ingest was converting.
+        self.tmp_conversion_dir = make_private_tmp_dir(shared_tmp_dir)
 
         # Calibre subprocess environment. Operator-opt-in plugin loading
         # (CWA_CALIBRE_USER_PLUGINS=true) routes HOME to /config so any
@@ -209,15 +320,17 @@ class LibraryConverter:
             if self.verbose:
                 print_and_log(f"[convert-library]: Running command: {' '.join(args)}")
                 
-            cmd = subprocess.run(
-                args,
-                env=self.calibre_env,
-                capture_output=True,
-                check=True,
-                text=True,
-                encoding='utf-8',
-                timeout=300  # 5 minute timeout for large libraries
-            )
+            with operation(timeout=300):
+                cmd = subprocess.run(
+                    args,
+                    env=self.calibre_env,
+                    capture_output=True,
+                    check=True,
+                    text=True,
+                    encoding='utf-8',
+                    timeout=300,  # 5 minute timeout for large libraries
+                    **_child_ownership()
+                )
 
             # Validate output before parsing
             raw_output = cmd.stdout.strip()
@@ -434,8 +547,8 @@ class LibraryConverter:
             file_extension = Path(file).suffix
 
             print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Converting {filename} from {file_extension} format to {self.target_format} format...")
-            # An ingest can remove the directory at any point, and a failed book
-            # skips empty_tmp_con_dir(), so check before every book.
+            # A failed book skips empty_tmp_con_dir(), and the directory can be
+            # removed from outside the run (a temp cleaner), so check before every book.
             self.ensure_tmp_conversion_dir()
 
             try: # Get Calibre Library Book ID from the immediate book folder (e.g., "Title (6120)")
@@ -487,9 +600,10 @@ class LibraryConverter:
                     print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while processing {os.path.basename(target_filepath)} with the kindle-epub-fixer. See the following error:\n{e}")
 
             try: # Import converted book to library. As of V3.0.0, "add_format" is used instead of "add"
-                self._run_streaming(
-                    ["calibredb", "add_format", book_id, target_filepath, f"--library-path={self.library_dir}"],
-                    env=self.calibre_env)
+                with operation(timeout=300):
+                    self._run_streaming(
+                        ["calibredb", "add_format", book_id, target_filepath, f"--library-path={self.library_dir}"],
+                        env=self.calibre_env)
 
                 if self.cwa_settings['auto_backup_imports']:
                     self.backup(target_filepath, backup_type="imported")
@@ -521,12 +635,9 @@ class LibraryConverter:
 
     def convert_to_kepub(self, filepath:str ,import_format:str) -> tuple[bool, str]:
         """Kepubify is limited in that it can only convert from epub to kepub, therefore any files not already in epub need to first be converted to epub, and then to kepub"""
-        if import_format == "epub":
+        # The caller passes Path(file).suffix, which keeps the dot (".epub").
+        if import_format.lstrip(".").lower() == "epub":
             print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) File already in epub format, converting directly to kepub...")
-
-            if self.cwa_settings['auto_backup_conversions']:
-                self.backup(filepath, backup_type="converted")
-
             epub_filepath = filepath
             epub_ready = True
         else:
@@ -541,7 +652,7 @@ class LibraryConverter:
                 print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Intermediate conversion of {os.path.basename(filepath)} to epub from {import_format} successful, now converting to kepub...")
                 epub_ready = True
             except subprocess.CalledProcessError as e:
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Intermediate conversion of {os.path.basename(filepath)} to epub was unsuccessful. Cancelling kepub conversion and moving on to next file. See the following error:\n{e}")
+                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Intermediate conversion of {os.path.basename(filepath)} to epub was unsuccessful. Cancelling kepub conversion and moving on to next file. See the following error:\n{e}{self._output_tail(e)}")
                 return False, ""
 
         if epub_ready:
@@ -570,12 +681,7 @@ class LibraryConverter:
 
 
     def ensure_tmp_conversion_dir(self):
-        """Create the temp conversion directory if it is missing.
-
-        ingest_processor.py ends each run with shutil.rmtree() on this same path,
-        so it disappears out from under a Convert Library run that is already
-        going as well as before one starts.
-        """
+        """Recreate this run's working directory if something removed it mid-run."""
         if os.path.isdir(self.tmp_conversion_dir):
             return
         try:
@@ -601,6 +707,11 @@ class LibraryConverter:
         # Only the tail is needed to explain a failure; a verbose conversion of
         # a large PDF can print tens of thousands of lines.
         output_tail = deque(maxlen=200)
+        # A Cancel that lands while the tool is being started is deferred until the
+        # child is recorded in _current_child, so the handler cannot miss it. (Blocking
+        # the signals instead would not work: the child inherits a blocked mask.)
+        global _launching, _current_child
+        _launching = True
         try:
             with subprocess.Popen(
                 args,
@@ -609,17 +720,30 @@ class LibraryConverter:
                 env=env,
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                start_new_session=os.name != "nt",
+                **_child_ownership()
             ) as process:
-                for line in process.stdout:  # Read from the combined stdout (which includes stderr)
-                    output_tail.append(line)
-                    if self.verbose:
-                        print_and_log(line)
-                    else:
-                        print(line)
+                _current_child = process
+                _launching = False
+                if _pending_stop is not None:
+                    _stop_on_sigterm(_pending_stop, None)
+                try:
+                    for line in process.stdout:  # Read from the combined stdout (which includes stderr)
+                        output_tail.append(line)
+                        if self.verbose:
+                            print_and_log(line)
+                        else:
+                            print(line)
+                finally:
+                    _current_child = None
         except OSError as error:
             # A missing or unexecutable tool fails this book, not the whole run.
             raise subprocess.CalledProcessError(127, args, output=str(error), stderr=str(error)) from error
+        finally:
+            _launching = False
+            if _pending_stop is not None:
+                _stop_on_sigterm(_pending_stop, None)
 
         if process.returncode != 0:
             output = ''.join(output_tail)
@@ -655,7 +779,7 @@ class LibraryConverter:
             print_and_log(f"{label} Successfully set ownership of new files in {self.library_dir}.")
 
 
-def main():
+def _main():
     _acquire_lock_or_exit()
 
     parser = argparse.ArgumentParser(
@@ -684,5 +808,28 @@ def main():
     sys.exit(0)
 
 
+_maintenance_fd = None
+
+
+def _child_ownership():
+    return {"pass_fds": (_maintenance_fd,)} if _maintenance_fd is not None and os.name != "nt" else {}
+
+
+def main():
+    global _maintenance_fd
+    try:
+        with ownership.maintenance(str(app_paths.config_dir()), wait_timeout=120) as fd:
+            _maintenance_fd = fd
+            try:
+                return _main()
+            finally:
+                _maintenance_fd = None
+    except (ownership.LibraryBusyError, TimeoutError, PermissionError) as error:
+        print_and_log(f"[convert-library]: Library unavailable; try again after maintenance: {error}")
+        logger.info(f"\nNextGen Convert Library Service - Run Failed: {datetime.now()}")
+        logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
+        return 2
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1,0 +1,125 @@
+.container { max-width: 900px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+
+.back {
+  display: inline-flex; align-items: center; gap: var(--sp-1); margin-bottom: var(--sp-3);
+  color: var(--text-muted); font-size: var(--fs-sm);
+  transition: color var(--dur-fast) var(--ease);
+}
+.back:hover { color: var(--accent); }
+
+.heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+.heading > svg { color: var(--accent); width: 22px; height: 22px; flex: none; }
+.heading h1 { margin: 0; font-family: var(--font-display); font-size: var(--fs-xl); }
+
+.lede { margin: 0 0 var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm); max-width: 70ch; }
+.hint { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.bad { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
+
+/* A read that failed, standing where its rows would have been. Bordered
+   rather than a bare line of red text because it replaces content the
+   administrator asked for, and the retry has to read as part of the same
+   message rather than as another of the section's controls. */
+.ok { display: inline-flex; align-items: center; gap: var(--sp-1); margin: 0; color: var(--text); font-size: var(--fs-sm); }
+.ok > svg { flex: none; color: var(--success-border, var(--accent)); }
+
+.notice {
+  display: flex; gap: var(--sp-2); align-items: flex-start;
+  margin: 0 0 var(--sp-4); padding: var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+}
+.notice > svg { flex: none; margin-top: 2px; color: var(--danger); }
+.notice p { margin: 0; font-size: var(--fs-sm); }
+
+.card {
+  margin-bottom: var(--sp-4); padding: var(--sp-4);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface-1); box-shadow: var(--elev-1);
+}
+.card > h2 {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-3); font-size: var(--fs-md); font-family: var(--font-display);
+}
+.card > h2 > svg { color: var(--accent); }
+.card h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); font-weight: var(--fw-semi); }
+
+.switchRow { display: flex; align-items: flex-start; gap: var(--sp-2); font-size: var(--fs-sm); }
+.switchRow > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.switchLabel { font-weight: var(--fw-medium); }
+
+.status { margin: var(--sp-3) 0 0; font-size: var(--fs-sm); color: var(--danger); overflow-wrap: anywhere; }
+.status[data-ok='true'] { color: var(--text-muted); }
+.status > p { margin: 0; }
+/* Keeps the bullet: the global reset sets list-style:none, and these reasons
+   are a genuine list the administrator has to work through one at a time. */
+.reasons { margin: var(--sp-1) 0 0; padding-left: var(--sp-4); list-style: disc; }
+.reasons > li { margin-top: var(--sp-1); }
+
+.connections { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0 0 var(--sp-4); padding: 0; }
+.connection {
+  display: flex; flex-wrap: wrap; gap: var(--sp-3);
+  align-items: center; justify-content: space-between;
+  padding: var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+}
+.connectionMain { min-width: 0; flex: 1 1 220px; }
+.connectionLabel { margin: 0 0 2px; font-size: var(--fs-sm); font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+.connectionActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+
+.inlineSwitch {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--text); white-space: nowrap;
+}
+.inlineSwitch input:disabled + span { color: var(--text-faint); }
+
+.form { padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.fields {
+  display: grid; gap: var(--sp-3); margin-bottom: var(--sp-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+.field { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); min-width: 0; }
+.field > span { color: var(--text-muted); }
+.field input, .field select {
+  min-height: 40px; padding: 0 var(--sp-2); min-width: 0;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-1); color: var(--text); font-size: var(--fs-sm);
+}
+
+.grants { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; }
+.grantRow {
+  display: flex; flex-wrap: wrap; gap: var(--sp-3);
+  align-items: center; justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+}
+.grantName { font-size: var(--fs-sm); font-weight: var(--fw-medium); min-width: 0; overflow-wrap: anywhere; }
+
+/* A queued request is a book AND the person who asked for it, stacked so the
+   requester stays legible when the title wraps. */
+.queueName {
+  display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); overflow-wrap: anywhere;
+}
+.queueRequester { color: var(--text-muted); font-weight: var(--fw-normal); }
+
+.primary, .secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  min-height: 40px; padding: 0 var(--sp-3);
+  border-radius: var(--r-md); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  cursor: pointer; white-space: nowrap;
+  transition: filter var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+/* --on-accent, not --accent-text — see the note in FindBooks.module.css. */
+.primary { border: 1px solid transparent; background: var(--accent); color: var(--on-accent); }
+.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.secondary { border: 1px solid var(--border); background: var(--surface-1); color: var(--text); }
+.secondary:hover:not(:disabled) { border-color: var(--border-strong); }
+.primary:disabled, .secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4) var(--sp-3); }
+  .fields { grid-template-columns: 1fr; }
+  .connection, .grantRow { align-items: flex-start; }
+  .connectionActions { width: 100%; }
+  .primary, .secondary { width: 100%; }
+  .connectionActions .secondary { width: auto; flex: 1 1 auto; }
+}

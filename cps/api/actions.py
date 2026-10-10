@@ -18,6 +18,11 @@ from ..helper import send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
 from ..cover_picker import designer_state
 from ..services import cover_extract, cover_url_validator, device_delivery, user_cover
+from ..services.ereader_send import (
+    ereader_addresses, other_users_with_ereader, record_email_activity,
+    send_includes_own_address,
+)
+from ..services.read_status import stop_reading as stop_reading_status
 
 BATCH_MEMBERSHIP_LIMIT = 200
 
@@ -74,6 +79,49 @@ def _my_cover_payload(book, row):
         # book folder.
         "designer": designer_state(),
     }
+
+
+@api_v1.route("/books/<int:book_id>/stop-reading", methods=["POST"])
+@login_required_if_no_ano
+def stop_reading_book(book_id):
+    """Clear only the caller's active marker, preserving every position carrier."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+
+    # Match book detail's visibility boundary, including the caller's own
+    # hidden/archived books and books available through a public shelf.
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    result = calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
+    )
+    if result is None:
+        return _err("not_found", "Book not found", 404)
+    _, custom_read, _ = result
+    if config.config_read_column and custom_read:
+        return _err("finished", "Finished books cannot be removed from Currently Reading", 409)
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == int(current_user.id),
+        ub.ReadBook.book_id == int(book_id),
+    ).one_or_none()
+    if row is not None and row.read_status == ub.ReadBook.STATUS_FINISHED:
+        return _err("finished", "Finished books cannot be removed from Currently Reading", 409)
+
+    changed = stop_reading_status(ub.session, current_user.id, book_id, ub.ReadBook)
+    if changed:
+        if not ub.session_commit("Stopped reading book {} for user {}".format(
+                book_id, current_user.id)):
+            return _err("update_failed", "Could not update reading status", 500)
+    return jsonify({"ok": True, "changed": changed})
 
 
 @api_v1.route("/books/<int:book_id>/my-cover", methods=["GET"])
@@ -447,7 +495,9 @@ def toggle_book_hidden(book_id):
 def send_book_to_ereader(book_id):
     """Email a book to the user's e-reader (Kindle/Kobo), optionally converting.
     Body: {format, convert?: bool, emails?: "a@x,b@y"}. With no emails, sends to
-    the user's configured kindle_mail. Reuses helper.send_mail."""
+    the user's configured kindle_mail. Reuses helper.send_mail. A book relayed
+    only to other people's eReaders is not the sender's own download (fork
+    #276), matching the classic send route."""
     guard = _require_real_user()
     if guard:
         return guard
@@ -478,9 +528,33 @@ def send_book_to_ereader(book_id):
     result = send_mail(book_id, book_format, convert, recipients, config.get_book_path(),
                        current_user.name, current_user.kindle_mail_subject)
     if result is None:
-        ub.update_download(book_id, int(current_user.id))
+        if send_includes_own_address(current_user.kindle_mail, recipients):
+            ub.update_download(book_id, int(current_user.id))
+        record_email_activity(current_user, book_id, book_format)
         return jsonify({"ok": True, "message": "Book queued for sending to %s" % recipients})
     return _err("send_failed", "There was an error sending the book: %s" % result, 502)
+
+
+@api_v1.route("/send-recipients", methods=["GET"])
+@login_required_if_no_ano
+def list_send_recipients():
+    """Other users' eReaders an admin can send a book to (fork #276, #2296).
+
+    The classic book page offers these as checkboxes; this is the New UI's
+    source for the same list. The addresses are other people's contact
+    details, so only an admin gets them. Everyone else gets an empty list
+    rather than an error, so the send panel needs no role logic of its own.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    others = []
+    if current_user.role_admin():
+        for user in other_users_with_ereader(current_user.id):
+            others.append({"id": user.id, "name": user.name,
+                           "emails": ereader_addresses(user.kindle_mail)})
+    return jsonify({"others": others})
 
 
 @api_v1.route("/books/<int:book_id>/device-deliveries", methods=["POST"])

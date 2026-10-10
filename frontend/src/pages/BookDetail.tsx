@@ -1,13 +1,15 @@
+import { BookReview } from '../components/BookReview';
+import { PersonalRating } from '../components/PersonalRating';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Glasses, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
-  useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
+  useBook, useToggleRead, useStopReading, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
-  useActiveDeliveryDevices, useQueueDeviceDelivery,
-  useDeleteFormat, useConvertFormat, useAddFormat,
+  useActiveDeliveryDevices, useQueueDeviceDelivery, useOtherEreaders,
+  useDeleteFormat, useConvertFormat, useAddFormat, useConversionTask,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
@@ -19,14 +21,19 @@ import { MoreByAuthor } from '../components/MoreByAuthor';
 import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice } from '../lib/api';
-import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
-import { useT } from '../lib/i18n';
-import { getPrimaryReadTarget } from '../lib/readerTarget';
-import { canConvertWithReflow, canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
+import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
+import { ApiError, resourceUrl, resourceSrcSet, TASK_FAILED, TASK_FINISHED, TASK_ENDED, TASK_CANCELLED } from '../lib/api';
+import { useT, useI18n } from '../lib/i18n';
+import { formatCustomColumnDate } from '../lib/customColumnDisplay';
+import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
+import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
+import {
+  canConvertWithReflow, canDeleteBooks, canDownloadBooks, canEditBookCover, canReadBooks, canUploadBooks,
+} from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { BookUserNotices } from '../components/UserNotices';
 import { backTarget } from '../lib/backLink';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -66,11 +73,11 @@ function formatDate(date: string, alwaysReturnFullDate = false): string {
   return date;
 }
 
-function formatCustomValue(column: CustomColumn, entry: CustomColumnValue, yes: string, no: string): string {
+function formatCustomValue(column: CustomColumn, entry: CustomColumnValue, yes: string, no: string, locale: string): string {
   const value = entry.value;
   if (value === null || value === undefined) return '';
   if (column.datatype === 'bool') return value ? yes : no;
-  if (column.datatype === 'datetime' && typeof value === 'string') return formatDate(value, true);
+  if (column.datatype === 'datetime' && typeof value === 'string') return formatCustomColumnDate(value, locale, { year: 'numeric', month: 'long', day: 'numeric' });
   if (column.datatype === 'rating' && typeof value === 'number') return `${value / 2}/5`;
   if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
     return new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
@@ -88,6 +95,8 @@ interface SendPanelProps {
   banner: { ok: boolean; text: string } | null;
   /** User's saved e-reader address, used to prefill the recipient field (#715). */
   defaultEmail: string;
+  /** Other users' eReaders an admin can add to the recipients (#2296). */
+  otherEreaders: OtherEreader[];
   onSend: (format: string, convert: boolean, emails: string) => void;
 }
 
@@ -96,7 +105,7 @@ interface SendPanelProps {
  *  saved e-reader address (#715 — previously the field was blank with only a
  *  "blank = your e-reader email" hint, so users thought the address was lost).
  *  Empty recipient still falls back to the saved address server-side. */
-function SendPanel({ formats, pending, banner, defaultEmail, onSend }: SendPanelProps) {
+function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSend }: SendPanelProps) {
   const t = useT();
   const [format, setFormat] = useState(formats[0] ?? '');
   const [convert, setConvert] = useState(false);
@@ -130,6 +139,26 @@ function SendPanel({ formats, pending, banner, defaultEmail, onSend }: SendPanel
           )}
         </label>
       </div>
+      {/* Admin-only (the server lists nobody for anyone else): tick another
+          user's eReader to add it to the recipients above (#2296, fork #276). */}
+      {otherEreaders.length > 0 && (
+        <fieldset className={styles.sendOthers} data-testid="send-other-ereaders">
+          <legend>{t("Other users' eReaders:")}</legend>
+          {otherEreaders.map((other) => (
+            <label key={other.id} className={styles.sendConvert}>
+              <input
+                type="checkbox"
+                checked={hasRecipients(emails, other.emails)}
+                onChange={(e) => {
+                  dirty.current = true;
+                  setEmails(toggleRecipients(emails, other.emails, e.target.checked));
+                }}
+              />
+              {other.name} <span className={styles.sendHint}>({other.emails.join(', ')})</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className={styles.sendActions}>
         <label className={styles.sendConvert}>
           <input type="checkbox" checked={convert} onChange={(e) => setConvert(e.target.checked)} />
@@ -377,8 +406,10 @@ function DescriptionBlock({ html, bookId }: { html: string; bookId: number }) {
 export function BookDetail() {
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
+  const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
   const announce = useAnnouncer();
+  const { locale } = useI18n();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -386,7 +417,18 @@ export function BookDetail() {
   const me = useMe().data;
   const selectionMode = me?.library_mode === 'personal_library';
   const inLibrary = !!book && (!selectionMode || book.in_my_library !== false);
+  // A book on a public shelf can be read and downloaded, and carries the
+  // reader's own notes and progress, without personal membership. Membership
+  // actions (shelves, favorites, archive, removal) still require inLibrary.
+  const canAccessBook = inLibrary || book?.accessible_via_public_shelf === true;
+  // The cover editor needs the library cover (editors) or a private cover the
+  // server keeps for this book; a public shelf alone grants neither.
+  const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
+  const stopReading = useStopReading(id);
+  const setReadingStatus = useSetReadingStatus(id);
+  const resetReadingStatus = setReadingStatus.reset;
+  useEffect(() => { resetReadingStatus(); }, [id, resetReadingStatus]);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
   const toggleHidden = useToggleHidden(id);
@@ -413,6 +455,7 @@ export function BookDetail() {
   const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download;
   const savedEreader = useAccount({ enabled: canSend }).data?.kindle_mail ?? '';
   const [sendOpen, setSendOpen] = useState(false);
+  const otherEreaders = useOtherEreaders(canSend && sendOpen && !!me?.role?.admin).data?.others ?? [];
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deviceSendOpen, setDeviceSendOpen] = useState(false);
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
@@ -508,11 +551,22 @@ export function BookDetail() {
   };
 
   /* The "More actions" gear menu — every book action that is not one of the
-     visible controls (Read now, Edit cover, Add to shelf, favorite, personal
-     membership removal, and the gear itself).
+     visible controls (Read now, Open without saving progress, Add to shelf, favorite, personal membership
+     removal, and the gear itself). Edit metadata and Edit cover stay listed
+     even though one of them is also the row's visible edit action.
      Labels name the ACTION performed (state-aware), per the cleanup brief:
      today's "In your library" state chip becomes "Remove from library". */
   const menuItems: MenuSectionDef['items'] = [];
+  if (canAccessBook && book.in_progress && !me?.role?.anonymous) {
+    menuItems.push({
+      id: 'stop-reading', label: t('Remove from Currently Reading'),
+      icon: <BookX size={15} />, disabled: stopReading.isPending,
+      onSelect: () => stopReading.mutate(undefined, {
+        onSuccess: () => announce(t('Removed from Currently Reading.')),
+        onError: () => announce(t('Could not remove this book from Currently Reading.'), { assertive: true }),
+      }), testId: 'menu-stop-reading',
+    });
+  }
   if (inLibrary) {
     menuItems.push({
       id: 'read-toggle',
@@ -581,12 +635,14 @@ export function BookDetail() {
         }),
         testId: 'menu-add-to-library',
       });
-    } else {
-      // Not toggleable for this user: show the current state, disabled.
+    } else if (!inLibrary) {
+      // Not addable by this user: show the current state, disabled. A book
+      // already in the library needs no entry here; its removal is the
+      // visible "Remove from my library" button.
       menuItems.push({ id: 'not-in-library', label: t('Not in your library'), icon: <BookPlus size={15} />, disabled: true });
     }
   }
-  if (inLibrary) {
+  if (canAccessBook) {
     const annotationCount = book.annotation_count ?? 0;
     menuItems.push({
       id: 'highlights',
@@ -611,7 +667,7 @@ export function BookDetail() {
       to: `/book/${book.id}/edit`,
     });
   }
-  if (!me?.role?.anonymous) {
+  if (canEditCover) {
     menuItems.push({
       id: 'edit-cover',
       label: t('Edit cover…'),
@@ -647,18 +703,40 @@ export function BookDetail() {
       </Link>
 
       {/* The action row is deliberately ordered by the reader's next likely
-          step: read, edit the artwork, organise, then compact personal state.
+          step: read, edit, organise, then compact personal state.
           The flexible group is the spacer before the gear, which pins Settings
           to the far edge without letting it become an orphaned mobile row. */}
       <div className={styles.actions} data-testid="book-actions">
         <div className={styles.actionsGroup}>
-          {inLibrary && primaryReadTarget ? (
+          {canAccessBook && primaryReadTarget ? (
             <Link href={primaryReadTarget} className={styles.actionPrimary}>
               {t('Read now')}
             </Link>
           ) : null}
 
-          {!me?.role?.anonymous && (
+          {/* Lookup reading sits beside Read now, not in the gear menu: people
+              who use it open books this way often (#2223). */}
+          {canAccessBook && primaryReadTarget ? (
+            <Link href={withLookupMode(primaryReadTarget, true)} className={styles.actionIcon}
+              aria-label={t('Open without saving progress')}
+              title={t('Open without saving progress')}
+              data-testid="open-lookup-action">
+              <Glasses size={17} aria-hidden="true" focusable={false} />
+            </Link>
+          ) : null}
+
+          {/* One visible edit action: Edit metadata for anyone allowed to edit
+              the book, since that is the edit people reach for most (#2338).
+              A reader whose only edit is their own cover keeps Edit cover
+              here. Both stay in the gear menu, and the metadata editor links
+              to the cover editor too. */}
+          {me?.role?.edit ? (
+            <Link href={`/book/${book.id}/edit`} className={styles.actionSecondary}
+              data-testid="edit-metadata-action">
+              <Pencil size={15} aria-hidden="true" focusable={false} />
+              {t('Edit metadata')}
+            </Link>
+          ) : canEditCover && (
             <Link href={`/book/${book.id}/cover`} className={styles.actionSecondary}
               data-testid="edit-cover-action">
               <ImageIcon size={15} aria-hidden="true" focusable={false} />
@@ -723,6 +801,7 @@ export function BookDetail() {
           pending={sendToEreader.isPending}
           banner={sendBanner}
           defaultEmail={savedEreader}
+          otherEreaders={otherEreaders}
           onSend={(format, convert, emails) => {
             setSendBanner(null);
             sendToEreader.mutate(
@@ -824,9 +903,31 @@ export function BookDetail() {
             {/* Rating — star parity with the classic detail page. Calibre stores
                 0–10 (half-star granularity); null means unrated (no stars shown,
                 not zero stars). */}
-            {book.rating != null && book.rating > 0 && (
+            {me && !me.role?.anonymous && <PersonalRating key={`${me.id}:${book.id}`} bookId={book.id} accountId={me.id} />}
+            {me?.preferences?.show_library_rating !== false && book.rating != null && book.rating > 0 && (
               <div className={styles.rating}>
+                <span>{t('Library rating')}</span>
                 <StarRating rating={book.rating} size={16} />
+              </div>
+            )}
+            {inLibrary && !me?.role?.anonymous && (
+              <div className={styles.readingStatusControl}>
+                <label htmlFor="reading-status">{t('Reading status')}</label>
+                <select id="reading-status"
+                  value={book.read_status ?? (book.read ? 'finished' : book.in_progress ? 'in_progress' : 'unread')}
+                  disabled={setReadingStatus.isPending}
+                  aria-invalid={setReadingStatus.isError || undefined}
+                  aria-describedby={`reading-status-help${setReadingStatus.isError ? ' reading-status-error' : ''}`}
+                  onChange={e => setReadingStatus.mutate(e.target.value as ReadingStatus)}>
+                  <option value="unread">{t('Unread')}</option>
+                  <option value="finished">{t('Finished')}</option>
+                  <option value="in_progress">{t('Currently reading')}</option>
+                  <option value="did_not_finish">{t('Did not finish')}</option>
+                  <option value="on_hold">{t('On hold')}</option>
+                </select>
+                <p id="reading-status-help">{t('Did not finish and On hold keep your reading position.')}</p>
+                <p role="status">{setReadingStatus.isPending ? t('Saving…') : setReadingStatus.isSuccess ? t('Reading status updated') : ''}</p>
+                {setReadingStatus.isError && <p id="reading-status-error" role="alert">{t('Could not update reading status. Please try again.')}</p>}
               </div>
             )}
             {/* Passive read state — the gear menu's "Mark as unread" is the
@@ -842,7 +943,7 @@ export function BookDetail() {
             {/* Passive "currently reading" marker (fork #634) — mirrors the classic
                 detail page. Sync-driven display only; the gear menu's read/unread
                 item stays a 2-state control. Shows the synced percent when known. */}
-            {inLibrary && book.in_progress && (
+            {canAccessBook && book.in_progress && (
               <div className={styles.readProgressWrap}>
                 <p className={styles.currentlyReading}>
                   <BookOpen size={14} aria-hidden="true" focusable={false} />
@@ -871,25 +972,27 @@ export function BookDetail() {
             <DescriptionBlock html={book.description_html} bookId={book.id} />
           )}
 
+          {me && !me.role?.anonymous && <BookReview key={`${me.id}:${book.id}`} bookId={book.id} accountId={me.id} />}
+
           {/* Tags — inline add/remove for editors (fork #572), read-only links
               otherwise. */}
           <TagEditor bookId={book.id} tags={book.tags} canEdit={!!me?.role?.edit} />
 
           {/* Metadata definition list */}
           <dl className={styles.meta}>
-            {book.original_filename && (
+            {book.original_filename && me?.preferences?.show_original_filename !== false && (
               <>
                 <dt className={styles.metaLabel}>{t('Imported as')}</dt>
-                <dd className={styles.metaValue}>{book.original_filename}</dd>
+                <dd className={`${styles.metaValue} original-filename-value`}>{book.original_filename}</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress != null && (
+            {canAccessBook && book.kosync_progress != null && (
               <>
                 <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>
                 <dd className={styles.metaValue}>{book.kosync_progress.toFixed(1)}%</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress_created_at !== null && (
+            {canAccessBook && book.kosync_progress_created_at !== null && (
               <>
                 <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
                   {t('Started reading')}
@@ -897,7 +1000,7 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress_timestamp !== null && (
+            {canAccessBook && book.kosync_progress_timestamp !== null && (
               <>
                 <dt className={styles.metaLabel}>{t('Last synced')}</dt>
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>
@@ -993,7 +1096,9 @@ export function BookDetail() {
                 </dd>
               </Fragment>
             ))}
-            {(book.custom_columns ?? []).map((column) => (
+            {(book.custom_columns ?? []).filter(column => column.datatype !== 'datetime'
+              || column.values.some(entry => typeof entry.value === 'string'
+                && formatCustomColumnDate(entry.value, locale))).map((column) => (
               <Fragment key={`custom-${column.id}`}>
                 <dt className={styles.metaLabel}>{column.name}</dt>
                 <dd className={styles.metaValue} dir="auto">
@@ -1004,7 +1109,7 @@ export function BookDetail() {
                       dangerouslySetInnerHTML={{ __html: column.values[0].value_html }}
                     />
                   ) : column.values
-                    .map((entry) => formatCustomValue(column, entry, t('Yes'), t('No')))
+                    .map((entry) => formatCustomValue(column, entry, t('Yes'), t('No'), locale))
                     .filter(Boolean)
                     .join(', ')}
                 </dd>
@@ -1022,6 +1127,7 @@ export function BookDetail() {
         <MoreByAuthor
           hideActions={cardActionsHidden}
           hideReadingTags={readingTagsHidden}
+                hideShelfTags={shelfBadgesHidden}
           canRead={canReadBooks(me)}
           key={book.id}
           authorId={book.authors[0].id}
@@ -1033,7 +1139,7 @@ export function BookDetail() {
       {/* Files — the per-format downloads (out of the action row) plus the
           delete/convert/add-format controls that used to sit at the foot of
           the edit-metadata page. Last on the page by design. */}
-      <FilesSection id={id} />
+      <FilesSection id={id} canAccessBook={canAccessBook} />
     </main>
   );
 }
@@ -1042,7 +1148,7 @@ export function BookDetail() {
  *  Delete (delete+edit roles), the Convert from/to control (edit role — the
  *  endpoint is _require_edit), and "Add a format" (upload role + the
  *  instance's upload switch). Moved here from Edit metadata. */
-function FilesSection({ id }: { id: string }) {
+function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolean }) {
   const t = useT();
   const { data: book } = useBook(id);
   const me = useMe().data;
@@ -1052,6 +1158,28 @@ function FilesSection({ id }: { id: string }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // #1110: the conversion this page queued, followed until it ends so the
+  // reader learns the new format is ready without refreshing.
+  const [converting, setConverting] = useState<{ taskId: string; to: string; at: number } | null>(null);
+  const { task: conversion, gone: conversionGone } = useConversionTask(
+    id, converting?.taskId ?? null, converting?.at);
+  const conversionStat = conversion?.stat;
+  useEffect(() => {
+    if (!converting) return;
+    if (conversionGone) {
+      setConverting(null);
+      return;
+    }
+    if (conversionStat === undefined) return;
+    if (conversionStat === TASK_FINISHED) {
+      setMsg({ ok: true, text: t('{format} is ready.', { format: converting.to }) });
+    } else if (conversionStat === TASK_FAILED) {
+      setMsg({ ok: false, text: conversion?.error || t('Convert failed.') });
+    } else if (conversionStat !== TASK_ENDED && conversionStat !== TASK_CANCELLED) {
+      return;
+    }
+    setConverting(null);
+  }, [converting, conversionGone, conversionStat, conversion?.error, t]);
 
   const formats = book?.formats.map((f) => f.format) ?? [];
   const convertOptions = book?.convert_options;
@@ -1060,7 +1188,9 @@ function FilesSection({ id }: { id: string }) {
   const sources = (convertOptions?.sources.length ? convertOptions.sources : formats.map((f) => f.toLowerCase()));
   const targets = convertOptions?.targets ?? [];
   if (!book || book.formats.length === 0) return null;
-  const canDownload = canDownloadBooks(me);
+  // Download needs content access (membership or a public shelf) as well as
+  // the role: a non-member's link would only reach the server's 404.
+  const canDownload = canAccessBook && canDownloadBooks(me);
   const canDelete = canDeleteBooks(me);
   // #1288: "Add a format" POSTs to /api/v1/books/<id>/formats, which requires
   // role_upload and honours the admin's "Enable Uploads" switch.
@@ -1094,7 +1224,11 @@ function FilesSection({ id }: { id: string }) {
     convertFormat.mutate(
       { from: src.toUpperCase(), to: dst.toUpperCase() },
       {
-        onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
+        onSuccess: (r) => {
+          setMsg({ ok: true, text: r.message });
+          setTo('');
+          setConverting(r.task_id ? { taskId: r.task_id, to: dst.toUpperCase(), at: Date.now() } : null);
+        },
         onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
       },
     );

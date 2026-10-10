@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { snapshotReaderFrameForAxe } from './readerAxeSnapshot';
 
 const isPhoneProject = () => test.info().project.name === 'mobile';
 
@@ -27,7 +28,7 @@ const KNOWN: Record<string, string> = {};
 // zero durations, and axeScan asserts the context option reached the page.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
-async function axeScan(page: Page, label: string) {
+async function axeScan(page: Page, label: string, themes: readonly ('dark' | 'light')[] = ['dark', 'light']) {
   await page.waitForLoadState('networkidle');
   // Clear any resting-pointer :hover before measuring: the navigation click
   // leaves the mouse at the old click point, and whatever link happens to sit
@@ -39,8 +40,13 @@ async function axeScan(page: Page, label: string) {
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'the a11y harness must disable transitions before comparing theme endpoints',
   ).toBe(true);
-  for (const theme of ['dark', 'light'] as const) {
-    await page.evaluate((slug) => document.documentElement.setAttribute('data-theme', slug), theme);
+  for (const theme of themes) {
+    await page.evaluate(async (slug) => {
+      document.documentElement.setAttribute('data-theme', slug);
+      // WebKit can expose a new surface color before descendants have painted
+      // their inherited text color. Scan the settled palette, not that frame.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    }, theme);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze();
@@ -95,7 +101,7 @@ test('edit book: no critical/serious a11y violations', async ({ page }) => {
 });
 
 test('smart shelf builder: no critical/serious a11y violations', async ({ page }) => {
-  await page.goto('/app/magic');
+  await page.goto('/app/magic/new');
   // The signed-in test user may use any supported locale. Identify the route by
   // structure rather than an English accessible name, and pin its one-landmark
   // invariant so a nested page-level <main> cannot return.
@@ -119,14 +125,157 @@ for (const [label, path] of [
   });
 }
 
-test('reader: TOC traps focus + Escape, named progressbar, no critical/serious', async ({ page }) => {
+// ── acquisition (book sources) — the two routes this feature adds ───────────
+/*
+ * Both routes are gated and ship switched off, so neither is reachable from
+ * the seeded login: `/app/find-books` renders <NotFound/> unless
+ * `me.acquisition_access` is true, and an empty Book sources page would scan
+ * almost no controls. Grant access in the RESPONSE and serve a POPULATED
+ * catalog, so axe grades the surfaces people actually meet — offer buttons,
+ * state pills, switches, the approval queue, the add-catalog form — rather
+ * than an empty state that hides all of them. Nothing on the server is
+ * touched, so these are safe alongside the parallel lanes.
+ *
+ * Deliberately NOT phone-skipped like the route loop above: this UI is new,
+ * its phone layout was changed in this branch, and mobile is where its
+ * regressions would land.
+ */
+const ACQ_V1 = '/api/v1';
+
+async function serveAcquisition(page: Page, replies: Record<string, unknown>): Promise<void> {
+  // Registered first, reached last: the catch-all below must `fallback()` for
+  // this override to be live at all.
+  await page.route(`**${ACQ_V1}/auth/me`, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      response,
+      contentType: 'application/json',
+      body: JSON.stringify({ ...body, acquisition_access: true }),
+    });
+  });
+  await page.route(`**${ACQ_V1}/**`, async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const body = replies[pathname];
+    if (body === undefined) return route.fallback();
+    await route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(body),
+    });
+  });
+}
+
+const ACQ_RUNTIME = { available: true, reasons: [] as string[] };
+
+test('find books: no critical/serious a11y violations', async ({ page }) => {
+  await serveAcquisition(page, {
+    [`${ACQ_V1}/acquisition`]: {
+      connections: [
+        { id: 'c1', label: 'Project Gutenberg', adapter: 'opds', enabled: true, revision: 1 },
+        { id: 'c2', label: 'Standard Ebooks', adapter: 'opds', enabled: true, revision: 1 },
+      ],
+      can_acquire: true,
+      runtime: ACQ_RUNTIME,
+    },
+    [`${ACQ_V1}/acquisition/catalog`]: {
+      title: 'Project Gutenberg',
+      protocol: 'opds',
+      publications: [{
+        title: 'Frankenstein; Or, The Modern Prometheus',
+        identity: 'pub-1',
+        authors: ['Mary Wollstonecraft Shelley'],
+        languages: ['en'],
+        description: 'A student of natural philosophy assembles a living creature.',
+        offers: [
+          { format: 'EPUB', label: 'EPUB', identity: 'o-epub', relation: 'acquisition', offer_id: 'offer-epub' },
+          { format: 'PDF', label: 'PDF', identity: 'o-pdf', relation: 'acquisition', offer_id: 'offer-pdf' },
+        ],
+        navigation: [],
+      }],
+      navigation: [
+        { title: 'Popular', relations: [], selection: 'sel-popular' },
+        { title: 'Latest', relations: [], selection: 'sel-latest' },
+      ],
+      pagination: [{ title: 'Next', relations: ['next'], selection: 'sel-next' }],
+      searches: [{ title: 'Search this catalog', selection: 'sel-search' }],
+      groups: [],
+      facets: [{ title: 'Language', navigation: [{ title: 'English', relations: [], selection: 'sel-en' }] }],
+    },
+    // Terminal states only: a job still in flight keeps the page polling, and
+    // `networkidle` would never settle for axe. These also render the richest
+    // row content — a state pill, a receipt link and a retry.
+    [`${ACQ_V1}/acquisition/jobs`]: {
+      jobs: [
+        {
+          id: 'j1', connection_id: 'c1', state: 'imported', add_to_my_library: true,
+          cancel_requested: false, error_code: null, claim_count: 1, title: 'Romeo and Juliet',
+          result: { book_ids: [224], disposition: 'imported' },
+        },
+        {
+          id: 'j2', connection_id: 'c1', state: 'failed', add_to_my_library: false,
+          cancel_requested: false, error_code: 'source_busy', claim_count: 2, title: 'Dracula',
+        },
+      ],
+    },
+  });
+
+  await page.goto('/app/find-books');
+  await expect(page.getByRole('heading', { name: 'Find books', level: 1 })).toBeVisible();
+  await expect(page.locator('main')).toHaveCount(1);
+  await axeScan(page, 'find-books');
+});
+
+test('admin book sources: no critical/serious a11y violations', async ({ page }) => {
+  await serveAcquisition(page, {
+    [`${ACQ_V1}/admin/acquisition`]: {
+      enabled: true, migration_status: 'ready', runtime: ACQ_RUNTIME,
+    },
+    [`${ACQ_V1}/admin/acquisition/connections`]: {
+      connections: [
+        { id: 'c1', label: 'Project Gutenberg', adapter: 'opds', enabled: true, revision: 1 },
+        { id: 'c2', label: 'Standard Ebooks', adapter: 'opds', enabled: false, revision: 1 },
+      ],
+    },
+    [`${ACQ_V1}/admin/acquisition/users`]: {
+      users: [
+        { id: 1, name: 'admin', access: false, auto_approve: false },
+        { id: 496, name: 'vlreader', access: true, auto_approve: false },
+      ],
+    },
+    [`${ACQ_V1}/admin/acquisition/jobs`]: {
+      jobs: [{
+        id: 'j3', connection_id: 'c1', state: 'awaiting_approval', owner_id: 496,
+        add_to_my_library: true, cancel_requested: false, error_code: null,
+        claim_count: 0, title: 'The Yellow Wallpaper',
+      }],
+    },
+  });
+
+  await page.goto('/app/admin/acquisition');
+  await expect(page.getByRole('heading', { name: 'Book sources', level: 1 })).toBeVisible();
+  // The queue is the section a failed read used to delete outright; scanning
+  // it populated is the only way axe sees the Approve control at all.
+  await expect(page.getByRole('heading', { name: 'Waiting for approval' })).toBeVisible();
+  await expect(page.locator('main')).toHaveCount(1);
+  await axeScan(page, 'admin-book-sources');
+});
+
+// Exercise the real reader independently in each palette before taking its
+// static accessibility snapshot. The reader has its own persisted theme.
+for (const theme of ['dark', 'light'] as const) {
+test(`reader/${theme}: TOC traps focus + Escape, named progressbar, no critical/serious`, async ({ page }) => {
   if (isPhoneProject()) test.skip();
-  // Find a book that offers the in-browser (epub) reader.
-  await page.goto('/app');
-  await page.locator('a[href*="/book/"]').first().click();
-  const readLink = page.locator('a[href*="/read/"]').first();
-  const hasReader = await readLink.isVisible().catch(() => false);
-  test.skip(!hasReader, 'no epub reader available in this library');
+  await page.addInitScript((value) => localStorage.setItem('cwng.reader.theme', value), theme);
+  // The seeded rig requires a readable EPUB. Await its detail query instead
+  // of checking isVisible immediately after navigation and silently skipping
+  // a still-loading reader link.
+  const response = await page.request.get('/api/v1/books?per_page=200&sort=new');
+  expect(response.ok()).toBeTruthy();
+  const book = (await response.json()).items.find((item: { formats: string[] }) =>
+    item.formats.some(format => format.toLowerCase() === 'epub'));
+  expect(book, 'the seeded a11y rig must contain an EPUB').toBeTruthy();
+  await page.goto(`/app/book/${book.id}`);
+  const readLink = page.getByRole('link', { name: 'Read now', exact: true });
+  await expect(readLink).toBeVisible();
   await readLink.click();
   await page.getByRole('button', { name: /table of contents/i }).waitFor({ state: 'visible', timeout: 30_000 });
 
@@ -141,8 +290,12 @@ test('reader: TOC traps focus + Escape, named progressbar, no critical/serious',
   await page.keyboard.press('Escape');
   await expect(toc).toBeHidden();
 
-  await axeScan(page, 'reader');
+  const frames = page.locator('iframe:visible');
+  await expect(frames.first(), 'the seeded EPUB must actually render').toBeVisible();
+  for (const frame of await frames.all()) await snapshotReaderFrameForAxe(frame);
+  await axeScan(page, 'reader', [theme]);
 });
+}
 
 test.describe('login (unauthenticated)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -181,11 +334,21 @@ test('skip link is the first tab stop and moves focus to <main>', async ({ page 
   expect(onMain).toBeTruthy();
 });
 
-test('book cards are a single tab stop (no nested tabindex)', async ({ page }) => {
+test('book-card destinations are sibling tab stops; selection remains one toggle', async ({ page }) => {
   await page.goto('/app');
   await page.locator('a[href*="/book/"]').first().waitFor({ state: 'visible' });
   // The old BookCard put tabIndex=0 on an inner <article>, a second tab stop.
   await expect(page.locator('article[tabindex]')).toHaveCount(0);
+
+  const bookLink = page.locator('a[aria-label^="Open details for"]').first();
+  await expect(bookLink.locator('a, button, [tabindex]:not([tabindex="-1"])')).toHaveCount(0);
+  const card = bookLink.locator('xpath=..');
+  const seriesLink = card.locator('a[data-testid="book-card-series"]');
+  if (await seriesLink.count()) {
+    await bookLink.focus();
+    await page.keyboard.press('Tab');
+    await expect(seriesLink).toBeFocused();
+  }
 });
 
 test('clickable announcement is a link with a sibling dismiss button', async ({ page }) => {

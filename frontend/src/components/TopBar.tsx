@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud } from 'lucide-react';
+import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud, LifeBuoy } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { KofiMark, KOFI_URL } from './KofiMark';
@@ -11,7 +11,7 @@ import { useT } from '../lib/i18n';
 import { collectContext, reportTarget } from '../lib/reportBuilder';
 import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
-import { canUploadBooks } from '../lib/permissions';
+import { canUploadBooks, showsProjectSupport } from '../lib/permissions';
 
 interface TopBarProps {
   userName: string;
@@ -73,7 +73,8 @@ function useMenu() {
     closeTimer.current = setTimeout(() => setOpen(false), 140);
   };
   const onTriggerClick = () => {
-    const next = !open;
+    clearClose();
+    const next = !pinnedRef.current;
     pinnedRef.current = next;
     setOpen(next);
   };
@@ -148,6 +149,9 @@ function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }
 
 function HelpMenu() {
   const t = useT();
+  const me = useMe().data;
+  const showProjectLinks = showsProjectSupport(me);
+  const hostSupport = !showProjectLinks && me?.support?.url;
   const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
   const unread = useWhatsNewUnread();
   // Prefill the issue with the version, the route SHAPE and a coarse browser,
@@ -181,15 +185,16 @@ function HelpMenu() {
             to="/whats-new"
             trailing={unread ? <span className={styles.itemDot} aria-hidden="true" /> : undefined}
             onSelect={close} />
-          <MenuItem
+          {showProjectLinks && <MenuItem
             icon={<IconWithBadge base={<Bug size={16} />} badge={<GithubMark />} />}
-            label={t('Report Issue on GitHub')} href={reportHref} onSelect={close} />
-          <MenuItem
+            label={t('Report Issue on GitHub')} href={reportHref} onSelect={close} />}
+          {showProjectLinks && <MenuItem
             icon={<IconWithBadge base={<Bug size={16} />} badge={<DiscordMark />} />}
-            label={t('Report Issue on Discord')} href={HELP_LINKS.discord} onSelect={close} />
-          <MenuItem icon={<DiscordMark size={15} />} label={t('Ask in Discord')} href={HELP_LINKS.discord} onSelect={close} />
+            label={t('Report Issue on Discord')} href={HELP_LINKS.discord} onSelect={close} />}
+          {showProjectLinks && <MenuItem icon={<DiscordMark size={15} />} label={t('Ask in Discord')} href={HELP_LINKS.discord} onSelect={close} />}
+          {hostSupport && <MenuItem icon={<LifeBuoy size={15} />} label={me.support?.label || t('Contact support')} href={hostSupport} onSelect={close} />}
           <MenuItem icon={<BookOpen size={15} />} label={t('Documentation')} href={HELP_LINKS.docs} onSelect={close} />
-          <MenuItem icon={<KofiMark size={16} />} label={t('Support on Ko-fi →')} href={KOFI_URL} onSelect={close} />
+          {showProjectLinks && <MenuItem icon={<KofiMark size={16} />} label={t('Support on Ko-fi →')} href={KOFI_URL} onSelect={close} />}
         </div>
       )}
     </div>
@@ -259,9 +264,7 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
 
 export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps) {
   const t = useT();
-  const [location, setLocation] = useLocation();
-  const deviceRoute = location === '/account/devices'
-    || location.startsWith('/account/devices/');
+  const [, setLocation] = useLocation();
   const rawSearch = useSearch();
   const urlQ = new URLSearchParams(rawSearch).get('q') || '';
   const [q, setQ] = useState(urlQ);
@@ -284,7 +287,7 @@ export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps
     });
   };
   return (
-    <header className={`${styles.bar} ${deviceRoute ? styles.barInFlow : ''}`}>
+    <header className={styles.bar}>
       <div className={styles.left}>
         {onMenu && (
           <button className={styles.menuBtn} onClick={onMenu} aria-label={t('Open navigation')}>

@@ -20,7 +20,11 @@ from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
                       generate_password_hash, reset_password)
 from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slug, theme_code
+from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
+                                   validate_default_font_updates)
 from ..admin import _delete_user
+from ..string_helper import strip_whitespaces
+from ..services.opds_filename import validate_template as validate_opds_filename_template
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
 # the safe, high-traffic display settings — the deep security config (LDAP,
@@ -33,7 +37,8 @@ from ..admin import _delete_user
 _UI_CONFIG_INT = ("config_books_per_page", "config_random_books",
                   "config_authors_max")
 _UI_CONFIG_STR = ("config_calibre_web_title", "config_default_language",
-                  "config_default_locale", "config_server_announcement")
+                  "config_default_locale", "config_server_announcement",
+                  "config_opds_filename_template")
 
 # SPA role key -> the User.role bitmask bit. ROLE_ANONYMOUS is intentionally
 # excluded — it's not an admin-assignable permission.
@@ -71,7 +76,10 @@ def _serialize_user(u):
         "locale": u.locale,
         "default_language": u.default_language,
         "is_guest": u.name == "Guest",
-        "roles": {key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+        "roles": {
+            **{key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+            "share_shelfs": bool(getattr(u, "share_shelfs", True)),
+        },
     }
     payload.update(user_library.mode_payload(u))
     return payload
@@ -165,7 +173,12 @@ def admin_my_library_intro_enable():
     guard = _require_admin()
     if guard:
         return guard
-    payload, report = user_library.enable_my_library_for_all()
+    try:
+        payload, report = user_library.enable_my_library_for_all()
+    except user_library.UserLibraryBusy as ex:
+        return _err('intro_busy', str(ex), 409)
+    except user_library.UserLibraryError as ex:
+        return _err('intro_enable_rejected', str(ex), 409)
     return jsonify({
         **payload,
         "results": report,
@@ -184,6 +197,8 @@ def admin_my_library_intro_undo():
         return guard
     try:
         payload, restored = user_library.undo_my_library_for_all()
+    except user_library.UserLibraryBusy as ex:
+        return _err("intro_busy", str(ex), 409)
     except user_library.UserLibraryError as ex:
         return _err("intro_undo_rejected", str(ex), 409)
     return jsonify({**payload, "restored_accounts": restored})
@@ -198,6 +213,8 @@ def admin_my_library_intro_dismiss():
         return guard
     try:
         payload = user_library.dismiss_my_library_admin_intro()
+    except user_library.UserLibraryBusy as ex:
+        return _err("intro_busy", str(ex), 409)
     except user_library.UserLibraryError as ex:
         return _err("intro_dismiss_rejected", str(ex), 409)
     return jsonify(payload)
@@ -267,7 +284,10 @@ def _ui_config_payload():
         "config_theme": config_theme_slug(config.config_theme),
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
+        "config_default_ui_font_body": getattr(config, "config_default_ui_font_body", ""),
+        "config_default_ui_font_display": getattr(config, "config_default_ui_font_display", ""),
         "config_server_announcement": config.config_server_announcement or "",
+        "config_opds_filename_template": getattr(config, "config_opds_filename_template", "") or "",
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
         "locales": locale_options(),
@@ -353,11 +373,24 @@ def admin_update_config():
     if guard:
         return guard
     data = request.get_json(silent=True) or {}
+    try:
+        font_updates = validate_default_font_updates(data)
+    except ValueError as ex:
+        return _err("invalid_request", str(ex), 400)
+    if "config_opds_filename_template" in data:
+        try:
+            validate_opds_filename_template(data["config_opds_filename_template"] if data["config_opds_filename_template"] is not None else "")
+        except ValueError as error:
+            return _err("invalid_opds_filename_template", str(error), 400)
+    integer_updates = {}
     for key in _UI_CONFIG_INT:
         if key in data:
             try:
-                setattr(config, key, int(data[key]))
-            except (TypeError, ValueError):
+                value = int(data[key])
+                if not -(2 ** 63) <= value < 2 ** 63:
+                    raise ValueError('Number exceeds the settings database range')
+                integer_updates[key] = value
+            except (TypeError, ValueError, OverflowError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
     if "config_theme" in data:
         # Validated against the SSOT slug set, exactly like the per-account
@@ -365,10 +398,15 @@ def admin_update_config():
         # instead of being stored and silently falling back to dark on read.
         if data["config_theme"] not in ALLOWED_THEME_SLUGS:
             return _err("invalid_request", "Invalid theme option", 400)
-        config.config_theme = theme_code(data["config_theme"])
+        integer_updates['config_theme'] = theme_code(data["config_theme"])
+    for key, value in integer_updates.items():
+        setattr(config, key, value)
     for key in _UI_CONFIG_STR:
         if key in data:
-            setattr(config, key, str(data[key] or ""))
+            value = str(data[key] or "")
+            setattr(config, key, strip_whitespaces(value) if key == "config_opds_filename_template" else value)
+    for key, value in font_updates.items():
+        setattr(config, key, value)
     try:
         config.save()
     except Exception as ex:
@@ -413,6 +451,7 @@ def admin_create_user():
             if roles.get(key):
                 role |= bit
         new_user.role = role
+        new_user.share_shelfs = bool(roles.get("share_shelfs", True))
     else:
         new_user.role = config.config_default_role
 
@@ -433,6 +472,7 @@ def admin_create_user():
     # Inherit the instance default theme, matching _handle_new_user. The account
     # keeps its own copy from here on — Account -> Theme edits User.theme only.
     new_user.theme = config_theme_code(config.config_theme)
+    seed_new_user_ui_font_defaults(new_user, config)
 
     try:
         ub.session.add(new_user)
@@ -493,12 +533,14 @@ def admin_update_user(user_id):
         if losing_admin and _other_admin_count(user.id) == 0:
             return _err("conflict", "Can't remove admin from the last administrator", 400)
         user.role = new_role
+        if "share_shelfs" in data["roles"]:
+            user.share_shelfs = bool(data["roles"]["share_shelfs"])
 
     try:
         if "email" in data:
             new_email = valid_email(data.get("email") or "")
             if new_email and new_email != user.email:
-                user.email = check_email(new_email)  # raises if taken
+                user.email = check_email(new_email, user.id)  # raises if taken
         if "kindle_mail" in data:
             user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "locale" in data and data["locale"]:
@@ -544,8 +586,8 @@ def admin_delete_user(user_id):
     if not user:
         return _err("not_found", "User not found", 404)
     try:
-        # _delete_user enforces the last-admin + Guest guards and purges the
-        # user's per-book data (read status, bookmarks, annotations + backups).
+        # _delete_user enforces the last-admin + Guest guards and purges
+        # everything app.db holds for the account (cps/user_account_data.py).
         _delete_user(user)
     except Exception as ex:
         ub.session.rollback()

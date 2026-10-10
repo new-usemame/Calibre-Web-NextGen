@@ -112,7 +112,7 @@ def test_portable_boundary_rejects_an_unrecognised_source():
 
     error = validate_portable_payload({"annotation_id": "dev-c", "source": "bogus"})
 
-    assert error == "source must be one of: kobo, koreader, webreader"
+    assert error == "source must be one of: kobo, koreader, textquote, webreader"
 
 
 def test_apply_portable_sets_origin_only_when_creating(session):
@@ -213,7 +213,7 @@ def test_apply_duplicate_is_suppressed(session):
     }
     _, first = apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
     _, second = apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
-    assert (first, second) == ("created", "skipped")
+    assert (first, second) == ("created", "unchanged")
     assert session.query(ub.Annotation).count() == 1
 
 

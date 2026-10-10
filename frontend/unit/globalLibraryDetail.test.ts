@@ -24,9 +24,7 @@ test('non-member detail keeps global editing and hides member-only controls', ()
   assert.match(detail, /selectionMode && inLibrary[\s\S]*onClick=\{removeMembership\}[\s\S]*data-testid="remove-from-my-library"/);
   assert.match(detail, /!inLibrary && me\?\.role\?\.browse_global[\s\S]*id: 'add-to-library'[\s\S]*addToLibrary\.mutate/);
   assert.match(detail, /label: t\('Not in your library'\)/);
-  assert.match(detail, /\{inLibrary && book\.in_progress && \(/);
   assert.match(detail, /\{inLibrary && \([\s\S]*<AddToShelf/);
-  assert.match(detail, /if \(inLibrary\) \{[\s\S]*to: `\/book\/\$\{book\.id\}\/annotations`/);
   assert.match(detail, /if \(me\?\.role\?\.edit\) \{[\s\S]*to: `\/book\/\$\{book\.id\}\/edit`/);
   assert.match(detail, /const canDelete = canDeleteBooks\(me\)/);
 

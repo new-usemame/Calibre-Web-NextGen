@@ -40,6 +40,12 @@ DIGEST = "0123456789abcdef0123456789abcdef"
 XPOINTER = "/body/DocFragment[7]/body/p[3]/text().12"
 
 
+@pytest.fixture(autouse=True)
+def gates_enforced(monkeypatch):
+    """Spec section 12: enforce the gates for every account in these tests."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "1")
+
+
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     built = LibraryWorld(monkeypatch, tmp_path)

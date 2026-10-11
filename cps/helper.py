@@ -1476,6 +1476,15 @@ def delete_book_file(book, calibrepath, book_format=None):
                    id=book.id,
                    path=book.path)
 
+def _same_filesystem_entry(first, second):
+    """True when two path spellings name one file or folder, e.g. a case-only
+    rename on a case-insensitive filesystem (APFS, NTFS, exFAT, SMB)."""
+    try:
+        return os.path.samefile(first, second)
+    except OSError:
+        return False
+
+
 def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdrive=False):
     for file_format in one_book.data:
         if not gdrive:
@@ -1502,8 +1511,10 @@ def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdriv
                     log.error("Neither old nor new file exists - cannot rename %s to %s", old_file, new_file)
                     continue
             
-            # Check if destination already exists
-            if os.path.exists(new_file) and old_file != new_file:
+            # Check if destination already exists. On a case-insensitive filesystem a
+            # case-only rename "finds" the source itself there; removing it would
+            # delete the only copy of the book (#2559).
+            if os.path.exists(new_file) and not _same_filesystem_entry(old_file, new_file):
                 log.warning("Destination file already exists, will overwrite: %s", new_file)
                 try:
                     os.remove(new_file)
@@ -1695,6 +1706,11 @@ def move_files_on_change(calibre_path, new_author_dir, new_titledir, localbook, 
                     except (OSError, IOError) as fallback_ex:
                         log.error("Copy tree fallback also failed: %s", fallback_ex)
                         raise
+            elif _same_filesystem_entry(path, new_path):
+                # Case-only rename on a case-insensitive filesystem: the "existing"
+                # folder is this book's own folder, so rename it in place (#2559).
+                log.debug("Renaming title folder in place: %s to %s", path, new_path)
+                os.rename(path, new_path)
             else:  # path is valid copy only files to new location (merge)
                 log.info("Moving title: %s into existing: %s", path, new_path)
                 # Take all files and subfolder from old path (strange command)

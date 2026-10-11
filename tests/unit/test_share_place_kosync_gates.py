@@ -537,3 +537,77 @@ def test_a_header_once_seen_makes_a_stock_registered_device_per_device(world):
     _put(world, 20, device_id="kindle-a", name="Kindle A")
 
     assert _devices_json(world)[kindle.public_id]["place_control"] == "per_device"
+
+
+# == 5b. Shared-row arbitration splits by who writes (coordinator, 2026-10-11) ==
+# An identified checked device's push is judged latest-wins against the shared
+# row; an unidentified push keeps today's rule exactly (furthest wins, with
+# same-device rewind), so a stock KOReader opening an old copy at 1% cannot pull
+# every checked device back.
+
+@pytest.fixture
+def checked_a(world):
+    device = _register(world, "kindle-a", "Kindle A")
+    _share(world, device, True)
+    return device
+
+
+def test_unidentified_backward_push_does_not_displace_a_checked_place(world, checked_a):
+    _put(world, 70, device_id="kindle-a", name="Kindle A")
+    _later()
+
+    _stock_reader_sets_shared(world, 30)
+
+    assert _shared_percent(world) == pytest.approx(70.0)
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.70)
+    assert _get_json(world)["percentage"] == pytest.approx(0.70)
+
+
+def test_unidentified_forward_push_still_moves_the_shared_place(world, checked_a):
+    _put(world, 70, device_id="kindle-a", name="Kindle A")
+    _later()
+
+    _stock_reader_sets_shared(world, 90)
+
+    assert _shared_percent(world) == pytest.approx(90.0)
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.90)
+
+
+def test_checked_backward_push_displaces_an_unidentified_place(world, checked_a):
+    _stock_reader_sets_shared(world, 70)
+    _later()
+
+    _put(world, 30, device_id="kindle-a", name="Kindle A")
+
+    assert _shared_percent(world) == pytest.approx(30.0)
+    assert _get_json(world)["percentage"] == pytest.approx(0.30)
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.30)
+
+
+def test_checked_stale_echo_does_not_displace_a_newer_unidentified_place(world, checked_a):
+    now = time.time()
+    _stock_reader_sets_shared(world, 40)  # received now, no client clock
+
+    # Further along, but reported before the unidentified place was received.
+    _put(world, 60, device_id="kindle-a", name="Kindle A", client_at=now - 300)
+
+    assert _shared_percent(world) == pytest.approx(40.0)
+    assert _get_json(world)["percentage"] == pytest.approx(0.40)
+
+
+# == 10b. A checked device's GET: its own row or the shared row, whichever is newer
+
+def test_turning_share_on_keeps_an_own_place_newer_than_the_shared_one(world):
+    _stock_reader_sets_shared(world, 70)
+    _later()
+    _put(world, 20, device_id="kindle-a", name="Kindle A")  # private, newer
+    device = _device_named(world, "Kindle A")
+
+    _share(world, device, True)
+
+    served = _get_json(world, device_id="kindle-a", name="Kindle A")
+    assert served["percentage"] == pytest.approx(0.20)
+    assert served["device_id"] == "kindle-a"

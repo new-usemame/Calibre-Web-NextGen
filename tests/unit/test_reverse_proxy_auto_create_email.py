@@ -153,7 +153,7 @@ def test_remote_email_header_is_never_stored_on_an_auto_created_account(um):
             "Remote-Email": "victim@example.com",
             "X-Remote-Email": "victim@example.com",
         }))
-    create.assert_called_once_with("stranger@example.com", "reverse proxy")
+    create.assert_called_once_with("stranger@example.com", auth_source="reverse proxy")
     created = um.ub.session.add.call_args[0][0]
     assert created.email == "stranger@example.com"
 
@@ -179,7 +179,14 @@ def test_user_with_email_ignores_values_that_are_not_one_address(um):
 def test_create_authenticated_user_stores_the_picked_email(um):
     um.ub.session.query.return_value.filter.return_value.first.return_value = None
     with patch.object(um, "_email_taken", _taken("rob@example.com")):
-        user = um.create_authenticated_user("rob@example.com", "reverse proxy")
+        user = um.create_authenticated_user("rob@example.com", auth_source="reverse proxy")
     assert user is not None
     assert user.email == "rob.example.com@localhost"
     um.ub.session.commit.assert_called_once()
+
+
+def test_an_offered_email_is_tried_before_the_username(um):
+    with patch.object(um, "_email_taken", _taken()):
+        assert um._auto_create_email("rob", "rob@example.com") == "rob@example.com"
+    with patch.object(um, "_email_taken", _taken("rob@example.com")):
+        assert um._auto_create_email("pat@example.com", "rob@example.com") == "pat@example.com"

@@ -113,7 +113,7 @@ def _user_with_email(address):
     return ub.session.query(ub.User).filter(func.lower(ub.User.email) == address.lower()).first()
 
 
-def _auto_create_email(username):
+def _auto_create_email(username, offered=None):
     """Pick the email for a user auto-created from proxy headers.
 
     Uses the username when it is an email address. Header-auth proxies such as
@@ -128,10 +128,15 @@ def _auto_create_email(username):
     <username>@localhost, with any @ in the username turned into a dot: a double-@
     fails valid_email() on the next profile save, and the user could never set a
     password.
+
+    ``offered`` is an address a trusted caller already knows (an OIDC claim, an
+    admin import). It is tried first, with the same checks; the reverse-proxy
+    login never passes one.
     """
     from .helper import valid_email
-    candidate = (username or "").strip()
-    if "@" in candidate and "," not in candidate:
+    for candidate in ((offered or "").strip(), (username or "").strip()):
+        if "@" not in candidate or "," in candidate:
+            continue
         try:
             candidate = valid_email(candidate)
         except Exception:
@@ -144,7 +149,7 @@ def _auto_create_email(username):
     return f"{username.replace('@', '.')}@localhost"
 
 
-def create_authenticated_user(username, auth_source="unknown"):
+def create_authenticated_user(username, email=None, auth_source="unknown"):
     """Create new user with default configuration settings for external authentication"""
     try:
         # Sanitize and validate username
@@ -167,7 +172,7 @@ def create_authenticated_user(username, auth_source="unknown"):
             log.warning("User '%s' already exists, returning existing user", username)
             return existing_user
             
-        email = _auto_create_email(username)
+        email = _auto_create_email(username, email)
 
         # Create user with same defaults as OAuth users
         user = ub.User()
@@ -432,7 +437,7 @@ def load_user_from_reverse_proxy_header(req):
 
         log.info("Reverse proxy authentication: attempting to create user '%s'", rp_header_username)
 
-        user = create_authenticated_user(rp_header_username, "reverse proxy")
+        user = create_authenticated_user(rp_header_username, auth_source="reverse proxy")
         if user:
             rate_limits.clear_current_limits(limiter)
             log.info("Reverse proxy authentication: successfully created user '%s'", user.name)

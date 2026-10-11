@@ -13,17 +13,17 @@ pytestmark = pytest.mark.unit
 NOW = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
 
 
-def test_five_minute_boundary_is_inclusive_but_next_instant_uses_receipt():
+def test_five_minute_boundary_after_receipt_is_inclusive_but_next_instant_uses_receipt():
     current = Report(NOW, NOW)
     received = NOW - timedelta(minutes=1)
-    boundary = NOW + timedelta(minutes=5)
-    assert report_wins(Report(boundary, received), current, now=NOW)
-    assert not report_wins(Report(boundary + timedelta(microseconds=1), received), current, now=NOW)
+    boundary = received + timedelta(minutes=5)
+    assert report_wins(Report(boundary, received), current)
+    assert not report_wins(Report(boundary + timedelta(microseconds=1), received), current)
 
 
 def test_naive_database_utc_and_offset_clocks_compare_as_instants():
     stored = Report(NOW.replace(tzinfo=None), NOW.replace(tzinfo=None))
     offset = timezone(timedelta(hours=-4))
     same = NOW.astimezone(offset)
-    assert not report_wins(Report(same, same), stored, now=NOW.replace(tzinfo=None))
-    assert report_wins(Report(same, same + timedelta(seconds=1)), stored, now=NOW)
+    assert not report_wins(Report(same, same), stored)
+    assert report_wins(Report(same, same + timedelta(seconds=1)), stored)

@@ -1514,7 +1514,8 @@ def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdriv
             # Check if destination already exists. On a case-insensitive filesystem a
             # case-only rename "finds" the source itself there; removing it would
             # delete the only copy of the book (#2559).
-            if os.path.exists(new_file) and not _same_filesystem_entry(old_file, new_file):
+            same_entry = _same_filesystem_entry(old_file, new_file)
+            if os.path.exists(new_file) and not same_entry:
                 log.warning("Destination file already exists, will overwrite: %s", new_file)
                 try:
                     os.remove(new_file)
@@ -1527,6 +1528,10 @@ def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdriv
                 log.debug("Successfully renamed %s to %s", old_file, new_file)
             except OSError as ex:
                 log.error("Failed to rename file from %s to %s: %s", old_file, new_file, ex)
+                if same_entry:
+                    # The file is still in place under its old name; a copy onto
+                    # itself would gain nothing, so keep the old name in the database.
+                    continue
                 # Try copy+delete as fallback for permission issues (e.g., network shares,
                 # cross-ownership bind mounts — janeczku/calibre-web#3437).
                 try:
@@ -1709,6 +1714,8 @@ def move_files_on_change(calibre_path, new_author_dir, new_titledir, localbook, 
             elif _same_filesystem_entry(path, new_path):
                 # Case-only rename on a case-insensitive filesystem: the "existing"
                 # folder is this book's own folder, so rename it in place (#2559).
+                # A rename through a temporary name is unsafe here: Docker Desktop's
+                # bind mount can report the second step as done without doing it.
                 log.debug("Renaming title folder in place: %s to %s", path, new_path)
                 os.rename(path, new_path)
             else:  # path is valid copy only files to new location (merge)

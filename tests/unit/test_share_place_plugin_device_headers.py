@@ -16,8 +16,16 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-TEST = (Path(__file__).resolve().parents[2] / "koreader" / "plugins"
-        / "cwngsync.koplugin" / "tests" / "share_place_device_headers_test.lua")
+TESTS = (Path(__file__).resolve().parents[2] / "koreader" / "plugins"
+         / "cwngsync.koplugin" / "tests")
+TEST = TESTS / "share_place_device_headers_test.lua"
+DORMANT = TESTS / "share_place_guard_dormant_test.lua"
+
+
+@pytest.fixture(autouse=True)
+def gates_enforced(monkeypatch):
+    """Rollout switch on (spec section 12); the plugin side does not read it."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "1")
 
 
 def _lua():
@@ -33,3 +41,10 @@ def test_progress_pull_and_push_send_the_device_identity_headers():
                             capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "share-place device header tests passed" in result.stdout
+
+
+def test_builtin_sync_guard_stays_dormant_unless_the_server_enforces_gates():
+    result = subprocess.run([_lua(), DORMANT.name], cwd=DORMANT.parent,
+                            capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "share-place guard dormant tests passed" in result.stdout

@@ -49,6 +49,16 @@ ADVERTISES = {"position_kinds": "locator,percentage"}
 
 # -- the world ----------------------------------------------------------------
 
+SWITCH = "CWNG_SHARE_PLACE_GATES"
+
+
+@pytest.fixture(autouse=True)
+def gates_enforced(monkeypatch):
+    """Rollout switch (spec section 12): every test here runs with the gates
+    on for everyone unless it says otherwise."""
+    monkeypatch.setenv(SWITCH, "1")
+
+
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     built = LibraryWorld(monkeypatch, tmp_path)
@@ -611,3 +621,200 @@ def test_turning_share_on_keeps_an_own_place_newer_than_the_shared_one(world):
     served = _get_json(world, device_id="kindle-a", name="Kindle A")
     assert served["percentage"] == pytest.approx(0.20)
     assert served["device_id"] == "kindle-a"
+
+
+# == 12. Rollout switch: gates enforce only when the server switch says so =====
+# CWNG_SHARE_PLACE_GATES is read on every request: "1" is everyone,
+# "user:3,107" is only those account ids, anything else (or unset) is off.
+
+def _assert_todays_behaviour_for_an_identified_unchecked_device(world):
+    _stock_reader_sets_shared(world, 70)
+
+    _put(world, 90, device_id="kindle-a", name="Kindle A")
+    assert _shared_percent(world) == pytest.approx(90.0)
+    _status_now, bookmark, _ = _account_state(world)
+    assert bookmark == pytest.approx(90.0)
+
+    # A second unchecked device going back is not served its own place.
+    _put(world, 10, device_id="kindle-b", name="Kindle B")
+    assert _shared_percent(world) == pytest.approx(90.0)
+    assert _get_json(world, device_id="kindle-b", name="Kindle B")["percentage"] == \
+        pytest.approx(0.90)
+
+
+def _assert_gated_for_an_identified_unchecked_device(world):
+    _stock_reader_sets_shared(world, 70)
+
+    _put(world, 90, device_id="kindle-a", name="Kindle A")
+
+    assert _shared_percent(world) == pytest.approx(70.0)
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.90)
+
+
+def test_switch_off_by_default_keeps_todays_behaviour(world, monkeypatch):
+    monkeypatch.delenv(SWITCH, raising=False)
+    _assert_todays_behaviour_for_an_identified_unchecked_device(world)
+
+
+@pytest.mark.parametrize("value", ["0", "", "yes", "true", "user:", "users:1"])
+def test_switch_values_other_than_on_or_an_allow_list_are_off(world, monkeypatch, value):
+    monkeypatch.setenv(SWITCH, value)
+    _assert_todays_behaviour_for_an_identified_unchecked_device(world)
+
+
+def test_allow_list_without_this_account_keeps_todays_behaviour(world, monkeypatch):
+    monkeypatch.setenv(SWITCH, f"user:{world.reader.id + 100},{world.reader.id + 101}")
+    _assert_todays_behaviour_for_an_identified_unchecked_device(world)
+
+
+def test_allow_list_with_this_account_is_gated(world, monkeypatch):
+    monkeypatch.setenv(SWITCH, f"user:{world.reader.id + 100},{world.reader.id}")
+    _assert_gated_for_an_identified_unchecked_device(world)
+
+
+def test_switch_is_read_on_every_request(world, monkeypatch):
+    monkeypatch.delenv(SWITCH, raising=False)
+    _stock_reader_sets_shared(world, 70)
+    _put(world, 20, device_id="kindle-a", name="Kindle A")
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.70)
+
+    monkeypatch.setenv(SWITCH, "1")
+
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.20)
+
+
+def _auth(world):
+    response = world.client.get("/kosync/users/auth", headers=_headers())
+    assert response.status_code == 200
+    return response.get_json()
+
+
+@pytest.mark.parametrize("value, expected", [
+    (None, False),
+    ("0", False),
+    ("1", True),
+    ("user:{other}", False),
+    ("user:{other},{me}", True),
+])
+def test_auth_reply_tells_the_plugin_whether_gates_are_enforced(
+        world, monkeypatch, value, expected):
+    if value is None:
+        monkeypatch.delenv(SWITCH, raising=False)
+    else:
+        monkeypatch.setenv(SWITCH, value.format(other=world.reader.id + 100,
+                                                me=world.reader.id))
+
+    body = _auth(world)
+
+    assert body["authorized"] == "OK"
+    assert body["share_place_gates"] is expected
+
+
+# == 12. Client timestamp validation on PUT ===================================
+# Only a finite JSON number is a client clock. Anything else (missing, null,
+# a string, a bool, NaN, inf), and any value <= 0 or before 2000-01-01, is
+# treated as missing: the report time is the server's receipt. Never a 400.
+# A far-future clock is left to the arbiter's clamp.
+
+Y2000 = 946684800  # 2000-01-01T00:00:00Z
+
+
+def _put_raw_timestamp(world, percent, *, device_id, name, timestamp_json):
+    """A push whose ``timestamp`` is written verbatim into the JSON text, so
+    NaN / Infinity / strings / booleans reach the server as sent."""
+    body = ('{"document": "%s", "progress": "%s", "percentage": %r, "device": "%s", '
+            '"device_id": "%s", "timestamp": %s}'
+            % (DIGEST, XPOINTER, percent / 100.0, name, device_id, timestamp_json))
+    response = world.client.put(
+        "/kosync/syncs/progress", data=body, content_type="application/json",
+        headers=_headers(device_id, name),
+    )
+    world.session.expire_all()
+    return response
+
+
+def _junk_values(now):
+    return [
+        "null", "true", "false",
+        '"%d"' % int(now + 180),   # a number in a string is not a number
+        '"%d"' % int(now - 3600),
+        '"soon"',
+        "NaN", "Infinity", "-Infinity",
+        "0", "-5", str(Y2000 - 1), "%r" % (Y2000 - 0.5),
+    ]
+
+
+@pytest.mark.parametrize("index", range(13))
+def test_a_junk_client_clock_is_receipt_time_on_both_sides(world, two_checked, index):
+    now = time.time()
+    junk = _junk_values(now)[index]
+    _put(world, 70, device_id="kindle-a", name="Kindle A", client_at=now - 120)
+
+    # Read as receipt time, B's report is newer than A's and wins; read as an
+    # ancient clock it would lose.
+    response = _put_raw_timestamp(world, 30, device_id="kindle-b", name="Kindle B",
+                                  timestamp_json=junk)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.30)
+
+    # Read as receipt time, a later genuine clock beats it; read as a
+    # near-future clock it would still hold.
+    _put(world, 50, device_id="kindle-a", name="Kindle A", client_at=time.time() + 60)
+    assert _get_json(world, device_id="kindle-a", name="Kindle A")["percentage"] == \
+        pytest.approx(0.50)
+
+
+def test_a_junk_clock_cannot_win_a_stale_echo(world, two_checked):
+    now = time.time()
+    _put(world, 30, device_id="kindle-b", name="Kindle B", client_at=now + 120)
+
+    # A's echo carries its old place with a clock it sent as a string.
+    response = _put_raw_timestamp(world, 70, device_id="kindle-a", name="Kindle A",
+                                  timestamp_json='"%d"' % int(now + 240))
+
+    assert response.status_code == 200
+    assert _get_json(world)["percentage"] == pytest.approx(0.30)
+
+
+@pytest.mark.parametrize("clock", [
+    lambda now: Y2000,                 # the first instant that counts
+    lambda now: float(now - 200.5),    # a float is a JSON number too
+])
+def test_a_finite_number_from_2000_on_is_the_client_clock(world, two_checked, clock):
+    now = time.time()
+    _put(world, 70, device_id="kindle-a", name="Kindle A", client_at=now - 120)
+
+    response = _put_raw_timestamp(world, 30, device_id="kindle-b", name="Kindle B",
+                                  timestamp_json=repr(clock(now)))
+
+    assert response.status_code == 200
+    # Older than A's report by its own clock, so it loses.
+    assert _get_json(world)["percentage"] == pytest.approx(0.70)
+
+
+def test_a_far_future_clock_is_clamped_by_the_arbiter(world, two_checked):
+    now = time.time()
+    response = _put_raw_timestamp(world, 70, device_id="kindle-a", name="Kindle A",
+                                  timestamp_json=str(int(now + 86400 * 365)))
+    assert response.status_code == 200
+    _later()
+
+    _put(world, 30, device_id="kindle-b", name="Kindle B")
+
+    assert _get_json(world)["percentage"] == pytest.approx(0.30)
+
+
+# == CWNG's stale-echo shape: stock push at T, checked echo at T-10m ===========
+
+def test_checked_echo_ten_minutes_old_loses_to_a_stock_push(world, checked_a):
+    _stock_reader_sets_shared(world, 40)  # received at T
+    t = time.time()
+
+    _put(world, 80, device_id="kindle-a", name="Kindle A", client_at=t - 600)
+
+    assert _shared_percent(world) == pytest.approx(40.0)
+    assert _get_json(world)["percentage"] == pytest.approx(0.40)

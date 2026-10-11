@@ -4,7 +4,7 @@
 .section form { display: flex; flex-direction: column; align-items: start; gap: var(--sp-2); }
 .section select { min-height: 44px; width: min(100%, 480px); padding: var(--sp-2); color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); font: inherit; }
 .section select:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
-.section button { min-height: 44px; }
+.section button { min-height: 44px; height: auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .checkbox { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; }
 .checkbox input { width: 24px; height: 24px; accent-color: var(--accent); }
 .hint { color: var(--text-muted); font-size: var(--fs-sm); }

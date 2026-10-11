@@ -212,6 +212,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   onClick={onNavigate}
                   title={s.name}
                 >
+                  <span className={styles.shelfInitials} aria-hidden="true">{s.name}</span>
                   <span className={styles.shelfName}>{s.name}</span>
                   <span className={styles.shelfCount}>{s.count}</span>
                 </Link>

@@ -103,10 +103,10 @@
       return r.json();
     })
     .then(data => {
-      showNotification('{{ _("Convert Library scheduled successfully") }}', 'success');
+      showNotification({{ _("Convert Library scheduled successfully")|tojson }}, 'success');
     })
     .catch(err => {
-      showNotification('{{ _("Error scheduling Convert Library") }}: ' + err.message, 'danger');
+      showNotification({{ _("Error scheduling Convert Library")|tojson }} + ': ' + err.message, 'danger');
     });
   }
   
@@ -124,7 +124,7 @@
       // the rest of the run. Back off and keep trying instead.
       console.error("Error: ", e);
       pollFailures += 1;
-      document.getElementById("pollMessage").textContent = "{{ _('Lost contact with the server, retrying...') }}";
+      document.getElementById("pollMessage").textContent = {{ _("Lost contact with the server, retrying...")|tojson }};
       timeout = setTimeout(getStatus, Math.min(30000, 1000 * Math.pow(2, pollFailures)));
       return;
     }

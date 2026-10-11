@@ -79,6 +79,7 @@ _counter = itertools.count(1)
 # NOT NULL columns without a default whose CHECK constraints a dummy value
 # would violate.
 _OVERRIDES = {
+    "book_rating": {"rating": 8},
     "notice_event": {"scope": "global", "book_id": None},
     "device_storage_snapshot": {"total_bytes": 10, "free_bytes": 5},
     "kobo_annotation_seed_capture": {"result": "pending",

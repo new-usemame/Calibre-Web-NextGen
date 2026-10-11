@@ -220,7 +220,8 @@ end
 function Home:loadCatalog()
     local state = self.plugin:getLibraryState()
     local root = self.plugin:getLibraryRoot()
-    local all = Catalog.entries(state.manifest or {}, state.books or {}, root)
+    local books, shelves = self.plugin:libraryCatalog()
+    local all = Catalog.entries(books or {}, state.books or {}, root)
     local present, tracked = {}, {}
     for _, entry in ipairs(all) do
         if entry.present then present[#present + 1] = entry end
@@ -235,7 +236,7 @@ function Home:loadCatalog()
         present[#present + 1] = entry
     end
     self.all_entries = present
-    self.shelves = state.shelves or {}
+    self.shelves = shelves or {}
 end
 
 function Home:entries()

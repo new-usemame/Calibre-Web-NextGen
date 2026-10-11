@@ -51,3 +51,17 @@ export function withLookupMode(target: string, lookup: boolean): string {
   params.set('lookup', '1');
   return `${path}?${params.toString()}${hash}`;
 }
+
+/**
+ * Hand the page's own fragment to the bundled pdf.js viewer (#2537).
+ *
+ * pdf.js reads its viewer options (`page`, `zoom`, `search`, `nameddest`,
+ * `pagemode`) from its own location hash, so `/app/view/7/pdf#page=12` only
+ * opens on page 12 if the iframe URL carries that same `#page=12`.
+ */
+export function withViewerHash(target: string, hash: string): string {
+  const hashIndex = target.indexOf('#');
+  const base = hashIndex < 0 ? target : target.slice(0, hashIndex);
+  const fragment = hash.startsWith('#') ? hash.slice(1) : hash;
+  return fragment ? `${base}#${fragment}` : base;
+}

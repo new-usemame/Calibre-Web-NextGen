@@ -138,7 +138,8 @@ class TaskConvert(CalibreTask):
                                                                self.settings['body'],
                                                                id=self.book_id,
                                                                internal=True,
-                                                               cover_user_id=self.cover_user_id)
+                                                               cover_user_id=self.cover_user_id,
+                                                               attachment_name=self.settings.get("attachment_name"))
                                           )
                 except Exception as ex:
                     return self._handleError(str(ex))
@@ -240,6 +241,10 @@ class TaskConvert(CalibreTask):
                 self.results['path'] = cur_book.path
                 self.title = cur_book.title
                 self.results['title'] = self.title
+                # #1110: the start of a conversion was logged but its success
+                # was not, so a finished conversion looked like a stalled one.
+                log.info("Book id %d converted from %s to %s.",
+                         book_id, format_old_ext, format_new_ext)
                 if not config.config_use_google_drive:
                     self._handleSuccess()
                 return os.path.basename(file_path + format_new_ext)

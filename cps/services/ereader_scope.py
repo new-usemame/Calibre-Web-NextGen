@@ -84,13 +84,10 @@ def magic_shelves_off_warning():
     """What a reader is told on marking a magic shelf while the admin's magic
     shelf sync setting is off. That one setting also governs the KOReader
     library, and is labelled for e-readers once KOReader sync is on."""
-    if koreader_library_on():
-        return _("E-reader sync for Magic Shelves is disabled globally — this shelf "
-                 "won't reach your e-readers until 'Sync Magic Shelves to e-readers "
-                 "(Kobo and KOReader)' is enabled in CWA Settings.")
-    return _("Kobo sync for Magic Shelves is disabled globally — "
-             "this shelf won't reach your Kobo until 'Sync Magic "
-             "Shelves to Kobo' is enabled in CWA Settings.")
+    setting = (_("Sync smart shelves to e-readers (Kobo and KOReader)")
+               if koreader_library_on() else _("Sync smart shelves to Kobo"))
+    return _("Smart-shelf sync is disabled globally. Enable “%(setting)s” in CWA Settings "
+             "so this shelf can reach your e-readers.", setting=setting)
 
 
 def personal_library(user):

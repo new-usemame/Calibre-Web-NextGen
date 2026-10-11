@@ -168,7 +168,7 @@ def shelf_route_client(opds_library, monkeypatch):
 
     monkeypatch.setattr(shelf_module, "render_title_template", _render_shelf)
     monkeypatch.setattr(
-        shelf_module, "_", lambda message, **values: message % values
+        shelf_module, "_", lambda message, **values: message % values if values else message
     )
 
     client = app.test_client()

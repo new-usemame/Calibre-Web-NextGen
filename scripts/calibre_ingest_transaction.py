@@ -260,8 +260,58 @@ def _epub_container_paths(payload):
     return paths or None
 
 
+class _OrdinaryContainerBuilder(ET.TreeBuilder):
+    def pi(self, target, text):
+        # Processing instructions can affect consumers, including outside the root.
+        raise ValueError("unsupported container processing instruction")
+
+
+def _ordinary_container_identity(payload):
+    """Only standard single-rootfile locators, never general XML equivalence."""
+    if _epub_container_paths(payload) is None:
+        return None
+    try:
+        root = ET.fromstring(payload, parser=ET.XMLParser(target=_OrdinaryContainerBuilder()))
+    except (ET.ParseError, ValueError):
+        return None
+    ns = "{urn:oasis:names:tc:opendocument:xmlns:container}"
+    if root.tag != ns + "container" or root.attrib != {"version": "1.0"} or len(root) != 1:
+        return None
+    files = root[0]
+    if files.tag != ns + "rootfiles" or files.attrib or len(files) != 1:
+        return None
+    item = files[0]
+    if (item.tag != ns + "rootfile" or len(item)
+            or set(item.attrib) != {"full-path", "media-type"}
+            or item.get("media-type") != "application/oebps-package+xml"
+            or not item.get("full-path")):
+        return None
+    if any((node.text or "").strip(" \t\r\n") or (node.tail or "").strip(" \t\r\n")
+           for node in (root, files, item)):
+        return None
+    return json.dumps(["1.0", item.get("full-path"), item.get("media-type")],
+                      ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _epub_framed_digest(payloads, frame):
+    digest = hashlib.sha256()
+    digest.update(frame)
+    for name in sorted(payloads):
+        size, member_digest = payloads[name]
+        digest.update(struct.pack(">Q", len(name)))
+        digest.update(name)
+        digest.update(struct.pack(">Q", size))
+        digest.update(member_digest)
+    return digest.hexdigest()
+
+
 def epub_resource_digest(path, *, budget=None):
-    """Hash exact regular EPUB resources, independent of ZIP packaging details.
+    """Backward-compatible exact-resource v2 identity."""
+    return epub_resource_identities(path, budget=budget).get(2)
+
+
+def epub_resource_identities(path, *, budget=None):
+    """Compute exact v2 and optional ordinary-locator v3 in one bounded ZIP pass.
 
     The canonical stream frames each UTF-8 path and its uncompressed length,
     then its SHA-256 payload digest, in bytewise path order. Empty directory
@@ -276,20 +326,20 @@ def epub_resource_digest(path, *, budget=None):
         source = Path(path)
         st = source.lstat()
         if not stat.S_ISREG(st.st_mode):
-            return None
+            return {}
         if st.st_size > budget.remaining_archive_bytes:
             budget.remaining_archive_bytes = 0
-            return None
+            return {}
         budget.remaining_archive_bytes -= st.st_size
         if st.st_size > _EPUB_PACKAGE_BYTES or not _epub_metadata_bounded(source, st.st_size):
-            return None
+            return {}
         with zipfile.ZipFile(source, "r") as archive:
             infos = archive.infolist()
             if not infos or len(infos) > _EPUB_ENTRY_COUNT:
-                return None
+                return {}
             if (infos[0].filename != "mimetype" or infos[0].header_offset != 0
                     or infos[0].compress_type != zipfile.ZIP_STORED):
-                return None
+                return {}
             names = set()
             regular = []
             local_records = []
@@ -298,88 +348,85 @@ def epub_resource_digest(path, *, budget=None):
             for info in infos:
                 name = _epub_name(info)
                 if name is None or name in names:
-                    return None
+                    return {}
                 names.add(name)
                 mode = (info.external_attr >> 16) & 0xFFFF
                 kind = stat.S_IFMT(mode)
                 directory = info.is_dir()
                 if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
-                    return None
+                    return {}
                 if info.flag_bits & ~(0x800 | 8 | 6) or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
-                    return None
+                    return {}
                 if directory and (info.file_size or kind == stat.S_IFREG):
-                    return None
+                    return {}
                 if ((not directory and kind == stat.S_IFDIR) or info.file_size > _EPUB_MEMBER_BYTES
                         or (name == b"META-INF/container.xml" and info.file_size > 2 * 1024 * 1024)):
-                    return None
+                    return {}
                 if info.compress_size == 0 and info.file_size:
-                    return None
+                    return {}
                 if info.compress_size and info.file_size > info.compress_size * _EPUB_RATIO:
-                    return None
+                    return {}
                 total += info.file_size
                 if total > _EPUB_EXPANDED_BYTES:
-                    return None
+                    return {}
                 record = _epub_local_header(archive, info, name)
                 if not record:
-                    return None
+                    return {}
                 local_records.append((info.header_offset, record[1]))
                 if not directory:
                     regular_names.add(name.decode("utf-8"))
                 regular.append((name, info, record[0], directory))
             if not regular or regular[0][0] != b"mimetype":
-                return None
+                return {}
             end = 0
             for start, record_end in sorted(local_records):
                 if start != end:
-                    return None
+                    return {}
                 end = record_end
             if end != archive.start_dir:
-                return None
+                return {}
             for name, _info, _start, directory in regular:
                 parts = name.decode("utf-8").rstrip("/").split("/")
                 if (directory and "/".join(parts) in regular_names
                         or any("/".join(parts[:index]) in regular_names for index in range(1, len(parts)))):
-                    return None
+                    return {}
             payloads = {}
             container = None
             for name, info, payload_start, directory in regular:
                 result = _epub_read_resource(archive.fp, info, payload_start, budget)
                 if result is None:
-                    return None
+                    return {}
                 count, member_digest, captured = result
                 if directory:
                     if count:
-                        return None
+                        return {}
                     continue
                 if name == b"mimetype" and member_digest != hashlib.sha256(b"application/epub+zip").digest():
-                    return None
+                    return {}
                 if captured is not None:
                     container = captured
                 payloads[name] = (count, member_digest)
             if container is None or len(container) > 2 * 1024 * 1024:
-                return None
+                return {}
             rootfiles = _epub_container_paths(container)
             if not rootfiles:
-                return None
+                return {}
             for rootfile in rootfiles:
                 try:
                     root_name = rootfile.encode("utf-8", "strict")
                 except UnicodeError:
-                    return None
+                    return {}
                 if root_name not in payloads or b"/" in root_name[:1] or b"\\" in root_name:
-                    return None
-            digest = hashlib.sha256()
-            digest.update(_EPUB_FRAME)
-            for name in sorted(payloads):
-                size, member_digest = payloads[name]
-                digest.update(struct.pack(">Q", len(name)))
-                digest.update(name)
-                digest.update(struct.pack(">Q", size))
-                digest.update(member_digest)
-            return digest.hexdigest()
+                    return {}
+            identities = {2: _epub_framed_digest(payloads, _EPUB_FRAME)}
+            normalized = _ordinary_container_identity(container)
+            if normalized is not None and b"META-INF/signatures.xml" not in payloads:
+                payloads[b"META-INF/container.xml"] = (len(normalized), hashlib.sha256(normalized).digest())
+                identities[3] = _epub_framed_digest(payloads, b"cwng-epub-ordinary-container-v3\0")
+            return identities
     except (OSError, RuntimeError, ValueError, zipfile.BadZipFile, zipfile.LargeZipFile,
             EOFError, UnicodeError, struct.error, NotImplementedError):
-        return None
+        return {}
 
 from calibre.db.adding import run_import_plugins, run_import_plugins_before_metadata
 from calibre.db.legacy import LibraryDatabase
@@ -606,7 +653,7 @@ def acquisition_result(cache, digest):
     if result["source_sha256"] != digest or not result["book_ids"]:
         raise RuntimeError("invalid acquisition provenance")
     if (result.get("disposition") == "existing_retained"
-            and result.get("artifact_identity_version") not in (1, 2)):
+            and result.get("artifact_identity_version") not in (1, 2, 3)):
         # Earlier versions retained title/author matches without proving that
         # the selected artifact was present. Reinspect for future requests;
         # historical application receipts remain an audit of their old import.
@@ -630,7 +677,8 @@ def add_acquisition(cache, metadata, extension, path, source_digest):
 
     Metadata matches are candidates only. Exact prepared bytes are preferred;
     EPUBs may also retain a deterministic book with exactly equal resources
-    across ZIP repackaging. Different or unsupported resources stay separate.
+    across ZIP repackaging or ordinary container-locator serialization.
+    Different publication resources and unsupported locators stay separate.
     Provenance describes the bytes actually retained/copied, after import plugins.
     """
     candidates = identical_format_paths(cache, metadata, extension)
@@ -643,21 +691,28 @@ def add_acquisition(cache, metadata, extension, path, source_digest):
         return digest == prepared_digest
 
     selected = next((candidate for candidate in candidates if has_prepared_bytes(candidate)), None)
-    resource_match = False
+    identity_version = 1
     if selected is None and candidates and extension.lower() == "epub":
         budget = EpubScanBudget()
-        prepared_resources = epub_resource_digest(path, budget=budget)
-        if prepared_resources is not None:
-            # Bound additional decompression across metadata matches. Unsupported
-            # or over-budget candidates simply retain the separate-record policy.
+        prepared_resources = epub_resource_identities(path, budget=budget)
+        locator_candidate = None
+        if prepared_resources:
+            # One shared scan budget; exact resources outrank an earlier locator match.
             for candidate in candidates[:32]:
                 stored = stored_format_path(cache, candidate["path"])
                 if stored is None or candidate_digests.get(candidate["book_id"]) is None:
                     continue
-                if epub_resource_digest(stored, budget=budget) == prepared_resources:
+                current = epub_resource_identities(stored, budget=budget)
+                if current.get(2) == prepared_resources[2]:
                     selected = candidate
-                    resource_match = True
+                    identity_version = 2
                     break
+                if (locator_candidate is None and 3 in prepared_resources
+                        and current.get(3) == prepared_resources[3]):
+                    locator_candidate = candidate
+            if selected is None and locator_candidate is not None:
+                selected = locator_candidate
+                identity_version = 3
     if selected is not None:
         book_ids = {selected["book_id"]}
         imported_digest = candidate_digests[selected["book_id"]]
@@ -680,7 +735,7 @@ def add_acquisition(cache, metadata, extension, path, source_digest):
     result = {"status": "imported", "source_sha256": source_digest,
               "imported_sha256": imported_digest, "book_ids": sorted(book_ids),
               "disposition": disposition, "format": extension,
-              "artifact_identity_version": 2 if resource_match else 1}
+              "artifact_identity_version": identity_version}
     persisted = json.dumps({key: value for key, value in result.items() if key != "status"}, sort_keys=True)
     attach_marker(cache, book_ids, source_digest)
     cache.backend.execute(

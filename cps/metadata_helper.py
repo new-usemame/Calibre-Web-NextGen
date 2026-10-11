@@ -131,6 +131,9 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                     
             except Exception as e:
                 log.warning(f"Error fetching metadata from provider {provider_id}: {e}")
+                # Each provider must start on a usable session: one that failed
+                # mid-flush would otherwise fail every provider after it (#2435).
+                calibre_db_instance.session.rollback()
                 continue
                 
         calibre_db_instance.session.close()
@@ -154,6 +157,9 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         bool: True if metadata was successfully applied
     """
     cover_stage = None
+    # Read before any flush can fail: afterwards the session refuses to load
+    # expired attributes until it is rolled back.
+    book_id = getattr(book, 'id', 'unknown')
     previous_cover_metadata = (
         getattr(book, 'has_cover', 0),
         getattr(book, 'last_modified', None),
@@ -300,13 +306,12 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             not (use_smart_application and book.ratings)):
             try:
                 rating_value = float(metadata.rating)
-                if 0 <= rating_value <= 10:  # Calibre uses 0-10 scale
-                    if book.ratings:
-                        book.ratings[0].rating = int(rating_value * 2)  # Convert to Calibre's 0-10 scale
-                    else:
-                        rating = db.Ratings(rating=int(rating_value * 2))
-                        calibre_db_instance.session.add(rating)
-                        book.ratings = [rating]
+                # MetaRecord.rating is 0-5 stars; calibre stores half-stars, 0-10.
+                if 0 < rating_value <= 5:
+                    # ratings is a shared lookup table (one row per value), so link
+                    # the book to the row for its value rather than inserting a
+                    # duplicate or rewriting a row other books point at (#2435).
+                    book.ratings = [_rating_row(calibre_db_instance.session, int(rating_value * 2))]
                     updated = True
             except (ValueError, TypeError):
                 pass
@@ -406,12 +411,21 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         return updated
         
     except Exception as e:
-        log.error(f"Error applying metadata to book {getattr(book, 'id', 'unknown')}: {e}")
+        calibre_db_instance.session.rollback()
+        log.error(f"Error applying metadata to book {book_id}: {e}")
         if cover_stage is not None:
             cover_stage.discard()
-        calibre_db_instance.session.rollback()
         book.has_cover, book.last_modified = previous_cover_metadata
         return False
+
+
+def _rating_row(session, value):
+    """Return the shared ``ratings`` row for ``value``, creating it if the library has none."""
+    rating = session.query(db.Ratings).filter(db.Ratings.rating == value).first()
+    if rating is None:
+        rating = db.Ratings(rating=value)
+        session.add(rating)
+    return rating
 
 
 def _apply_cover_from_metadata(book, metadata):
@@ -518,12 +532,86 @@ def _normalize_title(value):
     return text
 
 
+# Words that announce a volume number, with the spelling each one compares as,
+# so "Vol. 2", "Volume 2" and "Vol 2" are the same words (fork #2479). A roman
+# numeral or number word only counts as a number straight after one of these
+# ("Part II", "Book Two"), because "I" and "one" are ordinary words elsewhere.
+_VOLUME_MARKERS = {
+    "vol": "vol", "vols": "vol", "volume": "vol", "part": "part", "pt": "part",
+    "book": "book", "bk": "book", "no": "no", "number": "no", "issue": "issue",
+    "episode": "episode", "season": "season", "chapter": "chapter",
+    "tome": "tome",
+}
+
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+}
+
+_ROMAN_NUMERALS = {
+    "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8,
+    "ix": 9, "x": 10, "xi": 11, "xii": 12, "xiii": 13, "xiv": 14, "xv": 15,
+    "xvi": 16, "xvii": 17, "xviii": 18, "xix": 19, "xx": 20,
+}
+
+# A marker written straight onto its number: "Vol12", "Pt3".
+_GLUED_VOLUME_RE = re.compile(r"^(" + "|".join(
+    sorted(_VOLUME_MARKERS, key=len, reverse=True)) + r")(\d+)$")
+
+
+def _title_tokens(value):
+    """Normalized title words with volume markers and the numbers after them
+    in one spelling: "Volume Two" and "Vol. 2" both become ``vol 2``
+    (fork #2479)."""
+    tokens = []
+    for word in _normalize_title(value).split():
+        glued = _GLUED_VOLUME_RE.match(word)
+        if glued:
+            tokens.extend((_VOLUME_MARKERS[glued.group(1)], str(int(glued.group(2)))))
+            continue
+        if word.isdecimal():
+            tokens.append(str(int(word)))
+            continue
+        # "no" is too common a word ("No One Lives Forever") to turn the word
+        # after it into a number; "No. 5" is still read through its digits.
+        if tokens and tokens[-1] in _VOLUME_MARKERS.values() and tokens[-1] != "no":
+            number = _NUMBER_WORDS.get(word) or _ROMAN_NUMERALS.get(word)
+            if number:
+                tokens.append(str(number))
+                continue
+        tokens.append(_VOLUME_MARKERS.get(word, word))
+    return tokens
+
+
 def _title_content_words(value):
     """The identifying words of a title, in order, with joining words removed
     (fork #1164). Order is kept so "Blood and Iron" doesn't match "Iron and
-    Blood"."""
-    return tuple(w for w in _normalize_title(value).split()
-                 if w not in _TITLE_STOPWORDS)
+    Blood". A volume marker right before its number is dropped, so "One
+    Piece, Vol. 12" and "ONE PIECE 12" are the same words (fork #2479)."""
+    tokens = _title_tokens(value)
+    return tuple(
+        w for i, w in enumerate(tokens)
+        if w not in _TITLE_STOPWORDS
+        and not (w in _VOLUME_MARKERS.values()
+                 and i + 1 < len(tokens) and tokens[i + 1].isdecimal()))
+
+
+def _title_numbers(value):
+    """The numbers in a title that tell one volume from another: every bare
+    number (so years count too) plus a number word or roman numeral after a
+    volume marker. An ordinal such as "60th" is not one (fork #2479)."""
+    return {int(w) for w in _title_tokens(value) if w.isdecimal()}
+
+
+def _volume_numbers_conflict(left, right):
+    """True when both titles carry numbers and they differ, as in "One Piece,
+    Vol. 12" against "Vol. 13": 0.94 similar as text, same author, different
+    book. A title with a number on one side only is left to the other checks
+    (fork #2479)."""
+    a, b = _title_numbers(left), _title_numbers(right)
+    return bool(a and b and a != b)
 
 
 def _title_similarity(left, right):
@@ -542,7 +630,12 @@ def _title_similarity(left, right):
     words_a, words_b = _title_content_words(left), _title_content_words(right)
     if words_a and words_a == words_b:
         return 1.0
+    if _volume_numbers_conflict(left, right):
+        return 0.0
     return SequenceMatcher(None, a, b).ratio()
+
+
+_PLACEHOLDER_AUTHORS = frozenset(("", "unknown"))
 
 
 def _author_name_tokens(authors):
@@ -564,6 +657,11 @@ def _author_name_tokens(authors):
     tokens = set()
     for author in (authors or []):
         name = author if isinstance(author, str) else getattr(author, "name", "")
+        # Calibre's "Unknown" placeholder is not a name (same rule as
+        # _has_meaningful_authors). Counted as one, it disagreed with every
+        # candidate, so a book with no author could never be filled in.
+        if (name or "").strip().lower() in _PLACEHOLDER_AUTHORS:
+            continue
         tokens.update(w for w in _normalize_title(name).split() if len(w) > 2)
     return tokens
 
@@ -646,7 +744,7 @@ def _has_meaningful_authors(book):
     """True if the book already has a real author (not empty / not the Calibre
     'Unknown' placeholder), so smart mode won't overwrite it (fork #403)."""
     authors = getattr(book, "authors", None) or []
-    return any((getattr(a, "name", "") or "").strip().lower() not in ("", "unknown")
+    return any((getattr(a, "name", "") or "").strip().lower() not in _PLACEHOLDER_AUTHORS
                for a in authors)
 
 

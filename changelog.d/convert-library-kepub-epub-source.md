@@ -1,0 +1,2 @@
+### Fixed
+- **Convert Library sends an epub straight to kepubify.** With kepub as the target format, every epub was first run through ebook-convert epub to epub because the format check compared ".epub" to "epub". That was slower, was one more step that could fail, and gave books without a cover a generated cover and title page. Epubs now go straight to kepubify, as they already did on ingest, so the kepub keeps the original book as it is. When converting another format to epub first does fail, the Convert Library log now includes the tool's own output.

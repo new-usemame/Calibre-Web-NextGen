@@ -15,6 +15,8 @@ test('book-list export sends current filters, retries failure and downloads CSV 
   });
   await page.goto('/app?q=A%2C%20title');
   await page.getByRole('button',{name:'Unread',exact:true}).click();
+  // #2475: on the library landing, Export lives in View settings.
+  await page.getByTestId('catalog-view-settings').click();
   const box=page.getByRole('group',{name:'Export this book list'});
   await expect(box.getByRole('button',{name:'Export CSV'})).toBeEnabled();
   await box.getByRole('button',{name:'Export CSV'}).click();
@@ -45,6 +47,7 @@ test('changing list scope cancels an export and suppresses a stale download', as
   });
   try {
     await page.goto('/app');
+    await page.getByTestId('catalog-view-settings').click();
     const box=page.getByRole('group',{name:'Export this book list'});
     await box.getByRole('button',{name:'Export TXT'}).click();
     await expect.poll(()=>started).toBe(true);
@@ -52,6 +55,7 @@ test('changing list scope cancels an export and suppresses a stale download', as
     await page.getByRole('button',{name:'Read',exact:true}).click();
     await failed;
     release?.();
+    // The menu stayed open through the pending export, so the cancel is visible.
     await expect(box.getByRole('button',{name:'Export TXT'})).toBeEnabled();
     expect(downloads).toEqual([]);
   } finally { release?.(); }

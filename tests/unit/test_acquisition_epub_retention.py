@@ -70,7 +70,7 @@ def test_resource_mismatch_and_external_candidate_never_substitute_old_edition(h
     cache.connection.close()
 
 
-@pytest.mark.parametrize('version,accepted', [(0,False),(1,True),(2,True),(3,False)])
+@pytest.mark.parametrize('version,accepted', [(0,False),(1,True),(2,True),(3,True),(4,False)])
 def test_receipt_recovery_accepts_only_proven_policies_and_actual_retained_bytes(tmp_path, version, accepted):
     old = package(tmp_path/'old.epub'); incoming = package(tmp_path/'incoming.epub', repack=True)
     import hashlib

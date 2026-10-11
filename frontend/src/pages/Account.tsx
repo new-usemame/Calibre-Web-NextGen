@@ -323,6 +323,20 @@ export function Account() {
           {updateNamedPreferences.isError && (
             <p className={styles.msgErr} role="alert">{t('Could not save.')}</p>
           )}
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.show_library_rating !== false}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ show_library_rating: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Show library rating')}</strong>
+              <small>{t('Show the labelled Calibre score alongside your own rating.')}</small></span>
+          </label>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.share_book_ratings === true}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ share_book_ratings: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Share my ratings in the household average')}</strong>
+              <small>{t('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}</small></span>
+          </label>
         </fieldset>
       </section>
 

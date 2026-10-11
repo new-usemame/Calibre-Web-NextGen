@@ -654,11 +654,26 @@ function Runtime:retireSnapshotCollections()
     G_reader_settings:delSetting("cwngsync_collection_state")
 end
 
+-- The list the library home shows. While a sync applies a new list it is
+-- that one, so covers appear as they arrive during a first fill instead of
+-- after the last one (#2329); otherwise the list last applied. The new list
+-- is kept out of the saved state until the sync finishes: saved earlier, it
+-- would be paired with the previous revision.
+function Runtime:libraryCatalog()
+    local filling = shared.filling
+    if filling and filling.token == shared.running then
+        return filling.books, filling.shelves
+    end
+    local state = self:getLibraryState()
+    return state.manifest, state.shelves
+end
+
 function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelves)
     local state = self:getLibraryState()
     local root = self:getLibraryRoot()
     local actions = Library.plan(books, state, root, self:libraryProbe())
     local client = self:newSyncClient()
+    shared.filling = { token = token, books = books, shelves = shelves }
     local changed = {}
     local adding = 0
     for _, action in ipairs(actions) do
@@ -679,6 +694,7 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
         state.revision = revision
         state.manifest = books
         state.shelves = shelves
+        shared.filling = nil
         local ok_collections, collections_error = pcall(self.applyLibraryCollections, self, books, shelves)
         if not ok_collections then
             logger.warn("CWNGSync: shelf collections failed", collections_error)

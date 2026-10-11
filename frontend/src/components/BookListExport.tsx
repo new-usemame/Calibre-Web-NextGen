@@ -11,7 +11,11 @@ export interface BookExportSource {
   params: Record<string, unknown>;
 }
 
-export function BookListExport({ source, disabled = false }: { source: BookExportSource; disabled?: boolean }) {
+/** `onPendingChange` lets a host menu stay open while a download is being
+ *  prepared: closing it would unmount this and abort the request (#2475). */
+export function BookListExport({ source, disabled = false, onPendingChange }: {
+  source: BookExportSource; disabled?: boolean; onPendingChange?: (pending: boolean) => void;
+}) {
   const t = useT();
   const { data: me } = useMe();
   const [pending, setPending] = useState(false);
@@ -24,6 +28,8 @@ export function BookListExport({ source, disabled = false }: { source: BookExpor
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { setMessage(''); setFailed(false); return () => { active.current?.abort(); }; }, [key]);
+  useEffect(() => { onPendingChange?.(pending); }, [pending, onPendingChange]);
+  useEffect(() => () => { onPendingChange?.(false); }, [onPendingChange]);
   async function download(format: 'csv' | 'txt') {
     const requested = key;
     const controller = new AbortController(); active.current = controller;

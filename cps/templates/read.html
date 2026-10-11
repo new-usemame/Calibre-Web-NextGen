@@ -18,11 +18,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/popup.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}">
 </head>
 
 <body>
-    {% include '_reader_lookup_banner.html' %}
     <div id="sidebar">
         <div id="panels">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -15,11 +15,11 @@ from sqlalchemy import or_, func
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
-from .serializers import serialize_shelf
+from .serializers import serialize_shelf, cover_url_for
 from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response, _list_custom_column_data
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
-from ..services import ereader_scope
+from ..services import ereader_scope, user_cover
 from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id, book_sort_order
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
@@ -35,6 +35,8 @@ from ..shelf import (
     queue_hardcover_sync,
     _shelf_book_count,
     sort_shelves_for_user,
+    shelf_picker_books,
+    SHELF_PICKER_PAGE_SIZE,
     SHELF_OK,
     SHELF_ALREADY_PRESENT,
     SHELF_INVALID_BOOK,
@@ -114,7 +116,10 @@ def shelf_detail(shelf_id):
     # anonymous guest has no history to sort by and falls back the way every
     # other unsupported sort does here — to the order the owner arranged.
     sort = request.args.get("sort", "stored")
-    if sort == RECENT_SORT:
+    if sort in ('ratingdesc', 'ratingasc'):
+        reader = viewer_id(current_user)
+        order = None if reader is None else book_sort_order(sort, user_id=reader)
+    elif sort == RECENT_SORT:
         reader = viewer_id(current_user)
         order = None if reader is None else recent_sort_order(reader)
     else:
@@ -299,6 +304,46 @@ def delete_shelf_api(shelf_id):
         ub.session.rollback()
         return _err("db_error", "Could not delete shelf: %s" % getattr(e, "orig", e), 500)
     return "", 204
+
+
+# ── Book picker (bulk add) ───────────────────────────────────────────────────
+
+@api_v1.route("/shelves/<int:shelf_id>/available-books")
+@login_required_if_no_ano
+def shelf_available_books_api(shelf_id):
+    """Searchable, paged book list for the shelf page's "Add books" picker.
+
+    The query is ``cps.shelf.shelf_picker_books``, shared with the classic
+    modal: the caller's browsing visibility minus archived books, which the
+    add path refuses. Each row says whether the book is already on this
+    shelf so the picker can disable it; the write path stays the per-book
+    ``POST /shelves/<id>/books/<book_id>`` endpoint, which owns permission,
+    de-duplication and library-membership checks.
+    """
+    shelf = ub.session.query(ub.Shelf).filter(ub.Shelf.id == shelf_id).first()
+    if shelf is None:
+        return _err("not_found", "Shelf not found", 404)
+    if not check_shelf_edit_permissions(shelf):
+        return _err("forbidden", "You are not allowed to add to this shelf", 403)
+
+    query = (request.args.get("query") or "").strip()
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    offset = (page - 1) * SHELF_PICKER_PAGE_SIZE
+    books, total, in_shelf = shelf_picker_books(shelf_id, query, offset, SHELF_PICKER_PAGE_SIZE)
+    overrides = user_cover.overrides_for_user(_uid(), [book.id for book in books])
+    items = [{
+        "id": book.id,
+        "title": book.title,
+        "authors": [a.name for a in book.authors] if book.authors else [],
+        "cover_url": cover_url_for(book, "sm", cover_override=overrides.get(int(book.id))),
+        "in_shelf": book.id in in_shelf,
+    } for book in books]
+    return jsonify({
+        "items": items,
+        "page": page,
+        "total": total,
+        "has_more": offset + len(items) < total,
+    })
 
 
 # ── Add / remove a book ──────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ See CONTRIBUTORS for full list of authors. -->
       <button class="update-view btn btn-primary" data-target="series_view" id="grid-button" data-view="grid">{{_('Grid')}}</button>
       {% endif %}
     </div>
-  <div class="container" id="{{_(title)}}">
+  <div class="container" id="{{_(title)}}"{% if data == "category" %} data-heading="{{_(title)}}"{% endif %}>
     {% if title == "Downloads" %}
       <h1 style="padding-top: 1rem; padding-bottom: 2rem;">Users Downloaded Books:</h1>
     {% endif %}

@@ -271,3 +271,78 @@ class TestLogReportsTheBookItSearchedFor:
             "_apply_metadata_to_book mutated it"
         )
         assert snippet is not None
+
+
+# --- numbered volumes (fork #2479, reported by @splitsec2) --------------------
+
+class TestNumberedVolumesAreDifferentBooks:
+    """Bare numbered volumes share every word but the number, so character
+    similarity alone passes them (Vol. 12 vs Vol. 13 scored 0.94) and the
+    author check cannot help: it is the same author. A fetch for one volume
+    must never apply the next volume's metadata."""
+
+    @pytest.mark.parametrize("book, wrong", [
+        ("One Piece, Vol. 12", "One Piece, Vol. 13"),
+        ("Attack on Titan, Vol. 3", "Attack on Titan, Vol. 4"),
+        ("Berserk Volume 1", "Berserk Volume 10"),
+        ("Saga, Book Two", "Saga, Book Three"),
+        ("Dune Part II", "Dune Part III"),
+        ("One Piece Vol12", "One Piece, Vol. 13"),
+        ("The Best American Short Stories 2019", "The Best American Short Stories 2020"),
+    ])
+    def test_a_different_volume_is_not_applied(self, book, wrong):
+        assert m._select_metadata_result(
+            [_cand(wrong, ["Same Author"])], None,
+            book_title=book, book_authors=["Same Author"],
+        ) is None
+
+    def test_the_matching_volume_still_wins_over_its_neighbour(self):
+        v13 = _cand("One Piece, Vol. 13", ["Eiichiro Oda"])
+        v12 = _cand("One Piece, Volume 12 (Shonen Jump)", ["Eiichiro Oda"])
+        assert m._select_metadata_result(
+            [v13, v12], None,
+            book_title="One Piece, Vol. 12", book_authors=["Eiichiro Oda"],
+        ) is v12
+
+    @pytest.mark.parametrize("book, candidate", [
+        # An ordinal is not a volume number: same book, anniversary edition.
+        ("Fahrenheit 451", "Fahrenheit 451: 60th Anniversary Edition"),
+        # Same number spelled differently on each side.
+        ("Saga Volume 2", "Saga, Vol. 2"),
+        # Open Library lists manga volumes with a bare number.
+        ("One Piece, Vol. 12", "ONE PIECE 12"),
+    ])
+    def test_same_number_or_no_conflict_still_matches(self, book, candidate):
+        assert m._title_similarity(book, candidate) > 0.0
+        assert not m._volume_numbers_conflict(book, candidate)
+
+    def test_a_number_on_one_side_only_is_left_to_the_other_checks(self):
+        # "Dune" vs "Dune 2" is not decided by the number rule; the ordinary
+        # similarity score still applies to it.
+        assert not m._volume_numbers_conflict("Dune", "Dune 2")
+
+    def test_ordinary_words_are_not_read_as_numerals(self):
+        # "I" and "one" outside a volume marker are words, not numbers.
+        assert not m._volume_numbers_conflict("I, Robot", "Robot Dreams")
+        assert not m._volume_numbers_conflict("One Day", "Ready Player One")
+        assert not m._volume_numbers_conflict("No One Lives Forever", "No Two Alike")
+
+
+class TestUnknownAuthorPlaceholderDoesNotBlock:
+    """Calibre files a book with no author under "Unknown". That placeholder is
+    not a name, so it must not count as an author that disagrees with every
+    candidate: a freshly ingested book with no author is exactly the book
+    auto-metadata exists to fill in (fork #2479, from @splitsec2's port)."""
+
+    def test_unknown_author_book_still_gets_its_matching_title(self):
+        devils = _cand("The Devils", ["Joe Abercrombie"])
+        assert m._select_metadata_result(
+            [devils], None,
+            book_title="The Devils", book_authors=["Unknown"],
+        ) is devils
+
+    def test_a_real_author_still_rejects_a_different_author(self):
+        assert m._select_metadata_result(
+            [_cand("The Devils", ["Someone Else"])], None,
+            book_title="The Devils", book_authors=["Joe Abercrombie"],
+        ) is None

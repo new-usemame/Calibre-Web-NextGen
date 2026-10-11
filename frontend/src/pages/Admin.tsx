@@ -551,6 +551,7 @@ function MailConfigForm() {
     setForm({
       mail_server: cfg.mail_server, mail_port: cfg.mail_port, mail_use_ssl: cfg.mail_use_ssl,
       mail_login: cfg.mail_login, mail_from: cfg.mail_from, mail_size_mb: cfg.mail_size_mb,
+      mail_filename_template: cfg.mail_filename_template,
     });
   }, [cfg]);
 
@@ -603,6 +604,16 @@ function MailConfigForm() {
           <span>{t('From address')}</span>
           <input value={String(form.mail_from ?? '')} onChange={(e) => set('mail_from', e.target.value)} />
         </label>
+      </div>
+      <div className={styles.newRow}>
+        <div className={styles.field}>
+          <label htmlFor="mail-filename-template">{t('eReader attachment filename template')}</label>
+          <input id="mail-filename-template" value={String(form.mail_filename_template ?? '')} maxLength={1024}
+            aria-describedby="mail-filename-help mail-filename-conditional"
+            onChange={(e) => set('mail_filename_template', e.target.value)} />
+          <p id="mail-filename-help" className={styles.fieldHint}>{t('Leave blank to keep the existing filename. Example: {series} #{series_index} - {title}. Fields include {title}, {authors}, {series} and {series_index}; the file extension is added automatically.')}</p>
+          <p id="mail-filename-conditional" className={styles.fieldHint}>{t('Use {series:|(|) }{title} to omit the series prefix when no series is set.')}</p>
+        </div>
       </div>
       <div className={styles.newActions}>
         <button type="submit" className={styles.submitBtn} disabled={update.isPending}>

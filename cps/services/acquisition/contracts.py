@@ -5,6 +5,20 @@ URLs may contain provider tokens: these internal objects are not API serializers
 A connection's transport must validate destinations and supply scoped credentials.
 """
 from dataclasses import dataclass, field
+from types import MappingProxyType
+
+MOBI_MEDIA_TYPE = 'application/x-mobipocket-ebook'
+DIRECT_FORMATS = MappingProxyType({
+    'application/epub+zip': ('EPUB', 'epub'),
+    'application/pdf': ('PDF', 'pdf'),
+    MOBI_MEDIA_TYPE: ('MOBI', 'mobi'),
+})
+
+
+def direct_format_allowed(media_type, config):
+    """Source capability plus the administrator's explicit catalog opt-in."""
+    return (isinstance(media_type, str) and media_type in DIRECT_FORMATS
+            and (media_type != MOBI_MEDIA_TYPE or config.get('allow_mobi') is True))
 
 
 @dataclass(frozen=True)
@@ -45,7 +59,7 @@ class Offer:
         """
         return (self.relation in ("download", "acquisition") and not self.link.templated
                 and not self.indirect_types
-                and self.link.media_type in ("application/epub+zip", "application/pdf"))
+                and isinstance(self.link.media_type, str) and self.link.media_type in DIRECT_FORMATS)
 
 
 @dataclass(frozen=True)

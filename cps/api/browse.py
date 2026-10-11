@@ -227,6 +227,26 @@ def list_ratings():
     return {"items": items}
 
 
+@api_v1.route('/personal-ratings')
+@login_required_if_no_ano
+def list_personal_ratings():
+    """Personal score buckets use scores, leaving legacy Calibre row IDs intact."""
+    from flask import jsonify
+    from ..personal_ratings import personal_score
+    from ..sort_orders import viewer_id
+    uid = viewer_id(current_user)
+    if uid is None:
+        return jsonify({'error': {'code': 'unauthorized', 'message': 'You must be signed in'}}), 401
+    score = personal_score(uid)
+    rows = (calibre_db.session.query(score.label('score'), func.count(db.Books.id))
+            .filter(calibre_db.common_filters()).group_by(score).order_by(score.desc()).all())
+    response = jsonify({'items': [{'id': value, 'name': '%g★' % (value / 2) if value else _('Unrated'),
+                                  'count': count} for value, count in rows]})
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['Vary'] = 'Cookie, Authorization'
+    return response
+
+
 @api_v1.route("/formats")
 @login_required_if_no_ano
 def list_formats():

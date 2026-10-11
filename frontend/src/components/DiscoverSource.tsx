@@ -4,7 +4,7 @@ import { useT } from '../lib/i18n';
 import { Button } from './Button';
 import styles from './DiscoverSource.module.css';
 
-export function DiscoverSource() {
+export function DiscoverSource({ onSaved }: { onSaved?: () => void } = {}) {
   const me = useMe().data;
   const query = useDiscoverSource();
   const t = useT();
@@ -12,10 +12,10 @@ export function DiscoverSource() {
   if (query.error) return <div className={styles.box}><p role="alert">{t('Could not load Discover sources.')}</p>
     <Button variant="ghost" onClick={() => void query.refetch()}>{t('Retry')}</Button></div>;
   if (!query.data) return <p role="status">{t('Loading…')}</p>;
-  return <SourceForm key={me.id} settings={query.data} />;
+  return <SourceForm key={me.id} settings={query.data} onSaved={onSaved} />;
 }
 
-function SourceForm({ settings }: { settings: DiscoverSourceSettings }) {
+function SourceForm({ settings, onSaved }: { settings: DiscoverSourceSettings; onSaved?: () => void }) {
   const t = useT();
   const id = useId();
   const update = useSaveDiscoverSource();
@@ -28,7 +28,7 @@ function SourceForm({ settings }: { settings: DiscoverSourceSettings }) {
   return <form className={styles.box} aria-busy={update.isPending} onSubmit={event => {
     event.preventDefault(); setStatus(''); setFailed(false);
     update.mutate(choice, {
-      onSuccess: data => { setChoice(data.source); setEdited(false); setStatus(t('Discover source saved.')); },
+      onSuccess: data => { setChoice(data.source); setEdited(false); setStatus(t('Discover source saved.')); onSaved?.(); },
       onError: () => { setFailed(true); setStatus(t('Could not save Discover source. Please try again.')); },
     });
   }}>

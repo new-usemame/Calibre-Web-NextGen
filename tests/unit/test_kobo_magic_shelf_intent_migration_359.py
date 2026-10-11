@@ -191,35 +191,43 @@ class TestIntentMigration:
 class TestUiHonesty:
     """The per-shelf checkbox must not silently swallow intent again."""
 
-    def test_template_gates_checkbox_on_global_flag(self):
-        tpl = TEMPLATE.read_text(encoding="utf-8")
-        assert "kobo_magic_sync_enabled" in tpl, (
-            "magic_shelf_edit.html must consult kobo_magic_sync_enabled"
-        )
-        # the checkbox itself carries the disabled gate
-        for line in tpl.splitlines():
-            if 'id="shelf-kobo-sync"' in line:
-                assert "disabled" in line and "kobo_magic_sync_enabled" in line, (
-                    "the kobo-sync checkbox must be disabled when the global "
-                    "flag is off"
-                )
-                break
-        else:
-            pytest.fail("shelf-kobo-sync checkbox not found in template")
+    @pytest.mark.parametrize("enabled", [False, True])
+    def test_checkbox_obeys_global_sync_flag(self, enabled):
+        from lxml import html
+        document = html.fromstring(_render_editor(enabled=enabled))
+        [checkbox] = document.xpath('//input[@id="shelf-kobo-sync"]')
+        assert ("disabled" in checkbox.attrib) is not enabled
 
-    def test_template_explains_why_disabled(self):
-        tpl = TEMPLATE.read_text(encoding="utf-8")
-        assert "Sync Magic Shelves to Kobo" in tpl, (
-            "the disabled state must name the exact CWA Settings toggle "
-            "the user needs"
-        )
+    @pytest.mark.parametrize("koreader", [False, True])
+    def test_disabled_checkbox_names_the_relevant_admin_setting(self, koreader):
+        from lxml import html
+        document = html.fromstring(_render_editor(enabled=False, koreader=koreader))
+        [checkbox] = document.xpath('//input[@id="shelf-kobo-sync"]')
+        text = checkbox.getparent().getparent().text_content()
+        setting = ("Sync smart shelves to e-readers (Kobo and KOReader)"
+                   if koreader else "Sync smart shelves to Kobo")
+        assert setting in text
+        assert "this checkbox has no effect" in text
 
-    def test_both_render_routes_pass_the_flag(self):
-        src = WEB_PY.read_text(encoding="utf-8")
-        assert src.count("kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves)") >= 2, (
-            "both magic_shelf_edit.html render calls (create + edit) must "
-            "pass kobo_magic_sync_enabled"
-        )
+
+def _render_editor(*, enabled, koreader=False):
+    from types import SimpleNamespace
+    import jinja2
+    environment = jinja2.Environment(
+        loader=jinja2.ChoiceLoader([
+            jinja2.DictLoader({"layout.html": "{% block body %}{% endblock %}"}),
+            jinja2.FileSystemLoader(str(TEMPLATE.parent)),
+        ]), autoescape=True,
+    )
+    return environment.get_template(TEMPLATE.name).render(
+        _=lambda message, **values: message % values if values else message,
+        url_for=lambda *args, **kwargs: "/", csrf_token=lambda: "test",
+        current_user=SimpleNamespace(role_share_shelfs=lambda: False,
+                                     role_edit_shelfs=lambda: False),
+        shelf=None, is_owner=True, allowed_icons=(), rule_schema={},
+        kobo_magic_sync_enabled=enabled, koreader_sync=koreader,
+        opds_expose_enabled=False, title="Create smart shelf",
+    )
 
 
 @pytest.mark.unit

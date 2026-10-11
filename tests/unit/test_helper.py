@@ -530,21 +530,21 @@ class TestCheckEmailAndUsername:
     @patch('cps.ub.session')
     def test_check_username_unique_passes(self, mock_session):
         """Test unique username passes check"""
-        mock_session.query().filter().scalar.return_value = None
+        mock_session.query().filter().first.return_value = None
         result = check_username("newuser")
         assert result == "newuser"
     
     @patch('cps.ub.session')
     def test_check_username_duplicate_raises(self, mock_session):
         """Test duplicate username raises exception"""
-        mock_session.query().filter().scalar.return_value = True
+        mock_session.query().filter().first.return_value = True
         with pytest.raises(Exception, match="This username is already taken"):
             check_username("existinguser")
     
     @patch('cps.ub.session')
     def test_check_username_strips_whitespace(self, mock_session):
         """Test username whitespace is stripped"""
-        mock_session.query().filter().scalar.return_value = None
+        mock_session.query().filter().first.return_value = None
         result = check_username("  newuser  ")
         assert result == "newuser"
 

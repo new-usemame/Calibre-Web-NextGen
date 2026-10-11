@@ -8,6 +8,8 @@ one line here, then a client hook call where the control lives.
 """
 
 NAMED_BOOLEAN_PREFERENCE_PATHS = {
+    "show_library_rating": ("preferences", "show_library_rating"),
+    "share_book_ratings": ("preferences", "share_book_ratings"),
     "discover_hidden": ("preferences", "discover_hidden"),
     "show_hidden_books": ("preferences", "show_hidden_books"),
     "card_actions_hidden": ("preferences", "card_actions_hidden"),
@@ -18,6 +20,8 @@ NAMED_BOOLEAN_PREFERENCE_PATHS = {
     # The classic grid's "Hide shelf badges on covers" toggle already stores
     # this; sharing its path keeps one answer across both UIs (#1254).
     "shelf_badges_hidden": ("cover", "hide_shelf_badges"),
+    # Cards stay draggable without the grip; it is for touch and keyboard (#2475).
+    "shelf_drag_handles_hidden": ("preferences", "shelf_drag_handles_hidden"),
 }
 
 

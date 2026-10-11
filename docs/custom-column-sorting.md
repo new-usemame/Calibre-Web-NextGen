@@ -32,7 +32,7 @@ available again. This feature reads existing Calibre values; it does not change
 the column definitions or book metadata.
 
 This extends [@kanjieater's contribution](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2115)
-and the existing Magic Shelf custom-column resolver.
+and the existing smart shelf custom-column resolver.
 
 Temporarily hiding an enabled field with the ignore expression also preserves a
 reader's existing display selection and label while other visible fields are
@@ -50,6 +50,6 @@ Each signed-in save carries the visible field IDs that the page knew about. Chan
 
 Custom Calibre date fields use the date component stored in the library, matching NextGen's Classic and edit-form interpretation. The list and detail APIs send date-only values, with Calibre's no-date sentinel represented as null. The detail API applies this contract to every custom date field, including fields outside the sorting allowlist. Cards, Table and book detail share the calendar formatter and use the reader's interface language. Browser timezones do not shift that date. Calibre desktop may encode a local date as a UTC instant using its machine's timezone; the library does not identify that originating timezone, so this policy can differ from desktop's local-time interpretation for such values. Ordinary date-added and modification timestamps keep their existing local-time display. Card fields share the compact one-line metadata layout; Table provides unabridged values when a dense grid truncates them.
 
-Calibre's no-date sentinel sorts with missing values at the end in both directions. Date sorting uses the same stored calendar day that the interfaces display; hidden clock components do not reorder equal days. Book ID resolves those ties. Empty custom dates are omitted from cards and book detail; New UI Table keeps its column and shows a dash; Classic Table leaves the value blank. The shared resolver applies the same calendar-day and empty-date ordering to Magic Shelves. Invalid legacy locale tags fall back to the browser's date locale.
+Calibre's no-date sentinel sorts with missing values at the end in both directions. Date sorting uses the same stored calendar day that the interfaces display; hidden clock components do not reorder equal days. Book ID resolves those ties. Empty custom dates are omitted from cards and book detail; New UI Table keeps its column and shows a dash; Classic Table leaves the value blank. The shared resolver applies the same calendar-day and empty-date ordering to smart shelves. Invalid legacy locale tags fall back to the browser's date locale.
 
 Classic Table also leaves a defensive SQL NULL custom relationship value blank across custom datatypes. Non-null zero, false and literal text `None` remain visible. Stock Calibre custom-date tables reject literal NULL rows; this defensive branch is covered through the real ORM relationship path, not a stock runtime NULL-date claim.

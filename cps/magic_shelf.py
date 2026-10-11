@@ -5,6 +5,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+import threading
+import time
+
 from . import db, ub, logger
 from .cw_login import current_user
 from flask_babel import lazy_gettext as N_
@@ -100,9 +103,9 @@ _NATIVE_RULE_FIELDS = (
     {'id': 'language', 'label': 'Language', 'type': 'string', 'input': 'select',
      'description': 'Book language', 'operators': _SELECT_OPERATORS,
      '_binding': (db.Languages, 'lang_code')},
-    {'id': 'rating', 'label': 'Rating', 'type': 'integer', 'input': 'select',
+    {'id': 'rating', 'label': 'Library rating', 'type': 'integer', 'input': 'select',
      'values': {value: value for value in range(1, 11)},
-     'description': 'Book rating (1-10)', 'operators': _NUMBER_OPERATORS,
+     'description': 'Calibre library rating (1-10)', 'operators': _NUMBER_OPERATORS,
      '_binding': (db.Ratings, 'rating')},
     {'id': 'pubdate', 'label': 'Publication Date', 'type': 'datetime',
      'validation': {'format': 'YYYY-MM-DD'}, 'description': 'Original publication date',
@@ -379,10 +382,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'timestamp',
                     'field': 'timestamp',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=30)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '30'
                 }
             ]
         }
@@ -503,10 +506,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'pubdate',
                     'field': 'pubdate',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=730)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '730'
                 }
             ]
         }
@@ -1214,6 +1217,39 @@ def get_books_for_magic_shelf(shelf_id, page=1, page_size=None, sort_order=None,
         if raise_on_error:
             raise
         return [], 0
+
+
+# Sidebar counts for the classic layout, cached per (user, shelf) on the server.
+# They used to live in the session cookie, which changed the cookie whenever a
+# count expired; covers are cached with ``Vary: Cookie``, so every library visit
+# more than a few minutes after the last one downloaded every cover again (#2386).
+BOOK_COUNT_CACHE_SECONDS = 300
+_book_count_cache = {}
+_book_count_cache_lock = threading.Lock()
+
+
+def cached_book_count_for_magic_shelf(user_id, shelf_id, now=None):
+    """``get_book_count_for_magic_shelf`` for ``user_id``, reused for a few minutes."""
+    now = time.time() if now is None else now
+    key = (user_id, shelf_id)
+    with _book_count_cache_lock:
+        cached = _book_count_cache.get(key)
+    if cached and now - cached[1] < BOOK_COUNT_CACHE_SECONDS:
+        return cached[0]
+    count = get_book_count_for_magic_shelf(shelf_id)
+    with _book_count_cache_lock:
+        _book_count_cache[key] = (count, now)
+    return count
+
+
+def forget_book_counts(shelf_id=None):
+    """Drop cached counts for one shelf (every user), or all of them."""
+    with _book_count_cache_lock:
+        if shelf_id is None:
+            _book_count_cache.clear()
+        else:
+            for key in [k for k in _book_count_cache if k[1] == shelf_id]:
+                del _book_count_cache[key]
 
 
 def get_book_count_for_magic_shelf(shelf_id):

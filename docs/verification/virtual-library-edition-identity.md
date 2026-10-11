@@ -8,7 +8,7 @@ Acquisition now retains the first deterministic metadata candidate with byte-ide
 
 New private results carry artifact-identity policy version 1. Both processor and helper recovery reinspect older metadata-only retention results; legacy imported results still recover normally. Historical completed jobs and application receipts are not replayed or rewritten. Existing request deduplication remains in place; this is a correction for new imports and recoverable in-progress jobs. Resolved format paths must remain inside Calibre's actual library root, independently of any split metadata-database location, for retention, recovery and new import success.
 
-No schema, grant, connection-ownership, UI-string or protocol change. No Anna or per-user connections. Multi-book selection and semantic equivalence of differently packaged files remain deferred: different prepared bytes may conservatively create another record.
+No schema, grant, connection-ownership, UI-string or protocol change. No Anna or per-user connections. Multi-book selection is covered by its separate verification record. The later [EPUB packaging identity slice](virtual-library-epub-repackaging.md) adds a bounded exact-resource fallback after this byte-identical policy; XML/text semantic equivalence remains deferred.
 
 ## Observed regression and independent checks
 
@@ -28,4 +28,4 @@ The product helper and processor were baked into an isolated candidate image; on
 
 The full probe's fixture preparation was corrected to use the canonical webreader source and migrated annotation/device state before taking the preservation snapshot. Failed fixture datums were retained; preservation assertions were not relaxed.
 
-Final required CI and immutable image references belong in the PR body. UI visual/locale matrices are not applicable because this slice changes no frontend rendering or strings. This does not expand real remote download-client compatibility claims or claim semantic equivalence for repackaged editions.
+Final required CI and immutable image references belong in the PR body. UI visual/locale matrices are not applicable because this slice changes no frontend rendering or strings. This does not expand real remote download-client compatibility claims. Later EPUB ZIP-packaging comparison has its own verification record and does not normalize XML or text.

@@ -7,6 +7,8 @@ from pathlib import PurePosixPath
 
 from sqlalchemy import select
 
+from .contracts import DIRECT_FORMATS
+
 
 def _storage():
     # Repository inherits this mixin; resolving exceptions lazily avoids a
@@ -67,7 +69,8 @@ class BundleChoicesMixin:
             if (not isinstance(c['name'], str) or not c['name'] or len(c['name']) > 240
                     or any(ord(x) < 32 or ord(x) == 127 for x in c['name'])):
                 raise s.StorageError('Invalid bundle display name')
-            if c['media_type'] not in ('application/epub+zip', 'application/pdf') or type(c['size']) is not int or not 0 < c['size'] <= 100*1024*1024:
+            if (not isinstance(c['media_type'], str) or c['media_type'] not in DIRECT_FORMATS
+                    or type(c['size']) is not int or not 0 < c['size'] <= 100*1024*1024):
                 raise s.StorageError('Invalid bundle file')
             if c['id'] in ids or p in paths:
                 raise s.StorageError('Duplicate bundle candidate')
@@ -108,7 +111,7 @@ class BundleChoicesMixin:
                 jobs.c.bundle_parent_id == parent['id'])).mappings() if r['selected_artifact_id']}
             choices = []
             for c in manifest['candidates']:
-                item = dict(id=c['id'], name=c['name'], format='PDF' if c['media_type'] == 'application/pdf' else 'EPUB', size=c['size'])
+                item = dict(id=c['id'], name=c['name'], format=DIRECT_FORMATS[c['media_type']][0], size=c['size'])
                 if c['id'] in chosen:
                     item.update(job_id=chosen[c['id']]['id'], state=chosen[c['id']]['state'])
                 choices.append(item)

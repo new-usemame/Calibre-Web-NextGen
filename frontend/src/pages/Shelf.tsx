@@ -5,13 +5,14 @@ import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
   ChevronLeft, Globe, Lock, Pencil, Trash2, Check, X, ArrowUpDown, ArrowUp, ArrowDown, Smartphone,
-  Info, ListChecks,
+  Info, ListChecks, Plus,
 } from 'lucide-react';
 import {
   useShelf, useUpdateShelf, useDeleteShelf, useShelfMembership, useReorderShelfBooks, useMe,
   useUpdateProfile,
 } from '../lib/queries';
 import { BulkBar } from '../components/BulkBar';
+import { ShelfAddBooks } from '../components/ShelfAddBooks';
 import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -61,6 +62,7 @@ export function Shelf({ id }: { id: string }) {
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [addingBooks, setAddingBooks] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectAllBusy, setSelectAllBusy] = useState(false);
@@ -382,6 +384,9 @@ export function Shelf({ id }: { id: string }) {
           {canEdit && <Link href={`/shelf/${id}/edit`} className={styles.manageBtn}>{t('Settings')}</Link>}
           {canEdit && !editing && (
             <div className={styles.manage}>
+              <button className={styles.manageBtn} onClick={() => setAddingBooks(true)} disabled={bulkBusy}>
+                <Plus size={14} /> {t('Add books')}
+              </button>
               <button className={styles.manageBtn} onClick={startRename}>
                 <Pencil size={14} /> {t('Rename')}
               </button>
@@ -512,6 +517,10 @@ export function Shelf({ id }: { id: string }) {
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
           onChanged={refreshAfterBulk} onBusyChange={setBulkBusy}
           actionsDisabled={selectAllBusy} />
+      )}
+      {addingBooks && (
+        <ShelfAddBooks shelfId={Number(id)} onClose={() => setAddingBooks(false)}
+          onAdded={() => refreshAfterBulk([])} />
       )}
     </div>
   );

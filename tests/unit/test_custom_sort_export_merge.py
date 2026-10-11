@@ -56,6 +56,8 @@ def test_combined_visible_and_select_all_keep_custom_order(export_library, direc
     elif selection_filter == "archived":
         export_library.session.add_all([ub.ArchivedBook(user_id=7, book_id=i, is_archived=True) for i in range(1, 7)])
     elif selection_filter == "rated":
+        export_library.session.add_all([ub.BookRating(user_id=7, book_id=i, rating=10)
+            for i in range(1, 7)])
         export_library.session.execute(db.Ratings.__table__.insert(), {"id": 9, "rating": 10})
         export_library.session.execute(db.books_ratings_link.insert(), [
             {"book": i, "rating": 9} for i in range(1, 7)])

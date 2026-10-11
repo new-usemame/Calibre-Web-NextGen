@@ -294,17 +294,17 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   page.on('request', request => {
     if (request.method() === 'POST' && /\/bookmark(?:\/|\?|$)|\/(?:read|stop-reading)(?:\?|$)|\/ajax\/stopreading\//.test(request.url())) writes.push(request.url());
   });
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Open without saving progress', exact: true }).click();
+  // #2223: lookup is a visible action beside Read now, and the reader shows
+  // no notice that would cover its controls.
+  await page.getByRole('link', { name: 'Open without saving progress', exact: true }).click();
   await expect(page).toHaveURL(/lookup=1/);
   await readerReady(page);
-  await expect(page.getByText('Progress is not being saved.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Progress is not being saved.', { exact: true })).toHaveCount(0);
   for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
   for (const theme of ['Light', 'Dark']) {
     await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
     await page.getByRole('button', { name: theme, exact: true }).click();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(page.getByText('Progress is not being saved.', { exact: true })).toBeVisible();
     await capture(page, testInfo, `new-ui-lookup-${theme.toLowerCase()}`);
   }
   // A TOC jump exits the transient highlight preview; lookup must survive it.
@@ -393,7 +393,7 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   expect(lookupUrl).toContain('lookup=1');
   writes.length = 0;
   await page.goto(lookupUrl!);
-  await expect(page.locator('.reader-lookup-banner')).toHaveText('Progress is not being saved.');
+  await expect(page.getByText('Progress is not being saved.', { exact: true })).toHaveCount(0);
   await expect(page.locator('#viewer iframe').first()).toBeVisible({ timeout: 30_000 });
   // An iframe element alone only proves the reader shell rendered. Require
   // actual prose visible to the reader in its live document before capture.

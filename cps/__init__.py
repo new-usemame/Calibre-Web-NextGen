@@ -9,9 +9,12 @@ import sys
 import os
 import mimetypes
 import threading
+import time
 from functools import wraps
 
 from flask import Flask, current_app, g, has_app_context, session
+from flask.sessions import SecureCookieSessionInterface
+from itsdangerous import BadSignature
 from .MyLoginManager import MyLoginManager
 from flask_principal import Principal
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -77,7 +80,14 @@ def protect_user_specific_catalog_responses(response):
     """Prevent a shared cache from crossing account-specific catalog views."""
     if not getattr(g, "_common_filters_user_specific", False):
         return response
-    response.headers["Cache-Control"] = "private, no-store"
+    # A response that already declares a private policy keeps it. `private` is
+    # what keeps a shared cache out, which is all this hook guarantees; covers,
+    # comic pages and fonts set their own private lifetimes on versioned URLs,
+    # and replacing those with no-store made every library visit re-download
+    # every cover (#2386). Anything shareable or unstated still becomes no-store.
+    cache_control = response.cache_control
+    if not cache_control.private or cache_control.public:
+        response.headers["Cache-Control"] = "private, no-store"
     response.vary.add("Cookie")
     response.vary.add("Authorization")
     runtime_config = current_app.extensions.get("cps_config", config)
@@ -86,6 +96,46 @@ def protect_user_specific_catalog_responses(response):
         if header_name:
             response.vary.add(header_name)
     return response
+
+
+class StableSessionCookieInterface(SecureCookieSessionInterface):
+    """Flask's signed-cookie sessions, minus the new cookie on every response.
+
+    "Remember me" makes the session permanent, and Flask re-signs a permanent
+    session on every response, so its value changes every second. Covers are
+    cached with ``Vary: Cookie``; a browser reuses a stored response only while
+    the ``Cookie`` header still matches, so the churn made every library visit
+    download every cover again (#2386). The cookie is now re-issued when the
+    session changed, or once it is past half its lifetime, which keeps the
+    sliding expiry: a session used at least every half-lifetime never lapses.
+    """
+
+    def open_session(self, app, request):
+        serializer = self.get_signing_serializer(app)
+        if serializer is None:
+            return None
+        value = request.cookies.get(self.get_cookie_name(app))
+        if not value:
+            return self.session_class()
+        max_age = int(app.permanent_session_lifetime.total_seconds())
+        try:
+            data, issued_at = serializer.loads(value, max_age=max_age, return_timestamp=True)
+        except BadSignature:
+            return self.session_class()
+        session = self.session_class(data)
+        session.cookie_issued_at = issued_at
+        return session
+
+    def should_set_cookie(self, app, session):
+        if session.modified:
+            return True
+        if not (session.permanent and app.config["SESSION_REFRESH_EACH_REQUEST"]):
+            return False
+        issued_at = getattr(session, "cookie_issued_at", None)
+        if issued_at is None:
+            return True
+        age = time.time() - issued_at.timestamp()
+        return age >= app.permanent_session_lifetime.total_seconds() / 2
 
 
 _BASE_HOOK_MARKER = "cps_base_after_request_registered"
@@ -131,6 +181,8 @@ def _configure_base_app(application, runtime_config=None):
     )
     if runtime_config is not None:
         application.extensions["cps_config"] = runtime_config
+
+    application.session_interface = StableSessionCookieInterface()
 
     if not application.extensions.get(_BASE_HOOK_MARKER):
         application.after_request(protect_user_specific_catalog_responses)
@@ -514,10 +566,13 @@ def create_app(config=None, services=None):
         calibre_db.init_db()
         # A process can die after staging or after committing cover metadata but
         # before publication. The stage alone cannot tell us which occurred, so
-        # startup logs and removes it rather than guessing at publication.
+        # startup logs and removes it rather than guessing at publication. Only
+        # registered stages are visited here; stages from earlier versions get
+        # one background sweep so a large library never delays the server (#2509).
         try:
             from . import helper
             helper.scavenge_staged_cover_files()
+            helper.start_legacy_cover_stage_sweep()
         except Exception as ex:
             log.error("Cover stage startup scavenging failed: %s", ex)
         # The annotation content-id backfill needs both databases: app.db owns the
@@ -695,29 +750,12 @@ def create_app(config=None, services=None):
                 _log_magic_shelf_counts(current_user.id, total_shelves, len(filtered_shelves),
                                         hidden_template_hits, hidden_public_hits)
 
-                # Magic Shelf Count Caching
-                if 'magic_shelf_counts' not in session:
-                    session['magic_shelf_counts'] = {}
-                
-                counts = session['magic_shelf_counts']
-                cache_updated = False
-                now = time.time()
-                CACHE_DURATION = 300  # 5 minutes
-                
+                # Counts are cached server-side; drop the copy older versions
+                # kept in the session cookie (#2386).
+                session.pop('magic_shelf_counts', None)
                 for shelf in g.magic_shelves_access:
-                    shelf_id_str = str(shelf.id)
-                    cached_data = counts.get(shelf_id_str)
-                    
-                    if cached_data and (now - cached_data.get('timestamp', 0) < CACHE_DURATION):
-                        shelf.book_count = cached_data['count']
-                    else:
-                        count = magic_shelf.get_book_count_for_magic_shelf(shelf.id)
-                        counts[shelf_id_str] = {'count': count, 'timestamp': now}
-                        shelf.book_count = count
-                        cache_updated = True
-                
-                if cache_updated:
-                    session.modified = True
+                    shelf.book_count = magic_shelf.cached_book_count_for_magic_shelf(
+                        current_user.id, shelf.id)
 
                 try:
                     magic_shelf.sort_magic_shelves_for_user(g.magic_shelves_access, current_user)
@@ -795,8 +833,9 @@ def create_app(config=None, services=None):
                 calibre_db.session.expire_all()
             except Exception as e:
                 log.debug("DESKTOP_COMPAT_MODE: rollback failed, snapshot may be stale: %s", e)
-        # Clear the Flask-session shelf count cache so sidebar counts stay fresh.
-        session.pop('magic_shelf_counts', None)
+        # Clear the shelf count cache so sidebar counts stay fresh.
+        from . import magic_shelf
+        magic_shelf.forget_book_counts()
 
     @application.teardown_appcontext
     def shutdown_session(exception=None):

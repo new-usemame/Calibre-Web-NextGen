@@ -43,7 +43,7 @@ See CONTRIBUTORS for full list of authors. -->
       <button class="update-view btn btn-primary" data-target="series_view" id="grid-button" data-view="grid">{{_('Grid')}}</button>
       {% endif %}
     </div>
-  <div class="container" id="{{_(title)}}">
+  <div class="container" id="{{_(title)}}"{% if data == "category" %} data-heading="{{_(title)}}"{% endif %}>
     {% if title == "Downloads" %}
       <h1 style="padding-top: 1rem; padding-bottom: 2rem;">Users Downloaded Books:</h1>
     {% endif %}
@@ -53,7 +53,8 @@ See CONTRIBUTORS for full list of authors. -->
         </div>
         <div id="second" class="col-xs-12 col-sm-6">
       {% endif %}
-      <div class="row" id="{{_(title)}}_row" {% if entry[0].sort %}data-name="{{entry[0].name}}"{% endif %} data-id="{% if entry[0].sort %}{{entry[0].sort}}{% else %}{% if entry[0].format %}{{entry[0].format}}{% else %}{% if entry[0].rating %}{{entry[0].rating}}{% else %}{{entry[0].name}}{% endif %}{% endif %}{% endif %}">
+      {% set initial_value = entry[0].name if data == 'publisher' else (entry[0].sort or entry[0].format or entry[0].rating or entry[0].name) %}
+      <div class="row" id="{{_(title)}}_row" data-initial="{% if data in ('author', 'series', 'category', 'publisher') %}{{ initial_value|catalog_initial }}{% else %}{{ initial_value[0]|upper if initial_value is string and initial_value else '' }}{% endif %}" {% if entry[0].sort %}data-name="{{entry[0].name}}"{% endif %} data-id="{% if entry[0].sort %}{{entry[0].sort}}{% else %}{% if entry[0].format %}{{entry[0].format}}{% else %}{% if entry[0].rating %}{{entry[0].rating}}{% else %}{{entry[0].name}}{% endif %}{% endif %}{% endif %}">
         <div class="col-xs-2 col-sm-2 col-md-1" align="left"><span class="badge">{{entry[1]}}</span></div>
         <div class="col-xs-10 col-sm-10 col-md-11">
           <a style="width: -webkit-fill-available; display: block;" id="list_{{loop.index0}}" href="{% if entry.format %}{{url_for('web.books_list', data=data, sort_param='stored', book_id=entry.format )}}{% else %}{{url_for('web.books_list', data=data, sort_param='stored', book_id=entry[0].id )}}{% endif %}">

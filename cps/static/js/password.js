@@ -17,6 +17,10 @@
 $(document).ready(function() {
     i18next.use(i18nextHttpBackend).init({
         lng: $('#password').data("lang"),
+        // Restrict requests to locale files shipped with this password-strength
+        // helper. Other interface languages retain its existing English fallback.
+        supportedLngs: ['ar', 'cs', 'de', 'el', 'en', 'eo', 'es', 'fr', 'it',
+            'no', 'pl', 'pt', 'ru', 'sk', 'th', 'tr', 'zh-TW'],
         debug: false,
         fallbackLng: 'en',
           backend: {

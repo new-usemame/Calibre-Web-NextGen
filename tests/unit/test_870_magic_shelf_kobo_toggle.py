@@ -168,14 +168,14 @@ def test_toggle_warns_when_global_magic_shelf_sync_is_off():
              patch.object(mod, "config", SimpleNamespace(config_kobo_sync=True,
                                                          config_kobo_sync_magic_shelves=False)), \
              patch.object(mod, "_", lambda s: s), \
-             patch.object(ereader_scope, "_", lambda s: s), \
+             patch.object(ereader_scope, "_", lambda s, **values: s % values if values else s), \
              patch.object(ereader_scope, "koreader_library_on", lambda: False):
             # A bare Flask app has no babel; a Kobo-only server (the e-reader
             # wording is covered in test_ereader_magic_shelf_wording.py).
             resp = inspect.unwrap(mod.set_magic_shelf_kobo_sync)(3)
     body = json.loads(resp.get_data())
     assert shelf.kobo_sync is True
-    assert "warning" in body and "Magic Shelves" in body["warning"]
+    assert "warning" in body and "smart shelves" in body["warning"]
 
 
 @pytest.mark.unit

@@ -286,6 +286,12 @@
   {% endif %}
 
 {% endif %}
+{% if current_user.is_authenticated and not current_user.is_anonymous and page != 'hot' %}
+  {% set opts = opts + [
+    {'key':'ratingdesc', 'icons':['glyphicon-star'], 'label':_('Your rating, highest first'), 'url':list_sort_url('ratingdesc')},
+    {'key':'ratingasc', 'icons':['glyphicon-star-empty'], 'label':_('Your rating, lowest first'), 'url':list_sort_url('ratingasc')},
+  ] %}
+{% endif %}
 {% if page == 'global_library' and recent_missing|default(false) %}
   {# This dedicated view always lists missing books newest first. #}
   {% set opts = [{'key': 'new', 'icons': opts[0].icons, 'label': opts[0].label,

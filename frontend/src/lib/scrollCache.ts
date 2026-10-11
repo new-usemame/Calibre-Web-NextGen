@@ -15,6 +15,7 @@
  * it without limit.
  */
 import type { Book } from './api';
+import { useSyncExternalStore } from 'react';
 
 export interface CatalogSnapshot {
   resetKey: string;      // filter/sort signature the pages were loaded under
@@ -34,6 +35,53 @@ export interface CatalogSnapshot {
 
 const _cache = new Map<string, CatalogSnapshot>();
 const _MAX = 12;         // keep the dozen most-recent catalog views
+let accountGeneration = 0;
+const coverReads = new Map<number, symbol>();
+const coverListeners = new Set<() => void>();
+const subscribeCover = (listener: () => void) => {
+  coverListeners.add(listener);
+  return () => { coverListeners.delete(listener); };
+};
+const notifyCover = () => coverListeners.forEach((listener) => listener());
+
+/** Subscribe as well as reading at mount: Back can happen while the fresh
+ * viewer-specific cover is still being fetched. React checks the snapshot
+ * again on subscription, so it also catches a read completed during mount. */
+export function useCatalogCoverSnapshot(key: string): Book[] | undefined {
+  const read = () => _cache.get(key)?.books;
+  return useSyncExternalStore(subscribeCover, read, read);
+}
+
+/** Fetch only when an accumulated page actually holds this book. The callback
+ * must return a fresh viewer URL, not the shared-cover mutation response (which
+ * cannot account for a personal override). Failure drops only affected views.
+ * A committed mutation remains successful even when this follow-up read fails. */
+export async function refreshCatalogCover(id: number, read: () => Promise<string | null>): Promise<void> {
+  if (![..._cache.values()].some((snap) => snap.books.some((book) => book.id === id))) return;
+  const generation = accountGeneration;
+  const request = Symbol();
+  coverReads.set(id, request);
+  const current = () => generation === accountGeneration && coverReads.get(id) === request;
+  try {
+    const coverUrl = await read();
+    if (!current()) return;
+    for (const snap of _cache.values()) {
+      if (snap.books.some((book) => book.id === id)) {
+        snap.books = snap.books.map((book) => book.id === id ? { ...book, cover_url: coverUrl } : book);
+      }
+    }
+  } catch {
+    if (!current()) return;
+    for (const [key, snap] of _cache) {
+      if (snap.books.some((book) => book.id === id)) _cache.delete(key);
+    }
+  } finally {
+    if (current()) {
+      coverReads.delete(id);
+      notifyCover();
+    }
+  }
+}
 
 export function saveCatalog(key: string, snap: CatalogSnapshot): void {
   // Refresh recency (Map preserves insertion order → re-insert to move to end).
@@ -54,7 +102,10 @@ export function loadCatalog(key: string): CatalogSnapshot | undefined {
  * scoped, not user-scoped, so retaining them across an in-place login could
  * render the previous account's accumulated My Library cards before a refetch. */
 export function clearCatalogCache(): void {
+  accountGeneration += 1;
+  coverReads.clear();
   _cache.clear();
+  notifyCover();
 }
 
 /** Drop a book from every cached snapshot — call when a book is deleted so a

@@ -89,6 +89,8 @@ test('a shelved book names its shelf on the library grid, and View settings can 
     await toggle.click();
     await expect(toggle).toBeChecked();
     if (testInfo.project.use.hasTouch === true) {
+      // Close View settings first: on a phone the open menu covers the card.
+      await page.getByTestId('catalog-view-settings').click();
       await expect(card.getByTestId('shelf-tags').locator('[class*="shelfSummary"]')).toBeVisible();
       await card.locator('..').getByRole('button', {
         name: `Actions for ${cardLabel!.replace(/^Open details for /, '')}`,

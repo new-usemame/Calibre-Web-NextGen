@@ -15,6 +15,7 @@ from flask_babel import gettext as _
 from sqlalchemy.sql.expression import func, not_, and_, or_, text, true
 from sqlalchemy.sql.functions import coalesce
 
+from .unicode_collation import locale_sort_key
 from . import logger, db, calibre_db, config, ub, helper
 from .string_helper import strip_whitespaces
 from .usermanagement import login_required_if_no_ano
@@ -131,6 +132,18 @@ def adv_search_language(q, include_languages_inputs, exclude_languages_inputs):
 
 
 def adv_search_ratings(q, rating_high, rating_low):
+    from .personal_ratings import personal_score
+    from .sort_orders import viewer_id
+    uid = viewer_id(current_user)
+    if uid is not None:
+        score = personal_score(uid)
+        if rating_high or rating_low:
+            q = q.filter(score > 0)
+        if rating_high:
+            q = q.filter(score <= int(rating_high) * 2)
+        if rating_low:
+            q = q.filter(score >= int(rating_low) * 2)
+        return q
     if rating_high:
         rating_high = int(rating_high) * 2
         q = q.filter(db.Books.ratings.any(db.Ratings.rating <= rating_high))
@@ -457,13 +470,13 @@ def render_prepare_search_form(cc):
         .join(db.Books)\
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_tags_link.tag'))\
-        .order_by(db.Tags.name).all()
+        .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all()
     series = calibre_db.session.query(db.Series)\
         .join(db.books_series_link)\
         .join(db.Books)\
         .filter(calibre_db.common_filters()) \
         .group_by(text('books_series_link.series'))\
-        .order_by(db.Series.name)\
+        .order_by(locale_sort_key(db.Series.name), db.Series.name, db.Series.id)\
         .filter(calibre_db.common_filters()).all()
     shelves = ub.session.query(ub.Shelf)\
         .filter(or_(ub.Shelf.is_public == 1, ub.Shelf.user_id == int(current_user.id)))\

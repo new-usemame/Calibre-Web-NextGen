@@ -135,7 +135,7 @@ class TestOpdsRootEntryDefsAreExtractable:
             assert str(title) in (
                 "Alphabetical Books",
                 "Recently added Books",
-                "Magic Shelves",
+                "Smart shelves",
             ), f"unexpected title for {k}: {title!r}"
 
     def test_get_opds_root_entries_resolves_title_through_gettext(self):

@@ -1,14 +1,15 @@
 import { BookReview } from '../components/BookReview';
+import { PersonalRating } from '../components/PersonalRating';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Glasses, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
   useBook, useToggleRead, useStopReading, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
   useActiveDeliveryDevices, useQueueDeviceDelivery, useOtherEreaders,
-  useDeleteFormat, useConvertFormat, useAddFormat,
+  useDeleteFormat, useConvertFormat, useAddFormat, useConversionTask,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
@@ -21,7 +22,7 @@ import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
-import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
+import { ApiError, resourceUrl, resourceSrcSet, TASK_FAILED, TASK_FINISHED, TASK_ENDED, TASK_CANCELLED } from '../lib/api';
 import { useT, useI18n } from '../lib/i18n';
 import { formatCustomColumnDate } from '../lib/customColumnDisplay';
 import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
@@ -97,6 +98,7 @@ interface SendPanelProps {
   /** Other users' eReaders an admin can add to the recipients (#2296). */
   otherEreaders: OtherEreader[];
   onSend: (format: string, convert: boolean, emails: string) => void;
+  onClose: () => void;
 }
 
 /** Compact send-to-e-reader form: pick a format, optionally convert, optionally
@@ -104,7 +106,7 @@ interface SendPanelProps {
  *  saved e-reader address (#715 — previously the field was blank with only a
  *  "blank = your e-reader email" hint, so users thought the address was lost).
  *  Empty recipient still falls back to the saved address server-side. */
-function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSend }: SendPanelProps) {
+function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSend, onClose }: SendPanelProps) {
   const t = useT();
   const [format, setFormat] = useState(formats[0] ?? '');
   const [convert, setConvert] = useState(false);
@@ -116,7 +118,9 @@ function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSe
     if (!dirty.current && defaultEmail) setEmails(defaultEmail);
   }, [defaultEmail]);
   return (
-    <div className={styles.sendPanel}>
+    <div id="book-send-ereader" className={styles.sendPanel} onKeyDown={(event) => {
+      if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+    }}>
       <div className={styles.sendRow}>
         <label className={styles.sendField}>
           <span>{t('Format')}</span>
@@ -451,11 +455,28 @@ export function BookDetail() {
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader
   // address used to prefill the recipient field, #715) until that's possible.
-  const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download;
+  const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download &&
+    !me?.role?.anonymous && (book?.formats.length ?? 0) > 0;
   const savedEreader = useAccount({ enabled: canSend }).data?.kindle_mail ?? '';
-  const [sendOpen, setSendOpen] = useState(false);
-  const otherEreaders = useOtherEreaders(canSend && sendOpen && !!me?.role?.admin).data?.others ?? [];
+  const formatsKey = JSON.stringify(book?.formats.map((format) => format.format) ?? []);
+  const [sendSession, setSendSession] = useState<{ bookId: string; userId: number; formatsKey: string } | null>(null);
+  const sendOpen = canSend && sendSession?.bookId === id && sendSession.userId === me?.id && sendSession.formatsKey === formatsKey;
+  // A draft and its async results belong to the book/account that opened it.
+  // A disabled query still retains cached data, so gate recipient data too.
+  const activeSendSession = useRef(sendSession);
+  activeSendSession.current = sendOpen ? sendSession : null;
+  const otherEreadersData = useOtherEreaders(sendOpen && !!me?.role?.admin).data;
+  const otherEreaders = sendOpen && me?.role?.admin ? otherEreadersData?.others ?? [] : [];
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
+  const sendTriggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (sendSession && !sendOpen) { setSendSession(null); setSendBanner(null); }
+  }, [sendSession, sendOpen]);
+  const toggleSendPanel = () => {
+    if (!canSend || !me) return;
+    setSendSession(sendOpen ? null : { bookId: id, userId: me.id, formatsKey });
+    setSendBanner(null);
+  };
   const [deviceSendOpen, setDeviceSendOpen] = useState(false);
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   /* Panels opened from the gear menu need a scroll nudge: the menu item's click
@@ -550,19 +571,12 @@ export function BookDetail() {
   };
 
   /* The "More actions" gear menu — every book action that is not one of the
-     visible controls (Read now, Add to shelf, favorite, personal membership
+     visible controls (Read now, Open without saving progress, Add to shelf, favorite, personal membership
      removal, and the gear itself). Edit metadata and Edit cover stay listed
      even though one of them is also the row's visible edit action.
      Labels name the ACTION performed (state-aware), per the cleanup brief:
      today's "In your library" state chip becomes "Remove from library". */
   const menuItems: MenuSectionDef['items'] = [];
-  if (canAccessBook && primaryReadTarget) {
-    menuItems.push({
-      id: 'lookup', label: t('Open without saving progress'),
-      icon: <BookOpen size={15} />,
-      to: withLookupMode(primaryReadTarget, true), testId: 'menu-open-lookup',
-    });
-  }
   if (canAccessBook && book.in_progress && !me?.role?.anonymous) {
     menuItems.push({
       id: 'stop-reading', label: t('Remove from Currently Reading'),
@@ -608,7 +622,7 @@ export function BookDetail() {
       id: 'send-ereader',
       label: t('Send to e-reader'),
       icon: <Send size={15} />,
-      onSelect: () => { setSendOpen((v) => !v); setSendBanner(null); },
+      onSelect: toggleSendPanel,
     });
   }
   if (inLibrary && me?.role?.download && book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0) {
@@ -709,7 +723,7 @@ export function BookDetail() {
       </Link>
 
       {/* The action row is deliberately ordered by the reader's next likely
-          step: read, edit, organise, then compact personal state.
+          step: read, send, edit, organise, then compact personal state.
           The flexible group is the spacer before the gear, which pins Settings
           to the far edge without letting it become an orphaned mobile row. */}
       <div className={styles.actions} data-testid="book-actions">
@@ -719,6 +733,24 @@ export function BookDetail() {
               {t('Read now')}
             </Link>
           ) : null}
+
+          {/* Lookup reading sits beside Read now, not in the gear menu: people
+              who use it open books this way often (#2223). */}
+          {canAccessBook && primaryReadTarget ? (
+            <Link href={withLookupMode(primaryReadTarget, true)} className={styles.actionIcon}
+              aria-label={t('Open without saving progress')}
+              title={t('Open without saving progress')}
+              data-testid="open-lookup-action">
+              <Glasses size={17} aria-hidden="true" focusable={false} />
+            </Link>
+          ) : null}
+
+          {canSend && <button type="button" className={styles.actionSecondary}
+            ref={sendTriggerRef} onClick={toggleSendPanel}
+            aria-expanded={sendOpen} aria-controls="book-send-ereader">
+            <Send size={15} aria-hidden="true" focusable={false} />
+            {t('Send to e-reader')}
+          </button>}
 
           {/* One visible edit action: Edit metadata for anyone allowed to edit
               the book, since that is the edit people reach for most (#2338).
@@ -787,24 +819,33 @@ export function BookDetail() {
           the destructive control itself lives in the gear menu. */}
       {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
-      {/* Send-to-e-reader / send-to-device panels (opened from the menu),
+      {/* Send-to-e-reader / send-to-device panels (opened from the action row),
           directly under the row that opens them. */}
       <div ref={sendPanelWrapRef} className={styles.sendPanelWrap}>
         {sendOpen && (
         <SendPanel
+          key={`${id}:${me?.id}:${formatsKey}`}
           formats={book.formats.map((f) => f.format)}
           pending={sendToEreader.isPending}
           banner={sendBanner}
           defaultEmail={savedEreader}
           otherEreaders={otherEreaders}
+          onClose={() => {
+            setSendSession(null); setSendBanner(null); sendTriggerRef.current?.focus();
+          }}
           onSend={(format, convert, emails) => {
+            const session = activeSendSession.current;
+            if (!session) return;
             setSendBanner(null);
             sendToEreader.mutate(
               { format, convert, emails: emails || undefined },
               {
-                onSuccess: (r) => { setSendBanner({ ok: true, text: r.message }); },
-                onError: (err) =>
-                  setSendBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Send failed.') }),
+                onSuccess: (r) => {
+                  if (activeSendSession.current === session) setSendBanner({ ok: true, text: r.message });
+                },
+                onError: (err) => {
+                  if (activeSendSession.current === session) setSendBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Send failed.') });
+                },
               },
             );
           }}
@@ -898,8 +939,10 @@ export function BookDetail() {
             {/* Rating — star parity with the classic detail page. Calibre stores
                 0–10 (half-star granularity); null means unrated (no stars shown,
                 not zero stars). */}
-            {book.rating != null && book.rating > 0 && (
+            {me && !me.role?.anonymous && <PersonalRating key={`${me.id}:${book.id}`} bookId={book.id} accountId={me.id} />}
+            {me?.preferences?.show_library_rating !== false && book.rating != null && book.rating > 0 && (
               <div className={styles.rating}>
+                <span>{t('Library rating')}</span>
                 <StarRating rating={book.rating} size={16} />
               </div>
             )}
@@ -1151,6 +1194,28 @@ function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolea
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // #1110: the conversion this page queued, followed until it ends so the
+  // reader learns the new format is ready without refreshing.
+  const [converting, setConverting] = useState<{ taskId: string; to: string; at: number } | null>(null);
+  const { task: conversion, gone: conversionGone } = useConversionTask(
+    id, converting?.taskId ?? null, converting?.at);
+  const conversionStat = conversion?.stat;
+  useEffect(() => {
+    if (!converting) return;
+    if (conversionGone) {
+      setConverting(null);
+      return;
+    }
+    if (conversionStat === undefined) return;
+    if (conversionStat === TASK_FINISHED) {
+      setMsg({ ok: true, text: t('{format} is ready.', { format: converting.to }) });
+    } else if (conversionStat === TASK_FAILED) {
+      setMsg({ ok: false, text: conversion?.error || t('Convert failed.') });
+    } else if (conversionStat !== TASK_ENDED && conversionStat !== TASK_CANCELLED) {
+      return;
+    }
+    setConverting(null);
+  }, [converting, conversionGone, conversionStat, conversion?.error, t]);
 
   const formats = book?.formats.map((f) => f.format) ?? [];
   const convertOptions = book?.convert_options;
@@ -1194,7 +1259,11 @@ function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolea
     convertFormat.mutate(
       { from: src.toUpperCase(), to: dst.toUpperCase() },
       {
-        onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
+        onSuccess: (r) => {
+          setMsg({ ok: true, text: r.message });
+          setTo('');
+          setConverting(r.task_id ? { taskId: r.task_id, to: dst.toUpperCase(), at: Date.now() } : null);
+        },
         onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
       },
     );

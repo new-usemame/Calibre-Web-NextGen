@@ -50,7 +50,7 @@ def test_new_ui_admin_creation_persists_shelf_only_default(session, monkeypatch)
         config_default_show=1, config_theme=1)
     monkeypatch.setattr(admin, 'config', cfg)
     # Name/password policy is outside this persistence test; use valid inputs.
-    monkeypatch.setattr(admin, 'check_username', lambda value: value)
+    monkeypatch.setattr(admin, 'check_username', lambda value, _user_id=None: value)
     monkeypatch.setattr(admin, 'valid_password', lambda value: value)
     app = Flask(__name__)
     with app.test_request_context('/api/v1/admin/users', method='POST', json={
@@ -104,8 +104,8 @@ def test_classic_admin_creation_honors_visible_choice_and_hidden_default(session
     cfg = SimpleNamespace(config_theme=1, config_public_reg=False,
         config_allowed_tags='', config_denied_tags='', config_allowed_column_value='', config_denied_column_value='')
     monkeypatch.setattr(admin, 'config', cfg)
-    monkeypatch.setattr(admin, 'check_username', lambda value: value)
-    monkeypatch.setattr(admin, 'check_email', lambda value: value)
+    monkeypatch.setattr(admin, 'check_username', lambda value, _user_id=None: value)
+    monkeypatch.setattr(admin, 'check_email', lambda value, _user_id=None: value)
     monkeypatch.setattr(admin.helper, 'valid_password', lambda value: value)
     monkeypatch.setattr(admin, 'flash', lambda *_a, **_k: None)
     monkeypatch.setattr(admin, '_', lambda value, **kwargs: value % kwargs if kwargs else value)

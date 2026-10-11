@@ -117,6 +117,7 @@ PER_USER_BOOK_MODELS = (
     "BookCoverPreview",
     "UserLibraryBook",
     "BookReview",
+    "BookRating",
 )
 # These ledgers are user-scoped through Device rather than a user_id column.
 # Keep the device-scoped registry extension separate from the flat-model tuple
@@ -161,6 +162,22 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
                 _delete_annotation(session, ann)
         else:
             ann.book_id = to_book_id
+    session.flush()
+
+    # A score and its clear are coherent choices. Latest wins; on an exact
+    # clock tie keep the destination, preserving a deterministic merge.
+    for rating in session.query(ub.BookRating).filter(
+            ub.BookRating.book_id == from_book_id).all():
+        existing = session.query(ub.BookRating).filter(
+            ub.BookRating.user_id == rating.user_id,
+            ub.BookRating.book_id == to_book_id).first()
+        if existing is None:
+            rating.book_id = to_book_id
+        else:
+            if _newer(rating.updated_at, existing.updated_at):
+                existing.rating = rating.rating
+                existing.updated_at = rating.updated_at
+            session.delete(rating)
     session.flush()
 
     # Private book reviews are authored text. If both copies have a note for
@@ -481,7 +498,7 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
 
     for model in (ub.Bookmark, ub.ReadBook, ub.ArchivedBook, ub.Downloads,
                   ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview,
-                  ub.UserLibraryBook, ub.BookReview):
+                  ub.UserLibraryBook, ub.BookReview, ub.BookRating):
         _scoped(session.query(model), model).delete(synchronize_session=False)
 
     # Per-device entitlement state has no user_id of its own.  Scope a user

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Shuffle, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Settings2, Sparkles, Shuffle, X } from 'lucide-react';
 import { DiscoverSource } from './DiscoverSource';
 import { BookCard } from './BookCard';
 import { Spinner } from './Spinner';
-import { useDiscover, useMe } from '../lib/queries';
+import { useDiscover, useDiscoverSource, useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './DiscoverSection.module.css';
@@ -25,6 +25,14 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
   const count = configuredCount && configuredCount > 0 ? configuredCount : STRIP_COUNT;
   const { data, isLoading, isFetching, error, refetch } = useDiscover(count, nonce);
   const books = data?.items ?? [];
+  // The source is a set-once preference, so its picker stays behind the gear
+  // (#2531) unless the saved source is gone or failed to load and needs attention.
+  const source = useDiscoverSource();
+  const sourceNeedsChoice = source.data?.available === false || !!source.error;
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const showSource = sourceOpen || sourceNeedsChoice;
+  const sourcePanelId = useId();
+  const sourceButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (shuffled.current && !isFetching) {
@@ -47,6 +55,18 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
           </div>
         </div>
         <div className={styles.actions}>
+          {me && !me.role.anonymous && <button
+            ref={sourceButton}
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => setSourceOpen(open => !open)}
+            aria-expanded={showSource}
+            aria-controls={showSource ? sourcePanelId : undefined}
+            title={t('Change Discover source')}
+            aria-label={t('Change Discover source')}
+          >
+            <Settings2 size={16} aria-hidden="true" focusable={false} />
+          </button>}
           <button
             type="button"
             className={styles.iconBtn}
@@ -76,7 +96,13 @@ export function DiscoverSection({ onClose, closeDisabled = false, hideActions = 
         </div>
       </div>
 
-      <DiscoverSource />
+      {showSource && <div id={sourcePanelId}>
+        <DiscoverSource onSaved={() => {
+          setSourceOpen(false);
+          announce(t('Discover source saved.'));
+          sourceButton.current?.focus();
+        }} />
+      </div>}
 
       {error ? <div className={styles.message}><p role="alert">{t('Failed to load books.')}</p><button type="button" onClick={() => void refetch()}>{t('Retry')}</button></div> : isLoading ? (
         <div className={styles.loading}><Spinner size={22} /></div>

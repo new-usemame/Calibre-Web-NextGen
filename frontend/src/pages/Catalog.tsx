@@ -1,4 +1,4 @@
-import { useShelfDragSelection } from '../components/ShelfDrag';
+import { useShelfDrag, useShelfDragSelection } from '../components/ShelfDrag';
 import { readGuestCustomFields, readGuestCustomLabels, customFieldsForSave, GUEST_CUSTOM_FIELDS_KEY, GUEST_CUSTOM_LABELS_KEY } from '../lib/customColumnDisplay';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,13 +19,14 @@ import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
-import { saveCatalog, loadCatalog } from '../lib/scrollCache';
+import { saveCatalog, loadCatalog, useCatalogCoverSnapshot } from '../lib/scrollCache';
 import { useLibraryRevision } from '../lib/libraryRevision';
 import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
+import { useShelfDragHandlesHidden } from '../lib/useShelfDragHandlesHidden';
 import { useT } from '../lib/i18n';
 import { useRangeSelection } from '../lib/useRangeSelection';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -264,7 +265,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   const [tagDeleteError, setTagDeleteError] = useState('');
   // Series views expose two extra series-order options and default to ascending
   // series order so the list reads 1, 2, 3… instead of newest-first (#573).
-  const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...SORT_OPTIONS] : SORT_OPTIONS;
+  const readerSorts = SORT_OPTIONS.filter(option => !option.value.startsWith('rating') || (me && !me.role.anonymous));
+  const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...readerSorts] : readerSorts;
   // Library-only controls (search box, advanced link, read-status filter) are
   // hidden for both entity-scoped and discovery views.
   const hideLibraryControls = filtered || isView || tagPath !== undefined;
@@ -292,6 +294,25 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
 
   const [page, setPage] = useState(() => snap?.page ?? 1);
   const [allBooks, setAllBooks] = useState<Book[]>(() => snap?.books ?? []);
+  const [coverResetRevision, setCoverResetRevision] = useState(0);
+  const coverSnapshot = useCatalogCoverSnapshot(restoreKey);
+  const previousCoverSnapshot = useRef(coverSnapshot);
+  useEffect(() => {
+    const previous = previousCoverSnapshot.current;
+    previousCoverSnapshot.current = coverSnapshot;
+    if (previous === coverSnapshot) return;
+    if (!coverSnapshot) {
+      // The follow-up cover read failed. Rebuild this affected view rather
+      // than restoring a cover we know was changed but cannot reconcile.
+      setAllBooks([]);
+      setPage(1);
+      setCoverResetRevision((revision) => revision + 1);
+      return;
+    }
+    const covers = new Map(coverSnapshot.map((book) => [book.id, book.cover_url]));
+    setAllBooks((books) => books.map((book) => covers.has(book.id)
+      ? { ...book, cover_url: covers.get(book.id)! } : book));
+  }, [coverSnapshot]);
   const [searchInput, setSearchInput] = useState(() => snap?.searchInput ?? '');
   const [search, setSearch] = useState(() => snap?.search ?? '');
   const [sort, setSort] = useState(() =>
@@ -370,7 +391,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // #1254: shelf tags on covers, shared with the classic grid's toggle.
   const [shelfBadgesHidden, setShelfBadgesHidden, shelfBadgesPreferenceSaving]
     = useShelfBadgesHidden({ onError: catalogPreferenceError });
+  // #2475: the grip on each card, for people who drag the card itself.
+  const [shelfDragHandlesHidden, setShelfDragHandlesHidden, shelfDragHandlesPreferenceSaving]
+    = useShelfDragHandlesHidden({ onError: catalogPreferenceError });
+  const shelfDragAvailable = !!useShelfDrag()?.available;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // An export started from the menu is cancelled if the menu unmounts it.
+  const exportPending = useRef(false);
+  const setExportPending = useCallback((pending: boolean) => { exportPending.current = pending; }, []);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   // `null` means show every administrator-enabled field. Signed-in readers
@@ -528,13 +556,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     if (!settingsOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        if (exportPending.current) return;
         const focused = document.activeElement;
         if (focused instanceof HTMLElement && settingsMenuRef.current?.contains(focused)) focused.blur();
         setSettingsOpen(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !exportPending.current) {
         const focusInside = settingsMenuRef.current?.contains(document.activeElement);
         setSettingsOpen(false);
         if (focusInside) settingsTriggerRef.current?.focus();
@@ -573,8 +602,17 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
       menu.style.maxHeight = `${Math.max(60, available)}px`;
     };
     constrainMenu();
+    // An observer delivery must not resize what it observes. Clamping the
+    // height can add a classic scrollbar that widens the max-content menu, and
+    // WebKit on Linux/Windows then reports a ResizeObserver loop (#2475 CI).
+    // The synchronous call above still positions the first paint.
+    let frame = 0;
+    const scheduleConstrain = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => { frame = 0; constrainMenu(); });
+    };
     const toolbar = settingsMenuRef.current?.closest<HTMLElement>(`.${styles.toolbar}`);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(constrainMenu);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleConstrain);
     const observedItems = new Set<Element>();
     const observeItems = () => {
       if (!toolbar || !active) return;
@@ -607,6 +645,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     window.addEventListener('scroll', constrainMenu, { passive: true });
     return () => {
       active = false;
+      cancelAnimationFrame(frame);
       observer?.disconnect();
       mutations?.disconnect();
       document.fonts?.removeEventListener('loadingdone', constrainMenu);
@@ -800,7 +839,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // A successful idempotent bulk action can refetch byte-identical data.
   // React Query keeps that object identity, but the cleared accumulator still
   // needs to consume the newly confirmed result.
-  }, [data, dataUpdatedAt, isPlaceholderData, resetKey]);
+  }, [data, dataUpdatedAt, isPlaceholderData, resetKey, coverResetRevision]);
 
   const total = data?.total ?? 0;
 
@@ -834,7 +873,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
         else if (readFilter !== 'all') params.set('filter', readFilter);
         if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
         if (entityKind && entityId !== undefined && entityId !== '') {
-          params.set(entityKind, String(entityId));
+          params.set(entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind, String(entityId));
         }
         const result = await apiGet<{ ids: number[] }>(`/api/v1/books?${params.toString()}`);
         ids = result.ids;
@@ -990,6 +1029,19 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     });
   };
 
+  const showExport = view !== 'discover' && view !== 'hot';
+  const bookListExport = <BookListExport onPendingChange={hideLibraryControls ? undefined : setExportPending} disabled={isLoading || isPlaceholderData || !!error} source={filterActive
+          ? { source: 'advanced', params: { ...advParams } }
+          : { source: 'catalog', params: {
+              sort,
+              ...(tagPath !== undefined ? { tag_path: tagPath } : {}),
+              ...(search && !entityKind && !view ? { search } : {}),
+              ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
+              ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
+              ...(entityKind && entityId !== undefined && entityId !== '' ? {
+                [entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind]: String(entityId),
+              } : {}),
+            } }} />;
   return (
     <main ref={setCatalogNode} className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`} data-testid="catalog-page">
       {tagPath !== undefined && <Link href="/tags" className={styles.back}>
@@ -1105,16 +1157,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
-        {view !== 'discover' && view !== 'hot' && <BookListExport disabled={isLoading || isPlaceholderData || !!error} source={filterActive
-          ? { source: 'advanced', params: { ...advParams } }
-          : { source: 'catalog', params: {
-              sort,
-              ...(tagPath !== undefined ? { tag_path: tagPath } : {}),
-              ...(search && !entityKind && !view ? { search } : {}),
-              ...(view ? { filter: view } : readFilter !== 'all' ? { filter: readFilter } : {}),
-              ...(!hideLibraryControls && showHidden ? { show_hidden: '1' } : {}),
-              ...(entityKind && entityId !== undefined && entityId !== '' ? { [entityKind]: String(entityId) } : {}),
-            } }} />}
+        {/* #2475: the library landing keeps Export in View settings; filtered
+            views have no gear, so it stays in the toolbar there. */}
+        {showExport && hideLibraryControls && bookListExport}
 
         {/* #1288: Upload is a library-wide ACTION, not one of the view-scoped
             controls hideLibraryControls exists to hide (search box, Advanced,
@@ -1220,7 +1265,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
               data-testid="catalog-view-settings"
               ref={settingsTriggerRef}
               className={settingsOpen ? styles.gearBtnActive : styles.gearBtn}
-              onClick={() => setSettingsOpen((o) => !o)}
+              onClick={() => setSettingsOpen((o) => (o && exportPending.current) || !o)}
               aria-expanded={settingsOpen}
               title={t('View settings')}
               aria-label={t('View settings')}
@@ -1288,6 +1333,20 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
                   />
                   <span>{t('Show shelf tags')}</span>
                 </label>
+                {shelfDragAvailable && (
+                  <label className={styles.settingsItem}>
+                    <input
+                      type="checkbox"
+                      data-testid="show-shelf-drag-handles"
+                      className={styles.settingsCheck}
+                      checked={!shelfDragHandlesHidden}
+                      disabled={shelfDragHandlesPreferenceSaving}
+                      onChange={(e) => setShelfDragHandlesHidden(!e.target.checked)}
+                    />
+                    <span>{t('Show shelf drag handles')}</span>
+                  </label>
+                )}
+                {showExport && !me?.role?.anonymous && <div className={styles.settingsExport}>{bookListExport}</div>}
                 {customColumnDefinitions.length > 0 && (
                   <fieldset className={styles.densityField}>
                     <legend>{t('Custom fields on book cards')}</legend>

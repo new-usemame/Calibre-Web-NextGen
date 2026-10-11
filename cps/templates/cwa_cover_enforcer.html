@@ -98,7 +98,7 @@
       console.error("Error: ", e);
       if (generation !== pollGeneration) return;
       pollFailures += 1;
-      setMessage("{{ _('Lost contact with the server, retrying...') }}");
+      setMessage({{ _('Lost contact with the server, retrying...')|tojson }});
       timeout = setTimeout(function () { getStatus(generation); },
                            Math.min(30000, 1000 * Math.pow(2, pollFailures)));
       return;
@@ -160,21 +160,21 @@
       try { payload = await res.json(); } catch (e) { /* non-JSON error page */ }
       if (!res.ok) {
         // 409 carries the "already running" message from the server.
-        setMessage(payload.message || "{{ _('The request failed.') }}");
+        setMessage(payload.message || {{ _('The request failed.')|tojson }});
         return false;
       }
       setMessage("");
       return true;
     } catch (e) {
       console.error("Error: ", e);
-      setMessage("{{ _('The request failed.') }}");
+      setMessage({{ _('The request failed.')|tojson }});
       return false;
     }
   }
 
   document.getElementById("startEnforcerBtn").addEventListener("click", async function () {
     const started = await postAction("{{ url_for('cover_enforcer_ui.start_cover_enforcer') }}",
-                                     "{{ _('Starting...') }}");
+                                     {{ _('Starting...')|tojson }});
     if (started) {
       document.getElementById("innerStatus").textContent = "";
       const progressBar = document.getElementById("progress-bar");
@@ -187,7 +187,7 @@
 
   document.getElementById("cancelEnforcerBtn").addEventListener("click", function () {
     postAction("{{ url_for('cover_enforcer_ui.cancel_cover_enforcer') }}",
-               "{{ _('Cancelling...') }}");
+               {{ _('Cancelling...')|tojson }});
   });
 
   getStatus();

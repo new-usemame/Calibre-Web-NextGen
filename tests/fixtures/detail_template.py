@@ -34,6 +34,7 @@ def reader(**overrides):
         role_admin=lambda: False,
         role_edit_shelfs=lambda: False,
         check_visibility=lambda *_args: False,
+        get_view_property=lambda *_args: None,
     )
     attributes.update(overrides)
     return SimpleNamespace(**attributes)

@@ -43,16 +43,9 @@ class TestAvailableBooksEndpoint:
         assert "403" in body, "endpoint must 403 when the user can't edit the shelf"
         assert "404" in body, "endpoint must 404 on an unknown shelf"
 
-    def test_endpoint_normalises_search_and_plain_book_shapes(self):
-        # get_search_results returns rows wrapping the book in `.Books`; the plain
-        # recent query returns Books directly — the endpoint must handle both.
-        m = re.search(r"def shelf_available_books\(shelf_id\):(.*?)\n@", SHELF_PY, re.S)
-        body = m.group(1)
-        assert "getattr(entry, 'Books', entry)" in body, (
-            "must normalise the two book shapes (search rows expose .Books; the "
-            "plain query yields the book) — otherwise the search path 500s on book.id"
-        )
-        assert "in_shelf" in body, "each book must be flagged with in_shelf"
+    # Shape normalisation, visibility and in_shelf flags are exercised by
+    # tests/unit/test_2499_shelf_picker_api.py through the shared
+    # cps.shelf.shelf_picker_books query this route now calls.
 
 
 class TestShelfPageWiring:

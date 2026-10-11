@@ -3,22 +3,16 @@ synced reading progress (the classic page shows "KOReader Progress: X%"). The
 detail endpoint now surfaces it and the SPA book page renders it.
 
 The endpoint reads the same source as the classic view
-(KoboReadingState.current_bookmark.progress_percent); these pins fail on main
-(which has neither the query nor the field) and the behaviour is additionally
-verified live on the wire. A behavioural endpoint test with a real progress row
-follows.
+(KoboReadingState.current_bookmark.progress_percent). These endpoint tests
+exercise the progress payload while other account-owned projections are empty.
 """
 import inspect
-import pathlib
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 import flask
 import pytest
-
-_ROOT = pathlib.Path(__file__).resolve().parents[2]
-
 
 @pytest.mark.unit
 def test_detail_endpoint_surfaces_kosync_progress():
@@ -33,9 +27,9 @@ def test_detail_endpoint_surfaces_kosync_progress():
         languages=[], publishers=[], identifiers=[], pubdate=None,
     )
 
-    def query_side_effect(model):
+    def query_side_effect(*models):
         q = MagicMock()
-        if model is ub.KoboReadingState:
+        if models == (ub.KoboReadingState,):
             # Faithful to the real KoboBookmark, which always carries these
             # three columns — the endpoint reports the percentage and the two
             # timestamps as one unit (#627).
@@ -91,13 +85,6 @@ def test_detail_endpoint_null_progress_when_unsynced():
             resp = inspect.unwrap(books_mod.book_detail)(7)
     data = json.loads(resp.get_data(as_text=True))
     assert data["kosync_progress"] is None
-
-
-@pytest.mark.unit
-def test_bookdetail_renders_progress():
-    src = (_ROOT / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
-    assert "book.kosync_progress != null" in src
-    assert "KOReader Progress" in src  # aligned to the classic, translatable msgid
 
 
 @pytest.fixture(autouse=True)

@@ -710,11 +710,14 @@ def feed_discover():
 @opds.route("/opds/rated")
 @requires_basic_auth_if_no_ano
 def feed_best_rated():
+    from .personal_ratings import personal_score
+    from .sort_orders import viewer_id
+    uid = viewer_id(auth.current_user())
     if not auth.current_user().check_visibility(constants.SIDEBAR_BEST_RATED):
         abort(404)
     off = request.args.get("offset") or 0
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
-                                                  db.Books, db.Books.ratings.any(db.Ratings.rating > 9),
+                                                  db.Books, personal_score(uid) > 9 if uid is not None else db.Books.ratings.any(db.Ratings.rating > 9),
                                                   BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)

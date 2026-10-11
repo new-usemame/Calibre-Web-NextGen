@@ -5,6 +5,8 @@
 // is a sort the client can only ask for, never compute (cps/sort_orders.py).
 export const SORT_OPTIONS = [
   { label: 'Recent', value: 'recent' },
+  { label: 'Your rating, highest first', value: 'ratingdesc' },
+  { label: 'Your rating, lowest first', value: 'ratingasc' },
   { label: 'Newest', value: 'new' },
   { label: 'Oldest', value: 'old' },
   { label: 'Title A–Z', value: 'abc' },

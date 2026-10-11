@@ -2238,12 +2238,6 @@ export function Reader({ id }: { id: string }) {
         </>
       )}
 
-      {lookupMode && (
-        <div className={styles.resumeNotice} role="status">
-          <span>{t('Progress is not being saved.')}</span>
-        </div>
-      )}
-
       {previewSource && !lookupMode && (
         <div className={styles.resumeNotice} role="status">
           <span>{t('Previewing {source}. Its saved position will not change.', {

@@ -43,7 +43,7 @@ local CWNGSync = WidgetContainer:extend{
     name = "cwngsync",
     settings_key = "cwngsync",
     title = _("Login to NextGen Server"),
-    version = "4.1.47",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.48",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -123,6 +123,9 @@ function CWNGSync:init()
     self.settings = migrated_settings
         or G_reader_settings:readSetting("cwngsync", self.default_settings)
     self.device_id = G_reader_settings:readSetting("device_id")
+    -- Persist before a later-initialized built-in plugin can schedule its
+    -- startup pull. The next-tick check below also guards the live instance.
+    self:checkBuiltinProgressSync()
     if device_id_replaced then
         device_id_replaced = false
         UIManager:nextTick(function()
@@ -138,6 +141,9 @@ function CWNGSync:init()
     self:installHomeButton()
     self:onDispatcherRegisterActions()
     self:registerEvents()
+    -- All plugins have initialized by the next tick, so disable the live
+    -- built-in handlers as well as persisting their setting.
+    UIManager:nextTick(function() self:checkBuiltinProgressSync() end)
     if not self.ui.document then
         UIManager:nextTick(function() self:onLibraryShown() end)
     end
@@ -146,6 +152,7 @@ end
 -- The file browser is up: finish a ready-made setup, offer to connect, or
 -- bring the library up to date.
 function CWNGSync:onLibraryShown()
+    self:checkBuiltinProgressSync()
     if self:importSetupBundle() then return end
     if not self:isConfigured() then
         if not self:bundlePending() then self:maybeWelcome() end
@@ -689,6 +696,28 @@ function CWNGSync:setServer(server)
         return
     end
     self.settings.server = normalized
+    UIManager:nextTick(function() self:checkBuiltinProgressSync() end)
+end
+
+function CWNGSync:checkBuiltinProgressSync()
+    if not self.settings.server then return end
+    local ok, err = pcall(function()
+        require("builtin_sync_guard").check{
+            server = self.settings.server,
+            reader_settings = G_reader_settings,
+            builtin = PluginLoader:getPluginInstance("kosync"),
+            open_settings = function()
+                return require("luasettings"):open(require("datastorage"):getSettingsDir() .. "/kosync.lua")
+            end,
+            unschedule = function(task) UIManager:unschedule(task) end,
+            notice = function()
+                UIManager:show(InfoMessage:new{
+                    text = _("Automatic Progress sync was turned off for this server. CWNG sync handles your place and respects Share my place; Progress sync cannot identify this device when pulling. Manual Progress sync still pulls the shared place."),
+                })
+            end,
+        }
+    end)
+    if not ok then logger.warn("CWNGSync: could not check built-in Progress sync", err) end
 end
 
 function CWNGSync:setSyncForward(strategy)
@@ -1826,6 +1855,8 @@ function CWNGSync:pullLibraryProgress(ensure_networking)
             self.settings.username,
             self.settings.password,
             doc_digest,
+            Device.model,
+            self.device_id,
             function(request_ok, body)
                 logger.dbg("CWNGSync: [Bulk Pull] server response for", file_path, "ok=", request_ok, "body=", body)
                 if not request_ok or type(body) ~= "table" then
@@ -2092,6 +2123,8 @@ function CWNGSync:getProgress(ensure_networking, interactive)
         self.settings.username,
         self.settings.password,
         doc_digest,
+        Device.model,
+        self.device_id,
         function(ok, body)
             logger.dbg("CWNGSync: [Pull] progress for", current_file)
             logger.dbg("CWNGSync: ok:", ok, "body:", body)

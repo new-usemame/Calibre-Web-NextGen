@@ -243,7 +243,7 @@ function AutoSync:deliverPending(client, entry, done)
 
     if entry.percentage ~= nil and entry.progress ~= nil then
         steps[#steps + 1] = function(continue)
-            client:get_progress(s.username, s.password, entry.document, function(ok, body, reason)
+            client:get_progress(s.username, s.password, entry.document, Device.model, self.device_id, function(ok, body, reason)
                 if not ok and reason ~= "HTTP 404" then return done(false, reason) end
                 local remote = ok and decodeBody(body) or nil
                 if not Pending.shouldSendProgress(entry, remote, self.device_id) then
@@ -254,7 +254,7 @@ function AutoSync:deliverPending(client, entry, done)
                     entry.percentage, Device.model, self.device_id, function(sent, _body, send_reason)
                         if sent or isFinalRefusal(send_reason) then return continue() end
                         done(false, send_reason)
-                    end)
+                    end, entry.captured_at)
             end)
         end
     end

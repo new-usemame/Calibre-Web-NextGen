@@ -396,7 +396,7 @@ def ensure_kosync_progress_table(conn):
             columns = [row[1] for row in pragma_result.fetchall()]
 
             expected_columns = {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
-            actual_columns = set(columns)
+            actual_columns = set(columns) - {'received_at'}
 
             # A mismatched table cannot provide the conflict target every
             # conditional writer depends on, so startup must not continue.
@@ -412,6 +412,8 @@ def ensure_kosync_progress_table(conn):
                 raise KOSyncProgressSchemaError(
                     "kosync_progress schema mismatch; migration required"
                 )
+            if "received_at" not in columns:
+                execute_sql("ALTER TABLE kosync_progress ADD COLUMN received_at TIMESTAMP")
 
             # Check if foreign keys have CASCADE DELETE
             has_cascade = check_cascade_delete_on_fk(conn, "kosync_progress", {'user_id': 'user'})
@@ -432,12 +434,13 @@ def ensure_kosync_progress_table(conn):
                             device TEXT NOT NULL,
                             device_id TEXT,
                             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            received_at TIMESTAMP,
                             FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
                         )
                     """)
                     execute_sql("""
-                        INSERT INTO kosync_progress_new (id, user_id, document, progress, percentage, device, device_id, timestamp)
-                        SELECT kp.id, kp.user_id, kp.document, kp.progress, kp.percentage, kp.device, kp.device_id, kp.timestamp
+                        INSERT INTO kosync_progress_new (id, user_id, document, progress, percentage, device, device_id, timestamp, received_at)
+                        SELECT kp.id, kp.user_id, kp.document, kp.progress, kp.percentage, kp.device, kp.device_id, kp.timestamp, kp.received_at
                         FROM kosync_progress AS kp
                         WHERE EXISTS (
                             SELECT 1 FROM user AS u WHERE u.id = kp.user_id
@@ -475,6 +478,11 @@ def ensure_kosync_progress_table(conn):
         # F-9073e5: ON CONFLICT needs a verified uniqueness guarantee. Repair a
         # same-named incompatible index, deduplicate legacy rows without a
         # window function, and verify the ordered unique columns before return.
+        # Receipt is separate from the event time for Share my place's
+        # tiebreak. Legacy rows use their timestamp as both clocks.
+        columns = {row[1] for row in execute_sql("PRAGMA table_info(kosync_progress)")}
+        if "received_at" not in columns:
+            execute_sql("ALTER TABLE kosync_progress ADD COLUMN received_at TIMESTAMP")
         try:
             _ensure_kosync_conflict_target(execute_sql)
         except KOSyncProgressSchemaError:
@@ -571,6 +579,7 @@ class KOSyncProgress(AppBase):
     device_id = Column(String)
     timestamp = Column(TIMESTAMP, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
+    received_at = Column(TIMESTAMP, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(

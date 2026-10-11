@@ -14,6 +14,8 @@ means is documented in ``cps/services/koreader_library.py``.
 
 import hashlib
 import os
+from dataclasses import replace
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from flask import g, jsonify, make_response, request, send_from_directory
@@ -21,7 +23,8 @@ from flask_babel import gettext as _
 from sqlalchemy.exc import SQLAlchemyError
 
 from ... import config, csrf, logger, ub
-from ...services import koreader_library, koreader_placeholder
+from ...services import device_registry, koreader_library, koreader_placeholder, kosync_place
+from ...services.place_arbiter import Report
 from .kosync import (
     MAX_DEVICE_ID_LENGTH,
     MAX_DEVICE_LENGTH,
@@ -133,11 +136,21 @@ def get_library():
     except ValueError as error:
         return _error(str(error), 400, "invalid_request")
     _observe_device(user)
+    target, identified, _raw_id = kosync_place.request_device(user.id)
+    # Older cwngsync versions already send library headers, but cannot name
+    # their progress GETs. Only a progress/status header observation enables
+    # the control, preserving those versions' existing library behavior.
+    private = (identified and device_registry.place_control(target) == "per_device"
+               and not target.share_place)
+    # Private walks have a device-scoped cache key. A different reader or a
+    # changed share setting can never reuse their private projection.
+    walk_owner = (user.id, "device", target.id) if private else user.id
     # The pages after the first come from the manifest this sync started with
     # (see koreader_library's "Syncs still reading pages"); a sync the server
     # no longer remembers carries on from the library as it is now.
-    manifest = (koreader_library.walk_manifest(user.id, cursor_revision)
+    manifest = (koreader_library.walk_manifest(walk_owner, cursor_revision)
                 if cursor_revision else None)
+    resumed = manifest is not None
     try:
         if manifest is None:
             manifest = koreader_library.build_manifest(user)
@@ -152,6 +165,29 @@ def get_library():
         return _error("The library is unavailable right now", 503,
                       "library_unavailable")
 
+    if private and not resumed:
+        entries = [dict(entry) for entry in manifest.entries]
+        ids = [entry["book_id"] for entry in entries]
+        rows = {}
+        for chunk in koreader_library._chunks(ids):
+            rows.update({row.book_id: row for row in ub.session.query(ub.DeviceReadingPosition).filter(
+                ub.DeviceReadingPosition.device_id == target.id,
+                ub.DeviceReadingPosition.book_id.in_(chunk))})
+        statuses = {ub.ReadBook.STATUS_UNREAD: koreader_library.READ_UNREAD,
+                    ub.ReadBook.STATUS_IN_PROGRESS: koreader_library.READ_READING,
+                    ub.ReadBook.STATUS_FINISHED: koreader_library.READ_FINISHED}
+        for entry in entries:
+            own = rows.get(entry["book_id"])
+            entry["progress"] = (own.progress_percent / 100.0
+                                 if own is not None and own.progress_percent is not None else None)
+            entry["read_status"] = statuses.get(own.reading_status if own else None,
+                                                 koreader_library.READ_UNREAD)
+            entry.pop("last_read", None)
+            if own is not None and own.progress_percent is not None:
+                entry["last_read"] = koreader_library.iso_z(own.client_modified_at or own.server_modified_at)
+        revision = koreader_library._revision(manifest.scope, manifest.scope_shelves,
+                                              manifest.shelves, entries)
+        manifest = replace(manifest, entries=entries, revision=revision)
     if_revision = request.args.get("if_revision")
     if cursor is None and if_revision and if_revision == manifest.revision:
         response = jsonify({"unchanged": True, "revision": manifest.revision})
@@ -162,7 +198,7 @@ def get_library():
     # between two pages is picked up by the next sync instead of hidden.
     revision = cursor_revision or manifest.revision
     books, more = koreader_library.page(manifest.entries, after=after, limit=limit)
-    koreader_library.continue_walk(user.id, revision, manifest, more=bool(more and books))
+    koreader_library.continue_walk(walk_owner, revision, manifest, more=bool(more and books))
     # File facts are read fresh for every page; the kept manifest stays as built.
     books = [dict(book) for book in books]
     koreader_library.fill_file_facts(books, manifest.paths, _library_root())
@@ -363,9 +399,31 @@ def put_read_status():
         return _error(str(error), 400, "invalid_request")
     if book_id is None or _visible_book(user, book_id) is None:
         return _error("Book not found", 404, "not_found")
-    _observe_device(user, data)
+    target, identified, _raw_id = kosync_place.request_device(user.id, data, observe=True)
     try:
-        problem = koreader_library.set_read_status(user, book_id, status)
+        if identified and not target.share_place:
+            now = datetime.now(timezone.utc)
+            own = kosync_place.own_position(target.id, book_id)
+            # A status-only report must not replace the position or its clocks.
+            kosync_place.latest_write(
+                ub.DeviceReadingPosition, dict(device_id=target.id, book_id=book_id),
+                dict(reading_status={"unread": ub.ReadBook.STATUS_UNREAD,
+                                     "reading": ub.ReadBook.STATUS_IN_PROGRESS,
+                                     "finished": ub.ReadBook.STATUS_FINISHED}[status],
+                     status_modified_at=now),
+                client_column="status_modified_at", server_column="status_modified_at",
+                candidate=Report(None, now))
+            percent = (100 if status == "finished" else
+                       own.progress_percent if own is not None and own.progress_percent is not None else 1)
+            ub.session.commit()
+            if status in ("finished", "reading"):
+                # External reading targets still see the account's reading.
+                # No ReadBook or custom-column helper runs on this path.
+                from .kosync import push_reading_state_to_hardcover
+                push_reading_state_to_hardcover(user, _visible_book(user, book_id), int(percent))
+            problem = ""
+        else:
+            problem = koreader_library.set_read_status(user, book_id, status)
     except SQLAlchemyError:
         ub.session.rollback()
         log.error("KOReader read status for book %s failed", book_id, exc_info=True)

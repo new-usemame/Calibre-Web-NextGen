@@ -55,7 +55,7 @@ local function pull(opts)
         pcall = pcall, type = type, tonumber = tonumber, require = function(name)
             if name == "CWNGSyncClient" then
                 local Client = {
-                    get_progress = function(_, _, _, _, callback) callback(true, opts.remote) end,
+                    get_progress = function(_, _, _, _, device, device_id, callback) callback(true, opts.remote) end,
                 }
                 Client.new = function(_, o) return setmetatable(o, { __index = Client }) end
                 return Client

@@ -61,7 +61,7 @@ from .services.annotation_colors import (
     to_display_name,
     to_storage_color,
 )
-from .services import device_capabilities
+from .services import device_capabilities, device_registry
 from .services.kobo_import import (
     KoboUploadError,
     MAX_KOBO_DATABASE_UPLOAD_BYTES,
@@ -255,6 +255,7 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "can_receive_books": device.kind in ("kobo", "koreader"),
         "active": bool(device.active),
         "share_place": bool(device.share_place),
+        "place_control": device_registry.place_control(device),
     }
 
 

@@ -242,7 +242,8 @@ function CWNGSyncClient:update_progress(
         percentage,
         device,
         device_id,
-        callback)
+        callback,
+        timestamp)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
     self.client:enable("GinClient")
@@ -251,6 +252,7 @@ function CWNGSyncClient:update_progress(
         password = password,
     })
     -- Set *very* tight timeouts to avoid blocking for too long...
+    self.client:enable("CWNGDeviceHeaders", { device = device, device_id = device_id })
     socketutil:set_timeout(PROGRESS_TIMEOUTS[1], PROGRESS_TIMEOUTS[2])
     local co = coroutine.create(function()
         local ok, res = pcall(function()
@@ -260,6 +262,7 @@ function CWNGSyncClient:update_progress(
                 percentage = percentage,
                 device = device,
                 device_id = device_id,
+                timestamp = timestamp or os.time(),
             })
         end)
         finish(callback, ok, res, "CWNGSyncClient:update_progress")
@@ -274,6 +277,8 @@ function CWNGSyncClient:get_progress(
         username,
         password,
         document,
+        device,
+        device_id,
         callback)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
@@ -283,6 +288,7 @@ function CWNGSyncClient:get_progress(
         password = password,
     })
     socketutil:set_timeout(PROGRESS_TIMEOUTS[1], PROGRESS_TIMEOUTS[2])
+    self.client:enable("CWNGDeviceHeaders", { device = device, device_id = device_id })
     local co = coroutine.create(function()
         local ok, res = pcall(function()
             return self.client:get_progress({
@@ -358,11 +364,14 @@ function CWNGSyncClient:claim_delivery(
     socketutil:reset_timeout()
 end
 
-local function jsonRequest(self, operation, username, password, callback, label)
+local function jsonRequest(self, operation, username, password, callback, label, device, device_id)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
     self.client:enable("GinClient")
     self.client:enable("CWNGSyncAuth", { username = username, password = password })
+    if device_id then
+        self.client:enable("CWNGDeviceHeaders", { device = device, device_id = device_id })
+    end
     socketutil:set_timeout(INVENTORY_TIMEOUTS[1], INVENTORY_TIMEOUTS[2])
     local co = coroutine.create(function()
         local ok, res = pcall(operation)
@@ -570,7 +579,7 @@ function CWNGSyncClient:update_read_status(
             document = document,
             status = status,
         })
-    end, username, password, callback, "CWNGSyncClient:update_read_status")
+    end, username, password, callback, "CWNGSyncClient:update_read_status", device, device_id)
 end
 
 -- Pairing runs before the device has any credentials, so these two calls go

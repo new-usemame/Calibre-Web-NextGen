@@ -1488,6 +1488,7 @@ class Device(Base):
     created_by = Column(String(32), nullable=False, default="auto")
     share_place = Column(Boolean, nullable=False, default=False, server_default='0')
     share_place_enabled_at = Column(DateTime, nullable=True)
+    cwng_header_seen_at = Column(DateTime, nullable=True)
 
     identities = relationship("DeviceIdentity", back_populates="device", cascade="all, delete-orphan")
     __table_args__ = (
@@ -4533,6 +4534,7 @@ def migrate_device_share_place(engine, _session):
     for table, name, ddl in (
         ("device", "share_place", "share_place BOOLEAN NOT NULL DEFAULT 0"),
         ("device", "share_place_enabled_at", "share_place_enabled_at DATETIME"),
+        ("device", "cwng_header_seen_at", "cwng_header_seen_at DATETIME"),
         ("device_reading_position", "reading_status", "reading_status INTEGER"),
         ("device_reading_position", "status_modified_at", "status_modified_at DATETIME"),
     ):

@@ -109,6 +109,7 @@ function SetupFlow:connectWith(config, how, on_done)
         return
     end
     self.settings.server = config.server
+    if self.checkBuiltinProgressSync then self:checkBuiltinProgressSync() end
     self.settings.username = config.username
     self.settings.password = config.password
     self.settings.library_enabled = true

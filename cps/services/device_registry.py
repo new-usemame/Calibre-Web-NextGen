@@ -398,8 +398,40 @@ def resolve_owned_device_best_effort(*, user_id, public_id):
                 pass
 
 
+def place_control(device):
+    """Whether protocol requests from this device can honor Share my place."""
+    return ("per_device" if device.kind in ("kobo", "webreader")
+            or device.cwng_header_seen_at is not None else "always_shared")
+
+
+def find_koreader_device(*, user_id, device_id, secret_key=None, session=None):
+    """Read-only, account-scoped resolution, including owned legacy identities.
+
+    Unlike registration this never migrates an identity or creates a device;
+    progress GETs must be harmless even when the header names a new reader.
+    """
+    from flask import current_app
+    from cps import ub
+    s = session if session is not None else ub.session
+    key = secret_key if secret_key is not None else current_app.secret_key
+    for version, owner in ((KEY_VERSION_PER_ACCOUNT, user_id),
+                           (KEY_VERSION_SERVER_WIDE, None)):
+        fingerprint = _koreader_fingerprint(device_id, key, user_id=owner)
+        if not fingerprint:
+            return None
+        identity = s.query(ub.DeviceIdentity).join(ub.Device).filter(
+            ub.DeviceIdentity.scheme == KOREADER_SCHEME,
+            ub.DeviceIdentity.key_version == version,
+            ub.DeviceIdentity.fingerprint == fingerprint,
+            ub.Device.user_id == user_id,
+        ).first()
+        if identity is not None:
+            return identity.device
+    return None
+
+
 def register_koreader_device_best_effort(*, user_id, device_id, device_name=None,
-                                          secret_key=None):
+                                          secret_key=None, header_seen=False):
     """Observe an optional kosync device id without retaining its raw value."""
     owned = None
     try:
@@ -464,6 +496,9 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
                     device.model = model
                 device.last_metadata_at = now
                 write_needed = True
+        if header_seen and device.cwng_header_seen_at is None:
+            device.cwng_header_seen_at = now
+            write_needed = True
         if write_needed:
             try:
                 owned.commit()
@@ -478,6 +513,9 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
                 ).first()
                 if winner is None or winner.device.user_id != user_id:
                     raise
+                if header_seen and winner.device.cwng_header_seen_at is None:
+                    winner.device.cwng_header_seen_at = now
+                    owned.commit()
                 return winner.device_id
         return device.id
     except Exception:

@@ -10,7 +10,9 @@ import random
 import io
 import mimetypes
 import tempfile
+import threading
 import time
+import hashlib
 import re
 import regex
 import shutil
@@ -437,7 +439,7 @@ def get_convert_options(book):
 # Convert existing book entry to new format
 def convert_book_format(book_id, calibre_path, old_book_format, new_book_format, user_id,
                         ereader_mail=None, subject=None, blocking=False, timeout=120,
-                        cover_user_id=None):
+                        cover_user_id=None, queued_tasks=None):
     book = calibre_db.get_book(book_id)
     data = calibre_db.get_book_format(book.id, old_book_format)
     if not data:
@@ -476,6 +478,9 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
         user=user_id, cover_user_id=cover_user_id,
     )
     WorkerThread.add(user_id, task)
+    if queued_tasks is not None:
+        # The caller watches this task in the task list (#1110).
+        queued_tasks.append(task)
     if blocking:
         # Only the context-free Event wait crosses onto the bounded native
         # thread pool. url_for(), translations, DB access, and task creation
@@ -1975,17 +1980,32 @@ def uniq(inpt):
     return output
 
 
-def check_email(email):
+def _taken_by_another_user(column, value, user_id):
+    # Uniqueness is case-insensitive, so the account being edited must not count
+    # as a clash with itself: renaming "myname" to "MyName" is not a collision.
+    query = ub.session.query(ub.User.id).filter(func.lower(column) == value.lower())
+    if user_id is not None:
+        query = query.filter(ub.User.id != user_id)
+    return query.first() is not None
+
+
+def check_email(email, user_id=None):
+    """Return the normalized address, or raise if another account already uses it.
+
+    Pass ``user_id`` when changing an existing account's address."""
     email = valid_email(email)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.email) == email.lower()).first():
+    if _taken_by_another_user(ub.User.email, email, user_id):
         log.error("Found an existing account for this Email address")
         raise Exception(_("Found an existing account for this Email address"))
     return email
 
 
-def check_username(username):
+def check_username(username, user_id=None):
+    """Return the stripped name, or raise if another account already uses it.
+
+    Pass ``user_id`` when renaming an existing account."""
     username = strip_whitespaces(username)
-    if ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).scalar():
+    if _taken_by_another_user(ub.User.name, username, user_id):
         log.error("This username is already taken")
         raise Exception(_("This username is already taken"))
     return username
@@ -2641,6 +2661,7 @@ class StagedCoverWrite:
         try:
             os.replace(self.staged_path, self.target_path)
             self._published = True
+            _forget_cover_stage(self.staged_path)
         except (IOError, OSError) as ex:
             log.error(
                 "Publishing staged cover failed target=%s: %s: %s",
@@ -2664,10 +2685,14 @@ class StagedCoverWrite:
         return True, None
 
     def discard(self):
-        if self._published or not os.path.exists(self.staged_path):
+        if self._published:
+            return True, None
+        if not os.path.exists(self.staged_path):
+            _forget_cover_stage(self.staged_path)
             return True, None
         try:
             os.remove(self.staged_path)
+            _forget_cover_stage(self.staged_path)
             return True, None
         except OSError as ex:
             log.error("Removing staged cover %s failed: %s", self.staged_path, ex)
@@ -2715,6 +2740,7 @@ class InPlaceStagedCoverWrite(StagedCoverWrite):
             return False, str(ex)
         try:
             os.remove(self.staged_path)
+            _forget_cover_stage(self.staged_path)
         except OSError as ex:
             log.warning("Could not remove published cover stage %s: %s", self.staged_path, ex)
         return True, None
@@ -2753,6 +2779,7 @@ class GDriveStagedCoverWrite(StagedCoverWrite):
 
         try:
             os.remove(self.staged_path)
+            _forget_cover_stage(self.staged_path)
         except OSError as ex:
             # Remote publication has committed. Local cleanup cannot roll it
             # back and is left to the startup scavenger.
@@ -2823,6 +2850,62 @@ def _server_uid():
     return os.geteuid() if hasattr(os, "geteuid") else "?"
 
 
+def _cover_stage_registry_dir():
+    return os.path.join(constants.CONFIG_DIR, "cover-stages")
+
+
+def _cover_stage_marker(staged_path):
+    digest = hashlib.sha256(
+        os.path.abspath(staged_path).encode("utf-8", "surrogateescape")).hexdigest()
+    return os.path.join(_cover_stage_registry_dir(), digest + ".pending")
+
+
+def _is_cover_stage_name(filename):
+    global_stage = filename.startswith(".cover.jpg.cwng-") and filename.endswith(".stage")
+    personal_stage = re.fullmatch(r"\.\d+(?:-\d+)?\.jpg\.cwng-.+\.stage", filename) is not None
+    return global_stage or personal_stage
+
+
+def _create_cover_stage(directory, prefix):
+    """Create a stage file whose path is registered before the file exists.
+
+    The registry under CONFIG_DIR is what lets startup find the stages a dead
+    process left without walking the whole library (#2509: a 36-minute walk of
+    a 129,000-book library before the web server could listen). The marker is
+    written first, so a crash between the two steps leaves a marker naming a
+    file that does not exist, which the scavenger simply drops.
+    """
+    staged_path = os.path.join(directory, "{}{}.stage".format(prefix, uuid4().hex))
+    marker = _cover_stage_marker(staged_path)
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w", encoding="utf-8", errors="surrogateescape") as marker_file:
+            marker_file.write(staged_path)
+            marker_file.flush()
+            os.fsync(marker_file.fileno())
+    except OSError as ex:
+        # An unwritable registry must not cost the user their cover; the
+        # stage is then only found by a full sweep.
+        log.error("Could not register cover stage %s: %s", staged_path, ex)
+    try:
+        fd = os.open(staged_path,
+                     os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    except BaseException:
+        _forget_cover_stage(staged_path)
+        raise
+    return fd, staged_path
+
+
+def _forget_cover_stage(staged_path):
+    """Drop the registry marker once the stage has been published or removed."""
+    try:
+        os.remove(_cover_stage_marker(staged_path))
+    except FileNotFoundError:
+        pass
+    except OSError as ex:
+        log.warning("Could not drop cover stage marker for %s: %s", staged_path, ex)
+
+
 def _open_cover_stage(filepath, saved_filename):
     """Create the stage file, beside the target when the folder allows it.
 
@@ -2836,7 +2919,7 @@ def _open_cover_stage(filepath, saved_filename):
     prefix = ".{}.cwng-".format(saved_filename)
     target = os.path.join(filepath, saved_filename)
     try:
-        fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=filepath)
+        fd, staged_path = _create_cover_stage(filepath, prefix)
         return fd, staged_path, False
     except PermissionError as ex:
         # A symlinked target is never rewritten in place: the rename path
@@ -2850,7 +2933,7 @@ def _open_cover_stage(filepath, saved_filename):
             "Give the folder the server's uid to restore the atomic path.",
             filepath, _describe_owner(filepath), _server_uid(), ex,
         )
-    fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=get_temp_dir())
+    fd, staged_path = _create_cover_stage(get_temp_dir(), prefix)
     return fd, staged_path, True
 
 
@@ -2957,8 +3040,12 @@ def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=No
     if staged_path:
         try:
             os.remove(staged_path)
+        except FileNotFoundError:
+            _forget_cover_stage(staged_path)
         except OSError:
             pass
+        else:
+            _forget_cover_stage(staged_path)
     return None, message
 
 
@@ -2982,41 +3069,126 @@ def save_cover(img, book_path):
 
 
 def scavenge_staged_cover_files():
-    """Log and remove orphan cover stages without attempting publication."""
+    """Log and remove orphan cover stages without attempting publication.
+
+    Only registered stages are visited (see ``_create_cover_stage``), so the
+    cost is the number of interrupted writes, not the size of the library.
+    This runs before the web server listens; it must never walk the library.
+    """
+    registry = _cover_stage_registry_dir()
+    try:
+        names = os.listdir(registry)
+    except FileNotFoundError:
+        return 0
+    except OSError as ex:
+        log.error("Could not read cover stage registry %s: %s", registry, ex)
+        return 0
+
+    removed = 0
+    for name in names:
+        if not name.endswith(".pending"):
+            continue
+        marker = os.path.join(registry, name)
+        try:
+            with open(marker, encoding="utf-8", errors="surrogateescape") as marker_file:
+                staged_path = marker_file.read()
+        except OSError as ex:
+            log.error("Could not read cover stage marker %s: %s", marker, ex)
+            continue
+        # A torn or foreign marker never names anything but a cover stage.
+        if (staged_path and _is_cover_stage_name(os.path.basename(staged_path))
+                and os.path.lexists(staged_path)):
+            log.warning(
+                "Removing orphan cover stage after interrupted update; metadata may "
+                "already reference an unpublished cover: %s",
+                staged_path,
+            )
+            try:
+                os.remove(staged_path)
+                removed += 1
+            except OSError as ex:
+                log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+                continue
+        try:
+            os.remove(marker)
+        except OSError as ex:
+            log.warning("Could not drop cover stage marker %s: %s", marker, ex)
+    return removed
+
+
+_LEGACY_STAGE_SWEEP_FLAG = ".legacy-sweep-done"
+
+
+def sweep_unregistered_cover_stages(started_before):
+    """Remove stages written before the registry existed; runs once per install.
+
+    Earlier versions found orphan stages by walking the library at every
+    startup. Stages such a version left behind have no marker, so one full walk
+    is still owed -- in the background, never before the server listens. A
+    stage that is registered, or newer than ``started_before``, may belong to a
+    live write and is left alone.
+    """
+    registry = _cover_stage_registry_dir()
+    flag = os.path.join(registry, _LEGACY_STAGE_SWEEP_FLAG)
+    if os.path.exists(flag):
+        return 0
     roots = []
-    # Global covers stage beside the Calibre file (or in the temporary Drive
-    # upload directory). Per-user covers use the same StagedCoverWrite
-    # primitive below CONFIG_DIR, so an interrupted personal write needs the
-    # same startup cleanup without ever scanning or changing its live JPEG.
     personal_cover_root = os.path.join(constants.CONFIG_DIR, "user-covers")
     for root in (config.get_book_path(), get_temp_dir(), personal_cover_root):
         if root and os.path.isdir(root) and root not in roots:
             roots.append(root)
 
+    began = time.monotonic()
+    log.info("Sweeping %s for cover stages left by an earlier version", ", ".join(roots))
     removed = 0
     for root in roots:
         for directory, _subdirs, filenames in os.walk(root):
             for filename in filenames:
-                global_stage = (
-                    filename.startswith(".cover.jpg.cwng-")
-                    and filename.endswith(".stage")
-                )
-                personal_stage = re.fullmatch(
-                    r"\.\d+(?:-\d+)?\.jpg\.cwng-.+\.stage", filename) is not None
-                if not (global_stage or personal_stage):
+                if not _is_cover_stage_name(filename):
                     continue
                 staged_path = os.path.join(directory, filename)
+                try:
+                    if os.path.exists(_cover_stage_marker(staged_path)):
+                        continue
+                    if os.lstat(staged_path).st_mtime >= started_before:
+                        continue
+                    os.remove(staged_path)
+                except FileNotFoundError:
+                    continue
+                except OSError as ex:
+                    log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+                    continue
+                removed += 1
                 log.warning(
                     "Removing orphan cover stage after interrupted update; metadata may "
                     "already reference an unpublished cover: %s",
                     staged_path,
                 )
-                try:
-                    os.remove(staged_path)
-                    removed += 1
-                except OSError as ex:
-                    log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+    try:
+        os.makedirs(registry, exist_ok=True)
+        with open(flag, "w", encoding="utf-8") as flag_file:
+            flag_file.write(datetime.now(timezone.utc).isoformat())
+    except OSError as ex:
+        log.error("Could not record the cover stage sweep: %s", ex)
+    log.info("Cover stage sweep finished in %.1fs; removed %d", time.monotonic() - began, removed)
     return removed
+
+
+def start_legacy_cover_stage_sweep():
+    """Run the one-time legacy sweep on a daemon thread, off the startup path."""
+    if os.path.exists(os.path.join(_cover_stage_registry_dir(), _LEGACY_STAGE_SWEEP_FLAG)):
+        return None
+    started_before = time.time()
+
+    def run():
+        try:
+            sweep_unregistered_cover_stages(started_before)
+        except Exception as ex:
+            log.error("Cover stage sweep failed: %s", ex)
+
+    worker = threading.Thread(target=run, name="cover-stage-sweep", daemon=True)
+    worker.start()
+    return worker
 
 
 def trigger_thumbnail_generation_for_book(book_id):
@@ -3293,7 +3465,7 @@ def check_unrar(unrar_location):
 
 def check_architecture():
     arch = platform.machine()
-    if arch not in ['x86_64', 'aarch64']:
+    if arch.lower() not in ['x86_64', 'aarch64', 'amd64', 'arm64']:
         return _("Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is optimized for x86_64 and aarch64.", arch=arch)
     return None
 

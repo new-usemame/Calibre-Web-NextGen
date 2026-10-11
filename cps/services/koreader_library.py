@@ -490,7 +490,7 @@ def build_manifest(user, *, cdb=None, session=None, read_column=None):
     scope = ereader_scope.membership(user, session=session)
     if not scope.reliable:
         raise ScopeUnavailable(
-            "One of the magic shelves that choose this device's books could "
+            "One of the smart shelves that choose this device's books could "
             "not be read")
     ids = ereader_scope.held_book_ids(user, cdb=cdb, session=session, scope=scope)
     shelves, members, scope_shelves = shelf_catalogue(user, session=session)

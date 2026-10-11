@@ -9,6 +9,7 @@ the legacy UI and the SPA.
 import re
 from datetime import datetime
 
+from ..unicode_collation import locale_sort_key
 from flask import jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy import func
@@ -166,9 +167,9 @@ def search_options():
     query builder expects: tags/series by row id, languages by row id (NOT
     lang_code — that's what adv_search_language filters on), formats by code."""
     tags = (calibre_db.session.query(db.Tags)
-            .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all())
+            .order_by(locale_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all())
     series = (calibre_db.session.query(db.Series)
-              .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id).all())
+              .order_by(locale_sort_key(db.Series.sort), db.Series.sort, db.Series.id).all())
     languages = (calibre_db.session.query(db.Languages).all())
     formats = (calibre_db.session.query(db.Data.format).distinct().order_by(db.Data.format).all())
 

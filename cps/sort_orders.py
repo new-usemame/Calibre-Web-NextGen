@@ -278,6 +278,19 @@ def book_sort_order(sort_param, user_id=None):
         orders degrade to the default rather than sorting by nobody's history.
     :return: A list of SQLAlchemy order expressions, never empty.
     """
+    if sort_param in ('ratingdesc', 'ratingasc') and user_id is not None:
+        from .personal_ratings import personal_rating_order
+        return personal_rating_order(user_id, descending=sort_param == 'ratingdesc')
     if sort_param == RECENT_SORT and user_id is not None:
         return recent_sort_order(user_id)
+    if sort_param in ('abc', 'zyx', 'authaz', 'authza'):
+        from .unicode_collation import locale_sort_key
+        descending = sort_param in ('zyx', 'authza')
+        if sort_param in ('abc', 'zyx'):
+            order = [locale_sort_key(db.Books.sort), db.Books.sort, db.Books.id]
+        else:
+            order = [locale_sort_key(db.Books.author_sort), db.Books.author_sort,
+                     locale_sort_key(db.Series.name), db.Series.name,
+                     db.Books.series_index, db.Books.id]
+        return [column.desc() for column in order] if descending else order
     return BOOK_SORT_ORDERS.get(sort_param, BOOK_SORT_ORDERS[DEFAULT_SORT])

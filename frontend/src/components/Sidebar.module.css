@@ -82,6 +82,12 @@
   white-space: nowrap;
 }
 
+/* #2536: the collapsed desktop rail's stand-in for a shelf's name. Only the
+   desktop rail shows it (below); the drawer always shows full names. */
+.shelfInitials {
+  display: none;
+}
+
 .shelfCount {
   flex-shrink: 0;
   font-size: var(--fs-xs);
@@ -246,9 +252,31 @@
     /* Keep this alignment stable in both reveal states. Animating padding-left
        would reintroduce per-frame layout work inside the new panel. */
     padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
+    position: relative;
   }
   .shelfList .shelfCount {
     display: none;
+  }
+
+  /* #2536: that fixed indent puts the name past the 64px collapsed rail, so a
+     shelf row showed nothing. The name's first letters sit in the icon column
+     instead and fade out as the panel reveals the full name; only opacity
+     changes, so the reveal stays free of per-frame layout. */
+  .shelfInitials {
+    display: block;
+    position: absolute;
+    left: var(--sp-3);
+    top: 50%;
+    transform: translateY(-50%);
+    width: calc(18px + var(--sp-2));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .shelfInitials {
+    opacity: 0;
   }
 
   .magicShelfIcon {
@@ -282,6 +310,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .magicShelfIcon,
+  .shelfInitials,
   :is(.shelfItem, .shelfItemActive) {
     transition: none;
   }

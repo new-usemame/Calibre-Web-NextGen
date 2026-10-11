@@ -90,7 +90,7 @@ def test_classic_edit_of_only_an_email_does_not_revoke_book_source_access(monkey
     monkeypatch.setattr(admin.ub, 'session_commit', lambda: None)
     monkeypatch.setattr(admin, 'get_sidebar_config', lambda: ([], None))
     monkeypatch.setattr(admin, 'valid_email', lambda value: value)
-    monkeypatch.setattr(admin, 'check_email', lambda value: value)
+    monkeypatch.setattr(admin, 'check_email', lambda value, _user_id=None: value)
     monkeypatch.setattr(admin, 'flag_modified', lambda *_a, **_k: None)
     monkeypatch.setattr(admin, 'flash', lambda *_a, **_k: None)
     monkeypatch.setattr(admin, '_', lambda value, **kw: value % kw if kw else value)

@@ -18,6 +18,10 @@ def test_built_image_calibre_authentication_and_process_ownership(
     subprocess.run(
         ["docker", "cp", str(PROBE), f"{container_name}:{remote}"], check=True
     )
+    subprocess.run(
+        ["docker", "cp", str(PROBE.with_name("calibre_runtime_probe_children.py")),
+         f"{container_name}:/tmp/calibre_runtime_probe_children.py"], check=True
+    )
     result = subprocess.run(
         ["docker", "exec", container_name, "cwa-as-abc", "python3", remote],
         capture_output=True,
@@ -43,6 +47,7 @@ def test_built_image_calibre_authentication_and_process_ownership(
         assert record["actual_launcher_owner_fd"]
         assert record["child_reaped"]
         assert record["owner_released"]
+        assert isinstance(record["adopted_helpers_reaped"], int)
     assert evidence["results"][0]["authenticated_client"]
     assert evidence["results"][0]["wrong_password_rejected"]
 

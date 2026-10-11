@@ -131,6 +131,46 @@ def test_unversioned_cover_response_still_revalidates(monkeypatch, tmp_path):
     assert "no-cache" in resp.headers.get("Cache-Control", "")
 
 
+def _cover_app_behind_user_specific_hook(monkeypatch, tmp_path):
+    """The cover route as the real app runs it: behind the app-wide hook.
+
+    ``get_book_cover`` resolves the book through ``common_filters``, which
+    marks the request user-specific, and ``protect_user_specific_catalog_responses``
+    then runs on the response. The tests above call the helper on a bare app,
+    so they never saw that hook replace the immutable policy with ``no-store``
+    (#2386: every library visit re-downloaded every cover).
+    """
+    import cps
+
+    app = _cover_app(monkeypatch, tmp_path)
+
+    @app.before_request
+    def _mark_user_specific():
+        flask.g._common_filters_user_specific = True
+
+    app.after_request(cps.protect_user_specific_catalog_responses)
+    return app
+
+
+def test_versioned_cover_stays_cacheable_behind_the_user_specific_hook(monkeypatch, tmp_path):
+    """Red before the fix: ``Cache-Control: private, no-store``."""
+    client = _cover_app_behind_user_specific_hook(monkeypatch, tmp_path).test_client()
+    resp = client.get("/cover/42?c=%s" % LAST_MODIFIED_EPOCH)
+
+    assert resp.status_code == 200
+    assert resp.headers.get("Cache-Control") == "private, max-age=31536000, immutable"
+    assert {"Cookie", "Authorization"} <= set(resp.vary)
+
+
+def test_unversioned_cover_behind_the_hook_is_still_not_stored(monkeypatch, tmp_path):
+    """The hook still owns every response that did not earn a private policy."""
+    client = _cover_app_behind_user_specific_hook(monkeypatch, tmp_path).test_client()
+    resp = client.get("/cover/42")
+
+    assert resp.status_code == 200
+    assert resp.headers.get("Cache-Control") == "private, no-store"
+
+
 def test_versioned_cover_keeps_conditional_requests_working(monkeypatch, tmp_path):
     """The cache policy must not disturb the ETag / 304 handling already there."""
     client = _cover_app(monkeypatch, tmp_path).test_client()

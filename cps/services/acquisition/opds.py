@@ -280,9 +280,22 @@ def _publication_xml(node, bases, budget):
 
 def _catalog_xml(payload, source_url, budget):
     root = _xml(payload, budget.limits)
-    if root.tag != "{" + ATOM + "}feed":
-        raise CatalogParseError("Expected Atom catalog feed")
+    standalone = root.tag == "{" + ATOM + "}entry"
+    if not standalone and root.tag != "{" + ATOM + "}feed":
+        raise CatalogParseError("Expected Atom catalog feed or entry")
     bases = _bases(root, source_url, budget)
+    if standalone:
+        for field in ("id", "updated"):
+            values = _children(root, field)
+            if len(values) != 1 or not _node_text(values[0], budget):
+                raise CatalogParseError("Publication needs Atom identity and update")
+        publication = _publication_xml(root, bases, budget)
+        if not publication.offers:
+            raise CatalogParseError("Publication needs an acquisition link")
+        return Catalog(publication.title, source_url, "opds1", (publication,), (),
+                       publication.links, (), (), (), Capabilities(True, False, any(
+                           offer.is_direct_download for offer in publication.offers)),
+                       is_publication_document=True)
     links = tuple(link for link, _ in _xml_links(root, bases, budget))
     publications, navigation = [], []
     for entry in _children(root, "entry"):

@@ -146,7 +146,11 @@ POSITION_KIND_ANCHOR = "anchor"
 #   percentage_push   PUT accepts position_kind "percentage" with no progress
 #   anchor            text anchors on a percentage PUT and on GET
 #   book_id_document  a decimal Calibre book id is accepted as ``document``
-SERVER_CAPABILITIES = ("position_kinds", "percentage_push", "anchor", "book_id_document")
+#   annotations_text_quote  /kosync/syncs/annotations places pushed
+#                     ``text_quote`` highlights and names pulled ones by their
+#                     words on ``?text_quote=1`` (koreader_annotations)
+SERVER_CAPABILITIES = ("position_kinds", "percentage_push", "anchor", "book_id_document",
+                       "annotations_text_quote")
 
 
 def is_percentage_only(progress_record) -> bool:

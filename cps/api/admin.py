@@ -540,7 +540,7 @@ def admin_update_user(user_id):
         if "email" in data:
             new_email = valid_email(data.get("email") or "")
             if new_email and new_email != user.email:
-                user.email = check_email(new_email)  # raises if taken
+                user.email = check_email(new_email, user.id)  # raises if taken
         if "kindle_mail" in data:
             user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "locale" in data and data["locale"]:

@@ -33,7 +33,7 @@ from __future__ import annotations
 import os
 import unicodedata
 from array import array
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from functools import lru_cache
 from typing import Optional
 
@@ -143,13 +143,30 @@ def _folded(path: str, _mtime_ns: int, _size: int) -> Optional[_Folded]:
     return _Folded(spine) if spine else None
 
 
-def _book(epub_path) -> Optional[_Folded]:
+@lru_cache(maxsize=8)
+def _reading(path: str, _mtime_ns: int, _size: int) -> Optional[tuple]:
+    return kx.spine_reading_texts(path)
+
+
+def _stat_key(epub_path):
     try:
         path = os.fspath(epub_path)
         stat = os.stat(path)
     except (OSError, TypeError):
         return None
-    return _folded(path, stat.st_mtime_ns, stat.st_size)
+    return path, stat.st_mtime_ns, stat.st_size
+
+
+def _book(epub_path) -> Optional[_Folded]:
+    key = _stat_key(epub_path)
+    return _folded(*key) if key else None
+
+
+def _reading_texts(epub_path) -> Optional[tuple]:
+    """``kx.spine_reading_texts``, read once per file version: a pull names
+    every highlight of a book by its words."""
+    key = _stat_key(epub_path)
+    return _reading(*key) if key else None
 
 
 _HIT_LIMIT = 64
@@ -200,6 +217,19 @@ def place(epub_path, anchor: dict, percentage: Optional[float] = None):
     if book is None or not book.text:
         return None
     before, text, after = (fold(anchor.get(k) or "") for k in ("before", "text", "after"))
+    at = _find(book, before, text, after, percentage)
+    if at is None:
+        return None
+    m, j = book.source(at)
+    xpointer = kx.xpointer_at_solid_index(epub_path, book.members[m], j, book.solids[m])
+    if not xpointer:
+        return None
+    return xpointer, at / len(book.text) * 100.0
+
+
+def _find(book: _Folded, before: str, text: str, after: str,
+          percentage: Optional[float]) -> Optional[int]:
+    """Folded index where ``text`` starts, framed by its context, or None."""
     if not text:
         return None
     target = None
@@ -218,12 +248,121 @@ def place(epub_path, anchor: dict, percentage: Optional[float] = None):
         chosen = _choose(hits, None if target is None else target - offset, len(book.text))
         if chosen is None:
             return None  # the words repeat; a shorter needle repeats more
-        m, j = book.source(chosen + offset)
-        xpointer = kx.xpointer_at_solid_index(epub_path, book.members[m], j, book.solids[m])
-        if not xpointer:
-            return None
-        return xpointer, (chosen + offset) / len(book.text) * 100.0
+        return chosen + offset
     return None
+
+
+# --- Text quotes: a passage named by its words ------------------------------
+#
+# A highlight from a client that holds no DOM arrives as the passage's own
+# words with a few words either side (W3C TextQuoteSelector's exact, prefix
+# and suffix). ``place_quote`` finds it as an XPointer range in the library
+# EPUB, the form KOReader draws and the web reader converts; ``quote_at``
+# turns any range there back into a quote for the client.
+
+MAX_QUOTE_CHARS = 4000
+
+
+def parse_quote(raw) -> Optional[dict]:
+    """A validated ``{"exact", "prefix", "suffix"}``, or ``None``.
+
+    The same rules as ``parse_anchor``: ``exact`` must hold something that
+    compares, and oversized fields are refused rather than clipped.
+    """
+    if not isinstance(raw, dict):
+        return None
+    exact = raw.get("exact")
+    prefix = raw.get("prefix") or ""
+    suffix = raw.get("suffix") or ""
+    if not all(isinstance(v, str) for v in (exact, prefix, suffix)):
+        return None
+    if (len(exact) > MAX_QUOTE_CHARS or len(prefix) > MAX_CONTEXT_CHARS
+            or len(suffix) > MAX_CONTEXT_CHARS):
+        return None
+    if not fold(exact):
+        return None
+    return {"exact": exact, "prefix": prefix, "suffix": suffix}
+
+
+def place_quote(epub_path, quote: dict, percentage: Optional[float] = None):
+    """``(start, end, passage, percent)`` of a quote in ``epub_path``, or None.
+
+    ``start``/``end`` are XPointers around the quoted words and ``passage``
+    is the book's own text between them, which compares equal to ``exact``.
+    A passage running across two spine items has no single range and is
+    None, as is anything ``place`` would not place.
+    """
+    book = _book(epub_path)
+    if book is None or not book.text:
+        return None
+    prefix, exact, suffix = (fold(quote.get(k) or "") for k in ("prefix", "exact", "suffix"))
+    at = _find(book, prefix, exact, suffix, percentage)
+    if at is None:
+        return None
+    found = _range(epub_path, book, at, exact)
+    return (*found, at / len(book.text) * 100.0) if found else None
+
+
+def place_in_text_range(epub_path, text_range, text: str):
+    """``(start, end, passage)`` of ``text`` starting inside ``text_range``, or None.
+
+    ``text_range`` is ``(start, end)`` in the book's non-whitespace characters
+    laid end to end (``kepub_alignment.span_text_range``): a device that named
+    the span a highlight starts in, and its words, but no position this
+    server can read inside the span. ``text`` must start there exactly once.
+    """
+    book = _book(epub_path)
+    needle = fold(text or "")
+    if book is None or not needle or not text_range:
+        return None
+    low, high = (bisect_left(book.origin, i) for i in text_range)
+    at = book.text.find(needle, low)
+    if not low <= at < high or low <= book.text.find(needle, at + 1) < high:
+        return None
+    return _range(epub_path, book, at, needle)
+
+
+def _range(epub_path, book: _Folded, at: int, exact: str):
+    """``(start, end, passage)`` around folded ``exact`` found at ``at``, or None."""
+    (m, i), (m_last, j) = book.source(at), book.source(at + len(exact) - 1)
+    if m != m_last:
+        return None
+    member, solid = book.members[m], book.solids[m]
+    start = kx.xpointer_at_solid_index(epub_path, member, i, solid)
+    end = kx.xpointer_at_solid_index(epub_path, member, j, solid, after=True)
+    if not start or not end:
+        return None
+    passage = kx.passage_between(epub_path, start, end)
+    # A quote that ends inside a character the book folds to several (a
+    # ligature) would frame more than its words: refuse rather than widen.
+    if passage is None or fold(passage) != exact:
+        return None
+    return start, end, passage
+
+
+def quote_at(epub_path, start_xpointer: str, end_xpointer: str,
+             words: int = ANCHOR_WORDS) -> Optional[dict]:
+    """The quote for the passage between two XPointers into ``epub_path``."""
+    span = kx.solid_span_of_xpointers(epub_path, start_xpointer, end_xpointer)
+    if span is None:
+        return None
+    member, i, j = span
+    texts = _reading_texts(epub_path)
+    if not texts:
+        return None
+    found = [m for m, (name, _t, _s) in enumerate(texts) if name == member]
+    if len(found) != 1:
+        return None
+    m = found[0]
+    _name, text, solid_at = texts[m]
+    if not 0 <= i < j <= len(solid_at):
+        return None
+    start, end = solid_at[i], solid_at[j - 1] + 1
+    return parse_quote({
+        "exact": " ".join(text[start:end].split()),
+        "prefix": _bounded(_words_before(texts, m, start, words), from_end=True),
+        "suffix": _bounded(_words_after(texts, m, end, words), from_end=False),
+    })
 
 
 def _words_before(texts, m, start, count):
@@ -250,7 +389,7 @@ def anchor_at(epub_path, xpointer: str, words: int = ANCHOR_WORDS) -> Optional[d
     if point is None:
         return None
     member, index = point
-    texts = kx.spine_reading_texts(epub_path)
+    texts = _reading_texts(epub_path)
     if not texts:
         return None
     found = [m for m, (name, _t, _s) in enumerate(texts) if name == member]

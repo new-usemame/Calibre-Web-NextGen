@@ -89,6 +89,27 @@ def span_to_xpointer(epub_path, kepub_path, source: str, span_id: str) -> Option
     return kx.xpointer_at_solid_index(epub_path, members[k], index - offsets[k], texts[k])
 
 
+def span_text_range(epub_path, kepub_path, source: str, span_id: str) -> Optional[tuple[int, int]]:
+    """``(start, end)``: where a Kobo span's text lies in the library EPUB.
+
+    Indexes count non-whitespace characters across the EPUB's spine laid end
+    to end (``spine_solid_texts``), the coordinates both books share; None
+    unless the EPUB holds exactly the KEPUB's text and the span holds some.
+    """
+    if not isinstance(span_id, str) or not _SPAN_ID.fullmatch(span_id):
+        return None
+    kepub = _kepub(kepub_path)
+    if kepub is None:
+        return None
+    document = _document(kepub, source)
+    if document is None or span_id not in document.spans:
+        return None
+    start, end = document.spans[span_id]
+    if start == end or _aligned_epub(epub_path, kepub) is None:
+        return None
+    return document.offset + start, document.offset + end
+
+
 def xpointer_to_span(epub_path, kepub_path, xpointer: str) -> Optional[tuple[str, str]]:
     """``(document, span id)``: the Kobo span of ``kepub_path`` holding an XPointer.
 

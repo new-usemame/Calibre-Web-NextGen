@@ -42,6 +42,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from tests.conftest import LANE_BY_DIRECTORY, LANE_MARKERS, lane_for_path  # noqa: E402
 from tests.quarantine import QUARANTINED  # noqa: E402
+from tests.ci_lane_collection import collect_ci_coverage  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 TESTS = REPO / "tests"
@@ -157,15 +158,24 @@ def test_fast_gate_selects_the_lanes_conftest_assigns():
     )
 
 
-def test_fast_lane_files_do_not_silently_opt_out():
+@pytest.fixture(scope="module")
+def ci_lane_inventory():
+    """One complete collection shared by the actual per-item lane guards."""
+    return collect_ci_coverage(REPO, _workflow_pytest_invocations())
+
+
+def test_fast_lane_files_do_not_silently_opt_out(ci_lane_inventory):
     opted_out = {}
     slow_markers = LANE_MARKERS - {"unit", "smoke"}
-    for directory in LANE_BY_DIRECTORY:
-        for path in sorted((TESTS / directory).glob("test_*.py")):
-            source = path.read_text(encoding="utf-8")
-            declared = set(re.findall(r"pytest\.mark\.([a-z_]+)", source))
-            if declared & slow_markers:
-                opted_out[str(path.relative_to(REPO))] = sorted(declared & slow_markers)
+    for nodeid, markers in ci_lane_inventory["markers"].items():
+        relative = nodeid.split("::", 1)[0]
+        parts = pathlib.PurePosixPath(relative).parts
+        if parts:
+            fast_directory = len(parts) >= 3 and parts[0] == "tests" and parts[1] in LANE_BY_DIRECTORY
+            slower = set(markers) & slow_markers
+            if fast_directory and slower:
+                opted_out.setdefault(relative, set()).update(slower)
+    opted_out = {path: sorted(markers) for path, markers in opted_out.items()}
 
     assert set(opted_out) == set(SLOW_LANE_OPT_OUTS), (
         "the set of fast-lane files declaring a slower lane changed: %r. A file "
@@ -341,25 +351,12 @@ def _workflow_pytest_invocations():
 
 
 def _collect_nodeids(paths, marker=None):
-    """The exact set of test nodeids one pytest invocation would run.
-
-    `-o addopts=` is load-bearing. pytest.ini sets `addopts = -v`, and with -v
-    the collector prints a <Module>/<Class> tree instead of nodeids, so a nodeid
-    match finds nothing for EVERY invocation and any guard built on it reports
-    universal coverage. Neutralise the ini options so the output shape is the
-    one being parsed.
-    """
-    command = [sys.executable, "-m", "pytest", "-o", "addopts=",
-               "--collect-only", "-q"]
-    command += list(paths) if paths else ["tests"]
-    if marker:
-        command += ["-m", marker]
-    result = subprocess.run(
-        command, cwd=REPO, capture_output=True, text=True, timeout=900)
-    return set(re.findall(r"^(\S+::\S+)\s*$", result.stdout, re.M))
+    """One selector's exact set, rejecting failed or partial collection."""
+    data = collect_ci_coverage(REPO, [(list(paths), marker)])
+    return set(data["selected"][0])
 
 
-def test_every_test_is_selected_by_some_ci_invocation():
+def test_every_test_is_selected_by_some_ci_invocation(ci_lane_inventory):
     """No test may exist that no CI job runs. Checked per TEST, not per file.
 
     An earlier version of this guard compared whole FILES and was vacuous, which
@@ -373,14 +370,13 @@ def test_every_test_is_selected_by_some_ci_invocation():
     Everything is derived from the workflow's own invocations, so this stays
     true when CI changes instead of encoding today's answer.
     """
-    everything = _collect_nodeids(["tests"])
+    data = ci_lane_inventory
+    everything = set(data["all"])
     assert len(everything) > 5000, (
         "only %d tests collected from tests/ — the collector or the parse has "
         "broken, and this guard would pass vacuously" % len(everything))
 
-    covered = set()
-    for paths, marker in _workflow_pytest_invocations():
-        covered |= _collect_nodeids(paths, marker)
+    covered = set().union(*(set(nodes) for nodes in data["selected"]))
     assert covered, "no CI invocation collected anything; the parse has drifted"
 
     uncovered = everything - covered

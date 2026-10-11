@@ -64,9 +64,36 @@ def test_ui_routing_surfaces_trigger_frontend_e2e(path):
     assert result["frontend"] is True, path
 
 
-def test_unrelated_classic_template_does_not_trigger_frontend_e2e():
-    result = classify_paths(["cps/templates/book_edit.html"], REPO)
-    assert result["frontend"] is False
+@pytest.mark.parametrize("path", [
+    "cps/templates/book_edit.html",
+    "cps/templates/search_form.html",
+])
+def test_classic_template_change_uses_current_full_stack_browser_image(path):
+    """A merged template copy cannot remove deleted files; test the exact tree."""
+    result = classify_paths([path], REPO)
+    assert result["frontend"] is True
+    assert result["build"] is True
+    assert result["concurrency"] is False
+
+
+@pytest.mark.parametrize("path", [
+    "cps/static/css/caliBlur_override.css",
+    "cps/static/js/libs/tinymce/themes/silver/theme.min.js",
+    "cps/static/js/future-classic-widget.js",
+])
+def test_classic_static_change_uses_current_full_stack_browser_image(path):
+    """The SPA/template overlay omits these files, so test their actual image."""
+    result = classify_paths([path], REPO)
+    assert result["frontend"] is True
+    assert result["build"] is True
+    assert result["concurrency"] is False
+
+
+def test_spa_bundle_change_keeps_current_overlay_without_full_stack_build():
+    result = classify_paths(["cps/static/app/assets/index-example.js"], REPO)
+    assert result["frontend"] is True
+    assert result["build"] is False
+    assert result["concurrency"] is False
 
 
 def test_concurrency_set_derives_new_helpers_from_imports(tmp_path):

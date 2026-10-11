@@ -799,7 +799,7 @@ class Repository(BundleChoicesMixin):
 
     def clear_rejected_submission(self, job_id, token, *, error_code='client_error'):
         """A definite rejection resolves all adopters of this attempt as well."""
-        if error_code not in ('needs_auth', 'client_error'):
+        if error_code not in ('needs_auth', 'client_error', 'torrent_already_exists'):
             raise StorageError('Submission rejection is not definite')
         table, now = self.tables.jobs, self._now()
         with self.engine.begin() as conn:
@@ -943,7 +943,7 @@ class Repository(BundleChoicesMixin):
             raise StorageError("Invalid publication capability")
         return hashlib.sha256(token.encode("ascii")).hexdigest()
 
-    def prepare_publication(self, job_id, lease_token, publication_token):
+    def prepare_publication(self, job_id, lease_token, publication_token, *, authorize=None):
         """Fence publication with durable proof independent of worker leases.
 
         The caller generates a cryptographically random token and persists it
@@ -951,6 +951,9 @@ class Repository(BundleChoicesMixin):
         only its hash in app.db. A retry must reuse that token; a lost token
         requires explicit reconciliation, never blind rotation/republication.
         No filesystem write occurs here. Caller checks proof before publishing.
+        New capabilities recheck source/client identity and an optional pure
+        authorization callback under the same write reservation. Already issued
+        capabilities retain their existing receipt-reconciliation authority.
         """
         proof, now, table = self._publication_proof(publication_token), self._now(), self.tables.jobs
         with self.engine.begin() as conn:
@@ -965,6 +968,19 @@ class Repository(BundleChoicesMixin):
             else:
                 if row["state"] != "staged" or not row["source_sha256"] or not row["staging_key"]:
                     raise Conflict("Job is not ready for publication")
+                if row['client_id'] is not None:
+                    self._bundle_fence(conn, row)
+                else:
+                    connections, offers = self.tables.connections, self.tables.offers
+                    source = conn.execute(select(connections.c.id).join(offers,
+                        offers.c.connection_id == connections.c.id).where(
+                        offers.c.id == row['offer_id'], offers.c.owner_id == row['owner_id'],
+                        offers.c.connection_revision == connections.c.revision,
+                        connections.c.enabled.is_(True), connections.c.deleted.is_(False))).first()
+                    if source is None:
+                        raise ConnectionChanged('Publication connection changed or is unavailable')
+                if authorize is not None:
+                    authorize()
                 updated = conn.execute(table.update().where(self._live(job_id, lease_token, now),
                     table.c.state == "staged", table.c.publication_proof_hash.is_(None),
                     table.c.cancel_requested.is_(False)).values(

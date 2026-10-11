@@ -22,6 +22,11 @@ from werkzeug.http import parse_accept_header
 from . import logger, constants, config
 from .cw_login.signals import user_loaded_from_cookie, user_logged_in
 
+try:
+    from flask_wtf.csrf import generate_csrf
+except ImportError:
+    generate_csrf = None
+
 log = logger.create()
 
 spa = Blueprint("spa", __name__)
@@ -316,6 +321,26 @@ def _inline_script_json(value):
     )
 
 
+def _csrf_meta_tag():
+    """The session's Flask-WTF token as ``<meta name="csrf-token">``.
+
+    Browser navigations of ``/login``, ``/`` and other Classic pages now land on
+    this shell, which had no token in it. Third-party clients that sign in the
+    way Classic always allowed (GET the page, scrape the token, POST the form)
+    then fail with "CSRF token not found": Calibre Web Companion 2.3.1, the
+    current F-Droid build, does exactly this. ``meta[name="csrf-token"]`` is the
+    conventional place such clients look, and it is the same token
+    ``/api/v1/auth/csrf`` already returns to any caller. Emitted only when the
+    app actually enforces Flask-WTF CSRF; the token is per session, so there
+    is none to give outside a request.
+    """
+    if (generate_csrf is None or not has_request_context()
+            or "csrf" not in current_app.extensions):
+        return ""
+    return '<meta name="csrf-token" content="%s">' % html_escape(
+        generate_csrf(), quote=True)
+
+
 def _render_shell(index_path, prefix):
     """Serve the built index.html adapted to the current mount prefix.
 
@@ -368,6 +393,7 @@ def _render_shell(index_path, prefix):
         _inline_script_json(prefix),
         _inline_script_json(constants.INSTALLED_VERSION),
     )
+    inject += _csrf_meta_tag()
     html = html.replace("</head>", inject + "</head>", 1)
     resp = Response(html, mimetype="text/html")
     # The shell NAMES the content-addressed bundle files, which are served

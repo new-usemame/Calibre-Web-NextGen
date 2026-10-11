@@ -80,6 +80,8 @@ export function GlobalLibrary() {
   const customColumns = selectedCustomColumns(listing.data?.custom_column_definitions, me);
   const sortOptions = [
     { value: 'recent', label: t('Recent') },
+    { value: 'ratingdesc', label: t('Your rating, highest first') },
+    { value: 'ratingasc', label: t('Your rating, lowest first') },
     { value: 'new', label: t('Recently added') },
     { value: 'old', label: t('Oldest') },
     { value: 'abc', label: t('Title A–Z') },

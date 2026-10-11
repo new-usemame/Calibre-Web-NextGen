@@ -147,6 +147,8 @@ export interface Me {
 export type ReadingStatus = 'unread' | 'finished' | 'in_progress' | 'did_not_finish' | 'on_hold';
 
 export interface Book {
+  personal_rating?: number | null;
+  household_rating?: number | null;
   id: number;
   title: string;
   authors: string[];
@@ -267,6 +269,8 @@ export interface BookDetail {
   /** Calibre rating on a 0–10 scale (half-star granularity: 9 → 4.5 stars),
    *  or null when the book is unrated. Divide by 2 for a 0–5 star display. */
   rating: number | null;
+  personal_rating?: number | null;
+  household_rating?: number | null;
   cover_url: string | null;
   /** Density candidates for the detail cover (`sm` 1x, `md` 2x). Absent on
    *  older servers — fall back to `cover_url` alone. */
@@ -693,7 +697,15 @@ export interface TaskItem {
   user: string;
   is_cancellable: boolean;
   stat: number;
+  /** Converter output for a failed task, HTML-escaped by the server. */
+  error?: string | null;
 }
+
+/** TaskItem.stat values (cps/services/worker.py STAT_*). */
+export const TASK_FAILED = 1;
+export const TASK_FINISHED = 3;
+export const TASK_ENDED = 4;
+export const TASK_CANCELLED = 5;
 
 export class ApiError extends Error {
   status: number;

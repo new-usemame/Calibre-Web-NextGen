@@ -97,4 +97,7 @@ def test_unreadable_app_db_costs_the_tags_not_the_page(env, monkeypatch):
     monkeypatch.setattr(ub, "session", broken)
     shelves = env(READER)
     assert shelves == {10: [], 11: [], 12: []}
-    broken.rollback.assert_called_once_with()
+    # Shelf and supplemental-rating queries each recover their failed read.
+    assert broken.rollback.call_count == 2
+    assert all(call.args == () and call.kwargs == {}
+               for call in broken.rollback.call_args_list)

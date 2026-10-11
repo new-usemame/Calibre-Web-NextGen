@@ -32,6 +32,9 @@ def load(name, path):
 
 guard = load("guard", str(APP_ROOT / "cps/calibre_server_guard.py"))
 policy = load("policy", str(APP_ROOT / "cps/calibre_library_target.py"))
+probe_children = load(
+    "probe_children", str(pathlib.Path(__file__).with_name("calibre_runtime_probe_children.py"))
+)
 
 
 def wait(check, timeout=12):
@@ -220,6 +223,15 @@ with tempfile.TemporaryDirectory(prefix="cwng-calibre-life-") as base:
                     pass
             if not supervisor.stdin.closed:
                 supervisor.stdin.close()
+            # SIGKILL can leave Calibre's safe_atexit pipe worker finishing
+            # against our private config/cache paths. As the subreaper, this
+            # probe owns its adopted helpers; drain them before directory removal.
+            adopted = pathlib.Path("/proc/%s/task/%s/children" % (os.getpid(), os.getpid()))
+            helper_statuses = probe_children.drain_owned_children(
+                lambda: [int(pid) for pid in adopted.read_text().split()]
+            )
+            if results and results[-1]["event"] == event:
+                results[-1]["adopted_helpers_reaped"] = len(helper_statuses)
 print(
     "CWNG_SERVER_RUNTIME="
     + json.dumps(

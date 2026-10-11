@@ -254,6 +254,7 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "authority": authority_rollup or _empty_authority_rollup(),
         "can_receive_books": device.kind in ("kobo", "koreader"),
         "active": bool(device.active),
+        "share_place": bool(device.share_place),
     }
 
 
@@ -779,15 +780,38 @@ def list_annotation_devices(*, user_id, session, active_only=False,
     return (rows, total) if return_total else rows
 
 
-def rename_annotation_device(public_id, *, user_id, label, session, commit):
-    if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
-        raise ValueError("device label must be 1-60 characters without surrounding whitespace")
-    if any(ord(char) < 32 or ord(char) == 127 for char in label):
-        raise ValueError("device label contains control characters")
+_DEVICE_SETTING_UNSET = object()
+
+
+class InvalidSharePlace(ValueError):
+    """The sharing setting must be a JSON boolean, not a truthy value."""
+
+
+def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
+                             share_place=_DEVICE_SETTING_UNSET, session, commit):
+    """Update the owner's label and/or sharing choice in a single commit.
+
+    Resolve ownership before validation and validate every field before any
+    mutation. Retain the enable clock on disable and repeated enable requests;
+    later protocol gates use it to recognize a new opt-in.
+    """
     device = _owned_device(public_id, user_id, session)
     if device is None:
         return None
-    device.display_name = label
+    if share_place is not _DEVICE_SETTING_UNSET and not isinstance(share_place, bool):
+        raise InvalidSharePlace("share_place must be a boolean")
+    if label is _DEVICE_SETTING_UNSET and share_place is _DEVICE_SETTING_UNSET:
+        raise ValueError("device label or share_place is required")
+    if label is not _DEVICE_SETTING_UNSET:
+        if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
+            raise ValueError("device label must be 1-60 characters without surrounding whitespace")
+        if any(ord(char) < 32 or ord(char) == 127 for char in label):
+            raise ValueError("device label contains control characters")
+        device.display_name = label
+    if share_place is not _DEVICE_SETTING_UNSET:
+        if share_place and not device.share_place:
+            device.share_place_enabled_at = datetime.now(timezone.utc)
+        device.share_place = share_place
     _commit_required(commit)
     return device
 
@@ -1365,15 +1389,21 @@ def annotation_device_inventory_delete(public_id, item_id):
 @user_login_required
 def annotation_device_rename(public_id):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
     try:
         device = rename_annotation_device(
-            public_id, user_id=current_user.id, label=data.get("label"),
+            public_id, user_id=current_user.id,
+            label=data.get("label", _DEVICE_SETTING_UNSET),
+            share_place=data.get("share_place", _DEVICE_SETTING_UNSET),
             session=ub.session, commit=ub.session_commit,
         )
+    except InvalidSharePlace:
+        return jsonify({"error": "invalid_share_place"}), 400
     except ValueError as error:
         return jsonify({"error": "invalid_label", "message": str(error)}), 400
     except (RuntimeError, SQLAlchemyError):
-        return _database_error_response("device rename")
+        return _database_error_response("device settings update")
     if device is None:
         abort(404)
     return jsonify(_device_json(device))

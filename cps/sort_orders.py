@@ -160,6 +160,7 @@ def _reading_activity(user_id):
             kobo_position.server_modified_at,
             kobo_position.last_modified,
             kobo_position.created_at,
+            _ACTIVITY_WHEN_UNKNOWN,
         )))
         .select_from(kobo_position)
         .join(state, kobo_position.kobo_reading_state_id == state.id)

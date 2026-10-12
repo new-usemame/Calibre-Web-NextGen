@@ -4380,6 +4380,12 @@ def HandleStateRequest(book_uuid):
                         ),
                         session=ub.session,
                     )
+                    # The write can also have settled legacy future status
+                    # and statistics clocks.
+                    for loaded in (kobo_reading_state.statistics,
+                                   kobo_reading_state.book_read_link):
+                        if loaded is not None:
+                            ub.session.expire(loaded, ["last_modified"])
                     ub.session.expire(current_bookmark)
                     ub.session.expire(kobo_reading_state)
                 else:

@@ -100,21 +100,29 @@ def _journal_report(row):
     return Report(clock, row.server_modified_at)
 
 
+# Each journal observation (place, status) stores its own ordering key: the
+# effective clock its report was ordered by (the client clock, or the receipt
+# when the clock is missing or too fast). The key is final when written, so
+# writing one observation never re-times the other; the row's receipt is
+# only the compare-and-swap guard.
+
+def _observation(key):
+    return None if key is None else Report(key, key)
+
+
 def _journal_place_report(row):
-    """The place observation a journal row holds, ordered by its own clock,
-    or None if the row holds no place."""
+    """The place observation a journal row holds, or None if it holds none."""
     if row is None or (row.progress_percent is None and not row.location_value):
         return None
-    return Report(row.client_modified_at, row.server_modified_at)
+    return _observation(row.client_modified_at)
 
 
 def _journal_status_report(row):
-    """The status observation a journal row holds, ordered by its own clock,
-    or None if the row holds no status."""
+    """The status observation a journal row holds, or None if it holds none."""
     if row is None or (row.reading_status is None
                        and row.status_modified_at is None):
         return None
-    return Report(row.status_modified_at, row.server_modified_at)
+    return _observation(row.status_modified_at)
 
 
 def _latest(*clocks):
@@ -152,18 +160,14 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
             candidate, _journal_status_report(row))
         if not (place_wins or status_wins):
             return JournalOutcome(False, pending)
+        key = effective_clock(client_at, received_at)
         values = {"server_modified_at": received_at}
         if place_wins:
-            # The place keeps the clock its report was ordered by: one with
-            # no clock is ordered at its receipt, never at the clock an
-            # earlier report left behind. A status-only report leaves the
-            # place and its clock alone.
-            values["client_modified_at"] = (
-                client_at if client_at is not None else received_at)
+            values["client_modified_at"] = key
             values.update(place)
         if status_wins:
             values["reading_status"] = status
-            values["status_modified_at"] = client_at or received_at
+            values["status_modified_at"] = key
         if row is None:
             result = s.execute(sqlite_insert(table).values(
                 device_id=device_id, book_id=book_id, **values,
@@ -294,6 +298,9 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
                 and row.progress_percent is not None
                 and row.progress_percent > progress_percent):
             return SharedWriteOutcome(False, row.progress_percent, row.last_modified)
+        if row.kobo_reading_state_id is not None:
+            _settle_legacy_future_clocks(
+                row.kobo_reading_state_id, row.server_modified_at, session=s)
         clock = effective_clock(client_at, received_at)
         values = {"last_modified": clock, "server_modified_at": received_at}
         if progress_percent is not None:
@@ -346,13 +353,42 @@ def advance_feed_clock(reading_state_id, clock, *, session):
     return target
 
 
+def _settle_legacy_future_clocks(reading_state_id, baseline, *, session):
+    """Freeze legacy future-dated shared status and statistics clocks at the
+    baseline they are ordered by, just before the bookmark receipt (that
+    baseline) moves.
+
+    A legacy fast device can have left them further in the future than any
+    honest clock; until replaced they are ordered at the shared bookmark's
+    receipt (capped at the upgrade by the migration, see
+    ``skew_ordered_clock``). Writing that receipt into them before an
+    accepted shared place moves it keeps their ordering, so a place-only
+    write cannot re-time them. Core updates: the feed clock is untouched.
+    Reached only from ``write_shared_bookmark`` (enforced, checked writers).
+    """
+    if baseline is None:
+        return
+    stats, read, state = ub.KoboStatistics, ub.ReadBook, ub.KoboReadingState
+    cutoff = _naive_utc(_now()) + SKEW
+    session.execute(update(stats.__table__).where(
+        stats.kobo_reading_state_id == reading_state_id,
+        stats.last_modified > cutoff,
+    ).values(last_modified=baseline))
+    owner = session.execute(select(state.user_id, state.book_id).where(
+        state.id == reading_state_id)).first()
+    if owner is not None:
+        session.execute(update(read.__table__).where(
+            read.user_id == owner.user_id, read.book_id == owner.book_id,
+            read.last_modified > cutoff,
+        ).values(last_modified=baseline))
+
+
 def future_skewed(stored, now=None):
     """True when a stored clock is further past the server's clock than any
     honest device could be: such a clock cannot outrank a report."""
     if stored is None:
         return False
-    now = _naive_utc(now or _now())
-    return _naive_utc(stored) > now + SKEW
+    return _naive_utc(stored) > future_cutoff(now)
 
 
 def future_cutoff(now=None):

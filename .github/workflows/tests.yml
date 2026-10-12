@@ -152,6 +152,10 @@ jobs:
         # 2026-09-24 a healthy run of this step took 8.4-8.7 min on main, and a
         # PR whose tests had all passed was killed at the 10-min wall. Still
         # inside the job's 25-min cap with the installs that precede it.
+        # No --cov: by 2026-10-12 the step reached the 15-min wall, and
+        # coverage made the same tests ~2.4x slower (18s vs 43s on 188
+        # share-place tests). Its only consumer, the Codecov upload, failed
+        # every run ("Token required - not valid tokenless upload").
         timeout-minutes: 15
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
@@ -186,10 +190,7 @@ jobs:
             --tb=short \
             --timeout=120 \
             --timeout-method=thread \
-            -o faulthandler_timeout=90 \
-            --cov=cps \
-            --cov-report=xml \
-            --cov-report=term-missing
+            -o faulthandler_timeout=90
 
       # Tests that live under tests/unit/ but declare a non-fast lane. The
       # marker expression above deselects them, and the Integration job selects
@@ -211,15 +212,6 @@ jobs:
             --tb=short \
             --timeout=120 \
             --timeout-method=thread
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        if: always()
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: fast-tests
-          fail_ci_if_error: false
       
       - name: Comment PR with results
         uses: actions/github-script@v9

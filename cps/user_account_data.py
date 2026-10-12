@@ -53,6 +53,7 @@ USER_ACCOUNT_MODELS = (
     "AnnotationDeviceState",
     "DeviceRetiredAssignment",
     "KoboDeviceBookDownload",
+    "KoboSharePlaceNudge",
     # KOReader (kosync protocol) positions and device names.
     "KOSyncProgress",
     # Shelves and magic shelves, including other users' rows that point at
@@ -115,7 +116,8 @@ def purge_user_account(user_id, session=None):
                   ub.DeviceStorageSnapshot,
                   ub.AnnotationDeviceState,
                   ub.DeviceRetiredAssignment,
-                  ub.KoboDeviceBookDownload):
+                  ub.KoboDeviceBookDownload,
+                  ub.KoboSharePlaceNudge):
         _delete(session, model, model.device_id.in_(device_ids))
     _delete(session, ub.DeviceCollectionSync,
             (ub.DeviceCollectionSync.user_id == user_id)

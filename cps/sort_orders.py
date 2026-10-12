@@ -151,10 +151,15 @@ def _reading_activity(user_id):
         .correlate(db.Books)
         .scalar_subquery()
     )
+    # ``last_modified`` is the reporting device's own clock (kept as the
+    # device sent it, so it can trail the server); ``server_modified_at`` is
+    # when this server received the place, which is when the reading
+    # happened as far as this list is concerned.
     kobo_activity = (
         select(func.max(func.max(
             coalesce(kobo_position.last_modified, _ACTIVITY_WHEN_UNKNOWN),
             coalesce(kobo_position.created_at, _ACTIVITY_WHEN_UNKNOWN),
+            coalesce(kobo_position.server_modified_at, _ACTIVITY_WHEN_UNKNOWN),
         )))
         .select_from(kobo_position)
         .join(state, kobo_position.kobo_reading_state_id == state.id)

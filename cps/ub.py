@@ -1450,6 +1450,12 @@ class KoboBookmark(Base):
     location_value = Column(String)
     progress_percent = Column(Float)
     content_source_progress_percent = Column(Float)
+    # When the server received the place this row holds (Share my place
+    # arbitration). ``last_modified`` is the reporting device's clock and is
+    # never a receipt; this is stamped by the server on every write.
+    server_modified_at = Column(DateTime, nullable=True,
+                                default=lambda: datetime.now(timezone.utc),
+                                onupdate=lambda: datetime.now(timezone.utc))
 
     # The parent FK is how every reader of this table reaches it. Unindexed,
     # SQLite reports "AUTOMATIC PARTIAL COVERING INDEX" — it rebuilds a
@@ -1496,6 +1502,29 @@ class Device(Base):
         Index('ix_device_user_display_name', 'user_id', 'display_name'),
         Index('uq_device_account_browser', 'user_id', unique=True,
               sqlite_where=text("kind = 'webreader' AND created_by = 'account-browser'")),
+    )
+
+
+class KoboSharePlaceNudge(Base):
+    """Share my place turn-on nudge: send this book's shared reading state to
+    this Kobo once, because the shared place won the arbiter against the
+    device's own row when its box was turned on. Kept apart from the
+    rehydrate latch so neither the confirmation echo nor the latch's PUT
+    rules apply to it. Deleted when the page that carried it is acknowledged.
+    """
+    __tablename__ = 'kobo_share_place_nudge'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(
+        Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False,
+    )
+    book_id = Column(Integer, nullable=False)
+    armed_at = Column(DateTime, nullable=False,
+                      default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('device_id', 'book_id',
+                         name='uq_kobo_share_place_nudge_device_book'),
     )
 
 
@@ -4541,6 +4570,30 @@ def migrate_device_share_place(engine, _session):
         _add_column_if_missing(engine, table, name, ddl)
 
 
+def migrate_kobo_bookmark_receipt(engine, _session):
+    """Add the shared Kobo bookmark's receipt clock and the turn-on nudges.
+
+    Additive and idempotent. Existing bookmarks get a receipt once, when the
+    column is added: the stored clock capped at the upgrade instant, since no
+    report can have been received after the upgrade began. A device clock
+    that ran ahead therefore stops outranking honest reports from then on.
+    """
+    added = _add_column_if_missing(
+        engine, "kobo_bookmark", "server_modified_at",
+        "server_modified_at DATETIME")
+    Base.metadata.create_all(
+        engine, tables=[KoboSharePlaceNudge.__table__], checkfirst=True)
+    if added:
+        upgrade_at = datetime.now(timezone.utc).replace(tzinfo=None).strftime(
+            "%Y-%m-%d %H:%M:%S.%f")
+        with engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE kobo_bookmark SET server_modified_at = CASE "
+                "WHEN last_modified IS NULL OR last_modified > :at THEN :at "
+                "ELSE last_modified END WHERE server_modified_at IS NULL"
+            ), {"at": upgrade_at})
+
+
 def migrate_kobo_annotation_seed_pipeline(engine, _session):
     """Install M2's sticky-authority and capture-kind columns before ORM use."""
     Base.metadata.create_all(
@@ -5470,6 +5523,7 @@ def migrate_Database(_session):
     migrate_webreader_device_identity_slice(engine, _session)
     migrate_device_reading_position_slice(engine, _session)
     migrate_device_share_place(engine, _session)
+    migrate_kobo_bookmark_receipt(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)

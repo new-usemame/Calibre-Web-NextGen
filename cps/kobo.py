@@ -53,6 +53,7 @@ from .helper import get_download_link
 from .services import SyncToken as SyncToken, hardcover
 from .services import cover_preview, ereader_scope, parallel, user_cover
 from .services import device_reading_position as device_positions
+from .services import kobo_place_gate
 from .fs import FileSystem
 from .web import download_required
 from .kobo_auth import requires_kobo_auth, get_auth_token
@@ -458,6 +459,17 @@ def _acknowledge_pending_page(
             ).delete(
                 synchronize_session=False,
             )
+
+        nudged_ids = [
+            int(position_id)
+            for position_id in confirmation.get("share_place_nudge_positions", [])
+        ]
+        if nudged_ids:
+            # Emitted once; the acknowledged page delivered it. No echo.
+            ub.session.query(ub.KoboSharePlaceNudge).filter(
+                ub.KoboSharePlaceNudge.id.in_(nudged_ids),
+                ub.KoboSharePlaceNudge.device_id == int(requesting_device_id),
+            ).delete(synchronize_session=False)
 
         for emitted in confirmation.get("rehydrate_positions", []):
             position = ub.session.query(ub.DeviceReadingPosition).filter_by(
@@ -2404,6 +2416,14 @@ def HandleSyncRequest():
     )
 
     reading_state_book_ids_emitted = []
+    # Share my place: a Kobo whose box is off is sent no shared reading
+    # state from any emission site below, while its reading-state frontier
+    # still advances past every row it would have been sent.
+    sync_place_mode = kobo_place_gate.kobo_place_mode(
+        current_user.id, requesting_device_id,
+    )
+    suppress_shared_states = sync_place_mode == kobo_place_gate.UNCHECKED
+    share_place_nudges_emitted = []
 
     # Establish one ordered reading-state frontier before rendering any
     # entitlements. Reading states can travel either embedded in an entitlement
@@ -2534,6 +2554,14 @@ def HandleSyncRequest():
                 refresh_fingerprint_record = False
 
             if (kobo_reading_state is not None
+                    and kobo_reading_state.id in reading_state_page_ids
+                    and suppress_shared_states):
+                new_reading_state_last_modified = max(
+                    new_reading_state_last_modified,
+                    books_cursor_datetime(kobo_reading_state.last_modified),
+                )
+                reading_state_book_ids_emitted.append(book.Books.id)
+            elif (kobo_reading_state is not None
                     and kobo_reading_state.id in reading_state_page_ids):
                 reading_state = get_kobo_reading_state_response(
                     book.Books, kobo_reading_state)
@@ -2754,6 +2782,13 @@ def HandleSyncRequest():
     for kobo_reading_state in reading_state_page:
         if kobo_reading_state.book_id in reading_state_book_ids_emitted:
             continue
+        if suppress_shared_states:
+            reading_state_book_ids_emitted.append(kobo_reading_state.book_id)
+            new_reading_state_last_modified = max(
+                new_reading_state_last_modified,
+                books_cursor_datetime(kobo_reading_state.last_modified),
+            )
+            continue
         book = calibre_db.session.query(db.Books).filter(db.Books.id == kobo_reading_state.book_id).one_or_none()
         if book:
             sync_results.append({
@@ -2773,8 +2808,10 @@ def HandleSyncRequest():
     # after the device has had a chance to replace the bytes. Entitlements
     # delivered in this response are excluded even when their latch was older.
     # The cap bounds renderer migrations/account resets; unserved rows stay
-    # latched and drain in book-id order on later requests.
-    if requesting_device_id:
+    # latched and drain in book-id order on later requests. A Kobo whose
+    # Share my place box is off keeps its latches armed and unserved: the
+    # repair carries the shared state, which is not its own.
+    if requesting_device_id and not suppress_shared_states:
         pending_rehydrates = (
             ub.session.query(
                 ub.DeviceReadingPosition,
@@ -2822,6 +2859,50 @@ def HandleSyncRequest():
                 reading_state_book_ids_emitted.append(position.book_id)
             rehydrate_positions_emitted.append(position)
 
+    # Share my place turn-on nudge (armed by the devices API only where the
+    # shared place won the arbiter against this Kobo's own row). Emitted
+    # once and cleared on acknowledgement with no confirmation echo; a book
+    # already sent above consumes its nudge without a second copy.
+    if requesting_device_id and sync_place_mode == kobo_place_gate.CHECKED:
+        pending_nudges = (
+            ub.session.query(
+                ub.KoboSharePlaceNudge,
+                ub.KoboReadingState,
+            )
+            .join(
+                ub.KoboReadingState,
+                ub.KoboReadingState.book_id
+                == ub.KoboSharePlaceNudge.book_id,
+            )
+            .filter(
+                ub.KoboSharePlaceNudge.device_id
+                == int(requesting_device_id),
+                ub.KoboReadingState.user_id == current_user.id,
+                # A book re-offered or removed in this response waits.
+                ub.KoboSharePlaceNudge.book_id.notin_(
+                    set(rehydrate_book_ids) | set(books_to_delete_ids),
+                ),
+            )
+            .order_by(ub.KoboSharePlaceNudge.book_id)
+            .limit(SYNC_ITEM_LIMIT)
+            .all()
+        )
+        for position, kobo_reading_state in pending_nudges:
+            book = calibre_db.session.query(db.Books).filter(
+                db.Books.id == position.book_id,
+            ).one_or_none()
+            if (book is not None
+                    and position.book_id not in reading_state_book_ids_emitted):
+                sync_results.append({
+                    "ChangedReadingState": {
+                        "ReadingState": get_kobo_reading_state_response(
+                            book, kobo_reading_state,
+                        ),
+                    },
+                })
+                reading_state_book_ids_emitted.append(position.book_id)
+            share_place_nudges_emitted.append(position)
+
     # Some Nickel versions acknowledge a repair state before materializing a
     # newly offered download, then recalculate the coarse book percentage as
     # the downloaded spine is installed. The acknowledging request is the
@@ -2832,7 +2913,7 @@ def HandleSyncRequest():
     # rows, which bounds this query and response work. Do not consume the echo
     # when this response re-offers the same book; that entitlement arms a fresh
     # latch for a later request instead.
-    if acknowledged_rehydrate_book_ids:
+    if acknowledged_rehydrate_book_ids and not suppress_shared_states:
         echo_book_ids = [
             book_id for book_id in acknowledged_rehydrate_book_ids
             if book_id not in reading_state_book_ids_emitted
@@ -3194,6 +3275,9 @@ def HandleSyncRequest():
             "confirmation_echo_book_ids": sorted(
                 set(confirmation_echo_book_ids),
             ),
+            "share_place_nudge_positions": [
+                position.id for position in share_place_nudges_emitted
+            ],
         }
         stored_headers = {
             header_name: header_value
@@ -3220,6 +3304,8 @@ def HandleSyncRequest():
         )
         for position in rehydrate_positions_emitted:
             position.rehydrate_needed = False
+        for nudge in share_place_nudges_emitted:
+            ub.session.delete(nudge)
 
     if requesting_device_id and redownload_book_ids:
         try:
@@ -4073,6 +4159,14 @@ def HandleStateRequest(book_uuid):
         log.info("Book %s not found in database", book_uuid)
         return redirect_or_proxy_request()
 
+    device_id = getattr(g, "annotation_origin_device_id", None)
+    place_mode = kobo_place_gate.kobo_place_mode(current_user.id, device_id)
+    if place_mode == kobo_place_gate.UNCHECKED:
+        # Share my place is off for this Kobo: the gate sits above
+        # get_or_create_reading_state so no shared row is created or read.
+        return _handle_unchecked_state_request(book, device_id)
+    checked = place_mode == kobo_place_gate.CHECKED
+
     kobo_reading_state = get_or_create_reading_state(book.id)
 
     if request.method == "GET":
@@ -4089,6 +4183,14 @@ def HandleStateRequest(book_uuid):
             # preventing the "newer PT" conflict popup. Official Kobo cloud does the same.
             lm_str = request_reading_state.get("LastModified")
             request_lm = parse_kobo_timestamp(lm_str)
+            client_lm = request_lm
+            if checked:
+                # A checked Kobo's clock is trusted only within five minutes
+                # of its receipt (place_arbiter); every shared clock it
+                # writes is that effective clock.
+                request_lm = kobo_place_gate.effective_clock(
+                    client_lm, datetime.now(timezone.utc),
+                ).replace(tzinfo=timezone.utc)
             g.kobo_reading_state_lm = request_lm
             if not device_positions.timestamp_is_newer(
                     request_lm, kobo_reading_state.last_modified):
@@ -4103,47 +4205,82 @@ def HandleStateRequest(book_uuid):
                 current_bookmark = kobo_reading_state.current_bookmark
                 location = request_bookmark.get("Location")
                 incoming_progress = request_bookmark.get("ProgressPercent")
-                rehydrate_pending = device_positions.stage_position(
-                    device_id=getattr(g, "annotation_origin_device_id", None),
-                    book_id=book.id,
-                    progress_percent=incoming_progress,
-                    content_source_progress_percent=request_bookmark.get(
-                        "ContentSourceProgressPercent",
-                    ),
-                    location_value=location["Value"] if location else None,
-                    location_type=location["Type"] if location else None,
-                    location_source=location["Source"] if location else None,
-                    client_modified_at=request_lm,
-                )
+                if checked:
+                    own_status = _request_status(request_reading_state)
+                    rehydrate_pending = kobo_place_gate.record_own_report(
+                        device_id=device_id,
+                        book_id=book.id,
+                        client_at=client_lm,
+                        place=_journal_place(request_bookmark),
+                        status=own_status[1],
+                        status_supplied=own_status[0],
+                    ).rehydrate_pending
+                else:
+                    rehydrate_pending = device_positions.stage_position(
+                        device_id=device_id,
+                        book_id=book.id,
+                        progress_percent=incoming_progress,
+                        content_source_progress_percent=request_bookmark.get(
+                            "ContentSourceProgressPercent",
+                        ),
+                        location_value=location["Value"] if location else None,
+                        location_type=location["Type"] if location else None,
+                        location_source=location["Source"] if location else None,
+                        client_modified_at=request_lm,
+                    )
 
-                bookmark_outcome = device_positions.advance_kobo_bookmark(
-                    current_bookmark,
-                    incoming_progress,
-                    content_source_progress_percent=request_bookmark.get(
-                        "ContentSourceProgressPercent",
-                    ),
-                    content_source_supplied=(
-                        "ContentSourceProgressPercent" in request_bookmark
-                    ),
-                    location_value=location["Value"] if location else None,
-                    location_type=location["Type"] if location else None,
-                    location_source=location["Source"] if location else None,
-                    location_supplied=bool(location),
-                    incoming_clock=request_lm,
-                    clock_accepts=True,
-                    # An armed latch means the server holds a position it
-                    # deliberately re-placed (a re-converted book) and will
-                    # replay on the next sync. The device echoing its old
-                    # locator at the same progress with an older clock must
-                    # not overwrite that repair (OBSERVED on hardware).
-                    equal_accepts=not rehydrate_pending,
-                    preserve_clock_when_missing=True,
-                    block_lower_at_or_below=(
-                        KOB0_COVER_RESET_PROGRESS_EPSILON
-                        if rehydrate_pending else None
-                    ),
-                    session=ub.session,
-                )
+                if checked:
+                    if current_bookmark.id is None:
+                        ub.session.flush()
+                    bookmark_outcome = kobo_place_gate.write_shared_bookmark(
+                        current_bookmark.id,
+                        client_at=client_lm,
+                        progress_percent=incoming_progress,
+                        content_source_progress_percent=request_bookmark.get(
+                            "ContentSourceProgressPercent",
+                        ),
+                        content_source_supplied=(
+                            "ContentSourceProgressPercent" in request_bookmark
+                        ),
+                        location=location,
+                        location_supplied=bool(location),
+                        block_lower_at_or_below=(
+                            KOB0_COVER_RESET_PROGRESS_EPSILON
+                            if rehydrate_pending else None
+                        ),
+                        session=ub.session,
+                    )
+                    ub.session.expire(current_bookmark)
+                    ub.session.expire(kobo_reading_state)
+                else:
+                    bookmark_outcome = device_positions.advance_kobo_bookmark(
+                        current_bookmark,
+                        incoming_progress,
+                        content_source_progress_percent=request_bookmark.get(
+                            "ContentSourceProgressPercent",
+                        ),
+                        content_source_supplied=(
+                            "ContentSourceProgressPercent" in request_bookmark
+                        ),
+                        location_value=location["Value"] if location else None,
+                        location_type=location["Type"] if location else None,
+                        location_source=location["Source"] if location else None,
+                        location_supplied=bool(location),
+                        incoming_clock=request_lm,
+                        clock_accepts=True,
+                        # An armed latch means the server holds a position it
+                        # deliberately re-placed (a re-converted book) and will
+                        # replay on the next sync. The device echoing its old
+                        # locator at the same progress with an older clock must
+                        # not overwrite that repair (OBSERVED on hardware).
+                        equal_accepts=not rehydrate_pending,
+                        preserve_clock_when_missing=True,
+                        block_lower_at_or_below=(
+                            KOB0_COVER_RESET_PROGRESS_EPSILON
+                            if rehydrate_pending else None
+                        ),
+                        session=ub.session,
+                    )
                 resolved_bookmark_accepted = bookmark_outcome.accepted
                 cover_reset_suppressed = bool(
                     not bookmark_outcome.accepted
@@ -4226,6 +4363,83 @@ def HandleStateRequest(book_uuid):
             "RequestResult": "Success",
             "UpdateResults": [update_results_response],
         })
+
+
+def _journal_place(request_bookmark):
+    """DeviceReadingPosition place columns for one Kobo CurrentBookmark."""
+    location = request_bookmark.get("Location") or {}
+    return {
+        "progress_percent": request_bookmark.get("ProgressPercent"),
+        "content_source_progress_percent": request_bookmark.get(
+            "ContentSourceProgressPercent"),
+        "location_value": location.get("Value"),
+        "location_type": location.get("Type"),
+        "location_source": location.get("Source"),
+    }
+
+
+def _request_status(request_reading_state):
+    """(supplied, ReadBook status) for a ReadingState's StatusInfo."""
+    status_info = request_reading_state.get("StatusInfo")
+    if not status_info:
+        return False, None
+    return True, get_ub_read_status(status_info["Status"])
+
+
+def _handle_unchecked_state_request(book, device_id):
+    """GET/PUT /state for a resolved Kobo whose Share my place box is off.
+
+    Only the device's own DeviceReadingPosition row is read or written:
+    no ReadBook, KoboReadingState, KoboBookmark or KoboStatistics row is
+    created or changed, nothing reaches the KOReader carrier or the custom
+    read column. Hardcover still hears the reading, as the account's.
+    Statistics from an unchecked Kobo are acknowledged and dropped.
+    """
+    if request.method == "GET":
+        row = ub.session.query(ub.DeviceReadingPosition).filter(
+            ub.DeviceReadingPosition.device_id == int(device_id),
+            ub.DeviceReadingPosition.book_id == book.id,
+        ).one_or_none()
+        return jsonify([kobo_place_gate.journal_state_response(book, row)])
+
+    update_results_response = {"EntitlementId": book.uuid}
+    try:
+        request_reading_state = request.json["ReadingStates"][0]
+        client_lm = parse_kobo_timestamp(request_reading_state.get("LastModified"))
+        request_bookmark = request_reading_state["CurrentBookmark"]
+        place = _journal_place(request_bookmark) if request_bookmark else None
+        if request_bookmark:
+            update_results_response["CurrentBookmarkResult"] = {"Result": "Success"}
+        if request_reading_state["Statistics"]:
+            update_results_response["StatisticsResult"] = {"Result": "Success"}
+        status_supplied, status = _request_status(request_reading_state)
+        request_reading_state["StatusInfo"]  # required, as on the shared path
+        if status_supplied:
+            update_results_response["StatusInfoResult"] = {"Result": "Success"}
+        outcome = kobo_place_gate.record_own_report(
+            device_id=device_id,
+            book_id=book.id,
+            client_at=client_lm,
+            place=place,
+            status=status,
+            status_supplied=status_supplied,
+        )
+    except (KeyError, TypeError, ValueError, AttributeError, StatementError):
+        log.debug("Received malformed v1/library/<book_uuid>/state request.")
+        ub.session.rollback()
+        abort(400, description="Malformed request data is missing 'ReadingStates' key")
+
+    if (outcome.accepted and request_bookmark
+            and request_bookmark.get("ProgressPercent") is not None):
+        push_reading_state_to_hardcover(
+            current_user, book, request_bookmark["ProgressPercent"],
+        )
+    if not ub.session_commit():
+        return "", 500
+    return jsonify({
+        "RequestResult": "Success",
+        "UpdateResults": [update_results_response],
+    })
 
 
 def share_kobo_progress_with_koreader(user_id, book_id, percentage):
@@ -4507,17 +4721,24 @@ def get_or_create_reading_state(book_id):
     3. We commit each create separately so a concurrent winner's insert
        is visible to our subsequent SELECT — the ON CONFLICT path makes
        this safe (no spurious IntegrityError to recover from).
+
+    Rows created here hold no report yet, so every clock on them is the
+    epoch, never the server's current time. Stamped "now", they outranked
+    the device's own first report (always a little behind the server):
+    its StatusInfo was dropped, the server's clock replaced the device's
+    in the GET echo, and the next writer with a newer past clock lost.
     """
     from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
     user_id = int(current_user.id)
+    never = kobo_place_gate.EPOCH
 
     # 1. ReadBook (book_read_link). Atomic insert-if-missing.
     rb_stmt = (
         sqlite_insert(ub.ReadBook)
         .values(user_id=user_id, book_id=book_id,
                 read_status=ub.ReadBook.STATUS_UNREAD,
-                times_started_reading=0)
+                times_started_reading=0, last_modified=never)
         .on_conflict_do_nothing(index_elements=["user_id", "book_id"])
     )
     ub.session.execute(rb_stmt)
@@ -4535,7 +4756,8 @@ def get_or_create_reading_state(book_id):
     if not book_read.kobo_reading_state:
         krs_stmt = (
             sqlite_insert(ub.KoboReadingState)
-            .values(user_id=user_id, book_id=book_id)
+            .values(user_id=user_id, book_id=book_id,
+                    last_modified=never, priority_timestamp=never)
             .on_conflict_do_nothing(index_elements=["user_id", "book_id"])
         )
         ub.session.execute(krs_stmt)
@@ -4548,13 +4770,30 @@ def get_or_create_reading_state(book_id):
 
     kobo_reading_state = book_read.kobo_reading_state
 
-    # 3. Child rows. These have an FK to KoboReadingState.id, so they
-    #    can be created via ORM safely (the parent row is now stable).
-    if kobo_reading_state.current_bookmark is None:
-        kobo_reading_state.current_bookmark = ub.KoboBookmark()
-    if kobo_reading_state.statistics is None:
-        kobo_reading_state.statistics = ub.KoboStatistics()
+    # 3. Child rows, inserted only while missing. Core inserts, so the ORM
+    #    before_flush hook does not stamp the empty parent with "now"; the
+    #    NOT EXISTS guard makes a concurrent creator's insert a no-op.
+    for model, missing in (
+            (ub.KoboBookmark, kobo_reading_state.current_bookmark is None),
+            (ub.KoboStatistics, kobo_reading_state.statistics is None)):
+        if not missing:
+            continue
+        table = model.__table__
+        values = {"kobo_reading_state_id": kobo_reading_state.id,
+                  "last_modified": never}
+        if model is ub.KoboBookmark:
+            # No place has been received yet.
+            values["server_modified_at"] = None
+        columns = list(values)
+        ub.session.execute(table.insert().from_select(
+            columns,
+            select(*[literal(values[name], type_=table.c[name].type)
+                     for name in columns]).where(~select(table.c.id).where(
+                         table.c.kobo_reading_state_id
+                         == kobo_reading_state.id).exists()),
+        ))
     ub.session.commit()
+    ub.session.refresh(kobo_reading_state)
 
     return kobo_reading_state
 

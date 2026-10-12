@@ -25,6 +25,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ... import config, csrf, logger, ub
 from ...services import device_registry, koreader_library, koreader_placeholder, kosync_place
 from ...services.place_arbiter import Report
+from ...services.share_place import gates_enforced
 from .kosync import (
     MAX_DEVICE_ID_LENGTH,
     MAX_DEVICE_LENGTH,
@@ -140,7 +141,8 @@ def get_library():
     # Older cwngsync versions already send library headers, but cannot name
     # their progress GETs. Only a progress/status header observation enables
     # the control, preserving those versions' existing library behavior.
-    private = (identified and device_registry.place_control(target) == "per_device"
+    private = (gates_enforced(user.id) and identified
+               and device_registry.place_control(target) == "per_device"
                and not target.share_place)
     # Private walks have a device-scoped cache key. A different reader or a
     # changed share setting can never reuse their private projection.
@@ -401,7 +403,7 @@ def put_read_status():
         return _error("Book not found", 404, "not_found")
     target, identified, _raw_id = kosync_place.request_device(user.id, data, observe=True)
     try:
-        if identified and not target.share_place:
+        if gates_enforced(user.id) and identified and not target.share_place:
             now = datetime.now(timezone.utc)
             own = kosync_place.own_position(target.id, book_id)
             # A status-only report must not replace the position or its clocks.

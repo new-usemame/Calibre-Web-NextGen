@@ -15,9 +15,15 @@ local function endpoint(url)
 end
 
 function Guard.check(args)
+    -- A live guard may have been installed before the latest auth reply.
+    -- Make that wrapper dormant too, without changing a reader's settings.
+    local builtin = args.builtin
+    if builtin and builtin.cwng_pull_guard then
+        builtin.cwng_pull_guard.enabled = false
+    end
+    if args.share_place_gates ~= true then return false end
     local server = endpoint(args.server)
     if not server then return false end
-    local builtin = args.builtin
     local store = builtin and builtin.settings_obj or args.open_settings()
     local settings = builtin and builtin.settings or store:readSetting("settings")
     if type(settings) ~= "table"
@@ -29,12 +35,17 @@ function Guard.check(args)
         -- its closure does not recheck auto_sync. Guard the live entry point
         -- too, including on later starts where the setting is already off.
         local get_progress = builtin.getProgress
+        local guard = { enabled = true, server = server .. "/kosync" }
         builtin.getProgress = function(self, ensure_networking, interactive, ...)
-            if interactive or self.settings.auto_sync then
+            if not guard.enabled or endpoint(self.settings.custom_server) ~= guard.server
+                    or interactive or self.settings.auto_sync then
                 return get_progress(self, ensure_networking, interactive, ...)
             end
         end
-        builtin.cwng_pull_guard = true
+        builtin.cwng_pull_guard = guard
+    elseif builtin and builtin.cwng_pull_guard then
+        builtin.cwng_pull_guard.enabled = true
+        builtin.cwng_pull_guard.server = server .. "/kosync"
     end
     if not settings.auto_sync then return false end
     local seen = args.reader_settings:readSetting(SEEN_KEY) or {}

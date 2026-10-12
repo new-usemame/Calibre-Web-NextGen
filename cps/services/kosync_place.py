@@ -27,11 +27,11 @@ def utc(value):
 
 def client_clock(raw, received_at):
     """Freeze invalid/future clocks at receipt, so they cannot mature later."""
-    if raw is None or isinstance(raw, bool):
+    if not isinstance(raw, (int, float)) or isinstance(raw, bool):
         return None
     try:
         epoch = float(raw)
-        if not math.isfinite(epoch):
+        if not math.isfinite(epoch) or epoch < 946684800:  # 2000-01-01 UTC
             return None
         stamp = datetime.fromtimestamp(epoch, timezone.utc)
     except (ValueError, TypeError, OverflowError, OSError):

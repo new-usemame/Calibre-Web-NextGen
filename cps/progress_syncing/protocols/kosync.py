@@ -49,6 +49,7 @@ from ...services import SyncToken as SyncToken, hardcover
 from ...services import (device_capabilities, device_delivery,
                          device_reading_position as device_positions)
 from ...services.place_arbiter import Report, report_wins
+from ...services.share_place import gates_enforced
 from ...kobo import push_reading_state_to_hardcover
 
 from flask import Blueprint, request, jsonify, send_from_directory
@@ -1139,7 +1140,8 @@ def auth_user():
     user = authenticate_user()
     if user:
         return create_sync_response({"authorized": "OK",
-                                     "capabilities": list(SERVER_CAPABILITIES)})
+                                     "capabilities": list(SERVER_CAPABILITIES),
+                                     "share_place_gates": gates_enforced(user.id)})
     else:
         return create_sync_response({
             "error": ERROR_UNAUTHORIZED_USER,
@@ -1209,6 +1211,7 @@ def get_progress(document: str):
         accepts_percentage = client_accepts_percentage_only()
         from ...services import kosync_place
         target, identified, raw_id = kosync_place.request_device(user.id)
+        identified = identified and gates_enforced(user.id)
         own_served = False
         private = identified and not target.share_place
         if identified and book_id:
@@ -2366,7 +2369,7 @@ def update_progress():
         internal_device_id = target.id if target is not None else None
         # Unmatched documents cannot have a book journal. They and failed or
         # capped registrations retain the legacy shared path.
-        gated = identified and bool(book_id)
+        gated = gates_enforced(user.id) and identified and bool(book_id)
         private = gated and not target.share_place
         canonical_document = str(book_id or document)
         proposed_percentage = percentage_float

@@ -15,6 +15,25 @@ from tests.unit.test_share_place_kosync_gates import (
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def enforce_share_place(monkeypatch):
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "1")
+
+
+def test_dormant_library_and_status_follow_the_account(world, monkeypatch):
+    world.position(world.reader, BOOK, 80)
+    _put(world, 20, device_id="kindle-a", name="Kindle A")
+    assert _listing(world)["books"][0]["progress"] == pytest.approx(.20)
+    monkeypatch.delenv("CWNG_SHARE_PLACE_GATES")
+    shared = _listing(world)["books"][0]
+    assert shared["progress"] == pytest.approx(.80)
+    assert shared["read_status"] == "reading"
+    response = _status(world, "finished", device_id="kindle-a", name="Kindle A")
+    assert response.status_code == 200
+    assert _account_state(world)[0] == ub.ReadBook.STATUS_FINISHED
+    assert _journal(world, _device_named(world, "Kindle A")).reading_status == ub.ReadBook.STATUS_IN_PROGRESS
+
+
 def _listing(world, raw="kindle-a", **query):
     response = world.client.get("/kosync/syncs/library", query_string=query,
                                 headers=_headers(raw, "Kindle A"))

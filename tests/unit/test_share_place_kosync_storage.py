@@ -18,6 +18,11 @@ from cps.services.place_arbiter import Report
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def enforce_share_place(monkeypatch):
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "1")
+
+
 @pytest.mark.parametrize("cascade", [False, True])
 def test_receipt_clock_upgrade_preserves_legacy_rows_and_is_repeatable(cascade):
     connection = sqlite3.connect(":memory:")

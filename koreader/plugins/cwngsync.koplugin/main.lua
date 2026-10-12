@@ -32,6 +32,7 @@ local Home = require("cwng_home")
 local LibraryRuntime = require("cwng_library_runtime")
 local Setup = require("cwng_setup")
 local SetupFlow = require("cwng_setup_flow")
+local ServerCapabilities = require("server_capabilities")
 
 -- A settings file copied from another e-reader carries that e-reader's ID.
 local device_id_replaced = DeviceIdentity.settle(G_reader_settings, {
@@ -684,6 +685,7 @@ function CWNGSync:setServer(server)
     logger.dbg("CWNGSync: Setting server to:", server)
     if server == "" then
         self.settings.server = nil
+        self:checkBuiltinProgressSync()
         return
     end
     -- Stored the way setup stores it, so the same server typed with a slash
@@ -700,10 +702,10 @@ function CWNGSync:setServer(server)
 end
 
 function CWNGSync:checkBuiltinProgressSync()
-    if not self.settings.server then return end
     local ok, err = pcall(function()
         require("builtin_sync_guard").check{
             server = self.settings.server,
+            share_place_gates = ServerCapabilities.gatesEnforced(self.settings),
             reader_settings = G_reader_settings,
             builtin = PluginLoader:getPluginInstance("kosync"),
             open_settings = function()
@@ -801,7 +803,12 @@ function CWNGSync:doLogin(username, password, menu)
         service_spec = self.path .. "/api.json"
     }
     Device:setIgnoreInput(true)
-    local ok, status, body = pcall(client.authorize, client, username, password)
+    local ok, status, body, reason = pcall(client.authorize, client, username, password)
+    if ok and reason == nil then
+        ServerCapabilities.remember(self.settings, body)
+        G_reader_settings:saveSetting(self.settings_key, self.settings)
+        self:checkBuiltinProgressSync()
+    end
     if not ok then
         if status then
             UIManager:show(InfoMessage:new{
@@ -834,6 +841,9 @@ end
 
 function CWNGSync:logout(menu)
     self.settings.password = nil
+    ServerCapabilities.remember(self.settings, nil)
+    G_reader_settings:saveSetting(self.settings_key, self.settings)
+    self:checkBuiltinProgressSync()
     if menu then
         menu:updateItems()
     end

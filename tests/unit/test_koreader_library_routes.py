@@ -803,15 +803,8 @@ def test_a_status_the_library_cannot_save_is_refused_without_its_database_error(
     """The database's own words (table names, SQL, paths) go to the log for
     the admin, not over the wire to whoever holds a device password."""
     from cps import helper
-    reader = world.add_user("reader")
+    world.add_user("reader")
     world.add_book(1, "Stuck")
-    # This error oracle exercises the shared custom-column path. Identified
-    # unchecked readers now save status privately and never call that helper.
-    from cps.services.device_registry import register_koreader_device_best_effort
-    internal = register_koreader_device_best_effort(
-        user_id=reader.id, device_id="kindle-1", secret_key=world.app.secret_key)
-    world.session.get(ub.Device, internal).share_place = True
-    world.session.commit()
     detail = ("Read status could not set: (sqlite3.OperationalError) disk I/O error "
               "[SQL: UPDATE custom_column_5 SET value=?]")
     monkeypatch.setattr(helper, "edit_book_read_status",

@@ -5675,7 +5675,7 @@ def purge_orphaned_accounts(_session):
     try:
         user_account_data.purge_orphaned_accounts(_session)
         _session.commit()
-    except exc.SQLAlchemyError as e:
+    except Exception as e:  # leftover rows are inert; never block startup
         _session.rollback()
         log.error("Could not remove data left by deleted accounts: %s", e)
 

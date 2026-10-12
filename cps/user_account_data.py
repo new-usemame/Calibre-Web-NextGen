@@ -204,7 +204,9 @@ def orphaned_user_ids(session=None):
 
     Every account-owned column is a foreign key into ``user.id``, so the
     model registry names them all; device- and shelf-scoped children are
-    reached through their parent by :func:`purge_user_account`.
+    reached through their parent by :func:`purge_user_account`. Only whole
+    numbers count: a stray 2.5 would otherwise purge live user 2, and text
+    names no account at all.
     """
     from .progress_syncing import models  # noqa: F401  registers kosync_progress
     session = session if session is not None else ub.session
@@ -216,7 +218,8 @@ def orphaned_user_ids(session=None):
                    for fk in column.foreign_keys):
                 found.update(session.execute(
                     sa.select(column).distinct().where(
-                        column.isnot(None), column.notin_(live))).scalars())
+                        sa.func.typeof(column) == "integer",
+                        column.notin_(live))).scalars())
     return sorted(found)
 
 

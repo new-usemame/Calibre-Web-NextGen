@@ -439,3 +439,38 @@ def test_startup_removes_rows_left_by_accounts_deleted_before_the_purge(
     _boot(ub, db_path)  # every start: nothing left to do, nothing else lost
     check()
     engine.dispose()
+
+
+@pytest.mark.parametrize("stray", [2.5, "abc"])
+def test_startup_cleanup_skips_a_user_id_that_is_not_a_whole_number(
+        ub_module, monkeypatch, tmp_path, stray):
+    """Review of #2574: the sweep matched any stored value missing from
+    ``user``, then purged ``int(value)``. A ``downloads.user_id`` of 2.5
+    purged live user 2; ``'abc'`` raised out of ``init_db`` and stopped the
+    server starting. Neither names an account, so startup must leave it,
+    keep the live account and still finish booting."""
+    from cps import constants
+    ub = ub_module
+    monkeypatch.setattr(constants, "CONFIG_DIR", str(tmp_path))
+    db_path = tmp_path / "app.db"
+    engine = create_engine("sqlite:///%s" % db_path, future=True)
+    ub.Base.metadata.create_all(engine)
+    with sessionmaker(bind=engine, future=True)() as s:
+        _user(ub, s, "admin", role=constants.ROLE_ADMIN)
+        live = _user(ub, s, "live")
+        s.add(ub.Shelf(name="mine", is_public=0, user_id=live.id))
+        s.commit()
+        assert live.id == 2
+        s.execute(sa.text("INSERT INTO downloads (book_id, user_id) "
+                          "VALUES (1, :v)"), {"v": stray})
+        s.commit()
+
+    _boot(ub, db_path)
+
+    with sessionmaker(bind=engine, future=True)() as s:
+        users = sorted(r for (r,) in s.execute(sa.text("SELECT name FROM user")))
+        shelves = s.execute(sa.text(
+            "SELECT count(*) FROM shelf WHERE user_id = 2")).scalar()
+    assert users == ["admin", "live"]
+    assert shelves == 1
+    engine.dispose()

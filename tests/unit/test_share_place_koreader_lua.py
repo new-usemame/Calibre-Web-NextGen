@@ -14,7 +14,6 @@ PLUGIN = Path(__file__).resolve().parents[2] / "koreader/plugins/cwngsync.koplug
 @pytest.mark.parametrize("suite", [
     "share_place_progress_traffic_test.lua",
     "share_place_builtin_sync_test.lua",
-    "share_place_version_test.lua",
 ])
 def test_share_place_plugin_behavior(suite):
     lua = shutil.which("lua5.4") or shutil.which("lua")

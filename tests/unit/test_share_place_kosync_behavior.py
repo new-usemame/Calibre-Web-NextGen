@@ -20,6 +20,36 @@ def enforce_share_place(monkeypatch):
     monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "1")
 
 
+@pytest.mark.parametrize("fast_by", [180, 86400])
+def test_checked_fast_clock_does_not_poison_a_stock_push(world, fast_by):
+    device = _register(world, "kindle-a", "Kindle A")
+    _share(world, device, True)
+    _put(world, 30, device_id="kindle-a", name="Kindle A", client_at=time.time() + fast_by)
+    before = time.time()
+    _put(world, 70, device_id="stock", name="Stock reader", header=False)
+    after = time.time()
+    served = _get(world).get_json()
+    assert served["percentage"] == pytest.approx(.70)
+    assert int(before) <= served["timestamp"] <= int(after)
+    # A later checked report must judge the stock write at its receipt clock.
+    _put(world, 20, device_id="kindle-a", name="Kindle A", client_at=time.time() + 60)
+    assert _get(world).get_json()["percentage"] == pytest.approx(.20)
+
+
+@pytest.mark.parametrize("private", [False, True])
+@pytest.mark.parametrize("offset", [-300, 180, 86400])
+def test_progress_timestamps_remain_receipt_time(world, private, offset):
+    device = _register(world, "kindle-a", "Kindle A")
+    _share(world, device, not private)
+    before = time.time()
+    pushed = _put(world, 30, device_id="kindle-a", name="Kindle A", client_at=before + offset)
+    after = time.time()
+    pulled = _get(world, device_id="kindle-a", name="Kindle A").get_json()
+    # The plugin compares this wire field with last_page_turn_timestamp.
+    for reply in (pushed, pulled):
+        assert int(before) <= reply["timestamp"] <= int(after)
+
+
 def test_dormant_library_and_status_follow_the_account(world, monkeypatch):
     world.position(world.reader, BOOK, 80)
     _put(world, 20, device_id="kindle-a", name="Kindle A")

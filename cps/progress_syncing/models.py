@@ -396,7 +396,7 @@ def ensure_kosync_progress_table(conn):
             columns = [row[1] for row in pragma_result.fetchall()]
 
             expected_columns = {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
-            actual_columns = set(columns) - {'received_at'}
+            actual_columns = set(columns) - {'received_at', 'client_modified_at'}
 
             # A mismatched table cannot provide the conflict target every
             # conditional writer depends on, so startup must not continue.
@@ -414,6 +414,13 @@ def ensure_kosync_progress_table(conn):
                 )
             if "received_at" not in columns:
                 execute_sql("ALTER TABLE kosync_progress ADD COLUMN received_at TIMESTAMP")
+            if "client_modified_at" not in columns:
+                execute_sql("ALTER TABLE kosync_progress ADD COLUMN client_modified_at TIMESTAMP")
+                # Earlier Share my place rows stored the event in timestamp.
+                # Preserve their report clock and restore the legacy receipt
+                # field. Stock/older rows have no received_at and stay intact.
+                execute_sql("UPDATE kosync_progress SET client_modified_at=timestamp, "
+                            "timestamp=received_at WHERE received_at IS NOT NULL")
 
             # Check if foreign keys have CASCADE DELETE
             has_cascade = check_cascade_delete_on_fk(conn, "kosync_progress", {'user_id': 'user'})
@@ -435,12 +442,13 @@ def ensure_kosync_progress_table(conn):
                             device_id TEXT,
                             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             received_at TIMESTAMP,
+                            client_modified_at TIMESTAMP,
                             FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
                         )
                     """)
                     execute_sql("""
-                        INSERT INTO kosync_progress_new (id, user_id, document, progress, percentage, device, device_id, timestamp, received_at)
-                        SELECT kp.id, kp.user_id, kp.document, kp.progress, kp.percentage, kp.device, kp.device_id, kp.timestamp, kp.received_at
+                        INSERT INTO kosync_progress_new (id, user_id, document, progress, percentage, device, device_id, timestamp, received_at, client_modified_at)
+                        SELECT kp.id, kp.user_id, kp.document, kp.progress, kp.percentage, kp.device, kp.device_id, kp.timestamp, kp.received_at, kp.client_modified_at
                         FROM kosync_progress AS kp
                         WHERE EXISTS (
                             SELECT 1 FROM user AS u WHERE u.id = kp.user_id
@@ -468,6 +476,8 @@ def ensure_kosync_progress_table(conn):
                     device TEXT NOT NULL,
                     device_id TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    received_at TIMESTAMP,
+                    client_modified_at TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
                 )
             """)
@@ -478,11 +488,6 @@ def ensure_kosync_progress_table(conn):
         # F-9073e5: ON CONFLICT needs a verified uniqueness guarantee. Repair a
         # same-named incompatible index, deduplicate legacy rows without a
         # window function, and verify the ordered unique columns before return.
-        # Receipt is separate from the event time for Share my place's
-        # tiebreak. Legacy rows use their timestamp as both clocks.
-        columns = {row[1] for row in execute_sql("PRAGMA table_info(kosync_progress)")}
-        if "received_at" not in columns:
-            execute_sql("ALTER TABLE kosync_progress ADD COLUMN received_at TIMESTAMP")
         try:
             _ensure_kosync_conflict_target(execute_sql)
         except KOSyncProgressSchemaError:
@@ -566,7 +571,9 @@ class KOSyncProgress(AppBase):
         percentage: Normalized percentage (0-100) of reading progress
         device: Device name that last synced this progress
         device_id: Unique identifier for the device
-        timestamp: Last update time for this progress record
+        timestamp: Server receipt time, also served to legacy progress clients
+        received_at: Receipt clock for identified reports; NULL on legacy writes
+        client_modified_at: Validated client clock for identified arbitration
     """
     __tablename__ = 'kosync_progress'
 
@@ -580,6 +587,7 @@ class KOSyncProgress(AppBase):
     timestamp = Column(TIMESTAMP, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
     received_at = Column(TIMESTAMP, nullable=True)
+    client_modified_at = Column(TIMESTAMP, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(

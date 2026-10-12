@@ -87,7 +87,7 @@ def latest_write(model, identity, values, *, client_column, server_column,
         report = Report(current[client_column], clock) if clock is not None else None
         if current is not None and present_column is not None and current[present_column] is None:
             report = None
-        if not report_wins(candidate, report, now=candidate.server_at):
+        if not report_wins(candidate, report):
             return False
         if current is None:
             result = s.execute(insert(table).values(**identity, **values)
@@ -137,7 +137,7 @@ def position_report(row):
 
 
 def shared_report(row):
-    return Report(row.timestamp, row.received_at or row.timestamp)
+    return Report(row.client_modified_at, row.received_at or row.timestamp)
 
 
 def own_record(device, row, raw_id, document):
@@ -149,5 +149,5 @@ def own_record(device, row, raw_id, document):
         progress=(row.location_value if row.location_source == document and row.location_value
                   else PERCENTAGE_ONLY_LOCATOR),
         percentage=row.progress_percent, device=device.display_name, device_id=raw_id,
-        timestamp=row.client_modified_at or row.server_modified_at,
+        timestamp=row.server_modified_at,
     )

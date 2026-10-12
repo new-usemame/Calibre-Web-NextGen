@@ -1060,6 +1060,7 @@ def _conditional_kosync_progress(
         "device_id": device_id,
         "timestamp": timestamp,
         "received_at": None,
+        "client_modified_at": None,
     }
     return device_positions.conditional_position_update(
         model=KOSyncProgress,
@@ -1074,6 +1075,7 @@ def _conditional_kosync_progress(
             "device_id": device_id,
             "timestamp": timestamp,
             "received_at": None,
+            "client_modified_at": None,
         },
         insert_values=payload,
         conflict_columns=(
@@ -2388,16 +2390,16 @@ def update_progress():
                         KOSyncProgress, dict(user_id=user.id, document=canonical_document),
                         dict(progress=current.progress, percentage=current.percentage,
                              device=current.device, device_id=current.device_id,
-                             timestamp=current.timestamp, received_at=current.received_at),
-                        client_column="timestamp", server_column="received_at",
+                             timestamp=current.timestamp, received_at=current.received_at,
+                             client_modified_at=current.client_modified_at),
+                        client_column="client_modified_at", server_column="timestamp",
                         candidate=kosync_place.shared_report(current))
-                event_at = report.client_at or report.server_at
                 shared_accepted = kosync_place.latest_write(
                     KOSyncProgress, dict(user_id=user.id, document=canonical_document),
                     dict(progress=stored_progress, percentage=proposed_percentage,
-                         device=device, device_id=device_id, timestamp=event_at,
-                         received_at=received_at),
-                    client_column="timestamp", server_column="received_at", candidate=report)
+                         device=device, device_id=device_id, timestamp=received_at,
+                         received_at=received_at, client_modified_at=report.client_at),
+                    client_column="client_modified_at", server_column="timestamp", candidate=report)
                 if shared_accepted:
                     # Retaining an older furthest checksum row would resurrect
                     # it on the next legacy GET after a checked backward move.
@@ -2411,7 +2413,7 @@ def update_progress():
                     # transaction. A later report must not commit its carrier
                     # and then have this report overwrite its Kobo mirror.
                     try:
-                        with ub.session.begin_nested():
+                        with ub.begin_contained_nested(ub.session):
                             update_book_read_status(user, book_id, proposed_percentage,
                                                     shared_accepted=True)
                     except Exception:
@@ -2421,8 +2423,7 @@ def update_progress():
             survived = (kosync_place.own_position(target.id, book_id) if private else
                         ub.session.query(KOSyncProgress).filter_by(
                             user_id=user.id, document=canonical_document).first())
-            timestamp = ((survived.client_modified_at or survived.server_modified_at)
-                         if private else survived.timestamp)
+            timestamp = survived.server_modified_at if private else survived.timestamp
             percentage_float = survived.progress_percent if private else survived.percentage
             response_data["timestamp"] = int(kosync_place.utc(timestamp).timestamp())
         else:

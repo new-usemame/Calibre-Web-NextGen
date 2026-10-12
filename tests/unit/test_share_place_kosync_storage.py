@@ -24,7 +24,8 @@ def enforce_share_place(monkeypatch):
 
 
 @pytest.mark.parametrize("cascade", [False, True])
-def test_receipt_clock_upgrade_preserves_legacy_rows_and_is_repeatable(cascade):
+@pytest.mark.parametrize("has_receipt", [False, True])
+def test_receipt_clock_upgrade_preserves_legacy_rows_and_is_repeatable(cascade, has_receipt):
     connection = sqlite3.connect(":memory:")
     connection.execute("CREATE TABLE user (id INTEGER PRIMARY KEY)")
     connection.execute("INSERT INTO user VALUES (1)")
@@ -34,12 +35,17 @@ def test_receipt_clock_upgrade_preserves_legacy_rows_and_is_repeatable(cascade):
                        "percentage REAL NOT NULL, device TEXT NOT NULL, device_id TEXT, timestamp TIMESTAMP"
                        + foreign_key + ")")
     connection.execute("INSERT INTO kosync_progress VALUES (7,1,'digest','page',40,'Kindle','raw','2026-09-01 12:00:00')")
-    models.ensure_kosync_progress_table(connection)
-    row = connection.execute("SELECT id, percentage, timestamp, received_at FROM kosync_progress").fetchone()
-    assert row == (7, 40, "2026-09-01 12:00:00", None)
+    if has_receipt:
+        connection.execute("ALTER TABLE kosync_progress ADD COLUMN received_at TIMESTAMP")
+        connection.execute("UPDATE kosync_progress SET received_at='2026-09-01 12:00:01'")
+    models.ensure_app_db_tables(connection)
+    row = connection.execute("SELECT id, percentage, timestamp, received_at, client_modified_at FROM kosync_progress").fetchone()
+    assert row == ((7, 40, "2026-09-01 12:00:01", "2026-09-01 12:00:01", "2026-09-01 12:00:00")
+                   if has_receipt else (7, 40, "2026-09-01 12:00:00", None, None))
     connection.execute("UPDATE kosync_progress SET received_at='2026-09-01 12:00:01'")
-    models.ensure_kosync_progress_table(connection)
+    models.ensure_app_db_tables(connection)
     assert connection.execute("SELECT received_at FROM kosync_progress").fetchone()[0] == "2026-09-01 12:00:01"
+    assert connection.execute("SELECT client_modified_at FROM kosync_progress").fetchone()[0] == row[4]
     connection.close()
 
 
@@ -72,8 +78,8 @@ def test_losing_first_insert_rejudges_the_concurrent_newer_report(tmp_path):
                 models.KOSyncProgress, dict(user_id=1, document="1"),
                 dict(progress="older" if older else "newer", percentage=80 if older else 20,
                      device="Kindle", device_id="a" if older else "b",
-                     timestamp=stamp, received_at=now),
-                client_column="timestamp", server_column="received_at",
+                     timestamp=now, received_at=now, client_modified_at=stamp),
+                client_column="client_modified_at", server_column="timestamp",
                 candidate=Report(stamp, now), session=session)
             session.commit()
             if not older:

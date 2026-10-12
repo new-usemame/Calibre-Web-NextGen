@@ -71,19 +71,26 @@ def request_device(user_id, body=None, *, observe=False):
 
 
 def latest_write(model, identity, values, *, client_column, server_column,
-                 candidate, present_column=None, session=None):
+                 candidate, present_column=None, fallback_server_column=None,
+                 session=None):
     """Apply one arbiter verdict atomically; rejudge only a concurrent winner.
 
     Clocks form the optimistic concurrency token. SQLite serializes the
     UPDATE/INSERT; if another writer won before it, its new clocks are read
     and judged instead of overwriting a newer report using an old verdict.
+    ``fallback_server_column`` is read as the receipt while
+    ``server_column`` is NULL (a row from before that column existed).
     """
     s = session if session is not None else ub.session
     table = model.__table__
     terms = [table.c[key] == value for key, value in identity.items()]
     while True:
         current = s.execute(select(table).where(*terms)).mappings().first()
-        clock = current[server_column] or current[client_column] if current is not None else None
+        clock = None
+        if current is not None:
+            clock = current[server_column] or (
+                current[fallback_server_column] if fallback_server_column
+                else None) or current[client_column]
         report = Report(current[client_column], clock) if clock is not None else None
         if current is not None and present_column is not None and current[present_column] is None:
             report = None
@@ -124,11 +131,15 @@ def journal(device_id, book_id, document, progress, percentage, report):
     if accepted:
         # Progress and explicit status are independent observations. A delayed
         # page turn can be the newest position but older than a status choice.
+        # Spec section 13: the status observation is (raw client clock, its
+        # own receipt), so a same-second tie goes to the later receipt.
         latest_write(ub.DeviceReadingPosition, identity,
                      dict(reading_status=read_status_for_percentage(percentage),
-                          status_modified_at=report.client_at or report.server_at),
-                     client_column="status_modified_at", server_column="status_modified_at",
-                     candidate=report)
+                          status_modified_at=report.client_at,
+                          status_received_at=report.server_at),
+                     client_column="status_modified_at", server_column="status_received_at",
+                     fallback_server_column="server_modified_at",
+                     present_column="reading_status", candidate=report)
     return accepted
 
 

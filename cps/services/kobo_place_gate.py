@@ -100,21 +100,22 @@ def _journal_report(row):
     return Report(clock, row.server_modified_at)
 
 
-# Each journal observation (place, status) stores its own ordering key: the
-# effective clock its report was ordered by (the client clock, or the receipt
-# when the clock is missing or too fast). The key is final when written, so
-# writing one observation never re-times the other; the row's receipt is
-# only the compare-and-swap guard.
-
-def _observation(key):
-    return None if key is None else Report(key, key)
-
+# Spec section 13: each journal observation (place, status) is ordered by
+# PR 1's Report(raw client clock, that observation's own receipt), built at
+# read time so report_wins applies the skew clamp and the receipt tiebreak.
+# Nothing normalized is stored, so rows the switch-off path wrote (raw
+# clocks) read the same way. Writing one observation never touches the
+# other's pair.
 
 def _journal_place_report(row):
     """The place observation a journal row holds, or None if it holds none."""
     if row is None or (row.progress_percent is None and not row.location_value):
         return None
-    return _observation(row.client_modified_at)
+    return Report(row.client_modified_at, row.server_modified_at)
+
+
+def _status_receipt(row):
+    return row.status_received_at or row.server_modified_at
 
 
 def _journal_status_report(row):
@@ -122,7 +123,11 @@ def _journal_status_report(row):
     if row is None or (row.reading_status is None
                        and row.status_modified_at is None):
         return None
-    return _observation(row.status_modified_at)
+    return Report(row.status_modified_at, _status_receipt(row))
+
+
+def _same(column, value):
+    return column.is_(None) if value is None else column == value
 
 
 def _latest(*clocks):
@@ -136,9 +141,9 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
 
     ``place`` is a dict of the DeviceReadingPosition place columns, or None
     when the report carried no bookmark. Place and status are separate
-    observations, each arbitrated against the row's own clock for it: a
-    report can carry the newest place and an older status, and only the
-    fields that won are written. A report where nothing wins changes
+    observations, each arbitrated by its own (raw clock, own receipt) pair:
+    a report can carry the newest place and an older status, and only the
+    fields and pair that won are written, guarded by that pair. A report where nothing wins changes
     nothing. ``rehydrate_needed`` is never touched.
     """
     s = session if session is not None else ub.session
@@ -160,23 +165,29 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
             candidate, _journal_status_report(row))
         if not (place_wins or status_wins):
             return JournalOutcome(False, pending)
-        key = effective_clock(client_at, received_at)
-        values = {"server_modified_at": received_at}
+        values, guard = {}, []
         if place_wins:
-            values["client_modified_at"] = key
-            values.update(place)
+            values.update(place, client_modified_at=client_at,
+                          server_modified_at=received_at)
+            if row is not None:
+                guard += [_same(table.c.client_modified_at, row.client_modified_at),
+                          _same(table.c.server_modified_at, row.server_modified_at)]
         if status_wins:
-            values["reading_status"] = status
-            values["status_modified_at"] = key
+            values.update(reading_status=status, status_modified_at=client_at,
+                          status_received_at=received_at)
+            if row is not None:
+                guard += [_same(table.c.status_modified_at, row.status_modified_at),
+                          _same(table.c.status_received_at, row.status_received_at)]
         if row is None:
+            # The row's receipt column is required; a status-only first
+            # report leaves the place empty, so it orders nothing.
+            values.setdefault("server_modified_at", received_at)
             result = s.execute(sqlite_insert(table).values(
                 device_id=device_id, book_id=book_id, **values,
             ).on_conflict_do_nothing(index_elements=["device_id", "book_id"]))
         else:
             result = s.execute(update(table).where(
-                table.c.id == row.id,
-                table.c.server_modified_at == row.server_modified_at,
-            ).values(**values))
+                table.c.id == row.id, *guard).values(**values))
         if result.rowcount == 1:
             return JournalOutcome(True, pending, place_wins)
     return JournalOutcome(False, pending)
@@ -204,10 +215,13 @@ def journal_state_response(book, row):
     from ..kobo import _clean_progress, get_read_status_for_kobo
     report = _journal_report(row)
     if report is None:
-        clock = status_clock = None
+        clock = status_clock = place_clock = None
     else:
-        clock = _latest(row.client_modified_at, row.status_modified_at)
-        status_clock = row.status_modified_at
+        place_clock = row.client_modified_at or (
+            row.server_modified_at if _journal_place_report(row) else None)
+        status_clock = row.status_modified_at or (
+            _status_receipt(row) if _journal_status_report(row) else None)
+        clock = _latest(place_clock, status_clock)
     response = {
         "EntitlementId": book.uuid,
         "Created": _kobo_ts(book.timestamp),
@@ -225,7 +239,7 @@ def journal_state_response(book, row):
     }
     if report is not None and (row.progress_percent is not None
                                or row.location_value):
-        mark = {"LastModified": _kobo_ts(row.client_modified_at or clock)}
+        mark = {"LastModified": _kobo_ts(place_clock)}
         if row.progress_percent is not None:
             mark["ProgressPercent"] = _clean_progress(row.progress_percent)
         if row.content_source_progress_percent is not None:
@@ -298,9 +312,6 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
                 and row.progress_percent is not None
                 and row.progress_percent > progress_percent):
             return SharedWriteOutcome(False, row.progress_percent, row.last_modified)
-        if row.kobo_reading_state_id is not None:
-            _settle_legacy_future_clocks(
-                row.kobo_reading_state_id, row.server_modified_at, session=s)
         clock = effective_clock(client_at, received_at)
         values = {"last_modified": clock, "server_modified_at": received_at}
         if progress_percent is not None:
@@ -326,6 +337,10 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
         if result.rowcount != 1:
             continue
         if row.kobo_reading_state_id is not None:
+            # Only now that this write moved the receipt: a lost CAS or
+            # exhausted retries leave the legacy child clocks untouched.
+            _settle_legacy_future_clocks(
+                row.kobo_reading_state_id, row.server_modified_at, session=s)
             advance_feed_clock(row.kobo_reading_state_id, clock, session=s)
         stored = progress_percent if progress_percent is not None else row.progress_percent
         return SharedWriteOutcome(True, stored, clock)
@@ -355,8 +370,8 @@ def advance_feed_clock(reading_state_id, clock, *, session):
 
 def _settle_legacy_future_clocks(reading_state_id, baseline, *, session):
     """Freeze legacy future-dated shared status and statistics clocks at the
-    baseline they are ordered by, just before the bookmark receipt (that
-    baseline) moves.
+    baseline they are ordered by (the bookmark receipt captured before this
+    write), once this write's compare-and-swap has moved that receipt.
 
     A legacy fast device can have left them further in the future than any
     honest clock; until replaced they are ordered at the shared bookmark's

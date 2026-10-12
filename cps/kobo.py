@@ -4904,8 +4904,8 @@ def get_or_create_reading_state(book_id):
 
 
 def _create_reading_state_holding_nothing(book_id):
-    """get_or_create_reading_state for a checked Kobo (Share my place
-    enforced). Rows created here hold no report yet, so every clock on them
+    """Create the reading-state graph before a Kobo's first report.
+    Rows created here hold no report yet, so every clock on them
     is the epoch, never the server's current time: stamped "now" they would
     outrank the device's own first report, which always trails the server.
     Children are Core inserts so the ORM hook cannot stamp the empty parent

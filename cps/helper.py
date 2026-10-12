@@ -3643,7 +3643,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         # annotation GET that follows is answered from CWNG's own rows.
         try:
             from flask import g
-            from .services.kobo_post_download_restore import record_download, confirm_download
+            from .services.kobo_post_download_restore import record_download, completed_download_body
             download = record_download(
                 device_id=getattr(g, "annotation_origin_device_id", None),
                 book_id=book.id, book_format=book_format, log=log,
@@ -3726,13 +3726,22 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         book, book_format, client, data1, headers,
         cover_user_id=cover_user_id,
     )
-    if download_proof and response.status_code in (200, 206):
+    from flask import current_app, request
+    if (download_proof and request.method == "GET"
+            and "Range" not in request.headers and response.status_code == 200):
         try:
-            confirm_download(download_id=download_proof[0],
-                             downloaded_at=download_proof[1],
-                             file_identity=download_proof[2], book=book, log=log)
+            from .services.kobo_place_gate import _book_paths
+            _epub, kepub_path = _book_paths(book)
+            # Streaming runs after Flask has popped the request context. Keep
+            # only scalar proof inputs, the app, and the thread-safe DB bind.
+            response.response = completed_download_body(
+                response.response, application=current_app._get_current_object(),
+                bind=ub.session.get_bind(), download_id=download_proof[0],
+                downloaded_at=download_proof[1], file_identity=download_proof[2],
+                kepub_path=kepub_path, log=log,
+            )
         except Exception:
-            log.warning("Kobo download proof confirmation failed for book %s",
+            log.warning("Could not track Kobo download completion for book %s",
                         book.id, exc_info=True)
     return response
 

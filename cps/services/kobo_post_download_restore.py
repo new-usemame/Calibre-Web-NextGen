@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
+from werkzeug.wsgi import ClosingIterator
 
 from cps import ub
 
@@ -139,7 +141,7 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
     """Upsert the restore row after a download, or stage it before a response.
 
     The route stages annotation restoration at its historical point, then
-    confirms file proof only after successfully preparing the file response.
+    confirms file proof only after a full GET body has streamed to the end.
     Direct callers record a completed download by default.
     """
     if book_id is None:
@@ -205,35 +207,60 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
         return None
 
 
-def confirm_download(*, download_id, downloaded_at, file_identity, book, log):
+def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
+                     session, log):
     """Confirm this attempt's file proof without changing annotation restore.
 
-    A failed response never reaches this seam. A replacement file, another
+    A failed or incomplete stream never reaches this seam. A replacement file, another
     download, or a restore announcement racing the response cannot inherit
     the earlier attempt's identity. No content/hash work runs on the request.
     """
     if not file_identity:
         return False
-    from .kobo_place_gate import _book_paths, _readable_kepub_identity
-    _epub, path = _book_paths(book)
-    if file_identity != _readable_kepub_identity(path):
+    from .kobo_place_gate import _readable_kepub_identity
+    if file_identity != _readable_kepub_identity(kepub_path):
         return False
     table = ub.KoboDeviceBookDownload.__table__
     try:
-        result = ub.session.execute(update(table).where(
+        result = session.execute(update(table).where(
             table.c.id == download_id,
             table.c.downloaded_at == downloaded_at,
             table.c.kepub_file_identity == file_identity,
             table.c.completed_at.is_(None),
             table.c.restore_state != RESTORE_ARMED,
         ).values(completed_at=_now()))
-        ub.session.commit()
+        session.commit()
         return result.rowcount == 1
     except SQLAlchemyError:
-        ub.session.rollback()
-        log.warning("Could not confirm Kobo file download proof for book %s",
-                    book.id, exc_info=True)
+        session.rollback()
+        log.warning("Could not confirm Kobo file download proof for attempt %s",
+                    download_id, exc_info=True)
         return False
+
+
+def completed_download_body(body, *, application, bind, download_id,
+                            downloaded_at, file_identity, kepub_path, log):
+    """Confirm a full GET only on natural exhaustion, never on close.
+
+    No context or session is held while yielding bytes. The independent
+    session opened at exhaustion cannot commit another request's work.
+    ClosingIterator closes the underlying file even if streaming never starts.
+    """
+    def stream():
+        for chunk in body:
+            yield chunk
+        try:
+            with application.app_context(), sessionmaker(bind=bind)() as owned:
+                confirm_download(download_id=download_id, downloaded_at=downloaded_at,
+                                 file_identity=file_identity, kepub_path=kepub_path,
+                                 session=owned, log=log)
+        except Exception:
+            # Proof is best effort; a persistence failure must not fail a body
+            # already delivered. The owned session is rolled back and closed.
+            log.warning("Kobo download completion failed for attempt %s",
+                        download_id, exc_info=True)
+
+    return ClosingIterator(stream(), getattr(body, "close", None))
 
 
 def pending_download(*, device_id, book_id):

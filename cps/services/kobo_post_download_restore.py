@@ -239,16 +239,26 @@ def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
 
 
 def completed_download_body(body, *, application, bind, download_id,
-                            downloaded_at, file_identity, kepub_path, log):
-    """Confirm a full GET only on natural exhaustion, never on close.
+                            downloaded_at, file_identity, kepub_path, headers, log):
+    """Confirm only natural exhaustion matching the declared byte count.
 
     No context or session is held while yielding bytes. The independent
     session opened at exhaustion cannot commit another request's work.
     ClosingIterator closes the underlying file even if streaming never starts.
     """
+    content_length = headers.get("Content-Length", type=int)
+    if (content_length is None or content_length < 0
+            or "X-Sendfile" in headers or "X-Accel-Redirect" in headers):
+        # Delegated transfers and lengthless streams cannot prove a full file.
+        return body
+
     def stream():
+        yielded = 0
         for chunk in body:
+            yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
             yield chunk
+        if yielded != content_length:
+            return
         try:
             with application.app_context(), sessionmaker(bind=bind)() as owned:
                 confirm_download(download_id=download_id, downloaded_at=downloaded_at,

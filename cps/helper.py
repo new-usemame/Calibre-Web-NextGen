@@ -3738,7 +3738,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 response.response, application=current_app._get_current_object(),
                 bind=ub.session.get_bind(), download_id=download_proof[0],
                 downloaded_at=download_proof[1], file_identity=download_proof[2],
-                kepub_path=kepub_path, log=log,
+                kepub_path=kepub_path, headers=response.headers, log=log,
             )
         except Exception:
             log.warning("Could not track Kobo download completion for book %s",

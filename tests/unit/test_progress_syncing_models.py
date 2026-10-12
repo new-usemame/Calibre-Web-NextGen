@@ -168,7 +168,7 @@ class TestEnsureKosyncProgressTable:
 
         cursor = conn.execute("PRAGMA table_info(kosync_progress)")
         columns = {row[1] for row in cursor.fetchall()}
-        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp', 'received_at', 'client_modified_at'}
+        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp', 'client_modified_at'}
 
     def test_creates_indexes(self, tmp_path):
         db = tmp_path / "test.db"
@@ -188,9 +188,9 @@ class TestEnsureKosyncProgressTable:
         conn.execute("CREATE TABLE user (id INTEGER PRIMARY KEY)")
         conn.execute("INSERT INTO user VALUES (1)")
         conn.execute("INSERT INTO kosync_progress "
-                     "(user_id, document, progress, percentage, device, timestamp, received_at, client_modified_at) "
+                     "(user_id, document, progress, percentage, device, timestamp, client_modified_at) "
                      "VALUES (1, 'digest', 'page', 40, 'Kindle', "
-                     "'2026-09-01 12:00:01', '2026-09-01 12:00:01', '2026-09-01 12:00:00')")
+                     "'2026-09-01 12:00:01', '2026-09-01 12:00:00')")
         before = conn.execute("SELECT * FROM kosync_progress").fetchall()
         schema_before = conn.execute("PRAGMA table_info(kosync_progress)").fetchall()
         indexes_before = conn.execute("PRAGMA index_list(kosync_progress)").fetchall()
@@ -198,7 +198,7 @@ class TestEnsureKosyncProgressTable:
 
         cursor = conn.execute("PRAGMA table_info(kosync_progress)")
         columns = {row[1] for row in cursor.fetchall()}
-        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp', 'received_at', 'client_modified_at'}
+        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp', 'client_modified_at'}
         assert conn.execute("SELECT * FROM kosync_progress").fetchall() == before
         assert conn.execute("PRAGMA table_info(kosync_progress)").fetchall() == schema_before
         assert conn.execute("PRAGMA index_list(kosync_progress)").fetchall() == indexes_before

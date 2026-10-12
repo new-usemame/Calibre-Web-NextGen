@@ -1059,7 +1059,6 @@ def _conditional_kosync_progress(
         "device": device,
         "device_id": device_id,
         "timestamp": timestamp,
-        "received_at": None,
         "client_modified_at": None,
     }
     return device_positions.conditional_position_update(
@@ -1074,7 +1073,6 @@ def _conditional_kosync_progress(
             "device": device,
             "device_id": device_id,
             "timestamp": timestamp,
-            "received_at": None,
             "client_modified_at": None,
         },
         insert_values=payload,
@@ -2377,6 +2375,7 @@ def update_progress():
         proposed_percentage = percentage_float
         shared_accepted = False
         if gated:
+            user_id = user.id
             device_id = raw_id
             device = request.headers.get("X-CWNG-Device-Name") or device
             report = Report(kosync_place.client_clock(data.get("timestamp"), received_at), received_at)
@@ -2390,7 +2389,7 @@ def update_progress():
                         KOSyncProgress, dict(user_id=user.id, document=canonical_document),
                         dict(progress=current.progress, percentage=current.percentage,
                              device=current.device, device_id=current.device_id,
-                             timestamp=current.timestamp, received_at=current.received_at,
+                             timestamp=current.timestamp,
                              client_modified_at=current.client_modified_at),
                         client_column="client_modified_at", server_column="timestamp",
                         candidate=kosync_place.shared_report(current))
@@ -2398,7 +2397,7 @@ def update_progress():
                     KOSyncProgress, dict(user_id=user.id, document=canonical_document),
                     dict(progress=stored_progress, percentage=proposed_percentage,
                          device=device, device_id=device_id, timestamp=received_at,
-                         received_at=received_at, client_modified_at=report.client_at),
+                         client_modified_at=report.client_at),
                     client_column="client_modified_at", server_column="timestamp", candidate=report)
                 if shared_accepted:
                     # Retaining an older furthest checksum row would resurrect
@@ -2419,7 +2418,15 @@ def update_progress():
                     except Exception:
                         log.warning("Could not mirror accepted shared place for book %s",
                                     book_id, exc_info=True)
-            ub.session.commit()
+            try:
+                ub.session.commit()
+            except SQLAlchemyError as e:
+                ub.session.rollback()
+                log.error(
+                    "Failed to commit kosync_progress for user=%s document=%s: %s",
+                    user_id, canonical_document, e,
+                )
+                raise KOSyncError(ERROR_INTERNAL, "Failed to save sync progress")
             survived = (kosync_place.own_position(target.id, book_id) if private else
                         ub.session.query(KOSyncProgress).filter_by(
                             user_id=user.id, document=canonical_document).first())

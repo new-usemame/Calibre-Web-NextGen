@@ -137,7 +137,7 @@ def position_report(row):
 
 
 def shared_report(row):
-    return Report(row.client_modified_at, row.received_at or row.timestamp)
+    return Report(row.client_modified_at, row.timestamp)
 
 
 def own_record(device, row, raw_id, document):

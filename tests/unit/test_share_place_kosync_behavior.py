@@ -20,6 +20,46 @@ def enforce_share_place(monkeypatch):
     monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "1")
 
 
+@pytest.mark.parametrize("private", [False, True])
+def test_gated_commit_failure_returns_sync_error_and_recovers_session(world, monkeypatch, private):
+    """A failed shared/private save rolls back and allows the next HTTP push."""
+    device = _register(world, "kindle-a", "Kindle A")
+    _share(world, device, not private)
+    _put(world, 30, device_id="kindle-a", name="Kindle A")
+    before = _account_state(world)
+    commit = world.session.commit
+    failed = False
+
+    def fail_once():
+        nonlocal failed
+        if not failed:
+            failed = True
+            # The real UNIQUE violation puts the session into failed-flush
+            # state; raising a mocked exception would not test recovery.
+            world.session.add(ub.User(name="reader"))
+        commit()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(world.session, "commit", fail_once)
+        response = world.client.put("/kosync/syncs/progress", json={
+            "document": OTHER_DIGEST, "progress": "12", "percentage": .60,
+            "device": "Kindle A", "device_id": "kindle-a",
+        }, headers=_headers("kindle-a", "Kindle A"))
+
+    assert failed, "the gated save never reached the failing commit"
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": world.kosync.ERROR_INTERNAL, "message": "Failed to save sync progress",
+    }
+    # Queries must work without a test-side rollback, and the failed report
+    # must not replace either the private journal or the account carrier.
+    assert world.session.query(ub.User).filter_by(name="reader").count() == 1
+    assert _journal(world, device).progress_percent == 30
+    assert _account_state(world) == before
+    _put(world, 45, device_id="kindle-a", name="Kindle A")
+    assert _get(world, device_id="kindle-a", name="Kindle A").get_json()["percentage"] == pytest.approx(.45)
+
+
 @pytest.mark.parametrize("fast_by", [180, 86400])
 def test_checked_fast_clock_does_not_poison_a_stock_push(world, fast_by):
     device = _register(world, "kindle-a", "Kindle A")

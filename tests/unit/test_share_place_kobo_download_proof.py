@@ -80,7 +80,7 @@ def _bookmark(sw):
     return sw.get(sw.checked).get("CurrentBookmark") or {}
 
 
-def _download(monkeypatch, sw, method="GET", headers=None, broken=False):
+def _download(monkeypatch, sw, method="GET", headers=None, broken=False, serve=None):
     """The Kobo's download request through the real route; returns the
     response the view handed to the server, body not yet read."""
     from cps import helper
@@ -97,7 +97,9 @@ def _download(monkeypatch, sw, method="GET", headers=None, broken=False):
     monkeypatch.setattr(helper, "get_valid_filename", lambda name, **_k: name)
     monkeypatch.setattr(helper, "CWA_DB", lambda: type(
         "C", (), {"log_activity": lambda *_a, **_k: None})())
-    if broken:
+    if serve is not None:
+        do_download = serve
+    elif broken:
         def do_download(*_a, **_k):
             def body():
                 yield b"first chunk"
@@ -186,3 +188,90 @@ def test_a_full_download_read_to_the_end_delivers_the_exact_span(monkeypatch, st
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
     assert location_of(bookmark) == sw.exact
     assert sw.synced_location(sw.checked) == sw.exact
+
+
+# == Byte count: proof needs the declared length actually yielded ============
+
+def test_an_x_sendfile_download_does_not_prove_the_current_kepub(monkeypatch, stale_kobo):
+    """With X-Sendfile the app yields no bytes; the front server sends the
+    file later, or not at all. Nothing CWNG saw proves the Kobo got it."""
+    sw = stale_kobo
+    monkeypatch.setitem(sw.app.config, "USE_X_SENDFILE", True)
+    response = _download(monkeypatch, sw)
+    assert response.status_code == 200
+    assert response.headers.get("X-Sendfile")
+    sent, error = _drain(response)
+    assert error is None and sent == b""
+
+    bookmark = _bookmark(sw)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == sw.own
+
+
+class _ShortDrive:
+    """A Google Drive file whose second ranged chunk fails: the real
+    ``do_gdrive_download`` logs it and ends the stream normally."""
+
+    def __init__(self, path):
+        with open(path, "rb") as handle:
+            self.data = handle.read()
+        assert len(self.data) > 64 * 1024  # at least two chunks
+        self.metadata = {"fileSize": str(len(self.data)), "downloadUrl": "https://drive.test/f"}
+        self.auth = self
+
+    def Get_Http_Object(self):
+        return self
+
+    def request(self, _url, headers):
+        first, last = (int(n) for n in headers["Range"][len("bytes="):].split("-"))
+        if first == 0:
+            return type("R", (), {"status": 206})(), self.data[first:last + 1]
+        return type("R", (), {"status": 500})(), b""
+
+
+def test_a_google_drive_stream_that_ends_short_does_not_prove_the_current_kepub(
+        monkeypatch, stale_kobo):
+    from cps import gdriveutils
+    sw = stale_kobo
+    # Drive chunks are 1 MiB; the fixture KEPUB is smaller, so cut them to
+    # 64 KiB to give the real generator a second chunk to fail on.
+    whole_chunks = gdriveutils.partial
+    monkeypatch.setattr(gdriveutils, "partial",
+                        lambda total, _limit: whole_chunks(total, 64 * 1024))
+    drive = _ShortDrive(sw.kepub)
+
+    def serve(_book, _format, _client, _data, headers, **_k):
+        return gdriveutils.do_gdrive_download(drive, headers)
+
+    response = _download(monkeypatch, sw, serve=serve)
+    assert response.status_code == 200
+    sent, error = _drain(response)
+    assert error is None and 0 < len(sent) < len(drive.data)
+
+    bookmark = _bookmark(sw)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == sw.own
+
+
+def test_a_stream_shorter_than_its_content_length_does_not_prove_the_current_kepub(
+        monkeypatch, stale_kobo):
+    """The byte-count clause on its own: Content-Length is declared and the
+    body ends normally, early."""
+    sw = stale_kobo
+    with open(sw.kepub, "rb") as handle:
+        whole = handle.read()
+
+    def serve(*_a, **_k):
+        def body():
+            yield whole[:1000]
+        return Response(body(), status=200,
+                        headers={"Content-Length": str(len(whole))})
+
+    response = _download(monkeypatch, sw, serve=serve)
+    assert response.status_code == 200
+    sent, error = _drain(response)
+    assert error is None and len(sent) == 1000
+
+    bookmark = _bookmark(sw)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == sw.own

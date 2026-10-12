@@ -1525,6 +1525,9 @@ class KoboSharePlaceNudge(Base):
     __table_args__ = (
         UniqueConstraint('device_id', 'book_id',
                          name='uq_kobo_share_place_nudge_device_book'),
+        # Ids are never reused, so acknowledging an old page cannot delete a
+        # nudge armed after it (the page names the ids it carried).
+        {'sqlite_autoincrement': True},
     )
 
 
@@ -4573,25 +4576,36 @@ def migrate_device_share_place(engine, _session):
 def migrate_kobo_bookmark_receipt(engine, _session):
     """Add the shared Kobo bookmark's receipt clock and the turn-on nudges.
 
-    Additive and idempotent. Existing bookmarks get a receipt once, when the
-    column is added: the stored clock capped at the upgrade instant, since no
-    report can have been received after the upgrade began. A device clock
-    that ran ahead therefore stops outranking honest reports from then on.
+    Additive, idempotent and resumable. Every writer stamps a receipt, so a
+    NULL receipt only ever means a row from before the column existed; each
+    startup gives those rows their stored clock capped at that startup's
+    instant (no report can have been received later), and leaves every
+    receipt already written alone. A startup interrupted after ADD COLUMN is
+    therefore completed by the next one. The nudge table is created with
+    IF NOT EXISTS so two workers migrating at once both succeed.
     """
-    added = _add_column_if_missing(
+    _add_column_if_missing(
         engine, "kobo_bookmark", "server_modified_at",
         "server_modified_at DATETIME")
-    Base.metadata.create_all(
-        engine, tables=[KoboSharePlaceNudge.__table__], checkfirst=True)
-    if added:
-        upgrade_at = datetime.now(timezone.utc).replace(tzinfo=None).strftime(
-            "%Y-%m-%d %H:%M:%S.%f")
-        with engine.begin() as conn:
-            conn.execute(text(
-                "UPDATE kobo_bookmark SET server_modified_at = CASE "
-                "WHEN last_modified IS NULL OR last_modified > :at THEN :at "
-                "ELSE last_modified END WHERE server_modified_at IS NULL"
-            ), {"at": upgrade_at})
+    _run_ddl_with_retry(engine, (
+        "CREATE TABLE IF NOT EXISTS kobo_share_place_nudge ("
+        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "
+        "device_id INTEGER NOT NULL REFERENCES device (id) ON DELETE CASCADE, "
+        "book_id INTEGER NOT NULL, "
+        "armed_at DATETIME NOT NULL, "
+        "CONSTRAINT uq_kobo_share_place_nudge_device_book "
+        "UNIQUE (device_id, book_id))"))
+    columns = _table_columns(engine, "kobo_bookmark")
+    if not columns or "server_modified_at" not in columns:
+        return
+    startup_at = datetime.now(timezone.utc).replace(tzinfo=None).strftime(
+        "%Y-%m-%d %H:%M:%S.%f")
+    # ``startup_at`` is formatted here from the clock, never from input.
+    _run_ddl_with_retry(engine, (
+        "UPDATE kobo_bookmark SET server_modified_at = CASE "
+        f"WHEN last_modified IS NULL OR last_modified > '{startup_at}' "
+        f"THEN '{startup_at}' ELSE last_modified END "
+        "WHERE server_modified_at IS NULL"))
 
 
 def migrate_kobo_annotation_seed_pipeline(engine, _session):

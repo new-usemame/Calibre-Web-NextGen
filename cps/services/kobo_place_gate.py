@@ -33,6 +33,13 @@ EPOCH = datetime(1970, 1, 1)
 
 _CAS_ATTEMPTS = 3
 
+# How far past the server's clock a stored clock may sit and still be one a
+# device could honestly have sent (place_arbiter's skew allowance).
+SKEW = timedelta(minutes=5)
+
+# The smallest step that survives the sync token's float-seconds round trip.
+FEED_STEP = timedelta(milliseconds=1)
+
 
 def _now():
     return datetime.now(timezone.utc)
@@ -115,9 +122,13 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
         if not report_wins(Report(client_at, received_at), _journal_report(row)):
             return JournalOutcome(False, pending)
         values = {"server_modified_at": received_at}
-        if client_at is not None:
-            values["client_modified_at"] = client_at
         if place is not None:
+            # The place keeps the clock its report was ordered by: one with
+            # no clock is ordered at its receipt, never at the clock an
+            # earlier report left behind. A status-only report leaves the
+            # place and its clock alone.
+            values["client_modified_at"] = (
+                client_at if client_at is not None else received_at)
             values.update(place)
         if status_supplied:
             values["reading_status"] = status
@@ -277,18 +288,67 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
         if result.rowcount != 1:
             continue
         if row.kobo_reading_state_id is not None:
-            state = ub.KoboReadingState
-            monotonic = case(
-                (or_(state.last_modified.is_(None), state.last_modified < clock),
-                 clock),
-                else_=state.last_modified,
-            )
-            s.execute(update(state.__table__).where(
-                state.id == row.kobo_reading_state_id,
-            ).values(last_modified=monotonic, priority_timestamp=monotonic))
+            advance_feed_clock(row.kobo_reading_state_id, clock, session=s)
         stored = progress_percent if progress_percent is not None else row.progress_percent
         return SharedWriteOutcome(True, stored, clock)
     return SharedWriteOutcome(False, None)
+
+
+def advance_feed_clock(reading_state_id, clock, *, session):
+    """Move a KoboReadingState's feed clock for an accepted shared change.
+
+    The new clock is ``clock`` when that is later than the stored one, and
+    otherwise one step past the stored one: every accepted change must pass
+    the frontier a Kobo already holds, including a same-second receipt
+    tiebreak and a change below a legacy future-dated clock. Returns the
+    clock written (naive UTC).
+    """
+    state = ub.KoboReadingState
+    stored = session.execute(select(state.last_modified).where(
+        state.id == reading_state_id)).scalar()
+    target = _naive_utc(clock)
+    if stored is not None and _naive_utc(stored) >= target:
+        target = _naive_utc(stored) + FEED_STEP
+    session.execute(update(state.__table__).where(
+        state.id == reading_state_id,
+    ).values(last_modified=target, priority_timestamp=target))
+    return target
+
+
+def future_skewed(stored, now=None):
+    """True when a stored clock is further past the server's clock than any
+    honest device could be: such a clock cannot outrank a report."""
+    if stored is None:
+        return False
+    now = _naive_utc(now or _now())
+    return _naive_utc(stored) > now + SKEW
+
+
+def own_place_newer(device_id, book_id, *, session=None):
+    """True when this Kobo's own journal report is strictly newer than the
+    shared place: the shared state is then older than what the device holds
+    and must not be sent to it."""
+    s = session if session is not None else ub.session
+    journal = ub.DeviceReadingPosition.__table__
+    own = s.execute(select(journal).where(
+        journal.c.device_id == int(device_id),
+        journal.c.book_id == int(book_id),
+    )).first()
+    own_report = _journal_report(own)
+    if own_report is None:
+        return False
+    state, mark = ub.KoboReadingState, ub.KoboBookmark
+    shared = s.execute(
+        select(mark.progress_percent, mark.location_value, mark.last_modified,
+               mark.server_modified_at)
+        .join(state, mark.kobo_reading_state_id == state.id)
+        .join(ub.Device, ub.Device.user_id == state.user_id)
+        .where(ub.Device.id == int(device_id), state.book_id == int(book_id))
+    ).first()
+    shared_report = None if shared is None else shared_bookmark_report(
+        shared.progress_percent, shared.location_value, shared.last_modified,
+        shared.server_modified_at)
+    return shared_report is not None and report_wins(own_report, shared_report)
 
 
 # -- turning the box on -------------------------------------------------------

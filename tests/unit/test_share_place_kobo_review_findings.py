@@ -25,8 +25,9 @@ Spec: state/kindle-kids/specs/2026-10-11-share-my-place.md, sections 11 and
    is served its own Finished status.
 9. A report with no clock is not overwritten by an older-dated report that
    arrives after it.
-10. With the rollout switch off, "recently read" order changes only where the
-    first-report clock fix changes behaviour.
+10. "Recently read" ranks a Kobo update by when it arrived, with the rollout
+    switch off too, so neither an old nor a far-future device clock decides
+    its place.
 
 The Kobo routes run through the real handlers over the in-memory world of
 ``kobo_state_world``; the migrations run against file-backed SQLite.
@@ -44,7 +45,7 @@ from tests.unit.kobo_state_world import (  # noqa: F401  (fixtures)
     _kts, _now, _states, kw, read_column_class,
 )
 from tests.unit.test_library_recent_sort import (  # noqa: F401  (fixture)
-    _kobo_progress_put, _web_reader_save, library,
+    _koreader_sync, _kobo_progress_put, _web_reader_save, library,
 )
 
 pytestmark = pytest.mark.unit
@@ -464,12 +465,13 @@ def test_a_clockless_report_is_not_overwritten_by_an_older_dated_one(kw):
 
 # == 10. "Recently read" with the switch off ==================================
 
-def test_switch_off_a_kobo_update_keeps_its_device_clock_recency(
+def test_switch_off_a_kobo_update_ranks_by_when_it_arrived(
         library, monkeypatch):
     """Both books already have reading rows (no first report involved).
     Book 1's Kobo clock is months old; book 3 was just read on the web. A new
-    Kobo update for book 1 still carries an old clock, so book 3 stays first,
-    as it did before PR 3a."""
+    Kobo update for book 1 still carries an old clock, but it is the latest
+    reading received, so book 1 goes first: a Kobo ranks by receipt, as web
+    saves and KOReader syncs already do."""
     monkeypatch.delenv(GATES_ENV, raising=False)
     older = datetime(2026, 7, 1, tzinfo=timezone.utc)
     _kobo_progress_put(library, 1, 50, older)
@@ -478,4 +480,17 @@ def test_switch_off_a_kobo_update_keeps_its_device_clock_recency(
 
     _kobo_progress_put(library, 1, 60, older + timedelta(hours=1))
 
-    assert library.ids(user=library.reader) == [3, 1, 2, 4]
+    assert library.ids(user=library.reader) == [1, 3, 2, 4]
+
+
+def test_a_far_future_kobo_clock_does_not_pin_a_book_to_the_top(
+        library, monkeypatch):
+    """A Kobo whose clock reads 2030 reports book 1. Reading received after
+    it, on the web (book 3) and through KOReader (book 2), still goes ahead
+    of it: a device clock cannot hold a book above everything read later."""
+    _kobo_progress_put(library, 1, 40,
+                       datetime(2030, 1, 1, tzinfo=timezone.utc))
+    _web_reader_save(library, 3, percentage=30)
+    _koreader_sync(library, 2, 20.0, monkeypatch)
+
+    assert library.ids(user=library.reader) == [2, 3, 1, 4]

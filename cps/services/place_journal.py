@@ -126,4 +126,3 @@ def write_report(*, device_id, book_id, client_at, place=None,
         if result.rowcount == 1:
             return JournalWriteOutcome(True, place_wins, status_wins)
     return JournalWriteOutcome(False)
-

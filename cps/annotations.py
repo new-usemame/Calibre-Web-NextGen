@@ -940,6 +940,9 @@ def annotation_devices_list():
         if error_response is not None:
             return error_response, error_status
         limit, offset = pagination
+        from .services.device_registry import ensure_webreader_device_best_effort
+        from .services.share_place import gates_enforced
+        ensure_webreader_device_best_effort(user_id=current_user.id)
         devices, total = list_annotation_devices(
             user_id=current_user.id, session=ub.session, active_only=active_only,
             limit=limit, offset=offset, return_total=True,
@@ -950,6 +953,7 @@ def annotation_devices_list():
         return _database_error_response("device list")
     return jsonify({
         "devices": devices,
+        "share_place_gates": gates_enforced(int(current_user.id)),
         "limit": limit,
         "offset": offset,
         "total": total,

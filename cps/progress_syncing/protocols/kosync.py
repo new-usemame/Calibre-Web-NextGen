@@ -652,7 +652,9 @@ def _hold_feed_clock(reading_state_id, *, moved):
 
 def update_book_read_status(user, book_id: int, percentage: float, *,
                             shared_accepted=False, client_at=None,
-                            source_document=None, source_progress=None):
+                            source_document=None, source_progress=None,
+                            web_report=False, source_cfi=None, source_format="epub",
+                            report_received_at=None, web_status_accepted=True):
     """
     Update the user's ReadBook status based on reading progress percentage.
 
@@ -682,8 +684,12 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
     (``kobo_place_gate.write_shared_bookmark``), so a deliberate backward
     move reaches the Kobo bookmark as a percentage, a newer Kobo report is
     not overwritten, and the Kobo feed clock moves past every Kobo's
-    frontier. The bookmark's Location is left as it is (exact
-    span is PR 3b). Every other caller keeps the forward-only percentage.
+    frontier. KOReader locators and Browser EPUB CFIs can become exact spans
+    with 3b provenance. A Browser conversion failure clears any older exact
+    Location; every historical caller keeps the forward-only percentage.
+    Browser-derived status is separately clock-checked and only follows an
+    accepted own status and shared place. Reader-open status has no place and
+    uses the Browser gate directly.
 
     Note:
         Caller is responsible for committing the session.
@@ -708,6 +714,11 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
             read_status=ub.ReadBook.STATUS_UNREAD,
             times_started_reading=0,
         )
+        if web_report:
+            # Creation is not a status observation. The first web report must
+            # not lose to the default timestamp applied during this flush.
+            from sqlalchemy import null
+            book_read.last_modified = null()
         ub.session.add(book_read)
     reading_state = book_read.kobo_reading_state
     bookmark = (
@@ -724,11 +735,17 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
     ub.session.flush()
     if shared_accepted:
         from ...services.kobo_place_gate import write_shared_bookmark, koreader_span
-        location, identity = koreader_span(book_id, source_document, source_progress)
+        if web_report:
+            from ...services.reading_position import web_span
+            location, identity = web_span(book_id, source_cfi, source_format)
+        else:
+            location, identity = koreader_span(book_id, source_document, source_progress)
         outcome = write_shared_bookmark(
             bookmark.id, client_at=client_at, progress_percent=percentage,
-            location=location, location_supplied=location is not None,
+            location=location, location_supplied=web_report or location is not None,
+            content_source_supplied=web_report,
             shared_from_koreader=True, span_kepub_identity=identity,
+            received_at=report_received_at,
             session=ub.session,
         )
         ub.session.expire(bookmark)
@@ -752,6 +769,8 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
         )
         return device_positions.PositionWriteOutcome(False, None)
     accepted_percentage = outcome.percentage
+    if web_report and not outcome.accepted:
+        return outcome
     if outcome.accepted:
         # Completing a partial legacy graph is useful only for an accepted
         # write. A rejected equal/backward sample must not add Statistics or
@@ -760,9 +779,13 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
         _ensure_visible_reading_state(book_read, user_id, book_id)
     from ...services.reading_status import update_automatic_read_status
     new_status = read_status_for_percentage(accepted_percentage)
-    status_accepted = update_automatic_read_status(
-        book_read, new_status, touch_unchanged=outcome.accepted,
-    )
+    status_accepted = False
+    if not web_report or web_status_accepted:
+        status_accepted = update_automatic_read_status(
+            book_read, new_status, touch_unchanged=outcome.accepted,
+            observed_clock=client_at if web_report else None,
+            require_newer_clock=web_report,
+        )
 
     if not outcome.accepted:
         log.info(

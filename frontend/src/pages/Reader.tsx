@@ -1771,6 +1771,9 @@ export function Reader({ id }: { id: string }) {
         // or those layout events would stamp the local CFI newer than the hint.
         previewingRef.current = !!resume;
         let initialTarget = savedCfiRef.current || undefined;
+        if (initialTarget && resume?.mode === 'automatic' && resume.cfi) {
+          initialTarget = resume.cfi;
+        }
         if (!initialTarget && resume?.mode === 'automatic') {
           // A validated exact target remains usable even if indexing stalls.
           initialTarget = resume.cfi;

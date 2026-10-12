@@ -130,6 +130,7 @@ def save_bookmark(book_id):
                     percentage,
                     origin_device_id=g.annotation_origin_device_id,
                     cfi=bookmark_key,
+                    fmt=fmt,
                     # A named-source preview is a read-only inspection. When
                     # the reader chooses to continue there, create/update only
                     # the Browser source rather than rewriting device carriers.

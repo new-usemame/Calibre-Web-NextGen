@@ -36,7 +36,7 @@ function isDeviceStale(lastSeen: string | null): boolean {
 }
 
 /** The account Browser is stored as "Browser"; show it in the reader's language.
- *  With Share my place on, its row is named "Web reader" (spec 2026-10-11 criterion 14). */
+ *  Use the same name as its detail page and reading-source heading. */
 function sourceName(device: Device, t: TFunction, sharePlace = false): string {
   if (device.type !== 'webreader' || device.label !== 'Browser') return device.label;
   return sharePlace ? t('Web reader') : t('Browser');
@@ -248,7 +248,9 @@ export function Devices() {
                 {group === 'browsers'
                   ? <Globe size={18} aria-hidden="true" focusable={false} />
                   : <Smartphone size={18} aria-hidden="true" focusable={false} />}
-                {group === 'browsers' ? t('Browser reading source') : t('E-readers')}
+                {group === 'browsers'
+                  ? (sharePlaceGates ? t('Web reader') : t('Browser reading source'))
+                  : t('E-readers')}
               </h2>
               {group === 'browsers' && (
                 <p className={styles.sectionHint}>{t('All browsers and computers signed in to your account share one Browser reading source.')}</p>

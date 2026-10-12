@@ -5690,7 +5690,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Browse by Column"
-msgstr "Обзор по столбцам"
+msgstr "Просмотр по столбцам"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5703,7 +5703,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Browse this catalog"
-msgstr "Обзор этого каталога"
+msgstr "Просмотреть этот каталог"
 
 #: cps/spa_strings.py
 msgid "Browser"
@@ -5752,13 +5752,7 @@ msgid ""
 "limits. NZBGet needs credentials that can read configuration, queue and "
 "history. qBittorrent needs an existing category. Transmission uses the "
 "configured folder and label."
-msgstr ""
-"CWNG копирует загруженные книги, разрешённые этим подключением и настройками форматов сервера. Он не перемещает файлы, не удаляет задания клиента и не "
-"изменяет лимиты на раздачу (seeding). Для NZBGet требуются учётные данные, которые могут читать конфигурацию, очередь и историю. Для qBittorrent "
-"требуется существующая категория. Transmission использует настроенную папку и метку.CWNG копирует завершенные книги, разрешенные этим подключением и "
-"настройками форматов сервера. Он не перемещает файлы, не удаляет задания клиента и не изменяет ограничения на раздачу (seeding). NZBGet требуются "
-"учетные данные, которые могут читать конфигурацию, очередь и историю. qBittorrent требует существующую категорию. Transmission использует настроенную "
-"папку и метку."
+msgstr "CWNG копирует завершённые книги, разрешённые этим подключением и настройками форматов сервера. Он не перемещает файлы, не удаляет задания клиента и не изменяет лимиты на раздачу (seeding). Для NZBGet требуются учётные данные, которые могут читать конфигурацию, очередь и историю. Для qBittorrent требуется существующая категория. Transmission использует настроенную папку и метку."
 
 #: cps/spa_strings.py
 msgid "Can browse and request"
@@ -10733,7 +10727,7 @@ msgstr "Ваша библиотека"
 msgid ""
 "Your OPDS feed includes all visible shelves. Enable selected shelves only in "
 "your account settings to choose individual shelves."
-msgstr "Ваша лента OPDS включает все видимые полки. Включите опцию «Только выбранные полки» в настройках аккаунта, чтобы выбирать отдельные полки."
+msgstr "Ваша лента OPDS включает все видимые полки. Включите опцию «Показывать по OPDS только выбранные полки» в настройках аккаунта, чтобы выбирать отдельные полки."
 
 #: cps/spa_strings.py
 msgid ""

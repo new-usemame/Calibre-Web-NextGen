@@ -168,6 +168,25 @@ def _register_reader_font_upload_limiter(application):
     application.extensions[_READER_FONT_UPLOAD_LIMITER_MARKER] = True
 
 
+def _rollback_failed_app_session():
+    """Roll back the app.db session if a failed flush left it dirty.
+
+    A flush that fails (e.g. ``sqlite3.OperationalError: database is locked``)
+    leaves the shared ``ub.session`` in a PendingRollbackError state. Because
+    the session is never rolled back at request teardown, every later request
+    that touches it fails with PendingRollbackError (fork issue #2562). Roll
+    it back only when the current transaction has been deactivated by a failed
+    flush, so normal requests are untouched.
+    """
+    try:
+        if ub.session.in_transaction():
+            txn = ub.session.get_transaction()
+            if txn is not None and not txn.is_active:
+                ub.session.rollback()
+    except Exception:  # noqa: BLE001 - failure-only boundary
+        pass
+
+
 def _configure_base_app(application, runtime_config=None):
     """Install import-time Flask defaults exactly once on one app object."""
     application.config.update(
@@ -852,6 +871,9 @@ def create_app(config=None, services=None):
                 pass
         if calibre_db.session_factory:
             calibre_db.session_factory.remove()
+        # Roll back the app.db session if a failed flush left it in a
+        # PendingRollbackError state, so the next request starts clean (#2562).
+        _rollback_failed_app_session()
 
     if first_process_initialization:
         from .schedule import register_scheduled_tasks, register_startup_tasks

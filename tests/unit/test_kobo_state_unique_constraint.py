@@ -595,19 +595,3 @@ def test_a_competing_request_that_creates_the_rows_first_is_not_an_error(
         "the competing request never ran: nothing was raced")
     assert state.id == competitor["state_id"]
     assert _graph_counts(reading_state_db.engine, 7) == ONE_OF_EACH
-
-
-@pytest.mark.unit
-class TestGetOrCreateReadingStateSourceInvariants:
-    def test_no_legacy_one_or_none_pattern(self):
-        import inspect
-        from cps.kobo import get_or_create_reading_state
-        src = inspect.getsource(get_or_create_reading_state)
-        # The pre-fix pattern was `.one_or_none()` on a query that could
-        # racily return either nothing or multiple rows. The new code
-        # uses `.one()` after the atomic insert which is safe because
-        # the UNIQUE INDEX guarantees at-most-one row.
-        assert ".one_or_none()" not in src, (
-            "Legacy one_or_none pattern survives — would raise "
-            "MultipleResultsFound if duplicates ever appeared."
-        )

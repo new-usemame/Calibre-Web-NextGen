@@ -4763,7 +4763,7 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
                                  dict(progress=current.progress, percentage=current.percentage,
                                       device=current.device, device_id=current.device_id,
                                       client_modified_at=current.client_modified_at,
-                                      timestamp=current.timestamp),
+                                      timestamp=current.timestamp, web_cfi=current.web_cfi),
                                  client_column="client_modified_at", server_column="timestamp",
                                  candidate=kobo_place_gate.Report(
                                      current.client_modified_at, current.timestamp))
@@ -4771,6 +4771,7 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
                     KOSyncProgress, identity,
                     dict(progress=PERCENTAGE_ONLY_LOCATOR, percentage=percentage,
                          device=KOBO_DEVICE, device_id=None,
+                         web_cfi=None,
                          client_modified_at=report.client_at, timestamp=report.server_at),
                     client_column="client_modified_at", server_column="timestamp",
                     candidate=report)

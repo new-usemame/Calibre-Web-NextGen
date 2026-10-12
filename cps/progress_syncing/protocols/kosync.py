@@ -926,7 +926,7 @@ def get_progress_record(user_id, document_checksum, book_id,
 
 def record_percentage_only_progress(user_id, book_id, percentage: float,
                                     device: str, device_id=None,
-                                    _return_outcome=False):
+                                    _return_outcome=False, web_cfi=None):
     """Publish a percentage-only reading position onto the carrier KOReader reads.
 
     KOReader pulls from ``KOSyncProgress``; until now the only writer was
@@ -960,6 +960,7 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
         device_id=device_id,
         timestamp=now,
         equal_accepts=False,
+        web_cfi=web_cfi if device == WEB_READER_DEVICE else None,
     )
     if not outcome.accepted:
         log.debug(
@@ -1114,7 +1115,7 @@ def _journal_koreader_report(user_id, internal_device_id, book_id, document,
 
 def _conditional_kosync_progress(
     *, user_id, document, progress, percentage, device, device_id, timestamp,
-    equal_accepts, same_device_rewind=False,
+    equal_accepts, same_device_rewind=False, web_cfi=None,
 ):
     """Run the shared SQL arbiter for the KOReader position carrier."""
     document = str(document)
@@ -1126,6 +1127,7 @@ def _conditional_kosync_progress(
         "device_id": device_id,
         "timestamp": timestamp,
         "client_modified_at": None,
+        "web_cfi": web_cfi,
     }
     return device_positions.conditional_position_update(
         model=KOSyncProgress,
@@ -1140,6 +1142,7 @@ def _conditional_kosync_progress(
             "device_id": device_id,
             "timestamp": timestamp,
             "client_modified_at": None,
+            "web_cfi": web_cfi,
         },
         insert_values=payload,
         conflict_columns=(
@@ -2456,13 +2459,15 @@ def update_progress():
                         dict(progress=current.progress, percentage=current.percentage,
                              device=current.device, device_id=current.device_id,
                              timestamp=current.timestamp,
-                             client_modified_at=current.client_modified_at),
+                             client_modified_at=current.client_modified_at,
+                             web_cfi=current.web_cfi),
                         client_column="client_modified_at", server_column="timestamp",
                         candidate=kosync_place.shared_report(current))
                 shared_accepted = kosync_place.latest_write(
                     KOSyncProgress, dict(user_id=user.id, document=canonical_document),
                     dict(progress=stored_progress, percentage=proposed_percentage,
                          device=device, device_id=device_id, timestamp=received_at,
+                         web_cfi=None,
                          client_modified_at=report.client_at),
                     client_column="client_modified_at", server_column="timestamp", candidate=report)
                 if shared_accepted:
@@ -2519,6 +2524,7 @@ def update_progress():
                     device=progress_record.device,
                     device_id=progress_record.device_id,
                     timestamp=progress_record.timestamp,
+                    web_cfi=progress_record.web_cfi,
                     equal_accepts=(
                         progress_record.progress != PERCENTAGE_ONLY_LOCATOR
                     ),

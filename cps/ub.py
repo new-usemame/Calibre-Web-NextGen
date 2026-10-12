@@ -4621,6 +4621,11 @@ def migrate_device_share_place(engine, _session):
             "WHERE reading_status IS NOT NULL AND status_received_at IS NULL"))
 
 
+def migrate_kosync_web_place(engine, _session):
+    """Bind web exactness additively, without guessing a historical shared CFI."""
+    _add_column_if_missing(engine, "kosync_progress", "web_cfi", "web_cfi TEXT")
+
+
 def migrate_kobo_place_delivery(engine, _session):
     """PR 3b additive, idempotent provenance and inexact-delivery guard."""
     for name, ddl in (
@@ -5614,6 +5619,7 @@ def migrate_Database(_session):
     migrate_device_share_place(engine, _session)
     migrate_kobo_bookmark_receipt(engine, _session)
     migrate_kobo_place_delivery(engine, _session)
+    migrate_kosync_web_place(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)

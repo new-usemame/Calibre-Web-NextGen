@@ -258,6 +258,7 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
                 return False
             kosync_outcome = record_percentage_only_progress(
                 user_id, book_id, percentage, device=WEB_READER_DEVICE,
+                web_cfi=cfi if fmt == "epub" else None,
                 _return_outcome=True,
             )
             if not kosync_outcome.accepted:
@@ -461,7 +462,8 @@ def _record_gated_progress(user, book_id, percentage, device_id, cfi, fmt,
                     KOSyncProgress, identity,
                     dict(progress=current.progress, percentage=current.percentage,
                          device=current.device, device_id=current.device_id,
-                         timestamp=current.timestamp, client_modified_at=current.client_modified_at),
+                         timestamp=current.timestamp, client_modified_at=current.client_modified_at,
+                         web_cfi=current.web_cfi),
                     client_column="client_modified_at", server_column="timestamp",
                     candidate=shared_report(current),
                 )
@@ -469,6 +471,7 @@ def _record_gated_progress(user, book_id, percentage, device_id, cfi, fmt,
                 KOSyncProgress, identity,
                 dict(progress=PERCENTAGE_ONLY_LOCATOR, percentage=percentage,
                      device=WEB_READER_DEVICE, device_id=None,
+                     web_cfi=cfi if fmt == "epub" else None,
                      timestamp=observed_at, client_modified_at=observed_at),
                 client_column="client_modified_at", server_column="timestamp",
                 candidate=Report(observed_at, observed_at),

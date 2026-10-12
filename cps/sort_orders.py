@@ -151,18 +151,15 @@ def _reading_activity(user_id):
         .correlate(db.Books)
         .scalar_subquery()
     )
-    # A first report can have a device clock behind the server's row creation
-    # time. Its receipt records when we actually received that activity.
-    # Legacy receipts are backfilled as min(device clock, upgrade time), so
-    # taking the later clock preserves their pre-upgrade Recent order.
+    # Rank Kobo activity by when it arrived, like KOReader and web saves.
+    # A device clock (including created_at) can be slow or far in the future;
+    # use it only when no receipt exists. Legacy receipts keep the backfilled
+    # min(device clock, upgrade time), with created_at the last fallback.
     kobo_activity = (
-        select(func.max(func.max(
-            coalesce(func.max(
-                kobo_position.last_modified,
-                coalesce(kobo_position.server_modified_at,
-                         kobo_position.last_modified),
-            ), _ACTIVITY_WHEN_UNKNOWN),
-            coalesce(kobo_position.created_at, _ACTIVITY_WHEN_UNKNOWN),
+        select(func.max(coalesce(
+            kobo_position.server_modified_at,
+            kobo_position.last_modified,
+            kobo_position.created_at,
         )))
         .select_from(kobo_position)
         .join(state, kobo_position.kobo_reading_state_id == state.id)

@@ -52,10 +52,10 @@ from ...services.place_arbiter import Report, report_wins
 from ...services.share_place import gates_enforced
 from ...kobo import push_reading_state_to_hardcover
 
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, g, has_request_context, request, jsonify, send_from_directory
 from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
-from sqlalchemy import func, desc, cast, String
+from sqlalchemy import func, desc, cast, select, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
 from werkzeug.exceptions import BadRequest, HTTPException
 
@@ -624,7 +624,34 @@ def read_status_for_percentage(percentage: float) -> int:
     return ub.ReadBook.STATUS_UNREAD
 
 
-def update_book_read_status(user, book_id: int, percentage: float, *, shared_accepted=False):
+def _hold_feed_clock(reading_state_id, *, moved):
+    """Keep the shared feed clock where an accepted checked mirror left it.
+
+    ``write_shared_bookmark`` moved it strictly past every Kobo's frontier.
+    The status helper and the ORM flush hook that follow in this request
+    stamp the parent with ``g.kobo_reading_state_lm`` (else the server's
+    now, which can trail a frontier set by a fast or legacy future clock),
+    so that clock is set for the rest of the request: never below the
+    stored one, and one step past it when this report did not move it.
+    """
+    from ...services.kobo_place_gate import FEED_STEP
+    stored = ub.session.execute(
+        select(ub.KoboReadingState.last_modified)
+        .where(ub.KoboReadingState.id == reading_state_id)
+    ).scalar()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if stored is None:
+        feed = now
+    else:
+        if stored.tzinfo is not None:
+            stored = stored.astimezone(timezone.utc).replace(tzinfo=None)
+        feed = max(now, stored if moved else stored + FEED_STEP)
+    if has_request_context():
+        g.kobo_reading_state_lm = feed.replace(tzinfo=timezone.utc)
+
+
+def update_book_read_status(user, book_id: int, percentage: float, *,
+                            shared_accepted=False, client_at=None):
     """
     Update the user's ReadBook status based on reading progress percentage.
 
@@ -646,6 +673,16 @@ def update_book_read_status(user, book_id: int, percentage: float, *, shared_acc
 
     Raises:
         SQLAlchemyError: If database operation fails
+
+    Share my place: ``shared_accepted=True`` means the KOSync gate already
+    accepted this checked writer's report onto the shared place. It is then
+    arbitrated latest-wins against the Kobo bookmark by ``client_at`` (the
+    report's client clock) and the server receipt
+    (``kobo_place_gate.write_shared_bookmark``), so a deliberate backward
+    move reaches the Kobo bookmark as a percentage, a newer Kobo report is
+    not overwritten, and the Kobo feed clock moves past every Kobo's
+    frontier. The bookmark's Location is left as it is (exact
+    span is PR 3b). Every other caller keeps the forward-only percentage.
 
     Note:
         Caller is responsible for committing the session.
@@ -685,19 +722,21 @@ def update_book_read_status(user, book_id: int, percentage: float, *, shared_acc
     # savepoint/transaction boundary; position acceptance itself is SQL-only.
     ub.session.flush()
     if shared_accepted:
-        # The timed gate already accepted this shared place. Mirror its
-        # verdict, including a deliberate backward move, into the Kobo graph.
-        now = datetime.now(timezone.utc)
-        bookmark.progress_percent = percentage
-        bookmark.last_modified = now
-        if percentage > 0 and bookmark.created_at is None:
-            bookmark.created_at = now
-        bookmark.kobo_reading_state.last_modified = now
-        bookmark.kobo_reading_state.priority_timestamp = now
-        outcome = device_positions.PositionWriteOutcome(True, percentage, now, bookmark.id)
+        from ...services.kobo_place_gate import write_shared_bookmark
+        outcome = write_shared_bookmark(
+            bookmark.id, client_at=client_at, progress_percent=percentage,
+            session=ub.session,
+        )
+        ub.session.expire(bookmark)
+        if reading_state is not None:
+            ub.session.expire(reading_state)
+        _hold_feed_clock(bookmark.kobo_reading_state_id, moved=outcome.accepted)
     else:
         outcome = device_positions.advance_kobo_bookmark(
-            bookmark, percentage, clock_accepts=False, session=ub.session,
+            bookmark,
+            percentage,
+            clock_accepts=False,
+            session=ub.session,
         )
     if outcome.percentage is None:
         # The primitive could not find a row that survived arbitration. Do not
@@ -2414,7 +2453,8 @@ def update_progress():
                     try:
                         with ub.begin_contained_nested(ub.session):
                             update_book_read_status(user, book_id, proposed_percentage,
-                                                    shared_accepted=True)
+                                                    shared_accepted=True,
+                                                    client_at=report.client_at)
                     except Exception:
                         log.warning("Could not mirror accepted shared place for book %s",
                                     book_id, exc_info=True)

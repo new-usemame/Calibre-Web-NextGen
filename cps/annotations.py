@@ -810,9 +810,21 @@ def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
             raise ValueError("device label contains control characters")
         device.display_name = label
     if share_place is not _DEVICE_SETTING_UNSET:
-        if share_place and not device.share_place:
+        turned_on = share_place and not device.share_place
+        turned_off = not share_place and device.share_place
+        if turned_on:
             device.share_place_enabled_at = datetime.now(timezone.utc)
         device.share_place = share_place
+        from .services import kobo_place_gate
+        from .services.share_place import gates_enforced
+        if gates_enforced(device.user_id):
+            # Turn-on: the device's next sync is sent the shared place for
+            # books where it wins the arbiter against the device's own row.
+            # Turn-off rewinds nothing; it only withdraws unsent nudges.
+            if turned_on:
+                kobo_place_gate.refresh_share_place_nudges(device, session=session)
+            elif turned_off:
+                kobo_place_gate.clear_share_place_nudges(device.id, session=session)
     _commit_required(commit)
     return device
 

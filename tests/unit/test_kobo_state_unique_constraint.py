@@ -23,8 +23,9 @@ These tests cover:
    marker file so it's idempotent.
 3. The UNIQUE INDEX is actually created and rejects duplicate INSERTs
    from then on.
-4. Source invariants on ``get_or_create_reading_state``: uses
-   ``sqlite_insert(...).on_conflict_do_nothing(index_elements=...)``.
+4. ``get_or_create_reading_state`` itself: a repeated first contact, and
+   a competing request that creates the rows in the gap before this one's
+   INSERT, both leave one row per table and raise nothing.
 
 Concurrency is tested in
 ``test_kobo_state_concurrent_insert.py`` (separate file, threaded).
@@ -492,64 +493,105 @@ class TestMigrationIdempotent:
         assert rows[0].last_modified.replace(tzinfo=None) == datetime(2026, 5, 10)
 
 
+@pytest.fixture
+def reading_state_db(tmp_path, monkeypatch):
+    """``get_or_create_reading_state`` against a file-backed app.db with the
+    UNIQUE indexes, as ``kobo.current_user`` 1. File-backed so a competing
+    request can write through a connection of its own."""
+    from types import SimpleNamespace
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from cps import kobo, ub
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'app.db'}", future=True)
+    ub.Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, future=True)
+    session = Session()
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(kobo, "current_user", SimpleNamespace(id=1))
+    yield SimpleNamespace(engine=engine, Session=Session, session=session)
+    session.close()
+    engine.dispose()
+
+
+def _graph_counts(engine, book_id):
+    with engine.connect() as conn:
+        return {
+            table: conn.exec_driver_sql(sql, (book_id,)).scalar()
+            for table, sql in (
+                ("book_read_link", "SELECT COUNT(*) FROM book_read_link "
+                                   "WHERE user_id = 1 AND book_id = ?"),
+                ("kobo_reading_state", "SELECT COUNT(*) FROM kobo_reading_state "
+                                       "WHERE user_id = 1 AND book_id = ?"),
+                ("kobo_bookmark",
+                 "SELECT COUNT(*) FROM kobo_bookmark b JOIN kobo_reading_state s "
+                 "ON b.kobo_reading_state_id = s.id "
+                 "WHERE s.user_id = 1 AND s.book_id = ?"),
+                ("kobo_statistics",
+                 "SELECT COUNT(*) FROM kobo_statistics t JOIN kobo_reading_state s "
+                 "ON t.kobo_reading_state_id = s.id "
+                 "WHERE s.user_id = 1 AND s.book_id = ?"),
+            )
+        }
+
+
+ONE_OF_EACH = {"book_read_link": 1, "kobo_reading_state": 1,
+               "kobo_bookmark": 1, "kobo_statistics": 1}
+
+
 @pytest.mark.unit
-class TestGetOrCreateReadingStateSourceInvariants:
-    """The source-level invariants matter because Flask request context
-    + auth aren't available at unit scope. These checks pin the atomic-
-    upsert behavior so a future refactor can't regress to read-then-
-    write semantics."""
+def test_a_repeated_first_contact_reuses_the_one_reading_state(reading_state_db):
+    """A Kobo asks about a book twice (a GET then its PUT, or a retried PUT):
+    the second call returns the row the first one made."""
+    from cps import kobo
 
-    def test_uses_sqlite_on_conflict_do_nothing(self):
-        import inspect
-        from cps.kobo import get_or_create_reading_state
-        src = inspect.getsource(get_or_create_reading_state)
-        assert "on_conflict_do_nothing" in src, (
-            "get_or_create_reading_state must use INSERT ... ON CONFLICT "
-            "DO NOTHING via the sqlite dialect to be race-safe; without "
-            "it two concurrent PUTs can produce duplicate rows."
-        )
+    first = kobo.get_or_create_reading_state(7)
+    second = kobo.get_or_create_reading_state(7)
 
-    def test_index_elements_named_correctly(self):
-        import inspect
-        from cps.kobo import get_or_create_reading_state
-        src = inspect.getsource(get_or_create_reading_state)
-        # Must target the (user_id, book_id) pair, matching the UNIQUE
-        # INDEX created by migrate_kobo_unique_constraints.
-        assert 'index_elements=["user_id", "book_id"]' in src or \
-               "index_elements=['user_id', 'book_id']" in src, (
-            "on_conflict_do_nothing must specify index_elements="
-            "['user_id', 'book_id'] so SQLite routes the conflict to "
-            "the correct UNIQUE INDEX."
-        )
+    assert first.id == second.id
+    assert _graph_counts(reading_state_db.engine, 7) == ONE_OF_EACH
 
-    def test_creates_read_book_atomically(self):
-        import inspect
-        from cps.kobo import get_or_create_reading_state
-        src = inspect.getsource(get_or_create_reading_state)
-        assert "ub.ReadBook" in src and "sqlite_insert" in src, (
-            "ReadBook creation must go through the atomic sqlite_insert "
-            "path; otherwise concurrent first-PUTs race on ReadBook."
-        )
 
-    def test_creates_kobo_reading_state_atomically(self):
-        import inspect
-        from cps.kobo import get_or_create_reading_state
-        src = inspect.getsource(get_or_create_reading_state)
-        assert "ub.KoboReadingState" in src and src.count("sqlite_insert") >= 1, (
-            "KoboReadingState creation must also use sqlite_insert + "
-            "on_conflict_do_nothing — it has the same (user, book) "
-            "uniqueness constraint."
-        )
+@pytest.mark.unit
+@pytest.mark.parametrize("raced_table", [
+    "book_read_link", "kobo_reading_state", "kobo_bookmark"])
+def test_a_competing_request_that_creates_the_rows_first_is_not_an_error(
+        reading_state_db, raced_table):
+    """Two state requests for one book from a Kobo waking from sleep (#132).
+    The competitor runs the whole creation through its own connection and
+    commits in the gap just before this request's INSERT into
+    ``raced_table`` -- after any check this request made, before its write.
+    Both requests succeed with the same reading state, and the book has one
+    row in each table: a duplicate made every later ``.one()`` a 500 the
+    device retried forever, and a plain INSERT hands the caller an
+    IntegrityError."""
+    from sqlalchemy import event
+    from cps import kobo, ub
 
-    def test_no_legacy_one_or_none_pattern(self):
-        import inspect
-        from cps.kobo import get_or_create_reading_state
-        src = inspect.getsource(get_or_create_reading_state)
-        # The pre-fix pattern was `.one_or_none()` on a query that could
-        # racily return either nothing or multiple rows. The new code
-        # uses `.one()` after the atomic insert which is safe because
-        # the UNIQUE INDEX guarantees at-most-one row.
-        assert ".one_or_none()" not in src, (
-            "Legacy one_or_none pattern survives — would raise "
-            "MultipleResultsFound if duplicates ever appeared."
-        )
+    competitor = {}
+
+    def compete(conn, cursor, statement, *_args):
+        if competitor or not statement.lstrip().upper().startswith(
+                "INSERT INTO " + raced_table.upper()):
+            return
+        competitor["running"] = True
+        mine = ub.session
+        other = reading_state_db.Session()
+        ub.session = other
+        try:
+            competitor["state_id"] = kobo.get_or_create_reading_state(7).id
+        finally:
+            ub.session = mine
+            other.close()
+
+    event.listen(reading_state_db.engine, "before_cursor_execute", compete)
+    try:
+        state = kobo.get_or_create_reading_state(7)
+    finally:
+        event.remove(reading_state_db.engine, "before_cursor_execute", compete)
+
+    assert "state_id" in competitor, (
+        "the competing request never ran: nothing was raced")
+    assert state.id == competitor["state_id"]
+    assert _graph_counts(reading_state_db.engine, 7) == ONE_OF_EACH

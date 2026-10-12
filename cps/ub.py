@@ -1450,6 +1450,12 @@ class KoboBookmark(Base):
     location_value = Column(String)
     progress_percent = Column(Float)
     content_source_progress_percent = Column(Float)
+    # When the server received the place this row holds (Share my place
+    # arbitration). ``last_modified`` is the reporting device's clock and is
+    # never a receipt; this is stamped by the server on every write.
+    server_modified_at = Column(DateTime, nullable=True,
+                                default=lambda: datetime.now(timezone.utc),
+                                onupdate=lambda: datetime.now(timezone.utc))
 
     # The parent FK is how every reader of this table reaches it. Unindexed,
     # SQLite reports "AUTOMATIC PARTIAL COVERING INDEX" — it rebuilds a
@@ -1499,6 +1505,32 @@ class Device(Base):
     )
 
 
+class KoboSharePlaceNudge(Base):
+    """Share my place turn-on nudge: send this book's shared reading state to
+    this Kobo once, because the shared place won the arbiter against the
+    device's own row when its box was turned on. Kept apart from the
+    rehydrate latch so neither the confirmation echo nor the latch's PUT
+    rules apply to it. Deleted when the page that carried it is acknowledged.
+    """
+    __tablename__ = 'kobo_share_place_nudge'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(
+        Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False,
+    )
+    book_id = Column(Integer, nullable=False)
+    armed_at = Column(DateTime, nullable=False,
+                      default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('device_id', 'book_id',
+                         name='uq_kobo_share_place_nudge_device_book'),
+        # Ids are never reused, so acknowledging an old page cannot delete a
+        # nudge armed after it (the page names the ids it carried).
+        {'sqlite_autoincrement': True},
+    )
+
+
 class DeviceReadingPosition(Base):
     """One device's last reported position and read status for a Calibre book.
 
@@ -1525,7 +1557,14 @@ class DeviceReadingPosition(Base):
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
     reading_status = Column(Integer, nullable=True)
+    # The status observation's ordering key is (status_modified_at, the raw
+    # client clock; status_received_at, its own receipt). The place's is
+    # (client_modified_at, server_modified_at). Every status writer sets
+    # status_received_at; migrate_device_share_place freezes one onto older
+    # status rows (spec section 13a). A status row still without one reads
+    # as main's key, (status_modified_at, status_modified_at).
     status_modified_at = Column(DateTime, nullable=True)
+    status_received_at = Column(DateTime, nullable=True)
     rehydrate_needed = Column(
         Boolean, nullable=False, default=False, server_default='0',
     )
@@ -4537,8 +4576,56 @@ def migrate_device_share_place(engine, _session):
         ("device", "cwng_header_seen_at", "cwng_header_seen_at DATETIME"),
         ("device_reading_position", "reading_status", "reading_status INTEGER"),
         ("device_reading_position", "status_modified_at", "status_modified_at DATETIME"),
+        # Spec section 13: the status observation's own receipt (PR 3a).
+        ("device_reading_position", "status_received_at", "status_received_at DATETIME"),
     ):
         _add_column_if_missing(engine, table, name, ddl)
+    # Spec section 13a: freeze a receipt onto status rows written before
+    # status_received_at existed (PR 2, unreleased main). Their own clock keeps
+    # main's key exactly; a clockless status takes the row's receipt once, so a
+    # later place write cannot re-time it. Idempotent: only NULL receipts move.
+    columns = _table_columns(engine, "device_reading_position")
+    if columns and {"reading_status", "status_modified_at",
+                    "status_received_at"} <= columns:
+        _run_ddl_with_retry(engine, (
+            "UPDATE device_reading_position SET status_received_at = "
+            "COALESCE(status_modified_at, server_modified_at) "
+            "WHERE reading_status IS NOT NULL AND status_received_at IS NULL"))
+
+
+def migrate_kobo_bookmark_receipt(engine, _session):
+    """Add the shared Kobo bookmark's receipt clock and the turn-on nudges.
+
+    Additive, idempotent and resumable. Every writer stamps a receipt, so a
+    NULL receipt only ever means a row from before the column existed; each
+    startup gives those rows their stored clock capped at that startup's
+    instant (no report can have been received later), and leaves every
+    receipt already written alone. A startup interrupted after ADD COLUMN is
+    therefore completed by the next one. The nudge table is created with
+    IF NOT EXISTS so two workers migrating at once both succeed.
+    """
+    _add_column_if_missing(
+        engine, "kobo_bookmark", "server_modified_at",
+        "server_modified_at DATETIME")
+    _run_ddl_with_retry(engine, (
+        "CREATE TABLE IF NOT EXISTS kobo_share_place_nudge ("
+        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "
+        "device_id INTEGER NOT NULL REFERENCES device (id) ON DELETE CASCADE, "
+        "book_id INTEGER NOT NULL, "
+        "armed_at DATETIME NOT NULL, "
+        "CONSTRAINT uq_kobo_share_place_nudge_device_book "
+        "UNIQUE (device_id, book_id))"))
+    columns = _table_columns(engine, "kobo_bookmark")
+    if not columns or "server_modified_at" not in columns:
+        return
+    startup_at = datetime.now(timezone.utc).replace(tzinfo=None).strftime(
+        "%Y-%m-%d %H:%M:%S.%f")
+    # ``startup_at`` is formatted here from the clock, never from input.
+    _run_ddl_with_retry(engine, (
+        "UPDATE kobo_bookmark SET server_modified_at = CASE "
+        f"WHEN last_modified IS NULL OR last_modified > '{startup_at}' "
+        f"THEN '{startup_at}' ELSE last_modified END "
+        "WHERE server_modified_at IS NULL"))
 
 
 def migrate_kobo_annotation_seed_pipeline(engine, _session):
@@ -5470,6 +5557,7 @@ def migrate_Database(_session):
     migrate_webreader_device_identity_slice(engine, _session)
     migrate_device_reading_position_slice(engine, _session)
     migrate_device_share_place(engine, _session)
+    migrate_kobo_bookmark_receipt(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)

@@ -123,7 +123,7 @@ def _reading_activity(user_id):
 
     Each is gated on POSITIVE evidence rather than on the row existing, because
     ``kobo.HandleStateRequest`` seeds the entire ReadBook/KoboReadingState/
-    KoboBookmark/KoboStatistics graph — with fresh clocks and no progress — on a
+    KoboBookmark/KoboStatistics graph — with empty clocks and no progress — on a
     **GET**. Ungated, a Kobo that merely listed the library would reorder it.
     ``helper.reset_reading_position`` ("mark unread") clears exactly what these
     gates read, so a restarted book leaves the read group.
@@ -151,10 +151,16 @@ def _reading_activity(user_id):
         .correlate(db.Books)
         .scalar_subquery()
     )
+    # Rank Kobo activity by when it arrived, like KOReader and web saves.
+    # A device clock (including created_at) can be slow or far in the future;
+    # use it only when no receipt exists. Legacy receipts keep the backfilled
+    # min(device clock, upgrade time), with created_at the last fallback.
     kobo_activity = (
-        select(func.max(func.max(
-            coalesce(kobo_position.last_modified, _ACTIVITY_WHEN_UNKNOWN),
-            coalesce(kobo_position.created_at, _ACTIVITY_WHEN_UNKNOWN),
+        select(func.max(coalesce(
+            kobo_position.server_modified_at,
+            kobo_position.last_modified,
+            kobo_position.created_at,
+            _ACTIVITY_WHEN_UNKNOWN,
         )))
         .select_from(kobo_position)
         .join(state, kobo_position.kobo_reading_state_id == state.id)

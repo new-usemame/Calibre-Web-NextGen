@@ -131,12 +131,15 @@ def test_a_checked_kobo_is_served_a_shared_trusted_fast_clock_tie_winner(kw):
 def test_a_switch_off_journal_rows_fast_clock_loses_to_an_honest_newer_report(
         kw, monkeypatch):
     book = kw.books[0]
-    now = _now()
     monkeypatch.delenv(GATES_ENV, raising=False)
-    kw.put(kw.a, book, 70, now + timedelta(days=1))
+    kw.put(kw.a, book, 70, _now() + timedelta(days=1))
     monkeypatch.setenv(GATES_ENV, "1")
 
-    kw.put(kw.a, book, 20, now + timedelta(seconds=1))
+    # The fast row is ordered by its receipt; the honest clock is read after
+    # that receipt, so it is newer however long the first PUT took. (Read
+    # before it, a slow first PUT could land its receipt past the honest
+    # clock, and the test then failed under load.)
+    kw.put(kw.a, book, 20, _now() + timedelta(seconds=1))
 
     assert kw.get(kw.a, book)["CurrentBookmark"]["ProgressPercent"] == 20
 

@@ -330,3 +330,27 @@ def _timestamps(value, path=""):
 
 
 EMPTY = {"read": None, "state": None, "bookmark": None, "statistics": None}
+
+
+def second_after_receipts(kw, device, book):
+    """The first whole client second after every receipt the server stored
+    for ``book`` (``device``'s journal row and the shared bookmark).
+
+    A report ordered at its receipt (a clock too fast to trust, or none) is
+    ordered at a server time the test does not choose; a wall clock read
+    before that PUT is not a safe base on a loaded worker, where the receipt
+    can land seconds later. Date a report that must be newer from this.
+    """
+    from cps import ub
+    kw.session.expire_all()
+    stamps = []
+    row = kw.journal(device, book)
+    if row is not None:
+        stamps += [row.server_modified_at, row.status_received_at]
+    state = kw.session.query(ub.KoboReadingState).filter_by(
+        user_id=USER_ID, book_id=book.id).one_or_none()
+    if state is not None and state.current_bookmark is not None:
+        stamps.append(state.current_bookmark.server_modified_at)
+    stamps = [_naive(stamp) for stamp in stamps if stamp is not None]
+    assert stamps, "no stored receipt for the book"
+    return max(stamps).replace(microsecond=0) + timedelta(seconds=1)

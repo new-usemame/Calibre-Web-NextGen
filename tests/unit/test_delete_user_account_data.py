@@ -86,6 +86,8 @@ _OVERRIDES = {
                                      "seed_kind": "routing_only"},
     "kobo_annotation_materialization": {"provenance": "cwng_authored",
                                         "attachments_state": "empty"},
+    # Unexpired, so startup's own expiry sweep leaves it alone.
+    "koreader_pairing": {"expires_at": datetime(2999, 1, 1)},
 }
 
 
@@ -356,3 +358,84 @@ def test_admin_delete_user_removes_devices_kosync_and_magic_shelves(
     assert survivor_after == dict(survivor_before, magic_shelf_cache=1,
                                   hidden_magic_shelf_templates=0)
     assert os.path.exists(user_cover.cover_path(survivor_id, 1))
+
+
+# ---------------------------------------------------------------------------
+# Accounts deleted before the purge existed (#2563)
+# ---------------------------------------------------------------------------
+
+def _boot(ub, db_path):
+    """One pass of the real app.db startup, restoring the module globals."""
+    previous_session, previous_path = ub.session, ub.app_DB_path
+    try:
+        ub.init_db(str(db_path))
+    finally:
+        if ub.session is not previous_session:
+            ub.session.close()
+            ub.session.bind.dispose()
+        ub.session, ub.app_DB_path = previous_session, previous_path
+
+
+def test_startup_removes_rows_left_by_accounts_deleted_before_the_purge(
+        ub_module, monkeypatch, tmp_path):
+    """OBSERVED on a real install: an account deleted before #2314 kept 9
+    devices, 2 KOReader positions, 5 magic shelves and 113 rows reachable
+    only through those devices, with no user row behind any of them.
+    Startup must clear every such row and leave a live account's alone, on
+    every boot."""
+    from cps import constants
+    from cps.services import user_cover
+    ub = ub_module
+    monkeypatch.setattr(constants, "CONFIG_DIR", str(tmp_path))
+    db_path = tmp_path / "app.db"
+
+    engine = create_engine("sqlite:///%s" % db_path, future=True)
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine, future=True)()
+    scoped = _user_scoped_tables(ub)
+    _user(ub, session, "admin", role=constants.ROLE_ADMIN)
+    deleted = _user(ub, session, "deleted-before-2314")
+    survivor = _user(ub, session, "survivor")
+    shared, seeded = {}, {}
+    for owner in (deleted, survivor):
+        rows = {"user": {"id": owner.id}}
+        for table in ub.Base.metadata.sorted_tables:
+            if table.name in scoped:
+                rows[table.name] = _seed(session, table, rows, shared, scoped)
+        seeded[owner.id] = rows
+    deleted_id, survivor_id = deleted.id, survivor.id
+    session.commit()
+    # What an old admin delete left: the user row gone, everything else kept.
+    session.execute(sa.text("DELETE FROM user WHERE id = :id"),
+                    {"id": deleted_id})
+    session.commit()
+    session.close()
+    os.makedirs(user_cover.cover_directory(deleted_id), exist_ok=True)
+    os.makedirs(user_cover.cover_directory(survivor_id), exist_ok=True)
+
+    tables = {t.name: t for t in ub.Base.metadata.sorted_tables}
+
+    def check():
+        with sessionmaker(bind=engine, future=True)() as s:
+            left = sorted(
+                name for name in scoped - set(EXEMPT_TABLES)
+                if _owned_rows_left(s, tables[name], seeded[deleted_id][name]))
+            lost = sorted(
+                name for name in scoped
+                if not _owned_rows_left(s, tables[name],
+                                        seeded[survivor_id][name]))
+            users = sorted(r for (r,) in s.execute(sa.text(
+                "SELECT name FROM user")))
+        assert left == [], "a deleted account's rows survived startup " \
+            "in: %s" % left
+        assert lost == [], "startup removed a live account's rows in " \
+            "%s" % lost
+        assert users == ["admin", "survivor"]
+        assert not os.path.exists(user_cover.cover_directory(deleted_id))
+        assert os.path.isdir(user_cover.cover_directory(survivor_id))
+
+    _boot(ub, db_path)
+    check()
+    _boot(ub, db_path)  # every start: nothing left to do, nothing else lost
+    check()
+    engine.dispose()

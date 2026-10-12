@@ -5580,6 +5580,18 @@ def clean_database(_session):
         sys.exit(2)
 
 
+def purge_orphaned_accounts(_session):
+    # Accounts deleted before #2314 left their devices, KOReader positions,
+    # magic shelves and more behind, with no user row (#2563).
+    from . import user_account_data
+    try:
+        user_account_data.purge_orphaned_accounts(_session)
+        _session.commit()
+    except exc.SQLAlchemyError as e:
+        _session.rollback()
+        log.error("Could not remove data left by deleted accounts: %s", e)
+
+
 # Save downloaded books per user in calibre-web's own database
 def update_download(book_id, user_id, _session=None):
     s = _session if _session else session
@@ -5820,6 +5832,7 @@ def init_db(app_db_path):
         Base.metadata.create_all(engine)
         migrate_Database(session)
         clean_database(session)
+        purge_orphaned_accounts(session)
     else:
         Base.metadata.create_all(engine)
         migrate_hardcover_match_queue_dedup(engine, session)

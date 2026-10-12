@@ -28,6 +28,8 @@ registry and fails on any user-scoped table left out.
 import os
 import shutil
 
+import sqlalchemy as sa
+
 from . import logger, ub, user_book_data
 
 log = logger.create()
@@ -193,3 +195,43 @@ def purge_user_account(user_id, session=None):
             log.warning("[user-account-data] could not remove personal "
                         "covers %s: %s", cover_dir, e)
     log.info("[user-account-data] purged account data for user_id=%s", user_id)
+
+
+def orphaned_user_ids(session=None):
+    """Ids that app.db rows still point at but that no ``user`` row has.
+
+    Every account-owned column is a foreign key into ``user.id``, so the
+    model registry names them all; device- and shelf-scoped children are
+    reached through their parent by :func:`purge_user_account`.
+    """
+    from .progress_syncing import models  # noqa: F401  registers kosync_progress
+    session = session if session is not None else ub.session
+    live = sa.select(ub.User.id).scalar_subquery()
+    found = set()
+    for table in ub.Base.metadata.sorted_tables:
+        for column in table.columns:
+            if any(fk.column.table.name == "user" and fk.column.name == "id"
+                   for fk in column.foreign_keys):
+                found.update(session.execute(
+                    sa.select(column).distinct().where(
+                        column.isnot(None), column.notin_(live))).scalars())
+    return sorted(found)
+
+
+def purge_orphaned_accounts(session=None):
+    """Purge what app.db still holds for accounts whose user row is gone.
+
+    Accounts deleted before :func:`purge_user_account` existed (#2314) kept
+    their devices, KOReader positions, magic shelves and the rest. Runs on
+    every start: with nothing orphaned it is one read per account-owned
+    column. Does not commit.
+    """
+    session = session if session is not None else ub.session
+    orphans = orphaned_user_ids(session)
+    for user_id in orphans:
+        purge_user_account(user_id, session=session)
+    if orphans:
+        log.info("[user-account-data] removed data left by %d deleted "
+                 "account(s): user_id %s", len(orphans),
+                 ", ".join(map(str, orphans)))
+    return orphans

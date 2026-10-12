@@ -26,6 +26,10 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from .. import ub
 from .place_arbiter import Report, report_wins
 from .share_place import gates_enforced
+from .place_journal import (
+    _journal_place_report, _journal_status_report, _status_receipt, _same,
+    write_report,
+)
 
 CHECKED = "checked"
 UNCHECKED = "unchecked"
@@ -109,48 +113,6 @@ def _journal_report(row):
 # clocks) read the same way. Writing one observation never touches the
 # other's pair.
 
-def _journal_place_report(row):
-    """The place observation a journal row holds, or None if it holds none."""
-    if row is None or (row.progress_percent is None and not row.location_value):
-        return None
-    return Report(row.client_modified_at, row.server_modified_at)
-
-
-# Spec section 13a: every writer that sets a status sets its receipt in the
-# same statement, and the startup migration freezes a receipt onto any older
-# status row. A status row still without one is read with main's key,
-# Report(status_modified_at, status_modified_at); the place's receipt moves
-# with every place write, so it never orders a status.
-
-def _status_receipt(row):
-    return row.status_received_at or row.status_modified_at
-
-
-def _journal_status_report(row):
-    """The status observation a journal row holds, or None if it holds none
-    (or holds one with no clock at all, which main also treats as absent)."""
-    if row is None or (row.reading_status is None
-                       and row.status_modified_at is None):
-        return None
-    receipt = _status_receipt(row)
-    if receipt is None:
-        return None
-    return Report(row.status_modified_at, receipt)
-
-
-def _place_absent(table):
-    return and_(table.c.progress_percent.is_(None),
-                or_(table.c.location_value.is_(None), table.c.location_value == ""))
-
-
-def _status_absent(table):
-    return and_(table.c.reading_status.is_(None), table.c.status_modified_at.is_(None))
-
-
-def _same(column, value):
-    return column.is_(None) if value is None else column == value
-
-
 def _latest(*clocks):
     present = [_naive_utc(clock) for clock in clocks if clock is not None]
     return max(present) if present else None
@@ -158,66 +120,20 @@ def _latest(*clocks):
 
 def record_own_report(*, device_id, book_id, client_at, place=None,
                       status=None, status_supplied=False, session=None):
-    """Write one device report onto its own journal row, latest-wins.
-
-    ``place`` is a dict of the DeviceReadingPosition place columns, or None
-    when the report carried no bookmark. Place and status are separate
-    observations, each arbitrated by its own (raw clock, own receipt) pair:
-    a report can carry the newest place and an older status, and only the
-    fields and pair that won are written, guarded by that pair. A report where nothing wins changes
-    nothing. ``rehydrate_needed`` is never touched.
-    """
+    """Journal a Kobo report through the common CAS writer, retaining its latch."""
     s = session if session is not None else ub.session
-    table = ub.DeviceReadingPosition.__table__
-    device_id, book_id = int(device_id), int(book_id)
-    for _ in range(_CAS_ATTEMPTS):
-        row = s.execute(select(table).where(
-            table.c.device_id == device_id, table.c.book_id == book_id,
-        )).first()
-        # An unacknowledged turn-on nudge guards a cover reset the same way
-        # an armed re-download latch does.
-        pending = bool(row is not None and row.rehydrate_needed) or _nudged(
-            s, device_id, book_id)
-        received_at = _now()
-        candidate = Report(client_at, received_at)
-        place_wins = place is not None and report_wins(
-            candidate, _journal_place_report(row))
-        status_wins = status_supplied and report_wins(
-            candidate, _journal_status_report(row))
-        if not (place_wins or status_wins):
-            return JournalOutcome(False, pending)
-        values, guard = {}, []
-        if place_wins:
-            values.update(place, client_modified_at=client_at,
-                          server_modified_at=received_at)
-            if row is not None:
-                # Section 13a: an empty place guards its emptiness, not just
-                # the pair, which a status-only first report shares.
-                guard += [_same(table.c.client_modified_at, row.client_modified_at),
-                          _same(table.c.server_modified_at, row.server_modified_at)]
-                if _journal_place_report(row) is None:
-                    guard.append(_place_absent(table))
-        if status_wins:
-            values.update(reading_status=status, status_modified_at=client_at,
-                          status_received_at=received_at)
-            if row is not None:
-                guard += [_same(table.c.status_modified_at, row.status_modified_at),
-                          _same(table.c.status_received_at, row.status_received_at)]
-                if _journal_status_report(row) is None:
-                    guard.append(_status_absent(table))
-        if row is None:
-            # The row's receipt column is required; a status-only first
-            # report leaves the place empty, so it orders nothing.
-            values.setdefault("server_modified_at", received_at)
-            result = s.execute(sqlite_insert(table).values(
-                device_id=device_id, book_id=book_id, **values,
-            ).on_conflict_do_nothing(index_elements=["device_id", "book_id"]))
-        else:
-            result = s.execute(update(table).where(
-                table.c.id == row.id, *guard).values(**values))
-        if result.rowcount == 1:
-            return JournalOutcome(True, pending, place_wins)
-    return JournalOutcome(False, pending)
+    row = s.execute(select(ub.DeviceReadingPosition.rehydrate_needed).where(
+        ub.DeviceReadingPosition.device_id == int(device_id),
+        ub.DeviceReadingPosition.book_id == int(book_id),
+    )).first()
+    pending = bool(row is not None and row.rehydrate_needed) or _nudged(
+        s, device_id, book_id)
+    outcome = write_report(
+        device_id=device_id, book_id=book_id, client_at=client_at,
+        place=place, status=status, status_supplied=status_supplied,
+        received_at=_now(), session=s,
+    )
+    return JournalOutcome(outcome.accepted, pending, outcome.place_accepted)
 
 
 def _nudged(session, device_id, book_id):
@@ -310,7 +226,7 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
                           content_source_supplied=False,
                           location=None, location_supplied=False,
                           block_lower_at_or_below=None, shared_from_koreader=False,
-                          span_kepub_identity=None, session=None):
+                          span_kepub_identity=None, received_at=None, session=None):
     """Arbitrate one checked writer's place onto the shared Kobo bookmark.
 
     Latest wins by ``report_wins``: a deliberate backward move is accepted,
@@ -332,7 +248,7 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
         ).where(mark.id == bookmark_id)).first()
         if row is None:
             return SharedWriteOutcome(False, None)
-        received_at = _now()
+        received_at = received_at or _now()
         current = shared_bookmark_report(
             row.progress_percent, row.location_value, row.last_modified,
             row.server_modified_at)

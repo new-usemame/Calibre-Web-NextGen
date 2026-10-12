@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Share my place gates for the Kobo protocol (spec sections 11 and 12, 3a).
+"""Share my place gates for the Kobo protocol (spec sections 11–14b, 3a/3b).
 
 A Kobo is *resolved* when ``requires_kobo_auth`` tied the request to a
 registered device. While ``share_place.gates_enforced`` is on for the
@@ -14,6 +14,8 @@ receipt is ``KoboBookmark.server_modified_at``. The stored device clock is
 never treated as a receipt.
 """
 
+import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -300,13 +302,15 @@ class SharedWriteOutcome:
     accepted: bool
     percentage: object
     clock: object = None
+    received_at: object = None
 
 
 def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
                           content_source_progress_percent=None,
                           content_source_supplied=False,
                           location=None, location_supplied=False,
-                          block_lower_at_or_below=None, session=None):
+                          block_lower_at_or_below=None, shared_from_koreader=False,
+                          span_kepub_identity=None, session=None):
     """Arbitrate one checked writer's place onto the shared Kobo bookmark.
 
     Latest wins by ``report_wins``: a deliberate backward move is accepted,
@@ -323,6 +327,8 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
         row = s.execute(select(
             mark.progress_percent, mark.location_value, mark.last_modified,
             mark.server_modified_at, mark.kobo_reading_state_id,
+            mark.shared_from_koreader, mark.location_source, mark.location_type,
+            mark.content_source_progress_percent,
         ).where(mark.id == bookmark_id)).first()
         if row is None:
             return SharedWriteOutcome(False, None)
@@ -338,7 +344,17 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
                 and row.progress_percent > progress_percent):
             return SharedWriteOutcome(False, row.progress_percent, row.last_modified)
         clock = effective_clock(client_at, received_at)
-        values = {"last_modified": clock, "server_modified_at": received_at}
+        values = {"last_modified": clock, "server_modified_at": received_at,
+                  "shared_from_koreader": shared_from_koreader,
+                  "span_kepub_identity": span_kepub_identity}
+        if shared_from_koreader and not row.shared_from_koreader:
+            # Preserve the last native Location for a Kobo with no own report.
+            # It must never be handed the newly converted, ineligible span.
+            values.update(native_location_value=row.location_value,
+                          native_location_source=row.location_source,
+                          native_location_type=row.location_type,
+                          native_progress_percent=row.progress_percent,
+                          native_content_source_progress_percent=row.content_source_progress_percent)
         if progress_percent is not None:
             values["progress_percent"] = progress_percent
             if progress_percent > 0:
@@ -368,7 +384,7 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
                 row.kobo_reading_state_id, row.server_modified_at, session=s)
             advance_feed_clock(row.kobo_reading_state_id, clock, session=s)
         stored = progress_percent if progress_percent is not None else row.progress_percent
-        return SharedWriteOutcome(True, stored, clock)
+        return SharedWriteOutcome(True, stored, clock, received_at)
     return SharedWriteOutcome(False, None)
 
 
@@ -450,6 +466,9 @@ def own_place_newer(device_id, book_id, *, session=None):
     shared place: the shared state is then older than what the device holds
     and must not be sent to it."""
     s = session if session is not None else ub.session
+    if active_echo_guard(device_id, book_id, session=s) is not None:
+        # A journaled echo is fresh, but it is not a newer reading place.
+        return False
     journal = ub.DeviceReadingPosition.__table__
     own = s.execute(select(journal).where(
         journal.c.device_id == int(device_id),
@@ -532,3 +551,189 @@ def clear_share_place_nudges(device_id, *, session):
     nudge = ub.KoboSharePlaceNudge.__table__
     return session.execute(nudge.delete().where(
         nudge.c.device_id == int(device_id))).rowcount
+
+
+# -- exact delivery and the inexact echo guard (spec sections 14a, 14b) --------
+
+def _book_paths(book):
+    from ..annotations import _book_format_path
+    try:
+        return _book_format_path(book, "EPUB"), _book_format_path(book, "KEPUB")
+    except (OSError, TypeError, AttributeError):
+        # A missing/unavailable library cannot establish an exact place.
+        return None, None
+
+
+def _file_identity(path):
+    stat = os.stat(path)
+    return f"{stat.st_dev}:{stat.st_ino}:{stat.st_size}:{stat.st_mtime_ns}"
+
+
+def koreader_span(book_id, document, progress):
+    """Convert only an XPointer known to address the current library EPUB.
+
+    Return the span and the KEPUB identity used in the conversion. Replacing
+    either file during conversion invalidates the result.
+    """
+    from .. import calibre_db
+    from .koreader_position import file_digest, is_xpointer
+    from .kepub_alignment import xpointer_to_span
+    from .parallel import run_blocking
+    if not is_xpointer(progress) or not isinstance(document, str):
+        return None, None
+    book = calibre_db.get_book(int(book_id))
+    if book is None:
+        return None, None
+    epub, kepub = _book_paths(book)
+    if not epub or not kepub:
+        return None, None
+    def convert():
+        try:
+            before = (_file_identity(epub), _file_identity(kepub))
+            if file_digest(epub) != document.lower():
+                return None, None
+            found = xpointer_to_span(epub, kepub, progress)
+            if not found or before != (_file_identity(epub), _file_identity(kepub)):
+                return None, None
+            source, span = found
+            return {"Source": source, "Value": span, "Type": "KoboSpan"}, before[1]
+        except (OSError, TypeError, ValueError):
+            return None, None
+    return run_blocking(convert)
+
+
+def clear_echo_guard(device_id, book_id=None, *, session=None):
+    s = session if session is not None else ub.session
+    table = ub.KoboPlaceEchoGuard.__table__
+    terms = [table.c.device_id == int(device_id)]
+    if book_id is not None:
+        terms.append(table.c.book_id == int(book_id))
+    s.execute(table.delete().where(*terms))
+
+
+def active_echo_guard(device_id, book_id, *, session=None):
+    s = session if session is not None else ub.session
+    table = ub.KoboPlaceEchoGuard.__table__
+    return s.execute(select(table).where(
+        table.c.device_id == int(device_id), table.c.book_id == int(book_id),
+        table.c.armed_at > _naive_utc(_now()) - timedelta(days=7),
+    )).first()
+
+
+def delivery_bookmark(book, bookmark, response, device_id):
+    """Adapt a KOReader-derived place to the KEPUB this checked Kobo holds.
+
+    Persist the held Location separately from the journal: Nickel's echoes
+    update that journal, but cannot shift the armed baseline or renew its
+    seven-day lifetime. Repeated delivery of one shared receipt does neither.
+    The caller commits together with its GET response or replayable sync page.
+    """
+    _epub, kepub = _book_paths(book)
+    if not bookmark.shared_from_koreader and not kepub:
+        return response
+    own = ub.session.query(ub.DeviceReadingPosition).filter_by(
+        device_id=int(device_id), book_id=int(book.id)).one_or_none()
+    if (not bookmark.shared_from_koreader and own is not None
+            and own.location_value == bookmark.location_value
+            and own.location_source == bookmark.location_source
+            and own.progress_percent == bookmark.progress_percent):
+        clear_echo_guard(device_id, book.id)
+        return response
+    exact = False
+    try:
+        download = ub.session.query(ub.KoboDeviceBookDownload).filter_by(
+            device_id=int(device_id), book_id=int(book.id)).one_or_none()
+        exact = bool(kepub and download and download.downloaded_at
+                     and (download.book_format or "").lower() == "kepub"
+                     and _naive_utc(download.downloaded_at) >= datetime.fromtimestamp(
+                         os.stat(kepub).st_mtime, timezone.utc).replace(tzinfo=None)
+                     and (not bookmark.shared_from_koreader or
+                          bookmark.span_kepub_identity == _file_identity(kepub)))
+    except OSError:
+        pass
+    if exact:
+        clear_echo_guard(device_id, book.id)
+        return response
+    own = ub.session.query(ub.DeviceReadingPosition).filter_by(
+        device_id=int(device_id), book_id=int(book.id)).one_or_none()
+    if own is not None and own.location_value:
+        held = own
+    elif bookmark.shared_from_koreader:
+        held = SimpleNamespace(
+            location_value=bookmark.native_location_value,
+            location_source=bookmark.native_location_source,
+            location_type=bookmark.native_location_type,
+            progress_percent=bookmark.native_progress_percent,
+            content_source_progress_percent=bookmark.native_content_source_progress_percent)
+    else:
+        held = bookmark
+    response = dict(response)
+    if held.location_value:
+        response["Location"] = {"Value": held.location_value,
+                                "Source": held.location_source,
+                                "Type": held.location_type}
+    else:
+        response.pop("Location", None)
+    # No place has been shared yet: there is nothing to guard.
+    if bookmark.progress_percent is None and not bookmark.location_value:
+        return response
+    table = ub.KoboPlaceEchoGuard.__table__
+    values = dict(device_id=int(device_id), book_id=int(book.id),
+                  location_value=held.location_value, location_source=held.location_source,
+                  progress_percent=held.progress_percent,
+                  content_source_progress_percent=held.content_source_progress_percent,
+                  shared_received_at=bookmark.server_modified_at, armed_at=_now())
+    insert = sqlite_insert(table).values(**values)
+    ub.session.execute(insert.on_conflict_do_update(
+        index_elements=["device_id", "book_id"],
+        set_={key: value for key, value in values.items()
+              if key not in ("device_id", "book_id")},
+        where=~_same(table.c.shared_received_at, bookmark.server_modified_at),
+    ))
+    return response
+
+
+def _span_ordinal(value):
+    match = re.fullmatch(r"kobo\.([0-9]{1,9})\.([0-9]{1,9})", value or "")
+    return tuple(map(int, match.groups())) if match else None
+
+
+def _first_spine_source(book):
+    from .kepub_alignment import _kepub
+    _epub, path = _book_paths(book)
+    if not path:
+        return None
+    kepub = _kepub(path)
+    return kepub.documents[0].member if kepub and kepub.documents else None
+
+
+def is_inexact_echo(device_id, book, place):
+    """Judge before journaling. A real move or expired guard clears the arm."""
+    guard = active_echo_guard(device_id, book.id)
+    if guard is None:
+        # Do not take SQLite's write lock for the overwhelmingly common case
+        # of no guard: concurrent bookmark writers must still reach the CAS.
+        table = ub.KoboPlaceEchoGuard.__table__
+        expired = ub.session.execute(select(table.c.id).where(
+            table.c.device_id == int(device_id), table.c.book_id == int(book.id),
+        )).first()
+        if expired is not None:
+            clear_echo_guard(device_id, book.id)
+        return False
+    location = place.get("Location") or {}
+    value, source = location.get("Value"), location.get("Source")
+    progress = place.get("ProgressPercent")
+    echo = not value or (value == guard.location_value and source == guard.location_source)
+    if not echo and progress == 0:
+        echo = source == _first_spine_source(book)
+    incoming, armed = _span_ordinal(value), _span_ordinal(guard.location_value)
+    if (not echo and source == guard.location_source and incoming and armed
+            and incoming <= armed and progress is not None
+            and guard.progress_percent is not None):
+        # No measured chapter page step is available: use the spec's
+        # conservative fallback of at most one book percentage point.
+        delta = guard.progress_percent - progress
+        echo = 0 <= delta <= 1
+    if not echo:
+        clear_echo_guard(device_id, book.id)
+    return echo

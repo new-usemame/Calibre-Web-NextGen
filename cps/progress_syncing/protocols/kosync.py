@@ -651,7 +651,8 @@ def _hold_feed_clock(reading_state_id, *, moved):
 
 
 def update_book_read_status(user, book_id: int, percentage: float, *,
-                            shared_accepted=False, client_at=None):
+                            shared_accepted=False, client_at=None,
+                            source_document=None, source_progress=None):
     """
     Update the user's ReadBook status based on reading progress percentage.
 
@@ -722,9 +723,12 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
     # savepoint/transaction boundary; position acceptance itself is SQL-only.
     ub.session.flush()
     if shared_accepted:
-        from ...services.kobo_place_gate import write_shared_bookmark
+        from ...services.kobo_place_gate import write_shared_bookmark, koreader_span
+        location, identity = koreader_span(book_id, source_document, source_progress)
         outcome = write_shared_bookmark(
             bookmark.id, client_at=client_at, progress_percent=percentage,
+            location=location, location_supplied=location is not None,
+            shared_from_koreader=True, span_kepub_identity=identity,
             session=ub.session,
         )
         ub.session.expire(bookmark)
@@ -2454,7 +2458,9 @@ def update_progress():
                         with ub.begin_contained_nested(ub.session):
                             update_book_read_status(user, book_id, proposed_percentage,
                                                     shared_accepted=True,
-                                                    client_at=report.client_at)
+                                                    client_at=report.client_at,
+                                                    source_document=journal_document,
+                                                    source_progress=journal_progress)
                     except Exception:
                         log.warning("Could not mirror accepted shared place for book %s",
                                     book_id, exc_info=True)

@@ -1457,6 +1457,16 @@ class KoboBookmark(Base):
                                 default=lambda: datetime.now(timezone.utc),
                                 onupdate=lambda: datetime.now(timezone.utc))
 
+    # PR 3b: a KOReader-derived span is usable only for this KEPUB identity.
+    shared_from_koreader = Column(Boolean, nullable=False, default=False, server_default='0')
+    span_kepub_identity = Column(String, nullable=True)
+    # Retain the native fallback before a converted span replaces Location.
+    native_location_value = Column(String)
+    native_location_source = Column(String)
+    native_location_type = Column(String)
+    native_progress_percent = Column(Float)
+    native_content_source_progress_percent = Column(Float)
+
     # The parent FK is how every reader of this table reaches it. Unindexed,
     # SQLite reports "AUTOMATIC PARTIAL COVERING INDEX" — it rebuilds a
     # throwaway index on each statement (measured on the "Recent" order).
@@ -1503,6 +1513,21 @@ class Device(Base):
         Index('uq_device_account_browser', 'user_id', unique=True,
               sqlite_where=text("kind = 'webreader' AND created_by = 'account-browser'")),
     )
+
+
+class KoboPlaceEchoGuard(Base):
+    """An inexact delivery's held place, independent of the mutable journal."""
+    __tablename__ = 'kobo_place_echo_guard'
+    id = Column(Integer, primary_key=True)
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False)
+    book_id = Column(Integer, nullable=False)
+    location_value = Column(String)
+    location_source = Column(String)
+    progress_percent = Column(Float)
+    content_source_progress_percent = Column(Float)
+    shared_received_at = Column(DateTime)
+    armed_at = Column(DateTime, nullable=False)
+    __table_args__ = (UniqueConstraint('device_id', 'book_id'),)
 
 
 class KoboSharePlaceNudge(Base):
@@ -4593,6 +4618,28 @@ def migrate_device_share_place(engine, _session):
             "WHERE reading_status IS NOT NULL AND status_received_at IS NULL"))
 
 
+def migrate_kobo_place_delivery(engine, _session):
+    """PR 3b additive, idempotent provenance and inexact-delivery guard."""
+    for name, ddl in (
+        ("shared_from_koreader", "shared_from_koreader BOOLEAN NOT NULL DEFAULT 0"),
+        ("span_kepub_identity", "span_kepub_identity TEXT"),
+        ("native_location_value", "native_location_value TEXT"),
+        ("native_location_source", "native_location_source TEXT"),
+        ("native_location_type", "native_location_type TEXT"),
+        ("native_progress_percent", "native_progress_percent FLOAT"),
+        ("native_content_source_progress_percent", "native_content_source_progress_percent FLOAT"),
+    ):
+        _add_column_if_missing(engine, "kobo_bookmark", name, ddl)
+    _run_ddl_with_retry(engine, (
+        "CREATE TABLE IF NOT EXISTS kobo_place_echo_guard ("
+        "id INTEGER NOT NULL PRIMARY KEY, "
+        "device_id INTEGER NOT NULL REFERENCES device (id) ON DELETE CASCADE, "
+        "book_id INTEGER NOT NULL, location_value TEXT, location_source TEXT, "
+        "progress_percent FLOAT, content_source_progress_percent FLOAT, "
+        "shared_received_at DATETIME, armed_at DATETIME NOT NULL, "
+        "UNIQUE (device_id, book_id))"))
+
+
 def migrate_kobo_bookmark_receipt(engine, _session):
     """Add the shared Kobo bookmark's receipt clock and the turn-on nudges.
 
@@ -5558,6 +5605,7 @@ def migrate_Database(_session):
     migrate_device_reading_position_slice(engine, _session)
     migrate_device_share_place(engine, _session)
     migrate_kobo_bookmark_receipt(engine, _session)
+    migrate_kobo_place_delivery(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)

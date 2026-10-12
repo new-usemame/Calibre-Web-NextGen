@@ -825,6 +825,7 @@ def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
                 kobo_place_gate.refresh_share_place_nudges(device, session=session)
             elif turned_off:
                 kobo_place_gate.clear_share_place_nudges(device.id, session=session)
+                kobo_place_gate.clear_echo_guard(device.id, session=session)
     _commit_required(commit)
     return device
 

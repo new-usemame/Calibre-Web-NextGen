@@ -29,6 +29,7 @@ import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi'
 import { flattenToc, tocFromNavigation, type TocItem } from '../lib/reader/toc';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
 import { getReaderContentUrl, withLookupMode } from '../lib/readerTarget';
+import { readerBookmarkBody } from '../lib/readerBookmark';
 import {
   classifyHref, inBookTarget, isNoteElement, isNoterefAnchor, isOpenableHref,
   sanitizeNoteElement,
@@ -1216,15 +1217,7 @@ export function Reader({ id }: { id: string }) {
     // latest observed mutation and are dropped entirely if the reader unmounts
     // first, so the retry bookkeeping would silently stop happening.
     saveBookmark.mutateAsync(
-      pct != null
-        ? {
-            format: 'epub', bookmark: cfi, percentage: pct,
-            share_with_devices: lastShareWithDevicesRef.current,
-          }
-        : {
-            format: 'epub', bookmark: cfi,
-            share_with_devices: lastShareWithDevicesRef.current,
-          },
+      readerBookmarkBody(cfi, pct, lastShareWithDevicesRef.current),
     ).then(() => {
       saveRetries.current = 0;
       saveFailureAnnounced.current = false;
@@ -1957,8 +1950,7 @@ export function Reader({ id }: { id: string }) {
           const pct = lastPercentRef.current;
           void apiPost(
             `/api/v1/books/${id}/bookmark`,
-            pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
-                        : { format: 'epub', bookmark: cfi },
+            readerBookmarkBody(cfi, pct, lastShareWithDevicesRef.current),
             { keepalive: true },
           );
         }

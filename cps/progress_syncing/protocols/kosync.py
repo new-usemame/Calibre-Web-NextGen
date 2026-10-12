@@ -651,7 +651,10 @@ def _hold_feed_clock(reading_state_id, *, moved):
 
 
 def update_book_read_status(user, book_id: int, percentage: float, *,
-                            shared_accepted=False, client_at=None):
+                            shared_accepted=False, client_at=None,
+                            source_document=None, source_progress=None,
+                            web_report=False, source_cfi=None, source_format="epub",
+                            report_received_at=None, web_status_accepted=True):
     """
     Update the user's ReadBook status based on reading progress percentage.
 
@@ -681,8 +684,12 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
     (``kobo_place_gate.write_shared_bookmark``), so a deliberate backward
     move reaches the Kobo bookmark as a percentage, a newer Kobo report is
     not overwritten, and the Kobo feed clock moves past every Kobo's
-    frontier. The bookmark's Location is left as it is (exact
-    span is PR 3b). Every other caller keeps the forward-only percentage.
+    frontier. KOReader locators and Browser EPUB CFIs can become exact spans
+    with 3b provenance. A Browser conversion failure clears any older exact
+    Location; every historical caller keeps the forward-only percentage.
+    Browser-derived status is separately clock-checked and only follows an
+    accepted own status and shared place. Reader-open status has no place and
+    uses the Browser gate directly.
 
     Note:
         Caller is responsible for committing the session.
@@ -707,6 +714,11 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
             read_status=ub.ReadBook.STATUS_UNREAD,
             times_started_reading=0,
         )
+        if web_report:
+            # Creation is not a status observation. The first web report must
+            # not lose to the default timestamp applied during this flush.
+            from sqlalchemy import null
+            book_read.last_modified = null()
         ub.session.add(book_read)
     reading_state = book_read.kobo_reading_state
     bookmark = (
@@ -722,9 +734,18 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
     # savepoint/transaction boundary; position acceptance itself is SQL-only.
     ub.session.flush()
     if shared_accepted:
-        from ...services.kobo_place_gate import write_shared_bookmark
+        from ...services.kobo_place_gate import write_shared_bookmark, koreader_span
+        if web_report:
+            from ...services.reading_position import web_span
+            location, identity = web_span(book_id, source_cfi, source_format)
+        else:
+            location, identity = koreader_span(book_id, source_document, source_progress)
         outcome = write_shared_bookmark(
             bookmark.id, client_at=client_at, progress_percent=percentage,
+            location=location, location_supplied=web_report or location is not None,
+            content_source_supplied=web_report,
+            shared_from_koreader=True, span_kepub_identity=identity,
+            received_at=report_received_at,
             session=ub.session,
         )
         ub.session.expire(bookmark)
@@ -748,6 +769,8 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
         )
         return device_positions.PositionWriteOutcome(False, None)
     accepted_percentage = outcome.percentage
+    if web_report and not outcome.accepted:
+        return outcome
     if outcome.accepted:
         # Completing a partial legacy graph is useful only for an accepted
         # write. A rejected equal/backward sample must not add Statistics or
@@ -756,9 +779,13 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
         _ensure_visible_reading_state(book_read, user_id, book_id)
     from ...services.reading_status import update_automatic_read_status
     new_status = read_status_for_percentage(accepted_percentage)
-    status_accepted = update_automatic_read_status(
-        book_read, new_status, touch_unchanged=outcome.accepted,
-    )
+    status_accepted = False
+    if not web_report or web_status_accepted:
+        status_accepted = update_automatic_read_status(
+            book_read, new_status, touch_unchanged=outcome.accepted,
+            observed_clock=client_at if web_report else None,
+            require_newer_clock=web_report,
+        )
 
     if not outcome.accepted:
         log.info(
@@ -899,7 +926,7 @@ def get_progress_record(user_id, document_checksum, book_id,
 
 def record_percentage_only_progress(user_id, book_id, percentage: float,
                                     device: str, device_id=None,
-                                    _return_outcome=False):
+                                    _return_outcome=False, web_cfi=None):
     """Publish a percentage-only reading position onto the carrier KOReader reads.
 
     KOReader pulls from ``KOSyncProgress``; until now the only writer was
@@ -933,6 +960,7 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
         device_id=device_id,
         timestamp=now,
         equal_accepts=False,
+        web_cfi=web_cfi if device == WEB_READER_DEVICE else None,
     )
     if not outcome.accepted:
         log.debug(
@@ -1087,7 +1115,7 @@ def _journal_koreader_report(user_id, internal_device_id, book_id, document,
 
 def _conditional_kosync_progress(
     *, user_id, document, progress, percentage, device, device_id, timestamp,
-    equal_accepts, same_device_rewind=False,
+    equal_accepts, same_device_rewind=False, web_cfi=None,
 ):
     """Run the shared SQL arbiter for the KOReader position carrier."""
     document = str(document)
@@ -1099,6 +1127,7 @@ def _conditional_kosync_progress(
         "device_id": device_id,
         "timestamp": timestamp,
         "client_modified_at": None,
+        "web_cfi": web_cfi,
     }
     return device_positions.conditional_position_update(
         model=KOSyncProgress,
@@ -1113,6 +1142,7 @@ def _conditional_kosync_progress(
             "device_id": device_id,
             "timestamp": timestamp,
             "client_modified_at": None,
+            "web_cfi": web_cfi,
         },
         insert_values=payload,
         conflict_columns=(
@@ -2429,13 +2459,15 @@ def update_progress():
                         dict(progress=current.progress, percentage=current.percentage,
                              device=current.device, device_id=current.device_id,
                              timestamp=current.timestamp,
-                             client_modified_at=current.client_modified_at),
+                             client_modified_at=current.client_modified_at,
+                             web_cfi=current.web_cfi),
                         client_column="client_modified_at", server_column="timestamp",
                         candidate=kosync_place.shared_report(current))
                 shared_accepted = kosync_place.latest_write(
                     KOSyncProgress, dict(user_id=user.id, document=canonical_document),
                     dict(progress=stored_progress, percentage=proposed_percentage,
                          device=device, device_id=device_id, timestamp=received_at,
+                         web_cfi=None,
                          client_modified_at=report.client_at),
                     client_column="client_modified_at", server_column="timestamp", candidate=report)
                 if shared_accepted:
@@ -2454,7 +2486,9 @@ def update_progress():
                         with ub.begin_contained_nested(ub.session):
                             update_book_read_status(user, book_id, proposed_percentage,
                                                     shared_accepted=True,
-                                                    client_at=report.client_at)
+                                                    client_at=report.client_at,
+                                                    source_document=journal_document,
+                                                    source_progress=journal_progress)
                     except Exception:
                         log.warning("Could not mirror accepted shared place for book %s",
                                     book_id, exc_info=True)
@@ -2490,6 +2524,7 @@ def update_progress():
                     device=progress_record.device,
                     device_id=progress_record.device_id,
                     timestamp=progress_record.timestamp,
+                    web_cfi=progress_record.web_cfi,
                     equal_accepts=(
                         progress_record.progress != PERCENTAGE_ONLY_LOCATOR
                     ),

@@ -825,6 +825,7 @@ def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
                 kobo_place_gate.refresh_share_place_nudges(device, session=session)
             elif turned_off:
                 kobo_place_gate.clear_share_place_nudges(device.id, session=session)
+                kobo_place_gate.clear_echo_guard(device.id, session=session)
     _commit_required(commit)
     return device
 
@@ -939,6 +940,13 @@ def annotation_devices_list():
         if error_response is not None:
             return error_response, error_status
         limit, offset = pagination
+        from .services.device_registry import ensure_webreader_device_best_effort
+        from .services.share_place import gates_enforced
+        gates = gates_enforced(int(current_user.id))
+        if gates:
+            # The web reader's Share my place row only matters once the
+            # gates read it; until then a list stays read-only.
+            ensure_webreader_device_best_effort(user_id=current_user.id)
         devices, total = list_annotation_devices(
             user_id=current_user.id, session=ub.session, active_only=active_only,
             limit=limit, offset=offset, return_total=True,
@@ -949,6 +957,7 @@ def annotation_devices_list():
         return _database_error_response("device list")
     return jsonify({
         "devices": devices,
+        "share_place_gates": gates,
         "limit": limit,
         "offset": offset,
         "total": total,

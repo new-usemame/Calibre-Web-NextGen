@@ -12,6 +12,9 @@ pending pages are acknowledged inside the handler. Hardcover is recorded at
 """
 
 import inspect
+import logging
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -288,17 +291,42 @@ def kw(monkeypatch, read_column_class):
         session.expire_all()
         return session.query(read_column_class).filter_by(book=book.id).all()
 
+    library = tempfile.TemporaryDirectory(prefix="kobo-state-world-")
+
+    def hold_current_kepub(device, *held):
+        """``device`` completed a download of each book's current library
+        KEPUB (real ``record_download``), so a span it reports, or is sent,
+        addresses a file it provably holds (spec section 14c)."""
+        import cps
+        from cps import config
+        from cps.services.kobo_post_download_restore import record_download
+        monkeypatch.setattr(config, "get_book_path", lambda: library.name)
+        monkeypatch.setattr(cps, "calibre_db", fake_calibre_db, raising=False)
+        for book in held:
+            folder = os.path.join(library.name, book.path)
+            os.makedirs(folder, exist_ok=True)
+            kepub = os.path.join(folder, f"book-{book.id}.kepub")
+            if not os.path.exists(kepub):
+                with open(kepub, "wb") as stream:
+                    stream.write(b"PK\x05\x06" + bytes(18))  # an empty zip
+            record_download(device_id=device.id, book_id=book.id, book_format="kepub",
+                            log=logging.getLogger("kobo_state_world"))
+        session.commit()
+        session.expire_all()
+
     world = SimpleNamespace(
         a=kobo_a, b=kobo_b, books=books, session=session, kobo=kobo, ub=ub,
         sync=sync, settle=settle, frontier=frontier, put=put, get=get,
         share=share, seed_shared=seed_shared, journal=journal, shared=shared,
         counts=counts, read_column=read_column, hardcover=hardcover, tokens=tokens,
+        hold_current_kepub=hold_current_kepub,
     )
     try:
         yield world
     finally:
         session.close()
         engine.dispose()
+        library.cleanup()
 
 
 def _states(response):
@@ -330,3 +358,27 @@ def _timestamps(value, path=""):
 
 
 EMPTY = {"read": None, "state": None, "bookmark": None, "statistics": None}
+
+
+def second_after_receipts(kw, device, book):
+    """The first whole client second after every receipt the server stored
+    for ``book`` (``device``'s journal row and the shared bookmark).
+
+    A report ordered at its receipt (a clock too fast to trust, or none) is
+    ordered at a server time the test does not choose; a wall clock read
+    before that PUT is not a safe base on a loaded worker, where the receipt
+    can land seconds later. Date a report that must be newer from this.
+    """
+    from cps import ub
+    kw.session.expire_all()
+    stamps = []
+    row = kw.journal(device, book)
+    if row is not None:
+        stamps += [row.server_modified_at, row.status_received_at]
+    state = kw.session.query(ub.KoboReadingState).filter_by(
+        user_id=USER_ID, book_id=book.id).one_or_none()
+    if state is not None and state.current_bookmark is not None:
+        stamps.append(state.current_bookmark.server_modified_at)
+    stamps = [_naive(stamp) for stamp in stamps if stamp is not None]
+    assert stamps, "no stored receipt for the book"
+    return max(stamps).replace(microsecond=0) + timedelta(seconds=1)

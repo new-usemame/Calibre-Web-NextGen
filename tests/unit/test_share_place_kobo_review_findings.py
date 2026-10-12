@@ -268,7 +268,11 @@ def test_turn_on_own_newer_repair_sends_no_older_shared_state(kw):
 # == 4. Same client second, receipt tiebreak ==================================
 
 def test_a_same_second_receipt_winner_reaches_the_other_kobo(kw):
+    """Both Kobos provably hold the current KEPUB (completed downloads), so
+    the winner's span reaches the other one exactly (spec 14c)."""
     book = kw.books[0]
+    kw.hold_current_kepub(kw.a, book)
+    kw.hold_current_kepub(kw.b, book)
     kw.seed_shared(book, 10, _now() - timedelta(hours=2))
     kw.share(kw.a, True)
     kw.share(kw.b, True)

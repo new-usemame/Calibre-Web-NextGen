@@ -61,10 +61,12 @@ def gates_enforced(monkeypatch):
     monkeypatch.setenv(GATES_ENV, "1")
 
 
-def _report(clock, *, percent=None, status=None, statistics=None):
+def _report(clock, *, percent=None, status=None, statistics=None, location=None):
+    bookmark = None if percent is None else {"ProgressPercent": percent}
+    if bookmark is not None and location is not None:
+        bookmark["Location"] = location
     return {"LastModified": _kts(clock),
-            "CurrentBookmark": (None if percent is None
-                                else {"ProgressPercent": percent}),
+            "CurrentBookmark": bookmark,
             "Statistics": statistics,
             "StatusInfo": None if status is None else {"Status": status}}
 
@@ -116,27 +118,40 @@ def test_the_later_receipt_wins_a_trusted_fast_clock_tie(kw, field):
 
 
 def test_a_checked_kobo_is_served_a_shared_trusted_fast_clock_tie_winner(kw):
+    """Both Kobos provably hold the current KEPUB (completed downloads), so
+    the winner's place reaches the other one exactly (spec 14c)."""
     book = kw.books[0]
+    kw.hold_current_kepub(kw.a, book)
+    kw.hold_current_kepub(kw.b, book)
     kw.share(kw.a, True)
     kw.share(kw.b, True)
     clock = _now() + timedelta(minutes=2)
-    _raw_put(kw, kw.a, book, _report(clock, percent=50))
+
+    def span(percent):
+        return {"Value": f"kobo.{percent}.1", "Type": "KoboSpan", "Source": "OEBPS/chap.xhtml"}
+
+    _raw_put(kw, kw.a, book, _report(clock, percent=50, location=span(50)))
     time.sleep(0.02)
-    _raw_put(kw, kw.b, book, _report(clock, percent=75))
+    _raw_put(kw, kw.b, book, _report(clock, percent=75, location=span(75)))
     assert kw.shared(book)["bookmark"][0] == 75
 
-    assert kw.get(kw.a, book)["CurrentBookmark"]["ProgressPercent"] == 75
+    served = kw.get(kw.a, book)["CurrentBookmark"]
+    assert served["ProgressPercent"] == 75
+    assert served["Location"]["Value"] == "kobo.75.1"
 
 
 def test_a_switch_off_journal_rows_fast_clock_loses_to_an_honest_newer_report(
         kw, monkeypatch):
     book = kw.books[0]
-    now = _now()
     monkeypatch.delenv(GATES_ENV, raising=False)
-    kw.put(kw.a, book, 70, now + timedelta(days=1))
+    kw.put(kw.a, book, 70, _now() + timedelta(days=1))
     monkeypatch.setenv(GATES_ENV, "1")
 
-    kw.put(kw.a, book, 20, now + timedelta(seconds=1))
+    # The fast row is ordered by its receipt; the honest clock is read after
+    # that receipt, so it is newer however long the first PUT took. (Read
+    # before it, a slow first PUT could land its receipt past the honest
+    # clock, and the test then failed under load.)
+    kw.put(kw.a, book, 20, _now() + timedelta(seconds=1))
 
     assert kw.get(kw.a, book)["CurrentBookmark"]["ProgressPercent"] == 20
 

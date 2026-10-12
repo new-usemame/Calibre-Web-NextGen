@@ -5207,6 +5207,32 @@ msgstr "Champs personnalisés sur les fiches de livres"
 msgid "Display name for {name}"
 msgstr "Nom d’affichage pour {name}"
 
+# Share my place (Devices page)
+#: cps/spa_strings.py
+msgid "Share my place"
+msgstr "Partager ma position"
+
+#: cps/spa_strings.py
+msgid ""
+"Devices with this on open each book where you last stopped on any of them. "
+"Turn it off for a device someone else reads on."
+msgstr ""
+"Les appareils où cette option est activée ouvrent chaque livre là où vous "
+"vous êtes arrêté sur l’un d’eux. Désactivez-la pour un appareil sur lequel "
+"lit quelqu’un d’autre."
+
+#: cps/spa_strings.py
+msgid "Could not save Share my place. Try again."
+msgstr "Impossible d’enregistrer Partager ma position. Réessayez."
+
+#: cps/spa_strings.py
+msgid ""
+"Always shares its place. Install or update the NextGen Sync plugin on this "
+"device to choose."
+msgstr ""
+"Partage toujours sa position. Installez ou mettez à jour le module "
+"d’extension NextGen Sync sur cet appareil pour choisir."
+
 #: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(aucun texte enregistré)"

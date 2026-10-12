@@ -15,7 +15,11 @@ import { KoboPairing } from '../components/KoboPairing';
 import styles from './Devices.module.css';
 
 interface Counts { origin_count: number; assigned_count: number }
-interface DevicePage { devices: Device[]; limit: number; offset: number; total: number }
+interface DevicePage {
+  devices: Device[]; limit: number; offset: number; total: number;
+  /** Server switch for Share my place (spec 2026-10-11 §12); the UI stays as before while it is off. */
+  share_place_gates?: boolean;
+}
 
 const DEVICE_PAGE_SIZE = 100;
 
@@ -31,13 +35,15 @@ function isDeviceStale(lastSeen: string | null): boolean {
   return timestamp !== null && Date.now() - timestamp > 30 * 86400000;
 }
 
-/** The account Browser is stored as "Browser"; show it in the reader's language. */
-function sourceName(device: Device, t: TFunction): string {
-  return device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label;
+/** The account Browser is stored as "Browser"; show it in the reader's language.
+ *  Use the same name as its detail page and reading-source heading. */
+function sourceName(device: Device, t: TFunction, sharePlace = false): string {
+  if (device.type !== 'webreader' || device.label !== 'Browser') return device.label;
+  return sharePlace ? t('Web reader') : t('Browser');
 }
 
-function RemoveDialog({ device, counts, onCancel, onRemove, pending, error }: {
-  device: Device; counts: Counts; onCancel: () => void; onRemove: () => void;
+function RemoveDialog({ device, name, counts, onCancel, onRemove, pending, error }: {
+  device: Device; name: string; counts: Counts; onCancel: () => void; onRemove: () => void;
   pending: boolean; error: boolean;
 }) {
   const t = useT();
@@ -48,7 +54,7 @@ function RemoveDialog({ device, counts, onCancel, onRemove, pending, error }: {
     <div className={styles.scrim}>
       <div ref={dialogRef} className={styles.dialog} role="alertdialog" aria-modal="true" tabIndex={-1}
         aria-labelledby={`${descriptionId}-title`} aria-describedby={descriptionId}>
-        <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: sourceName(device, t) })}</h2>
+        <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name })}</h2>
         <div id={descriptionId}>
           {counts.origin_count > 0 && <p>{t('{n} annotations were made on this source. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
           {counts.assigned_count > 0 && <p>{t('{n} annotations assigned to this source will become Unknown device.', { n: counts.assigned_count })}</p>}
@@ -80,6 +86,8 @@ export function Devices() {
   const [deviceOffset, setDeviceOffset] = useState(0);
   const [preflightError, setPreflightError] = useState(false);
   const [preflightPending, setPreflightPending] = useState(false);
+  const [sharePending, setSharePending] = useState<ReadonlySet<string>>(() => new Set());
+  const [shareError, setShareError] = useState<string | null>(null);
   const preflightRef = useRef(false);
   const undoRef = useRef<HTMLButtonElement>(null);
   const focusedUndoRef = useRef<Device | null>(null);
@@ -121,6 +129,8 @@ export function Devices() {
       document.removeEventListener('keydown', dismissOnEscape);
     };
   }, [menu]);
+  const sharePlaceGates = data?.share_place_gates === true;
+  const displayName = (device: Device) => sourceName(device, t, sharePlaceGates);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['annotation-devices'] });
   const rename = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => apiPatch(`/api/annotations/devices/${id}`, { label: name }),
@@ -130,7 +140,7 @@ export function Devices() {
     mutationFn: (device: Device) => apiDelete(`/api/annotations/devices/${device.public_id}`),
     onSuccess: (_result, device) => {
       setRemoving(null); restore.reset(); setUndoDevice(device); refresh();
-      announce(t('{name} removed.', { name: sourceName(device, t) }));
+      announce(t('{name} removed.', { name: displayName(device) }));
     },
   });
   const restore = useMutation({
@@ -140,6 +150,32 @@ export function Devices() {
       document.getElementById('main')?.focus();
     },
   });
+
+  // Share my place: the checkbox flips at once; a failed save puts it back
+  // and says so beside it. One request per device at a time.
+  const setCachedSharePlace = (id: string, value: boolean) => {
+    queryClient.setQueryData<DevicePage>(['annotation-devices', deviceOffset], (old) => old && {
+      ...old,
+      devices: old.devices.map(item => (item.public_id === id ? { ...item, share_place: value } : item)),
+    });
+  };
+  const toggleSharePlace = async (device: Device, next: boolean) => {
+    const id = device.public_id;
+    if (sharePending.has(id)) return;
+    setShareError(null);
+    setSharePending(prev => new Set(prev).add(id));
+    await queryClient.cancelQueries({ queryKey: ['annotation-devices'] });
+    setCachedSharePlace(id, next);
+    try {
+      const updated = await apiPatch<Partial<Device>>(`/api/annotations/devices/${id}`, { share_place: next });
+      setCachedSharePlace(id, typeof updated?.share_place === 'boolean' ? updated.share_place : next);
+    } catch {
+      setCachedSharePlace(id, !next);
+      setShareError(id);
+    } finally {
+      setSharePending((prev) => { const rest = new Set(prev); rest.delete(id); return rest; });
+    }
+  };
 
   const removePendingRef = useRef(false);
   removePendingRef.current = remove.isPending;
@@ -179,7 +215,6 @@ export function Devices() {
   const devices = data?.devices ?? [];
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE));
   const currentPage = Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1;
-  const displayName = (device: Device) => sourceName(device, t);
   return (
     <div className={styles.container}>
       <Link href="/account" className={styles.back}><ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Account')}</Link>
@@ -213,7 +248,9 @@ export function Devices() {
                 {group === 'browsers'
                   ? <Globe size={18} aria-hidden="true" focusable={false} />
                   : <Smartphone size={18} aria-hidden="true" focusable={false} />}
-                {group === 'browsers' ? t('Browser reading source') : t('E-readers')}
+                {group === 'browsers'
+                  ? (sharePlaceGates ? t('Web reader') : t('Browser reading source'))
+                  : t('E-readers')}
               </h2>
               {group === 'browsers' && (
                 <p className={styles.sectionHint}>{t('All browsers and computers signed in to your account share one Browser reading source.')}</p>
@@ -237,7 +274,7 @@ export function Devices() {
                       <button type="button" disabled={rename.isPending} onClick={() => { setEditing(null); renameInvokerRef.current?.focus(); }}>{t('Cancel')}</button>
                       <span id={`rename-error-${device.public_id}`} role="alert" className={styles.renameError}>{rename.isError ? t('Could not rename this source. Try again.') : ''}</span>
                     </form>
-                  ) : <h3 className={styles.cardName}><Link href={`/account/devices/${device.public_id}`}>{displayName(device)}</Link></h3>}
+                  ) : <h3 className={styles.cardName}><Link id={`device-name-${device.public_id}`} href={`/account/devices/${device.public_id}`}>{displayName(device)}</Link></h3>}
                   <p className={styles.deviceMeta}>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
                 </div>
                 <div className={styles.cardActions}>
@@ -300,6 +337,26 @@ export function Devices() {
                   </span>
                 </p>
               )}
+              {sharePlaceGates && device.place_control === 'per_device' && (
+                <div className={styles.sharePlace}>
+                  <label className={styles.sharePlaceLabel}>
+                    <input type="checkbox" checked={device.share_place === true}
+                      disabled={sharePending.has(device.public_id)}
+                      aria-labelledby={`share-place-${device.public_id} device-name-${device.public_id}`}
+                      aria-describedby={shareError === device.public_id
+                        ? `share-place-error-${device.public_id} share-place-help`
+                        : 'share-place-help'}
+                      onChange={event => void toggleSharePlace(device, event.currentTarget.checked)} />
+                    <span id={`share-place-${device.public_id}`}>{t('Share my place')}</span>
+                  </label>
+                  <span id={`share-place-error-${device.public_id}`} role="alert" className={styles.sharePlaceError}>
+                    {shareError === device.public_id ? t('Could not save Share my place. Try again.') : ''}
+                  </span>
+                </div>
+              )}
+              {sharePlaceGates && device.place_control === 'always_shared' && (
+                <p className={styles.sharePlaceNote}>{t('Always shares its place. Install or update the NextGen Sync plugin on this device to choose.')}</p>
+              )}
               {device.type !== 'webreader' && <button type="button" className={styles.inventoryToggle}
                 aria-expanded={expandedInventory === device.public_id}
                 aria-controls={`device-inventory-${device.public_id}`}
@@ -317,6 +374,9 @@ export function Devices() {
           </ul>
             </section>;
           })}
+          {sharePlaceGates && <p id="share-place-help" className={styles.sharePlaceHelp}>
+            {t('Devices with this on open each book where you last stopped on any of them. Turn it off for a device someone else reads on.')}
+          </p>}
           {(data?.total ?? 0) > DEVICE_PAGE_SIZE && (
             <nav className={styles.pagination} aria-label={t('Devices and browsers')}>
               <button
@@ -348,7 +408,7 @@ export function Devices() {
         <button ref={undoRef} type="button" disabled={restore.isPending || remove.isPending || preflightPending} onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>
         <span role="alert" className={styles.undoError}>{restore.isError ? t('Could not restore this source. Try again.') : ''}</span>
       </div>}
-      {removing && <RemoveDialog device={removing.device} counts={removing.counts}
+      {removing && <RemoveDialog device={removing.device} name={displayName(removing.device)} counts={removing.counts}
         onCancel={cancelRemoval} pending={remove.isPending} error={remove.isError}
         onRemove={() => { if (!remove.isPending) remove.mutate(removing.device); }} />}
     </div>

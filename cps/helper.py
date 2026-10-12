@@ -3637,17 +3637,22 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         log.error("Requested format %s for book id %s not found in database", book_format.upper(), book_id)
         abort(404)
 
+    download_proof = None
     if client == "kobo":
         # The device is about to replace its local copy; remember that so the
         # annotation GET that follows is answered from CWNG's own rows.
         try:
             from flask import g
-            from .services.kobo_post_download_restore import record_download
-            record_download(
+            from .services.kobo_post_download_restore import record_download, completed_download_body
+            download = record_download(
                 device_id=getattr(g, "annotation_origin_device_id", None),
                 book_id=book.id, book_format=book_format, log=log,
                 user_id=getattr(current_user, "id", None),
+                completed=False,
             )
+            if isinstance(download, ub.KoboDeviceBookDownload):
+                download_proof = (download.id, download.downloaded_at,
+                                  download.kepub_file_identity)
         except Exception:
             log.warning("Kobo download ledger update failed for book %s",
                         book.id, exc_info=True)
@@ -3717,10 +3722,31 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             cover_user_id = int(current_user.id)
     except (AttributeError, TypeError, ValueError):
         pass
-    return do_download_file(
+    response = do_download_file(
         book, book_format, client, data1, headers,
         cover_user_id=cover_user_id,
     )
+    from flask import current_app, request
+    if (download_proof and request.method == "GET"
+            and "Range" not in request.headers and response.status_code == 200
+            # Tornado buffers the iterable before writing; only gevent's
+            # chunk-by-chunk writes make exhaustion completion evidence.
+            and request.environ.get("SERVER_SOFTWARE", "").startswith("gevent/")):
+        try:
+            from .services.kobo_place_gate import _book_paths
+            _epub, kepub_path = _book_paths(book)
+            # Streaming runs after Flask has popped the request context. Keep
+            # only scalar proof inputs, the app, and the thread-safe DB bind.
+            response.response = completed_download_body(
+                response.response, application=current_app._get_current_object(),
+                bind=ub.session.get_bind(), download_id=download_proof[0],
+                downloaded_at=download_proof[1], file_identity=download_proof[2],
+                kepub_path=kepub_path, headers=response.headers, log=log,
+            )
+        except Exception:
+            log.warning("Could not track Kobo download completion for book %s",
+                        book.id, exc_info=True)
+    return response
 
 
 def clear_cover_thumbnail_cache(book_id):

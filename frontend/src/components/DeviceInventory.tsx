@@ -41,6 +41,10 @@ export interface Device {
   unseeded_books?: number;
   authority?: AuthorityRollup;
   active: boolean;
+  /** Opt-in place sharing between devices (spec 2026-10-11); off by default. */
+  share_place?: boolean;
+  /** per_device: the device's own requests can honor the checkbox; always_shared: an old KOReader plugin or stock KOReader. */
+  place_control?: 'per_device' | 'always_shared';
 }
 
 interface InventoryBook {

@@ -306,3 +306,16 @@
 .undoError { flex-basis: 100%; font-size: var(--fs-sm); }
 .deviceWaiting { grid-template-columns: minmax(0, 1fr) auto; }
 @media (max-width: 600px) { .deviceWaiting { grid-template-columns: minmax(0, 1fr); } }
+
+/* Share my place: one real checkbox per card, set apart from the read-only
+   stats by a hairline so it reads as the card's one setting. The help line is
+   shared by every card (each checkbox points at it with aria-describedby). */
+.sharePlace { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+.sharePlaceLabel { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; color: var(--text); font-weight: var(--fw-medium); cursor: pointer; }
+.sharePlaceLabel input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: inherit; }
+.sharePlaceLabel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sharePlaceLabel:has(input:disabled) { cursor: progress; opacity: .7; }
+.sharePlaceError { flex-basis: 100%; padding: var(--sp-2) var(--sp-3); color: var(--text); background: var(--danger-soft); border: 1px solid var(--danger-border); border-radius: var(--r-md); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.sharePlaceError:empty { display: none; }
+.sharePlaceHelp { margin: calc(-1 * var(--sp-2)) 0 var(--sp-5); color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+.sharePlaceNote { margin: var(--sp-3) 0 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }

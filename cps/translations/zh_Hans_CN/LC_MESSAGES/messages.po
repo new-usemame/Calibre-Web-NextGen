@@ -4877,6 +4877,26 @@ msgid "Display name for {name}"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Share my place"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Devices with this on open each book where you last stopped on any of them. "
+"Turn it off for a device someone else reads on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save Share my place. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Always shares its place. Install or update the NextGen Sync plugin on this "
+"device to choose."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr ""
 

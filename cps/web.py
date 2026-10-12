@@ -359,6 +359,7 @@ def set_bookmark(book_id, book_format):
                 percentage,
                 origin_device_id=g.annotation_origin_device_id,
                 cfi=bookmark_key,
+                fmt=book_format.lower(),
             )
         except Exception as e:
             # Position sharing must never cost the user their bookmark.
@@ -3101,6 +3102,19 @@ def serve_book(book_id, book_format, anyname):
     if not data:
         return "File not in Database"
     range_header = request.headers.get('Range', None)
+    # The SPA opens its archive through /show rather than the classic /read
+    # handler. Under the rollout switch, route that open's status identically.
+    from .services.share_place import gates_enforced
+    if (request.method == "GET" and not range_header
+            and request.args.get("lookup") != "1"
+            and book_format.upper() in ("EPUB", "KEPUB")
+            and current_user.is_authenticated and gates_enforced(int(current_user.id))):
+        try:
+            reading_position.record_gated_reader_open(current_user, book_id)
+            ub.session_commit()
+        except Exception:
+            log.warning("Could not record Browser archive open for book %s", book_id, exc_info=True)
+            ub.session.rollback()
 
     if config.config_use_google_drive:
         try:
@@ -4272,38 +4286,42 @@ def read_book(book_id, book_format):
     # "recently read" sorting reflects every open.
     if current_user.is_authenticated and not lookup_mode:
         try:
-            read_row = ub.session.query(ub.ReadBook).filter(
-                ub.ReadBook.user_id == int(current_user.id),
-                ub.ReadBook.book_id == book_id,
-            ).first()
-            now = datetime.now(timezone.utc)
-            if read_row is None:
-                read_row = ub.ReadBook(
-                    user_id=int(current_user.id),
-                    book_id=book_id,
-                    read_status=ub.ReadBook.STATUS_IN_PROGRESS,
-                    times_started_reading=1,
-                    last_time_started_reading=now,
-                    read_status_choice_at=now,
-                )
-                ub.session.add(read_row)
+            from .services.share_place import gates_enforced
+            if gates_enforced(int(current_user.id)):
+                reading_position.record_gated_reader_open(current_user, book_id)
             else:
-                prev_status = read_row.read_status or 0
-                can_resume = True
-                if (prev_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
-                                    ub.ReadBook.STATUS_ON_HOLD)
-                        and config.config_read_column):
-                    # Opening the ordinary reader is an explicit resume. A
-                    # prior shared finished marker must not mask that resume.
-                    can_resume = helper.set_custom_read_column_value(
-                        book_id, False, source="web reader resume")
-                if prev_status != ub.ReadBook.STATUS_IN_PROGRESS \
-                        and prev_status != ub.ReadBook.STATUS_FINISHED and can_resume:
-                    read_row.times_started_reading = (read_row.times_started_reading or 0) + 1
-                    read_row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
-                if can_resume and prev_status != ub.ReadBook.STATUS_FINISHED:
-                    read_row.read_status_choice_at = now
-                read_row.last_time_started_reading = now
+                read_row = ub.session.query(ub.ReadBook).filter(
+                    ub.ReadBook.user_id == int(current_user.id),
+                    ub.ReadBook.book_id == book_id,
+                ).first()
+                now = datetime.now(timezone.utc)
+                if read_row is None:
+                    read_row = ub.ReadBook(
+                        user_id=int(current_user.id),
+                        book_id=book_id,
+                        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
+                        times_started_reading=1,
+                        last_time_started_reading=now,
+                        read_status_choice_at=now,
+                    )
+                    ub.session.add(read_row)
+                else:
+                    prev_status = read_row.read_status or 0
+                    can_resume = True
+                    if (prev_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                        ub.ReadBook.STATUS_ON_HOLD)
+                            and config.config_read_column):
+                        # Opening the ordinary reader is an explicit resume. A
+                        # prior shared finished marker must not mask that resume.
+                        can_resume = helper.set_custom_read_column_value(
+                            book_id, False, source="web reader resume")
+                    if prev_status != ub.ReadBook.STATUS_IN_PROGRESS \
+                            and prev_status != ub.ReadBook.STATUS_FINISHED and can_resume:
+                        read_row.times_started_reading = (read_row.times_started_reading or 0) + 1
+                        read_row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
+                    if can_resume and prev_status != ub.ReadBook.STATUS_FINISHED:
+                        read_row.read_status_choice_at = now
+                    read_row.last_time_started_reading = now
             ub.session_commit()
         except Exception as e:
             log.debug(f"Failed to record web reader open in book_read_link: {e}")

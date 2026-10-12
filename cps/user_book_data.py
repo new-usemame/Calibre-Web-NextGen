@@ -127,6 +127,7 @@ PER_USER_BOOK_MODELS += (
     "KoboDeviceBookEntitlement",
     "DeviceBookDelivery",
     "DeviceReadingPosition",
+    "KoboPlaceEchoGuard",     # invalidated on merge: bound to one book's file
 )
 
 
@@ -142,6 +143,12 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
     session = session if session is not None else ub.session
     if from_book_id == to_book_id:
         return
+
+    # An inexact-delivery guard names a Location in one book's file. Merging
+    # reading graphs cannot preserve that proof; the next delivery re-arms it.
+    session.query(ub.KoboPlaceEchoGuard).filter(
+        ub.KoboPlaceEchoGuard.book_id.in_((from_book_id, to_book_id)),
+    ).delete(synchronize_session=False)
 
     # Annotations: re-point, but a user may already have the same
     # annotation_id on the kept book (e.g. the device synced both copies).
@@ -527,16 +534,15 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
         )
     pending_state.delete(synchronize_session=False)
 
-    position_state = session.query(ub.DeviceReadingPosition)
-    if book_id is not None:
-        position_state = position_state.filter(
-            ub.DeviceReadingPosition.book_id == book_id)
-    if user_id is not None:
-        device_ids = session.query(ub.Device.id).filter(
-            ub.Device.user_id == user_id).scalar_subquery()
-        position_state = position_state.filter(
-            ub.DeviceReadingPosition.device_id.in_(device_ids))
-    position_state.delete(synchronize_session=False)
+    for model in (ub.DeviceReadingPosition, ub.KoboPlaceEchoGuard):
+        position_state = session.query(model)
+        if book_id is not None:
+            position_state = position_state.filter(model.book_id == book_id)
+        if user_id is not None:
+            device_ids = session.query(ub.Device.id).filter(
+                ub.Device.user_id == user_id).scalar_subquery()
+            position_state = position_state.filter(model.device_id.in_(device_ids))
+        position_state.delete(synchronize_session=False)
 
     # Pull-delivery rows are scoped through Device, just like the Kobo
     # entitlement ledger. A removed metadata book can never satisfy a queued

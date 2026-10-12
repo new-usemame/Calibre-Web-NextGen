@@ -206,7 +206,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     publicId: string;
     device: Device;
   } | null>(null);
-  const registry = useQuery<{ devices: Device[] }>({
+  const registry = useQuery<{ devices: Device[]; share_place_gates?: boolean }>({
     queryKey: ['annotation-devices'],
     queryFn: () => apiGet('/api/annotations/devices'),
   });
@@ -290,6 +290,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     );
   }
   const activePanelId = `device-panel-${tab}`;
+  const browserName = registry.data?.share_place_gates === true ? t('Web reader') : t('Browser');
   return (
     <main className={styles.container}>
       <Link href="/account/devices" className={styles.back}>
@@ -297,7 +298,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
       </Link>
       <header className={styles.header}>
         <Smartphone aria-hidden="true" focusable={false} />
-        <div><h1>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</h1><p>{device.type === 'webreader' ? t('Browser reading source') : device.kind_label || device.type}</p></div>
+        <div><h1>{device.type === 'webreader' && device.label === 'Browser' ? browserName : device.label}</h1><p>{device.type === 'webreader' ? (registry.data?.share_place_gates === true ? browserName : t('Browser reading source')) : device.kind_label || device.type}</p></div>
       </header>
       <section className={styles.summary} aria-label={t('Device summary')}>
         <DeviceSummary device={{

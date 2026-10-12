@@ -29,7 +29,7 @@ from datetime import timedelta
 import pytest
 
 from tests.unit.kobo_state_world import (  # noqa: F401  (fixtures)
-    _kts, _now, kw, read_column_class,
+    _kts, _now, kw, read_column_class, second_after_receipts,
 )
 from tests.unit.test_share_place_kobo_review_findings import _raw_put
 
@@ -64,8 +64,10 @@ def test_a_newer_status_beats_a_fast_status_after_a_place_only_report(
     T); a place-only 40% received at T+3s; then a delayed status-only
     Finished dated T+2s, newer than the fast status's T."""
     book = kw.books[0]
-    base = _now()
-    _raw_put(kw, kw.a, book, _report(base + timedelta(days=1), status="Reading"))
+    _raw_put(kw, kw.a, book, _report(_now() + timedelta(days=1), status="Reading"))
+    # T: the fast status's receipt (read back, not assumed to be the wall
+    # clock before the PUT; on a loaded worker it lands seconds later).
+    base = second_after_receipts(kw, kw.a, book)
     if intervening:
         _wait_until(base + timedelta(seconds=3))
         _raw_put(kw, kw.a, book, _report(base + timedelta(seconds=3), percent=40))
@@ -84,8 +86,10 @@ def test_a_newer_place_beats_a_fast_place_after_a_status_only_report(
     status-only Reading received at T+3s; then a delayed honest 20% dated
     T+2s, newer than the fast place's T."""
     book = kw.books[0]
-    base = _now()
-    _raw_put(kw, kw.a, book, _report(base + timedelta(days=1), percent=70))
+    _raw_put(kw, kw.a, book, _report(_now() + timedelta(days=1), percent=70))
+    # T: the fast place's receipt (read back, not assumed to be the wall
+    # clock before the PUT; on a loaded worker it lands seconds later).
+    base = second_after_receipts(kw, kw.a, book)
     if intervening:
         _wait_until(base + timedelta(seconds=3))
         _raw_put(kw, kw.a, book,

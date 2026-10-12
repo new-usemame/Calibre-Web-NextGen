@@ -52,10 +52,10 @@ from ...services.place_arbiter import Report, report_wins
 from ...services.share_place import gates_enforced
 from ...kobo import push_reading_state_to_hardcover
 
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, g, has_request_context, request, jsonify, send_from_directory
 from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
-from sqlalchemy import func, desc, cast, String
+from sqlalchemy import func, desc, cast, select, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
 from werkzeug.exceptions import BadRequest, HTTPException
 
@@ -624,6 +624,32 @@ def read_status_for_percentage(percentage: float) -> int:
     return ub.ReadBook.STATUS_UNREAD
 
 
+def _hold_feed_clock(reading_state_id, *, moved):
+    """Keep the shared feed clock where an accepted checked mirror left it.
+
+    ``write_shared_bookmark`` moved it strictly past every Kobo's frontier.
+    The status helper and the ORM flush hook that follow in this request
+    stamp the parent with ``g.kobo_reading_state_lm`` (else the server's
+    now, which can trail a frontier set by a fast or legacy future clock),
+    so that clock is set for the rest of the request: never below the
+    stored one, and one step past it when this report did not move it.
+    """
+    from ...services.kobo_place_gate import FEED_STEP
+    stored = ub.session.execute(
+        select(ub.KoboReadingState.last_modified)
+        .where(ub.KoboReadingState.id == reading_state_id)
+    ).scalar()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if stored is None:
+        feed = now
+    else:
+        if stored.tzinfo is not None:
+            stored = stored.astimezone(timezone.utc).replace(tzinfo=None)
+        feed = max(now, stored if moved else stored + FEED_STEP)
+    if has_request_context():
+        g.kobo_reading_state_lm = feed.replace(tzinfo=timezone.utc)
+
+
 def update_book_read_status(user, book_id: int, percentage: float, *,
                             shared_accepted=False, client_at=None):
     """
@@ -704,6 +730,7 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
         ub.session.expire(bookmark)
         if reading_state is not None:
             ub.session.expire(reading_state)
+        _hold_feed_clock(bookmark.kobo_reading_state_id, moved=outcome.accepted)
     else:
         outcome = device_positions.advance_kobo_bookmark(
             bookmark,

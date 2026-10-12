@@ -10,9 +10,15 @@ from sqlalchemy import and_, case, func, or_, update
 from .. import ub
 
 
+def _naive(value):
+    if value.tzinfo is not None and value.utcoffset() is not None:
+        value = value.astimezone(timezone.utc)
+    return value.replace(tzinfo=None)
+
+
 def update_automatic_read_status(book_read, status, *, observed_clock=None,
                                  require_newer_clock=False, touch_unchanged=False,
-                                 changed_only=False):
+                                 changed_only=False, future_clock_baseline=None):
     """Apply automatic state only while the stored row is not explicitly paused.
 
     The pause and optional device-clock comparisons belong to the UPDATE, not
@@ -20,6 +26,11 @@ def update_automatic_read_status(book_read, status, *, observed_clock=None,
     computed from the same persisted row. A rejected write changes none of
     these fields; callers continue updating independent positions/statistics.
     Caller owns the transaction and must flush new rows before calling.
+
+    ``future_clock_baseline`` (``(cutoff, baseline)``, Share my place's
+    checked Kobo only): a stored clock after ``cutoff`` is one no honest
+    device sent, so ``require_newer_clock`` orders against ``baseline``
+    instead of it.
     """
     table = ub.ReadBook.__table__
     fields = ("read_status", "last_modified", "times_started_reading",
@@ -37,8 +48,12 @@ def update_automatic_read_status(book_read, status, *, observed_clock=None,
                                   ub.ReadBook.STATUS_ON_HOLD)),
     ]
     if require_newer_clock:
-        conditions.append(or_(table.c.last_modified.is_(None),
-                              table.c.last_modified < clock))
+        newer = [table.c.last_modified.is_(None), table.c.last_modified < clock]
+        if future_clock_baseline is not None:
+            cutoff, baseline = future_clock_baseline
+            if baseline is None or _naive(baseline) < _naive(clock):
+                newer.append(table.c.last_modified > _naive(cutoff))
+        conditions.append(or_(*newer))
     if changed_only:
         conditions.append(changed)
 

@@ -351,6 +351,8 @@ def _warn_sync_header_budget(response):
 
 
 def _pending_response(page, withhold_reading_states=False):
+    # ``withhold_reading_states``: False, True (every state), or a callable
+    # taking a book uuid (only the states it names).
     """Recreate a previously committed response without touching live state.
 
     ``withhold_reading_states``: the device's Share my place box was turned
@@ -360,7 +362,10 @@ def _pending_response(page, withhold_reading_states=False):
     """
     body = page.response_body
     if withhold_reading_states:
-        body = _without_reading_states(body, page.device_id)
+        body = _without_reading_states(
+            body, page.device_id,
+            withhold=(withhold_reading_states
+                      if callable(withhold_reading_states) else None))
         if body is None:
             return None
     try:
@@ -382,7 +387,7 @@ def _pending_response(page, withhold_reading_states=False):
     return response
 
 
-def _without_reading_states(body, device_id):
+def _without_reading_states(body, device_id, withhold=None):
     try:
         items = json.loads(body or "[]")
         if not isinstance(items, list):
@@ -393,23 +398,50 @@ def _without_reading_states(body, device_id):
             device_id,
         )
         return None
+    def withheld(state):
+        if withhold is None:
+            return True
+        uuid = state.get("EntitlementId") if isinstance(state, dict) else None
+        return uuid is not None and withhold(uuid)
+
     kept = []
     for item in items:
         if isinstance(item, dict) and "ChangedReadingState" in item:
-            continue
+            changed = item["ChangedReadingState"]
+            if withheld(changed.get("ReadingState")
+                        if isinstance(changed, dict) else None):
+                continue
         if isinstance(item, dict):
             for key in ("NewEntitlement", "ChangedEntitlement"):
-                if isinstance(item.get(key), dict):
-                    item[key].pop("ReadingState", None)
+                entitlement = item.get(key)
+                if (isinstance(entitlement, dict)
+                        and withheld(entitlement.get("ReadingState"))):
+                    entitlement.pop("ReadingState", None)
         kept.append(item)
     return json.dumps(kept)
 
 
 def _replay_withholds_reading_states(requesting_device_id):
-    """True when a replayed page must not carry shared reading states: the
-    rollout switch is on and this Kobo's box is off now."""
-    return kobo_place_gate.kobo_place_mode(
-        current_user.id, requesting_device_id) == kobo_place_gate.UNCHECKED
+    """Which shared reading states a replayed page must not carry, judged
+    now: every one when the rollout switch is on and this Kobo's box is off;
+    for a checked Kobo, those of books whose own report is newer than the
+    shared place; otherwise none (False)."""
+    mode = kobo_place_gate.kobo_place_mode(current_user.id, requesting_device_id)
+    if mode == kobo_place_gate.UNCHECKED:
+        return True
+    if mode != kobo_place_gate.CHECKED:
+        return False
+    decided = {}
+
+    def own_newer(book_uuid):
+        if book_uuid not in decided:
+            book_id = calibre_db.session.query(db.Books.id).filter(
+                db.Books.uuid == book_uuid).scalar()
+            decided[book_uuid] = book_id is not None and \
+                kobo_place_gate.own_place_newer(requesting_device_id, book_id)
+        return decided[book_uuid]
+
+    return own_newer
 
 
 def _pending_position_clock(value):
@@ -4240,6 +4272,14 @@ def HandleStateRequest(book_uuid):
         kobo_reading_state = get_or_create_reading_state(book.id)
 
     if request.method == "GET":
+        if checked and kobo_place_gate.own_place_newer(device_id, book.id):
+            # The shared place is older than this Kobo's own report (it was
+            # turned on after reading on its own): serve its own, as sync does.
+            own = ub.session.query(ub.DeviceReadingPosition).filter(
+                ub.DeviceReadingPosition.device_id == int(device_id),
+                ub.DeviceReadingPosition.book_id == book.id,
+            ).one_or_none()
+            return jsonify([kobo_place_gate.journal_state_response(book, own)])
         return jsonify([get_kobo_reading_state_response(book, kobo_reading_state)])
     else:
         update_results_response = {"EntitlementId": book_uuid}
@@ -4271,6 +4311,18 @@ def HandleStateRequest(book_uuid):
                     kobo_reading_state, "last_modified", None)
 
             request_bookmark = request_reading_state["CurrentBookmark"]
+            # A legacy fast device can have left the shared status and
+            # statistics clocks further in the future than any honest clock.
+            # Such a clock is ordered at the shared graph's last receipt
+            # (capped at the upgrade by the migration), read before this
+            # report writes it, never ignored.
+            shared_receipt = None
+            if checked:
+                shared_receipt = ub.session.execute(
+                    select(ub.KoboBookmark.server_modified_at).where(
+                        ub.KoboBookmark.kobo_reading_state_id
+                        == kobo_reading_state.id)
+                ).scalar() or kobo_place_gate.EPOCH
             if checked:
                 # The device's own journal hears every report it makes,
                 # status-only ones included, so turning the box off later
@@ -4390,9 +4442,10 @@ def HandleStateRequest(book_uuid):
             if request_statistics:
                 statistics = kobo_reading_state.statistics
                 if device_positions.timestamp_is_newer(
-                        request_lm, statistics.last_modified) or (
-                            checked and kobo_place_gate.future_skewed(
-                                statistics.last_modified)):
+                        request_lm,
+                        kobo_place_gate.skew_ordered_clock(
+                            statistics.last_modified, shared_receipt)
+                        if checked else statistics.last_modified):
                     spent = request_statistics.get("SpentReadingMinutes")
                     if spent is not None:
                         statistics.spent_reading_minutes = int(spent)
@@ -4410,12 +4463,12 @@ def HandleStateRequest(book_uuid):
                 status_accepted = update_automatic_read_status(
                     book_read, new_book_read_status,
                     observed_clock=request_lm,
-                    # A checked Kobo's status is not held back by a stored
-                    # clock no honest device could have sent (a legacy
-                    # fast clock); that clock is judged by the skew rule.
-                    require_newer_clock=not (
-                        checked and kobo_place_gate.future_skewed(
-                            book_read.last_modified)),
+                    require_newer_clock=True,
+                    # A checked Kobo's report is ordered against a legacy
+                    # fast stored clock as if it were the shared receipt.
+                    future_clock_baseline=(
+                        kobo_place_gate.future_cutoff(), shared_receipt,
+                    ) if checked else None,
                 )
                 if (status_accepted
                         and new_book_read_status == ub.ReadBook.STATUS_FINISHED
@@ -4546,7 +4599,7 @@ def _handle_unchecked_state_request(book, device_id):
         ub.session.rollback()
         abort(400, description="Malformed request data is missing 'ReadingStates' key")
 
-    if (outcome.accepted and request_bookmark
+    if (outcome.place_accepted and request_bookmark
             and request_bookmark.get("ProgressPercent") is not None):
         push_reading_state_to_hardcover(
             current_user, book, request_bookmark["ProgressPercent"],

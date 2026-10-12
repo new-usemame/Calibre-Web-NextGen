@@ -85,6 +85,7 @@ def kobo_place_mode(user_id, device_id, session=None):
 class JournalOutcome:
     accepted: bool
     rehydrate_pending: bool
+    place_accepted: bool = False
 
 
 def _journal_report(row):
@@ -92,11 +93,33 @@ def _journal_report(row):
     nudge placeholder)."""
     if row is None:
         return None
-    clock = row.client_modified_at or row.status_modified_at
+    clock = _latest(row.client_modified_at, row.status_modified_at)
     if clock is None and row.progress_percent is None and not row.location_value \
             and row.reading_status is None:
         return None
     return Report(clock, row.server_modified_at)
+
+
+def _journal_place_report(row):
+    """The place observation a journal row holds, ordered by its own clock,
+    or None if the row holds no place."""
+    if row is None or (row.progress_percent is None and not row.location_value):
+        return None
+    return Report(row.client_modified_at, row.server_modified_at)
+
+
+def _journal_status_report(row):
+    """The status observation a journal row holds, ordered by its own clock,
+    or None if the row holds no status."""
+    if row is None or (row.reading_status is None
+                       and row.status_modified_at is None):
+        return None
+    return Report(row.status_modified_at, row.server_modified_at)
+
+
+def _latest(*clocks):
+    present = [_naive_utc(clock) for clock in clocks if clock is not None]
+    return max(present) if present else None
 
 
 def record_own_report(*, device_id, book_id, client_at, place=None,
@@ -104,8 +127,11 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
     """Write one device report onto its own journal row, latest-wins.
 
     ``place`` is a dict of the DeviceReadingPosition place columns, or None
-    when the report carried no bookmark. A report that loses the arbiter
-    against the row changes nothing. ``rehydrate_needed`` is never touched.
+    when the report carried no bookmark. Place and status are separate
+    observations, each arbitrated against the row's own clock for it: a
+    report can carry the newest place and an older status, and only the
+    fields that won are written. A report where nothing wins changes
+    nothing. ``rehydrate_needed`` is never touched.
     """
     s = session if session is not None else ub.session
     table = ub.DeviceReadingPosition.__table__
@@ -119,10 +145,15 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
         pending = bool(row is not None and row.rehydrate_needed) or _nudged(
             s, device_id, book_id)
         received_at = _now()
-        if not report_wins(Report(client_at, received_at), _journal_report(row)):
+        candidate = Report(client_at, received_at)
+        place_wins = place is not None and report_wins(
+            candidate, _journal_place_report(row))
+        status_wins = status_supplied and report_wins(
+            candidate, _journal_status_report(row))
+        if not (place_wins or status_wins):
             return JournalOutcome(False, pending)
         values = {"server_modified_at": received_at}
-        if place is not None:
+        if place_wins:
             # The place keeps the clock its report was ordered by: one with
             # no clock is ordered at its receipt, never at the clock an
             # earlier report left behind. A status-only report leaves the
@@ -130,7 +161,7 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
             values["client_modified_at"] = (
                 client_at if client_at is not None else received_at)
             values.update(place)
-        if status_supplied:
+        if status_wins:
             values["reading_status"] = status
             values["status_modified_at"] = client_at or received_at
         if row is None:
@@ -143,7 +174,7 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
                 table.c.server_modified_at == row.server_modified_at,
             ).values(**values))
         if result.rowcount == 1:
-            return JournalOutcome(True, pending)
+            return JournalOutcome(True, pending, place_wins)
     return JournalOutcome(False, pending)
 
 
@@ -171,7 +202,7 @@ def journal_state_response(book, row):
     if report is None:
         clock = status_clock = None
     else:
-        clock = row.client_modified_at or row.status_modified_at
+        clock = _latest(row.client_modified_at, row.status_modified_at)
         status_clock = row.status_modified_at
     response = {
         "EntitlementId": book.uuid,
@@ -324,6 +355,20 @@ def future_skewed(stored, now=None):
     return _naive_utc(stored) > now + SKEW
 
 
+def future_cutoff(now=None):
+    """Stored clocks after this are further in the future than any honest
+    device clock (naive UTC)."""
+    return _naive_utc(now or _now()) + SKEW
+
+
+def skew_ordered_clock(stored, baseline):
+    """The clock a stored status or statistics clock is ordered by: itself,
+    unless future-skewed, then ``baseline`` (the shared receipt)."""
+    if stored is not None and future_skewed(stored):
+        return baseline
+    return stored
+
+
 def own_place_newer(device_id, book_id, *, session=None):
     """True when this Kobo's own journal report is strictly newer than the
     shared place: the shared state is then older than what the device holds
@@ -334,7 +379,7 @@ def own_place_newer(device_id, book_id, *, session=None):
         journal.c.device_id == int(device_id),
         journal.c.book_id == int(book_id),
     )).first()
-    own_report = _journal_report(own)
+    own_report = _journal_place_report(own)
     if own_report is None:
         return False
     state, mark = ub.KoboReadingState, ub.KoboBookmark
@@ -395,7 +440,7 @@ def refresh_share_place_nudges(device, *, session):
         report = shared_bookmark_report(
             row.progress_percent, row.location_value, row.last_modified,
             row.server_modified_at)
-        if report is not None and report_wins(report, _journal_report(own.get(row.book_id))):
+        if report is not None and report_wins(report, _journal_place_report(own.get(row.book_id))):
             armed.append(row.book_id)
     if not armed:
         return 0

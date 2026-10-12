@@ -345,7 +345,10 @@ def write_shared_bookmark(bookmark_id, *, client_at, progress_percent,
             return SharedWriteOutcome(False, row.progress_percent, row.last_modified)
         clock = effective_clock(client_at, received_at)
         values = {"last_modified": clock, "server_modified_at": received_at,
-                  "shared_from_koreader": shared_from_koreader,
+                  # A percentage-only report retains the stored Location's
+                  # origin; it cannot turn a converted span into a native one.
+                  "shared_from_koreader": (shared_from_koreader or
+                                           (row.shared_from_koreader and not location_supplied)),
                   "span_kepub_identity": span_kepub_identity}
         if shared_from_koreader and not row.shared_from_koreader:
             # Preserve the last native Location for a Kobo with no own report.
@@ -620,42 +623,88 @@ def active_echo_guard(device_id, book_id, *, session=None):
     )).first()
 
 
-def delivery_bookmark(book, bookmark, response, device_id):
-    """Adapt a KOReader-derived place to the KEPUB this checked Kobo holds.
-
-    Persist the held Location separately from the journal: Nickel's echoes
-    update that journal, but cannot shift the armed baseline or renew its
-    seven-day lifetime. Repeated delivery of one shared receipt does neither.
-    The caller commits together with its GET response or replayable sync page.
-    """
-    _epub, kepub = _book_paths(book)
-    if not bookmark.shared_from_koreader and not kepub:
-        return response
-    own = ub.session.query(ub.DeviceReadingPosition).filter_by(
-        device_id=int(device_id), book_id=int(book.id)).one_or_none()
-    if (not bookmark.shared_from_koreader and own is not None
-            and own.location_value == bookmark.location_value
-            and own.location_source == bookmark.location_source
-            and own.progress_percent == bookmark.progress_percent):
-        clear_echo_guard(device_id, book.id)
-        return response
-    exact = False
+def _readable_kepub_identity(path):
+    """Cheap identity of an accessible file, stable across the readability check."""
+    if not path:
+        return None
     try:
-        download = ub.session.query(ub.KoboDeviceBookDownload).filter_by(
-            device_id=int(device_id), book_id=int(book.id)).one_or_none()
-        exact = bool(kepub and download and download.downloaded_at
-                     and (download.book_format or "").lower() == "kepub"
-                     and _naive_utc(download.downloaded_at) >= datetime.fromtimestamp(
-                         os.stat(kepub).st_mtime, timezone.utc).replace(tzinfo=None)
-                     and (not bookmark.shared_from_koreader or
-                          bookmark.span_kepub_identity == _file_identity(kepub)))
+        before = _file_identity(path)
+        with open(path, "rb") as stream:
+            stream.read(1)
+        return before if before == _file_identity(path) else None
+    except (OSError, TypeError):
+        return None
+
+
+def completed_kepub_identity(device_id, book, *, session=None):
+    """Proof this device completed a download of the current readable KEPUB.
+
+    New downloads freeze completed_at/file identity in record_download.
+    Restore arming invalidates that proof. Pre-column pending/served rows
+    are the historical completed-download states; only those retain the old
+    format/mtime proof. An armed-to-empty annotation response is never proof.
+    """
+    from .kobo_post_download_restore import RESTORE_ARMED, RESTORE_PENDING, RESTORE_SERVED
+    s = session if session is not None else ub.session
+    row = s.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=int(device_id), book_id=int(book.id)).one_or_none()
+    if (row is None or (row.book_format or "").lower() != "kepub"
+            or row.restore_state == RESTORE_ARMED):
+        return None
+    _epub, path = _book_paths(book)
+    identity = _readable_kepub_identity(path)
+    if identity is None:
+        return None
+    if row.completed_at is not None:
+        if row.kepub_file_identity != identity:
+            return None
+        completed = row.completed_at
+    elif (row.kepub_file_identity is None
+          and row.restore_state in (RESTORE_PENDING, RESTORE_SERVED)):
+        completed = row.downloaded_at
+    else:
+        return None
+    try:
+        written = datetime.fromtimestamp(os.stat(path).st_mtime, timezone.utc)
+        if completed is not None and _naive_utc(completed) >= _naive_utc(written):
+            return identity if identity == _readable_kepub_identity(path) else None
     except OSError:
         pass
-    if exact:
-        clear_echo_guard(device_id, book.id)
+    return None
+
+
+def native_bookmark_response(bookmark, response):
+    """Historical native Location for an unresolved reader of a converted row."""
+    if not bookmark.shared_from_koreader:
         return response
+    response = dict(response)
+    if bookmark.native_location_value:
+        response["Location"] = {
+            "Value": bookmark.native_location_value,
+            "Source": bookmark.native_location_source,
+            "Type": bookmark.native_location_type,
+        }
+    else:
+        response.pop("Location", None)
+    return response
+
+
+def delivery_bookmark(book, bookmark, response, device_id):
+    """Prove exact delivery, otherwise arm and serve only a held native place.
+
+    Conversion freezes the KEPUB identity at write time. Native Kobo writes
+    freeze the sender's completed-download proof at that same seam. Receiver
+    proof is rechecked here, including replay; a later sender download cannot
+    validate an earlier report. No held Location means no shared bookmark.
+    """
     own = ub.session.query(ub.DeviceReadingPosition).filter_by(
         device_id=int(device_id), book_id=int(book.id)).one_or_none()
+    receiver_identity = completed_kepub_identity(device_id, book)
+    if (receiver_identity is not None and bookmark.location_value
+            and bookmark.location_source and bookmark.location_type == "KoboSpan"
+            and bookmark.span_kepub_identity == receiver_identity):
+        clear_echo_guard(device_id, book.id)
+        return response
     if own is not None and own.location_value:
         held = own
     elif bookmark.shared_from_koreader:
@@ -667,16 +716,9 @@ def delivery_bookmark(book, bookmark, response, device_id):
             content_source_progress_percent=bookmark.native_content_source_progress_percent)
     else:
         held = bookmark
-    response = dict(response)
-    if held.location_value:
-        response["Location"] = {"Value": held.location_value,
-                                "Source": held.location_source,
-                                "Type": held.location_type}
-    else:
-        response.pop("Location", None)
-    # No place has been shared yet: there is nothing to guard.
+    # No shared place has ever been written, so no inexact delivery to arm.
     if bookmark.progress_percent is None and not bookmark.location_value:
-        return response
+        return None
     table = ub.KoboPlaceEchoGuard.__table__
     values = dict(device_id=int(device_id), book_id=int(book.id),
                   location_value=held.location_value, location_source=held.location_source,
@@ -690,6 +732,12 @@ def delivery_bookmark(book, bookmark, response, device_id):
               if key not in ("device_id", "book_id")},
         where=~_same(table.c.shared_received_at, bookmark.server_modified_at),
     ))
+    if not held.location_value:
+        return None
+    response = dict(response)
+    response["Location"] = {"Value": held.location_value,
+                            "Source": held.location_source,
+                            "Type": held.location_type}
     return response
 
 
@@ -726,6 +774,13 @@ def is_inexact_echo(device_id, book, place):
     echo = not value or (value == guard.location_value and source == guard.location_source)
     if not echo and progress == 0:
         echo = source == _first_spine_source(book)
+        if not echo and not guard.location_value:
+            from .kepub_alignment import _kepub
+            _epub, path = _book_paths(book)
+            kepub = _kepub(path) if path else None
+            first = next(((doc.member, doc.ids[0]) for doc in kepub.documents
+                          if doc.ids), None) if kepub else None
+            echo = first == (source, value)
     incoming, armed = _span_ordinal(value), _span_ordinal(guard.location_value)
     if (not echo and source == guard.location_source and incoming and armed
             and incoming <= armed and progress is not None

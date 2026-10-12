@@ -437,7 +437,10 @@ def _adapt_replayed_reading_states(body, device_id):
                 else:
                     adapted = kobo_place_gate.delivery_bookmark(book, mark, current, device_id)
                     if adapted != cached:
-                        state["CurrentBookmark"] = adapted
+                        if adapted is None:
+                            state.pop("CurrentBookmark", None)
+                        else:
+                            state["CurrentBookmark"] = adapted
                         changed = True
             if not drop:
                 result.append(item)
@@ -4442,6 +4445,10 @@ def HandleStateRequest(book_uuid):
                             ),
                             location=location,
                             location_supplied=bool(location),
+                            span_kepub_identity=(
+                                kobo_place_gate.completed_kepub_identity(device_id, book)
+                                if location and location.get("Type") == "KoboSpan" else None
+                            ),
                             block_lower_at_or_below=(
                                 KOB0_COVER_RESET_PROGRESS_EPSILON
                                 if rehydrate_pending else None
@@ -4470,6 +4477,9 @@ def HandleStateRequest(book_uuid):
                         location_type=location["Type"] if location else None,
                         location_source=location["Source"] if location else None,
                         location_supplied=bool(location),
+                        **({"clear_location_proof": True}
+                           if location and kobo_place_gate.gates_enforced(current_user.id)
+                           else {}),
                         incoming_clock=request_lm,
                         clock_accepts=True,
                         # An armed latch means the server holds a position it
@@ -5111,7 +5121,10 @@ def get_kobo_reading_state_response(book, kobo_reading_state):
     if device_id and kobo_place_gate.kobo_place_mode(current_user.id, device_id) == kobo_place_gate.CHECKED:
         bookmark_response = kobo_place_gate.delivery_bookmark(
             book, kobo_reading_state.current_bookmark, bookmark_response, device_id)
-    return {
+    elif has_request_context() and kobo_place_gate.gates_enforced(current_user.id):
+        bookmark_response = kobo_place_gate.native_bookmark_response(
+            kobo_reading_state.current_bookmark, bookmark_response)
+    response = {
         "EntitlementId": book.uuid,
         "Created": convert_to_kobo_timestamp_string(book.timestamp),
         "LastModified": convert_to_kobo_timestamp_string(kobo_reading_state.last_modified),
@@ -5119,8 +5132,10 @@ def get_kobo_reading_state_response(book, kobo_reading_state):
         "PriorityTimestamp": convert_to_kobo_timestamp_string(kobo_reading_state.priority_timestamp),
         "StatusInfo": get_status_info_response(kobo_reading_state.book_read_link),
         "Statistics": get_statistics_response(kobo_reading_state.statistics),
-        "CurrentBookmark": bookmark_response,
     }
+    if bookmark_response is not None:
+        response["CurrentBookmark"] = bookmark_response
+    return response
 
 
 def get_status_info_response(book_read):

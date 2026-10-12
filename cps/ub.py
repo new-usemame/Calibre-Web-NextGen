@@ -1155,6 +1155,9 @@ class KoboDeviceBookDownload(Base):
     )
     restored_at = Column(DateTime, nullable=True)
     restored_count = Column(Integer, nullable=True)
+    # Share-place proof belongs to record_download, never restore arming.
+    completed_at = Column(DateTime, nullable=True)
+    kepub_file_identity = Column(String, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
@@ -4630,6 +4633,11 @@ def migrate_kobo_place_delivery(engine, _session):
         ("native_content_source_progress_percent", "native_content_source_progress_percent FLOAT"),
     ):
         _add_column_if_missing(engine, "kobo_bookmark", name, ddl)
+    for name, ddl in (
+        ("completed_at", "completed_at DATETIME"),
+        ("kepub_file_identity", "kepub_file_identity TEXT"),
+    ):
+        _add_column_if_missing(engine, "kobo_device_book_download", name, ddl)
     _run_ddl_with_retry(engine, (
         "CREATE TABLE IF NOT EXISTS kobo_place_echo_guard ("
         "id INTEGER NOT NULL PRIMARY KEY, "

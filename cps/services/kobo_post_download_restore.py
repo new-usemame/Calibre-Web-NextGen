@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
 
 from cps import ub
@@ -116,6 +117,10 @@ def arm_pending_restore(*, device_id, book_ids, log):
                 continue
             row.downloaded_at = _now()
             row.restore_state = RESTORE_ARMED
+            # A restore announcement is not a file download. Invalidating
+            # proof also survives an armed annotation GET returning empty.
+            row.completed_at = None
+            row.kepub_file_identity = None
             row.restored_at = None
             row.restored_count = None
             armed += 1
@@ -129,8 +134,14 @@ def arm_pending_restore(*, device_id, book_ids, log):
     return armed
 
 
-def record_download(*, device_id, book_id, book_format, log, user_id=None):
-    """Upsert the pending-restore row; best effort, never raises to the route."""
+def record_download(*, device_id, book_id, book_format, log, user_id=None,
+                    completed=True):
+    """Upsert the restore row after a download, or stage it before a response.
+
+    The route stages annotation restoration at its historical point, then
+    confirms file proof only after successfully preparing the file response.
+    Direct callers record a completed download by default.
+    """
     if book_id is None:
         return None
     if device_id is None:
@@ -161,6 +172,25 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None):
             ub.session.add(row)
         row.book_format = (book_format or "")[:16] or None
         row.downloaded_at = _now()
+        row.completed_at = row.downloaded_at if completed else None
+        row.kepub_file_identity = None
+        if (book_format or "").lower() == "kepub":
+            # Best-effort file proof is independent of annotation restoration.
+            # Failure to prove it must not prevent the pending row being saved.
+            try:
+                from cps import calibre_db
+                from .kobo_place_gate import _book_paths, _readable_kepub_identity
+                book = calibre_db.get_book(int(book_id))
+                if book is not None:
+                    _epub, path = _book_paths(book)
+                    row.kepub_file_identity = _readable_kepub_identity(path)
+            except Exception:
+                log.debug("Could not prove Kobo download file for book %s", book_id,
+                          exc_info=True)
+        if not completed and row.kepub_file_identity is None:
+            # Distinguish a modern, uncompleted attempt from a pre-column
+            # pending row that was recorded by a completed legacy download.
+            row.kepub_file_identity = ""
         row.restore_state = RESTORE_PENDING
         row.restored_at = None
         row.restored_count = None
@@ -173,6 +203,37 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None):
             device_id, book_id, exc_info=True,
         )
         return None
+
+
+def confirm_download(*, download_id, downloaded_at, file_identity, book, log):
+    """Confirm this attempt's file proof without changing annotation restore.
+
+    A failed response never reaches this seam. A replacement file, another
+    download, or a restore announcement racing the response cannot inherit
+    the earlier attempt's identity. No content/hash work runs on the request.
+    """
+    if not file_identity:
+        return False
+    from .kobo_place_gate import _book_paths, _readable_kepub_identity
+    _epub, path = _book_paths(book)
+    if file_identity != _readable_kepub_identity(path):
+        return False
+    table = ub.KoboDeviceBookDownload.__table__
+    try:
+        result = ub.session.execute(update(table).where(
+            table.c.id == download_id,
+            table.c.downloaded_at == downloaded_at,
+            table.c.kepub_file_identity == file_identity,
+            table.c.completed_at.is_(None),
+            table.c.restore_state != RESTORE_ARMED,
+        ).values(completed_at=_now()))
+        ub.session.commit()
+        return result.rowcount == 1
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.warning("Could not confirm Kobo file download proof for book %s",
+                    book.id, exc_info=True)
+        return False
 
 
 def pending_download(*, device_id, book_id):

@@ -205,6 +205,7 @@ def advance_kobo_bookmark(
     location_type=None,
     location_value=None,
     location_supplied=False,
+    clear_location_proof=False,
     incoming_clock=None,
     clock_accepts=False,
     equal_accepts=False,
@@ -235,6 +236,10 @@ def advance_kobo_bookmark(
             "location_type": location_type,
             "location_value": location_value,
         })
+        if clear_location_proof:
+            # A legacy native writer has no current-file sender proof. Drop
+            # the previous conversion's proof in the same accepted SQL write.
+            values.update(shared_from_koreader=False, span_kepub_identity=None)
     if incoming_percentage is not None and incoming_percentage > 0:
         values["created_at"] = case(
             (ub.KoboBookmark.created_at.is_(None), write_clock or now),

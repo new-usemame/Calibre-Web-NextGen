@@ -247,7 +247,7 @@ def completed_download_body(body, *, application, bind, download_id,
     ClosingIterator closes the underlying file even if streaming never starts.
     """
     content_length = headers.get("Content-Length", type=int)
-    if (content_length is None or content_length < 0
+    if (content_length is None or content_length <= 0
             or "X-Sendfile" in headers or "X-Accel-Redirect" in headers):
         # Delegated transfers and lengthless streams cannot prove a full file.
         return body

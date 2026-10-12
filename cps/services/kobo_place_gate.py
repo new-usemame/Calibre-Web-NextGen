@@ -624,13 +624,14 @@ def active_echo_guard(device_id, book_id, *, session=None):
 
 
 def _readable_kepub_identity(path):
-    """Cheap identity of an accessible file, stable across the readability check."""
+    """Cheap identity of a nonempty accessible file, stable across the check."""
     if not path:
         return None
     try:
         before = _file_identity(path)
         with open(path, "rb") as stream:
-            stream.read(1)
+            if not stream.read(1):
+                return None
         return before if before == _file_identity(path) else None
     except (OSError, TypeError):
         return None

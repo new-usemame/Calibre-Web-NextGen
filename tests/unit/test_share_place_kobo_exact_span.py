@@ -12,10 +12,11 @@ backward, with no prompt).
   ``kepub_alignment.xpointer_to_span`` gives for it; a checked Kobo holding
   the current KEPUB gets that span on GET /state and on library/sync,
   backward moves included.
-* Any other Kobo gets the percentage only: a KEPUB downloaded before the
-  library KEPUB was last written, no download, a download in another format.
-  When alignment fails, every Kobo gets the percentage only, and the Kobo's
-  earlier span is not left behind to mislead a later one.
+* Any other Kobo (a KEPUB downloaded before the library KEPUB was last
+  written, no download, a download in another format), and every Kobo when
+  alignment fails, keeps today's fallback: its existing Location with the new
+  percentage. Never a bookmark with no Location: Nickel opens that at the
+  cover and PUTs 0% back (section 14, Clara probe 2).
 * Unchanged: an unchecked Kobo never receives it; a Kobo's own span report
   works as today; with the rollout switch off nothing changes (the merge
   bar); an unidentified KOReader keeps today's percentage-only bridge.
@@ -102,10 +103,10 @@ def test_a_backward_move_from_koreader_reaches_the_kobo_as_the_earlier_span(acco
     assert sw.synced_location(sw.checked) == _expected(sw, rows["early"])
 
 
-# == Percentage only for a Kobo that does not hold the current KEPUB ==========
+# == Today's fallback for a Kobo that does not hold the current KEPUB ========
 
 @pytest.mark.parametrize("held", ["stale-kepub", "no-download", "epub-format"])
-def test_a_checked_kobo_without_the_current_kepub_gets_the_percentage_only(
+def test_a_checked_kobo_without_the_current_kepub_keeps_its_location_with_the_new_percentage(
         account, rows, held):
     sw = account
     if held == "stale-kepub":
@@ -119,24 +120,26 @@ def test_a_checked_kobo_without_the_current_kepub_gets_the_percentage_only(
 
     sw.push(rows["late"]["xpointer"], 40)
 
+    own = span_location(rows["kobo-own"]["source"], rows["kobo-own"]["span"])
     bookmark = _bookmark(sw, sw.checked)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
-    assert location_of(bookmark) is None
-    assert sw.synced_location(sw.checked) is None
+    assert location_of(bookmark) == own
+    assert sw.synced_location(sw.checked) == own
 
 
 def test_the_span_is_sent_once_the_kobo_downloads_the_current_kepub(account, rows):
     sw = account
     sw.download(sw.checked, at=sw.kepub_written() - timedelta(days=1))
     sw.push(rows["late"]["xpointer"], 40)
-    assert location_of(_bookmark(sw, sw.checked)) is None
+    own = span_location(rows["kobo-own"]["source"], rows["kobo-own"]["span"])
+    assert location_of(_bookmark(sw, sw.checked)) == own
 
     sw.download(sw.checked)
 
     assert location_of(_bookmark(sw, sw.checked)) == _expected(sw, rows["late"])
 
 
-# == Alignment failure: the percentage only, and nothing misleading kept ======
+# == Alignment failure: today's fallback for every Kobo ======================
 
 def _kepub_of_another_edition(sw):
     """The library KEPUB re-made from a different text: one word changed in
@@ -157,7 +160,8 @@ def _kepub_of_another_edition(sw):
 
 @pytest.mark.parametrize("failure", ["xpointer-outside-the-book", "kepub-not-this-epub",
                                      "koreader-holds-another-file"])
-def test_when_alignment_fails_every_kobo_gets_the_percentage_only(account, rows, failure):
+def test_when_alignment_fails_every_kobo_keeps_its_location_with_the_new_percentage(
+        account, rows, failure):
     sw = account
     xpointer, document = rows["late"]["xpointer"], None
     if failure == "xpointer-outside-the-book":
@@ -173,11 +177,12 @@ def test_when_alignment_fails_every_kobo_gets_the_percentage_only(account, rows,
 
     sw.push(xpointer, 40, document=document)
 
+    own = span_location(rows["kobo-own"]["source"], rows["kobo-own"]["span"])
     for device in (sw.checked, later):
         bookmark = _bookmark(sw, device)
         assert bookmark.get("ProgressPercent") == pytest.approx(40), device.display_name
-        assert location_of(bookmark) is None, device.display_name
-    assert sw.synced_location(sw.checked) is None
+        assert location_of(bookmark) == own, device.display_name
+    assert sw.synced_location(sw.checked) == own
 
 
 # == Ownership and unchanged paths (controls) =================================

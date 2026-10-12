@@ -177,15 +177,17 @@ def sw(monkeypatch, tmp_path):
         assert isinstance(body, list) and len(body) == 1, body
         return body[0]
 
-    def put(device, source, span, percent, clock):
+    def put(device, source, span, percent, clock, *, status="Reading"):
+        """A Kobo's PUT /state; ``source=None`` sends a bookmark with no
+        Location (what Nickel closes at when it opened at the cover)."""
+        bookmark = {"ProgressPercent": percent, "ContentSourceProgressPercent": percent}
+        if source is not None:
+            bookmark["Location"] = span_location(source, span)
         payload = {"ReadingStates": [{
             "LastModified": _kts(clock),
-            "CurrentBookmark": {
-                "ProgressPercent": percent, "ContentSourceProgressPercent": percent,
-                "Location": span_location(source, span),
-            },
+            "CurrentBookmark": bookmark,
             "Statistics": {"SpentReadingMinutes": 7, "RemainingTimeMinutes": 93},
-            "StatusInfo": {"Status": "Reading"},
+            "StatusInfo": {"Status": status},
         }]}
         with world.app.test_request_context(f"/v1/library/{book.uuid}/state",
                                             method="PUT", json=payload):
@@ -255,6 +257,21 @@ def sw(monkeypatch, tmp_path):
         assert response.status_code == 200, response.get_data(as_text=True)
         session.expire_all()
 
+    def pull(*, raw_id="koreader-1", name="KOReader"):
+        """KOReader's GET of the shared place: (percent, progress)."""
+        headers = LibraryWorld.basic("reader")
+        headers["Accept"] = "application/vnd.koreader.v1+json"
+        headers["X-CWNG-Device-ID"] = raw_id
+        headers["X-CWNG-Device-Name"] = name
+        response = world.client.get(f"/kosync/syncs/progress/{world.digest}",
+                                    query_string={"position_kinds": "locator,percentage"},
+                                    headers=headers)
+        assert response.status_code == 200, response.get_data(as_text=True)
+        session.expire_all()
+        body = response.get_json()
+        return round(float(body["percentage"]) * 100, 3), body.get("progress")
+
+    world.pull = pull
     world.kobo_device, world.share, world.download = kobo_device, share, download
     world.kepub_written = kepub_written
     world.get, world.put, world.sync, world.settle = get, put, sync, settle

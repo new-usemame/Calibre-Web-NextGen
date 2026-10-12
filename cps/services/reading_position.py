@@ -505,6 +505,59 @@ _SAME_REPORT_SLACK = timedelta(seconds=60)
 _MAX_KOREADER_DIGESTS = 3
 
 
+def _kobo_resume_proof(connection, user_id, book_id, location, percentage,
+                       shared_clock):
+    """The winning native reporter's completed-download identity, if known.
+
+    Match the journal's place AND effective clock, not just a span that
+    another Kobo happened to report. A download after the report cannot
+    establish which file that report addressed. Old databases fail closed.
+    """
+    import sqlite3
+    from .kobo_place_gate import effective_clock
+    from .kobo_post_download_restore import RESTORE_ARMED
+    try:
+        shared = connection.execute(
+            "SELECT b.shared_from_koreader, b.server_modified_at "
+            "FROM kobo_bookmark b JOIN kobo_reading_state s "
+            "ON s.id=b.kobo_reading_state_id WHERE s.user_id=? AND s.book_id=? LIMIT 1",
+            (user_id, book_id),
+        ).fetchone()
+        if not shared or shared[0] or not shared[1]:
+            return None
+        rows = connection.execute(
+            "SELECT p.client_modified_at, p.server_modified_at, "
+            "x.kepub_file_identity, x.completed_at, x.restore_state "
+            "FROM device_reading_position p JOIN device d ON d.id=p.device_id "
+            "LEFT JOIN kobo_device_book_download x "
+            "ON x.device_id=p.device_id AND x.book_id=p.book_id "
+            "AND lower(x.book_format)='kepub' "
+            "WHERE d.user_id=? AND d.kind='kobo' AND p.book_id=? "
+            "AND p.location_source=? AND p.location_type=? AND p.location_value=? "
+            "AND p.progress_percent=? AND p.server_modified_at<=? "
+            "ORDER BY p.server_modified_at DESC",
+            (user_id, book_id, *location, percentage, shared[1]),
+        ).fetchall()
+        def clock(raw):
+            return datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+        for client, receipt, identity, completed, state in rows:
+            if not receipt:
+                continue
+            received = clock(receipt)
+            if (effective_clock(clock(client) if client else None, received)
+                    != shared_clock.replace(tzinfo=None)):
+                continue
+            # The most recent matching reporter is the sender; do not borrow
+            # proof from an older device when this sender has none.
+            if (identity and completed and state != RESTORE_ARMED
+                    and clock(completed) <= received):
+                return identity
+            return None
+    except (sqlite3.Error, ValueError, TypeError):
+        log.debug("Could not identify proven Kobo resume reporter", exc_info=True)
+    return None
+
+
 def _koreader_report(connection, user_id, book_id, bookmark_percent, bookmark_clock, utc):
     """``(xpointer, digests)`` when the resume position IS a KOReader report.
 
@@ -637,6 +690,10 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
                 log.debug("Could not read KOReader position for book %s", book_id,
                           exc_info=True)
                 koreader = None
+            kepub_identity = None
+            if koreader is None and location and location[1] == "KoboSpan":
+                kepub_identity = _kobo_resume_proof(
+                    connection, user_id, book_id, location, percentage, synced_at)
             # Release the read snapshot before any optional EPUB work.
             connection.close()
             connection = None
@@ -650,7 +707,8 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
                     if exact:
                         break
             elif location and location[1] == "KoboSpan" and location[0] and location[2]:
-                exact = exact_resume(book_id, *location)
+                exact = (exact_resume(book_id, *location, kepub_identity=kepub_identity)
+                         if kepub_identity else exact_resume(book_id, *location))
             if exact:
                 result["resume"].update(exact)
                 if mode is True:

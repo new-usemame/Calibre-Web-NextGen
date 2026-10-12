@@ -133,6 +133,9 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
         place=place, status=status, status_supplied=status_supplied,
         received_at=_now(), session=s,
     )
+    if outcome.place_accepted and place and place.get('location_type') == 'KoboSpan':
+        from .kobo_resume import warm_alignment
+        warm_alignment(book_id)
     return JournalOutcome(outcome.accepted, pending, outcome.place_accepted)
 
 

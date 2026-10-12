@@ -488,7 +488,8 @@ def _resolve(epub_path, fn):
     if stat.st_size > MAX_ARCHIVE_BYTES:
         return None
     try:
-        book = _load_book(path, stat.st_mtime_ns, stat.st_size)
+        book = _load_book(path, stat.st_mtime_ns, stat.st_size,
+                          (stat.st_dev, stat.st_ino, stat.st_ctime_ns))
     except Exception:
         log.debug("koreader_xpointer: cannot read %s", path, exc_info=True)
         return None
@@ -508,7 +509,8 @@ def _xml(raw: bytes):
 
 
 @lru_cache(maxsize=16)
-def _load_book(path: str, _mtime_ns: int, _size: int) -> Optional[_Book]:
+def _load_book(path: str, _mtime_ns: int, _size: int,
+               _identity=None) -> Optional[_Book]:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         container = _xml(archive.read("META-INF/container.xml"))

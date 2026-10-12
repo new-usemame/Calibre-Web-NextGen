@@ -180,14 +180,16 @@ def _kepub(kepub_path) -> Optional[_Kepub]:
     if stat.st_size > kx.MAX_ARCHIVE_BYTES:
         return None
     try:
-        return _load_kepub(path, stat.st_mtime_ns, stat.st_size)
+        return _load_kepub(path, stat.st_mtime_ns, stat.st_size,
+                           (stat.st_dev, stat.st_ino, stat.st_ctime_ns))
     except Exception:
         log.debug("kepub_alignment: cannot read %s", path, exc_info=True)
         return None
 
 
 @lru_cache(maxsize=8)
-def _load_kepub(path: str, _mtime_ns: int, _size: int) -> Optional[_Kepub]:
+def _load_kepub(path: str, _mtime_ns: int, _size: int,
+                 _identity=None) -> Optional[_Kepub]:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         container = kx._xml(archive.read("META-INF/container.xml"))

@@ -197,6 +197,9 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
         row.restored_at = None
         row.restored_count = None
         ub.session.commit()
+        if row.kepub_file_identity:
+            from .kobo_resume import warm_alignment
+            warm_alignment(book_id)
         return row
     except SQLAlchemyError:
         ub.session.rollback()

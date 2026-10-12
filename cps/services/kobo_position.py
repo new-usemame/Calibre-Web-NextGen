@@ -346,7 +346,7 @@ def compute_cfi_point(epub_path, source, location_type, value):
     return snapshot[0] if snapshot else None
 
 
-def _resume_snapshot(epub_path, source, location_type, value):
+def _resume_snapshot(epub_path, source, location_type, value, *, bridge=None):
     """Return (point, archive SHA256) from one bounded, stable file snapshot."""
     import hashlib
     import io
@@ -396,6 +396,14 @@ def _resume_snapshot(epub_path, source, location_type, value):
             for index, info in enumerate(entries):
                 member_end = entries[index + 1].header_offset if index + 1 < len(entries) else directory_start
                 bounds[info.filename] = _resume_member_bounds(raw, member_end, info)
+
+            if bridge is not None:
+                # The alternate locator must address these same validated
+                # bytes, even if the source href exists only in a split KEPUB.
+                point = bridge()
+                if not point or identity(after) != identity(path.stat()):
+                    return None
+                return point, hashlib.sha256(raw).hexdigest()
 
             def xml(name):
                 info = archive.getinfo(name)

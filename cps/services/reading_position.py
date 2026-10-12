@@ -331,6 +331,11 @@ def web_place_mode(user_id, device_id=None):
         )
         if device_id is not None:
             query = query.filter(ub.Device.id == int(device_id))
+        else:
+            # Inactive legacy aliases share the kind; only the account's
+            # Browser carries its Share my place choice.
+            from .browser_source import ACCOUNT_BROWSER
+            query = query.filter(ub.Device.created_by == ACCOUNT_BROWSER)
         row = query.first()
     return bool(row and row.share_place)
 
@@ -595,11 +600,13 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
                 "JOIN kobo_reading_state s ON s.id=b.kobo_reading_state_id "
                 "WHERE s.user_id=? AND s.book_id=? LIMIT 1", (user_id, book_id),
             ).fetchone()
+            from .browser_source import ACCOUNT_BROWSER
             own = connection.execute(
                 "SELECT p.client_modified_at, p.server_modified_at FROM device_reading_position p "
                 "JOIN device d ON d.id=p.device_id WHERE d.user_id=? AND d.kind='webreader' "
-                "AND p.book_id=? AND (p.progress_percent IS NOT NULL OR p.cfi IS NOT NULL) LIMIT 1",
-                (user_id, book_id),
+                "AND d.created_by=? AND p.book_id=? "
+                "AND (p.progress_percent IS NOT NULL OR p.cfi IS NOT NULL) LIMIT 1",
+                (user_id, ACCOUNT_BROWSER, book_id),
             ).fetchone()
             own_report = (Report(utc(own[0]) if own[0] else None, utc(own[1])) if own
                           else Report(utc(local_updated_at), utc(local_updated_at))

@@ -14,11 +14,16 @@ dies after its first chunk each made a Kobo still holding an older KEPUB
 "hold" the current one, so it was sent a span it cannot resolve.
 
 Each case drives the real ``helper.get_download_link`` for a checked Kobo
-that holds a stale KEPUB, consumes the body the way a WSGI server does (after
-the view has returned, outside the request context, then ``close()``), and
-then asks the real Kobo GET /state what that Kobo is now served. Every case
-drains the body, even HEAD and 206, so the method and status clauses of the
-rule are each tested on their own rather than through "nothing was read".
+that holds a stale KEPUB through a real server: gevent's pywsgi with
+``MyWSGIHandler`` on a local socket (production), or the Tornado fallback's
+``MyWSGIContainer.handle_request`` with a fake connection. The view runs in a
+request context that is popped before the server reads the body, as Flask
+does. It then asks the real Kobo GET /state what that Kobo is now served.
+
+Later rules from the same item: proof also needs the declared
+``Content-Length`` (greater than zero) actually yielded and no
+X-Sendfile/X-Accel-Redirect hand-off; and only gevent can prove, since
+Tornado joins the whole body before it writes anything to the Kobo.
 
 The post-download annotation restore (case 5 of the brief) is already
 covered through the same route and is not duplicated here:
@@ -80,9 +85,10 @@ def _bookmark(sw):
     return sw.get(sw.checked).get("CurrentBookmark") or {}
 
 
-def _download(monkeypatch, sw, method="GET", headers=None, broken=False, serve=None):
-    """The Kobo's download request through the real route; returns the
-    response the view handed to the server, body not yet read."""
+def _install_download(monkeypatch, sw, *, broken=False, serve=None):
+    """The real ``helper.get_download_link`` as a WSGI app, mounted the way
+    Flask runs a view: the request context is pushed for the view and popped
+    before the server reads the body."""
     from cps import helper
     book = sw.book
     fake_user = type("User", (), {"id": sw.reader.id, "name": "reader",
@@ -109,27 +115,92 @@ def _download(monkeypatch, sw, method="GET", headers=None, broken=False, serve=N
         def do_download(*_a, **_k):
             return send_file(sw.kepub, conditional=True)
     monkeypatch.setattr(helper, "do_download_file", do_download)
-    with sw.app.test_request_context(f"/kobo/download/{book.id}/kepub",
-                                     method=method, headers=headers or {}):
-        g.annotation_origin_device_id = sw.checked.id
-        response = helper.get_download_link(book.id, "kepub", "kobo")
-    sw.session.expire_all()
-    return response
+
+    def application(environ, start_response):
+        with sw.app.request_context(environ):
+            g.annotation_origin_device_id = sw.checked.id
+            response = helper.get_download_link(book.id, "kepub", "kobo")
+        return response(environ, start_response)
+    return application
 
 
-def _drain(response):
-    """Send the body as a WSGI server would: iterate it to the end, then
-    close it whether or not the iteration failed. Returns the bytes sent and
-    the error that ended the stream, if any."""
-    sent, error = [], None
+class Served:
+    """What reached the Kobo's socket."""
+
+    def __init__(self, status, headers, body, complete):
+        self.status, self.headers, self.body, self.complete = status, headers, body, complete
+
+
+def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serve=None):
+    """The Kobo downloads through CWNG's production server, gevent's pywsgi
+    with ``cps.gevent_wsgi.MyWSGIHandler`` on a real local socket. The server
+    is chosen here by what actually serves the request, not by a flag."""
+    import http.client
+    import gevent.socket
+    from gevent.pywsgi import WSGIServer
+    from cps.gevent_wsgi import MyWSGIHandler
+
+    application = _install_download(monkeypatch, sw, broken=broken, serve=serve)
+    server = WSGIServer(("127.0.0.1", 0), application, handler_class=MyWSGIHandler,
+                        log=None, error_log=None)
+    server.start()
     try:
-        for chunk in response.response:
-            sent.append(chunk)
-    except OSError as exc:
-        error = exc
+        sock = gevent.socket.create_connection(("127.0.0.1", server.server_port))
+        lines = [f"{method} /kobo/download/{sw.book.id}/kepub HTTP/1.1", "Host: localhost"]
+        lines += [f"{k}: {v}" for k, v in (headers or {}).items()]
+        sock.sendall(("\r\n".join(lines + ["Connection: close", "", ""])).encode())
+        reply = http.client.HTTPResponse(sock, method=method)
+        reply.begin()
+        try:
+            body, complete = reply.read(), True
+        except http.client.IncompleteRead as short:
+            body, complete = short.partial, False
+        served = Served(reply.status, dict(reply.getheaders()), body, complete)
+        sock.close()
     finally:
-        response.close()
-    return b"".join(sent), error
+        server.stop(timeout=5)
+    sw.session.expire_all()
+    return served
+
+
+class _TornadoConnection:
+    """The HTTP1Connection a Tornado request writes its reply to."""
+
+    def __init__(self, fail_headers=False):
+        self.fail_headers, self.written, self.finished = fail_headers, None, False
+        self.context = type("Context", (), {"remote_ip": "127.0.0.1", "protocol": "http"})()
+
+    def write_headers(self, start_line, headers, chunk=None):
+        if self.fail_headers:
+            from tornado.iostream import StreamClosedError
+            raise StreamClosedError()
+        self.written = (start_line, headers, chunk)
+
+    def finish(self):
+        self.finished = True
+
+
+def _download_under_tornado(monkeypatch, sw, *, fail_headers=False):
+    """The same download through the Tornado fallback server
+    (``cps.tornado_wsgi.MyWSGIContainer``), which buffers the whole body
+    before it writes anything to the Kobo."""
+    import asyncio
+    from tornado import httputil
+    from cps.tornado_wsgi import MyWSGIContainer
+
+    application = _install_download(monkeypatch, sw)
+    connection = _TornadoConnection(fail_headers=fail_headers)
+    request = httputil.HTTPServerRequest(
+        method="GET", uri=f"/kobo/download/{sw.book.id}/kepub", version="HTTP/1.1",
+        headers=httputil.HTTPHeaders({"Host": "localhost"}), connection=connection)
+    container = MyWSGIContainer(application)
+    error = None
+    try:
+        asyncio.run(container.handle_request(request))
+    except Exception as exc:  # noqa: BLE001  (the write failure is the case)
+        error = exc
+    sw.session.expire_all()
+    return connection, error
 
 
 # == Requests that do not deliver the whole current KEPUB set no proof ========
@@ -137,9 +208,8 @@ def _drain(response):
 def test_a_head_download_does_not_prove_the_kobo_holds_the_current_kepub(
         monkeypatch, stale_kobo):
     sw = stale_kobo
-    response = _download(monkeypatch, sw, method="HEAD")
-    assert response.status_code == 200
-    _drain(response)
+    served = _download(monkeypatch, sw, method="HEAD")
+    assert served.status == 200 and served.body == b""
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -149,10 +219,9 @@ def test_a_head_download_does_not_prove_the_kobo_holds_the_current_kepub(
 def test_a_range_download_does_not_prove_the_kobo_holds_the_current_kepub(
         monkeypatch, stale_kobo):
     sw = stale_kobo
-    response = _download(monkeypatch, sw, headers={"Range": "bytes=0-0"})
-    assert response.status_code == 206
-    sent, error = _drain(response)
-    assert error is None and len(sent) == 1  # the whole (one-byte) range was sent
+    served = _download(monkeypatch, sw, headers={"Range": "bytes=0-0"})
+    assert served.status == 206
+    assert served.complete and len(served.body) == 1  # the whole (one-byte) range
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -162,11 +231,9 @@ def test_a_range_download_does_not_prove_the_kobo_holds_the_current_kepub(
 def test_a_download_whose_stream_fails_partway_does_not_prove_the_current_kepub(
         monkeypatch, stale_kobo):
     sw = stale_kobo
-    response = _download(monkeypatch, sw, broken=True)
-    assert response.status_code == 200
-    sent, error = _drain(response)
-    assert sent == b"first chunk"
-    assert isinstance(error, OSError)
+    served = _download(monkeypatch, sw, broken=True)
+    assert served.status == 200
+    assert served.body == b"first chunk" and not served.complete
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -177,12 +244,10 @@ def test_a_download_whose_stream_fails_partway_does_not_prove_the_current_kepub(
 
 def test_a_full_download_read_to_the_end_delivers_the_exact_span(monkeypatch, stale_kobo):
     sw = stale_kobo
-    response = _download(monkeypatch, sw)
-    assert response.status_code == 200
-    sent, error = _drain(response)
-    assert error is None
+    served = _download(monkeypatch, sw)
+    assert served.status == 200 and served.complete
     with open(sw.kepub, "rb") as handle:
-        assert sent == handle.read()
+        assert served.body == handle.read()
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -197,11 +262,9 @@ def test_an_x_sendfile_download_does_not_prove_the_current_kepub(monkeypatch, st
     file later, or not at all. Nothing CWNG saw proves the Kobo got it."""
     sw = stale_kobo
     monkeypatch.setitem(sw.app.config, "USE_X_SENDFILE", True)
-    response = _download(monkeypatch, sw)
-    assert response.status_code == 200
-    assert response.headers.get("X-Sendfile")
-    sent, error = _drain(response)
-    assert error is None and sent == b""
+    served = _download(monkeypatch, sw)
+    assert served.status == 200
+    assert served.headers.get("X-Sendfile") and served.body == b""
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -243,10 +306,9 @@ def test_a_google_drive_stream_that_ends_short_does_not_prove_the_current_kepub(
     def serve(_book, _format, _client, _data, headers, **_k):
         return gdriveutils.do_gdrive_download(drive, headers)
 
-    response = _download(monkeypatch, sw, serve=serve)
-    assert response.status_code == 200
-    sent, error = _drain(response)
-    assert error is None and 0 < len(sent) < len(drive.data)
+    served = _download(monkeypatch, sw, serve=serve)
+    assert served.status == 200
+    assert 0 < len(served.body) < len(drive.data)
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -267,11 +329,51 @@ def test_a_stream_shorter_than_its_content_length_does_not_prove_the_current_kep
         return Response(body(), status=200,
                         headers={"Content-Length": str(len(whole))})
 
-    response = _download(monkeypatch, sw, serve=serve)
-    assert response.status_code == 200
-    sent, error = _drain(response)
-    assert error is None and len(sent) == 1000
+    served = _download(monkeypatch, sw, serve=serve)
+    assert served.status == 200
+    assert len(served.body) == 1000 and not served.complete
 
+    bookmark = _bookmark(sw)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == sw.own
+
+
+# == Server and size: only gevent proves, and never an empty KEPUB ============
+
+@pytest.mark.parametrize("write", ["written", "write-fails"])
+def test_a_download_under_the_tornado_fallback_does_not_prove_the_current_kepub(
+        monkeypatch, stale_kobo, write):
+    """Tornado joins the whole body before it writes the reply, so reading
+    the body to the end says nothing about what reached the Kobo."""
+    sw = stale_kobo
+    connection, error = _download_under_tornado(
+        monkeypatch, sw, fail_headers=(write == "write-fails"))
+    if write == "written":
+        assert error is None and connection.finished
+        start_line, _headers, chunk = connection.written
+        with open(sw.kepub, "rb") as handle:
+            assert start_line.code == 200 and chunk == handle.read()
+    else:
+        assert error is not None and connection.written is None
+
+    bookmark = _bookmark(sw)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == sw.own
+
+
+def test_a_zero_byte_kepub_served_in_full_does_not_prove_the_current_kepub(
+        monkeypatch, stale_kobo):
+    sw = stale_kobo
+    open(sw.kepub, "wb").close()
+
+    served = _download(monkeypatch, sw)
+    assert served.status == 200 and served.complete and served.body == b""
+    assert served.headers.get("Content-Length") == "0"
+
+    # An empty KEPUB has no spans, so the Location served cannot show the
+    # proof either way; ask the proof itself, as the span gate does.
+    from cps.services.kobo_place_gate import completed_kepub_identity
+    assert completed_kepub_identity(sw.checked.id, sw.book) is None
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
     assert location_of(bookmark) == sw.own

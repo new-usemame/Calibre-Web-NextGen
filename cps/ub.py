@@ -1486,6 +1486,9 @@ class Device(Base):
     last_metadata_at = Column(DateTime, nullable=True)
     active = Column(Boolean, nullable=False, default=True)
     created_by = Column(String(32), nullable=False, default="auto")
+    share_place = Column(Boolean, nullable=False, default=False, server_default='0')
+    share_place_enabled_at = Column(DateTime, nullable=True)
+    cwng_header_seen_at = Column(DateTime, nullable=True)
 
     identities = relationship("DeviceIdentity", back_populates="device", cascade="all, delete-orphan")
     __table_args__ = (
@@ -1497,7 +1500,7 @@ class Device(Base):
 
 
 class DeviceReadingPosition(Base):
-    """One device's last reported position for a Calibre book.
+    """One device's last reported position and read status for a Calibre book.
 
     ``book_id`` deliberately has no foreign key because the book lives in
     metadata.db while this journal lives in app.db. ``KoboReadingState`` stays
@@ -1521,6 +1524,8 @@ class DeviceReadingPosition(Base):
     server_modified_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
+    reading_status = Column(Integer, nullable=True)
+    status_modified_at = Column(DateTime, nullable=True)
     rehydrate_needed = Column(
         Boolean, nullable=False, default=False, server_default='0',
     )
@@ -4519,6 +4524,23 @@ def migrate_device_reading_position_slice(engine, _session):
         ))
 
 
+def migrate_device_share_place(engine, _session):
+    """Add opt-in sharing and nullable device status without rewriting rows.
+
+    SQLite's column default makes every existing device (and future raw SQL
+    insert) start off. Only missing columns are added, so repeated or partial
+    upgrades preserve subsequent sharing choices and recorded status.
+    """
+    for table, name, ddl in (
+        ("device", "share_place", "share_place BOOLEAN NOT NULL DEFAULT 0"),
+        ("device", "share_place_enabled_at", "share_place_enabled_at DATETIME"),
+        ("device", "cwng_header_seen_at", "cwng_header_seen_at DATETIME"),
+        ("device_reading_position", "reading_status", "reading_status INTEGER"),
+        ("device_reading_position", "status_modified_at", "status_modified_at DATETIME"),
+    ):
+        _add_column_if_missing(engine, table, name, ddl)
+
+
 def migrate_kobo_annotation_seed_pipeline(engine, _session):
     """Install M2's sticky-authority and capture-kind columns before ORM use."""
     Base.metadata.create_all(
@@ -5453,6 +5475,7 @@ def migrate_Database(_session):
     migrate_device_management_slice(engine, _session)
     migrate_webreader_device_identity_slice(engine, _session)
     migrate_device_reading_position_slice(engine, _session)
+    migrate_device_share_place(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)

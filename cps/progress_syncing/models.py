@@ -396,7 +396,7 @@ def ensure_kosync_progress_table(conn):
             columns = [row[1] for row in pragma_result.fetchall()]
 
             expected_columns = {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
-            actual_columns = set(columns)
+            actual_columns = set(columns) - {'client_modified_at'}
 
             # A mismatched table cannot provide the conflict target every
             # conditional writer depends on, so startup must not continue.
@@ -412,6 +412,8 @@ def ensure_kosync_progress_table(conn):
                 raise KOSyncProgressSchemaError(
                     "kosync_progress schema mismatch; migration required"
                 )
+            if "client_modified_at" not in columns:
+                execute_sql("ALTER TABLE kosync_progress ADD COLUMN client_modified_at TIMESTAMP")
 
             # Check if foreign keys have CASCADE DELETE
             has_cascade = check_cascade_delete_on_fk(conn, "kosync_progress", {'user_id': 'user'})
@@ -432,12 +434,13 @@ def ensure_kosync_progress_table(conn):
                             device TEXT NOT NULL,
                             device_id TEXT,
                             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            client_modified_at TIMESTAMP,
                             FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
                         )
                     """)
                     execute_sql("""
-                        INSERT INTO kosync_progress_new (id, user_id, document, progress, percentage, device, device_id, timestamp)
-                        SELECT kp.id, kp.user_id, kp.document, kp.progress, kp.percentage, kp.device, kp.device_id, kp.timestamp
+                        INSERT INTO kosync_progress_new (id, user_id, document, progress, percentage, device, device_id, timestamp, client_modified_at)
+                        SELECT kp.id, kp.user_id, kp.document, kp.progress, kp.percentage, kp.device, kp.device_id, kp.timestamp, kp.client_modified_at
                         FROM kosync_progress AS kp
                         WHERE EXISTS (
                             SELECT 1 FROM user AS u WHERE u.id = kp.user_id
@@ -465,6 +468,7 @@ def ensure_kosync_progress_table(conn):
                     device TEXT NOT NULL,
                     device_id TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    client_modified_at TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
                 )
             """)
@@ -558,7 +562,8 @@ class KOSyncProgress(AppBase):
         percentage: Normalized percentage (0-100) of reading progress
         device: Device name that last synced this progress
         device_id: Unique identifier for the device
-        timestamp: Last update time for this progress record
+        timestamp: Server receipt time, also served to legacy progress clients
+        client_modified_at: Validated client clock for identified arbitration
     """
     __tablename__ = 'kosync_progress'
 
@@ -571,6 +576,7 @@ class KOSyncProgress(AppBase):
     device_id = Column(String)
     timestamp = Column(TIMESTAMP, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
+    client_modified_at = Column(TIMESTAMP, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(

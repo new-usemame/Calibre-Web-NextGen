@@ -16,12 +16,14 @@
                 "device",
                 "device_id"
             ],
+            "optional_params" : ["timestamp"],
             "payload" : [
                 "document",
                 "progress",
                 "percentage",
                 "device",
-                "device_id"
+                "device_id",
+                "timestamp"
             ],
             "expected_status" : [200, 202, 401]
         },

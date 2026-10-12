@@ -168,7 +168,7 @@ class TestEnsureKosyncProgressTable:
 
         cursor = conn.execute("PRAGMA table_info(kosync_progress)")
         columns = {row[1] for row in cursor.fetchall()}
-        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
+        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp', 'client_modified_at'}
 
     def test_creates_indexes(self, tmp_path):
         db = tmp_path / "test.db"
@@ -185,11 +185,23 @@ class TestEnsureKosyncProgressTable:
         conn = sqlite3.connect(str(db))
         from cps.progress_syncing.models import ensure_kosync_progress_table
         ensure_kosync_progress_table(conn)
+        conn.execute("CREATE TABLE user (id INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO user VALUES (1)")
+        conn.execute("INSERT INTO kosync_progress "
+                     "(user_id, document, progress, percentage, device, timestamp, client_modified_at) "
+                     "VALUES (1, 'digest', 'page', 40, 'Kindle', "
+                     "'2026-09-01 12:00:01', '2026-09-01 12:00:00')")
+        before = conn.execute("SELECT * FROM kosync_progress").fetchall()
+        schema_before = conn.execute("PRAGMA table_info(kosync_progress)").fetchall()
+        indexes_before = conn.execute("PRAGMA index_list(kosync_progress)").fetchall()
         ensure_kosync_progress_table(conn)
 
         cursor = conn.execute("PRAGMA table_info(kosync_progress)")
         columns = {row[1] for row in cursor.fetchall()}
-        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
+        assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp', 'client_modified_at'}
+        assert conn.execute("SELECT * FROM kosync_progress").fetchall() == before
+        assert conn.execute("PRAGMA table_info(kosync_progress)").fetchall() == schema_before
+        assert conn.execute("PRAGMA index_list(kosync_progress)").fetchall() == indexes_before
 
     def test_rejects_schema_mismatch(self, tmp_path, caplog):
         """A table without the writers' conflict target must stop startup."""

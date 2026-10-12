@@ -589,3 +589,94 @@ def test_the_devices_list_says_whether_gates_are_enforced(w, monkeypatch, value,
         monkeypatch.setenv(SWITCH, value.format(other=w.reader.id + 100, me=w.reader.id))
 
     assert _devices(w)["share_place_gates"] is expected
+
+
+# == 15a.1 Web -> KOReader exactness binds to the shared report ==============
+# KOReader's exact XPointer from the web must come from the Browser report that
+# wrote the shared KOSync row. A later private Browser report at the same
+# percentage (an unchecked box, or a "Read from here" save sent with
+# share_with_devices=false) must never change what KOReader receives: it gets
+# the shared row's percentage, or the old shared exact place.
+
+def private_save(w, percent, cfi):
+    response = w.web.post(f"/api/v1/books/{BOOK}/bookmark", json={
+        "format": "epub", "bookmark": cfi, "percentage": percent,
+        "share_with_devices": False})
+    assert response.status_code == 204, response.get_data(as_text=True)
+    w.session.expire_all()
+
+
+@pytest.mark.parametrize("private", ["unchecked", "preview-gates-on", "preview-gates-off"])
+def test_a_private_browser_save_never_becomes_koreaders_exact_place(
+        w, rows, monkeypatch, private):
+    from cps.services import koreader_xpointer
+    from cps.services.koreader_position import is_xpointer
+    if private == "preview-gates-off":
+        monkeypatch.delenv(SWITCH, raising=False)
+    w.koreader("koreader-1", "KOReader", checked=True)
+    me = browser(w, checked=True)
+    shared_cfi = cfi_of(w, rows["late"])
+    save(w, 60, shared_cfi)
+    shared_xpointer = koreader_xpointer.cfi_to_xpointer(w.epub, shared_cfi)
+    assert w.pull() == (pytest.approx(60), shared_xpointer)
+    later()
+
+    private_cfi = cfi_of(w, rows["early"])
+    if private == "unchecked":
+        w.share(me, False)
+        save(w, 60, private_cfi)
+    else:
+        private_save(w, 60, private_cfi)
+
+    percent, progress = w.pull()
+    assert percent == pytest.approx(60)
+    assert progress != koreader_xpointer.cfi_to_xpointer(w.epub, private_cfi)
+    assert progress == shared_xpointer or not is_xpointer(progress)
+
+
+def test_a_later_checked_save_rebinds_koreaders_exact_place(w, rows):
+    """Control: the binding follows the newest shared report, even at the
+    same percentage (a fix must not pin the first CFI for good)."""
+    from cps.services import koreader_xpointer
+    w.koreader("koreader-1", "KOReader", checked=True)
+    browser(w, checked=True)
+    save(w, 60, cfi_of(w, rows["late"]))
+    later()
+
+    newer = cfi_of(w, rows["early"])
+    save(w, 60, newer)
+
+    assert w.pull() == (pytest.approx(60), koreader_xpointer.cfi_to_xpointer(w.epub, newer))
+
+
+# == 15a.2 The share flag on a keepalive-shaped save (server half) ===========
+# Reader.tsx's teardown keepalive is a plain POST of format/bookmark/percentage.
+# The client must send its current share flag; the server keeps honouring an
+# explicit false and keeps today's default (share) when the flag is omitted,
+# which is what older clients send.
+
+def test_an_explicit_no_share_save_changes_no_shared_state(w, rows):
+    """Control: "Read from here" on a checked Browser stays Browser-only."""
+    me = browser(w, checked=True)
+    cfi = cfi_of(w, rows["early"])
+
+    private_save(w, 30, cfi)
+
+    assert shared_bookmark(w) is None
+    assert account_status(w) is None
+    assert kosync_rows(w) == []
+    assert journal(w, me).cfi == cfi
+
+
+def test_a_save_without_the_share_flag_shares_as_older_clients_expect(w, rows):
+    """Control: an omitted flag means share (old-client default)."""
+    browser(w, checked=True)
+
+    response = w.web.post(f"/api/v1/books/{BOOK}/bookmark", json={
+        "format": "epub", "bookmark": cfi_of(w, rows["early"]), "percentage": 30})
+    assert response.status_code == 204
+    w.session.expire_all()
+
+    assert shared_bookmark(w)[0] == pytest.approx(30)
+    assert account_status(w) == IN_PROGRESS
+    assert [row[1] for row in kosync_rows(w)] == [pytest.approx(30)]

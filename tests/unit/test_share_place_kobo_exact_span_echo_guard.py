@@ -106,8 +106,10 @@ def _not_rewound(sw, rows, percent=40):
 
 
 def _won(sw, percent):
-    """The Kobo's report is the shared place the other checked Kobo gets."""
+    """The Kobo's report is the shared place: the other checked Kobo gets it,
+    and so does KOReader's KOSync GET (section 14b: mirrored latest-wins)."""
     assert sw.get(sw.observer)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(percent)
+    assert sw.pull()[0] == pytest.approx(percent)
 
 
 @pytest.fixture
@@ -258,3 +260,47 @@ def test_with_the_switch_off_a_report_at_the_old_place_behaves_as_on_main(
     bookmark = sw.get(kobo)["CurrentBookmark"]
     assert bookmark["ProgressPercent"] == pytest.approx(HELD_PERCENT)
     assert location_of(bookmark) == _held(rows)
+
+
+# == A checked Kobo's place on KOSync (section 14b) ==========================
+
+def _kobo_after_koreader(sw, rows, *, checked, name="Kobo"):
+    """A Kobo holding the current KEPUB reported ``held`` an hour ago; a
+    checked KOReader has since shared its place at 40%."""
+    sw.koreader_device = sw.koreader("koreader-1", "KOReader", checked=True)
+    kobo = sw.kobo_device(name, checked=checked)
+    sw.download(kobo)
+    held = rows["held"]
+    sw.put(kobo, held["source"], held["span"], HELD_PERCENT, _now() - timedelta(hours=1))
+    sw.settle(kobo)
+    sw.push(rows["koreader"]["xpointer"], 40, client_at=after_now(2))
+    assert sw.pull()[0] == pytest.approx(40)
+    return kobo
+
+
+def test_koreader_gets_a_checked_kobos_backward_move(sw, rows):
+    kobo = _kobo_after_koreader(sw, rows, checked=True)
+
+    _close_at(sw, kobo, rows["page-back-far"], HELD_PERCENT - 3)
+
+    assert sw.pull()[0] == pytest.approx(HELD_PERCENT - 3)
+
+
+def test_an_unchecked_kobos_report_does_not_reach_koreader(sw, rows):
+    kobo = _kobo_after_koreader(sw, rows, checked=False, name="Kobo Unchecked")
+
+    _close_at(sw, kobo, rows["koreader"], 60)  # even ahead of KOReader
+
+    seen_percent, progress = sw.pull()
+    assert seen_percent == pytest.approx(40)
+    assert progress == rows["koreader"]["xpointer"]
+
+
+def test_with_the_switch_off_a_kobos_backward_move_leaves_koreader_where_it_was(
+        sw, rows, monkeypatch):
+    monkeypatch.delenv(SWITCH, raising=False)
+    kobo = _kobo_after_koreader(sw, rows, checked=True)
+
+    _close_at(sw, kobo, rows["page-back-far"], HELD_PERCENT - 3)
+
+    assert sw.pull()[0] == pytest.approx(40)  # main: furthest wins

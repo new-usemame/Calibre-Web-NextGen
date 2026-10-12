@@ -1559,9 +1559,10 @@ class DeviceReadingPosition(Base):
     reading_status = Column(Integer, nullable=True)
     # The status observation's ordering key is (status_modified_at, the raw
     # client clock; status_received_at, its own receipt). The place's is
-    # (client_modified_at, server_modified_at). NULL status_received_at (no
-    # status yet, or a row from before the column) falls back to
-    # server_modified_at.
+    # (client_modified_at, server_modified_at). Every status writer sets
+    # status_received_at; migrate_device_share_place freezes one onto older
+    # status rows (spec section 13a). A status row still without one reads
+    # as main's key, (status_modified_at, status_modified_at).
     status_modified_at = Column(DateTime, nullable=True)
     status_received_at = Column(DateTime, nullable=True)
     rehydrate_needed = Column(
@@ -4579,6 +4580,17 @@ def migrate_device_share_place(engine, _session):
         ("device_reading_position", "status_received_at", "status_received_at DATETIME"),
     ):
         _add_column_if_missing(engine, table, name, ddl)
+    # Spec section 13a: freeze a receipt onto status rows written before
+    # status_received_at existed (PR 2, unreleased main). Their own clock keeps
+    # main's key exactly; a clockless status takes the row's receipt once, so a
+    # later place write cannot re-time it. Idempotent: only NULL receipts move.
+    columns = _table_columns(engine, "device_reading_position")
+    if columns and {"reading_status", "status_modified_at",
+                    "status_received_at"} <= columns:
+        _run_ddl_with_retry(engine, (
+            "UPDATE device_reading_position SET status_received_at = "
+            "COALESCE(status_modified_at, server_modified_at) "
+            "WHERE reading_status IS NOT NULL AND status_received_at IS NULL"))
 
 
 def migrate_kobo_bookmark_receipt(engine, _session):

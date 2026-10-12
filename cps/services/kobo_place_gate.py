@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from sqlalchemy import case, or_, select, update
+from sqlalchemy import and_, case, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from .. import ub
@@ -114,16 +114,35 @@ def _journal_place_report(row):
     return Report(row.client_modified_at, row.server_modified_at)
 
 
+# Spec section 13a: every writer that sets a status sets its receipt in the
+# same statement, and the startup migration freezes a receipt onto any older
+# status row. A status row still without one is read with main's key,
+# Report(status_modified_at, status_modified_at); the place's receipt moves
+# with every place write, so it never orders a status.
+
 def _status_receipt(row):
-    return row.status_received_at or row.server_modified_at
+    return row.status_received_at or row.status_modified_at
 
 
 def _journal_status_report(row):
-    """The status observation a journal row holds, or None if it holds none."""
+    """The status observation a journal row holds, or None if it holds none
+    (or holds one with no clock at all, which main also treats as absent)."""
     if row is None or (row.reading_status is None
                        and row.status_modified_at is None):
         return None
-    return Report(row.status_modified_at, _status_receipt(row))
+    receipt = _status_receipt(row)
+    if receipt is None:
+        return None
+    return Report(row.status_modified_at, receipt)
+
+
+def _place_absent(table):
+    return and_(table.c.progress_percent.is_(None),
+                or_(table.c.location_value.is_(None), table.c.location_value == ""))
+
+
+def _status_absent(table):
+    return and_(table.c.reading_status.is_(None), table.c.status_modified_at.is_(None))
 
 
 def _same(column, value):
@@ -170,14 +189,20 @@ def record_own_report(*, device_id, book_id, client_at, place=None,
             values.update(place, client_modified_at=client_at,
                           server_modified_at=received_at)
             if row is not None:
+                # Section 13a: an empty place guards its emptiness, not just
+                # the pair, which a status-only first report shares.
                 guard += [_same(table.c.client_modified_at, row.client_modified_at),
                           _same(table.c.server_modified_at, row.server_modified_at)]
+                if _journal_place_report(row) is None:
+                    guard.append(_place_absent(table))
         if status_wins:
             values.update(reading_status=status, status_modified_at=client_at,
                           status_received_at=received_at)
             if row is not None:
                 guard += [_same(table.c.status_modified_at, row.status_modified_at),
                           _same(table.c.status_received_at, row.status_received_at)]
+                if _journal_status_report(row) is None:
+                    guard.append(_status_absent(table))
         if row is None:
             # The row's receipt column is required; a status-only first
             # report leaves the place empty, so it orders nothing.

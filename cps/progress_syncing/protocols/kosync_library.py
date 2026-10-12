@@ -415,7 +415,6 @@ def put_read_status():
                      status_modified_at=now, status_received_at=now),
                 # Spec section 13: the status pair is (clock, own receipt).
                 client_column="status_modified_at", server_column="status_received_at",
-                fallback_server_column="server_modified_at",
                 present_column="reading_status", candidate=Report(None, now))
             percent = (100 if status == "finished" else
                        own.progress_percent if own is not None and own.progress_percent is not None else 1)

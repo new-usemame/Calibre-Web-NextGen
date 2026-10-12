@@ -71,15 +71,16 @@ def request_device(user_id, body=None, *, observe=False):
 
 
 def latest_write(model, identity, values, *, client_column, server_column,
-                 candidate, present_column=None, fallback_server_column=None,
-                 session=None):
+                 candidate, present_column=None, session=None):
     """Apply one arbiter verdict atomically; rejudge only a concurrent winner.
 
     Clocks form the optimistic concurrency token. SQLite serializes the
     UPDATE/INSERT; if another writer won before it, its new clocks are read
     and judged instead of overwriting a newer report using an old verdict.
-    ``fallback_server_column`` is read as the receipt while
-    ``server_column`` is NULL (a row from before that column existed).
+    A NULL ``server_column`` reads the client clock as the receipt (main's
+    key). When ``present_column`` is NULL the stored pair is ignored, so the
+    UPDATE also requires it still NULL (spec section 13a): a concurrent
+    first observation sharing the old pair cannot be overwritten.
     """
     s = session if session is not None else ub.session
     table = model.__table__
@@ -88,11 +89,11 @@ def latest_write(model, identity, values, *, client_column, server_column,
         current = s.execute(select(table).where(*terms)).mappings().first()
         clock = None
         if current is not None:
-            clock = current[server_column] or (
-                current[fallback_server_column] if fallback_server_column
-                else None) or current[client_column]
+            clock = current[server_column] or current[client_column]
         report = Report(current[client_column], clock) if clock is not None else None
-        if current is not None and present_column is not None and current[present_column] is None:
+        absent = (current is not None and present_column is not None
+                  and current[present_column] is None)
+        if absent:
             report = None
         if not report_wins(candidate, report):
             return False
@@ -101,6 +102,8 @@ def latest_write(model, identity, values, *, client_column, server_column,
                                .on_conflict_do_nothing(index_elements=list(identity)))
         else:
             tokens = [table.c[key] == current[key] for key in (client_column, server_column)]
+            if absent:
+                tokens.append(table.c[present_column].is_(None))
             result = s.execute(update(table).where(*terms, *tokens).values(**values))
         if result.rowcount == 1:
             s.expire_all()
@@ -138,7 +141,6 @@ def journal(device_id, book_id, document, progress, percentage, report):
                           status_modified_at=report.client_at,
                           status_received_at=report.server_at),
                      client_column="status_modified_at", server_column="status_received_at",
-                     fallback_server_column="server_modified_at",
                      present_column="reading_status", candidate=report)
     return accepted
 

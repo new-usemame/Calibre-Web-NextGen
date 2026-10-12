@@ -19129,6 +19129,23 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+# Share my place (Devices page)
+#: cps/spa_strings.py
+msgid "Share my place"
+msgstr "Mijn plek delen"
+
+#: cps/spa_strings.py
+msgid "Devices with this on open each book where you last stopped on any of them. Turn it off for a device someone else reads on."
+msgstr "Apparaten met deze optie aan openen elk boek waar je op een van hen het laatst gebleven was. Zet het uit voor een apparaat waarop iemand anders leest."
+
+#: cps/spa_strings.py
+msgid "Could not save Share my place. Try again."
+msgstr "Kan Mijn plek delen niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Always shares its place. Install or update the NextGen Sync plugin on this device to choose."
+msgstr "Deelt altijd zijn plek. Installeer de NextGen Sync-plug-in op dit apparaat of werk deze bij om te kiezen."
+
 #~ msgid "Progress is not being saved."
 #~ msgstr "Voortgang wordt niet opgeslagen."
 

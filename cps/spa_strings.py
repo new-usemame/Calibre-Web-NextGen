@@ -657,6 +657,12 @@ _("Custom display name")
 _("Custom fields on book cards")
 _("Display name for {name}")
 
+# Share my place (Devices page, spec 2026-10-11).
+_("Share my place")
+_("Devices with this on open each book where you last stopped on any of them. Turn it off for a device someone else reads on.")
+_("Could not save Share my place. Try again.")
+_("Always shares its place. Install or update the NextGen Sync plugin on this device to choose.")
+
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
 # property in frontend/src that

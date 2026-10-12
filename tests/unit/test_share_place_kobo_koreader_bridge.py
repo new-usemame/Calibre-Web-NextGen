@@ -70,6 +70,14 @@ def world(monkeypatch, tmp_path):
     state.current_bookmark.location_type = "KoboSpan"
     state.current_bookmark.location_source = "OEBPS/chap.xhtml"
     built.session.commit()
+    # Editing the location re-stamps the bookmark's clocks to now; put the
+    # bookmark (its clock and its receipt) and the reading state back at the
+    # hour-old report they stand for.
+    bookmark = ub.KoboBookmark.__table__
+    built.session.execute(bookmark.update()
+                          .where(bookmark.c.id == state.current_bookmark.id)
+                          .values(last_modified=built.kobo_at,
+                                  server_modified_at=built.kobo_at))
     state.last_modified = built.kobo_at
     state.priority_timestamp = built.kobo_at
     built.session.commit()

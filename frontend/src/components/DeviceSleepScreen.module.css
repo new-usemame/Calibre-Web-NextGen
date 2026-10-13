@@ -1,0 +1,20 @@
+.scrim { position: fixed; inset: 0; z-index: calc(var(--z-overlay) + 3); display: flex; align-items: center; justify-content: center; padding: var(--sp-4); background: rgba(0, 0, 0, .65); }
+.dialog, .confirmation { box-sizing: border-box; width: min(100%, 540px); max-height: calc(100dvh - 2 * var(--sp-4)); overflow-y: auto; padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); color: var(--text); box-shadow: var(--elev-3); overflow-wrap: anywhere; }
+.dialog h2, .confirmation h2 { margin: 0 0 var(--sp-3); font-family: var(--font-display); font-size: var(--fs-lg); }
+.help, .dimensions { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); margin: var(--sp-2) 0; }
+.help p { margin: 0 0 var(--sp-2); }
+.preview { width: min(100%, 160px); max-height: 240px; margin: var(--sp-4) auto var(--sp-2); background: #fff; border: 1px solid var(--border-strong); }
+.preview img { display: block; width: 100%; height: 100%; object-fit: contain; filter: grayscale(1); }
+.dimensions { text-align: center; }
+.status { font-weight: var(--fw-medium); margin: var(--sp-3) 0; }
+.fileLabel { display: block; font-weight: var(--fw-medium); margin: var(--sp-4) 0 var(--sp-2); }
+.dialog input[type='file'] { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2); background: var(--surface-2); }
+.dialog input::file-selector-button { min-height: 28px; max-width: 100%; margin-right: var(--sp-2); border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface-3); color: var(--text); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
+.dialog button, .confirmation button { min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); color: var(--text); }
+.dialog button:not(:disabled):hover, .confirmation button:not(:disabled):hover { background: var(--surface-2); }
+.dialog button:disabled, .confirmation button:disabled { opacity: .55; cursor: default; }
+.dialog .primary { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent); }
+.dialog .remove, .confirmation .danger { color: var(--danger); border-color: var(--danger-border); margin-top: var(--sp-3); }
+.error { color: var(--danger); padding: var(--sp-2) var(--sp-3); background: var(--danger-soft); border: 1px solid var(--danger-border); border-radius: var(--r-md); }
+@media (max-width: 480px) { .dialog, .confirmation { padding: var(--sp-4); } }

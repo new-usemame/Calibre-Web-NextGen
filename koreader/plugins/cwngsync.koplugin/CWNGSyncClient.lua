@@ -661,6 +661,101 @@ function CWNGSyncClient:download_file(
         nil
 end
 
+-- Sleep screens use a conditional, same-server transport. Redirects are
+-- forbidden so an asset response can never forward Basic credentials elsewhere.
+function CWNGSyncClient:_sleep_screen_request(username, password, device, device_id, method, path, body, etag, target)
+    if type(path) ~= "string" or not path:match("^/syncs/sleep%-screen")
+        or path:find("[\r\n]") then return false, nil, "invalid_manifest" end
+    local http, ltn12, mime = require("socket.http"), require("ltn12"), require("mime")
+    local json = require("json")
+    local headers = {
+        ["Authorization"] = "Basic " .. mime.b64(username .. ":" .. password):gsub("%s", ""),
+        ["X-CWNG-Device-ID"] = device_id, ["X-CWNG-Device-Name"] = device,
+        ["Accept-Encoding"] = "identity",
+    }
+    if etag then headers["If-None-Match"] = etag end
+    local payload = body and json.encode(body)
+    if payload and path == "/syncs/sleep-screen/device" then
+        -- KOReader versions use different JSON libraries/null sentinels.
+        -- These two trusted protocol members are the only nullable fields;
+        -- encode absent values explicitly without a library-specific sentinel.
+        if body.screen_width == nil then payload = payload:gsub("}%s*$", ',"screen_width":null}') end
+        if body.screen_height == nil then payload = payload:gsub("}%s*$", ',"screen_height":null}') end
+    end
+    if payload then headers["Content-Type"] = "application/json"; headers["Content-Length"] = tostring(#payload) end
+    local chunks, size, handle, sink_error = {}, 0, nil, nil
+    -- Do not open/truncate a file before knowing the response: a 304 has no
+    -- bytes. The bounded sink opens lazily, and closes before returning success.
+    local function sink(chunk, err)
+        if err then sink_error = "download_failed"; return nil, sink_error end
+        if not chunk then return 1 end
+        size = size + #chunk
+        if size > (target and 8 * 1024 * 1024 or 128 * 1024) then sink_error = "download_failed"; return nil, sink_error end
+        if target then
+            if not handle then handle = io.open(target, "wb") end
+            if not handle or not handle:write(chunk) then sink_error = "storage_failed"; return nil, sink_error end
+        else chunks[#chunks + 1] = chunk end
+        return 1
+    end
+    socketutil:set_timeout(10, 30)
+    local called, sent, code, response = pcall(http.request, {
+        url = self.service_url .. path, method = method, headers = headers,
+        source = payload and ltn12.source.string(payload), sink = sink, redirect = false,
+    })
+    local closed = true
+    if handle then closed = handle:close() end
+    socketutil:reset_timeout()
+    code = tonumber(code)
+    if not called or not sent or sink_error or not closed or (code ~= 200 and code ~= 304) then
+        if target then os.remove(target) end
+        return false, nil, sink_error or (code and ("HTTP " .. code) or "download_failed")
+    end
+    local observed_etag = responseHeader(response, "etag")
+    if code == 304 then
+        if target then os.remove(target) end
+        return true, { status = 304, etag = observed_etag or etag }
+    end
+    if target then
+        local length = tonumber(responseHeader(response, "content-length"))
+        if (length and length ~= size) or responseHeader(response, "content-type") ~= "image/png" then
+            os.remove(target); return false, nil, "invalid_image"
+        end
+        return true, { status = 200, etag = observed_etag, size = size }
+    end
+    local decoded, result = pcall(json.decode, table.concat(chunks))
+    if not decoded or type(result) ~= "table" then return false, nil, "invalid_manifest" end
+    result.etag = observed_etag
+    return true, result
+end
+
+function CWNGSyncClient:report_sleep_screen_device(username, password, device, device_id, report)
+    -- Refresh on every sync, rather than trusting setup-time or another
+    -- server's capability. Older servers never receive an unsupported route.
+    local ok, body, reason = self:authorize(username, password)
+    if not ok then return false, nil, reason or "authentication_failed" end
+    local available = type(body) == "table" and body.sleep_screen_v1 == true
+    if type(body) == "table" and type(body.capabilities) == "table" then
+        for _, capability in ipairs(body.capabilities) do if capability == "sleep_screen_v1" then available = true end end
+    end
+    if not available then return false, nil, "sleep_screen_unavailable" end
+    return self:_sleep_screen_request(username, password, device, device_id, "PUT", "/syncs/sleep-screen/device", report)
+end
+
+function CWNGSyncClient:get_sleep_screen_manifest(username, password, device, device_id, etag)
+    return self:_sleep_screen_request(username, password, device, device_id, "GET", "/syncs/sleep-screen", nil, etag)
+end
+
+function CWNGSyncClient:download_sleep_screen_image(username, password, device, device_id, path, target, etag)
+    if type(path) ~= "string" or not path:match("^/syncs/sleep%-screen/image%?revision=[%w_-]+$") then
+        return false, nil, "invalid_manifest"
+    end
+    return self:_sleep_screen_request(username, password, device, device_id, "GET", path, nil, etag, target)
+end
+
+function CWNGSyncClient:ack_sleep_screen(username, password, device, device_id, receipt)
+    return self:_sleep_screen_request(username, password, device, device_id, "POST", "/syncs/sleep-screen/ack", receipt)
+end
+
 -- Phase 2: pull annotations for a document (server -> device).
 function CWNGSyncClient:pull_annotations(username, password, document, device, device_id, callback)
     self.client:reset_middlewares()

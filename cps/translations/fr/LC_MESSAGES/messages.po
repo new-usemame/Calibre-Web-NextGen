@@ -11986,6 +11986,102 @@ msgstr ""
 "Choisissez un groupe d’étiquettes pour parcourir les livres de ce groupe et "
 "de ses sous-étiquettes."
 
+#: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr "Écran de veille"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr "Écran de veille de {name}"
+
+#: cps/spa_strings.py
+msgid "Set sleep screen"
+msgstr "Définir l’écran de veille"
+
+#: cps/spa_strings.py
+msgid "Replace image"
+msgstr "Remplacer l’image"
+
+#: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr "Supprimer l’écran de veille"
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr "Choisir une image"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr "Aperçu de l’écran de veille de {name}"
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr "Affiché lorsque cet appareil se met en veille dans KOReader."
+
+#: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr "L’écran de verrouillage natif du Kindle reste inchangé."
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr "En attente de la prochaine synchronisation"
+
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr "Appliqué sur l’appareil"
+
+#: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr "Suppression en attente de synchronisation"
+
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr "Réglages précédents restaurés"
+
+#: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr "En attente des informations de l’appareil"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr "Mettre à jour le plugin CWNG"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr "Mettez à jour le plugin CWNG sur cet appareil, puis synchronisez."
+
+#: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr ""
+"Connectez cet appareil, puis utilisez Synchroniser maintenant dans KOReader."
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr ""
+"Cet appareil ne peut pas afficher d’écran de veille KOReader personnalisé."
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr "Utilisez une image JPEG ou PNG de 10 Mio maximum."
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr "Impossible d’enregistrer l’écran de veille. Réessayez."
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr "Impossible d’appliquer l’écran de veille"
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr ""
+"Supprimer cette image ? Vos réglages précédents d’écran de veille KOReader "
+"seront restaurés après la prochaine synchronisation."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Étiquette sans nom"

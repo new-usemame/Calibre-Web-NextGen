@@ -11801,6 +11801,100 @@ msgstr ""
 "Kies een labelgroep om boeken uit die groep en de onderliggende labels te "
 "bekijken."
 
+#: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr "Slaapscherm"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr "Slaapscherm voor {name}"
+
+#: cps/spa_strings.py
+msgid "Set sleep screen"
+msgstr "Slaapscherm instellen"
+
+#: cps/spa_strings.py
+msgid "Replace image"
+msgstr "Afbeelding vervangen"
+
+#: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr "Slaapscherm verwijderen"
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr "Kies een afbeelding"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr "Voorbeeld van het slaapscherm voor {name}"
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr "Wordt getoond wanneer dit apparaat in KOReader in slaapstand gaat."
+
+#: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr "Het oorspronkelijke Kindle-vergrendelscherm blijft ongewijzigd."
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr "Wachten op de volgende synchronisatie"
+
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr "Toegepast op het apparaat"
+
+#: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr "Verwijdering wacht op synchronisatie"
+
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr "Vorige instellingen hersteld"
+
+#: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr "Wachten op apparaatgegevens"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr "Werk de CWNG-plugin bij"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr "Werk de CWNG-plugin op dit apparaat bij en synchroniseer daarna."
+
+#: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr "Verbind dit apparaat en gebruik Nu synchroniseren in KOReader."
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr "Dit apparaat kan geen aangepast KOReader-slaapscherm tonen."
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr "Gebruik een JPEG- of PNG-afbeelding van maximaal 10 MiB."
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr "Het slaapscherm kon niet worden opgeslagen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr "Het slaapscherm kon niet worden toegepast"
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr ""
+"Deze afbeelding verwijderen? Je vorige KOReader-slaapscherminstellingen "
+"worden na de volgende synchronisatie hersteld."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Naamloos label"

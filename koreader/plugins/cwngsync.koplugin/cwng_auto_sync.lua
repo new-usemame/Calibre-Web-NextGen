@@ -370,6 +370,7 @@ function AutoSync:onDeviceOnline(force)
     local auto = self.settings.auto_sync
     local library = self:libraryEnabled()
     if not auto and not library then return end
+    self:syncSleepScreen()
     self:flushPending(function()
         if auto and self:hasCurrentDocument() then
             self:getProgress(false, false)
@@ -403,6 +404,7 @@ function AutoSync:syncEverythingNow()
         return
     end
     NetworkMgr:runWhenConnected(function()
+        self:syncSleepScreen()
         local InfoMessage = require("ui/widget/infomessage")
         local T = require("ffi/util").template
         local _ = require("gettext")

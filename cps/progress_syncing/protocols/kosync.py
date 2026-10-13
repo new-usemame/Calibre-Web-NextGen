@@ -152,7 +152,7 @@ POSITION_KIND_ANCHOR = "anchor"
 #                     ``text_quote`` highlights and names pulled ones by their
 #                     words on ``?text_quote=1`` (koreader_annotations)
 SERVER_CAPABILITIES = ("position_kinds", "percentage_push", "anchor", "book_id_document",
-                       "annotations_text_quote")
+                       "annotations_text_quote", "sleep_screen_v1")
 
 
 def is_percentage_only(progress_record) -> bool:
@@ -2691,3 +2691,5 @@ from . import kosync_library  # noqa: E402,F401
 
 # Connecting a device with a code (pairing). Same reason again.
 from . import kosync_pairing  # noqa: E402,F401
+
+from . import kosync_sleep_screen  # noqa: E402,F401

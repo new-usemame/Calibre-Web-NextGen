@@ -46,6 +46,7 @@ USER_ACCOUNT_MODELS = (
     "KoboDeletedBook",            # tombstones for the user's Kobo sync
     # Registered devices and every ledger hanging off them.
     "Device",
+    "DeviceSleepScreen",
     "DeviceIdentity",
     "DeviceInventoryReport",
     "DeviceInventoryItem",
@@ -111,7 +112,8 @@ def purge_user_account(user_id, session=None):
     # through the user's book states.
     device_ids = session.query(ub.Device.id).filter(
         ub.Device.user_id == user_id).scalar_subquery()
-    for model in (ub.DeviceBookDeletion,        # -> device_inventory_item
+    for model in (ub.DeviceSleepScreen,
+                  ub.DeviceBookDeletion,        # -> device_inventory_item
                   ub.DeviceInventoryItem,       # -> device_inventory_report
                   ub.DeviceInventoryReport,
                   ub.DeviceIdentity,
@@ -124,7 +126,10 @@ def purge_user_account(user_id, session=None):
     _delete(session, ub.DeviceCollectionSync,
             (ub.DeviceCollectionSync.user_id == user_id)
             | ub.DeviceCollectionSync.device_id.in_(device_ids))
-    _delete(session, ub.Device, ub.Device.user_id == user_id)
+    # Mark loaded devices deleted too, preserving their readable identity
+    # after commit instead of leaving expired objects pointing at missing rows.
+    session.query(ub.Device).filter(ub.Device.user_id == user_id).delete(
+        synchronize_session="fetch")
 
     from .progress_syncing.models import KOSyncProgress
     _delete(session, KOSyncProgress, KOSyncProgress.user_id == user_id)

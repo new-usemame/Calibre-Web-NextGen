@@ -114,6 +114,11 @@ function SetupFlow:connectWith(config, how, on_done)
         if on_done then on_done(false, why) end
         return
     end
+    if (self.settings.server ~= config.server or self.settings.username ~= config.username)
+        and self.restoreSleepScreen and not self:restoreSleepScreen() then
+        if on_done then on_done(false, "unreachable") end
+        return
+    end
     self.settings.server = config.server
     ServerCapabilities.remember(self.settings, body)
     if self.checkBuiltinProgressSync then self:checkBuiltinProgressSync() end
@@ -283,6 +288,7 @@ function SetupFlow:askServer(continue)
                         })
                         return
                     end
+                    if self.settings.server ~= server and self.restoreSleepScreen and not self:restoreSleepScreen() then return end
                     UIManager:close(dialog)
                     self.settings.server = server
                     continue(server, Setup.secureAlternative(typed))
@@ -405,6 +411,10 @@ end
 -- Forget this device's connection. The library folder and every downloaded
 -- book stay; only the sign-in goes.
 function SetupFlow:disconnect()
+    if self.restoreSleepScreen and not self:restoreSleepScreen() then
+        UIManager:show(InfoMessage:new{ text = _("Could not restore your previous sleep screen. Try again."), timeout = 5 })
+        return false
+    end
     self.settings.password = nil
     self.settings.username = nil
     G_reader_settings:saveSetting(self.settings_key, self.settings)
@@ -414,6 +424,7 @@ function SetupFlow:disconnect()
         text = _("This device is disconnected from CWNG. Your downloaded books stay on it."),
         timeout = 4,
     })
+    return true
 end
 
 return SetupFlow

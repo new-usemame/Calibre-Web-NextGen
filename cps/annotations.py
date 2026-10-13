@@ -875,6 +875,9 @@ def soft_delete_annotation_device(public_id, *, user_id, session, commit):
     session.query(ub.AnnotationDeviceState).filter_by(device_id=device.id).update(
         {ub.AnnotationDeviceState.desired: False}, synchronize_session=False,
     )
+    if device.kind == "koreader":
+        from .services import device_sleep_screen
+        device_sleep_screen.remove(device, session=session)
     device.active = False
     _commit_required(commit)
     return device, counts

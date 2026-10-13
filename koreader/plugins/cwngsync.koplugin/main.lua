@@ -33,6 +33,7 @@ local LibraryRuntime = require("cwng_library_runtime")
 local Setup = require("cwng_setup")
 local SetupFlow = require("cwng_setup_flow")
 local ServerCapabilities = require("server_capabilities")
+local SleepScreen = require("sleep_screen")
 
 -- A settings file copied from another e-reader carries that e-reader's ID.
 local device_id_replaced = DeviceIdentity.settle(G_reader_settings, {
@@ -124,6 +125,9 @@ function CWNGSync:init()
     self.settings = migrated_settings
         or G_reader_settings:readSetting("cwngsync", self.default_settings)
     self.device_id = G_reader_settings:readSetting("device_id")
+    if self.recoverSleepScreen and not self:recoverSleepScreen() then
+        logger.warn("CWNGSync: sleep screen recovery requires a later successful storage write")
+    end
     -- Persist before a later-initialized built-in plugin can schedule its
     -- startup pull. The next-tick check below also guards the live instance.
     self:checkBuiltinProgressSync()
@@ -684,6 +688,7 @@ end
 function CWNGSync:setServer(server)
     logger.dbg("CWNGSync: Setting server to:", server)
     if server == "" then
+        if self.restoreSleepScreen and not self:restoreSleepScreen() then return end
         self.settings.server = nil
         self:checkBuiltinProgressSync()
         return
@@ -697,6 +702,7 @@ function CWNGSync:setServer(server)
         })
         return
     end
+    if normalized ~= self.settings.server and self.restoreSleepScreen and not self:restoreSleepScreen() then return end
     self.settings.server = normalized
     UIManager:nextTick(function() self:checkBuiltinProgressSync() end)
 end
@@ -823,6 +829,10 @@ function CWNGSync:doLogin(username, password, menu)
         Device:setIgnoreInput(false)
         return
     elseif status then
+        if username ~= self.settings.username and self.restoreSleepScreen and not self:restoreSleepScreen() then
+            Device:setIgnoreInput(false)
+            return
+        end
         self.settings.username = username
         self.settings.password = password
         if menu then
@@ -840,6 +850,7 @@ function CWNGSync:doLogin(username, password, menu)
 end
 
 function CWNGSync:logout(menu)
+    if self.restoreSleepScreen and not self:restoreSleepScreen() then return end
     self.settings.password = nil
     ServerCapabilities.remember(self.settings, nil)
     G_reader_settings:saveSetting(self.settings_key, self.settings)
@@ -2599,7 +2610,7 @@ end
 -- The library folder, setup and automatic sync live in their own files; their
 -- functions become plugin methods. A name defined twice is a load error, not a
 -- silent override.
-for _, mixin in ipairs({ LibraryRuntime, SetupFlow, AutoSync }) do
+for _, mixin in ipairs({ LibraryRuntime, SetupFlow, AutoSync, SleepScreen }) do
     for key, value in pairs(mixin) do
         if type(value) == "function" and key:sub(1, 1) ~= "_" then
             assert(CWNGSync[key] == nil, "CWNGSync: duplicate method " .. key)

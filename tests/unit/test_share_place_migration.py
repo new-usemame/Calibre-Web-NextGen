@@ -14,7 +14,7 @@ from datetime import datetime
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import load_only, sessionmaker
 
 
 pytestmark = pytest.mark.unit
@@ -92,7 +92,7 @@ def _column_names(engine, table):
 
 
 def _assert_upgraded(engine):
-    """Every pre-existing device is off; positions keep their data; the ORM loads."""
+    """Sharing fields load after this slice, without requiring later migrations."""
     from cps import ub
 
     with engine.connect() as conn:
@@ -105,7 +105,12 @@ def _assert_upgraded(engine):
 
     db = sessionmaker(bind=engine)()
     try:
-        devices = db.query(ub.Device).order_by(ub.Device.id).all()
+        # This test runs only the sharing migration against its pinned old
+        # schema. Later independent Device columns are not part of that slice.
+        devices = db.query(ub.Device).options(load_only(
+            ub.Device.id, ub.Device.share_place,
+            ub.Device.share_place_enabled_at, ub.Device.display_name,
+        )).order_by(ub.Device.id).all()
         assert [d.share_place for d in devices] == [False, False, False]
         assert [d.share_place_enabled_at for d in devices] == [None, None, None]
         assert [d.display_name for d in devices] == ["Kobo Clara", "Kindle", "Browser"]

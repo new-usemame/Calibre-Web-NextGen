@@ -126,6 +126,8 @@
 .menu { position: absolute; z-index: calc(var(--z-overlay) + 2); right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
 .menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--danger); }
 .menu button:hover { background: var(--danger-soft); }
+.menu button.sleepScreenAction { color: var(--text); }
+.menu button.sleepScreenAction:hover { background: var(--surface-3); }
 
 .renameForm { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .renameForm input { min-width: min(260px, 100%); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-3); background: var(--surface-3); color: var(--text); }

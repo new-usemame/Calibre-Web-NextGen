@@ -33,7 +33,7 @@ except ImportError:
         oauth_support = False
 from sqlalchemy import create_engine, DDL, exc, exists, event, text
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
-from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB
+from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB, LargeBinary
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import func
@@ -1508,6 +1508,8 @@ class Device(Base):
     share_place = Column(Boolean, nullable=False, default=False, server_default='0')
     share_place_enabled_at = Column(DateTime, nullable=True)
     cwng_header_seen_at = Column(DateTime, nullable=True)
+    # Capability observations exist even before a reader chooses an image.
+    sleep_screen_capability = Column(JSON, nullable=True)
 
     identities = relationship("DeviceIdentity", back_populates="device", cascade="all, delete-orphan")
     __table_args__ = (
@@ -1516,6 +1518,26 @@ class Device(Base):
         Index('uq_device_account_browser', 'user_id', unique=True,
               sqlite_where=text("kind = 'webreader' AND created_by = 'account-browser'")),
     )
+
+
+class DeviceSleepScreen(Base):
+    """One device's private image intent and revision-scoped receipt.
+
+    Bounded source/rendition bytes publish and purge in the same transaction.
+    Removal keeps a byte-free tombstone until the device restores its settings.
+    """
+    __tablename__ = 'device_sleep_screen'
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), primary_key=True)
+    desired_revision = Column(String(36), nullable=False, default=lambda: str(uuid.uuid4()))
+    state = Column(String(24), nullable=False, default='waiting_for_device')
+    source_png = Column(LargeBinary, nullable=True)
+    prepared_png = Column(LargeBinary, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    applied_revision = Column(String(36), nullable=True)
+    applied_status = Column(String(16), nullable=True)
+    applied_at = Column(DateTime, nullable=True)
+    last_error = Column(String(64), nullable=True)
+    error_revision = Column(String(36), nullable=True)
 
 
 class KoboPlaceEchoGuard(Base):
@@ -4595,6 +4617,13 @@ def migrate_device_reading_position_slice(engine, _session):
         ))
 
 
+def migrate_device_sleep_screen(engine, _session):
+    """Add a capability observation without changing existing devices."""
+    _add_column_if_missing(engine, "device", "sleep_screen_capability",
+                           "sleep_screen_capability JSON")
+    DeviceSleepScreen.__table__.create(engine, checkfirst=True)
+
+
 def migrate_device_share_place(engine, _session):
     """Add opt-in sharing and nullable device status without rewriting rows.
 
@@ -5626,6 +5655,7 @@ def migrate_Database(_session):
     migrate_webreader_device_identity_slice(engine, _session)
     migrate_device_reading_position_slice(engine, _session)
     migrate_device_share_place(engine, _session)
+    migrate_device_sleep_screen(engine, _session)
     migrate_kobo_bookmark_receipt(engine, _session)
     migrate_kobo_place_delivery(engine, _session)
     migrate_kosync_web_place(engine, _session)

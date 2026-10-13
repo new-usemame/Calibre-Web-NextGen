@@ -1185,12 +1185,12 @@ export async function apiPostDownload(
   return { blob: await res.blob(), filename: named ? named[1] : null };
 }
 
-/** Multipart POST (file upload). Mirrors apiPost's CSRF handling, but lets the
+/** Multipart upload. Mirrors apiPost's CSRF handling, but lets the
  *  browser set the multipart Content-Type + boundary (so we must NOT set it). */
-export async function apiUpload<T>(path: string, formData: FormData, options?: ApiRequestOptions): Promise<T> {
+export async function apiUpload<T>(path: string, formData: FormData, options?: ApiRequestOptions, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> =>
     classifiedFetch(path, {
-      method: 'POST',
+      method,
       credentials: 'include',
       headers: { 'X-CSRFToken': csrf },
       body: formData,

@@ -168,6 +168,30 @@ def _register_reader_font_upload_limiter(application):
     application.extensions[_READER_FONT_UPLOAD_LIMITER_MARKER] = True
 
 
+def _register_sleep_screen_upload_limiter(application):
+    """Install the image body bound before CSRF can parse multipart data."""
+    if application.extensions.get("cps_sleep_screen_upload_limiter_registered"):
+        return
+
+    @application.before_request
+    def limit_sleep_screen_upload():
+        from flask import jsonify, request
+        if request.endpoint != "api_v1.device_sleep_screen" or request.method != "PUT":
+            return None
+        from .services.device_sleep_screen import UPLOAD_LIMIT
+        request.max_content_length = UPLOAD_LIMIT + 256 * 1024
+        if request.content_length is not None and request.content_length > request.max_content_length:
+            response = jsonify({"error": {
+                "code": "sleep_screen_upload_too_large", "message": "Use an image up to 10 MiB",
+            }})
+            response.status_code = 413
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
+        return None
+
+    application.extensions["cps_sleep_screen_upload_limiter_registered"] = True
+
+
 def _configure_base_app(application, runtime_config=None):
     """Install import-time Flask defaults exactly once on one app object."""
     application.config.update(
@@ -499,9 +523,10 @@ def create_app(config=None, services=None):
 
     # CSRFProtect inspects request.form before blueprint route handlers run,
     # which parses multipart uploads before a route-local limit can take effect.
-    # Bound only the reader-font endpoint here so other existing upload routes
+    # Bound the font and sleep-screen endpoints here; other upload routes
     # retain their own size policies.
     _register_reader_font_upload_limiter(application)
+    _register_sleep_screen_upload_limiter(application)
 
     if csrf:
         csrf.init_app(application)

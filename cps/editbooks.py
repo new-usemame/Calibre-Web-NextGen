@@ -439,6 +439,31 @@ def edit_selected_books():
         return json.dumps({'success': True})
     return ""
 
+# Calibre exports FB2 books as "Title.fb2.zip" but names the format "fbz"
+# everywhere else — its input plugins and this project's ingest pipeline both
+# match ".fbz" only. The upload gates read just the last dotted segment, so
+# the double extension used to be rejected as "zip". Normalizing it here
+# keeps validation, the ingest staging name and the format-add gate on one
+# canonical name.
+_FB2_ZIP_SUFFIX = ".fb2.zip"
+
+
+def _normalized_upload_filename(filename):
+    """Map a trailing ".fb2.zip" (any case) to Calibre's canonical ".fbz"."""
+    name = filename or ""
+    if name.lower().endswith(_FB2_ZIP_SUFFIX):
+        return name[:-len(_FB2_ZIP_SUFFIX)] + ".fbz"
+    return name
+
+
+def _uploaded_file_extension(filename):
+    """Last dotted segment after fb2.zip normalization, or None without one."""
+    name = _normalized_upload_filename(filename)
+    if '.' not in name:
+        return None
+    return name.rsplit('.', 1)[-1].lower()
+
+
 # Helper to validate upload according to server settings
 def _validate_uploaded_file(uploaded_file):
     allowed_extensions = config.config_upload_formats.split(',')
@@ -447,8 +472,8 @@ def _validate_uploaded_file(uploaded_file):
             if not validate_mime_type(uploaded_file, allowed_extensions):
                 flash(_("File type isn't allowed to be uploaded to this server"), category="error")
                 return False
-    if '.' in uploaded_file.filename:
-        file_ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
+    file_ext = _uploaded_file_extension(uploaded_file.filename)
+    if file_ext is not None:
         if file_ext not in allowed_extensions and '' not in allowed_extensions:
             flash(_("File extension '%(ext)s' is not allowed to be uploaded to this server",
                     ext=file_ext), category="error")
@@ -516,7 +541,11 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
 
     _ensure_ingest_dir_writable(ingest_dir)
 
-    base_name = _safe_upload_basename(uploaded_file.filename)
+    # Calibre's ".fb2.zip" export is staged as ".fbz" — the only form the
+    # ingest pipeline's format matching knows (see _FB2_ZIP_SUFFIX).
+    # Normalization runs before the stem/suffix split in
+    # _safe_upload_basename, whose "last suffix" would otherwise be "zip".
+    base_name = _safe_upload_basename(_normalized_upload_filename(uploaded_file.filename))
     # CWA change: use timestamp for more predictable sorting vs uuid
     unique = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     prefix = "_".join([str(p) for p in (prefix_parts or []) if p])
@@ -2357,8 +2386,8 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
                 flash(_("User has no rights to upload additional file formats"), category="error")
                 error = True
                 continue
-            if '.' in current_filename:
-                file_ext = current_filename.rsplit('.', 1)[-1].lower()
+            file_ext = _uploaded_file_extension(current_filename)
+            if file_ext is not None:
                 if file_ext not in allowed_extensions and '' not in allowed_extensions:
                     flash(_("File extension '%(ext)s' is not allowed to be uploaded to this server", ext=file_ext),
                           category="error")

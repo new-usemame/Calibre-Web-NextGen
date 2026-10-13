@@ -5,6 +5,10 @@
 The ingest service picks the format from the staged file's last suffix. Werkzeug's
 secure_filename() reduces "龙蛋.epub" to "epub", so the staged file had no suffix
 and ingest deleted it after the upload API had already answered "queued".
+
+Exception since #2598: a trailing ".fb2.zip" is normalized to ".fbz" before
+the stem/suffix split — "zip" is not a format the ingest supports, so that
+one case must not preserve its original last suffix.
 """
 import os
 from pathlib import Path
@@ -34,7 +38,7 @@ def stage(monkeypatch, tmp_path):
 @pytest.mark.unit
 @pytest.mark.parametrize("filename", [
     "龙蛋.epub", "中文 书名.epub", "файл.epub", "龙蛋.EPUB", "1. 龙蛋.pdf",
-    "第一卷.龙蛋.mobi", "../../龙蛋.epub", "书.fb2.zip",
+    "第一卷.龙蛋.mobi", "../../龙蛋.epub",
 ])
 def test_non_ascii_upload_keeps_the_suffix_ingest_reads(stage, filename):
     staged = stage(filename)
@@ -44,7 +48,18 @@ def test_non_ascii_upload_keeps_the_suffix_ingest_reads(stage, filename):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("filename", [
-    "book.epub", "My Book.epub", "Dr. Who.epub", "My.Book.v2.epub", "x.fb2.zip",
+    "book.epub", "My Book.epub", "Dr. Who.epub", "My.Book.v2.epub",
 ])
 def test_ascii_upload_names_stage_as_before(stage, filename):
     assert stage(filename).name.endswith("_" + secure_filename(filename))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("filename", [
+    "书.fb2.zip", "файл.fb2.zip", "x.fb2.zip", "My Book.fb2.zip",
+])
+def test_fb2_zip_uploads_stage_as_fbz(stage, filename):
+    staged = stage(filename)
+    assert staged.suffix == ".fbz"
+    assert ".fb2.zip" not in staged.name
+    assert staged.stem  # never a bare ".fbz" that ingest would treat as hidden

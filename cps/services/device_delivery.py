@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
-from .. import ub
+from .. import config, ub
+from ..utils.filename_sanitizer import get_valid_filename_shared
 from . import device_capabilities
 
 
@@ -68,15 +69,61 @@ def select_device_format(device_kind: str, formats: Iterable):
     return None
 
 
-def _delivery_filename(book_id: int, data) -> str:
+# Bytes, not characters: a Cyrillic or Chinese title is two or three bytes a
+# letter, and cut at 180 letters it made a name no e-reader could create. 180
+# leaves room for the " [id]" suffix and the extension while keeping the DB and
+# FAT filename safely below their common 255-byte/component ceilings.
+_STEM_BYTES = 180
+# When a cut title is restored, the author part may take at most this much of
+# the stem, so a long author name can never crowd the title - the part that
+# tells two books apart - back out of it.
+_AUTHOR_BYTES = 60
+_SEPARATOR = " - "
+
+
+def _cut(text: str, limit: int) -> str:
+    return text.encode("utf-8")[:limit].decode("utf-8", "ignore").rstrip(" .")
+
+
+def _full_title(title) -> str:
+    """``title`` as the server turns a title into a file name, but not cut to
+    the 42 characters it stores books under."""
+    try:
+        return get_valid_filename_shared(
+            str(title or ""), chars=_STEM_BYTES,
+            unicode_filename=bool(getattr(config, "config_unicode_filename", False)),
+        )
+    except ValueError:
+        return ""
+
+
+def _delivery_filename(book_id: int, data, title=None) -> str:
+    """The file name a book has on a device: ``Title - Author [id].ext``.
+
+    It starts from the name the book is stored under (``data.name``), but that
+    name is cut to 42 characters each for title and author (Windows path
+    limits). Two books whose titles differ only after that point - volumes of
+    one work, "Main Title: Subtitle, Volume I: ..." and "... Volume II: ..." -
+    are stored under the very same name, and a device that lists a file by its
+    name showed them as one book (#2565). So when the stored name is provably
+    the cut-off form of this book's ``title``, the title part is restored to
+    its full length; the author part stays as stored. A name that is not a cut
+    of the title (a custom or imported one), or a book without a ``title``, is
+    used exactly as before, so the great majority of the library keeps the
+    file names its devices already hold.
+    """
     stem = _UNSAFE_FILENAME.sub("_", str(getattr(data, "name", "") or "")).strip(" .")
+    head, separator, author = stem.rpartition(_SEPARATOR)
+    full = _full_title(title)
+    if separator and head and len(full) > len(head) and full.startswith(head):
+        author = _cut(_UNSAFE_FILENAME.sub("_", author).strip(" ."), _AUTHOR_BYTES)
+        room = _STEM_BYTES - len(_SEPARATOR.encode()) - len(author.encode("utf-8"))
+        stem = _cut(_UNSAFE_FILENAME.sub("_", full).strip(" ."), room)
+        if author:
+            stem += _SEPARATOR + author
     if not stem:
         stem = "Book"
-    # Leave room for the stable id and extension while keeping the DB and FAT
-    # filename safely below their common 255-byte/component ceilings. Bytes,
-    # not characters: a Cyrillic or Chinese title is two or three bytes a
-    # letter, and cut at 180 letters it made a name no e-reader could create.
-    stem = stem.encode("utf-8")[:180].decode("utf-8", "ignore").rstrip(" .") or "Book"
+    stem = _cut(stem, _STEM_BYTES) or "Book"
     return f"{stem} [{book_id}].{str(data.format).lower()}"
 
 
@@ -154,7 +201,8 @@ def queue_book_for_device(*, session, user_id: int, device_public_id: str, book,
         session.add(delivery)
     delivery.state = QUEUED
     delivery.format = str(selected.format).upper()
-    delivery.filename = _delivery_filename(book.id, selected)
+    delivery.filename = _delivery_filename(
+        book.id, selected, getattr(book, "title", None))
     delivery.expected_size = selected_size
     delivery.expected_checksum = None
     delivery.claimed_at = None

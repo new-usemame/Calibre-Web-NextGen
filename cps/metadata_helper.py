@@ -173,11 +173,13 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         
         updated = False
         
-        # Update title - only if enabled in settings
+        # Update title - only if enabled in settings. Smart mode only fills a
+        # missing title. It used to take the longer one, and a summary or study
+        # guide's title is nearly always longer than the book's.
         if (cwa_settings.get('auto_metadata_update_title', True) and 
             metadata.title and metadata.title.strip()):
             if use_smart_application:
-                if len(metadata.title.strip()) > len(book.title.strip()):
+                if not _has_meaningful_title(book):
                     book.title = metadata.title.strip()
                     updated = True
             else:
@@ -205,8 +207,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         if (cwa_settings.get('auto_metadata_update_description', True) and 
             metadata.description and metadata.description.strip()):
             current_description = book.comments[0].text if book.comments else ""
+            # Smart mode only fills a missing description, for the same reason as
+            # the title: the longer text is often a summary's disclaimer.
             if use_smart_application:
-                if len(metadata.description.strip()) > len(current_description):
+                if not (current_description or "").strip():
                     if book.comments:
                         book.comments[0].text = metadata.description.strip()
                     else:
@@ -767,6 +771,12 @@ def _select_metadata_result(results, book_isbn, book_title=None, book_authors=No
         return None
 
     return best
+
+
+def _has_meaningful_title(book):
+    """True if the book has a title other than empty or Calibre's 'Unknown'."""
+    title = (getattr(book, "title", "") or "").strip().lower()
+    return title not in ("", "unknown")
 
 
 def _has_meaningful_authors(book):

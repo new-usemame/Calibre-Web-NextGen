@@ -1,0 +1,3 @@
+### Fixed
+
+- **An import that can't tell which book it added now fails instead of changing a different book.** When Calibre reported no id for a newly added book, the importer picked the most recently changed book in the library, which could be one someone had just edited, and gave it this import's fetched metadata, generated cover, auto-send to Kindle and "Recently Added" date. It now stops, logs why, and keeps the source file. A kept original format is also no longer attached to the newest book when an import was skipped. ([#2544](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2544))

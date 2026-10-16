@@ -993,3 +993,31 @@ class TestIngestServiceTimeoutMessaging:
         convert_end = source.find("def convert_to_kepub")
         assert 0 < convert_start < convert_end
         assert "ingest_timeout_minutes" not in source[convert_start:convert_end]
+
+
+def test_retained_original_is_not_attached_to_the_newest_book_without_an_id(
+    monkeypatch, tmp_path
+):
+    """#2544: when the import reported no book id (skipped or quarantined),
+    the retained original must not land on whichever book is newest."""
+    import sqlite3
+
+    metadata_db = tmp_path / "metadata.db"
+    with sqlite3.connect(metadata_db) as con:
+        con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, timestamp TEXT)")
+        con.execute("INSERT INTO books VALUES (9, '2099-01-01 00:00:00+00:00')")
+    converted = str(tmp_path / "tmp_conversion" / "Big Handbook.epub")
+    original_factory = _FakeProcessor
+
+    def _retaining(filepath, **kwargs):
+        fake = original_factory(filepath, **kwargs)
+        fake.convert_retained_formats = ["pdf"]
+        fake.metadata_db = str(metadata_db)
+        return fake
+
+    monkeypatch.setattr(sys.modules[__name__], "_FakeProcessor", _retaining)
+    fake, _source = _run_main(monkeypatch, tmp_path, convert_result=(True, converted))
+
+    assert fake.imported == [converted]
+    assert fake.last_added_book_id is None
+    assert fake.added_formats == []

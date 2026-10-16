@@ -79,24 +79,6 @@ class TestIngestCapture:
             "app.db reads do"
         )
 
-    def test_fallback_ids_never_recorded(self):
-        """Adversarial-review finding: _fallback_last_added_book_id guesses
-        the most-recently-modified book when calibredb output parsing
-        fails — under concurrent ingest that can be ANOTHER processor's
-        book. A wrong 'Imported as' is worse than none, so recording is
-        gated on ids that came from parsed output."""
-        src = INGEST.read_text(encoding="utf-8")
-        body = src.split("def record_original_filename", 1)[1]
-        body = body.split("\n    def ", 1)[0]
-        assert "last_added_ids_are_fallback" in body, (
-            "record_original_filename must skip fallback-inferred book ids"
-        )
-        fb = src.split("def _fallback_last_added_book_id", 1)[1]
-        fb = fb.split("\n    def ", 1)[0]
-        assert "last_added_ids_are_fallback = True" in fb, (
-            "_fallback_last_added_book_id must mark its ids as guesses"
-        )
-
     def test_record_called_after_successful_add(self):
         src = INGEST.read_text(encoding="utf-8")
         assert re.search(

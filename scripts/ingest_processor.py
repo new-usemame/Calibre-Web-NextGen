@@ -1230,9 +1230,6 @@ class NewBookProcessor:
         # remain global-only because they have no authenticated uploader.
         self.uploader_user_id = None
         self.uploader_was_personal_library = False
-        # True when last_added_book_id(s) came from the most-recently-modified
-        # fallback guess rather than parsed calibredb output.
-        self.last_added_ids_are_fallback = False
         self.can_convert, self.input_format = self.can_convert_check()
         # Determine if the file is already in the desired target format using normalized extensions
         self.is_target_format = (self.input_format.lower() == str(self.target_format).lower())
@@ -1293,31 +1290,6 @@ class NewBookProcessor:
             return ids
         except Exception:
             return []
-
-    def _fallback_last_added_book_id(self) -> None:
-        """Fallback to the most recently modified book when calibredb output lacks IDs."""
-        if self.last_added_book_id is not None:
-            return
-        try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
-                cur = con.cursor()
-                row = cur.execute(
-                    "SELECT id FROM books ORDER BY last_modified DESC LIMIT 1"
-                ).fetchone()
-                if row:
-                    self.last_added_book_id = int(row[0])
-                    self.last_added_book_ids = [self.last_added_book_id]
-                    # Guess, not parsed output — under concurrent ingest this
-                    # can be ANOTHER processor's book. Consumers that would
-                    # mis-attribute on a wrong id (original-filename capture)
-                    # check this flag and skip.
-                    self.last_added_ids_are_fallback = True
-                    print(
-                        "[ingest-processor] WARN: Could not parse calibredb output; using most recently modified book ID.",
-                        flush=True,
-                    )
-        except Exception as e:
-            print(f"[ingest-processor] WARN: Failed to infer book ID after import: {e}", flush=True)
 
     def _register_title_sort_function(self, connection: sqlite3.Connection) -> bool:
         """Register title_sort SQL function on a raw SQLite connection."""
@@ -1669,14 +1641,6 @@ class NewBookProcessor:
             [self.last_added_book_id]
             if getattr(self, 'last_added_book_id', None) else [])
         if not book_ids:
-            return
-        if getattr(self, 'last_added_ids_are_fallback', False):
-            # The id is a most-recently-modified guess (calibredb output
-            # parsing failed) — under concurrent ingest it can belong to a
-            # DIFFERENT book, and a wrong "Imported as" is worse than none.
-            print("[ingest-processor] Skipping original-filename record: "
-                  "book id came from fallback inference, not calibredb "
-                  "output", flush=True)
             return
         try:
             with sqlite3.connect(get_app_db_path(), timeout=30) as con:
@@ -2718,10 +2682,16 @@ class NewBookProcessor:
             if imported_ids:
                 self.last_added_book_ids = imported_ids
                 self.last_added_book_id = imported_ids[-1]
+            elif acquisition:
+                raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
             else:
-                if acquisition:
-                    raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
-                self._fallback_last_added_book_id()
+                # Never guess which book this was (#2544): the newest row can be a book
+                # someone else just edited, and it would receive this import's metadata,
+                # cover, path fix, auto-send and timestamp.
+                raise PreserveIngestSourceError(
+                    f"Calibre reported no book id for {staged_path.name}; refusing to guess "
+                    "which book was added, so no post-import step ran and the source is kept"
+                )
             if acquisition:
                 self._finish_acquisition(transaction_result)
                 mark_ingest_batch_dirty()
@@ -2742,11 +2712,8 @@ class NewBookProcessor:
             # Optional post-import GDrive sync
             gdrive_sync_if_enabled()
 
-            # Fetch metadata if enabled, prefer exact book id from calibredb
-            if self.last_added_book_id is not None:
-                self.fetch_metadata_if_enabled(book_id=self.last_added_book_id)
-            else:
-                self.fetch_metadata_if_enabled(staged_path.stem)
+            # Fetch metadata if enabled, for the exact book Calibre reported
+            self.fetch_metadata_if_enabled(book_id=self.last_added_book_id)
 
             # Fix paths garbled by calibredb add's ascii_filename() transliteration.
             # Runs after fetch_metadata so any author-name update is already in the DB.
@@ -2762,20 +2729,14 @@ class NewBookProcessor:
                 self.generate_missing_cover_if_enabled(imported_id)
 
             # Trigger auto-send for users who have it enabled
-            if self.last_added_book_id is not None:
-                self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
-            else:
-                self.trigger_auto_send_if_enabled(staged_path.stem, book_path)
+            self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
 
             # Generate KOReader sync checksums for the imported book.
             # Gated on is_koreader_sync_enabled() so disabled-sync instances
             # skip the (slow) partial-MD5 work entirely — see PR #94 for the
             # same pattern in cps/helper.py, and fork #219 for the root cause.
             if _is_koreader_sync_enabled():
-                if self.last_added_book_id is not None:
-                    self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id)
-                else:
-                    self.generate_book_checksums(staged_path.stem)
+                self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id)
 
             # Ensure newly imported books have their timestamp set to the current time
             # so they appear at the top of "Recently Added" views.
@@ -2934,11 +2895,11 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
-                if book_id is not None:
-                    cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
-                else:
-                    # Fallback: most recently added book
-                    cur.execute("SELECT id, title FROM books ORDER BY timestamp DESC LIMIT 1")
+                if book_id is None:
+                    # Never the newest book instead (#2544): it can be someone else's.
+                    print(f"[ingest-processor] No book id for metadata fetch, skipping: {book_title}", flush=True)
+                    return
+                cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
                 result = cur.fetchone()
 
             if not result:
@@ -2973,10 +2934,11 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
-                if book_id is not None:
-                    cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
-                else:
-                    cur.execute("SELECT id, title FROM books ORDER BY timestamp DESC LIMIT 1")
+                if book_id is None:
+                    # Never the newest book instead (#2544): it can be someone else's.
+                    print(f"[ingest-processor] No book id for auto-send, skipping: {book_title}", flush=True)
+                    return
+                cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
                 result = cur.fetchone()
 
             if not result:
@@ -3438,15 +3400,10 @@ def main(filepath=None):
                         print(f"[ingest-processor]: Retaining original format ({nbp.input_format}) for {nbp.filename}...", flush=True)
                         # Find the book that was just added to get its ID
                         try:
-                            # Prefer the exact id we just added if available
-                            if nbp.last_added_book_id is not None:
-                                target_book_id = nbp.last_added_book_id
-                            else:
-                                with sqlite3.connect(nbp.metadata_db, timeout=30) as con:
-                                    cur = con.cursor()
-                                    cur.execute("SELECT id FROM books ORDER BY timestamp DESC LIMIT 1")
-                                    res = cur.fetchone()
-                                    target_book_id = res[0] if res else None
+                            # Only the exact id this import added. With none (the import
+                            # was skipped or quarantined), the newest book is someone
+                            # else's and must not get this file (#2544).
+                            target_book_id = nbp.last_added_book_id
 
                             if target_book_id is not None:
                                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:

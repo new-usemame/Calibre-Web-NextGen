@@ -231,6 +231,8 @@ from . import admin_security  # noqa: E402,F401
 from . import notices   # noqa: E402,F401
 from . import kobo_two_way  # noqa: E402,F401
 from . import kobo_pairing  # noqa: E402,F401
+from . import reflow  # noqa: E402,F401
+
 from . import koreader_devices  # noqa: E402,F401
 from . import acquisition  # noqa: E402,F401
 from . import discover_source  # noqa: E402,F401

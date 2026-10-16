@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import type { Me } from '../src/lib/api.ts';
 import {
-  canDeleteBooks, canDownloadBooks, canEditBookCover, canEditShelf, canReadBooks,
+  canConvertWithReflow, canDeleteBooks, canDownloadBooks, canEditBookCover, canEditShelf, canReadBooks,
 } from '../src/lib/permissions.ts';
 import { getPrimaryReadTarget, getReaderContentUrl } from '../src/lib/readerTarget.ts';
 
@@ -64,6 +64,16 @@ test('all destructive book CTAs require delete-books and edit together', () => {
   assert.match(detail, /const canDelete = canDeleteBooks\(me\);[\s\S]*\{canDelete && \(/);
   assert.match(edit, /\{canDeleteBooks\(me\) && \(/);
   assert.match(bulk, /const canDelete = canDeleteBooks\(me\)/);
+});
+
+test('Reflow is offered to the same accounts the server lets convert: edit or admin', () => {
+  // cps/api/reflow.py::_require_edit accepts role_edit() or role_admin(), the
+  // predicate of editbooks.edit_required. A link gated on edit alone hid a
+  // conversion the server would have accepted from an admin without the edit bit.
+  assert.equal(canConvertWithReflow(account({ edit: true, admin: false })), true);
+  assert.equal(canConvertWithReflow(account({ edit: false, admin: true })), true);
+  assert.equal(canConvertWithReflow(account({ edit: false, admin: false })), false);
+  assert.equal(canConvertWithReflow(undefined), false);
 });
 
 test('the cover editor is offered only where some cover can be saved', () => {

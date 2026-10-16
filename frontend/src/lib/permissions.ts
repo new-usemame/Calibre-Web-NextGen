@@ -56,6 +56,17 @@ export function canDeleteBooks(me: Me | undefined | null): boolean {
 }
 
 /**
+ * May this user convert a book's PDF with Reflow?
+ *
+ * Mirrors `cps/api/reflow.py::_require_edit`, which uses the rest of the editing
+ * surface's rule (`editbooks.edit_required`): the edit role OR the admin role.
+ * UI-gating only; the server enforces it on every Reflow endpoint.
+ */
+export function canConvertWithReflow(me: Me | undefined | null): boolean {
+  return !!me?.role?.edit || !!me?.role?.admin;
+}
+
+/**
  * May this user open the cover editor for a book?
  *
  * Editors change the library cover of any book they can see

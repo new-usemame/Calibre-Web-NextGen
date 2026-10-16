@@ -9,6 +9,7 @@ export const SPA_ROUTES = {
   editBook: '/book/:id/edit',
   coverPicker: '/book/:id/cover',
   annotations: '/book/:id/annotations',
+  reflow: '/book/:id/reflow',
   book: '/book/:id',
   authors: '/authors',
   author: '/authors/:id',

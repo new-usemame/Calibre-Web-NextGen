@@ -12,7 +12,7 @@ import sys
 import json
 import threading
 
-from sqlalchemy import Column, String, Integer, SmallInteger, Boolean, BLOB, JSON
+from sqlalchemy import Column, String, Integer, SmallInteger, Boolean, BLOB, JSON, Float
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -178,6 +178,33 @@ class _Settings(_Base):
     config_hardcover_token = Column(String)
     config_google_books_api_key = Column(String)
     config_comicvine_api_key = Column(String)
+
+    # Reflow (cps/services/reflow): AI-assisted PDF -> reflowable EPUB.
+    #
+    # The key is encrypted at rest (``_e``) rather than stored in the clear beside
+    # config_hardcover_token. A metadata token reads a public catalogue; this one
+    # authorises spending money against the admin's own OpenRouter account, and the
+    # settings row is copied into backups and read by anyone with file access to
+    # /config. mail_password_e set the precedent for exactly this reason.
+    config_openrouter_key_e = Column(String)
+    config_reflow_default_tier = Column(String, default="standard")
+    # What a conversion is expected to cost. Above it the UI says so and suggests a
+    # sample first; it is not a limit.
+    config_reflow_target_usd = Column(Float, default=0.5)
+    # The limit. No job's own cap may be set higher than this, so a user cannot
+    # spend the instance's money beyond what its administrator allowed.
+    config_reflow_hard_cap_usd = Column(Float, default=5.0)
+    # A separate rolling instance allowance for paid source review. Zero is an
+    # explicit safe default: it disables paid dispatch until an administrator
+    # decides what the shared provider account may spend.
+    config_reflow_instance_budget_usd = Column(Float, default=0.0)
+    # The largest PDF one conversion reads, in pages and in megabytes. A PDF over
+    # either is refused at the estimate, the preparation and the start, before any
+    # work. These ceilings bound allocation and processing for a whole-book job.
+    # The page ceiling permits long documents; 500 MB holds a long
+    # greyscale 300-dpi scan. See cps/tasks/reflow.py MAX_PAGES_DEFAULT.
+    config_reflow_max_pages = Column(Integer, default=2000)
+    config_reflow_max_pdf_mb = Column(Integer, default=500)
     
     config_register_email = Column(Boolean, default=False)
     config_login_type = Column(Integer, default=0)
@@ -607,6 +634,37 @@ class ConfigSQL(object):
         # raw column access raises AttributeError and aborts the whole fetch —
         # fork #819. The env/file fallbacks must still resolve.
         return self._resolved_hardcover_token_and_source()[0]
+
+    def _resolved_openrouter_key_and_source(self):
+        """The OpenRouter key and where it came from, through one precedence path.
+
+        Same shape as the Hardcover token (fork #743): the admin's setting, then
+        OPENROUTER_API_KEY, then the file named by OPENROUTER_API_KEY_FILE for a
+        docker-secrets deployment. The environment is read per call rather than
+        copied into the database, so rotating the container's secret works and an
+        admin saving the form never writes the env value into app.db.
+        """
+        candidates = (
+            ("database", getattr(self, "config_openrouter_key_e", None)),
+            ("OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY")),
+        )
+        for source, raw in candidates:
+            key = strip_whitespaces(raw) if isinstance(raw, str) else ""
+            if key:
+                return key, source
+        key = strip_whitespaces(
+            _read_secret_file(os.environ.get("OPENROUTER_API_KEY_FILE")) or "")
+        if key:
+            return key, "OPENROUTER_API_KEY_FILE"
+        return "", None
+
+    def resolved_openrouter_key(self):
+        """The key Reflow calls OpenRouter with, or "" when none is configured."""
+        return self._resolved_openrouter_key_and_source()[0]
+
+    def openrouter_key_source(self):
+        """Where the active key came from, without exposing the key itself."""
+        return self._resolved_openrouter_key_and_source()[1]
 
     def hardcover_token_source(self):
         """Return the active global token source without exposing its value."""

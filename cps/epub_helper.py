@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+import struct
 import zipfile
 from copy import deepcopy
 from lxml import etree
@@ -49,18 +50,192 @@ _KEPUB_MANAGED_META_NAMES = {
 }
 
 
-def updateEpub(src, dest, filename, data, ):
-    # create a temp copy of the archive without filename
-    with zipfile.ZipFile(src, 'r') as zin:
-        with zipfile.ZipFile(dest, 'w') as zout:
-            zout.comment = zin.comment  # preserve the comment
-            for item in zin.infolist():
-                if item.filename != filename:
-                    zout.writestr(item, zin.read(item.filename))
+def _without_zip64_extra(extra):
+    """Central ZIP64 values describe the OLD sizes/offset; zipfile rebuilds them."""
+    result = bytearray()
+    position = 0
+    while position + 4 <= len(extra):
+        tag, size = struct.unpack_from('<HH', extra, position)
+        end = position + 4 + size
+        if end > len(extra):
+            raise zipfile.BadZipFile('Truncated ZIP extra field')
+        if tag != 1:
+            result.extend(extra[position:end])
+        position = end
+    result.extend(extra[position:])  # zipfile also accepts trailing padding
+    return bytes(result)
 
-    # now add filename with its new data
-    with zipfile.ZipFile(dest, mode='a', compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(filename, data)
+
+class _RawCopyZipInfo(zipfile.ZipInfo):
+    def _encodeFilenameFlags(self):
+        # The standard writer converts non-ASCII CP437 names to UTF-8. A raw
+        # local header still uses CP437, so keep the central name/flags in sync.
+        return self.orig_filename.encode('utf-8' if self.flag_bits & 0x800 else 'cp437'), self.flag_bits
+
+
+def _raw_copy_info(info):
+    result = _RawCopyZipInfo(info.filename, info.date_time)
+    for attribute in zipfile.ZipInfo.__slots__:
+        if hasattr(info, attribute):
+            setattr(result, attribute, getattr(info, attribute))
+    result.extra = _without_zip64_extra(info.extra)
+    return result
+
+
+def _raw_member_length(source, info, limit):
+    """Return a validated local-record length, or None for the legacy path.
+
+    APPNOTE 6.3.10 §§4.3.7–4.3.9, 4.4.4, 4.5.3:
+    https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+    Local extras are independent of central extras. Descriptors immediately
+    follow compressed data and have 32/64-bit sizes, with/without signature.
+    Never search payload bytes for a signature or infer size from the next file.
+    """
+    if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED,
+                                  zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA):
+        return None
+    # Refuse encryption (0), patched data (5), strong encryption (6) and
+    # masked local headers (13). Compression options/EOS (1/2/4) and encoding
+    # (11) do not obstruct verbatim copying; retain opaque/reserved bits too.
+    # In particular, source EPUB writers commonly leave enhanced-deflate bit 4
+    # set (0x816). An allow-list based on zipfile's writer needlessly decodes it.
+    # Bit 3 still requires the descriptor validation below, regardless of hints.
+    if info.flag_bits & ((1 << 0) | (1 << 5) | (1 << 6) | (1 << 13)):
+        return None
+    handle = source.fp
+    handle.seek(info.header_offset)
+    header = handle.read(30)
+    if len(header) != 30:
+        return None
+    signature, _, flags, method, _, _, crc, packed, size, names, extras = struct.unpack('<4s5H3L2H', header)
+    if signature != b'PK\x03\x04' or flags != info.flag_bits or method != info.compress_type:
+        return None
+    name = handle.read(names)
+    extra = handle.read(extras)
+    encoding = 'utf-8' if flags & 0x800 else 'cp437'
+    try:
+        if name.decode(encoding) != info.orig_filename or len(extra) != extras:
+            return None
+    except UnicodeError:
+        return None
+    # ZIP64 local sizes live in the LOCAL extra, not ZipInfo.extra (central).
+    # Validate them before retaining the header; zipfile's reader can handle
+    # some damaged local metadata using the central sizes on the legacy path.
+    local_sizes = None
+    position = 0
+    while position + 4 <= len(extra):
+        tag, length = struct.unpack_from('<HH', extra, position)
+        if position + 4 + length > len(extra):
+            return None
+        if tag == 1:
+            if length < 16:
+                return None
+            local_sizes = struct.unpack_from('<QQ', extra, position + 4)
+        position += 4 + length
+    if packed == 0xFFFFFFFF or size == 0xFFFFFFFF:
+        if local_sizes is None:
+            return None
+        if not flags & 8 and local_sizes != (info.file_size, info.compress_size):
+            return None
+    data_end = info.header_offset + 30 + names + extras + info.compress_size
+    if data_end > limit:
+        return None
+    if not flags & 8:
+        # zipfile tolerates some inconsistent local sizes, too. Leave such
+        # files to its reader instead of certifying a bad raw record.
+        if crc != info.CRC:
+            return None
+        if packed != 0xFFFFFFFF and packed != info.compress_size:
+            return None
+        if size != 0xFFFFFFFF and size != info.file_size:
+            return None
+        return data_end - info.header_offset
+
+    handle.seek(data_end)
+    descriptor = handle.read(min(24, limit - data_end))
+    # Compare the complete tuple, including CRC: a CRC can itself equal the
+    # optional signature. Try both layouts rather than consuming it blindly.
+    for prefix in (0, 4):
+        if prefix and descriptor[:4] != b'PK\x07\x08':
+            continue
+        for layout in ('<LQQ', '<LLL'):
+            length = struct.calcsize(layout)
+            if len(descriptor) >= prefix + length and struct.unpack_from(layout, descriptor, prefix) == (
+                    info.CRC, info.compress_size, info.file_size):
+                return data_end + prefix + length - info.header_offset
+    return None
+
+
+def rewrite_zip_members(src, dest, replacements):
+    """Copy a book ZIP, replacing {member_name: bytes_or_text} in source order.
+
+    Unchanged supported members keep their local headers, compressed bytes and
+    descriptors verbatim. Only replacements are compressed; bulk work is bounded
+    memory file I/O. Existing metadata/comment survives, CRC/sizes are recalculated
+    for replacements. Missing names are appended (new members use deflate).
+    Duplicate names use the last entry's content at the first entry's position,
+    matching ZipFile.read(name), without producing another ambiguous archive.
+
+    This deliberately uses zipfile's fp/filelist/NameToInfo/start_dir/_didModify
+    writer state and ZipInfo slots/filename encoder. The wire-format tests cover
+    raw→writestr→raw transitions and ZIP64 output on the running Python version.
+    Unsupported layouts go through the old read/writestr path, including its
+    normal errors for unknown methods or password-protected members.
+    src/dest accept the paths or seekable file objects accepted by ZipFile; they
+    must refer to separate files. Callers own temporary-file cleanup on failure.
+    """
+    with zipfile.ZipFile(src, 'r') as source, zipfile.ZipFile(dest, 'w') as target:
+        target.comment = source.comment
+        infos = source.infolist()
+        offsets = sorted({info.header_offset for info in infos} | {source.start_dir})
+        limits = dict(zip(offsets, offsets[1:]))
+        members = {info.filename: info for info in infos}
+        names = list(members)
+        names.extend(name for name in replacements if name not in members)
+        if 'mimetype' in names:
+            names.remove('mimetype')
+            names.insert(0, 'mimetype')
+        for name in names:
+            info = members.get(name)
+            if info is None:
+                target.writestr(name, replacements[name], compress_type=(
+                    zipfile.ZIP_STORED if name == 'mimetype' else zipfile.ZIP_DEFLATED))
+                continue
+            replacement = name in replacements
+            length = None if replacement else _raw_member_length(
+                source, info, limits.get(info.header_offset, source.start_dir))
+            if name == 'mimetype' and info.compress_type != zipfile.ZIP_STORED:
+                length = None
+            if length is None:
+                # Use a normal ZipInfo for rewritten headers: writestr clears
+                # descriptor/encryption bits and chooses its own name encoding.
+                copied = deepcopy(info)
+                copied.extra = _without_zip64_extra(info.extra)
+                if name == 'mimetype':
+                    copied.compress_type = zipfile.ZIP_STORED
+                elif replacement and copied.compress_type not in (
+                        zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA):
+                    copied.compress_type = zipfile.ZIP_DEFLATED
+                target.writestr(copied, replacements[name] if replacement else source.read(info))
+                continue
+            copied = _raw_copy_info(info)
+            copied.header_offset = target.fp.tell()
+            source.fp.seek(info.header_offset)
+            remaining = length
+            while remaining:
+                chunk = source.fp.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    raise zipfile.BadZipFile('Truncated ZIP member')
+                target.fp.write(chunk)
+                remaining -= len(chunk)
+            target.filelist.append(copied)
+            target.NameToInfo[name] = copied
+            target.start_dir = target.fp.tell()
+            target._didModify = True
+
+
+def updateEpub(src, dest, filename, data):
+    rewrite_zip_members(src, dest, {filename: data})
 
 
 def _strip_xml_leading_noise(data):

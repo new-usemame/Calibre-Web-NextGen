@@ -3062,20 +3062,10 @@ def _repair_epub_container_if_needed(book_id, original_path):
             return fixed_path
 
         temp_path = fixed_path + ".tmp"
-        with zipfile.ZipFile(original_path, "r") as zin, zipfile.ZipFile(temp_path, "w") as zout:
-            for item in zin.infolist():
-                data = zin.read(item.filename)
-                if item.filename == "META-INF/container.xml":
-                    data = _sanitize_container_xml(data)
-
-                zi = zipfile.ZipInfo(item.filename)
-                zi.date_time = item.date_time
-                zi.compress_type = item.compress_type
-                zi.external_attr = item.external_attr
-                zi.internal_attr = item.internal_attr
-                zi.extra = item.extra
-                zi.comment = item.comment
-                zout.writestr(zi, data, compress_type=item.compress_type)
+        from .epub_helper import rewrite_zip_members
+        rewrite_zip_members(original_path, temp_path, {
+            "META-INF/container.xml": _sanitize_container_xml(container_bytes),
+        })
 
         os.replace(temp_path, fixed_path)
         return fixed_path

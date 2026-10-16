@@ -112,6 +112,7 @@ function FieldPanel({ field }: { field: Field }) {
   const [prefill, setPrefill] = useState('');
   const [filter, setFilter] = useState('');
   const [uncoveredOnly, setUncoveredOnly] = useState(true);
+  const [sortBy, setSortBy] = useState<'books' | 'name'>('books');
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -126,9 +127,14 @@ function FieldPanel({ field }: { field: Field }) {
 
   const values = useMemo(() => {
     const needle = fold(filter);
-    return (data?.values ?? []).filter((value) =>
+    const shown = (data?.values ?? []).filter((value) =>
       (!uncoveredOnly || !value.covered) && (!needle || fold(value.name).includes(needle)));
-  }, [data, filter, uncoveredOnly]);
+    // By name, folded the way rules match, so near duplicates ("Montreal" and
+    // "Montréal", "Zebra" and "Zebra Books") sit next to each other.
+    return sortBy === 'name'
+      ? [...shown].sort((a, b) => fold(a.name).localeCompare(fold(b.name)) || a.name.localeCompare(b.name))
+      : shown;
+  }, [data, filter, uncoveredOnly, sortBy]);
 
   if (isLoading) return <SpinnerCentered size={36} />;
   if (error || !data) return <EmptyState message={t('Could not load the map.')} />;
@@ -285,6 +291,11 @@ function FieldPanel({ field }: { field: Field }) {
         <header className={styles.cardHeader}>
           <h2 id={`${field}-values`}>{t('Values in your library')} <span className={styles.count}>{data.values.length}</span></h2>
           <div className={styles.toolbar}>
+            <select className={styles.search} value={sortBy} aria-label={t('Sort values')}
+              onChange={(e) => setSortBy(e.target.value as 'books' | 'name')}>
+              <option value="books">{t('Most books first')}</option>
+              <option value="name">{t('By name')}</option>
+            </select>
             <input className={styles.search} type="search" value={filter} placeholder={t('Filter')}
               aria-label={t('Filter values')} onChange={(e) => setFilter(e.target.value)} />
             <label className={styles.inlineSwitch}>

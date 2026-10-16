@@ -1,0 +1,3 @@
+### Fixed
+
+- **Volumes of one work no longer look like the same book in the KOReader library.** Books whose titles are the same for their first 42 characters and differ only later, such as "Main Title: Subtitle, Volume I: ..." and "... Volume II: ...", were given the same file name on the device, apart from the book number at the end, so a device that lists a file by its name showed both as one title. The device file name now carries the whole title, with the author as before. Books whose titles are not that long keep the file name they already have, and a book whose name does change is renamed in place on the device with its reading position and notes kept. Fixes #2565.

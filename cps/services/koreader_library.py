@@ -456,7 +456,8 @@ def _describe(ids, *, user, cdb, session, read_column, members):
             "series_index": (float(row.series_index)
                              if book_series and row.series_index is not None
                              else None),
-            "filename": device_delivery._delivery_filename(book_id, chosen),
+            "filename": device_delivery._delivery_filename(
+                book_id, chosen, row.title),
             "format": chosen.format.upper(),
             "size": None,
             "checksum": None,

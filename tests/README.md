@@ -22,7 +22,7 @@ cd ../..
 ### Quick Feedback Loop (< 2 minutes) 
 ```bash
 # Smoke + Unit tests only (no Docker)
-pytest -m "smoke or unit" -n auto -v
+pytest -m "(smoke or unit) and not reflow" -n auto -v
 ```
 
 ### Run All Smoke Tests (Fastest - ~30 seconds)
@@ -34,6 +34,27 @@ pytest tests/smoke/ -v
 ```bash
 pytest tests/unit/ -n auto -v
 ```
+
+### Run PDF Converter Tests
+
+The converter lane uses Tesseract and the approved development extras. On
+Ubuntu 24.04, install `tesseract-ocr`, `tesseract-ocr-eng` and
+`tesseract-ocr-osd`, plus `gettext` for catalogue checks, then run:
+
+```bash
+pytest tests/unit -m reflow -n 4 --dist=loadfile -rs
+```
+
+CI runs this lane in its own **Reflow Tests (PDF converter)** job with two
+workers and a 30-minute test-step budget. It reports all failures rather than
+stopping after the first three. Fast Tests keeps its 15-minute budget and uses
+`-m "(smoke or unit) and not reflow"`.
+
+`lane_for_path` in `tests/conftest.py` assigns converter filename families and
+an explicit set of neutral filenames to `reflow`; existing module imports do
+not move. New neutral-name converter modules belong in `REFLOW_TEST_FILES`.
+`tests/unit/test_ci_test_lanes.py` checks actual collected items against every
+workflow invocation, including explicit `unit` marks and real OCR tests.
 
 ### Run Docker Integration Tests (Requires Docker, ~15-20 min)
 ```bash

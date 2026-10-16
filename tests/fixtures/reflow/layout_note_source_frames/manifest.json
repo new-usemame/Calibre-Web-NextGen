@@ -1,0 +1,464 @@
+{
+  "version": 1,
+  "source_commit": "9b6c014f16323a4259d22843bebff3e87ef4d2b9",
+  "expected_semantics": "Frozen decoded exact RGB source pixels at 6x, JPEG95; fixed reading-frame/source-clip projection established independently of SourceDisplay and package_glyphs. Both actual wrong provenance cases and distinctive synthetic quadrants; native records retain native coordinate convention.",
+  "cases": [
+    {
+      "name": "synthetic-reading-angle90-rotation0",
+      "pdf": "distinct-quadrants-rotation0.pdf",
+      "pdf_sha256": "38387df07c25b774b5cfb9470e9a6485d689d4303f14dd9da96eb701d712960a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 90,
+        "source_rotation": 0,
+        "page_rect": [
+          0.0,
+          0.0,
+          120.0,
+          180.0
+        ]
+      },
+      "mode": "layout",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "synthetic-reading-angle90-rotation0-layout_note-expected.png",
+          "expected_pixels_sha256": "30a7c8d943cdd43debb41aa11728f0f4a937970f8ee4899ea749e30e52232452",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            18,
+            110.0,
+            65,
+            165.0
+          ],
+          "source_render_angle": 90
+        }
+      ]
+    },
+    {
+      "name": "mixed-native-first-angle90-rotation0",
+      "pdf": "distinct-quadrants-rotation0.pdf",
+      "pdf_sha256": "38387df07c25b774b5cfb9470e9a6485d689d4303f14dd9da96eb701d712960a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 90,
+        "source_rotation": 0,
+        "page_rect": [
+          0.0,
+          0.0,
+          120.0,
+          180.0
+        ]
+      },
+      "mode": "native-first",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "mixed-native-first-angle90-rotation0-layout_note-expected.png",
+          "expected_pixels_sha256": "30a7c8d943cdd43debb41aa11728f0f4a937970f8ee4899ea749e30e52232452",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            18,
+            110.0,
+            65,
+            165.0
+          ],
+          "source_render_angle": 90
+        },
+        {
+          "kind": "native_glyph",
+          "bbox": [
+            20,
+            30,
+            65,
+            75
+          ],
+          "size": 10,
+          "font": "native-symbol",
+          "page": 0,
+          "expected_pixels_path": "mixed-native-first-angle90-rotation0-native_glyph-expected.png",
+          "expected_pixels_sha256": "498bb1ed67bdf20a054ecea089d1e570f782f56a96dd7917ca52ccd904a49634",
+          "expected_pixel_size": [
+            270,
+            270
+          ],
+          "source_display_clip": [
+            20.0,
+            30.0,
+            65.0,
+            75.0
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    },
+    {
+      "name": "mixed-layout-first-angle90-rotation0",
+      "pdf": "distinct-quadrants-rotation0.pdf",
+      "pdf_sha256": "38387df07c25b774b5cfb9470e9a6485d689d4303f14dd9da96eb701d712960a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 90,
+        "source_rotation": 0,
+        "page_rect": [
+          0.0,
+          0.0,
+          120.0,
+          180.0
+        ]
+      },
+      "mode": "layout-first",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "mixed-layout-first-angle90-rotation0-layout_note-expected.png",
+          "expected_pixels_sha256": "30a7c8d943cdd43debb41aa11728f0f4a937970f8ee4899ea749e30e52232452",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            18,
+            110.0,
+            65,
+            165.0
+          ],
+          "source_render_angle": 90
+        },
+        {
+          "kind": "native_note",
+          "bbox": [
+            20,
+            30,
+            65,
+            75
+          ],
+          "size": 0,
+          "font": "note",
+          "page": 0,
+          "expected_pixels_path": "mixed-layout-first-angle90-rotation0-native_note-expected.png",
+          "expected_pixels_sha256": "498bb1ed67bdf20a054ecea089d1e570f782f56a96dd7917ca52ccd904a49634",
+          "expected_pixel_size": [
+            270,
+            270
+          ],
+          "source_display_clip": [
+            20.0,
+            30.0,
+            65.0,
+            75.0
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    },
+    {
+      "name": "synthetic-reading-angle0-rotation90",
+      "pdf": "distinct-quadrants-rotation90.pdf",
+      "pdf_sha256": "f76a3434b62ff4e2e23547b9022db4f716379582e1f3c57299d4b4902eb1c18a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 0,
+        "source_rotation": 90,
+        "page_rect": [
+          0.0,
+          0.0,
+          180.0,
+          120.0
+        ]
+      },
+      "mode": "layout",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "synthetic-reading-angle0-rotation90-layout_note-expected.png",
+          "expected_pixels_sha256": "30a7c8d943cdd43debb41aa11728f0f4a937970f8ee4899ea749e30e52232452",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    },
+    {
+      "name": "mixed-native-first-angle0-rotation90",
+      "pdf": "distinct-quadrants-rotation90.pdf",
+      "pdf_sha256": "f76a3434b62ff4e2e23547b9022db4f716379582e1f3c57299d4b4902eb1c18a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 0,
+        "source_rotation": 90,
+        "page_rect": [
+          0.0,
+          0.0,
+          180.0,
+          120.0
+        ]
+      },
+      "mode": "native-first",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "mixed-native-first-angle0-rotation90-layout_note-expected.png",
+          "expected_pixels_sha256": "30a7c8d943cdd43debb41aa11728f0f4a937970f8ee4899ea749e30e52232452",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "source_render_angle": 0
+        },
+        {
+          "kind": "native_glyph",
+          "bbox": [
+            20,
+            30,
+            65,
+            75
+          ],
+          "size": 10,
+          "font": "native-symbol",
+          "page": 0,
+          "expected_pixels_path": "mixed-native-first-angle0-rotation90-native_glyph-expected.png",
+          "expected_pixels_sha256": "cca0ede069bce2f524b49d291b829f75f76b06e2d20f1c715d80b74b1b925c4a",
+          "expected_pixel_size": [
+            270,
+            270
+          ],
+          "source_display_clip": [
+            105.0,
+            20.0,
+            150.0,
+            65.0
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    },
+    {
+      "name": "mixed-layout-first-angle0-rotation90",
+      "pdf": "distinct-quadrants-rotation90.pdf",
+      "pdf_sha256": "f76a3434b62ff4e2e23547b9022db4f716379582e1f3c57299d4b4902eb1c18a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 0,
+        "source_rotation": 90,
+        "page_rect": [
+          0.0,
+          0.0,
+          180.0,
+          120.0
+        ]
+      },
+      "mode": "layout-first",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "mixed-layout-first-angle0-rotation90-layout_note-expected.png",
+          "expected_pixels_sha256": "30a7c8d943cdd43debb41aa11728f0f4a937970f8ee4899ea749e30e52232452",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "source_render_angle": 0
+        },
+        {
+          "kind": "native_note",
+          "bbox": [
+            20,
+            30,
+            65,
+            75
+          ],
+          "size": 0,
+          "font": "note",
+          "page": 0,
+          "expected_pixels_path": "mixed-layout-first-angle0-rotation90-native_note-expected.png",
+          "expected_pixels_sha256": "cca0ede069bce2f524b49d291b829f75f76b06e2d20f1c715d80b74b1b925c4a",
+          "expected_pixel_size": [
+            270,
+            270
+          ],
+          "source_display_clip": [
+            105.0,
+            20.0,
+            150.0,
+            65.0
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    },
+    {
+      "name": "clean-reading-layout",
+      "pdf": "distinct-quadrants-rotation0.pdf",
+      "pdf_sha256": "38387df07c25b774b5cfb9470e9a6485d689d4303f14dd9da96eb701d712960a",
+      "page": 0,
+      "source_geometry": {
+        "space": "reading",
+        "orientation": 0,
+        "source_rotation": 0,
+        "page_rect": [
+          0,
+          0,
+          120,
+          180
+        ]
+      },
+      "mode": "layout",
+      "targets": [
+        {
+          "kind": "layout_note",
+          "bbox": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "size": 0,
+          "font": "note",
+          "reason": "layout",
+          "page": 0,
+          "expected_pixels_path": "clean-reading-layout-layout_note-expected.png",
+          "expected_pixels_sha256": "1dc5899806e0064a873b78d3e23357e43999a1c25bfeb786e03e8f5f6cad2a32",
+          "expected_pixel_size": [
+            330,
+            282
+          ],
+          "source_display_clip": [
+            15,
+            18,
+            70,
+            65
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    },
+    {
+      "name": "native-rotated-without-ocr",
+      "pdf": "distinct-quadrants-rotation90.pdf",
+      "pdf_sha256": "f76a3434b62ff4e2e23547b9022db4f716379582e1f3c57299d4b4902eb1c18a",
+      "page": 0,
+      "source_geometry": {},
+      "mode": "native",
+      "targets": [
+        {
+          "kind": "native_glyph",
+          "bbox": [
+            20,
+            30,
+            65,
+            75
+          ],
+          "size": 10,
+          "font": "native-symbol",
+          "page": 0,
+          "expected_pixels_path": "native-rotated-without-ocr-native_glyph-expected.png",
+          "expected_pixels_sha256": "cca0ede069bce2f524b49d291b829f75f76b06e2d20f1c715d80b74b1b925c4a",
+          "expected_pixel_size": [
+            270,
+            270
+          ],
+          "source_display_clip": [
+            105.0,
+            20.0,
+            150.0,
+            65.0
+          ],
+          "source_render_angle": 0
+        }
+      ]
+    }
+  ]
+}

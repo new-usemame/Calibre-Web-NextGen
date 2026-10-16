@@ -39,6 +39,9 @@ dependencies = [
     "iso-639>=0.4.5,<0.5.0;python_version<'3.12'",
     "pycountry>=24.6.1,<25.0.0;python_version>='3.12'",
     "pypdf>=6.0.0",
+    # Reflow (AI-assisted PDF -> EPUB): span/line geometry and page rasters.
+    # abi3 wheels cover the image's Python 3.13 on x86_64 and aarch64.
+    "pymupdf>=1.24.0,<2.0.0",
     "Pillow>=11.0.0,<13.0.0",
     "pytz>=2016.10",
     "requests>=2.32.4,<2.33.0",
@@ -134,6 +137,10 @@ dev = [
     "pytest-mock>=3.12.0",
     "pytest-timeout>=2.2.0",
     "pytest-xdist>=3.5.0",
+    "jsonschema>=4.0.0",          # Validate generated model wire schemas in tests
+    # Frozen visible-DOM provenance evaluator used by synthetic reflow tests.
+    "cssselect2==0.9.0",
+    "tinycss2==1.5.1",
 
     # Integration testing
     "testcontainers>=3.7.0",

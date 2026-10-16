@@ -28,6 +28,7 @@ Both must stay. If a future refactor drops either, these tests fail.
 from __future__ import annotations
 
 import re
+import shlex
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,15 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
 
 def _yaml() -> str:
     return WORKFLOW.read_text()
+
+
+def _fast_pytest_arguments() -> list[str]:
+    job = _yaml().split("\n  fast-tests:\n", 1)[1].split("\n  reflow-tests:\n", 1)[0]
+    lines = re.sub(r"\\\s*\n\s*", " ", job).splitlines()
+    commands = [line.strip() for line in lines
+                if line.strip().startswith("pytest -m ")]
+    assert len(commands) == 1, "locate the actual Fast Tests marker invocation"
+    return shlex.split(commands[0])
 
 
 def test_push_trigger_scoped_to_main_dev_only():
@@ -64,12 +74,7 @@ def test_push_trigger_scoped_to_main_dev_only():
 def test_pytest_invocation_pins_dist_loadfile():
     """The Fast Tests pytest invocation must include `--dist=loadfile`
     to eliminate work-stealing races between xdist workers."""
-    src = _yaml()
-    # The relevant pytest call lives under the fast-tests job.
-    assert re.search(
-        r"pytest -m \"smoke or unit\"[^&]*--dist=loadfile",
-        src, re.DOTALL,
-    ), (
+    assert "--dist=loadfile" in _fast_pytest_arguments(), (
         "Fast Tests pytest invocation must include `--dist=loadfile` — "
         "eliminates the xdist work-stealing race that hangs fast-tests "
         "runs at the step-level timeout. See "
@@ -81,6 +86,6 @@ def test_pytest_invocation_still_has_pytest_timeout():
     """Belt-and-suspenders: `--timeout=120 --timeout-method=thread` must
     stay alongside `--dist=loadfile`. They cover different failure
     modes (per-test hang vs worker-IPC hang)."""
-    src = _yaml()
-    assert "--timeout=120" in src, "must keep --timeout=120 (per-test hang gate)"
-    assert "--timeout-method=thread" in src, "must keep --timeout-method=thread"
+    arguments = _fast_pytest_arguments()
+    assert "--timeout=120" in arguments, "must keep --timeout=120 (per-test hang gate)"
+    assert "--timeout-method=thread" in arguments, "must keep --timeout-method=thread"

@@ -12,8 +12,9 @@ it did. 118 of 434 files under ``tests/unit/`` had drifted out that way, hiding
 937 tests; ``tests/smoke/`` had another 36. Among them were regression guards
 for shipped fixes, and 37 tests that had gone red unnoticed.
 
-The lane now comes from the directory, so a new file cannot be born invisible.
-These tests defend the three ways that could quietly stop being true:
+The lane comes from the directory and converter filename registry, so a new
+file cannot be born invisible. These tests defend the ways that could stop
+being true:
 
 * a test directory appears that no lane covers;
 * the workflow's ``-m`` expression drifts away from the lanes conftest assigns;
@@ -23,6 +24,7 @@ Plus the end-to-end check that the pieces actually compose: collect a
 previously-invisible file with the gate's own selector and see nothing dropped.
 """
 
+import ast
 import pathlib
 import re
 import shlex
@@ -40,7 +42,9 @@ pytestmark = pytest.mark.unit
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from tests.conftest import LANE_BY_DIRECTORY, LANE_MARKERS, lane_for_path  # noqa: E402
+from tests.conftest import (  # noqa: E402
+    LANE_BY_DIRECTORY, LANE_MARKERS, REFLOW_TEST_FILES, lane_for_path,
+)
 from tests.quarantine import QUARANTINED  # noqa: E402
 from tests.ci_lane_collection import collect_ci_coverage  # noqa: E402
 
@@ -99,6 +103,7 @@ def _workflow_step_block(step_name):
     "step_name",
     [
         "Run smoke and unit tests",
+        "Run converter tests",
         "Run non-xdist unit tests (lane opt-outs)",
         "Run Docker integration tests",
     ],
@@ -169,12 +174,10 @@ def test_fast_lane_files_do_not_silently_opt_out(ci_lane_inventory):
     slow_markers = LANE_MARKERS - {"unit", "smoke"}
     for nodeid, markers in ci_lane_inventory["markers"].items():
         relative = nodeid.split("::", 1)[0]
-        parts = pathlib.PurePosixPath(relative).parts
-        if parts:
-            fast_directory = len(parts) >= 3 and parts[0] == "tests" and parts[1] in LANE_BY_DIRECTORY
-            slower = set(markers) & slow_markers
-            if fast_directory and slower:
-                opted_out.setdefault(relative, set()).update(slower)
+        fast_directory = lane_for_path(REPO / relative) in {"unit", "smoke"}
+        slower = set(markers) & slow_markers
+        if fast_directory and slower:
+            opted_out.setdefault(relative, set()).update(slower)
     opted_out = {path: sorted(markers) for path, markers in opted_out.items()}
 
     assert set(opted_out) == set(SLOW_LANE_OPT_OUTS), (
@@ -188,6 +191,11 @@ def test_fast_lane_files_do_not_silently_opt_out(ci_lane_inventory):
     "path, expected",
     [
         ("tests/unit/test_anything.py", "unit"),
+        ("tests/unit/test_reflow_anything.py", "reflow"),
+        ("tests/unit/test_round7_anything.py", "reflow"),
+        ("tests/unit/test_marker_shared_source_context.py", "reflow"),
+        ("tests/unit/test_283_round3_zindex_colors.py", "unit"),
+        ("tests/smoke/test_reflow_anything.py", "smoke"),
         ("tests/smoke/test_anything.py", "smoke"),
         ("tests/integration/test_anything.py", None),
         ("tests/test_top_level.py", None),
@@ -197,6 +205,120 @@ def test_fast_lane_files_do_not_silently_opt_out(ci_lane_inventory):
 def test_lane_is_derived_from_the_directory(path, expected):
     candidate = path if path.startswith("/") else str(REPO / path)
     assert lane_for_path(candidate) == expected
+
+
+def _converter_gate_marker_expression():
+    block = _workflow_step_block("Run converter tests")
+    match = re.search(r'pytest -m "([^"]+)"', block)
+    assert match, "the converter job must select its own named lane"
+    return match.group(1)
+
+
+def test_converter_lane_is_exclusive_and_fully_run(ci_lane_inventory):
+    """Actual pytest selectors must partition items, including explicit unit."""
+    invocations = _workflow_pytest_invocations()
+    fast_index = invocations.index(([], _fast_gate_marker_expression()))
+    converter_index = invocations.index(
+        (["tests/unit"], _converter_gate_marker_expression()))
+    markers = ci_lane_inventory["markers"]
+    expected = {
+        node for node in ci_lane_inventory["all"]
+        if lane_for_path(REPO / node.split("::", 1)[0]) == "reflow"
+    }
+    assert len(expected) > 3000, "converter inventory unexpectedly empty or partial"
+    assert any("unit" in markers[node] for node in expected), (
+        "the partition must exercise converter files that retain explicit unit"
+    )
+    assert set(ci_lane_inventory["selected"][converter_index]) == expected
+    assert not expected.intersection(ci_lane_inventory["selected"][fast_index])
+    assert all("reflow" in markers[node] for node in expected)
+    # real_ocr is a named skipif decorator, not a pytest marker name. Read
+    # decorated definitions, then require their real parametrized items in CI.
+    real_ocr = set()
+    for path in sorted((TESTS / "unit").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        definitions = [node.name for node in tree.body
+                       if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                       and any(isinstance(mark, ast.Name) and mark.id == "real_ocr"
+                               for mark in node.decorator_list)]
+        for name in definitions:
+            prefix = "%s::%s" % (path.relative_to(REPO).as_posix(), name)
+            nodes = {node for node in markers
+                     if node == prefix or node.startswith(prefix + "[")}
+            assert nodes, "real OCR definition was not collected: %s" % prefix
+            real_ocr.update(nodes)
+    assert real_ocr, "no real OCR tests collected; the capability guard is vacuous"
+    assert real_ocr <= expected, (
+        "real OCR tests escaped the converter job: %s" % sorted(real_ocr - expected)
+    )
+
+
+def _imports_converter(source):
+    tree = ast.parse(source)
+    imports = [name for node in ast.walk(tree)
+               for name in (
+                   [alias.name for alias in node.names] if isinstance(node, ast.Import)
+                   else [node.module or "", *[
+                       "%s.%s" % (node.module or "", alias.name)
+                       for alias in node.names]] if isinstance(node, ast.ImportFrom)
+                   else [])]
+    return any(name.startswith(("cps.services.reflow", "tests.fixtures.reflow",
+                                "tests.unit.round7_")) for name in imports)
+
+
+@pytest.mark.parametrize("source, expected", [
+    ("from cps.services import reflow", True),
+    ("from cps.services.reflow import gate", True),
+    ("import cps.services.reflow.ocr as adapter", True),
+    ("from tests.fixtures import reflow_pdfs", True),
+    ("from cps.services import metadata", False),
+    ('message = "cps.services.reflow"', False),
+])
+def test_converter_importer_guard_recognizes_import_forms(source, expected):
+    assert _imports_converter(source) is expected
+
+
+def test_converter_registry_has_no_stale_paths_or_unclaimed_importers():
+    for name in REFLOW_TEST_FILES:
+        assert (TESTS / "unit" / name).is_file(), name
+    unclaimed = [
+        path.name for path in sorted((TESTS / "unit").glob("test_*.py"))
+        if _imports_converter(path.read_text(encoding="utf-8"))
+        and lane_for_path(path) != "reflow"
+    ]
+    assert not unclaimed, (
+        "converter importers must enter the dedicated lane: %s" % unclaimed
+    )
+
+
+def test_converter_ci_has_its_engine_and_an_independent_budget():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    job = workflow.split("  reflow-tests:\n", 1)[1].split("\n  # ===", 1)[0]
+    assert "runs-on: ubuntu-24.04" in job
+    assert "python-version: '3.13'" in job
+    install = _workflow_step_block("Install converter system dependencies")
+    assert {"tesseract-ocr", "tesseract-ocr-eng", "tesseract-ocr-osd", "gettext"} <= set(
+        re.findall(r"[a-z0-9-]+", install))
+    assert "tesseract --list-langs" in install
+    assert "tesseract" not in _workflow_step_block("Install system dependencies")
+    assert "python -m pip install -e '.[dev]'" in _workflow_step_block(
+        "Install converter test dependencies")
+    block = re.sub(r"\\\s*\n\s*", " ", _workflow_step_block("Run converter tests"))
+    command = next(line.strip() for line in block.splitlines()
+                   if line.strip().startswith("pytest "))
+    arguments = shlex.split(command)
+    assert arguments[arguments.index("-n") + 1] == "2"
+    assert "--dist=loadfile" in arguments
+    assert not any(arg.startswith(("--maxfail", "--exitfirst")) or arg == "-x"
+                   for arg in arguments)
+    assert "--timeout=1800" in arguments
+    assert "--junitxml=test-results/reflow.xml" in arguments
+    assert "timeout-minutes: 30" in block
+    assert "timeout-minutes: 40" in job
+    assert "timeout-minutes: 15" in _workflow_step_block("Run smoke and unit tests")
+    artifact = _workflow_step_block("Upload converter test results")
+    assert "if: always()" in artifact
+    assert "path: test-results/reflow.xml" in artifact
 
 
 def test_a_declared_lane_is_never_overridden_by_the_directory():

@@ -1,0 +1,427 @@
+"""Bounded original pixels in the source's established upright reading space."""
+import math
+import hashlib
+import json
+import zlib
+from . import extract, ocr
+from .unit_recovery import SourceIntegrityError
+
+VERSION = 'source-display-1'
+MAX_INSPECTION_TILES = 64
+GRID_QUERY_PIXELS = 1_000_000
+MAX_LOSSLESS_CANDIDATE_PIXELS = 3_000_000
+MIN_PACKAGED_SAVING = 1024
+
+
+def _rect(value):
+    values=tuple(value)
+    if len(values)!=4 or not all(math.isfinite(v) for v in values):
+        raise ValueError('invalid source display geometry')
+    rect=extract.pymupdf.Rect(values)
+    if rect.is_empty or rect.is_infinite:raise ValueError('invalid source display geometry')
+    return rect
+
+
+class SourceDisplay:
+    def __init__(self,doc,pno,provenance=None):
+        self.doc,self.pno=doc,pno
+        self.page=doc[pno];self.provenance=provenance or {}
+        self.angle=self.provenance.get('orientation',0) if self.provenance.get('layer')=='ocr' else 0
+        if self.angle not in (0,90,180,270):raise ValueError('invalid source orientation')
+        self.displayed=_rect(self.page.rect)
+        if self.provenance.get('layer')=='ocr':
+            if self.provenance.get('source_rotation',self.page.rotation)!=self.page.rotation:
+                raise ValueError('stale source rotation')
+            saved=self.provenance.get('page_rect')
+            if saved and any(abs(a-b)>.01 for a,b in zip(saved,self.displayed)):
+                raise ValueError('stale source rectangle')
+        w,h=self.displayed.width,self.displayed.height
+        self.rect=extract.pymupdf.Rect(0,0,h,w) if self.angle in (90,270) else extract.pymupdf.Rect(0,0,w,h)
+
+    def source_rect(self,reading_rect):
+        rect=_rect(reading_rect)&self.rect
+        if rect.is_empty:raise ValueError('source region outside page')
+        # get_pixmap clips in the displayed PDF space, unlike text/figure boxes
+        # that may be stored in unrotated PDF coordinates.
+        return extract.pymupdf.Rect(ocr._source_box(rect,self.displayed.width,self.displayed.height,self.angle))
+
+    def reading_rect(self,unrotated_rect):
+        source=_rect(unrotated_rect)*self.page.rotation_matrix
+        rotated=source*extract.pymupdf.Matrix(1,1).prerotate(self.angle)
+        origin=self.displayed*extract.pymupdf.Matrix(1,1).prerotate(self.angle)
+        return extract.pymupdf.Rect(rotated.x0-origin.x0,rotated.y0-origin.y0,
+                                    rotated.x1-origin.x0,rotated.y1-origin.y0)&self.rect
+
+    def pixmap(self,rect=None,scale=1,gray=False,max_pixels=None):
+        reading=self.rect if rect is None else _rect(rect)&self.rect
+        if reading.is_empty:raise ValueError('source region outside page')
+        if not math.isfinite(scale) or scale<=0:raise ValueError('invalid source scale')
+        limit=min(extract.MAX_RASTER_PIXELS,max_pixels or extract.MAX_RASTER_PIXELS)
+        if not math.isfinite(limit) or limit < 16:raise ValueError('invalid source pixel bound')
+        bounded=min(float(scale),math.sqrt(limit/(reading.width*reading.height)))
+        if (math.ceil(reading.width*bounded)+2)*(math.ceil(reading.height*bounded)+2)>limit:
+            low,high=0.,bounded
+            for _ in range(48):
+                mid=(low+high)/2
+                if (math.ceil(reading.width*mid)+2)*(math.ceil(reading.height*mid)+2)<=limit:low=mid
+                else:high=mid
+            bounded=low
+        return self.page.get_pixmap(matrix=extract.pymupdf.Matrix(bounded,bounded).prerotate(self.angle),
+            clip=self.source_rect(reading),alpha=False,
+            colorspace=extract.pymupdf.csGRAY if gray else extract.pymupdf.csRGB)
+
+    def jpeg(self,rect=None,scale=3,quality=90,max_bytes=2*1024*1024):
+        for requested in extract._scale_ladder(scale):
+            pix=self.pixmap(rect,requested)
+            data=pix.tobytes('jpg',jpg_quality=quality)
+            if len(data)<=max_bytes:return data
+        raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
+
+    def roi_pixmap(self,rect=None,scale=1,gray=False,max_pixels=None):
+        """Render original detail only after proving its prepared-page lineage.
+
+        Ordinary page rendering retains its exact prepared bytes. An optional
+        original frame supplies higher resolution pixels for bounded evidence;
+        neither its OCR layer nor its text is read.
+        """
+        frame=self.provenance.get('original_frame')
+        if frame is None:return self.pixmap(rect,scale,gray,max_pixels)
+        import hashlib
+        from pathlib import Path
+        def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        try:
+            original=frame['original_pdf'];prepared=self.doc.name
+            expected_original=frame['original_pdf_sha256'];expected_prepared=frame['prepared_pdf_sha256']
+            original_page=frame['original_page_index0'];prepared_page=frame['prepared_page_index0']
+            if (type(original_page) is not int or type(prepared_page) is not int or
+                    original_page<0 or prepared_page!=self.pno or self.angle or self.page.rotation):
+                raise SourceIntegrityError('Unsupported original source frame coordinates')
+            if not prepared or digest(prepared)!=expected_prepared or digest(original)!=expected_original:
+                raise SourceIntegrityError('Original source frame identity changed')
+            reading=self.rect if rect is None else _rect(rect)
+            if reading.is_empty or any(abs(a-b)>.001 for a,b in zip(reading,reading&self.rect)):
+                raise ValueError('Original detail outside the proved page')
+            with extract.pymupdf.open(original) as doc:
+                if original_page>=len(doc):raise SourceIntegrityError('Original source page outside document')
+                source=SourceDisplay(doc,original_page)
+                if source.page.rotation or any(abs(a-b)>.001 for a,b in zip(source.rect,self.rect)):
+                    raise SourceIntegrityError('Original source frame geometry differs')
+                canonical=self.pixmap(scale=2,max_pixels=2_500_000)
+                comparable=source.pixmap(scale=2,max_pixels=2_500_000)
+                if ((canonical.width,canonical.height,canonical.n)!=(comparable.width,comparable.height,comparable.n)
+                        or canonical.samples!=comparable.samples):
+                    raise SourceIntegrityError('Original source page does not match prepared pixels')
+                result=source.pixmap(reading,scale,gray,max_pixels)
+            if digest(prepared)!=expected_prepared or digest(original)!=expected_original:
+                raise SourceIntegrityError('Original source frame changed during detail query')
+            return result
+        except (KeyError,TypeError,OSError,IndexError) as error:
+            raise SourceIntegrityError('Invalid original source frame provenance') from error
+
+    def roi_jpeg(self,rect=None,scale=3,quality=90,max_bytes=2*1024*1024):
+        """Bounded original detail; default rendering and cache inputs are unchanged."""
+        if self.provenance.get('original_frame') is None:
+            return self.jpeg(rect,scale,quality,max_bytes)
+        for requested in extract._scale_ladder(scale):
+            pix=self.roi_pixmap(rect,requested)
+            data=pix.tobytes('jpg',jpg_quality=quality)
+            if len(data)<=max_bytes:return data
+        raise extract.RasterTooLarge('original source detail exceeds encoded-byte bound')
+
+    def _native_bitonal(self):
+        """Prove that one opaque native bitmap is the complete visible page."""
+        if hasattr(self, '_bitonal'):
+            return self._bitonal
+        self._bitonal = None
+        if self.angle or self.page.rotation:
+            return None
+        try:
+            from PIL import Image
+            images = self.page.get_image_info(xrefs=True)
+            if len(images) != 1:
+                return None
+            info = images[0]
+            width, height, xref = info['width'], info['height'], info['xref']
+            if not xref or info['bpc'] != 1 or info['colorspace'] != 1 or not (0 < width * height <= extract.MAX_RASTER_PIXELS):
+                return None
+            matrix = extract.pymupdf.Matrix(info['transform'])
+            if matrix.b or matrix.c or matrix.a <= 0 or matrix.d <= 0:
+                return None
+            if any(abs(a-b) > .001 for a,b in zip(info['bbox'], self.displayed)):
+                return None
+            sx, sy = width/self.displayed.width, height/self.displayed.height
+            if abs(sx-sy) > max(sx,sy)*1e-6:
+                return None
+            refs = [r for r in self.page.get_images(full=True) if r[0] == xref]
+            if len(refs) != 1 or refs[0][1] or self.doc.xref_get_key(xref, 'ImageMask')[1] == 'true':
+                return None
+            paint = self.page.get_bboxlog()
+            positions = [i for i,entry in enumerate(paint) if entry[0] == 'fill-image']
+            if len(positions) != 1 or any(entry[0] != 'ignore-text' for entry in paint[positions[0]+1:]):
+                return None
+            pix = extract.pymupdf.Pixmap(self.doc,xref)
+            if pix.n != 1 or pix.alpha or pix.width != width or pix.height != height:
+                return None
+            samples = pix.samples
+            image = Image.frombytes('L',(width,height),samples)
+            histogram = image.histogram()
+            if sum(histogram[1:255]):
+                return None
+            # Paint order alone cannot establish clipping/opacity. At the native
+            # resolution the complete rendered page must equal every source bit.
+            visible = self.page.get_pixmap(matrix=extract.pymupdf.Matrix(sx,sy),
+                alpha=False,colorspace=extract.pymupdf.csGRAY)
+            if (visible.width,visible.height)!=(width,height) or visible.samples != samples:
+                return None
+            self._bitonal = image.convert('1',dither=Image.Dither.NONE)
+        except (ValueError,RuntimeError,KeyError,TypeError,OverflowError):
+            return None
+        return self._bitonal
+
+    @staticmethod
+    def _lossless_candidate(pix, jpeg, max_bytes):
+        """Choose exact rendered samples only for a material packaged saving."""
+        if pix.width*pix.height > MAX_LOSSLESS_CANDIDATE_PIXELS:
+            return jpeg
+        from PIL import Image
+        import io
+        samples = pix.samples
+        size = (pix.width, pix.height)
+        if samples[0::3] == samples[1::3] == samples[2::3]:
+            image = Image.frombytes('L', size, samples[0::3])
+        else:
+            image = Image.frombytes('RGB', size, samples)
+        stream = io.BytesIO()
+        image.save(stream, format='PNG', optimize=True)
+        png = stream.getvalue()
+        if len(png) > max_bytes:
+            return jpeg
+        with Image.open(io.BytesIO(png)) as decoded:
+            if decoded.size != size or decoded.convert('RGB').tobytes() != samples:
+                raise ValueError('lossless source evidence changed rendered pixels')
+        jpeg_zip = len(zlib.compress(jpeg, 6))
+        png_zip = len(zlib.compress(png, 6))
+        if jpeg_zip-png_zip >= MIN_PACKAGED_SAVING and png_zip*50 <= jpeg_zip*49:
+            return png
+        return jpeg
+
+    def source_image(self,rect=None,scale=3,quality=90,max_bytes=2*1024*1024,
+                     lossless_candidate=False):
+        """Lossless native pixels when proved; otherwise the existing renderer."""
+        import io
+        if not math.isfinite(scale) or scale <= 0:
+            raise ValueError('invalid source scale')
+        image = self._native_bitonal()
+        if image is not None:
+            reading = self.rect if rect is None else _rect(rect)&self.rect
+            if reading.is_empty:
+                raise ValueError('source region outside page')
+            sx,sy=image.width/self.rect.width,image.height/self.rect.height
+            box=(max(0,math.floor(reading.x0*sx)),max(0,math.floor(reading.y0*sy)),
+                 min(image.width,math.ceil(reading.x1*sx)),min(image.height,math.ceil(reading.y1*sy)))
+            crop=image.crop(box);stream=io.BytesIO();crop.save(stream,format='PNG',optimize=True)
+            data=stream.getvalue()
+            if len(data)<=max_bytes:
+                return data
+        if not lossless_candidate:
+            return self.jpeg(rect,scale,quality,max_bytes)
+        # This branch serves packaged source evidence only. The JPEG/OCR path
+        # keeps its existing scale ladder and exact input bytes.
+        for requested in extract._scale_ladder(scale):
+            pix = self.pixmap(rect, requested)
+            jpeg = pix.tobytes('jpg', jpg_quality=quality)
+            if len(jpeg) <= max_bytes:
+                return self._lossless_candidate(pix, jpeg, max_bytes)
+        raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
+
+    def complete_detail_rect(self,rect):
+        """Complete ink touching a passage detail's edges in the native bitmap.
+
+        Neighboring source context is allowed here. These are inspection crops,
+        not isolated words or figures. No resizing, recognition, or new pixels
+        supplies the completion; an exhausted halo uses the full original page.
+        """
+        seed=_rect(rect)&self.rect
+        if seed.is_empty:raise ValueError('source detail outside page')
+        proof=dict(version='source-native-detail-edges-1',seed_reading_bbox=list(seed))
+        image=self._native_bitonal()
+        if image is None:return seed,dict(proof,status='withheld',reason='native_bitonal_visible_page_unproved')
+        sx,sy=image.width/self.rect.width,image.height/self.rect.height
+        initial=[max(0,math.floor(seed.x0*sx)),max(0,math.floor(seed.y0*sy)),
+                 min(image.width,math.ceil(seed.x1*sx)),min(image.height,math.ceil(seed.y1*sy))]
+        halo=[max(0,initial[0]-math.ceil(12*sx)),max(0,initial[1]-math.ceil(12*sy)),
+              min(image.width,initial[2]+math.ceil(12*sx)),min(image.height,initial[3]+math.ceil(12*sy))]
+        if (halo[2]-halo[0])*(halo[3]-halo[1])>GRID_QUERY_PIXELS:
+            return seed,dict(proof,status='withheld',reason='bounded_query_exceeded')
+        box=list(initial)
+        def edges():
+            x0,y0,x1,y1=box
+            strips=((x0,y0,min(x1,x0+2),y1),(x0,y0,x1,min(y1,y0+2)),
+                    (max(x0,x1-2),y0,x1,y1),(x0,max(y0,y1-2),x1,y1))
+            return [image.crop(strip).getextrema()!=(255,255) for strip in strips]
+        while True:
+            touching=edges()
+            if not any(touching):break
+            changed=False
+            for index,ink in enumerate(touching):
+                if not ink:continue
+                if index<2 and box[index]>halo[index]:box[index]-=1;changed=True
+                elif index>=2 and box[index]<halo[index]:box[index]+=1;changed=True
+            if not changed:
+                return self.rect,dict(proof,status='full_page_context',reason='complete_edge_not_proved_within_halo')
+        result=extract.pymupdf.Rect(box[0]/sx,box[1]/sy,box[2]/sx,box[3]/sy)
+        return result,dict(proof,status='completed' if box!=initial else 'already_clear',
+            native_pixel_box=box,native_seed_pixel_box=initial,reading_bbox=list(result))
+
+    def query_document(self,isolate=False):
+        """Existing pixel questions in reading coordinates, without a second renderer."""
+        display=self
+        original_pno=self.pno
+        owned=None
+        if isolate:
+            # MuPDF image decoding can be affected by previous render sizes.
+            # Probes get a separate page object; emitted source pixels keep the
+            # original document's render state. No pixels are resampled here.
+            owned=extract.pymupdf.open()
+            try:
+                owned.insert_pdf(self.doc,from_page=self.pno,to_page=self.pno)
+                display=SourceDisplay(owned,0,self.provenance)
+            except Exception:
+                owned.close()
+                raise
+        class ReadingPage:
+            rect=display.rect
+            def get_pixmap(self,matrix,clip=None,alpha=False,colorspace=None):
+                if owned is not None and owned.is_closed:raise ValueError('source query is closed')
+                if alpha or matrix.b or matrix.c or matrix.a!=matrix.d:
+                    raise ValueError('unsupported reading-space pixel query')
+                if colorspace not in (None,extract.pymupdf.csRGB,extract.pymupdf.csGRAY):
+                    raise ValueError('unsupported reading-space colorspace')
+                return display.pixmap(clip,scale=matrix.a,gray=colorspace==extract.pymupdf.csGRAY)
+        class ReadingDocument:
+            def __getitem__(self,pno):
+                if pno!=original_pno:raise IndexError('wrong source page')
+                return ReadingPage()
+            def close(self):
+                if owned is not None and not owned.is_closed:owned.close()
+            def __enter__(self):return self
+            def __exit__(self,*args):self.close()
+        return ReadingDocument()
+
+
+def inspection_tiles(rect,width=240,height=320,overlap=24):
+    rect=_rect(rect)
+    if min(width,height)<=overlap or overlap<0:raise ValueError('invalid inspection geometry')
+    cols=max(1,math.ceil((rect.width-overlap)/(width-overlap)))
+    rows=max(1,math.ceil((rect.height-overlap)/(height-overlap)))
+    if cols*rows>MAX_INSPECTION_TILES:
+        raise ValueError('source inspection exceeds tile count bound')
+    xs=[rect.x0+min(i*(width-overlap),max(0,rect.width-width)) for i in range(cols)]
+    ys=[rect.y0+min(i*(height-overlap),max(0,rect.height-height)) for i in range(rows)]
+    return [extract.pymupdf.Rect(x,y,min(x+width,rect.x1),min(y+height,rect.y1)) for y in ys for x in xs]
+
+
+def _rule_count(columns,length):
+    # A fixed +/-5-degree source skew envelope, half-degree samples, and one
+    # raster-pixel stroke tolerance. Require repeated almost-spanning strokes;
+    # ordinary letter baselines and a single decorative rule are insufficient.
+    best=0
+    for half_degree in range(-10,11):
+        slope=math.tan(math.radians(half_degree/2));counts={}
+        for x,ys in enumerate(columns):
+            for y in {round(y-slope*x)+dy for y in ys for dy in (-1,0,1)}:
+                counts[y]=counts.get(y,0)+1
+        hits=sorted(y for y,n in counts.items() if n>=length*.8)
+        count=sum(1 for i,y in enumerate(hits) if i==0 or y>hits[i-1]+1)
+        best=max(best,count)
+    return best
+
+
+def ruled_grid(display,rect):
+    """Evidence of ruled relationships, not a semantic table classification."""
+    rect=_rect(rect)&display.rect
+    if min(rect.width,rect.height)<24:return None
+    pix=display.pixmap(rect,scale=1,gray=True,max_pixels=GRID_QUERY_PIXELS)
+    w,h=pix.width,pix.height;data=pix.samples
+    columns=[[] for _ in range(w)];rows=[[] for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            if data[y*w+x]<200:columns[x].append(y);rows[y].append(x)
+    vertical=_rule_count(rows,h)
+    if vertical<3:return None
+    horizontal=_rule_count(columns,w)
+    if horizontal<3:return None
+    return {'version':VERSION,'horizontal_rules':horizontal,'vertical_rules':vertical,
+            'reading_bbox':list(rect),'displayed_pdf_bbox':list(display.source_rect(rect)),
+            'query_pixels':[w,h],'orientation':display.angle,'source_rotation':display.page.rotation}
+
+
+def _connected_source_extents(display, check_cancelled=None):
+    """Measure connected original ink, with a one-pixel scan-gap tolerance.
+
+    This is an extent check after orthogonal ruling was established. A component
+    is not itself evidence that prose is a table. Full-page context is the safe
+    remainder if the grid cannot be connected reliably.
+    """
+    pix=display.pixmap(scale=1,gray=True,max_pixels=GRID_QUERY_PIXELS)
+    w,h=pix.width,pix.height;raw=pix.samples;mask=bytearray(w*h)
+    for y in range(h):
+        if check_cancelled and y%128==0:check_cancelled()
+        for x in range(w):
+            if raw[y*w+x]<200:
+                for yy in range(max(0,y-1),min(h,y+2)):
+                    for xx in range(max(0,x-1),min(w,x+2)):mask[yy*w+xx]=1
+    extents=[]
+    for start in range(w*h):
+        if not mask[start]:continue
+        mask[start]=0;stack=[start];left=right=start%w;top=bottom=start//w
+        while stack:
+            pos=stack.pop();y,x=divmod(pos,w)
+            left=min(left,x);right=max(right,x);top=min(top,y);bottom=max(bottom,y)
+            for yy in range(max(0,y-1),min(h,y+2)):
+                for xx in range(max(0,x-1),min(w,x+2)):
+                    n=yy*w+xx
+                    if mask[n]:mask[n]=0;stack.append(n)
+        if right-left>=12 and bottom-top>=12:
+            sx,sy=display.rect.width/w,display.rect.height/h
+            extents.append(extract.pymupdf.Rect(max(0,left-1)*sx,max(0,top-1)*sy,
+                min(w,right+2)*sx,min(h,bottom+2)*sy))
+        if check_cancelled:check_cancelled()
+    return extents
+
+
+def grid_regions(book,doc,pno,provenance,check_cancelled=None):
+    if provenance.get('layer')!='ocr':return {}
+    display=SourceDisplay(doc,pno,provenance);regions={};extents=None
+    for index,element in enumerate(book.pages[pno]):
+        if check_cancelled:check_cancelled()
+        if element.kind!='p' or element.table_row:continue
+        if not element.bbox or element.bbox[2]<=element.bbox[0] or element.bbox[3]<=element.bbox[1]:continue
+        proof=ruled_grid(display,element.bbox)
+        if proof:
+            rect=extract.pymupdf.Rect(element.bbox)
+            if extents is None:extents=_connected_source_extents(display,check_cancelled)
+            matching=[bound for bound in extents if (bound & rect).get_area()>=rect.get_area()*.8
+                      and bound.width>=rect.width*.8 and bound.height>=rect.height*.8]
+            if matching:
+                complete=min(matching,key=lambda bound:bound.get_area())
+                rect=complete | rect
+                proof['extent_method']='connected_original_ruling'
+            else:
+                complete=rect=display.rect
+                proof['extent_method']='complete_original_context'
+            proof['region_id']=hashlib.sha256(json.dumps([VERSION,pno,display.angle,
+                display.page.rotation,[round(v,6) for v in complete]],separators=(',',':')).encode()).hexdigest()
+            proof['reading_bbox']=list(rect)
+            proof['displayed_pdf_bbox']=list(display.source_rect(rect))
+            regions[index]=proof
+    grouped={}
+    for index,proof in regions.items():grouped.setdefault(proof['region_id'],[]).append(index)
+    for members in grouped.values():
+        rect=extract.pymupdf.Rect(regions[members[0]]['reading_bbox'])
+        for index in members[1:]:rect |= extract.pymupdf.Rect(regions[index]['reading_bbox'])
+        for index in members:
+            regions[index]['element_indices']=members
+            regions[index]['reading_bbox']=list(rect)
+            regions[index]['displayed_pdf_bbox']=list(display.source_rect(rect))
+    return regions

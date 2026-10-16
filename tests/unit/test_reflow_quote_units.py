@@ -1,0 +1,507 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Complete printed quotation units bound structural choices."""
+import copy
+import re
+import zipfile
+import pymupdf
+import pytest
+from cps.services.reflow import assemble,extract,skeleton,structural_ops as ops
+pytestmark=pytest.mark.unit
+
+def fixture(tmp_path,kind='multi'):
+    doc=pymupdf.open();page=doc.new_page(width=500,height=700)
+    for y,text in [(80,'Ordinary source body establishes a wider text column.'),(94,'Its next complete line supplies a stable source reference.'),(108,'The following passage is displayed separately:')]:page.insert_text((40,y),text,fontsize=11,fontname='tiro')
+    prefix=''
+    if kind=='attribution':
+        prefix='(from an earlier source) ';page.insert_text((70,160),prefix.strip(),fontsize=11,fontname='tiit')
+        lines=['"First complete sentence. The next sentence continues','across the printed block and ends here."'];ys=[174,188]
+    elif kind in ('annotation','all_italic_annotation','mixed_native_styles'):
+        lines=['A complete verse ends here.', '(A separate observation occupies', 'two printed lines.)'];ys=[160,174,188]
+    elif kind=='inline_parenthetical':lines=['A complete verse (with its own aside) ends here.'];ys=[160]
+    elif kind=='numeric':lines=['15'];ys=[160]
+    elif kind=='short':lines=['"Stay."'];ys=[160]
+    elif kind=='inline':lines=['Ordinary prose calls this "a name" inside its sentence.'];ys=[160]
+    else:lines=['First complete sentence. The next sentence continues','across the printed block. The final sentence must stay.'];ys=[160,174]
+    if kind=='closing_only':lines[-1]+='\"'
+    if kind=='opening_only':lines[0]='\"'+lines[0]
+    for i,(y,text) in enumerate(zip(ys,lines)):
+        x=40 if kind=='inline' or (kind=='ordinary_indent' and i>0) else 95 if kind=='display_first_indent' and i==0 else 70
+        font = 'tiit' if kind=='all_italic_annotation' or (kind=='annotation' and i>0) else 'tiro'
+        if kind=='mixed_native_styles':
+            font=('tiit','tibo','tibi')[i]
+        page.insert_text((x,y),text,fontsize=11,fontname=font)
+    if kind=='note':page.insert_text((70+pymupdf.get_text_length(lines[-1],fontname='tiro',fontsize=11),ys[-1]-3),'7',fontsize=7,fontname='tiro')
+    for y,text in [(240,'Ordinary source body resumes with the original column.'),(254,'The following text remains distinct from the display.')]:page.insert_text((40,y),text,fontsize=11,fontname='tiro')
+    path=tmp_path/(kind+'.pdf');doc.save(path);doc.close();doc=pymupdf.open(path);raw=extract.read_page(doc,0)
+    source_lines=[l for b in raw.text_blocks for l in b.lines]
+    def element(chosen,runs=None):
+        box=(min(l.bbox[0] for l in chosen),min(l.bbox[1] for l in chosen),max(l.bbox[2] for l in chosen),max(l.bbox[3] for l in chosen))
+        return assemble.Element('p',pno=0,bbox=box,line_boxes=[l.bbox for l in chosen],runs=runs or [['t',' '.join(l.text.strip() for l in chosen)]])
+    before=element([l for l in source_lines if l.bbox[1]<120]);after=element([l for l in source_lines if l.bbox[1]>220])
+    text=prefix+' '.join(lines);runs=[['t',text]]+([['sup','7',0]] if kind=='note' else [])
+    quote=element([l for l in source_lines if 140<l.bbox[1]<210],runs)
+    book=assemble.Book(elements=[before,quote,after],pages={0:[before,quote,after]},style=skeleton.BookStyle(body_size=11))
+    return book,doc,raw,len(prefix),len(text)+(1 if kind=='note' else 0)
+
+def prepare(data,layer='native'):
+    book,doc,raw,*_=data
+    return ops.prepare(book,doc,0,'unit-test',{'layer':layer},raw_page=raw)
+
+@pytest.mark.parametrize('kind',['multi','attribution','short','note'])
+def test_only_complete_source_unit_is_offered_including_short_displays(tmp_path,kind):
+    data=fixture(tmp_path,kind);book,doc,raw,start,end=data;p=prepare(data)
+    offered=[c['source_range'] for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1']
+    assert offered==[[start,end]], 'partial sentences, attribution and partial sentences are excluded; attached note stays atomic'
+    doc.close()
+
+@pytest.mark.parametrize('kind',['inline','ordinary_indent'])
+def test_inline_and_ordinary_first_line_indentation_do_not_make_display_quotes(tmp_path,kind):
+    data=fixture(tmp_path,kind);p=prepare(data)
+    assert not [c for c in p.candidates() if c['kind']=='quote'], 'ordinary text must not gain a quote menu'
+    data[1].close()
+
+def test_missing_or_uncertain_source_cannot_authorize_a_quote(tmp_path):
+    data=fixture(tmp_path);book,doc,raw,*_=data
+    assert not any(c['kind']=='quote' for c in ops.prepare(book,doc,0,'test',{'layer':'native'}).candidates())
+    book.pages[0][1].punctuation_uncertain=True
+    assert any(c['kind']=='quote' for c in prepare(data).candidates()), 'word uncertainty is preserved when the complete layout boundary is proven'
+    book.pages[0][1].punctuation_uncertain=False
+    changed=copy.deepcopy(raw);changed.text_blocks[1].lines[0].spans[0].text='Unrelated source reading'
+    assert not any(c['kind']=='quote' for c in ops.prepare(book,doc,0,'test',{'layer':'ocr'},raw_page=changed).candidates())
+    doc.close()
+
+@pytest.mark.parametrize('kind',['multi','attribution'])
+def test_final_admission_cannot_reintroduce_removed_partial_or_mixed_unit(tmp_path,kind):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,kind);book,doc,raw,start,end=data;p=prepare(data)
+    bad_end=book.pages[0][1].runs[0][1].index('.')+1 if kind=='multi' else end
+    forged=replace(p,specs=(ops._Spec(1,'quote',0,bad_end),))
+    cid=forged.candidates()[0]['candidate_id']
+    reply={'protocol':ops.PROTOCOL,'snapshot_id':forged.snapshot_id,'select':[cid]}
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        forged.accept(book,doc,reply)
+    target=tmp_path/'forged.epub'
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        build_epub.build(book,str(target),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    assert not target.exists()
+    doc.close()
+
+
+def test_atomic_note_and_source_word_order_survive_current_quote_admission(tmp_path):
+    from cps.services.reflow import build_epub
+    import zipfile
+    from xml.etree import ElementTree as ET
+    data=fixture(tmp_path,'note');book,doc,raw,start,end=data;p=prepare(data)
+    choice=next(c for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1')
+    assert choice['source_range']==[start,end]
+    plan=p.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[choice['candidate_id']]))
+    before=copy.deepcopy(book.pages[0][1].runs);target=tmp_path/'quote.epub'
+    build_epub.build(book,str(target),doc=doc,operation_plans=[plan]);assert book.pages[0][1].runs==before
+    with zipfile.ZipFile(target) as z:
+        blocks=[b for n in z.namelist() if n.endswith('.xhtml') for b in ET.fromstring(z.read(n)).iter('{http://www.w3.org/1999/xhtml}blockquote')]
+    assert len(blocks)==1 and 'final sentence must stay.' in ''.join(blocks[0].itertext())
+    assert any(s.text=='7' for s in blocks[0].iter('{http://www.w3.org/1999/xhtml}sup'))
+    doc.close()
+
+
+def test_truncated_source_paragraph_is_not_a_complete_display_unit(tmp_path):
+    data=fixture(tmp_path);book,doc,raw,*_=data
+    quote=book.pages[0][1]
+    first=next(l for b in raw.text_blocks for l in b.lines if tuple(l.bbox)==tuple(quote.line_boxes[0]))
+    quote.runs=[['t',first.text]];quote.line_boxes=[first.bbox];quote.bbox=first.bbox
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data).candidates())
+    doc.close()
+
+
+def test_native_italic_complete_quote_stays_italic_after_admitted_wrapper(tmp_path):
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'all_italic_annotation');_,doc,raw,*_=data
+    style=skeleton.book_style([raw])
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    prepared=ops.prepare(book,doc,0,'italic-native-test',{'layer':'native'},raw_page=raw)
+    choice=next(c['candidate_id'] for c in prepared.candidates() if c['kind']=='quote')
+    plan=prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,
+                                       select=[choice]))
+    target=tmp_path/'italic-quote.epub'
+    build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
+    with zipfile.ZipFile(target) as archive:
+        chapters=''.join(archive.read(name).decode() for name in archive.namelist()
+                         if name.startswith('OEBPS/ch') and name.endswith('.xhtml'))
+    assert '<blockquote><p><em>A complete verse ends here.</em> <em>(A separate observation occupies</em> <em>two printed lines.)</em></p></blockquote>' in chapters
+    assert 'A complete verse ends here. (A separate observation occupies two printed lines.)' in re.sub(r'<[^>]+>','',chapters)
+    doc.close()
+
+
+def test_native_mixed_inline_styles_survive_complete_quote_and_partial_forgery(tmp_path):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'mixed_native_styles');_,doc,raw,*_=data
+    style=skeleton.book_style([raw])
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    prepared=ops.prepare(book,doc,0,'mixed-native-style-test',{'layer':'native'},raw_page=raw)
+    choice=next(c for c in prepared.candidates() if c['kind']=='quote')
+    assert choice['source_range']==[0,len(assemble.plain_text(book.pages[0][1].runs))]
+    plan=prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,
+                                       select=[choice['candidate_id']]))
+    target=tmp_path/'mixed-native.epub';build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
+    with zipfile.ZipFile(target) as archive:
+        chapters=''.join(archive.read(name).decode() for name in archive.namelist()
+                         if name.startswith('OEBPS/ch') and name.endswith('.xhtml'))
+    assert ('<blockquote><p><em>A complete verse ends here.</em> '
+            '<strong>(A separate observation occupies</strong> '
+            '<strong><em>two printed lines.)</em></strong></p></blockquote>') in chapters
+    assert 'A complete verse ends here. (A separate observation occupies two printed lines.)' in re.sub(r'<[^>]+>','',chapters)
+    forged=replace(prepared,specs=(ops._Spec(1,'quote',0,choice['source_range'][1]-1),))
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=forged.snapshot_id,
+                                    select=[forged.candidates()[0]['candidate_id']]))
+    doc.close()
+
+
+def test_ocr_geometry_preserves_complete_display_but_not_inferred_italic_attribution(tmp_path):
+    data=fixture(tmp_path,'multi')
+    assert any(c['kind']=='quote' and c['source_range']==[data[3],data[4]] for c in prepare(data,'ocr').candidates())
+    data[1].close()
+    data=fixture(tmp_path,'attribution')
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data,'ocr').candidates())
+    data[1].close()
+
+
+def test_missing_line_metadata_recovers_exact_complete_raw_unit(tmp_path):
+    data=fixture(tmp_path);book,doc,raw,start,end=data
+    quote=book.pages[0][1];quote.line_boxes=quote.line_boxes[:1];quote.bbox=quote.line_boxes[0]
+    assert any(c['kind']=='quote' and c['element_id']=='e1' and c['source_range']==[start,end] for c in prepare(data).candidates())
+    doc.close()
+
+def test_qualified_uncertain_terminal_marker_keeps_proven_source_unit(tmp_path):
+    data=fixture(tmp_path,'note');book,doc,raw,start,end=data
+    book.pages[0][1].runs[-1]=['sup','153',0,'uncertain']
+    last=next(l for b in raw.text_blocks for l in b.lines if l.bbox==book.pages[0][1].line_boxes[-1])
+    last.spans[-1].text='\"'
+    assert any(c['kind']=='quote' and c['element_id']=='e1' and c['source_range']==[start,end+2] for c in prepare(data).candidates())
+    assert book.pages[0][1].runs[-1]==['sup','153',0,'uncertain']
+    doc.close()
+
+
+def split_display(tmp_path):
+    data=fixture(tmp_path);book,doc,raw,*_=data
+    quote=book.pages[0][1];raw=raw.to_dict()
+    block=next(b for b in raw['blocks'] if len(b.get('lines',[]))==2 and b['lines'][0]['bbox'][1]>140 and b['lines'][0]['bbox'][1]<200)
+    parts=[]
+    for line in block['lines']:
+        part=copy.deepcopy(quote);part.bbox=line['bbox'];part.line_boxes=[line['bbox']]
+        part.runs=[['t',''.join(s['text'] for s in line['spans'])]]
+        part.punctuation_uncertain=True;parts.append(part)
+    book.elements[1:2]=parts;book.pages[0][1:2]=parts
+    at=raw['blocks'].index(block)
+    raw['blocks'][at:at+1]=[dict(block,lines=[line],bbox=line['bbox']) for line in block['lines']]
+    return book,doc,raw,0,len(parts[0].runs[0][1])
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_same_page_split_display_cannot_be_admitted_as_complete_quote(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=split_display(tmp_path);book,doc,raw,start,end=data;p=prepare(data)
+    if seam=='candidates':
+        assert not any(c['kind']=='quote' and c['element_id'] in ('e1','e2') for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',start,end),))
+        cid=forged.candidates()[0]['candidate_id'];target=tmp_path/'split.epub'
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(target),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+        assert not target.exists()
+    doc.close()
+
+
+@pytest.mark.parametrize('kind',['closing_only','display_first_indent'])
+def test_complete_display_boundary_does_not_require_paired_quotes_or_uniform_first_indent(tmp_path,kind):
+    data=fixture(tmp_path,kind);p=prepare(data)
+    assert [c['source_range'] for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1']==[[data[3],data[4]]]
+    data[1].close()
+
+
+def test_opening_only_quote_does_not_prove_its_terminal_boundary(tmp_path):
+    data=fixture(tmp_path,'opening_only')
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data).candidates())
+    data[1].close()
+
+
+def cross_page_display(tmp_path, editorial=False, indented_footer=False, interior=False, body_tail=False):
+    doc=pymupdf.open();raws=[];pages={}
+    for pno in (0,1):
+        page=doc.new_page(width=500,height=700)
+        specs=([('body',40,80,['Ordinary body establishes the full printed text column.'],11),
+                ('quote',92 if editorial else 70,180,['Counting onward leaves an equal'] if editorial else ['A displayed quotation continues across the page break','and leaves an unfinished thought in'],11),
+                ('footer',92 if indented_footer else 40,600,['A footnote citation below the display,', 'continued as a separate complete reference.'] if indented_footer else ['12 A smaller reference printed below the quotation.'],11 if indented_footer else 8)] if pno==0 else
+               [('header',160,40,['Running title'],10),
+                ('quote',40 if body_tail else 70,180,['[number] in the next interval, ending here.'] if editorial else ['the same source display on the next page, ending here.'],11),
+                ('body',40,300,['Ordinary body resumes after the complete quotation.'],11)])
+        if pno==1 and interior:specs.insert(1,('earlier',70,100,['A separate complete source display.'],11))
+        for name,x,y,texts,size in specs:
+            for i,text in enumerate(texts):page.insert_text((x,y+i*14),text,fontsize=size,fontname='tiro')
+    path=tmp_path/'continued.pdf';doc.save(path);doc.close();doc=pymupdf.open(path)
+    for pno in (0,1):
+        raw=extract.read_page(doc,pno);raws.append(raw);elements=[]
+        for block in raw.text_blocks:
+            elements.append(assemble.Element('p',pno=pno,bbox=block.bbox,line_boxes=[l.bbox for l in block.lines],runs=[['t',' '.join(l.text.strip() for l in block.lines)]]))
+        pages[pno]=elements
+    book=assemble.Book(elements=pages[0]+pages[1],pages=pages,style=skeleton.BookStyle(body_size=11))
+    return book,doc,raws
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_footer_and_running_header_cannot_hide_cross_page_quote_continuation(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path)
+    for pno in (0,1):
+        p=ops.prepare(book,doc,pno,'cross-page',{'layer':'native'},raw_page=raws[pno])
+        if seam=='candidates':assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+        else:
+            e=book.pages[pno][1];forged=replace(p,specs=(ops._Spec(1,'quote',0,len(e.text)),));cid=forged.candidates()[0]['candidate_id']
+            target=tmp_path/('cross-'+str(pno)+'.epub')
+            with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+                if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+                else:build_epub.build(book,str(target),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+            assert not target.exists()
+    doc.close()
+
+
+def test_centered_terminal_fragment_uses_recovered_neighbor_lines(tmp_path):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    doc=pymupdf.open();page=doc.new_page(width=500,height=700)
+    page.insert_text((40,90),'Ordinary body text establishes a broad source text column.',fontsize=11,fontname='tiro')
+    lines=['"A centered quotation begins and continues through','another complete source line before reaching','its actual ending."']
+    for i,text in enumerate(lines):page.insert_text((230-pymupdf.get_text_length(text,fontname='tiro',fontsize=11)/2,180+i*14),text,fontsize=11,fontname='tiro')
+    page.insert_text((40,300),'Ordinary body text resumes after the full source quotation.',fontsize=11,fontname='tiro')
+    path=tmp_path/'centered.pdf';doc.save(path);doc.close();doc=pymupdf.open(path);raw=extract.read_page(doc,0).to_dict()
+    source=[l for b in raw['blocks'] for l in b.get('lines',[])]
+    quoted=[l for l in source if 150<l['bbox'][1]<220]
+    def element(chosen,text):
+        return assemble.Element('p',pno=0,bbox=chosen[0]['bbox'],line_boxes=[chosen[0]['bbox']],runs=[['t',text]])
+    before=element([source[0]],''.join(s['text'] for s in source[0]['spans']))
+    prefix=element(quoted[:2],' '.join(lines[:2]));tail=element(quoted[2:],lines[2])
+    after=element([source[-1]],''.join(s['text'] for s in source[-1]['spans']))
+    raw['blocks']=[dict(b,lines=[l],bbox=l['bbox']) for b in raw['blocks'] for l in b.get('lines',[])]
+    elements=[before,prefix,tail,after];book=assemble.Book(elements=elements,pages={0:elements},style=skeleton.BookStyle(body_size=11))
+    p=ops.prepare(book,doc,0,'centered',{'layer':'native'},raw_page=raw)
+    assert not any(c['kind']=='quote' and c['element_id']=='e2' for c in p.candidates())
+    forged=replace(p,specs=(ops._Spec(2,'quote',0,len(tail.text)),));cid=forged.candidates()[0]['candidate_id']
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        build_epub.build(book,str(tmp_path/'centered-fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_separate_italic_parenthetical_is_outside_quote_unit(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'annotation');book,doc,raw,start,end=data;p=prepare(data)
+    if seam=='candidates':
+        assert [c['source_range'] for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1']==[[0,len('A complete verse ends here.')]]
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,end),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'mixed.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+def test_annotation_words_remain_outside_emitted_quote(tmp_path):
+    from cps.services.reflow import build_epub
+    import zipfile
+    from xml.etree import ElementTree as ET
+    data=fixture(tmp_path,'annotation');book,doc,raw,*_=data;p=prepare(data)
+    choice=next(c for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1')
+    plan=p.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[choice['candidate_id']]))
+    target=tmp_path/'annotation.epub';before=copy.deepcopy(book.pages[0][1].runs)
+    build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
+    assert book.pages[0][1].runs==before
+    with zipfile.ZipFile(target) as z:
+        roots=[ET.fromstring(z.read(n)) for n in z.namelist() if n.endswith('.xhtml')]
+    blocks=[b for root in roots for b in root.iter('{http://www.w3.org/1999/xhtml}blockquote')]
+    assert len(blocks)==1 and ''.join(blocks[0].itertext()).strip()=='A complete verse ends here.'
+    bodies=[' '.join(''.join(b.itertext()).split()) for root in roots for b in root.iter('{http://www.w3.org/1999/xhtml}body')]
+    assert any('A complete verse ends here.' in text and '(A separate observation occupies two printed lines.)' in text for text in bodies)
+    doc.close()
+
+
+@pytest.mark.parametrize('kind',['all_italic_annotation','inline_parenthetical'])
+def test_parentheses_without_contrasting_source_line_style_are_not_split(tmp_path,kind):
+    data=fixture(tmp_path,kind)
+    assert [c['source_range'] for c in prepare(data).candidates() if c['kind']=='quote' and c['element_id']=='e1']==[[0,data[4]]]
+    data[1].close()
+
+
+@pytest.mark.parametrize('layer,uncertain',[('ocr',False),('native',True)])
+def test_mixed_annotation_boundary_needs_reliable_native_source(tmp_path,layer,uncertain):
+    data=fixture(tmp_path,'annotation');data[0].pages[0][1].punctuation_uncertain=uncertain
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data,layer).candidates())
+    data[1].close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_editorial_bracket_and_first_line_indent_do_not_hide_continuation(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path,editorial=True)
+    p=ops.prepare(book,doc,1,'editorial-cross-page',{'layer':'native'},raw_page=raws[1])
+    if seam=='candidates':
+        assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,len(book.pages[1][1].text)),))
+        cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    assert not assemble.continues('Counting onward leaves an equal','[number] in the next interval.'), 'prose joining remains conservative'
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['admission','builder'])
+def test_old_quote_proof_cannot_survive_current_boundary_revision(tmp_path,monkeypatch,seam):
+    from cps.services.reflow import quote_evidence,build_epub
+    data=fixture(tmp_path);book,doc,raw,*_=data
+    current=quote_evidence.VERSION
+    monkeypatch.setattr(quote_evidence,'VERSION','previous-boundary-contract')
+    prepared=prepare(data);choice=next(c for c in prepared.candidates() if c['kind']=='quote')
+    monkeypatch.setattr(quote_evidence,'VERSION',current)
+    with pytest.raises(ops.ContractError,match='quote evidence'):
+        if seam=='admission':prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]))
+        else:build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,operation_plans=[ops.OperationPlan(prepared,(choice['candidate_id'],))])
+    assert not (tmp_path/'stale.epub').exists()
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_more_indented_multiline_footnote_cannot_hide_quote_edge(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path,indented_footer=True)
+    p=ops.prepare(book,doc,0,'footer-indent',{'layer':'native'},raw_page=raws[0])
+    if seam=='candidates':assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,len(book.pages[0][1].text)),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'footer-fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+def test_interior_lowercase_display_does_not_inherit_unrelated_previous_page_prefix(tmp_path):
+    book,doc,raws=cross_page_display(tmp_path,interior=True)
+    p=ops.prepare(book,doc,1,'interior-display',{'layer':'native'},raw_page=raws[1])
+    assert any(c['kind']=='quote' and c['element_id']=='e2' for c in p.candidates())
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_single_line_first_indent_continues_at_next_body_margin(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path,editorial=True,body_tail=True)
+    p=ops.prepare(book,doc,0,'body-margin-tail',{'layer':'native'},raw_page=raws[0])
+    if seam=='candidates':assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,len(book.pages[0][1].text)),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'first-indent.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_bare_numeric_leaf_is_not_a_quotation_unit(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'numeric');book,doc,raw,*_=data;p=prepare(data)
+    if seam=='candidates':assert not any(c['kind']=='quote' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,2),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'numeric.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+@pytest.mark.parametrize('seam', ['candidates', 'admission', 'builder'])
+def test_unmapped_native_glyph_unit_cannot_gain_structural_role(tmp_path, seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    from cps.services.reflow.native_text import descriptor
+    data = fixture(tmp_path)
+    book, doc, raw, start, end = data
+    element = book.pages[0][1]
+    element.runs = [['glyph', element.runs[0][1], descriptor(0, element.bbox, 11, 'LegacySymbols')]]
+    prepared = prepare(data)
+    if seam == 'candidates':
+        assert not [c for c in prepared.candidates() if c['element_id'] == 'e1']
+    else:
+        forged = replace(prepared, specs=(ops._Spec(1, 'quote', 0, end),))
+        cid = forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError, match='complete source quote evidence'):
+            if seam == 'admission':
+                forged.accept(book, doc, {'protocol': ops.PROTOCOL, 'snapshot_id': forged.snapshot_id, 'select': [cid]})
+            else:
+                build_epub.build(book, str(tmp_path/'forged.epub'), doc=doc,
+                    operation_plans=[ops.OperationPlan(forged, (cid,))])
+    doc.close()
+
+
+def test_complete_quote_preserves_source_word_image_as_an_indivisible_atom(tmp_path):
+    from cps.services.reflow import enriched_source,build_epub
+    from cps.services.reflow.native_text import descriptor
+    from xml.etree import ElementTree as ET
+    from dataclasses import replace
+    data=fixture(tmp_path);book,doc,raw,start,end=data
+    element=book.pages[0][1];text=element.runs[0][1];a=text.index('complete');b=a+len('complete')
+    box=next(w[:4] for w in doc[0].get_text('words') if w[4]=='complete' and w[1]>140)
+    record=descriptor(0,box,11,'Times-Roman',reason='transcript')
+    element.runs=[['t',text[:a]],['glyph',text[a:b],record],['t',text[b:]]]
+    original=copy.deepcopy(element.runs)
+    source=enriched_source.prepare_source_page(book,0,{'layer':'native'},[])
+    prepared=ops.prepare(book,doc,0,'protected-atoms',{'layer':'native'},source_page=source,raw_page=raw)
+    choice=next(c for c in prepared.candidates() if c['kind']=='quote' and c['element_id']=='e1')
+    assert choice['source_range']==[start,end]
+    plan=prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]),source_page=source)
+    target=tmp_path/'protected.epub';build_epub.build(book,str(target),doc=doc,source_pages={0:source},operation_plans=[plan])
+    assert element.runs==original and build_epub.validate(str(target))==[]
+    with zipfile.ZipFile(target) as archive:
+        blocks=[b for name in archive.namelist() if name.endswith('.xhtml') for b in ET.fromstring(archive.read(name)).iter('{http://www.w3.org/1999/xhtml}blockquote')]
+        assert len(blocks)==1 and len(list(blocks[0].iter('{http://www.w3.org/1999/xhtml}img')))==1
+    # Use the sealed canonical source block rather than a synthesized replacement.
+    fragment=build_epub.split_blocks(source.html)[1]
+    with pytest.raises(ops.ContractError,match='atom'):
+        enriched_source.wrap(fragment,element,[ops._Spec(1,'quote',a+1,end)])
+    forged=replace(prepared,specs=(ops._Spec(1,'quote',a+1,end),))
+    bad=forged.candidates()[0]['candidate_id']
+    with pytest.raises(ops.ContractError):forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=forged.snapshot_id,select=[bad]),source_page=source)
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(tmp_path/'cut.epub'),doc=doc,source_pages={0:source},operation_plans=[ops.OperationPlan(forged,(bad,))])
+    element.runs[1][2]['bbox'][0]+=1
+    with pytest.raises(ops.ContractError):prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]),source_page=source)
+    doc.close()
+
+
+@pytest.mark.parametrize('kind,offered',[('closing_only',True),('inline',False)])
+def test_uncertain_terminal_image_cannot_be_used_as_a_textual_quote_boundary(tmp_path,kind,offered):
+    from cps.services.reflow import enriched_source
+    from cps.services.reflow.native_text import descriptor
+    data=fixture(tmp_path,kind);book,doc,raw,start,end=data
+    element=book.pages[0][1];text=element.runs[0][1]
+    # The complete final source word remains pixels, including the uncertain
+    # punctuation. It does not authorize a partial textual quotation.
+    cut=text.rstrip().rfind(' ')+1
+    record=descriptor(0,element.bbox,11,'Times-Roman',reason='transcript')
+    element.runs=[['t',text[:cut]],['glyph',text[cut:],record],*element.runs[1:]]
+    element.punctuation_uncertain=True
+    source=enriched_source.prepare_source_page(book,0,{'layer':'native'},[])
+    prepared=ops.prepare(book,doc,0,'protected-atoms',{'layer':'native'},source_page=source,raw_page=raw)
+    assert any(c['kind']=='quote' and c['source_range']==[start,end] for c in prepared.candidates()) is offered
+    doc.close()

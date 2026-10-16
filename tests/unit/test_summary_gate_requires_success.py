@@ -49,9 +49,11 @@ def _summary_shell():
 
 def _render(shell, *, event, ref, fast, build, integration, e2e,
             is_frontend_pr="false", is_tier2="false", is_build_pr="false",
-            is_concurrency_pr="false", changed_paths="success", impact_map="success"):
+            is_concurrency_pr="false", changed_paths="success", impact_map="success",
+            reflow="success"):
     subs = {
         "needs.fast-tests.result": fast,
+        "needs.reflow-tests.result": reflow,
         "needs.frontend-build.result": build,
         "needs.integration-tests.result": integration,
         "needs.e2e-tests.result": e2e,
@@ -149,6 +151,27 @@ def test_summary_requires_impact_map_success_on_every_trigger(event, ref, result
     assert rc == expected, f"{event} with impact-map={result}: expected exit {expected}, got {rc}\n{out}"
     if result != "success":
         assert "Impact map" in out and result in out
+
+
+@pytest.mark.parametrize("event,ref", [
+    ("pull_request", "refs/pull/1/merge"),
+    ("push", "refs/heads/main"),
+    ("push", "refs/heads/dev"),
+    ("push", "refs/tags/v1.0.0"),
+    ("workflow_dispatch", "refs/heads/main"),
+])
+@pytest.mark.parametrize("result", ["success", "failure", "skipped", "cancelled"])
+def test_summary_requires_converter_success_on_every_trigger(event, ref, result):
+    """Execute the required summary for each converter outcome and trigger."""
+    rc, out = _run(
+        event=event, ref=ref, fast="success", build="success",
+        integration="success", e2e="success", reflow=result,
+    )
+    expected = 0 if result == "success" else 1
+    assert rc == expected, (
+        f"{event} with reflow-tests={result}: expected exit {expected}, got {rc}\n{out}"
+    )
+    assert "Reflow Tests" in out and result in out
 
 
 def test_positive_control_all_success_passes():

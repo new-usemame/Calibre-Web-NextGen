@@ -701,20 +701,45 @@ LANE_BY_DIRECTORY = {
     "smoke": "smoke",
 }
 
-#: A test declaring one of these has already chosen its lane; the directory
-#: must not override it. This is what keeps the two deliberately-slow files
-#: under tests/unit/ out of the fast gate.
+#: Explicit lanes keep deliberately slower tests out of the fast gate.
+#: Converter files additionally receive reflow even when they retain unit;
+#: the Fast Tests selector excludes reflow explicitly.
 LANE_MARKERS = frozenset({
     "smoke", "unit", "integration", "e2e",
-    "docker", "docker_integration", "docker_e2e", "slow",
+    "docker", "docker_integration", "docker_e2e", "slow", "reflow",
+})
+
+
+# Converter modules keep their established import paths under tests/unit. The
+# filename families put new converter regressions in their own CI lane without
+# requiring every file to repeat a marker. Neutral-name modules are explicit so
+# moving an unrelated unit test out of Fast Tests remains a visible review.
+REFLOW_TEST_PREFIXES = (
+    "test_reflow_", "test_round2_", "test_round4_", "test_round5_",
+    "test_round6_", "test_round7_",
+)
+REFLOW_TEST_FILES = frozenset({
+    "test_cached_table_live_source_cells_v2.py",
+    "test_dockerfile_ocr_runtime_packages.py",
+    "test_env_example_is_the_ssot.py",
+    "test_marker_noanchor_and_repeated_slot_v2.py",
+    "test_marker_shared_source_context.py",
+    "test_native_figure_inventory_original_predicate.py",
+    "test_native_generated_figure_source_ownership.py",
+    "test_native_mixed_style_paragraph_ownership.py",
+    "test_native_publication_adversarial.py",
+    "test_native_publication_source_ownership.py",
+    "test_recovered_source_column_ownership.py",
+    "test_recovery_consecutive_row_instance.py",
+    "test_source_placeholder_display_marker_v2.py",
 })
 
 
 def lane_for_path(path):
-    """Return the lane marker implied by a test file's directory, or None.
+    """Return the lane implied by a test's directory and filename, or None.
 
-    Only the directories in LANE_BY_DIRECTORY imply a lane. Anything outside
-    tests/ (or in an unmapped subdirectory) returns None and is left alone.
+    Converter files under tests/unit use their dedicated reflow lane. Other
+    directories inherit LANE_BY_DIRECTORY; unmapped locations are left alone.
     """
     if path is None:
         return None
@@ -724,6 +749,10 @@ def lane_for_path(path):
         return None
     if not relative.parts:
         return None
+    if (len(relative.parts) == 2 and relative.parts[0] == "unit"
+            and (relative.name.startswith(REFLOW_TEST_PREFIXES)
+                 or relative.name in REFLOW_TEST_FILES)):
+        return "reflow"
     return LANE_BY_DIRECTORY.get(relative.parts[0])
 
 
@@ -741,7 +770,9 @@ def pytest_collection_modifyitems(config, items):
 
     Lane assignment (#1105) has to happen here rather than in each test file:
     `-m` selection is opt-in, so an unmarked file is silently deselected and
-    never runs. A test that declares its own lane marker is left untouched.
+    never runs. Explicit slower lanes remain untouched. Converter files also
+    receive reflow when they retain unit: CI excludes reflow from Fast Tests,
+    while unit continues to describe their isolation and fixture restrictions.
 
     Skip Docker tests if not in Docker environment.
     Skip Calibre tests if Calibre tools not installed.
@@ -751,10 +782,11 @@ def pytest_collection_modifyitems(config, items):
     import os
 
     for item in items:
-        if not LANE_MARKERS.intersection(marker.name for marker in item.iter_markers()):
-            lane = lane_for_path(
-                getattr(item, "path", None) or getattr(item, "fspath", None)
-            )
+        lane = lane_for_path(
+            getattr(item, "path", None) or getattr(item, "fspath", None)
+        )
+        if lane == "reflow" or not LANE_MARKERS.intersection(
+                marker.name for marker in item.iter_markers()):
             if lane:
                 item.add_marker(getattr(pytest.mark, lane))
 

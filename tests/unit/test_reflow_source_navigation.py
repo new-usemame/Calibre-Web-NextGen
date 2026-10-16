@@ -1,0 +1,535 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""A reader can navigate to actual PDF page starts, including sampled gaps."""
+
+import zipfile
+import io
+from xml.etree import ElementTree as ET
+
+import pymupdf
+import pytest
+from PIL import Image
+
+from cps.services.reflow import assemble, build_epub
+
+pytestmark = pytest.mark.unit
+XHTML = "{http://www.w3.org/1999/xhtml}"
+EPUB_TYPE = "{http://www.idpf.org/2007/ops}type"
+
+
+class _Images(dict):
+    """The builder's image sink (``build_epub._Package``), keeping the bytes it is
+    given so a test can compare the pixels it was sent."""
+
+    @property
+    def aliases(self):
+        return {}  # This byte-comparison sink deliberately keeps requested names.
+
+    @property
+    def images(self):
+        return {href: len(data) for href, data in self.items()}
+
+    def image(self, href, data):
+        self[href] = data
+
+
+@pytest.mark.parametrize("selected", [(0, 1, 2), (0, 2)])
+def test_source_page_navigation_resolves_to_real_starts_without_renumbering(tmp_path, selected):
+    with pymupdf.open() as doc:
+        for words in ("Arrival beside the river.", "The middle passage continues.",
+                      "A final journey into the hills."):
+            page = doc.new_page(width=500, height=700)
+            page.insert_text((50, 110), words, fontsize=12)
+        book = assemble.deterministic_book(doc)
+    fragments = {pno: build_epub.page_fragment(book, pno) for pno in selected}
+    # The marker must still resolve when the first source page spans chapters.
+    fragments[0] += "<h2>A new section</h2><p>Its text follows.</p>"
+    target = tmp_path / "navigation.epub"
+    build_epub.build(book, str(target), page_html=fragments,
+                     metadata={"title": "Source navigation contract", "language": "en"})
+    with zipfile.ZipFile(target) as archive:
+        nav = ET.fromstring(archive.read("OEBPS/nav.xhtml"))
+        page_lists = [node for node in nav.iter(XHTML + "nav")
+                      if node.get(EPUB_TYPE) == "page-list"]
+        assert len(page_lists) == 1, "PDF page markers are unreachable through the navigation document"
+        links = list(page_lists[0].iter(XHTML + "a"))
+        assert [node.text for node in links] == ["PDF page %d" % (pno + 1) for pno in selected]
+        for pno, link in zip(selected, links):
+            filename, ident = link.attrib["href"].split("#")
+            assert ident == "pg_%04d" % pno
+            chapter = ET.fromstring(archive.read("OEBPS/" + filename))
+            markers = [node for node in chapter.iter() if node.get("id") == ident]
+            assert len(markers) == 1
+            assert markers[0].get(EPUB_TYPE) == "pagebreak"
+
+        # Nickel ignores the standard page-list. An ordinary, visible spine
+        # document must offer the same destinations through its normal ToC.
+        toc = next(node for node in nav.iter(XHTML + "nav")
+                   if node.get(EPUB_TYPE) == "toc")
+        index_entry = next((node for node in toc.iter(XHTML + "a")
+                            if node.text == "Source PDF pages"), None)
+        assert index_entry is not None, "Readers ignoring page-list have no source-page index"
+        index_href = index_entry.get("href")
+        source_index = ET.fromstring(archive.read("OEBPS/" + index_href))
+        assert not any(node.get("hidden") or node.get("aria-hidden") == "true"
+                       for node in source_index.iter())
+        index_links = list(source_index.iter(XHTML + "a"))
+        assert [(node.text, node.get("href")) for node in index_links] == [
+            (node.text, node.get("href")) for node in links]
+        opf = ET.fromstring(archive.read("OEBPS/content.opf"))
+        ns = "{http://www.idpf.org/2007/opf}"
+        item = next(node for node in opf.iter(ns + "item")
+                    if node.get("href") == index_href)
+        spine = list(opf.iter(ns + "itemref"))
+        assert spine[-1].get("idref") == item.get("id"), "The index must not interrupt the book"
+
+
+def test_source_glyph_notice_does_not_split_a_sentence_at_a_page_turn():
+    """A page-end source warning remains available after its sentence finishes.
+
+    Breaks if the warning hides the preceding paragraph from page-turn joining,
+    or if moving it loses the actual source-page marker or original-page link.
+    """
+    notice = ('<p class="source-evidence-notice">Some glyphs need checking. '
+              '<a href="original-p0000.xhtml#page">Open original page</a>.</p>')
+    pages = build_epub._page_blocks({
+        0: '<p>The workbench has no removable shelf, yet is stored</p>' + notice,
+        1: '<p>beside the low wooden racks, with its spare legs beneath the drawers.</p>'
+           '<h2>A new section</h2><p>Another paragraph.</p>',
+    })
+    assert build_epub._join_page_turns(pages) == 1
+    chapters = build_epub._chapters(pages)
+    root = ET.fromstring('<body xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">%s</body>' %
+                         ''.join(block for chapter in chapters for block in chapter.blocks))
+    paragraphs = list(root.iter(XHTML + 'p'))
+    joined = next(p for p in paragraphs if 'The workbench' in ''.join(p.itertext()))
+    assert 'stored beside the low wooden racks' in ''.join(joined.itertext())
+    notices = [p for p in paragraphs if 'Some glyphs need checking' in ''.join(p.itertext())]
+    assert len(notices) == 1
+    assert paragraphs.index(notices[0]) > paragraphs.index(joined)
+    assert joined.find('.//*[@id="pg_0001"]') is not None
+    assert root.find('.//*[@href="original-p0000.xhtml#page"]') is not None
+
+
+@pytest.mark.parametrize('first,second', [
+    ('A complete sentence.', 'Another paragraph starts here.'),
+    ('A heading follows', '<h2>New chapter</h2><p>new opening.</p>'),
+    ('An unfinished thought', '<figure><img src="images/diagram.jpg" alt="diagram"/></figure><p>new prose.</p>'),
+])
+def test_source_notice_cannot_force_unrelated_page_blocks_to_merge(first, second):
+    """Warnings are movable only when the two adjacent prose blocks continue."""
+    notice = '<p class="source-evidence-notice">Check source.</p>'
+    pages = build_epub._page_blocks({0: '<p>%s</p>%s' % (first, notice),
+                               1: second if second.startswith('<') else '<p>%s</p>' % second})
+    assert build_epub._join_page_turns(pages) == 0
+    assert pages[0]['body'][-1] == notice
+
+
+def test_page_turn_with_a_prior_note_keeps_its_marker_after_the_note():
+    """Joining prose cannot put the next PDF page ahead of an earlier note."""
+    pages = build_epub._page_blocks({
+        0: '<p>An unfinished thought</p><aside class="footnote" id="fn_1">1 Earlier note.</aside>',
+        1: '<p>continues here.</p>',
+    })
+    assert build_epub._join_page_turns(pages) == 1
+    assert 'continues here' in pages[0]['body'][0]
+    assert 'pg_0001' not in pages[0]['body'][0]
+    assert 'pg_0001' in pages[1]['anchor']
+
+
+def test_page_opening_folio_and_heading_share_new_chapter_with_page_marker():
+    pages = build_epub._page_blocks({
+        126: '<h1>Notes</h1><p>Earlier table note remains in this unit.</p>',
+        127: '<p>116                                           The Boards</p>'
+             '<h1>Assembly of Tall Wooden Cabinets</h1><p>New source prose.</p>',
+    })
+    chapters = build_epub._chapters(pages)
+    assert len(chapters) == 2
+    assert 'Earlier table note' in ''.join(chapters[0].blocks)
+    assert 'pg_0127' not in ''.join(chapters[0].blocks)
+    new = ''.join(chapters[1].blocks)
+    assert new.index('pg_0127') < new.index('116') < new.index('Assembly')
+    assert build_epub._page_homes(chapters)[127] == chapters[1].href
+
+
+@pytest.mark.parametrize('opening', [
+    '<p>116 The Boards</p>',
+    '<p>116                                           4.23</p>',
+    '<p>116                                           A genuine sentence ends here.</p>',
+])
+def test_unproved_page_opening_does_not_move_to_following_chapter(opening):
+    pages = build_epub._page_blocks({
+        0: '<h1>Earlier section</h1><p>Earlier text.</p>',
+        1: opening + '<h1>Next section</h1><p>Next text.</p>',
+    })
+    chapters = build_epub._chapters(pages)
+    assert len(chapters) == 2
+    assert 'pg_0001' in ''.join(chapters[0].blocks)
+    assert opening in ''.join(chapters[0].blocks)
+
+
+def test_page_opening_heading_without_folio_keeps_marker_with_new_chapter():
+    pages = build_epub._page_blocks({
+        0: '<h1>Prior</h1><p>Prior text.</p>',
+        1: '<h1>Next</h1><p>Next text.</p>',
+    })
+    chapters = build_epub._chapters(pages)
+    assert 'pg_0001' not in ''.join(chapters[0].blocks)
+    assert 'pg_0001' in ''.join(chapters[1].blocks)
+
+
+def test_completed_index_entry_does_not_absorb_next_page_entry():
+    """Dot leaders and terminal page references identify separate index rows."""
+    pages = build_epub._page_blocks({
+        0: '<h2>Index</h2><p>alpha . . . . . . 7 beta . . . . . . 9, 42</p>',
+        1: '<p>gamma . . . . . . 2 delta . . . . . . 17</p>',
+    })
+    assert build_epub._join_page_turns(pages) == 0
+    assert len(pages[1]['body']) == 1
+    chapters = build_epub._chapters(pages)
+    root = ET.fromstring('<body xmlns="http://www.w3.org/1999/xhtml" '
+                         'xmlns:epub="http://www.idpf.org/2007/ops">%s</body>' %
+                         ''.join(block for chapter in chapters for block in chapter.blocks))
+    paragraphs = list(root.iter(XHTML + 'p'))
+    assert len(paragraphs) == 2
+    marker = root.find('.//*[@id="pg_0001"]')
+    assert marker is not None and list(root).index(marker) < list(root).index(paragraphs[1])
+
+
+@pytest.mark.parametrize('before,after', [
+    ('Among the 12 crates, our worker stores this bracket in crate 3',
+     'because the drawer needs a wider wooden base.'),
+    ('The measured series . . . . . . 3',
+     'continues with a further observation in the next passage.'),
+])
+def test_numeric_prose_still_joins_across_page_turn(before, after):
+    """A number at the page edge alone is not an index-entry boundary."""
+    pages = build_epub._page_blocks({
+        0: '<p>%s</p>' % before,
+        1: '<p>%s</p>' % after,
+    })
+    assert build_epub._join_page_turns(pages) == 1
+    assert before + ' <span epub:type="pagebreak"' in pages[0]['body'][0]
+    assert not pages[1]['body']
+
+
+@pytest.mark.parametrize('details', [
+    [],
+    [{'id': 'notes', 'label': 'Printed note context',
+      'src': 'images/original_p0015_notes.jpg', 'inspection_ids': ['inspection_0']},
+     {'id': 'inspection_0', 'label': 'Original detail 1 (row order)',
+      'src': 'images/original_p0015_inspection_0.jpg'}],
+])
+def test_original_page_fragment_has_return_at_entry_and_after_final_image(details):
+    """A fragment jump and the last image both expose an explicit return route.
+
+    Breaks when #page lands below the sole return link, or when a reader finishing
+    a full-page image or inspection tile has no later link back to reflowed text.
+    """
+    record = {'page': 15, 'full': 'images/original_p0015.jpg', 'details': details}
+    root = ET.fromstring(build_epub._original_document(record, 'ch015.xhtml', 'en'))
+    body = root.find(XHTML + 'body')
+    children = list(body)
+    entry = next(el for el in body.iter() if el.get('id') == 'page')
+    entry_index = next(i for i, el in enumerate(children) if entry in el.iter())
+    assert entry_index == 0, 'fragment target misses the original-page entry'
+    nodes = list(body.iter())
+    images = [el for el in nodes if el.tag == XHTML + 'img']
+    returns = [el for el in nodes if el.tag == XHTML + 'a'
+               and el.get('href') == 'ch015.xhtml#pg_0015']
+    assert len(images) == 1 + len(details)
+    assert all(img.get('alt') for img in images)
+    assert returns
+    first_return_owner = next(i for i, el in enumerate(children) if returns[0] in el.iter())
+    assert first_return_owner <= entry_index + 1, 'the return is not at fragment entry'
+    assert nodes.index(returns[0]) < nodes.index(images[0])
+    assert nodes.index(returns[-1]) > nodes.index(images[-1]), 'image end has no return'
+    assert {el.get('id') for el in nodes if el.get('id')} >= {'page'} | {d['id'] for d in details}
+    assert {img.get('src') for img in images} == {record['full']} | {d['src'] for d in details}
+    if not details:
+        assert not any(node.get('aria-label') == 'Original source details' for node in body.iter())
+        assert {el.get('id') for el in nodes if el.get('id')} == {'page'}
+
+
+def test_all_detail_links_land_on_visible_heading_with_complete_detail_and_returns():
+    details = [
+        {'id': 'notes', 'label': 'Printed note context', 'src': 'images/note.png'},
+        {'id': 'figure_0', 'label': 'Original figure', 'src': 'images/figure.png'},
+        {'id': 'caption_1', 'label': 'Original caption', 'src': 'images/caption.png'},
+        {'id': 'title_2', 'label': 'Original title', 'src': 'images/title.png'},
+        {'id': 'layout_3', 'label': 'Original layout', 'src': 'images/layout.png'},
+        {'id': 'inspection_0', 'label': 'First original tile', 'src': 'images/tile0.png'},
+        {'id': 'inspection_1', 'label': 'Next original tile', 'src': 'images/tile1.png'},
+    ]
+    root = ET.fromstring(build_epub._original_document(
+        {'page': 15, 'full': 'images/page.png', 'details': details}, 'ch015.xhtml', 'en'))
+    ids = [node.get('id') for node in root.iter() if node.get('id')]
+    assert len(ids) == len(set(ids))
+    index = next(nav for nav in root.iter(XHTML + 'nav')
+                 if nav.get('aria-label') == 'Original source details')
+    links = list(index.iter(XHTML + 'a'))
+    # All supplementary tile links must also resolve to visible detail headings.
+    for link in root.iter(XHTML + 'a'):
+        if link.get('href', '').startswith('#'):
+            target = root.find('.//*[@id="%s"]' % link.get('href')[1:])
+            assert target is not None and target.tag == XHTML + 'h2'
+    assert [node.get('href') for node in links] == ['#' + d['id'] for d in details]
+    assert [node.text for node in links] == [d['label'] for d in details]
+    for link, detail in zip(links, details):
+        target = next(node for node in root.iter() if node.get('id') == link.get('href')[1:])
+        assert target.tag == XHTML + 'h2' and target.text == detail['label']
+        section = next(node for node in root.iter(XHTML + 'section') if target in list(node))
+        assert [node.get('src') for node in section.iter(XHTML + 'img')] == [detail['src']]
+        returns = [node for node in section.iter(XHTML + 'a')
+                   if node.get('href') == 'ch015.xhtml#pg_0015']
+        assert len(returns) == 2
+        nodes = list(section.iter())
+        assert nodes.index(returns[0]) < nodes.index(next(section.iter(XHTML + 'img'))) < nodes.index(returns[1])
+
+
+def test_original_detail_navigation_precedes_full_page_image_and_preserves_entry():
+    details = [
+        {'id': 'inspection_0', 'label': 'First tile', 'src': 'images/tile0.png'},
+        {'id': 'inspection_1', 'label': 'Second tile', 'src': 'images/tile1.png'},
+    ]
+    root = ET.fromstring(build_epub._original_document(
+        {'page': 15, 'full': 'images/page.png', 'details': details}, 'ch015.xhtml', 'en'))
+    body = root.find(XHTML + 'body')
+    children = list(body)
+    nav = next(node for node in children if node.tag == XHTML + 'nav')
+    full = next(node for node in children if any(
+        img.get('src') == 'images/page.png' for img in node.iter(XHTML + 'img')))
+    first_return = next(node for node in children if any(
+        link.get('href') == 'ch015.xhtml#pg_0015' for link in node.iter(XHTML + 'a')))
+    assert children[0].get('id') == 'page'
+    assert children.index(first_return) < children.index(nav) < children.index(full)
+    assert [link.get('href') for link in nav.iter(XHTML + 'a')] == [
+        '#inspection_0', '#inspection_1']
+    assert [img.get('src') for img in body.iter(XHTML + 'img')] == [
+        'images/page.png', 'images/tile0.png', 'images/tile1.png']
+
+
+def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(tmp_path):
+    from cps.services.reflow import extract
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=500,height=700)
+        page.insert_text((50,90),'Original body marker 188 and reliable note 2.',fontsize=12)
+        page.insert_text((50,580),'188 Original printed reference.',fontsize=10)
+        page.insert_text((50,610),'2 Reliable printed reference.',fontsize=10)
+        elements = [assemble.Element(kind='p',pno=0,runs=[
+            ['t','A damaged association '],['sup','1',0,'uncertain'],
+            ['t',' and a reliable association '],['sup','2',0],['t','.']])]
+        notes = [assemble.Note(num=1,text='Misread extracted reference.',pno=0,marked=True,uncertain=True),
+                 assemble.Note(num=2,text='Reliable printed reference.',pno=0,marked=True),
+                 assemble.Note(num=3,text='Ordinary-looking unmatched neighbor.',pno=0),
+                 assemble.Note(num=4,text='Another unmatched neighbor.',pno=0)]
+        for note in notes: note.bbox=(50,565,400,620)
+        book = assemble.Book(elements=elements,pages={0:elements},notes=notes)
+        target=tmp_path/'evidence.epub'
+        result=build_epub.build(book,str(target),doc=doc,
+                               page_html={0:'<p>Unqualified replacement rendering.</p>'})
+        original=extract.render_page_jpeg(doc,0,scale=1.5,quality=85)
+        from cps.services.reflow.source_display import SourceDisplay
+        rendered=SourceDisplay(doc,0).pixmap(scale=1.5)
+        rendered_size=(rendered.width,rendered.height)
+        rendered_samples=rendered.samples
+    assert build_epub.validate(str(target)) == []
+    with zipfile.ZipFile(target) as z:
+        chapter=ET.fromstring(z.read('OEBPS/'+result.chapters[0]['href']))
+        links=list(chapter.iter(XHTML+'a'))
+        assert not any('#fn_p0000_1' in a.get('href','') for a in links)
+        assert any(a.get('href','').endswith('#fn_p0000_2') for a in links)
+        evidence=next((a for a in links if 'original-p0000.xhtml' in a.get('href','')),None)
+        assert evidence is not None, 'a touch reader cannot reach original source pixels'
+        assert 'uncertain' in ''.join(chapter.itertext()).lower()
+        original_doc=ET.fromstring(z.read('OEBPS/original-p0000.xhtml'))
+        images=list(original_doc.iter(XHTML+'img'))
+        assert len(images)>=2, 'full page plus readable note-context detail are required'
+        encoded=z.read('OEBPS/'+images[0].get('src'))
+        if encoded.startswith(b'\x89PNG'):
+            with Image.open(io.BytesIO(encoded)) as image:
+                assert image.size==rendered_size
+                assert image.convert('RGB').tobytes()==rendered_samples
+        else:
+            assert encoded==original
+        assert any('notes' in img.get('alt','').lower() for img in images)
+        assert any(a.get('href','').endswith('#pg_0000') for a in original_doc.iter(XHTML+'a'))
+        index=ET.fromstring(z.read('OEBPS/source-pages.xhtml'))
+        assert any('original-p0000.xhtml' in a.get('href','') for a in index.iter(XHTML+'a'))
+        sidecar=build_epub.read_sidecar(str(target))
+        opf=ET.fromstring(z.read('OEBPS/content.opf'))
+        refs=list(opf.iter('{http://www.idpf.org/2007/opf}itemref'))
+        assert next(r for r in refs if r.get('idref')=='original-p0000').get('linear')=='no'
+        assert sidecar['notes_ambiguous']==3
+        for number in (1,3,4):
+            note=next(n for n in chapter.iter(XHTML+'aside')
+                      if n.get('id')=='fn_p0000_%d'%number)
+            assert '%d (?)'%number in ''.join(note.itertext())
+            assert any(a.get('href')=='original-p0000.xhtml#notes'
+                       for a in note.iter(XHTML+'a')), 'each detached note needs its own evidence link'
+        reliable=next(n for n in chapter.iter(XHTML+'aside') if n.get('id')=='fn_p0000_2')
+        assert '(?)' not in ''.join(reliable.itertext())
+        assert sidecar['source_evidence'][0]['page']==0
+        assert sidecar['source_evidence'][0]['bytes']>0
+
+
+def test_original_caption_details_are_unique_and_linked_per_caption(tmp_path):
+    with pymupdf.open() as doc:
+        page=doc.new_page(width=400,height=600)
+        page.insert_text((50,300),'First printed caption')
+        page.insert_text((50,400),'Second printed caption')
+        elements=[assemble.Element(kind='fig',pno=0),
+                  assemble.Element(kind='caption',pno=0,runs=[['t','First extracted caption']],
+                                   bbox=(40,280,250,310),caption_uncertain=True),
+                  assemble.Element(kind='caption',pno=0,runs=[['t','Second extracted caption']],
+                                   bbox=(40,380,250,410),caption_uncertain=True)]
+        book=assemble.Book(elements=elements,pages={0:elements})
+        fragments={0:build_epub.page_fragment(book,0)}
+        images=_Images()
+        evidence=build_epub._original_evidence(book,fragments,doc,images)
+        details=evidence[0]['details']
+        assert len({d['id'] for d in details})==2
+        assert len({d['src'] for d in details})==2
+        assert images[details[0]['src']] != images[details[1]['src']]
+        for d in details:
+            assert 'original-p0000.xhtml#'+d['id'] in fragments[0]
+        assert fragments[0].count('transcription uncertain') >= 2
+
+
+def test_original_evidence_rejects_empty_transformed_geometry_before_padding():
+    with pymupdf.open() as doc:
+        doc.new_page(width=400,height=600)
+        caption=assemble.Element(kind='caption',pno=0,runs=[['t','Caption']],
+                                 bbox=(40,280,250,310),caption_uncertain=True)
+        book=assemble.Book(elements=[caption],pages={0:[caption]})
+        with pytest.raises(ValueError,match='geometry'):
+            build_epub._original_evidence(book,{0:build_epub.page_fragment(book,0)},doc,
+                                          _Images(),figure_transform=lambda p,b:(0,0,0,0))
+
+
+def test_unmatched_notes_without_damaged_source_group_remain_unqualified():
+    book=assemble.Book(notes=[assemble.Note(num=3,text='Unmatched but undamaged.',pno=0)],
+                       pages={0:[]})
+    assert book.ambiguous_note_numbers(0)==set()
+    assert '(?)' not in build_epub.page_fragment(book,0)
+
+@pytest.mark.parametrize('notice', [
+    '<p class="source-evidence-notice">OCR uncertain. <a href="original-p0001.xhtml#page">View original page</a></p>',
+    '<div class="source-evidence-notice"><p>Some note labels are uncertain.</p></div>',
+])
+def test_leading_source_notice_preserves_fallback_continuation_and_both_warnings(notice):
+    trailing = '<p class="source-evidence-notice">Check preceding source.</p>'
+    pages = build_epub._page_blocks({0: '<p>The assem-</p>'+trailing,
+                                   1: notice+'<p>bly sequence continues.</p>'})
+    assert build_epub._join_page_turns(pages) == 1
+    text = ''.join(block for chapter in build_epub._chapters(pages) for block in chapter.blocks)
+    root = ET.fromstring('<body xmlns:epub="http://www.idpf.org/2007/ops">'+text+'</body>')
+    assert any('The assembly sequence continues.' in ''.join(p.itertext()) for p in root.iter('p'))
+    assert text.count(trailing) == text.count(notice) == 1
+    assert root.find('.//*[@id="pg_0001"]') is not None
+
+@pytest.mark.parametrize('opening', [
+    '<p>A separate sentence starts here.</p>',
+    '<h2>A new section</h2><p>bly is only a fragment here.</p>',
+    '<figure><img src="images/figure.jpg"/></figure><p>bly follows a figure.</p>',
+])
+def test_leading_source_notice_does_not_join_across_completed_prose_or_real_structure(opening):
+    notice = '<p class="source-evidence-notice">Check source.</p>'
+    pages = build_epub._page_blocks({0: '<p>A completed sentence.</p>',1: notice+opening})
+    assert build_epub._join_page_turns(pages) == 0
+    assert pages[1]['body'][0] == notice
+
+
+def test_original_return_reaches_joined_source_before_prior_page_notes(tmp_path, monkeypatch):
+    """A source return reaches the joined passage; notes leave the body lane."""
+    with pymupdf.open() as doc:
+        for text in ('An unfinished thought', 'continues here.'):
+            doc.new_page(width=400, height=600).insert_text((40, 100), text, fontsize=12)
+        book = assemble.deterministic_book(doc)
+        book.notes.append(assemble.Note(num=1, text='Earlier source note.', pno=0))
+        def original_evidence(book, html, doc, package, *args, **kwargs):
+            image = io.BytesIO()
+            Image.new('RGB', (32, 32), 'white').save(image, format='PNG')
+            package.image('images/original1.png', image.getvalue())
+            return {1: {'page': 1, 'href': 'original-p0001.xhtml',
+                        'full': 'images/original1.png', 'details': []}}
+        monkeypatch.setattr(build_epub, '_original_evidence', original_evidence)
+        target = tmp_path / 'joined-return.epub'
+        build_epub.build(book, str(target), doc=doc)
+    with zipfile.ZipFile(target) as archive:
+        original = ET.fromstring(archive.read('OEBPS/original-p0001.xhtml'))
+        back = next(a for a in original.iter(XHTML + 'a')
+                    if (a.text or '').startswith('Return to reflowed'))
+        filename, ident = back.get('href').split('#')
+        chapter = ET.fromstring(archive.read('OEBPS/' + filename))
+        joined = next(p for p in chapter.iter(XHTML + 'p')
+                      if 'An unfinished thought continues here.' in ''.join(p.itertext()))
+        assert joined.find('.//*[@id="%s"]' % ident) is not None
+        # The original page return still reaches the exact joined source span.
+        assert ident != 'pg_0001'
+        all_nodes = list(chapter.iter())
+        note = next(n for n in all_nodes if n.tag == XHTML + 'aside')
+        marker = next(n for n in all_nodes if n.get('id') == 'pg_0001')
+        section = next(n for n in all_nodes if n.get('class') == 'source-notes')
+        assert note in list(section.iter())
+        assert 'Earlier source note.' in ''.join(note.itertext())
+        assert all_nodes.index(joined) < all_nodes.index(marker) < all_nodes.index(section)
+        assert len([n for n in all_nodes if n.get('id') == ident]) == 1
+        assert len([n for n in all_nodes if n.get('id') == 'pg_0001']) == 1
+
+
+@pytest.mark.parametrize('reason,label',[
+    ('embedded','0e75efb2811234eccf2e5a1b84e3e880118511054b55e3f669382729fed905f6'),
+    ('ocr_uncertain_region','a6d60ee1657d29bea4228f128b51ebb30650e8f4692d89314c6ae29bbccd7d4c'),
+    ('source_visual_table','a41b0c644095b8a68a4e2c9484a5592257554cb057fd496907d3d70861ad0d07'),
+    ('source_scan_grid','a41b0c644095b8a68a4e2c9484a5592257554cb057fd496907d3d70861ad0d07'),
+    ('ocr_uncertain_note','a6d60ee1657d29bea4228f128b51ebb30650e8f4692d89314c6ae29bbccd7d4c'),
+])
+def test_native_figure_opens_source_details_with_explicit_return(tmp_path,reason,label):
+    """An unflagged native table image must still be inspectable on a reader."""
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=500, height=700)
+        for row in range(8):
+            page.insert_text((60, 120 + row * 28), 'Column A     Column B     Column C')
+        box = (45, 95, 455, 355)
+        figure = assemble.Element(kind='fig', pno=0, bbox=box)
+        caption = assemble.Element(kind='caption', pno=0,
+                                   runs=[['t', 'Printed table caption']],
+                                   bbox=(45, 370, 300, 390))
+        book = assemble.Book(elements=[figure, caption], pages={0: [figure, caption]},
+                             figures=[dict(pno=0, bbox=box, full_page=False,
+                                           needs_ink=False, found=reason)])
+        assert book.needs_source_evidence(0)==(reason!='embedded')
+        target = tmp_path / 'native-figure.epub'
+        result = build_epub.build(book, str(target), doc=doc,
+                                  metadata={'title': 'Native figure', 'language': 'en'})
+    with zipfile.ZipFile(target) as archive:
+        chapters = [ET.fromstring(archive.read(n)) for n in archive.namelist()
+                    if n.startswith('OEBPS/ch') and n.endswith('.xhtml')]
+        links = [a for chapter in chapters for a in chapter.iter(XHTML + 'a')
+                 if any(i.get('src', '').startswith('images/fig_p0000_0')
+                        for i in a.iter(XHTML + 'img'))]
+        assert len(links) == 1, 'The native figure needs a real source-inspection link'
+        name, anchor = links[0].get('href').split('#')
+        original = ET.fromstring(archive.read('OEBPS/' + name))
+        detail = next(n for n in original.iter() if n.get('id') == anchor)
+        assert detail.tag == XHTML + 'h2', 'figure URI must land on its visible heading'
+        assert __import__('hashlib').sha256(''.join(detail.itertext()).encode()).hexdigest()==label
+        owner = next(section for section in original.iter(XHTML + 'section')
+                     if detail in list(section))
+        returns = [a for a in owner.iter(XHTML + 'a')
+                   if __import__('hashlib').sha256(''.join(a.itertext()).encode()).hexdigest() == '75defb7db8fa7e2b3c98c9446b9c308fd088d1648fb2380de1150499e3a2d924']
+        assert len(returns) == 2
+        for back in returns:
+            home, target_id = back.get('href').split('#')
+            destination = ET.fromstring(archive.read('OEBPS/' + home))
+            assert len([n for n in destination.iter() if n.get('id') == target_id]) == 1
+        if reason=='embedded':
+            assert len([n for n in original.iter() if n.get('id', '').startswith('inspection_')]) >= 2
+        else:
+            # This synthetic page is native text, with no OCR provenance to
+            # authorize scan tiles. Its complete detail still has real pixels.
+            images=list(owner.iter(XHTML+'img'))
+            assert images
+            with Image.open(io.BytesIO(archive.read('OEBPS/'+images[0].get('src')))) as image:
+                assert image.width>=820 and image.height>=520
+        assert sum('Printed table caption' in ''.join(c.itertext()) for c in chapters) == 1

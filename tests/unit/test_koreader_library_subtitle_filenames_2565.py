@@ -15,6 +15,7 @@ full title and first author rather than from the storage name.
 """
 
 import pytest
+from sqlalchemy import text
 
 from cps import db
 from cps.utils.filename_sanitizer import get_valid_filename_shared
@@ -157,3 +158,38 @@ def test_a_long_title_in_any_script_stays_under_the_device_limit(world):
     for book_id, name in _filenames(world).items():
         assert len(name.encode("utf-8")) <= 255, name
         assert name.endswith(" - Ann Author [%d].epub" % book_id), name
+
+
+def test_progress_under_a_listed_name_finds_its_book_without_a_download(world):
+    """A device in *filename* document matching (Sync settings) identifies a
+    book by the MD5 of its file name. The server used to record that digest
+    only when it served the download, but a book this change renames is moved
+    in place on the device, never downloaded again, so its progress would stop
+    reaching the server. Every name the library lists is matchable."""
+    import hashlib
+
+    world.add_user("reader")
+    _add_volume(world, 1, VOLUME_ONE)
+    _add_volume(world, 2, VOLUME_TWO)
+    names = _filenames(world)
+
+    for book_id in (1, 2):
+        digest = hashlib.md5(names[book_id].encode("utf-8")).hexdigest()
+        response = world.client.put(
+            "/kosync/syncs/progress", headers=world.device_headers("reader"),
+            json={"document": digest, "progress": "/body/DocFragment[3]/body/p[1].0",
+                  "percentage": 0.25, "device": "KOReader", "device_id": "kindle-1"})
+        assert response.status_code == 200, response.get_data(as_text=True)
+        assert response.get_json().get("calibre_book_id") == book_id, names[book_id]
+
+
+def test_listing_twice_records_each_name_once(world):
+    world.add_user("reader")
+    _add_volume(world, 1, VOLUME_ONE)
+    _filenames(world)
+    _filenames(world)
+
+    rows = world.session.execute(text(
+        "SELECT COUNT(*) FROM book_format_checksums WHERE book = 1 "
+        "AND version = 'koreader_filename'")).scalar()
+    assert rows == 1

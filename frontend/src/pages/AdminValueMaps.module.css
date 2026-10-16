@@ -92,10 +92,15 @@
 .chipRemoved { background: var(--danger-soft); border-color: var(--danger-border); text-decoration: line-through; color: var(--text-muted); }
 .dropped { color: var(--text-muted); font-style: italic; background: var(--surface-3); }
 
+/* Right under the rule editor, and it stays in view while a long rules list
+   scrolls past, so an unsaved change is never out of sight. */
 .saveBar {
+  position: sticky; top: var(--sp-2); z-index: 1;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3);
-  margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--accent-soft); font-size: var(--fs-sm);
+  margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  box-shadow: var(--elev-1);
+  border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--surface-1);
+  background-image: linear-gradient(var(--accent-soft), var(--accent-soft)); font-size: var(--fs-sm);
 }
 
 .values { max-height: 420px; overflow-y: auto; }

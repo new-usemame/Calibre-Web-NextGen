@@ -253,6 +253,16 @@ function FieldPanel({ field }: { field: Field }) {
 
         <RuleEditor multi={data.multi} initial={prefill} onAdd={addRule} />
 
+        {dirty && (
+          <div className={styles.saveBar} role="status">
+            <span>{t('Unsaved changes to the rules.')}</span>
+            <div className={styles.toolbar}>
+              <button type="button" className={styles.secondary} disabled={busy} onClick={() => setDraft(null)}>{t('Discard')}</button>
+              <button type="button" className={styles.primary} disabled={busy} onClick={() => void save()}>{t('Save rules')}</button>
+            </div>
+          </div>
+        )}
+
         {rules.length === 0 ? (
           <p className={styles.muted}>{t('No rules yet. Add one above, or import a JSON map.')}</p>
         ) : (
@@ -276,15 +286,6 @@ function FieldPanel({ field }: { field: Field }) {
           </ul>
         )}
 
-        {dirty && (
-          <div className={styles.saveBar} role="status">
-            <span>{t('Unsaved changes to the rules.')}</span>
-            <div className={styles.toolbar}>
-              <button type="button" className={styles.secondary} disabled={busy} onClick={() => setDraft(null)}>{t('Discard')}</button>
-              <button type="button" className={styles.primary} disabled={busy} onClick={() => void save()}>{t('Save rules')}</button>
-            </div>
-          </div>
-        )}
       </section>
 
       <section className={styles.card} aria-labelledby={`${field}-values`}>

@@ -231,6 +231,74 @@ def serve(parent, cache_root, control):
                                 operation_plans=plans, stage_records=args['stage_records']), args['book_id'], document=doc)
                             native_audit.bounded(value)
                             plans = []; canonical = prepared = saved = old = None
+                        elif op == 'vision_sample_start':
+                            from . import vision_quote
+                            count = args.get('count')
+                            if set(args) != {'count'} or type(count) is not int or not 1 <= count <= 60:
+                                raise ValueError('vision sample size')
+                            value = vision_quote.sample_origins(doc, count=count, should_stop=stop)[str(count)]
+                        elif op == 'vision_quote':
+                            from . import vision_quote
+                            if set(args) != {'page_numbers'}:
+                                raise ValueError('vision quote fields')
+                            value = vision_quote.measure(doc, page_numbers=args['page_numbers'],
+                                progress=progress, should_stop=stop)
+                        elif op == 'vision_convert':
+                            from . import vision_bridge, vision_pipeline, pipeline
+                            if (set(args) != {'page_numbers', 'metadata', 'cache', 'reader', 'job_id'}
+                                    or not cache_root or not isinstance(args['reader'], dict)
+                                    or set(args['reader']) != {'enabled', 'cap_usd', 'token_confidence', 'confidence_protocol', 'reuse_legacy'}):
+                                raise ValueError('vision conversion fields')
+                            relative = Path(args['cache'])
+                            if (relative.is_absolute() or not relative.parts
+                                    or any(part.startswith('.') for part in relative.parts)):
+                                raise ValueError('vision cache ownership')
+                            cache = Path(cache_root).resolve() / relative
+                            cache.resolve().relative_to(Path(cache_root).resolve())
+                            bridge_sequence = 0
+                            def rpc(operation, arguments):
+                                nonlocal bridge_sequence
+                                owner = unit_recovery.current()
+                                page = owner._active_page if owner is not None else None
+                                if (operation == 'ledger' and owner is not None
+                                        and arguments.get('method') == 'reserve_attempt'
+                                        and arguments.get('args')):
+                                    page = owner._page_by_image.get(arguments['args'][0], page)
+                                if operation == 'post' and owner is not None:
+                                    import base64, hashlib
+                                    encoded = arguments['payload']['messages'][0]['content'][1]['image_url']['url']
+                                    image = base64.b64decode(encoded.split(',',1)[1], validate=True)
+                                    matched = owner._page_by_image.get(hashlib.sha256(image).hexdigest())
+                                    if matched is not None:
+                                        page = matched
+                                context = dict(source_sha256=fingerprint, page_index0=page)
+                                bridge_sequence += 1
+                                ipc.write_owned(root, 'reader-request.json', dict(
+                                    operation=operation, arguments=arguments, context=context))
+                                emit({'reader_request': bridge_sequence})
+                                if sys.stdin.readline(32) != 'continue\n' or stop():
+                                    raise build_epub.BuildCancelled('Parent stopped page reading')
+                                return vision_bridge.checked_reply(codec.loads(
+                                    ipc.read_owned(root, 'reader-response.json')))
+                            reader_args = dict(args['reader'])
+                            cap = reader_args.pop('cap_usd')
+                            child_reader = vision_bridge.ChildReader(rpc, cache, root, cap, **reader_args)
+                            numbers = args['page_numbers']
+                            if (not isinstance(numbers, list) or not numbers or len(set(numbers)) != len(numbers)
+                                    or any(type(n) is not int or not 0 <= n < len(doc) for n in numbers)):
+                                raise ValueError('vision source page scope')
+                            completed = set()
+                            def vision_progress(number, record):
+                                completed.add(number)
+                                progress(pipeline.Progress('vision', page=len(completed), pages=len(numbers),
+                                    message='Reading printed pages'))
+                            job_id = args['job_id']
+                            if job_id is not None:
+                                unit_recovery._job_component(job_id)
+                            scratch = Path(cache_root) / 'conversion-scratch' if job_id is not None else root / 'conversion-scratch'
+                            value = vision_pipeline.convert(doc, str(root / 'candidate.epub'), child_reader,
+                                page_numbers=numbers, metadata=args['metadata'], progress=vision_progress,
+                                scratch_dir=str(scratch), job_id=job_id or 'vision')
                         elif op == 'survey':
                             if args: raise ValueError('survey fields')
                             value = source_assessment.survey(doc)

@@ -1,0 +1,324 @@
+"""Synthetic native-worker and parent-finance boundary regressions."""
+import base64
+from contextlib import contextmanager
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+from types import SimpleNamespace
+import zipfile
+
+from PIL import Image
+import pymupdf
+import pytest
+import requests
+
+from cps.services.reflow import native_ipc, unit_recovery, vision_bridge, vision_reading
+from cps.services.reflow.ledger import CapExceeded, Ledger
+
+pytestmark = pytest.mark.unit
+SOURCE = 'a' * 64
+
+
+def image():
+    output = io.BytesIO()
+    Image.new('RGB', (90, 120), 'white').save(output, 'JPEG')
+    return output.getvalue()
+
+
+def reading(text='A synthetic sentence written for this test.'):
+    return {'blocks': [dict(id='b1', role='body', text=text, marker='',
+        bbox=[50, 50, 950, 800], low_confidence=[],
+        continues_previous=False, continues_next=False)]}
+
+
+def response(answer=None, *, cost=.0004, actual_model=None):
+    return SimpleNamespace(status_code=200, json=lambda: dict(id='synthetic-request',
+        model=actual_model or vision_reading.MODEL, usage={'cost': cost},
+        choices=[dict(finish_reason='stop', message={'content': json.dumps(answer or reading())})]))
+
+
+def rig(tmp_path, monkeypatch, *, cap=.1, authorize=None, reply=None):
+    calls = []
+    ledger = Ledger(tmp_path / 'parent.jsonl', cap, job_id='synthetic-job')
+    parent = vision_reading.Reader('inert-key', tmp_path / 'cache', ledger)
+    class Authorizer:
+        def authorize(self, payload, context):
+            if authorize:
+                authorize(payload, context)
+    broker = vision_bridge.ParentBroker(parent, SOURCE, [0], authorizer=Authorizer())
+    def post(*args, **kwargs):
+        assert Ledger(ledger.path, cap).pending_usd() > 0
+        calls.append((os.getpid(), kwargs))
+        return reply or response()
+    monkeypatch.setattr(requests, 'post', post)
+    def rpc(operation, arguments):
+        return vision_bridge.checked_reply(broker.handle(dict(operation=operation,
+            arguments=arguments, context=dict(source_sha256=SOURCE, page_index0=0))))
+    child = vision_bridge.ChildReader(rpc, parent.cache, tmp_path, cap, enabled=True)
+    return SimpleNamespace(parent=parent, child=child, ledger=ledger, calls=calls,
+                           broker=broker, rpc=rpc)
+
+
+def test_parent_owns_dispatch_and_settles_exact_charge_before_reply(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch)
+    actual = state.child.read(image())
+    assert actual['answer'] == reading()
+    assert actual['cached'] is False
+    assert state.child.key == 'parent-owned-reader'
+    assert state.calls[0][0] == os.getpid()
+    assert state.calls[0][1]['headers']['Authorization'] == 'Bearer inert-key'
+    assert state.ledger.spent() == pytest.approx(.0004)
+    assert state.ledger.pending_usd() == 0
+    assert state.child.read(image())['cached'] is True
+    assert len(state.calls) == 1
+    assert len(state.ledger.entries('reservation')) == 3  # hold + parent/child same-attempt settlements
+
+
+def test_bridge_preserves_native_source_repair_without_reread(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch, reply=response(reading('A synthetic <n:bad> sentence.')))
+    repaired = []
+    def source_repair(answer):
+        repaired.append(answer)
+        return reading(), {'kind': 'synthetic_source_identity'}
+    result = state.child.read_unit(image(), source_repair=source_repair, page=0)
+    assert result['answer'] == reading()
+    assert result['source_repairs'] == [{'kind': 'synthetic_source_identity'}]
+    assert len(repaired) == 1 and len(state.calls) == 1
+    assert state.ledger.spent() == pytest.approx(.0004)
+    assert state.ledger.pending_usd() == 0
+    assert not list(state.parent.cache.glob('unit-reread-*'))
+
+
+def test_retry_keeps_parent_bridge_and_confidence_contract(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch)
+    retry = state.child._retry_reader()
+    assert isinstance(retry, vision_bridge.ChildReader)
+    assert retry.rpc is state.child.rpc
+    assert retry.key == state.child.key
+    assert retry.prompt == state.parent._retry_reader().prompt
+    assert retry.api_schema == state.parent._retry_reader().api_schema
+    assert state.child._retry_reader(offline=True).key is None
+    assert retry.read(image())['answer'] == reading()
+    assert len(state.calls) == 1
+
+
+def test_own_cap_is_checked_in_parent_before_http(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch, cap=0)
+    with pytest.raises(CapExceeded):
+        state.child.read(image())
+    assert state.calls == []
+    assert state.ledger.spent() == state.ledger.pending_usd() == 0
+
+
+def test_out_of_quote_request_releases_unsent_reservation_durably(tmp_path, monkeypatch):
+    def refuse(payload, context):
+        raise unit_recovery.SourceIntegrityError('Synthetic quote mismatch')
+    state = rig(tmp_path, monkeypatch, authorize=refuse)
+    with pytest.raises(unit_recovery.SourceIntegrityError, match='quote mismatch'):
+        state.child.read(image())
+    reopened = Ledger(state.ledger.path, .1)
+    assert reopened.spent() == reopened.pending_usd() == 0
+    assert state.calls == []
+    rejected = list(state.parent.cache.glob('*.rejected'))
+    assert len(rejected) == 1
+    assert json.loads(rejected[0].read_text())['reason'] == 'local_pre_dispatch'
+    assert not list(state.parent.cache.glob('*.pending'))
+
+
+def test_known_charge_survives_child_loss_before_its_own_settlement(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch)
+    frame = image(); identity = hashlib.sha256(frame).hexdigest()
+    bound = state.parent._bounded_image_request(frame, state.parent.prompt,
+        state.parent.api_schema, state.parent.confidence_protocol)
+    attempt = state.rpc('ledger', dict(method='reserve_attempt',
+        args=[identity, bound, vision_reading.MODEL, vision_reading.VERSION], kwargs={}))
+    pending = identity + '-' + state.parent._configuration() + '.pending'
+    payload = dict(messages=[dict(content=[dict(type='text', text=state.parent.prompt),
+        dict(type='image_url', image_url={'url':'data:image/jpeg;base64,'+base64.b64encode(frame).decode()})])])
+    result = state.rpc('post', dict(payload=payload, pending=pending,
+        reservation=attempt, bound_usd=bound, title='ignored', timeout=[1, 1]))
+    # Do not let the simulated child receive, parse or settle its response.
+    assert result['status'] == 200
+    reopened = Ledger(state.ledger.path, .1)
+    assert reopened.spent() == pytest.approx(.0004) and reopened.pending_usd() == 0
+    saved = json.loads((state.parent.cache / pending).read_text())
+    assert saved['response']['usage']['cost'] == .0004
+    assert saved['reservation'] == attempt
+    assert state.calls[0][1]['timeout'] == (30, 240)
+
+
+def test_substituted_model_is_billed_but_never_adopted(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch, reply=response(actual_model='synthetic-other-model'))
+    with pytest.raises(vision_reading.model.UnusableAnswer):
+        state.child.read(image())
+    assert state.ledger.spent() == pytest.approx(.0004)
+    assert state.ledger.pending_usd() == 0
+    assert list(state.parent.cache.glob('*.pending'))
+    assert not list(state.parent.cache.glob('*.json'))
+
+
+def test_unknown_ledger_method_and_foreign_source_fail_closed(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch)
+    request = dict(operation='ledger', arguments={'method':'__getattribute__',
+        'args':['key'], 'kwargs':{}}, context={'source_sha256':SOURCE, 'page_index0':0})
+    with pytest.raises(unit_recovery.SourceIntegrityError):
+        vision_bridge.checked_reply(state.broker.handle(request))
+    request['arguments'] = {'method':'spent','args':[],'kwargs':{}}
+    request['context']['source_sha256'] = 'b' * 64
+    with pytest.raises(unit_recovery.SourceIntegrityError):
+        vision_bridge.checked_reply(state.broker.handle(request))
+    assert state.calls == []
+
+
+def test_native_guards_restore_page_scope_even_when_recovery_raises(tmp_path):
+    controller = unit_recovery.Controller(SimpleNamespace(), [0, 1], tmp_path)
+    with unit_recovery.activated(controller):
+        assert controller._active_page is None
+        with unit_recovery.guard(0, 'synthetic_outer'):
+            assert controller._active_page == 0
+            with unit_recovery.guard([0, 1], 'synthetic_shared'):
+                assert controller._active_page is None
+            assert controller._active_page == 0
+            with pytest.raises(unit_recovery.UnitFailure):
+                with unit_recovery.guard(1, 'synthetic_inner'):
+                    assert controller._active_page == 1
+                    raise ValueError('Synthetic local rejection')
+            assert controller._active_page == 0
+        assert controller._active_page is None
+
+
+def test_actual_native_worker_builds_vision_candidate_without_provider(tmp_path):
+    source = tmp_path / 'source.pdf'
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        page.insert_textbox(pymupdf.Rect(40, 40, 550, 650),
+            'The garden path follows the river. Each reader can open the source page.\n' * 6,
+            fontsize=12)
+        doc.save(source)
+    state = tmp_path / 'state'
+    ledger = Ledger(state / 'job.jsonl', 0, job_id='synthetic-job')
+    reader = vision_reading.Reader(None, state / 'reading-cache', ledger)
+    output = tmp_path / 'candidate.epub'
+    with native_ipc.NativeDocument(source, scratch_root=state / 'native-scratch',
+                                   cache_root=state) as doc:
+        report = doc.convert_vision(output, reader, metadata={'title':'Synthetic garden guide'})
+        assert report['native_pages'] == [0]
+        assert report['vision_pages'] == []
+        assert report['new_cost_usd'] == 0
+        assert report['source_document_sha256'] == doc.fingerprint
+        assert doc.reader_broker is None
+    assert ledger.spent() == ledger.pending_usd() == 0
+    with zipfile.ZipFile(output) as epub:
+        assert json.loads(epub.read('META-INF/reflow.json')) == json.loads(json.dumps(report))
+        assert 'Synthetic garden guide' in epub.read('OEBPS/content.opf').decode()
+    assert list((state / 'native-scratch').iterdir()) == []
+
+
+def test_actual_scanned_worker_dispatches_only_through_current_parent_quote(tmp_path, monkeypatch):
+    text = ('Every clear sentence follows the line above.\n'
+            'The river runs beyond the garden wall.\n'
+            'A reader can inspect the original page.\n'
+            'This simple record keeps the printed words.\n'
+            'The window opens toward the quiet road.\n')
+    source = tmp_path / 'scan.pdf'
+    with pymupdf.open() as original:
+        page = original.new_page(width=400, height=500)
+        page.insert_textbox(pymupdf.Rect(40, 60, 360, 420), text, fontsize=13)
+        pixels = page.get_pixmap(matrix=pymupdf.Matrix(2, 2)).tobytes('png')
+    with pymupdf.open() as scanned:
+        scanned.new_page(width=400, height=500).insert_image(pymupdf.Rect(0, 0, 400, 500), stream=pixels)
+        scanned.save(source)
+    state = tmp_path / 'state'
+    from cps.services.reflow.shared_budget import SharedLedger, Store
+    store = Store(state, lambda: 1)
+    ledger = SharedLedger(state / 'job.jsonl', .1, job_id='synthetic-job',
+                          store=store, book_id=5, user_id=7)
+    parent = vision_reading.Reader('inert-key', state / 'reading-cache', ledger,
+                                   confidence_protocol='tokens', reuse_legacy=True)
+    calls = []
+    answer = reading(text)
+    item = answer['blocks'][0]
+    item['tokens'] = [dict(text=word, low_confidence=False) for word in item.pop('text').split()]
+    item.pop('low_confidence')
+    def post(*args, **kwargs):
+        calls.append(os.getpid())
+        assert Ledger(ledger.path, .1).pending_usd() > 0
+        return response(answer)
+    monkeypatch.setattr(requests, 'post', post)
+    target = state / 'conversion-scratch' / 'synthetic-job' / 'candidate.epub'
+    with native_ipc.NativeDocument(source, scratch_root=state / 'native-scratch',
+                                   cache_root=state) as doc:
+        quote = doc.vision_quote()
+        assert quote['eligible_pages'] == 1
+        report = doc.convert_vision(target, parent, quote=quote, job_id='synthetic-job')
+    assert calls == [os.getpid()]
+    assert ledger.spent() == pytest.approx(.0004)
+    assert ledger.pending_usd() == 0
+    assert 1 - store.status()['remaining_usd'] == pytest.approx(.0004)
+    assert report['new_cost_usd'] == pytest.approx(.0004)
+    assert report['native_pages'] == [] and report['vision_pages'] == [0]
+    assert not any(case.get('block') is None for case in report['degraded_units'])
+    assert target.is_file()
+    assert list(target.parent.iterdir()) == [target]
+
+
+def test_child_cannot_replace_parent_metered_charge_or_release_ambiguous_dispatch(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch)
+    state.child.read(image())
+    attempt = state.ledger.entries('reservation')[0]['attempt']
+    with pytest.raises(unit_recovery.SourceIntegrityError, match='metered response'):
+        state.rpc('ledger', dict(method='reconcile_attempt', args=[attempt, 0], kwargs={}))
+    assert state.ledger.spent() == pytest.approx(.0004)
+    def timeout(*args, **kwargs):
+        raise requests.Timeout('Synthetic ambiguous outcome')
+    monkeypatch.setattr(requests, 'post', timeout)
+    other = io.BytesIO()
+    Image.new('RGB', (91, 120), 'white').save(other, 'JPEG')
+    with pytest.raises(requests.RequestException):
+        state.child.read(other.getvalue())
+    held = state.ledger.pending_usd()
+    attempt = state.ledger.entries('reservation')[-1]['attempt']
+    assert held > 0
+    with pytest.raises(unit_recovery.SourceIntegrityError, match='cannot be released'):
+        state.rpc('ledger', dict(method='release_attempt',
+            args=[attempt, 'local_pre_dispatch'], kwargs={}))
+    assert state.ledger.pending_usd() == held
+
+
+def test_native_deadline_excludes_only_parent_bridge_wait(tmp_path, monkeypatch):
+    import time
+    doc = native_ipc.NativeDocument.__new__(native_ipc.NativeDocument)
+    doc.root = tmp_path; doc.closed = False; doc.seq = 0
+    doc.resource_lease = None; doc.should_stop = None
+    doc.deadline_exceeded = False; doc.operation_deadline = None
+    doc.process = SimpleNamespace(stdin=io.BytesIO())
+    class SlowBroker:
+        def handle(self, request):
+            time.sleep(.08)
+            return {'ok':True, 'value':0}
+    doc.reader_broker = SlowBroker()
+    replies = iter([{'seq':1, 'reader_request':1}, {'seq':1, 'ready':True}])
+    doc._line = lambda: next(replies)
+    native_ipc.write_owned(tmp_path, 'reader-request.json', {'synthetic':True})
+    native_ipc.write_owned(tmp_path, 'response.json', {'seq':1,'ok':True,'value':'complete'})
+    monkeypatch.setattr(native_ipc, 'operation_timeout', lambda *args: .04)
+    assert doc._call('vision_convert', {}) == 'complete'
+    assert doc.deadline_exceeded is False
+    assert doc.process.stdin.getvalue() == b'1\ncontinue\n'
+
+
+def test_actual_worker_sample_origin_is_native_and_validated(tmp_path):
+    source = tmp_path / 'sample.pdf'
+    from tests.fixtures import reflow_pdfs as fixtures
+    with pymupdf.open() as doc:
+        fixtures.title_page(doc)
+        fixtures.prose_page(doc)
+        doc.save(source)
+    with native_ipc.NativeDocument(source, scratch_root=tmp_path / 'scratch') as native:
+        start = native.vision_sample_start(1)
+        assert start == 1
+        with pytest.raises(ValueError, match='sample size'):
+            native.vision_sample_start(True)
+    assert list((tmp_path / 'scratch').iterdir()) == []

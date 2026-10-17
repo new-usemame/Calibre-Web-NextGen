@@ -4952,6 +4952,7 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                 page={'pno':n,'anchor':f'<span id="pg_{n:04d}"></span>','body':[fragment],'asides':asides}
                 pages.append(page);records[n]=dict(source='original_source',blocks=unit['blocks'],new_cost_usd=0.,cached=False,
                     words=0,marks=0,degraded_figures=[],degraded_figure_count=0,degraded_units=[unit])
+                if progress:progress(n,records[n])
                 continue
             if n in native:
                 for lane in ('body','asides'):
@@ -4969,7 +4970,9 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                     if controller:
                         native_pages[n],native_report=build_epub.degrade_native_units(native_pages[n],native_report,
                             controller.blocked(n),SourceDisplay(doc,n),package,images)
-                pages.append(native_pages[n]);records[n]=native_report;continue
+                pages.append(native_pages[n]);records[n]=native_report
+                if progress:progress(n,records[n])
+                continue
             s=scans[n];reading=s['reading'];recovered=s['recovered']
             try:
                 with unit_recovery.guard(n,'page_compilation'):

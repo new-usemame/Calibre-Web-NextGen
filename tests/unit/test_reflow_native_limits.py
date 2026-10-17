@@ -168,14 +168,14 @@ def test_task_deadline_preserves_prior_artifact_and_ambiguous_billing(rig, monke
     original_timeout = ipc.operation_timeout
     owned = []
     def stall(self, operation, arguments, **kwargs):
-        if operation == 'prepare':
+        if operation in ('prepare', 'vision_convert'):
             self.ledger.reserve_attempt('unresolved-fixture', .01)
             owned.append(self.process)
             os.kill(self.process.pid, signal.SIGSTOP)
         return original_call(self, operation, arguments, **kwargs)
     monkeypatch.setattr(ipc.NativeDocument, 'call', stall)
     monkeypatch.setattr(ipc, 'operation_timeout', lambda operation, args, pages:
-                        .2 if operation == 'prepare' else original_timeout(operation, args, pages))
+                        .2 if operation in ('prepare', 'vision_convert') else original_timeout(operation, args, pages))
     task = _run(rig, mode='full', replace_existing_epub=True)
     assert task.stat == STAT_FAIL and 'safety deadline' in task.error
     assert owned and all(process.returncode == -signal.SIGKILL for process in owned)

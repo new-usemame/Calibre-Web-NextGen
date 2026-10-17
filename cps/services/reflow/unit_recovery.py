@@ -212,6 +212,9 @@ def guard(pages, stage, *, block=None, units=None):
     pages = [pages] if isinstance(pages, int) else list(pages)
     owned = units or [dict(page=n, block=block) for n in pages]
     controller.check_units(owned)
+    previous_page = controller._active_page
+    selected_pages = {unit['page'] for unit in owned}
+    controller._active_page = next(iter(selected_pages)) if len(selected_pages) == 1 else None
     try:
         yield
     except UnitFailure:
@@ -221,6 +224,8 @@ def guard(pages, stage, *, block=None, units=None):
             raise
         owned = controller.refine_units(owned, error)
         raise UnitFailure(owned, stage, error) from error
+    finally:
+        controller._active_page = previous_page
 
 
 class Controller:

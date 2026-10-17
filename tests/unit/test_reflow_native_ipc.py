@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -24,7 +25,7 @@ def test_native_death_during_actual_task_fails_job_keeps_web_alive_and_prior_fil
     rig.formats['EPUB'] = SimpleNamespace(name='Book - Author', format='EPUB')
     real = ipc.NativeDocument.call; seen = []
     def die(self, operation, args, **kwargs):
-        if operation == 'build':
+        if operation == 'vision_convert':
             seen.append(self.process.pid); os.kill(self.process.pid, signal.SIGKILL)
         return real(self, operation, args, **kwargs)
     monkeypatch.setattr(ipc.NativeDocument, 'call', die)
@@ -59,7 +60,7 @@ def test_task_cancel_interrupts_blocked_child_only_and_cleans_owned_files(rig, m
     unrelated = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
     owned = []
     def pause(self, operation, args, **kwargs):
-        if operation == 'prepare':
+        if operation == 'vision_convert':
             owned.append(self.process); os.kill(self.process.pid, signal.SIGSTOP)
             task.stat = STAT_ENDED
         return real(self, operation, args, **kwargs)
@@ -153,43 +154,50 @@ def test_child_environment_excludes_secrets_and_uses_installed_script(rig, monke
         assert 'OPENROUTER_API_KEY' not in kw['env'] and 'PYTHONPATH' not in kw['env']
 
 
+@pytest.mark.skipif(shutil.which('tesseract') is None, reason='requires Tesseract')
 @pytest.mark.parametrize('stop_kind', ['death', 'cancel', 'capacity'])
-def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, monkeypatch, stop_kind):
-    """Real task + native child + typed provider/ledger/cache; only HTTP is fake.
+def test_parent_pixel_billing_survives_native_death_without_paid_replay(rig, monkeypatch, stop_kind):
+    """Real task + native child + pixel provider/ledger/cache; only HTTP is fake.
     Crash after paid adoption, then retry: neither charge nor approved decision
     can disappear or be replayed, and nothing publishes from the failed child."""
-    import json
-    from cps.services.reflow import model, ledger, structural_pipeline
-    from tests.unit.test_reflow_task import _ChoicesSession
-    with F.new_doc() as pdf:
-        page = pdf.new_page(width=500, height=700)
-        page.insert_text((80, 100), '"Original displayed words remain exactly as printed."', fontsize=12)
-        for y in (180, 195, 210):
-            page.insert_text((50, y), 'Ordinary body context supports the source display.', fontsize=12)
-        pdf.save(rig.folder / 'Book - Author.pdf')
-    provider = _ChoicesSession(); calls = provider.calls; parent = os.getpid()
+    from cps.services.reflow import model, ledger, vision_quote
+    from tests.unit.test_reflow_task import _PixelSession
+    from tests.unit.test_reflow_app_vision_route import _source
+    path = rig.folder / 'Book - Author.pdf'
+    _source(path, scanned=True, pages=1)
+    with pymupdf.open(path) as document:
+        quote = vision_quote.measure(document)
+    provider = _PixelSession(); calls = provider.calls; parent = os.getpid()
     def answer(*args, **kwargs):
         assert os.getpid() == parent, 'provider dispatch escaped parent'
         return provider.post(*args, **kwargs)
-    monkeypatch.setattr(structural_pipeline, 'QUALITY_RELEASED', True)
     monkeypatch.setattr(rig.mod.config, 'resolved_openrouter_key', lambda: 'inert-parent-key')
-    monkeypatch.setattr(model.requests, 'get', provider.get)
     monkeypatch.setattr(model.requests, 'post', answer)
     previous = rig.folder / 'Book - Author.epub'; previous.write_bytes(b'previous reader artifact')
     rig.formats['EPUB'] = SimpleNamespace(name='Book - Author', format='EPUB')
     failed = rig.mod.TaskReflowPdf(5, 7, {'mode': 'full', 'cost_cap_usd': 1,
         'review_mode': 'source_verified', 'replace_existing_epub': True})
+    failed.options.consent_quote = quote
+    failed.options.source_sha256 = quote['source_sha256']
     real = ipc.NativeDocument.call
     def die(self, operation, args, **kwargs):
-        if operation == 'build':
-            assert len(calls) == 2
-            assert self.ledger.pending_usd() == 0
-            if stop_kind == 'death': os.kill(self.process.pid, signal.SIGKILL)
-            elif stop_kind == 'capacity':
-                from cps.services.reflow import native_resources
-                monkeypatch.setattr(native_resources, 'measure', lambda root: (0, 8 * 1024**3))
-                self.resource_lease.next_check = 0
-            else: failed.stat = STAT_ENDED
+        if operation == 'vision_convert':
+            progress = self.progress
+            def after_adoption(event):
+                if progress: progress(event)
+                if event.stage != 'vision' or not event.page: return
+                assert len(calls) == 1
+                assert self.ledger.pending_usd() == 0
+                assert self.ledger.spent() == pytest.approx(provider.cost)
+                # The child has adopted the reading before reporting a completed page.
+                assert list((Path(rig.root) / 'cache' / 'vision').glob('*.json'))
+                if stop_kind == 'death': os.kill(self.process.pid, signal.SIGKILL)
+                elif stop_kind == 'capacity':
+                    from cps.services.reflow import native_resources
+                    monkeypatch.setattr(native_resources, 'measure', lambda root: (0, 8 * 1024**3))
+                    self.resource_lease.next_check = 0
+                else: failed.stat = STAT_ENDED
+            self.progress = after_adoption
         return real(self, operation, args, **kwargs)
     monkeypatch.setattr(ipc.NativeDocument, 'call', die)
     failed.run(None)
@@ -197,9 +205,11 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     assert previous.read_bytes() == b'previous reader artifact'
     row = next(r for r in _ledger_rows(rig) if r['job_id'] == failed.job_id)
     assert row['status'] == ('failed' if stop_kind == 'death' else 'cancelled') and row['pending_usd'] == 0
-    assert row['spend_usd'] == pytest.approx(2 * .000123456789)
+    assert row['spend_usd'] == pytest.approx(provider.cost)
     audit = ledger.Ledger(str(Path(rig.root) / 'jobs' / '5' / (failed.job_id + '.jsonl')), 1)
-    assert [e['event'] for e in audit.entries('operation_audit')] == ['validated']
+    settlements = [e for e in audit.entries('reservation') if e['event'] == 'reconciled']
+    assert len(settlements) == 1
+    assert settlements[0]['cost_usd'] == pytest.approx(provider.cost)
     exits = audit.entries('native_worker')
     assert len(exits) == 1
     assert exits[0]['exit_code'] == -signal.SIGKILL
@@ -222,12 +232,18 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     if stop_kind == 'capacity':
         from cps.services.reflow import native_resources
         monkeypatch.setattr(native_resources, 'measure', lambda root: (8 * 1024**3, 8 * 1024**3))
-    success = _run(rig, mode='full', cost_cap_usd=1, replace_existing_epub=True)
+    success = rig.mod.TaskReflowPdf(5, 7, {'mode': 'full', 'cost_cap_usd': 1,
+        'review_mode': 'source_verified', 'replace_existing_epub': True})
+    success.options.consent_quote = quote
+    success.options.source_sha256 = quote['source_sha256']
+    success.run(None)
     assert success.stat == STAT_FINISH_SUCCESS, success.error
-    assert len(calls) == 2, 'durably answered requests must be cache hits on retry'
+    assert len(calls) == 1, 'durably answered requests must be cache hits on retry'
     assert success.results['report']['spend']['usd'] == 0
-    assert success.results['report']['structural']['approved_pages'] == 1
-    assert success.results['report']['structural']['approved_operations'] > 0
+    assert success.results['report']['route'] == 'vision'
+    assert success.results['report']['fidelity']['pages_model'] == 1
+    assert success.results['report']['fidelity']['pages_disclosed'] == 0
+    assert success.results['report']['cost']['reused'] == 1
     assert build_epub.validate(success.results['path']) == []
 
 
@@ -280,13 +296,13 @@ def test_actual_task_rejects_untrusted_completed_child_artifacts(rig, monkeypatc
         raw = real_read(root, name)
         if fault == 'nonboolean_ok' and name == 'response.json':
             result = codec.loads(raw)
-            if isinstance(result.get('value'), build_epub.BuildResult):
+            if isinstance(result.get('value'), dict) and 'source_document_sha256' in result['value']:
                 result['ok'] = 'true'; return codec.dumps(result)
         return raw
     def tamper(self, operation, args, **kwargs):
         result = real_call(self, operation, args, **kwargs)
-        if operation == 'build':
-            if fault == 'manifest_path': result.path = str(outside)
+        if operation == 'vision_convert':
+            if fault == 'manifest_path': result = build_epub.BuildResult(path=str(outside))
             elif fault == 'symlink':
                 candidate = Path(self.root) / 'candidate.epub'
                 candidate.unlink(); candidate.symlink_to(outside)

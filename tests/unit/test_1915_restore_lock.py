@@ -6,16 +6,29 @@
 
 """Regression coverage for the last-resort restore's process locks (#1915)."""
 
-import fcntl
 import inspect
 import os
 
 import pytest
 
 from cps import admin
-
+from cps.services import file_lock
 
 pytestmark = pytest.mark.unit
+
+
+def _hold(fd):
+    """Simulate a rival lock holder through the SAME primitive the production
+    seams use (flock on POSIX, msvcrt on Windows), so a contended restore is
+    exercised identically on every platform. Asserts the take so a degraded
+    locking backend fails loudly instead of silently passing the refusal
+    assertions below."""
+    assert file_lock.acquire(fd, blocking=False), (
+        "the simulated lock holder could not take the lock")
+
+
+def _unhold(fd):
+    file_lock.release(fd)
 
 
 def _restore_lock_api():
@@ -44,7 +57,12 @@ def test_dead_pid_sentinel_does_not_block_restore(monkeypatch, tmp_path):
 
     try:
         assert handle is not None
-        assert lock_path.read_text(encoding="utf-8") == "999999"
+        # Read through the holder's own handle: Windows mandatory locks block
+        # a DIFFERENT handle from reading the locked byte (Errno 13), while
+        # POSIX flock is advisory. Same assertion either way: the dead-PID
+        # sentinel must survive an acquire untouched.
+        handle.seek(0)
+        assert handle.read() == "999999"
     finally:
         release([handle] if handle is not None else [])
 
@@ -54,7 +72,7 @@ def test_held_ingest_lock_refuses_before_backup_or_copy(monkeypatch, tmp_path):
     acquire, release = _service_lock_api()
     ingest_path = tmp_path / "ingest_processor.lock"
     ingest_holder = open(ingest_path, "a+", encoding="utf-8")
-    fcntl.flock(ingest_holder.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    _hold(ingest_holder.fileno())
     backup_dir = tmp_path / "backup"
     metadata_db = tmp_path / "metadata.db"
     app_db = tmp_path / "app.db"
@@ -89,7 +107,7 @@ def test_held_ingest_lock_refuses_before_backup_or_copy(monkeypatch, tmp_path):
         )
     finally:
         release(handles)
-        fcntl.flock(ingest_holder.fileno(), fcntl.LOCK_UN)
+        _unhold(ingest_holder.fileno())
         ingest_holder.close()
 
 
@@ -106,7 +124,7 @@ def test_held_service_lock_is_a_hard_refusal(
     monkeypatch.setattr(admin.tempfile, "gettempdir", lambda: str(tmp_path))
     acquire, release = _service_lock_api()
     holder = open(tmp_path / lock_name, "a+", encoding="utf-8")
-    fcntl.flock(holder.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    _hold(holder.fileno())
 
     handles = []
     try:
@@ -116,7 +134,7 @@ def test_held_service_lock_is_a_hard_refusal(
         assert blocked_by == blocking_service
     finally:
         release(handles)
-        fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+        _unhold(holder.fileno())
         holder.close()
 
 

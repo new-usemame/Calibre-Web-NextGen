@@ -19,13 +19,24 @@ import time
 import shutil
 import signal
 import sqlite3
-import fcntl
 import threading
 from datetime import datetime
 from pathlib import Path
 
 import app_paths
 import service_user
+
+# Single-instance locking goes through the same primitive the app uses
+# (cps/services/file_lock.py): flock on POSIX, msvcrt on Windows. The module
+# is dependency-free, so it loads standalone here WITHOUT firing
+# cps/__init__.py -- the eager-import ban that _load_optional_cps_modules()
+# exists for (CWA #1349) still holds on the fast-exit path.
+import importlib.util as _ilutil
+_lock_spec = _ilutil.spec_from_file_location(
+    "_cwng_ingest_file_lock",
+    Path(__file__).resolve().parents[1] / "cps" / "services" / "file_lock.py")
+file_lock = _ilutil.module_from_spec(_lock_spec)
+_lock_spec.loader.exec_module(file_lock)
 
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
 # initialize_runtime() (CWA #1349 by @navels) so the ingest-service can
@@ -213,18 +224,18 @@ class ProcessLock:
                 lock_writable = False
             else:
                 if not lock_existed:
+                    # Mode bits are best-effort on Windows (no os.fchmod
+                    # there); the lock itself does not depend on them.
                     try:
                         os.fchmod(lock_fd, 0o666)
-                    except OSError:
+                    except (OSError, AttributeError):
                         pass
             self.lock_file = os.fdopen(lock_fd, 'r+' if lock_writable else 'r')
 
             # Try to acquire an exclusive lock with timeout
             start_time = time.time()
             while time.time() - start_time < timeout:
-                try:
-                    fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-
+                if file_lock.acquire(self.lock_file.fileno(), blocking=False):
                     # Successfully acquired lock. Replace the diagnostic PID
                     # only when this user can write the persistent inode.
                     if lock_writable:
@@ -237,10 +248,9 @@ class ProcessLock:
                     print(f"[ingest-processor] Lock acquired successfully (PID: {os.getpid()})")
                     return True
 
-                except (IOError, OSError):
-                    # The flock is authoritative. PID text is only diagnostic;
-                    # invalid text cannot make a contended lock stale.
-                    time.sleep(0.1)  # Brief wait before retry
+                # Contended. The lock is authoritative; the PID text is only
+                # diagnostic, so invalid text cannot make a contended lock stale.
+                time.sleep(0.1)  # Brief wait before retry
 
             # Timeout reached
             holding_pid = self._get_holding_pid()
@@ -268,7 +278,7 @@ class ProcessLock:
         """Release the lock"""
         if self.acquired and self.lock_file:
             try:
-                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
+                file_lock.release(self.lock_file.fileno())
                 self.lock_file.close()
                 self.lock_file = None
 

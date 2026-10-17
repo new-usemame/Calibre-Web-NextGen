@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import importlib
 import inspect
 import json

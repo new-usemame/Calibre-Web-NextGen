@@ -32,7 +32,10 @@ import metadata_change_dispatch as dispatch  # noqa: E402
 HELPER_PRESENT = lambda name: "/usr/local/bin/" + name  # noqa: E731
 HELPER_ABSENT = lambda name: None  # noqa: E731
 ENFORCER = "/app/calibre-web-automated/scripts/cover_enforcer.py"
-BARE = ["python3", ENFORCER, "--log", "20261009095953-502.json"]
+# sys.executable, not "python3": the dispatcher must run the enforcer under
+# the interpreter that runs IT (same venv/install), and "python3" is not on
+# PATH by default on Windows (windows_issues_v2.md N3).
+BARE = [sys.executable, ENFORCER, "--log", "20261009095953-502.json"]
 
 
 def test_root_runs_the_enforcer_through_the_privilege_drop_helper():
@@ -64,12 +67,14 @@ def test_default_dispatch_runs_the_enforcer_through_the_helper(monkeypatch):
         seen["cmd"], seen["kwargs"] = cmd, kwargs
 
     monkeypatch.setattr(dispatch.subprocess, "run", fake_run)
-    monkeypatch.setattr(dispatch.os, "geteuid", lambda: 0)
+    # raising=False: os.geteuid does not exist on Windows, and the patch is
+    # how this test simulates a root container.
+    monkeypatch.setattr(dispatch.os, "geteuid", lambda: 0, raising=False)
     monkeypatch.setattr(dispatch.shutil, "which", HELPER_PRESENT)
 
     dispatch._default_dispatch("/config/metadata_change_logs", ENFORCER)("x-502.json")
 
-    assert seen["cmd"] == ["cwa-as-abc", "python3", ENFORCER, "--log", "x-502.json"]
+    assert seen["cmd"] == ["cwa-as-abc", sys.executable, ENFORCER, "--log", "x-502.json"]
     assert seen["kwargs"]["check"] is False
 
 
@@ -171,8 +176,12 @@ def test_the_app_user_does_not_try_to_chown_book_dirs(monkeypatch, tmp_path, cap
     import cover_enforcer
 
     calls = []
-    monkeypatch.setattr(cover_enforcer.os, "geteuid", lambda: 1000)
-    monkeypatch.setattr(cover_enforcer.os, "chown", lambda *a: calls.append(a))
+    # raising=False: os.geteuid does not exist on Windows; the patch simulates
+    # the non-root app user of the container.
+    monkeypatch.setattr(cover_enforcer.os, "geteuid", lambda: 1000, raising=False)
+    # raising=False: os.chown does not exist on Windows either.
+    monkeypatch.setattr(cover_enforcer.os, "chown", lambda *a: calls.append(a),
+                        raising=False)
     (tmp_path / "book.epub").write_text("x")
 
     cover_enforcer.Enforcer._reset_book_dir_ownership(str(tmp_path))

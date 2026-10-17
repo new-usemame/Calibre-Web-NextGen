@@ -153,7 +153,9 @@ class ChangeLogDispatcher:
 
 
 def _will_drop(euid: Optional[int], which: Optional[Callable[[str], Optional[str]]]) -> bool:
-    euid = os.geteuid() if euid is None else euid
+    # os.geteuid does not exist on Windows; a platform without it is by
+    # definition not root, so the privilege drop never applies there.
+    euid = getattr(os, "geteuid", lambda: 1000)() if euid is None else euid
     which = shutil.which if which is None else which
     return euid == 0 and bool(which("cwa-as-abc"))
 
@@ -170,7 +172,10 @@ def enforcer_command(enforcer: str, filename: str, *, euid: Optional[int] = None
     too. ``cwa-as-abc`` drops only when we are root and otherwise leaves the
     uid alone, and is absent outside the image, so a bare run is the fallback.
     """
-    command = ["python3", enforcer, "--log", filename]
+    # sys.executable, not "python3": the dispatcher must run the enforcer under
+    # the interpreter that is running IT (same venv, same install), and
+    # "python3" is not on PATH by default on Windows.
+    command = [sys.executable, enforcer, "--log", filename]
     return ["cwa-as-abc"] + command if _will_drop(euid, which) else command
 
 

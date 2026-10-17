@@ -102,7 +102,7 @@ def test_operator_chosen_kobo_repair_notices_omit_superseded_caveats():
 @pytest.mark.parametrize(
     "msgid",
     [
-        "A few random picks from your library",
+        "A few random picks from your Discover source",
         "Table view",
         "Smart shelves",
         "Formats",

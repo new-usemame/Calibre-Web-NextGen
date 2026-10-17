@@ -617,6 +617,20 @@ def create_app(config=None, services=None):
         except Exception as ex:
             log.error("Custom column visibility seed failed: %s", ex)
 
+        # The custom-column sidecar lives in app.db but is reached through
+        # CalibreDB's session, so it needs metadata.db attached -- i.e. after
+        # calibre_db.init_db() above. Creates its tables and reconciles them
+        # against the library. Inert on a fresh install: with no curated order
+        # rows the prune step scans nothing, and is_hierarchy stays NULL, which
+        # means "keep deriving it from the data".
+        try:
+            from . import cc_sidecar
+            cc_sidecar.reconcile()
+        except Exception as ex:
+            # A missing sidecar costs the curated order and nothing else, so this
+            # must never be fatal -- same reasoning as the visibility seed above.
+            log.error("Custom column sidecar reconcile failed: %s", ex)
+
         updater_thread.init_updater(runtime_config, web_server)
     # Perform dry run of updater and exit afterward
     if cli_param.dry_run:

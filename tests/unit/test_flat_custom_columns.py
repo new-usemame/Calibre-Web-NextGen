@@ -94,28 +94,49 @@ def library(monkeypatch):
 def _flat_entries(calibre, rows):
     """Drive get_cc_flat_list's row handling with canned query output.
 
-    The query itself is `select value, count(distinct Books.id) ... group by
-    value`; what this exercises is the part written for flat columns — the
-    row-to-entry mapping, the blank filter and the ordering.
+    The reader now runs TWO queries and merges them: a book-side count query
+    (`select value, count(distinct Books.id) ... group by value`) and an
+    unfiltered `distinct` value query, because a value no book carries must
+    still be listed with a count of 0 (otherwise "Create new" produces
+    something unfindable). `rows` are the counts; every value in it is also
+    treated as present, which is what these tests care about -- the
+    bookless-value case is pinned for real, against real SQL, in
+    test_cc_value_bookless.py.
+
+    What this exercises is the part written for flat columns: the row-to-entry
+    mapping, the blank filter and the ordering.
     """
-    query = SimpleNamespace()
+    count_query = SimpleNamespace()
 
     def _join(*a, **kw):
-        return query
+        return count_query
 
     def _group_by(*a, **kw):
-        return query
+        return count_query
 
     def _filter(*a, **kw):
-        return query
+        return count_query
 
-    query.select_from = _join
-    query.join = _join
-    query.group_by = _group_by
-    query.filter = _filter
-    query.all = lambda: rows
+    count_query.select_from = _join
+    count_query.join = _join
+    count_query.group_by = _group_by
+    count_query.filter = _filter
+    count_query.all = lambda: rows
+
+    value_query = SimpleNamespace()
+    value_query.distinct = lambda *a, **kw: value_query
+    value_query.all = lambda: [(r[0],) for r in rows]
+
+    # The reader issues the counts query first and the distinct-values query
+    # second, so dispatch on the call order rather than returning one stub for both.
+    issued = []
+
+    def _query(*a, **kw):
+        issued.append(1)
+        return count_query if len(issued) == 1 else value_query
+
     original = calibre.session
-    calibre.session = SimpleNamespace(query=lambda *a, **kw: query)
+    calibre.session = SimpleNamespace(query=_query)
     try:
         return calibre.get_cc_flat_list(3)
     finally:
@@ -185,7 +206,17 @@ def test_the_flat_list_honours_a_book_filter(library):
     query.group_by = lambda *a, **kw: query
     query.all = lambda: [("778.3", 1)]
     query.filter = lambda arg: (filtered.append(arg), query)[1]
-    calibre.session = SimpleNamespace(query=lambda *a, **kw: query)
+    # Second query: the unfiltered distinct-value list (see _flat_entries).
+    value_query = SimpleNamespace()
+    value_query.distinct = lambda *a, **kw: value_query
+    value_query.all = lambda: [("778.3",)]
+    issued = []
+
+    def _query(*a, **kw):
+        issued.append(1)
+        return query if len(issued) % 2 == 1 else value_query
+
+    calibre.session = SimpleNamespace(query=_query)
 
     common_calls = []
     calibre.common_filters = lambda *a, **kw: (common_calls.append(1), None)[1]

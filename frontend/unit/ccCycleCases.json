@@ -1,0 +1,57 @@
+{
+  "_comment": "The cycle rule, expressed once for two implementations. tests/unit/test_cc_value_rules_single_home.py executes these against hierarchy.can_place_under; frontend/unit/ccValuePaste.test.ts executes the SAME file against canPasteInto. Neither language may own a copy of the table: a case added on one side and not the other is the exact drift this exists to prevent. Adding a case means editing THIS file only.",
+  "cases": [
+    {
+      "name": "a deep node onto its own ancestor is allowed",
+      "why": "The reported case. History.AncientHistory.India under History yields History.India, a SIBLING of AncientHistory. Refusing this is what made the move read as a no-op.",
+      "cut": "History.AncientHistory.India",
+      "onto": "History",
+      "allowed": true
+    },
+    {
+      "name": "a deep node onto the top level is allowed",
+      "cut": "History.AncientHistory.India",
+      "onto": "",
+      "allowed": true
+    },
+    {
+      "name": "an unrelated branch is allowed",
+      "cut": "History.AncientHistory.India",
+      "onto": "TestNode",
+      "allowed": true
+    },
+    {
+      "name": "onto itself is refused",
+      "cut": "TestNode.TestSubNode",
+      "onto": "TestNode.TestSubNode",
+      "allowed": false
+    },
+    {
+      "name": "into its own direct child is refused",
+      "cut": "TestNode.TestSubNode",
+      "onto": "TestNode.TestSubNode.Horror",
+      "allowed": false
+    },
+    {
+      "name": "into its own deep descendant is refused",
+      "why": "The guard must hold at depth, not just for a two-level tree.",
+      "cut": "TestNode",
+      "onto": "TestNode.TestSubNode.TestDeepNode",
+      "allowed": false
+    },
+    {
+      "name": "a shared prefix that is not a path segment is allowed",
+      "why": "TestNodeOther merely starts with the same characters; it is a sibling, not a child. A bare startsWith(cut) with no separator would wrongly refuse this.",
+      "cut": "TestNode",
+      "onto": "TestNodeOther",
+      "allowed": true
+    },
+    {
+      "name": "a shared prefix one level deeper is allowed",
+      "why": "Historyics is not History. The separator, not the characters, is what makes a node an ancestor.",
+      "cut": "History",
+      "onto": "Historyics",
+      "allowed": true
+    }
+  ]
+}

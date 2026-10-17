@@ -355,16 +355,45 @@ export interface CcColumnsPage {
   items: CcColumn[];
 }
 
+/** What may be done to a value, decided server-side by hierarchy.py.
+ *
+ *  Only the rules that depend on the value ALONE appear here. Whether a
+ *  value can receive a move, or be a merge destination, depends on what
+ *  the user has ticked or cut right now — client state the server cannot
+ *  see — so those stay in the editor.
+ *
+ *  `merge_reason` is a stable code, not prose, so a client can render its own
+ *  wording. Absent on older servers: fall back to the local derivation. */
+export interface CcNodeAvailability {
+  can_delete: boolean;
+  delete_reason: string | null;
+  can_merge_source: boolean;
+  merge_reason: string | null;
+  /** Whether this value can move one place among its OWN siblings. Published
+   *  rather than derived, because the answer turns only on the node's place in
+   *  its parent's list -- unlike `can_merge_into`, which needs the live
+   *  selection and so has to be worked out here. Absent on older servers, where
+   *  the buttons stay hidden. */
+  can_move_up?: boolean;
+  move_up_reason?: string | null;
+  can_move_down?: boolean;
+  move_down_reason?: string | null;
+}
+
 /** One node of a custom column's browse tree. `path` is the canonical dotted
  *  path from the root (e.g. `Computers.DB`) for a hierarchical column, and the
  *  whole stored value for a flat one. `count` is direct hits on the exact
  *  value, `total_count` includes every descendant — always equal for a flat
- *  node, which has none. */
+ *  node, which has none.
+ *
+ *  `available` is optional so the SPA still works against a server that predates
+ *  it; `CcValueEditor` falls back to deriving `can_delete` from `children`. */
 export interface CcNode {
   name: string;
   path: string;
   count: number;
   total_count: number;
+  available?: CcNodeAvailability;
   children: CcNode[];
 }
 
@@ -378,6 +407,29 @@ export interface CcTree {
 export interface CcBooksPage extends BooksPage {
   path: string;
   column: { id: number; name: string };
+}
+
+/** One value that a rename (or move) would fold into an existing one.
+ *  `value` is UNIQUE in calibre's custom-column tables, so landing on a
+ *  taken spelling IS a merge — never applied without the caller's explicit
+ *  `confirm_merges`, mirroring the tag editor. */
+export interface CcValueConflict {
+  from: string;
+  into: string;
+  books: number;
+}
+
+/** Result of one custom-column value mutation. */
+export interface CcValueWriteResult {
+  books: number;
+  /** rename/move: the old->new value mapping actually applied. */
+  renamed?: Record<string, string>;
+  merged?: CcValueConflict[];
+  /** delete: the values removed. merge: the values folded in. */
+  deleted?: string[];
+  /** create: the value and its (always 0) book count. */
+  created?: string;
+  path?: string;
 }
 
 /** One row in an entity-browse list, with how many books reference it. */
@@ -602,6 +654,11 @@ export interface EditableCustomColumn {
   value: string;
   /** Allowed values, enumeration columns only. */
   enum_values?: string[];
+  /** Text columns only: true when the stored values form a dotted hierarchy,
+   *  false when they are flat atomic values. Decided by the server from the
+   *  same detector the browse views use, so the picker cannot disagree with
+   *  CcBrowse about which a column is. */
+  hierarchical?: boolean;
 }
 
 /** Custom columns are sent flat, keyed as the server expects (`custom_column_7`),

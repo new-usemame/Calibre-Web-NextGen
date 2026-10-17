@@ -27,7 +27,7 @@ import type {
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken, KoreaderPairRequest,
-  CcColumnsPage, CcTree, CcBooksPage,
+  CcColumnsPage, CcTree, CcBooksPage, CcValueWriteResult,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -556,6 +556,104 @@ export function useCcTree(colId: string | number, enabled = true) {
     queryFn: () => apiGet<CcTree>(`/api/v1/columns/${colId}/tree`),
     enabled,
     staleTime: 60000,
+  });
+}
+
+/** Editing a custom column's VALUES (rename/merge/delete/move/create).
+ *
+ *  Every mutation re-reads the tree: a value may change shape (a move can make
+ *  a flat column hierarchical), so the cached node list is the thing most
+ *  likely to be wrong afterwards. Books are invalidated too because a delete
+ *  removes the value from them.
+ *
+ *  `confirm_merges` is only ever sent as literal `true`. The value column is
+ *  UNIQUE, so landing on a taken spelling is a merge, and a merge cannot be
+ *  undone -- the same opt-in rule the tag editor follows. */
+function invalidateCcViews(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ['cc-tree'] });
+  void qc.invalidateQueries({ queryKey: ['cc-books'] });
+  void qc.invalidateQueries({ queryKey: ['cc-columns'] });
+  void qc.invalidateQueries({ queryKey: ['entities'] });
+  void qc.invalidateQueries({ queryKey: ['books'] });
+}
+
+export interface RenameCcValueInput {
+  path: string;
+  newName: string;
+  confirmMerges?: boolean;
+}
+
+export function useRenameCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, newName, confirmMerges }: RenameCcValueInput) =>
+      apiPost<CcValueWriteResult>(
+        `/api/v1/columns/${colId}/values/rename`,
+        confirmMerges === true
+          ? { path, new_name: newName, confirm_merges: true }
+          : { path, new_name: newName },
+      ),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useMergeCcValues(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paths, into }: { paths: string[]; into: string }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/merge`, { paths, into }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useDeleteCcValues(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paths: string[]) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/delete`, { paths }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useMoveCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, newParent }: { path: string; newParent: string }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/move`,
+        { path, new_parent: newParent }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+/** Move one value one place up or down among its own siblings.
+ *
+ *  The only value operation that changes no stored value: no book is touched
+ *  and no value is rewritten, so there is no merge to confirm and nothing to
+ *  undo. A move cannot cross a level -- the server orders it against the node's
+ *  own sibling list -- and it answers 409 if the value is already at the end it
+ *  was asked to reach, which is what a stale tree looks like. */
+export function useReorderCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, direction }: { path: string; direction: 'up' | 'down' }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/reorder`,
+        { path, direction }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useCreateCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    /* `after` places the new value immediately below that sibling -- the same
+     * level, not under it. Sent by the per-row create button; the bottom
+     * Create-new omits it and the value sorts alphabetically among its peers,
+     * which is the predictable default when the user has said nothing about
+     * where it should go. */
+    mutationFn: ({ path, after }: { path: string; after?: string }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/create`,
+        after ? { path, after } : { path }),
+    onSuccess: () => invalidateCcViews(qc),
   });
 }
 

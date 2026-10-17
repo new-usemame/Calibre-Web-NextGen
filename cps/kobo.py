@@ -3697,46 +3697,57 @@ def _is_sqlite_lock_error(error):
     return "database is locked" in str(getattr(error, "orig", error)).lower()
 
 
+def _set_busy_timeout(timeout_ms):
+    """Set the busy timeout on ub.session's current connection; return the old one."""
+    driver = ub.session.connection().connection.driver_connection
+    previous = driver.execute("PRAGMA busy_timeout").fetchone()[0]
+    driver.execute("PRAGMA busy_timeout=%d" % int(timeout_ms))
+    return previous
+
+
 def _stage_pending_page_best_effort(*args):
     """Stage the replayable page if the writer is free; never fail the sync.
 
-    Returns True when the page is staged, False when it was skipped. Every
-    attempt runs on this transaction's own connection with a short busy
-    timeout; on giving up, the timeout is restored before the rollback hands
-    the connection back to the pool.
+    Returns True when the page is staged, False when it was skipped. Each
+    attempt sets a short busy timeout on the session's current connection
+    (another greenlet may end the shared session's transaction during a pause,
+    and the next attempt may then run on a different pooled connection), and
+    the previous timeout is restored before the give-up rollback hands the
+    connection back to the pool.
     """
-    driver = ub.session.connection().connection.driver_connection
-    previous_timeout = None
-    try:
-        previous_timeout = driver.execute("PRAGMA busy_timeout").fetchone()[0]
-        driver.execute(
-            "PRAGMA busy_timeout=%d" % _PENDING_STAGE_ATTEMPT_TIMEOUT_MS,
-        )
-    except Exception:  # noqa: BLE001 - attempts still work on the old timeout
-        pass
-    deadline = monotonic() + _PENDING_STAGE_RETRY_BUDGET_S
+    started = monotonic()
+    deadline = started + _PENDING_STAGE_RETRY_BUDGET_S
     attempt = 0
     staged = False
-    try:
-        while True:
-            attempt += 1
-            try:
-                kobo_sync_status.stage_pending_sync_page(*args)
-                staged = True
-                break
-            except OperationalError as error:
-                if not _is_sqlite_lock_error(error):
-                    raise
-                # A failed flush deactivates the transaction; nothing to retry.
-                if not ub.session.is_active or monotonic() >= deadline:
-                    break
-                parallel.cooperative_sleep(_PENDING_STAGE_RETRY_SLEEP_S)
-    finally:
+    reason = "budget spent"
+    while True:
+        attempt += 1
+        previous_timeout = None
         try:
-            if previous_timeout is not None:
-                driver.execute("PRAGMA busy_timeout=%d" % int(previous_timeout))
-        except Exception:  # noqa: BLE001
+            previous_timeout = _set_busy_timeout(_PENDING_STAGE_ATTEMPT_TIMEOUT_MS)
+        except Exception:  # noqa: BLE001 - the attempt still runs on the old timeout
             pass
+        try:
+            kobo_sync_status.stage_pending_sync_page(*args)
+            staged = True
+        except OperationalError as error:
+            if not _is_sqlite_lock_error(error):
+                raise
+        finally:
+            if previous_timeout is not None:
+                try:
+                    _set_busy_timeout(previous_timeout)
+                except Exception:  # noqa: BLE001
+                    pass
+        if staged:
+            break
+        # A failed flush deactivates the transaction; nothing to retry.
+        if not ub.session.is_active:
+            reason = "transaction inactive"
+            break
+        if monotonic() >= deadline:
+            break
+        parallel.cooperative_sleep(_PENDING_STAGE_RETRY_SLEEP_S)
     if staged:
         if attempt > 1:
             log.info(
@@ -3745,8 +3756,9 @@ def _stage_pending_page_best_effort(*args):
             )
         return True
     log.warning(
-        "Kobo Sync: app.db writer held for %.1fs; delivering the response "
-        "without a staged page", _PENDING_STAGE_RETRY_BUDGET_S,
+        "Kobo Sync: app.db writer unavailable after %.1fs (%s, %s attempts); "
+        "delivering the response without a staged page",
+        monotonic() - started, reason, attempt,
     )
     try:
         ub.session.rollback()

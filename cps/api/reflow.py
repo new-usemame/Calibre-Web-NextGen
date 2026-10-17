@@ -10,13 +10,13 @@ This is the boundary where a user authorises somebody's money to be spent, so th
 things are deliberate and worth stating.
 
 *The fast assessment is source-only.* Full current source preparation happens
-in a bounded, cancellable local process. Typed reservation ceilings use the exact
-shared proposer and verifier request serializers, never the legacy router prices.
+in a bounded, cancellable local process. Pixel-reading ceilings bind the source,
+page rasters, reader schema, targeted reread and marker allowances.
 
-*Consent names the current route and source.* Deterministic conversion needs no
-key or paid cap. Optional review requires a current owner-scoped prepared quote,
-explicit two-stage consent and a finite cap. A smaller cap permits partial review;
-remaining pages retain complete deterministic output.
+*Consent names the current route and source.* Cached conversion needs no
+key or paid cap. New pixel readings require a current owner-scoped prepared quote,
+explicit source-pixel consent and a finite cap. A smaller cap permits partial reading;
+remaining pages retain their legible disclosed originals.
 
 *A sample belongs to whoever paid for it.* The download path is built from
 ``current_user.id`` and a validated job id; no part of it comes from the URL, so
@@ -54,7 +54,7 @@ from ..constants import REFLOW_DIR
 from ..cw_login import current_user
 from ..services import parallel
 from ..services.reflow import (admission, build_epub, extract,
-                               ledger as ledger_mod, model, ocr, pipeline, retention, structural_pipeline, typed_model,
+                               ledger as ledger_mod, model, ocr, pipeline, retention, vision_quote, vision_reading,
                                 quote_preparation, source_assessment)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
@@ -378,7 +378,7 @@ def _resource_refusal(exc):
                 'Native capacity is busy, insufficient or unmeasurable. Retry after active work completes or an administrator restores capacity.', 503)
 
 
-CONSENT_CONTRACT='source-layout-1'
+CONSENT_CONTRACT=vision_quote.VERSION
 _PREPARATION_STORES={}
 _PREPARATION_LOCK=threading.Lock()
 
@@ -387,6 +387,8 @@ def _source_options(body):
     recovery=body.get('source_recovery','auto');language=body.get('ocr_language','eng')
     if recovery not in ('auto','textless','off') or not isinstance(language,str) or len(language)>64:
         raise ValueError('invalid source recovery options')
+    if recovery != 'auto' or language != 'eng':
+        raise ValueError('The pixel route uses automatic evidence recovery with English local OCR')
     parts=language.split('+')
     if not 1<=len(parts)<=4 or any(not ocr.LANGUAGE.fullmatch(p) for p in parts):
         raise ValueError('invalid OCR language')
@@ -397,7 +399,7 @@ def _quote_store():
     root=os.path.abspath(REFLOW_DIR)
     with _PREPARATION_LOCK:
         if root not in _PREPARATION_STORES:
-            _PREPARATION_STORES[root]=quote_preparation.PreparationStore(os.path.join(root,'typed-quotes'))
+            _PREPARATION_STORES[root]=quote_preparation.PreparationStore(os.path.join(root,'vision-quotes'))
         return _PREPARATION_STORES[root]
 
 
@@ -422,8 +424,8 @@ def _ready_quote(owner,book_id,identifier,source,options):
 
 
 def _estimate_payload(book, source):
-    # This fast assessment describes the source. Typed prices only come from
-    # complete source preparation and the actual two-stage request serializers.
+    # This fast assessment describes the source. Pixel-reading prices come from
+    # complete source preparation and the actual reader request serializers.
     quote=_survey(source);engine=_ocr_engine_state('eng')
     pages=int(quote.get('pages') or 0);fingerprint=_fingerprint(source)
     if quote.get('source_sha256') not in (None, fingerprint):
@@ -440,11 +442,12 @@ def _estimate_payload(book, source):
         'sampled':int(quote.get('sampled') or 0),'cached':bool(quote.get('cached')),
         'assessment_scope':quote.get('assessment_scope','sample'),
         'limits':{'max_pages':tasks_reflow.max_pages(),'max_pdf_mb':tasks_reflow.max_pdf_mb()},
-        'review':{'quality_released':structural_pipeline.QUALITY_RELEASED,'route_version':typed_model.ROUTE_VERSION,
-            'source_revision':typed_model.SOURCE_REVISION,'provider':'openai/flex','service_tier':'flex',
-            'scope':'uncertain source-wrapper choices',
-            'proposer':typed_model.STAGES['proposer'].model_id,'verifier':typed_model.STAGES['verifier'].model_id,
-            'max_output_tokens':typed_model.MAX_OUTPUT_TOKENS},
+        'target_usd':_target_usd(),
+        'review':{'quality_released':True,'route_version':vision_quote.VERSION,
+            'source_revision':vision_reading.VERSION,'provider':'openai','service_tier':'standard',
+            'scope':'printed-page pixel transcription', 'model':vision_reading.MODEL,
+            'proposer':vision_reading.MODEL,'verifier':'source-word and pixel evidence',
+            'max_output_tokens':20000},
         'recovery':{'ocr_candidates':int(quote.get('ocr_candidates') or 0),
             'image_only':int(quote.get('ocr_image_only') or 0),'damaged':int(quote.get('ocr_damaged') or 0),
             'estimated_seconds':quote.get('ocr_estimated_seconds'),
@@ -584,8 +587,7 @@ def reflow_start(book_id):
     except (TypeError,ValueError,OverflowError):return _err('invalid_options','Conversion options are invalid.',400)
     needed=0.0;quote=None
     if options.review_mode=='source_verified':
-        if not structural_pipeline.QUALITY_RELEASED:return _err('review_unavailable','AI formatting review is not available in this build. Source-only conversion is available.',409)
-        if not config.resolved_openrouter_key():return _err('not_configured','AI review needs a configured provider key. Source-only conversion is available.',400)
+        if not config.resolved_openrouter_key():return _err('not_configured','Pixel reading needs a configured provider key. Cached readings and original-page disclosures remain available.',400)
         cap=body.get('cost_cap_usd')
         if isinstance(cap,bool) or not isinstance(cap,(int,float)) or not math.isfinite(cap) or not 0<cap<=tasks_reflow.hard_cap_usd():
             return _err('invalid_cap','Choose a finite positive cap within the administrator limit.',400)
@@ -594,14 +596,14 @@ def reflow_start(book_id):
             return _err('estimate_stale','Prepare a current source estimate before AI review.',409)
         try:quote=_ready_quote(current_user.id,book_id,body.get('preparation_id'),source,source_options)
         except (KeyError,ValueError):return _err('estimate_stale','Prepare a current estimate for these source recovery settings.',409)
-        selected=(range(quote['first_body_page'],min(quote['source_context_pages'],quote['first_body_page']+options.sample_pages))
+        selected=(range(quote['sample_starts'][str(options.sample_pages)],min(quote['source_context_pages'],quote['sample_starts'][str(options.sample_pages)]+options.sample_pages))
                   if options.mode=='sample' else range(quote['source_context_pages']))
         needed=sum(p['full_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected)
         options.consent_quote=quote
         shared=parallel.run_blocking(tasks_reflow.instance_budget_status)
         if shared['status'] in ('disabled','unavailable'):
             return _err('instance_budget_unavailable','Shared AI review budget is unavailable. An administrator must configure or repair it; source-only conversion remains available.',409)
-        first_bound=next((p['proposer_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected and p['proposer_bound_usd']>0),0)
+        first_bound=next((p['primary_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected and p['primary_bound_usd']>0),0)
         if shared['status']=='exhausted' or shared['remaining_usd']<first_bound:
             return _err('instance_budget_exhausted','Shared AI review budget cannot fund the next request. Source-only conversion remains available.',409)
     options.source_sha256=fingerprint
@@ -614,23 +616,8 @@ def reflow_start(book_id):
                     "This book already has an EPUB. Choose 'replace the existing "
                     "EPUB' if you want Reflow to overwrite it.", 409)
 
-    # A chosen recovery with no engine to do it fails here, before consent or
-    # spend, naming the missing component -- never page by page after the money.
-    recovery = payload.get("recovery") or {}
-    recoverable = recovery.get("image_only", 0) + (
-        recovery.get("damaged", 0) if options.source_recovery == "auto" else 0)
-    if options.source_recovery != "off" and recoverable:
-        engine = _ocr_engine_state(options.ocr_language)
-        if not engine["available"]:
-            return _err(
-                "ocr_unavailable",
-                "This PDF has %d pages that need local text recognition, and %s "
-                "An administrator must install it, or the conversion can keep a "
-                "facsimile of the page images instead (Source recovery: none)."
-                % (recoverable, engine["detail"]), 422)
-
-    # A smaller cap authorizes a partial paid review. Every actual stage reserves
-    # its current bound; remaining pages retain complete deterministic output.
+    # A smaller cap authorizes partial paid reading. Every actual request reserves
+    # its current bound; unavailable readings retain disclosed source images.
     if _running_task(book_id) is not None:
         return _err("already_queued",
                     "A conversion of this book is already running", 409)

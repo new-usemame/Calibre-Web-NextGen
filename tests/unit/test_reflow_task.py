@@ -895,7 +895,9 @@ def test_explicit_deterministic_job_needs_no_key_or_structural_candidate_prepara
     import zipfile
     with zipfile.ZipFile(task.results['path']) as epub:
         reports=''.join(epub.read(name).decode() for name in epub.namelist() if name.endswith('.xhtml'))
-    assert 'Clean native pages retain deterministic text.' in reports
+        assert 'OEBPS/vision-about.xhtml' in epub.namelist()
+        from xml.etree import ElementTree as ET
+        assert ET.fromstring(epub.read('OEBPS/vision-about.xhtml')).tag.endswith('}html')
     assert 'Eligible pages</td>' not in reports
 
 

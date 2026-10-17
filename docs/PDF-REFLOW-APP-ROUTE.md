@@ -6,8 +6,9 @@ callers. The application does not ask a model to restyle extracted HTML.
 
 Clean native pages retain their source text. Pages that need reading are rendered
 as images and transcribed by the configured page-reading model. Local English OCR
-supplies alignment evidence. It is not used as a substitute for a model's
-transcription. Source ownership, note links, text quality, non-Latin handling,
+supplies alignment evidence. When a model reading is unavailable, bounded local
+OCR can also supply selectable text, with every word explicitly marked as an
+unverified reading and linked to its original source detail and complete page. Source ownership, note links, text quality, non-Latin handling,
 whole-book coverage, EPUB structure and output size are checked before publication.
 A passage that cannot be read safely remains available as an explicitly disclosed
 original-source image, including enlarged evidence where needed.
@@ -23,7 +24,8 @@ expected cost. Expected cost is an estimate, not a reservation or a promise.
 The per-book target is $0.50; the maximum allowed cap is $5, subject to a lower
 administrator limit. The user's authorized cap and the shared administrator budget
 must both permit each request. A cap below the quote can produce a partial set of
-readings, with original-source disclosures for the rest. Changing source, selected
+model readings. Remaining pages use visibly unverified local OCR where supported,
+with original-source disclosures for units that fail the quality checks. Changing source, selected
 pages or authorized cap requires consent again. A sample starts at the first body
 page found by the bounded front-of-PDF search, or the first PDF page if no body page
 is found there. Quote selection and conversion use the same start.
@@ -37,8 +39,11 @@ and are labeled as historical formatting-review jobs.
 
 With no provider key, no shared paid allowance, or paid reading switched off,
 the application still uses the vision converter. It keeps clean native text,
-reuses compatible cached readings, and discloses original-source images wherever
-no safe reading is available. It sends no new model request. It does not silently
+reuses compatible cached readings, and attempts bounded local OCR for remaining
+scans. Every local word stays visibly unverified, including words that agree with
+an existing OCR text layer. Each paragraph links to its source detail and complete
+original page. Weak or garbled units retain source images independently of healthy
+text; a whole-page image is used only when no unit can be kept safely. It sends no new model request. It does not silently
 substitute an older structural route or publish local OCR as a new model reading.
 The page offers this choice explicitly, with zero provider authorization.
 
@@ -52,7 +57,7 @@ A durable rejection completes that release after restart. Job-owned preparation
 checkpoints are fingerprinted and removed by interrupted-job recovery or retention.
 
 The job result and the embedded report count native pages, model readings and
-whole-page source disclosures separately. Confirmed spend, held liability and cap
+unverified local OCR pages and whole-page source disclosures separately. Confirmed spend, held liability and cap
 come from the same ledger. Financial details in the EPUB and its sidecar follow
 the report's cost-visibility setting. Job lists and samples stay owner-scoped.
 

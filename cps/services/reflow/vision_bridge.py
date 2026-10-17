@@ -6,6 +6,7 @@ The parent alone holds credentials and the authoritative financial ledger.
 import base64
 from contextlib import contextmanager
 import hashlib
+import fcntl
 import json
 import math
 import os
@@ -115,6 +116,51 @@ class ChildReader(vision_reading.Reader):
         return response
 
 
+def recover_unsent_receipts(cache, ledger):
+    """Remove only an exact unsent request after its authoritative release.
+
+    Page lock precedes job lock, matching Reader.read. Charged responses,
+    malformed receipts and dispatched attempts are never discarded here.
+    """
+    cache = Path(cache)
+    if not cache.is_dir() or cache.is_symlink(): return
+    for pending in cache.glob('*.pending'):
+        if (pending.is_symlink() or not re.fullmatch(
+                r'(?:marker-)?[a-f0-9]{64}-[a-f0-9]{64}\.pending', pending.name)):
+            continue
+        label = pending.stem.rsplit('-', 1)[0]
+        with (cache / (label + '.lock')).open('a') as page_lock:
+            fcntl.flock(page_lock, fcntl.LOCK_EX)
+            with open(ledger.path + '.lock', 'a') as job_lock:
+                fcntl.flock(job_lock, fcntl.LOCK_EX)
+                try:
+                    if pending.stat().st_size > 4096: continue
+                    receipt = json.loads(pending.read_text())
+                    if not isinstance(receipt, dict) or set(receipt) != {'reservation', 'bound_usd'}:
+                        continue
+                    entries = [json.loads(line) for line in Path(ledger.path).read_bytes().splitlines() if line.strip()]
+                    attempt = receipt['reservation']
+                    original = [e for e in entries if e.get('kind') == 'reservation'
+                        and e.get('event') == 'pending' and e.get('attempt') == attempt]
+                    released = any(e.get('kind') == 'reservation' and e.get('event') == 'released'
+                        and e.get('attempt') == attempt and e.get('reason') == 'worker_exited_before_dispatch'
+                        for e in entries)
+                    unsafe = any(e.get('attempt') == attempt and (e.get('kind') == 'vision_dispatch'
+                        or e.get('event') == 'reconciled' or e.get('cost_usd') is not None) for e in entries)
+                    if (not released or unsafe or len(original) != 1
+                            or original[0].get('page_label') != label
+                            or original[0].get('bound_usd') != receipt['bound_usd']):
+                        continue
+                    pending.unlink()
+                    fd = os.open(cache, os.O_RDONLY)
+                    try: os.fsync(fd)
+                    finally: os.close(fd)
+                except FileNotFoundError:
+                    continue
+                except (ValueError, TypeError, AttributeError):
+                    continue
+
+
 class ParentBroker:
     """One selected source scope, one real Reader, one consent authorizer."""
     def __init__(self, reader, source_sha256, pages, *, authorizer=None, should_stop=None):
@@ -130,6 +176,7 @@ class ParentBroker:
         recover = getattr(self.reader.ledger, 'recover_authoritative', None)
         if recover is not None:
             recover(worker_gone=True)
+            recover_unsent_receipts(self.reader.cache, self.reader.ledger)
 
     def handle(self, request):
         try:

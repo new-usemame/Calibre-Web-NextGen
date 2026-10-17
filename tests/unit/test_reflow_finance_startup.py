@@ -48,3 +48,26 @@ def test_startup_cannot_release_an_unsent_attempt_while_native_lease_is_live(rig
     assert Ledger(led.path,1).pending_usd()==.9
     rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[]))
     assert Ledger(led.path,1).pending_usd()==0
+
+
+@pytest.mark.parametrize('receipt_kind', ['unsent', 'charged', 'wrong_bound', 'malformed', 'dispatched'])
+def test_receipt_cleanup_removes_only_exact_released_unsent_request(tmp_path, receipt_kind):
+    import json
+    from cps.services.reflow.vision_bridge import recover_unsent_receipts
+    root=tmp_path/'state';store=Store(root,lambda:5)
+    ledger=SharedLedger(root/'jobs'/'5'/'job.jsonl',1,job_id='job',store=store,book_id=5,user_id=7)
+    label='a'*64;cache=root/'cache'/'vision';cache.mkdir(parents=True)
+    attempt=ledger.reserve_attempt(label,.2,context={'route_version':'vision-parent-v1'})
+    path=cache/(label+'-'+'b'*64+'.pending')
+    receipt=dict(reservation=attempt,bound_usd=.2)
+    if receipt_kind=='charged':receipt.update(cost_usd=.1,response={'synthetic':True})
+    if receipt_kind=='wrong_bound':receipt['bound_usd']=.3
+    if receipt_kind=='dispatched':ledger.record(dict(kind='vision_dispatch',attempt=attempt),durable=True)
+    path.write_text('{' if receipt_kind=='malformed' else json.dumps(receipt))
+    before=path.read_bytes()
+    ledger.recover_authoritative(worker_gone=True)
+    recover_unsent_receipts(cache,ledger)
+    recover_unsent_receipts(cache,ledger)
+    if receipt_kind=='unsent':assert not path.exists()
+    else:assert path.read_bytes()==before
+    assert ledger.pending_usd()==(.2 if receipt_kind=='dispatched' else 0)

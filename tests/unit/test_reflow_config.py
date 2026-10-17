@@ -315,3 +315,20 @@ def test_the_settings_form_saves_reflow_limits_and_shared_budget(monkeypatch):
         assert admin._configuration_update_helper() == {"saved": True}
     assert saved == {"config_reflow_max_pages": "1200", "config_reflow_max_pdf_mb": "250"}
     assert "config_reflow_instance_budget_usd" in saved_floats
+
+
+@pytest.mark.parametrize("typed,expected", [
+    ("0.00126", "0.00"), ("1.239999", "1.23"),
+    ("1.2300", "1.23"), ("0.009999999", "0.00"),
+    ("3.99999999999999999999", "3.99"), ("1e-3", "0.00")])
+def test_admin_dollar_limits_round_down_to_cents(monkeypatch, typed, expected):
+    from decimal import Decimal
+    from cps import admin as admin_mod
+    for field in ("config_reflow_target_usd", "config_reflow_hard_cap_usd",
+                  "config_reflow_instance_budget_usd"):
+        recorder = _Recorder(**{field: 5.0})
+        monkeypatch.setattr(admin_mod, "config", recorder)
+        admin_mod._config_float({field: typed}, field)
+        actual = Decimal(str(getattr(recorder, field)))
+        assert actual == Decimal(expected)
+        assert actual <= Decimal(typed)

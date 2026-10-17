@@ -1752,7 +1752,7 @@ def _figure_crop_margin(data, audit=None):
     Crops already surrounded by white paper retain their original encoding.
     """
     import io
-    from PIL import Image, ImageOps
+    from PIL import Image, ImageOps, ImageChops
     with Image.open(io.BytesIO(data)) as image:
         if audit is not None:
             audit['reading_image_geometry'] = dict(source_pixel_size=list(image.size),
@@ -1766,6 +1766,11 @@ def _figure_crop_margin(data, audit=None):
         if audit is not None:
             audit['reading_image_geometry'].update(packaged_pixel_size=list(padded.size),
                 padding=[margin]*4)
+        # Grayscale storage is lossless when all three channels are equal.
+        # Framing a gray source as RGB needlessly triples the filtered samples.
+        r,g,b=padded.split()
+        if ImageChops.difference(r,g).getbbox() is None and ImageChops.difference(r,b).getbbox() is None:
+            padded=r
         output = io.BytesIO()
         padded.save(output, format='PNG', optimize=True)
         return output.getvalue()
@@ -2400,7 +2405,8 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
                         figure.get('reading_bbox', bbox), trims))
                 # Outside the crop's failure handling: a crop the archive cannot take
                 # is a failed build, never a figure reported lost from the source.
-                package.image(src, _figure_crop_margin(data, figure))
+                writer = getattr(package, 'figure_image', package.image)
+                writer(src, _figure_crop_margin(data, figure))
     return missing, blanks
 
 
@@ -2621,10 +2627,25 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
             display = SourceDisplay(doc, pno, provenance)
             def package_source_image(src, data):
-                if pno in native_figures:
-                    package.image(src, data, store=True)
-                else:
-                    package.image(src, data)
+                # Inspection identities remain distinct; identical evidence bytes
+                # can share one archive member and retain every inspection link.
+                package._deduplicate_evidence = True
+                try:
+                    if pno in native_figures:
+                        package.image(src, data, store=True)
+                    else:
+                        package.image(src, data)
+                finally:
+                    package._deduplicate_evidence = False
+            def display_evidence(rect):
+                # Lossless native pixels and their source predicates are an
+                # existing evidence contract. Preserve them exactly; only lossy
+                # display copies use the bounded shared inspection encoder.
+                data=display.source_image(rect,scale=2 if pno in native_figures else 3,
+                    lossless_candidate=pno not in native_figures)
+                if pno in native_figures or data.startswith(b'\x89PNG\r\n\x1a\n') or not hasattr(package,'evidence_jpeg'):
+                    return data
+                return package.evidence_jpeg(display,rect,detail=True)
             source_edges = None
             def reading_crop(rect, data):
                 # Primary artwork and its enlarged inspection must agree. The full
@@ -2689,9 +2710,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                     reading_rect, edge_proof = display.complete_detail_rect(reading_rect)
                     rect = display.source_rect(reading_rect) * doc[pno].derotation_matrix
                 original_reading_rect = reading_rect
-                reading_rect, data, trims = reading_crop(reading_rect, display.source_image(reading_rect,
-                    scale=2 if pno in native_figures else 3,
-                    lossless_candidate=pno not in native_figures))
+                reading_rect, data, trims = reading_crop(reading_rect, display_evidence(reading_rect))
                 if any(t.get('action') == 'drop_scan_carrier' for t in trims):
                     continue
                 package_source_image(src, data)
@@ -2714,7 +2733,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 key = "layout_%d" % element_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)
                 rect, data, trims = reading_crop(extract.pymupdf.Rect(proof['reading_bbox']),
-                    display.source_image(proof['reading_bbox'], lossless_candidate=True))
+                    display_evidence(proof['reading_bbox']))
                 if any(t.get('action') == 'drop_scan_carrier' for t in trims):
                     continue
                 package.image(src, data)
@@ -2734,8 +2753,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                     _check_cancelled(should_stop)
                     key = "inspection_%d" % tile_index
                     src = "images/original_p%04d_%s.jpg" % (pno, key)
-                    trimmed_tile, data, trims = reading_crop(tile, display.source_image(tile,
-                        lossless_candidate=pno not in native_figures))
+                    trimmed_tile, data, trims = reading_crop(tile, display_evidence(tile))
                     if any(t.get('action') == 'drop_scan_carrier' for t in trims):
                         continue
                     package_source_image(src, data)
@@ -3008,7 +3026,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     # From here the book is written while it is built: each image goes into the
     # archive when it is rendered (_Package), and a build that stops for any reason
     # -- a cancel, a bad page, a full disk -- removes its half-written archive.
-    package = _Package(out_path)
+    from . import image_budget
+    package = _Package(out_path, source_bytes=image_budget.source_size(doc))
     try:
         from .native_text import package_glyphs
         if runtime_progress is not None:
@@ -3317,6 +3336,13 @@ def _resource_aliases(value,aliases):
     return value
 
 
+def _encoded_image_href(href, data):
+    """Name image resources for their encoded bytes, preserving caller aliases."""
+    extension = ('.png' if data.startswith(b'\x89PNG\r\n\x1a\n') else
+                 '.jpg' if data.startswith(b'\xff\xd8') else None)
+    return posixpath.splitext(href)[0] + extension if extension else href
+
+
 class _Package(object):
     """The EPUB archive, written while the book is built rather than after it.
 
@@ -3333,7 +3359,12 @@ class _Package(object):
     nothing else.
     """
 
-    def __init__(self, out_path):
+    def __init__(self, out_path, *, source_bytes=0):
+        from .image_budget import limit
+        limit(source_bytes)
+        self.source_bytes = source_bytes
+        self._image_digests = {}
+        self._resource_hashes = {}
         self.path = str(out_path)
         self.tmp = "%s.tmp" % self.path
         directory = os.path.dirname(self.path)
@@ -3355,15 +3386,40 @@ class _Package(object):
             self.abandon()
             raise
 
-    def image(self, href, data, *, store=False):
+    def evidence_jpeg(self, display, rect, *, detail=False):
+        from .image_budget import EvidenceRaster
+        if not hasattr(self, '_evidence_raster'):
+            self._evidence_raster = EvidenceRaster()
+        return self._evidence_raster.jpeg(display, rect, detail=detail)
+
+    def figure_image(self, href, data):
+        # The PNG/JPEG encoder already compressed these pixels. Avoid a second
+        # compressor and its in-flight workspace while streaming each plate.
+        self.image(href, data, store=True)
+
+    def disclosure_image(self, href, display, rect):
+        # Whole-page context has one physical owner. Separate cropped regions
+        # keep their identities even when their encoded samples are identical.
+        self._deduplicate_evidence = tuple(rect) == tuple(display.rect)
+        try:
+            self.image(href, self.evidence_jpeg(display, rect))
+        finally:
+            self._deduplicate_evidence = False
+
+    def image(self, href, data, *, store=False, deduplicate=False):
         requested=href
         png=data.startswith(b'\x89PNG\r\n\x1a\n')
-        if png and href.endswith('.jpg'):
-            href=href[:-4]+'.png'
+        href=_encoded_image_href(href,data)
         if requested in self.aliases or href in self.images:
             # A dictionary kept the last of two renders under one name; an archive
             # would keep both, and a reader could open either.
             raise ValueError("the image %s was rendered twice" % href)
+        import hashlib
+        digest = hashlib.sha256(data).hexdigest()
+        existing = self._image_digests.get(digest) if (deduplicate or getattr(self, '_deduplicate_evidence', False)) else None
+        if existing is not None:
+            self.aliases[requested] = existing
+            return
         if store:
             # These native-figure source assets are already JPEG/PNG encoded.
             # DEFLATE reserves a multi-megabyte workspace for each tile even
@@ -3374,6 +3430,8 @@ class _Package(object):
             self._zf.writestr(info, data)
         else:
             self._zf.writestr(posixpath.join(OEBPS, href), data)
+        self._image_digests[digest] = href
+        self._resource_hashes[href] = digest
         self.images[href] = len(data)
         self.media_types[href] = 'image/png' if png else 'image/jpeg'
         if requested!=href:self.aliases[requested]=href
@@ -3401,6 +3459,12 @@ class _Package(object):
         for href, text in parts["documents"].items():
             zf.writestr(posixpath.join(OEBPS, href), text)
         zf.close()
+        from .image_budget import check
+        try:
+            check(self.source_bytes, os.path.getsize(self.tmp))
+        except BaseException:
+            self.abandon()
+            raise
         os.replace(self.tmp, self.path)
         return self.path
 

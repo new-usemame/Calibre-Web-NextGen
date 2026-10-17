@@ -369,13 +369,22 @@ def _source_links(page, payload, page_count):
     return records
 
 
+class PasswordProtected(ValueError):
+    pass
+
+
 def open_document(source):
     """Open a PDF from a path or bytes. Failures are plain messages, not tracebacks."""
     if pymupdf is None:
         raise RuntimeError("Reflow needs PyMuPDF: pip install pymupdf")
     if isinstance(source, (bytes, bytearray)):
-        return pymupdf.open(stream=bytes(source), filetype="pdf")
-    return pymupdf.open(source)
+        doc = pymupdf.open(stream=bytes(source), filetype="pdf")
+    else:
+        doc = pymupdf.open(source)
+    if doc.needs_pass:
+        doc.close()
+        raise PasswordProtected("This PDF is password-protected. Remove its password before converting it.")
+    return doc
 
 
 def read_page(doc, pno, *, keep_char_boxes=False):

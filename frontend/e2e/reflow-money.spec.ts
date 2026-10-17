@@ -293,3 +293,26 @@ test('invalid cap is associated with its field and a failed preparation buys not
   await expect(page.locator('#reflow-cap-error')).toContainText('positive cap');
   expect(state.starts).toHaveLength(0); assertNoPageErrors(errors);
 });
+
+
+test('a durable early failure replaces the old result and keeps its reason after reload', async ({ page }) => {
+  const reason = 'This PDF is over the administrator size limit.';
+  const failed: ReflowJob = { ...reviewed, job_id: 'a'.repeat(16), mode: 'full',
+    status: 'failed', started: 3, finished: 4, spend_usd: 0, pending_usd: 0,
+    pages: 0, calls: 0, reused: 0, error: reason, artifact: undefined,
+    structural: undefined, sample_url: null, sample_ready: false };
+  const previous: ReflowJob = { ...reviewed, status: 'done', mode: 'full', pending_usd: 0 };
+  const { errors } = await stub(page, assessment(), [failed, previous]);
+  for (const reload of [false, true]) {
+    if (reload) await page.reload();
+    const result = page.locator('section[aria-labelledby="reflow-result"]');
+    await expect(result.getByRole('heading', { name: 'Failed', exact: true })).toBeVisible();
+    await expect(result.getByRole('alert')).toHaveText(reason);
+    await expect(page.getByRole('heading', { name: 'The book was converted', exact: true })).toHaveCount(0);
+    await expect(result.getByRole('link', { name: /Download/ })).toHaveCount(0);
+  }
+  const violations = (await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-result"]').analyze())
+    .violations.filter((issue) => issue.impact === 'critical' || issue.impact === 'serious');
+  expect(violations).toEqual([]);
+  assertNoPageErrors(errors);
+});

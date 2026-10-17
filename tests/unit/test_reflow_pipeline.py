@@ -382,12 +382,13 @@ def test_a_page_the_gate_refused_carries_no_marks(tmp_path):
 
 # --------------------------------------- R3: recovered source evidence survives
 
-def _recovery_with_uncertain(pno, token, score=20.0):
+def _recovery_with_uncertain(doc, pno, token, score=20.0):
     """The recovery state a local OCR run leaves when its engine was unsure of
     one word on the page: provenance, and the word as a source-evidence record."""
     from cps.services.reflow import ocr, source
-    word = ocr.OCRWord(token, (0, 0, 30, 10), (0, 0, 30, 10), (0, 0, 30, 10),
-                       score, 1, 1, 1)
+    boxes = [tuple(word[:4]) for word in doc[pno].get_text("words") if word[4] == token]
+    assert len(boxes) == 1
+    word = ocr.OCRWord(token, boxes[0], boxes[0], boxes[0], score, 1, 1, 1)
     spans = source.uncertain_spans(types.SimpleNamespace(words=(word,)))
     recovery = source.Recovery()
     recovery.provenance[pno] = source.PageRecovery(
@@ -418,7 +419,7 @@ def test_a_model_answer_keeps_the_recovered_uncertain_readings(tmp_path):
     own low-confidence evidence: the adopted page keeps the visible mark and the
     reportable source record (independent repro: low_confidence_marks=0)."""
     doc = _doc(F.prose_page, F.ambiguous_residue_page)
-    recovery = _recovery_with_uncertain(1, "Checklist")
+    recovery = _recovery_with_uncertain(doc, 1, "Checklist")
     try:
         result = _run_with_recovery(doc, FakeClient(), tmp_path, recovery)
     finally:
@@ -440,8 +441,8 @@ def test_a_warm_cache_replay_keeps_the_recovered_uncertain_readings(tmp_path):
     must re-derive the same source evidence at adoption, not replay the empty
     list and ship the page unmarked."""
     cache = pipeline.PageCache(str(tmp_path / "cache"))
-    recovery = _recovery_with_uncertain(1, "Checklist")
     doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    recovery = _recovery_with_uncertain(doc, 1, "Checklist")
     try:
         cold = _run_with_recovery(doc, FakeClient(), tmp_path, recovery, cache=cache)
     finally:

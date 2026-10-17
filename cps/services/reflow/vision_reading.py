@@ -643,6 +643,9 @@ class Reader:
                 if record['image_sha256']!=identity or record['config_sha256']!=config:
                     raise ValueError('Marker cache identity mismatch')
                 return dict(record,cached=True,new_cost_usd=0.)
+            if pending.with_suffix('.rejected').exists():
+                self._complete_direct_rejection(pending)
+                raise model.ModelError('Printed marker request was rejected unbilled; not retried')
             if pending.exists():raise model.UncertainBilling('Unreconciled marker reading; not retried')
             if not self.key:raise model.ModelError('Printed marker absent from offline cache')
             from PIL import Image
@@ -651,23 +654,19 @@ class Reader:
             output_bound=1024
             prompt_bound=len((prompt+json.dumps(api_schema)).encode())+1024+max(1024,2*math.ceil(w*h/750))
             bound=(prompt_bound*.1+output_bound*.5)/1e6
-            with self._budget():
-                self.ledger.reserve(bound)
-                if not self.financial_dispatch_allowed():raise model.UncertainBilling('Financial evidence blocks further marker dispatch')
-                reservation=self.ledger.reserve_attempt('marker-'+identity,bound,MODEL,'printed-marker-v1')
-                with open(self.ledger.path,'a') as data:data.flush();os.fsync(data.fileno())
-            pending.write_text(json.dumps({'reservation':reservation,'bound_usd':bound}))
-            payload={'model':MODEL,'messages':[{'role':'user','content':[
-                {'type':'text','text':prompt},{'type':'image_url','image_url':{
-                    'url':'data:image/jpeg;base64,'+base64.b64encode(image).decode(),'detail':'original'}}]}],
-                'reasoning':{'effort':'low'},'max_tokens':output_bound,
-                'response_format':{'type':'json_schema','json_schema':{'name':'printed_note_marker','strict':True,'schema':api_schema}},
-                'provider':{'order':['openai'],'allow_fallbacks':False,
-                            'max_price':{'prompt':.1,'completion':.5,'image':0}},'usage':{'include':True}}
-            import requests,time
-            start=time.monotonic()
-            response=requests.post(model.OPENROUTER_URL,headers={'Authorization':'Bearer '+self.key,
-                'HTTP-Referer':model.REFERER,'X-Title':'CWNG printed note marker'},json=payload,timeout=(30,120))
+            with self._direct_reservation(pending,bound,'marker-'+identity,'printed-marker-v1') as reservation:
+                pending.write_text(json.dumps({'reservation':reservation,'bound_usd':bound}))
+                payload={'model':MODEL,'messages':[{'role':'user','content':[
+                    {'type':'text','text':prompt},{'type':'image_url','image_url':{
+                        'url':'data:image/jpeg;base64,'+base64.b64encode(image).decode(),'detail':'original'}}]}],
+                    'reasoning':{'effort':'low'},'max_tokens':output_bound,
+                    'response_format':{'type':'json_schema','json_schema':{'name':'printed_note_marker','strict':True,'schema':api_schema}},
+                    'provider':{'order':['openai'],'allow_fallbacks':False,
+                                'max_price':{'prompt':.1,'completion':.5,'image':0}},'usage':{'include':True}}
+                import requests,time
+                start=time.monotonic()
+            response=self._direct_post(payload,pending,reservation,bound,
+                title='CWNG printed note marker',timeout=(30,120))
             response.raise_for_status();data=response.json();cost=float(data['usage']['cost'])
             if not math.isfinite(cost) or cost<0:raise model.UncertainBilling('Invalid marker bill')
             with self._budget():self.ledger.reconcile_attempt(reservation,cost)
@@ -682,6 +681,115 @@ class Reader:
             record=dict(receipt,**checked(json.loads(choice['message']['content'])))
             temp=path.with_suffix('.tmp');temp.write_text(json.dumps(record));os.replace(temp,path);pending.unlink()
             return dict(record,cached=False,new_cost_usd=cost)
+
+    @contextmanager
+    def _direct_reservation(self, pending, bound, label, version):
+        """Own the local setup window; the caller dispatches only after it exits."""
+        reservation = None
+        try:
+            with self._budget():
+                self.ledger.reserve(bound)
+                if not self.financial_dispatch_allowed():
+                    raise model.UncertainBilling('Financial evidence blocks further reading dispatch')
+                reservation = self.ledger.reserve_attempt(label,bound,MODEL,version)
+            yield reservation
+        except BaseException:
+            if reservation is not None:
+                # No transport call is inside this context. Even a partial
+                # pending write or payload-encoding failure is proven unbilled.
+                self._reject_direct(pending,reservation,bound,'local_pre_dispatch')
+            raise
+
+    def _write_direct_rejection(self, pending, reservation, bound, reason, status=None):
+        receipt = {'status':'REJECTED_UNBILLED','reservation':reservation,
+                   'bound_usd':bound,'reason':reason}
+        if status is not None:
+            receipt['http_status'] = status
+        temporary = pending.with_suffix('.rejected.tmp')
+        temporary.write_text(json.dumps(receipt))
+        with temporary.open('rb') as handle:
+            os.fsync(handle.fileno())
+        os.replace(temporary,pending.with_suffix('.rejected'))
+        directory = os.open(self.cache,os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+
+    def _complete_direct_rejection(self, pending):
+        """Finish terminal, proven-unbilled bookkeeping once across restarts."""
+        receipt = json.loads(pending.with_suffix('.rejected').read_text())
+        reason = receipt.get('reason')
+        valid = (receipt.get('status') == 'REJECTED_UNBILLED'
+                 and reason in ('local_pre_dispatch','pre_dispatch','rejected_before_generation')
+                 and (reason != 'rejected_before_generation'
+                      or receipt.get('http_status') in (400,401,402,403,404,413,422)))
+        with self._budget():
+            entries = self.ledger.entries('reservation')
+            attempt = receipt.get('reservation')
+            original = [e for e in entries if e.get('attempt') == attempt
+                        and e.get('event') == 'pending']
+            expected_label = pending.stem.rsplit('-',1)[0]
+            if (not valid or len(original) != 1
+                    or original[0].get('bound_usd') != receipt.get('bound_usd')
+                    or original[0].get('page_label') != expected_label
+                    or any(e.get('attempt') == attempt and e.get('event') == 'reconciled'
+                           for e in entries)
+                    or any(e.get('attempt') == attempt and e.get('cost_usd') is not None
+                           for e in self.ledger.entries() if e.get('kind') != 'reservation')):
+                raise model.UncertainBilling('Rejected reading has inconsistent financial evidence')
+            if attempt in self.ledger._financial_state()[1]:
+                self.ledger.release_attempt(attempt,reason)
+        pending.unlink(missing_ok=True)
+
+    def _reject_direct(self, pending, reservation, bound, reason, status=None):
+        try:
+            self._write_direct_rejection(pending,reservation,bound,reason,status)
+        except BaseException:
+            # This method is reached only with proof that no bill is possible.
+            # Even failed receipt storage cannot retain an unsent liability.
+            with self._budget():
+                self.ledger.release_attempt(reservation,reason)
+            pending.unlink(missing_ok=True)
+            raise
+        self._complete_direct_rejection(pending)
+
+    def _direct_post(self, payload, pending, reservation, bound, *, title, timeout):
+        """Share the common transport's proof rules without retrying a request.
+
+        Only pre-dispatch failures and documented pre-generation refusals can
+        release liability. A terminal receipt prevents rebuilding the same
+        refused request as though it were an unresolved bill or a fresh read.
+        """
+        import requests
+
+        try:
+            headers = {'Authorization':'Bearer ' + self.key,
+                       'HTTP-Referer':model.REFERER,'X-Title':title}
+        except BaseException:
+            self._reject_direct(pending,reservation,bound,'local_pre_dispatch')
+            raise
+        try:
+            response = requests.post(model.OPENROUTER_URL,
+                headers=headers,
+                json=payload, timeout=timeout)
+        except requests.RequestException as error:
+            if model._transport_was_pre_dispatch(error):
+                self._reject_direct(pending,reservation,bound,'pre_dispatch')
+                raise model.ModelError('Reading request failed before dispatch') from error
+            # Preserve callers' transport diagnostics; pending bytes and the
+            # durable bound remain untouched for every ambiguous outcome.
+            raise
+        # Lightweight fake success responses may omit status_code; real requests
+        # responses always carry it. Their existing success parser remains owner.
+        status = getattr(response, 'status_code', 200)
+        if status != 200:
+            if model._rejection_was_pre_generation(response):
+                self._reject_direct(pending,reservation,bound,'rejected_before_generation',status)
+                raise model.ModelError('Reading request rejected before generation: HTTP %s' % status)
+            raise model.UncertainBilling('Reading request may have been accepted: HTTP %s' % status,
+                                         held_usd=bound, attempt=reservation)
+        return response
 
     @contextmanager
     def _budget(self):
@@ -732,6 +840,9 @@ class Reader:
         output_bound=20000 if self.confidence_protocol else 10000
         bound=(prompt_bound*.1+output_bound*.5)/1e6
         pending=path.with_suffix('.pending')
+        if pending.with_suffix('.rejected').exists():
+            self._complete_direct_rejection(pending)
+            raise model.ModelError('Page request was rejected unbilled; not retried')
         if pending.exists():
             # A saved, charged, complete response may have unusable geometry.
             # Recover its transcription WITHOUT another request; coordinates are
@@ -767,24 +878,19 @@ class Reader:
                 return dict(prior,cached=True,new_cost_usd=0.)
             raise model.UncertainBilling('Unreconciled page reading; not retried')
         if not self.key:raise model.ModelError('Reading absent from offline cache')
-        with self._budget():
-            self.ledger.reserve(bound)
-            if not self.financial_dispatch_allowed():raise model.UncertainBilling('Financial evidence blocks further page dispatch')
-            reservation=self.ledger.reserve_attempt(identity,bound,MODEL,VERSION)
-            # The cap survives power loss, not only a clean Python restart.
-            with open(self.ledger.path,'a') as handle:handle.flush();os.fsync(handle.fileno())
-        pending.write_text(json.dumps({'reservation':reservation,'bound_usd':bound}))
-        payload={'model':MODEL,'messages':[{'role':'user','content':[
-            {'type':'text','text':self.prompt},{'type':'image_url','image_url':{
-                'url':'data:image/jpeg;base64,'+base64.b64encode(image).decode(),'detail':'original'}}]}],
-            'reasoning':{'effort':'low'},'max_tokens':output_bound,
-            'response_format':{'type':'json_schema','json_schema':{'name':'page_reading','strict':True,'schema':self.api_schema}},
-            'provider':{'order':['openai'],'allow_fallbacks':False,
-                'max_price':{'prompt':.1,'completion':.5,'image':0}},'usage':{'include':True}}
-        import requests,time
-        start=time.monotonic()
-        response=requests.post(model.OPENROUTER_URL,headers={'Authorization':'Bearer '+self.key,
-            'HTTP-Referer':model.REFERER,'X-Title':'CWNG vision page pilot'},json=payload,timeout=(30,240))
+        with self._direct_reservation(pending,bound,identity,VERSION) as reservation:
+            pending.write_text(json.dumps({'reservation':reservation,'bound_usd':bound}))
+            payload={'model':MODEL,'messages':[{'role':'user','content':[
+                {'type':'text','text':self.prompt},{'type':'image_url','image_url':{
+                    'url':'data:image/jpeg;base64,'+base64.b64encode(image).decode(),'detail':'original'}}]}],
+                'reasoning':{'effort':'low'},'max_tokens':output_bound,
+                'response_format':{'type':'json_schema','json_schema':{'name':'page_reading','strict':True,'schema':self.api_schema}},
+                'provider':{'order':['openai'],'allow_fallbacks':False,
+                    'max_price':{'prompt':.1,'completion':.5,'image':0}},'usage':{'include':True}}
+            import requests,time
+            start=time.monotonic()
+        response=self._direct_post(payload,pending,reservation,bound,
+            title='CWNG vision page reading',timeout=(30,240))
         response.raise_for_status();data=response.json()
         # Save the bill before interpreting the reading, even when it is unusable.
         cost=float(data['usage']['cost'])

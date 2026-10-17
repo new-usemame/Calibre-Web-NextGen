@@ -18,7 +18,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import List
 
-from . import extract, unit_recovery
+from . import extract, unit_recovery, text_quality
 
 #: Real English prose is 25-40% these words. OCR mojibake scores near zero, which is
 #: how "there is a text layer" is told apart from "there is a usable text layer".
@@ -66,6 +66,8 @@ def looks_like_prose(text):
     non-English prose garbage solely for its language: a page with letters mostly
     outside ASCII and which is full of words is prose its own language.
     """
+    if text_quality.inspect(text)['needs_read']:
+        return False
     words = _WORDS.findall((text or "").lower())
     if len(words) >= PROSE_MIN_WORDS and \
             sum(1 for w in words if w in STOPWORDS) / len(words) >= STOPWORD_MIN:

@@ -1670,6 +1670,21 @@ def _opaque_unowned_note_marker(opening, prose, pixel_probe, em, small, left):
     if not words:
         return None
     first = words[0]
+    parts = [span for span in opening.spans if span.text.strip()]
+    prefix = parts[0]
+    # A reliable native equality prefix on the lexical baseline defines a
+    # symbol key. An unowned raised component cannot change that source role.
+    # Independent printed openings and established notes use their own proofs.
+    if (prefix is not first and prefix.text.strip() == '='
+            and not opening.transcription_uncertain
+            and all(span.font != 'ocr' and not (span.uncertain
+                    or span.punctuation_uncertain or span.transcription_uncertain
+                    or span.encoding_unresolved) for span in (prefix, first))
+            and first.size*.9 <= prefix.size <= first.size*1.1
+            and 0 <= first.bbox[0]-prefix.bbox[2] <= first.size*2
+            and abs((prefix.origin_y or prefix.bbox[3])-
+                    (first.origin_y or first.bbox[3])) <= first.size*.125):
+        return None
     if first.bbox[0]-left > em*2.5:
         return None
     baseline_edge = max(sp.bbox[3] for sp in words)

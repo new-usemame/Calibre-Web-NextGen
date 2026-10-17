@@ -133,6 +133,7 @@ class Store:
             db.execute("""CREATE TABLE IF NOT EXISTS attempts (id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','settled','released')), bound TEXT NOT NULL, cost TEXT, created REAL NOT NULL CHECK(created>=0 AND created<1e20), settled REAL, identity TEXT NOT NULL, CHECK((state='pending' AND cost IS NULL AND settled IS NULL) OR (state!='pending' AND cost IS NOT NULL AND settled>=0 AND settled<1e20)))""")
             db.execute('CREATE INDEX IF NOT EXISTS liability_window ON attempts(state,settled)')
             db.execute('CREATE TABLE IF NOT EXISTS imported (path TEXT PRIMARY KEY, digest TEXT NOT NULL, size INTEGER NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS dispatches (id TEXT PRIMARY KEY)')
             if db.execute('PRAGMA quick_check').fetchone()[0]!='ok':raise BudgetError()
             blocked = db.execute("SELECT value FROM meta WHERE key='blocked'").fetchone()
             if blocked:raise BudgetError()
@@ -255,6 +256,82 @@ class Store:
             if ledger:identity['ledger']=str(Path(ledger).relative_to(self.root))
             db.execute('INSERT INTO attempts VALUES (?,?,?,?,?,?,?)',(attempt,'pending',str(bound),None,now,None,json.dumps(identity,sort_keys=True)))
 
+    def mark_dispatched(self, attempt):
+        """Publish a second durable transport witness before the job mirror."""
+        with self._locked() as (db, _now):
+            if not db.execute("SELECT 1 FROM attempts WHERE id=? AND state='pending'", (attempt,)).fetchone():
+                raise BudgetError()
+            db.execute('INSERT OR IGNORE INTO dispatches VALUES (?)', (attempt,))
+
+    def vision_job_ledgers(self):
+        """Discover durable parent-vision reservations before their mirror exists."""
+        with self._locked() as (db, _now):
+            paths = set()
+            for (raw,) in db.execute('SELECT identity FROM attempts'):
+                identity = json.loads(raw)
+                if identity.get('context', {}).get('route_version') == 'vision-parent-v1':
+                    relative = identity.get('ledger')
+                    path = Path(relative) if isinstance(relative, str) else None
+                    if (path is None or path.is_absolute() or '..' in path.parts
+                            or len(path.parts) != 3 or path.parts[0] != 'jobs'
+                            or path.suffix != '.jsonl'):
+                        raise BudgetError()
+                    paths.add(self.root / path)
+            return sorted(paths)
+
+    def reconcile_ledger(self, ledger, *, worker_gone=False):
+        """Repair the mirror; release unsent vision work only after exclusive exit proof.
+
+        The caller must exclude every native owner before passing worker_gone.
+        A strict ledger read is essential: a partial dispatch marker is ambiguous,
+        never evidence that transport did not start. Lock order matches Reader:
+        job ledger first, shared store second.
+        """
+        path = Path(ledger.path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(str(path) + '.lock', 'a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                raw = path.read_bytes() if path.exists() else b''
+                entries = [json.loads(line) for line in raw.splitlines() if line.strip()]
+                if any(not isinstance(e, dict) for e in entries): raise ValueError()
+                relative = str(path.relative_to(self.root))
+            except (OSError, ValueError, TypeError):
+                raise BudgetError() from None
+            ledger._entries = entries
+            dispatched = {e.get('attempt') for e in entries if e.get('kind') == 'vision_dispatch'}
+            with self._locked() as (db, now):
+                prior = db.execute('SELECT 1 FROM imported WHERE path=?', (relative,)).fetchone()
+                if not path.exists() and prior:
+                    raise BudgetError()
+                dispatched.update(row[0] for row in db.execute('SELECT id FROM dispatches'))
+                rows = list(db.execute('SELECT id,state,bound,cost,created,settled,identity FROM attempts'))
+                for attempt, state, bound, cost, created, settled, raw_identity in rows:
+                    identity = json.loads(raw_identity)
+                    if identity.get('ledger') != relative: continue
+                    parent_vision = identity.get('context', {}).get('route_version') == 'vision-parent-v1'
+                    if state == 'pending' and worker_gone and parent_vision and attempt not in dispatched:
+                        state, cost, settled = 'released', '0', now
+                        db.execute('UPDATE attempts SET state=?,cost=?,settled=? WHERE id=?',
+                                   (state, cost, settled, attempt))
+                    history = [e for e in ledger.entries('reservation') if e.get('attempt') == attempt]
+                    if not history:
+                        ledger.record(dict(kind='reservation', event='pending', attempt=attempt,
+                            bound_usd=float(money(bound)), ts=created, recovered=True), durable=True)
+                    if state == 'pending': continue
+                    event = 'reconciled' if state == 'settled' else 'released'
+                    terminal = [e for e in history if e.get('event') in ('reconciled', 'released')]
+                    if terminal:
+                        if any(e.get('event') != event or (state == 'settled' and
+                               money(e.get('cost_usd')) != money(cost)) for e in terminal):
+                            self._conflict(db)
+                        continue
+                    record = dict(kind='reservation', event=event, attempt=attempt,
+                                  ts=settled, recovered=True)
+                    if state == 'settled': record['cost_usd'] = float(money(cost))
+                    else: record['reason'] = 'worker_exited_before_dispatch' if attempt not in dispatched else 'authoritative_release'
+                    ledger.record(record, durable=True)
+
     def finish(self, attempt, cost=None):
         state='released' if cost is None else 'settled';cost=Decimal(0) if cost is None else money(cost)
         with self._locked() as (db,now):
@@ -270,9 +347,14 @@ class SharedLedger(Ledger):
         super().__init__(*args,**kwargs)
         self.store=store;self.book_id=book_id;self.user_id=user_id
 
+    def recover_authoritative(self, *, worker_gone=False):
+        self.store.reconcile_ledger(self, worker_gone=worker_gone)
+
     def record(self,entry,durable=False):
         entry=dict(entry);entry.setdefault('ts',self.store.clock())
         if entry.get('kind')=='job' and entry.get('event')=='start':entry['shared_budget_version']=1
+        if entry.get('kind') == 'vision_dispatch':
+            self.store.mark_dispatched(entry.get('attempt'))
         return super().record(entry,durable=durable)
 
     def reserve_attempt(self,page_label,bound_usd,model_id='',prompt_version='',context=None):

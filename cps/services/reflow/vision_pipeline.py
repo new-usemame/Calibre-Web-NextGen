@@ -4785,7 +4785,7 @@ def _prepare_scanned_page(doc,n,reader,controller,provenance,original_frames):
     return dict(display=display,**prepared),boundary_receipts
 
 
-def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None):
+def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,preparation_progress=None,native_prepared=None,original_frames=None,metadata=None):
     """Build an EPUB with explicit source-word disclosures and source-linked notes."""
     numbers=sorted(page_numbers if page_numbers is not None else range(len(doc)))
     # Scanned pages need their original rendering, not a native rawdict image
@@ -4809,13 +4809,20 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
     scanned=[n for n in numbers if n not in native and n not in source_pages]
     prepared=None
     if native:
+        def native_progress(event):
+            if preparation_progress:
+                preparation_progress(pipeline.Progress('native_preparation',
+                    page=min(len(native), max(0, int(event.page or 0))), pages=len(native)))
+        native_progress(pipeline.Progress('native_preparation'))
         source_prepared=native_prepared
         if source_prepared is None:
             source_prepared=getattr(controller,'native_prepared',None)
             if source_prepared is None:
-                source_prepared=pipeline.run(doc,page_numbers=native,recovery_opts={'mode':'off'})
+                source_prepared=pipeline.run(doc,page_numbers=native,recovery_opts={'mode':'off'},
+                    progress=native_progress if preparation_progress else None)
                 if controller:controller.native_prepared=source_prepared
         prepared=copy.deepcopy(source_prepared)
+        native_progress(pipeline.Progress('native_preparation', page=len(native)))
     book=prepared.book if prepared else assemble.Book()
     # Filter cached native preparation to the actual selected native pages.
     book.pages={n:els for n,els in book.pages.items() if n in native}
@@ -4891,9 +4898,13 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                 native_pages[pno]['asides'].extend(asides)
                 case.update(unit,unit_kind='figure');native_cases.append(case)
         scans={};boundary_receipts={}
-        for n in scanned:
+        for index,n in enumerate(scanned):
+            if preparation_progress:
+                preparation_progress(pipeline.Progress('source_reading', page=index, pages=len(scanned)))
             scans[n],receipts=_prepare_scanned_page(doc,n,reader,controller,provenance,original_frames)
             boundary_receipts.update(receipts)
+            if preparation_progress:
+                preparation_progress(pipeline.Progress('source_reading', page=index+1, pages=len(scanned)))
         # Resolve book-level roles before omitted-line recovery so an oversized
         # model illustration cannot swallow either live prose or a note tail.
         _note_ownership(scans)
@@ -5150,7 +5161,7 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         package.abandon();raise
 
 
-def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None,scratch_dir=None,job_id=None):
+def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,preparation_progress=None,native_prepared=None,original_frames=None,metadata=None,scratch_dir=None,job_id=None):
     """Complete source-owned units despite rejected readings or assembly units.
 
     Each failed publication attempt is abandoned. Its source-bound unit either
@@ -5194,13 +5205,14 @@ def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=No
             while True:
                 try:
                     return _convert_attempt(doc,out_path,reader,page_numbers=numbers,
-                        provenance=provenance,progress=progress,native_prepared=native_prepared,
+                        provenance=provenance,progress=progress,preparation_progress=preparation_progress,
+                        native_prepared=native_prepared,
                         original_frames=original_frames,metadata=metadata)
                 except unit_recovery.UnitFailure as failure:
                     controller.recover(failure)
 
 
-def convert(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None,scratch_dir=None,job_id=None):
+def convert(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,preparation_progress=None,native_prepared=None,original_frames=None,metadata=None,scratch_dir=None,job_id=None):
     """Publish source-owned units; persist bounded SOURCE-fatal diagnostics.
 
     Optional source-record metadata supplies OPF title, authors and language.
@@ -5208,7 +5220,8 @@ def convert(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=Non
     """
     try:
         return _convert_with_recovery(doc,out_path,reader,page_numbers=page_numbers,
-            provenance=provenance,progress=progress,native_prepared=native_prepared,
+            provenance=provenance,progress=progress,preparation_progress=preparation_progress,
+            native_prepared=native_prepared,
             original_frames=original_frames,metadata=metadata,scratch_dir=scratch_dir,job_id=job_id)
     except unit_recovery.SourceIntegrityError as error:
         import os,tempfile

@@ -49,6 +49,9 @@
 <div class="discover hardcover-review-page">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <h2>{{_('Hardcover Match Review 🔖')}}</h2>
+  <p style="margin-top: 10px;">
+    <a href="{{url_for('admin.hardcover_missing_ids')}}">🔍 {{_('Books without a Hardcover ID')}} ({{ missing_count }}) →</a>
+  </p>
   
   <div class="row" style="margin-top: 20px;">
     <div class="col-sm-12">

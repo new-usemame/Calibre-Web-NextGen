@@ -8,13 +8,15 @@ and the Jinja UI never diverge. All are per-user actions, so they require a real
 (non-anonymous) session — the anonymous-browse guest can't own favorites/hidden
 state or send mail.
 """
+import re
+
 from flask import jsonify, request
 
 from . import api_v1
-from .. import ub, config, calibre_db, user_library
+from .. import ub, config, calibre_db, db, user_library
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
-from ..helper import send_mail, valid_email
+from ..helper import convert_book_format, get_valid_filename, send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
 from ..cover_picker import designer_state
 from ..services import cover_extract, cover_url_validator, device_delivery, user_cover
@@ -22,6 +24,7 @@ from ..services.ereader_send import (
     ereader_addresses, other_users_with_ereader, record_email_activity,
     send_includes_own_address,
 )
+from ..services import kindle_usb
 from ..services.read_status import stop_reading as stop_reading_status
 
 BATCH_MEMBERSHIP_LIMIT = 200
@@ -533,6 +536,138 @@ def send_book_to_ereader(book_id):
         record_email_activity(current_user, book_id, book_format)
         return jsonify({"ok": True, "message": "Book queued for sending to %s" % recipients})
     return _err("send_failed", "There was an error sending the book: %s" % result, 502)
+
+
+# Formats a Kindle opens from a USB sideload, best first. EPUB is absent on purpose: Kindles only take
+# EPUB through Send-to-Kindle, so for USB an EPUB is converted to AZW3 instead.
+KINDLE_USB_FORMATS = ("AZW3", "MOBI", "AZW", "PDF", "TXT")
+KINDLE_USB_CONVERT_FROM = ("EPUB", "FB2", "DOCX", "HTMLZ", "ODT", "RTF")
+
+
+def kindle_usb_plan(available, converter_configured):
+    """Decide what to put on the Kindle: (format, convert_from).
+
+    An existing AZW3 wins. Otherwise a convertible source is turned into AZW3 when a converter is
+    configured (convert_from names the source). With neither, fall back to the best format the
+    Kindle can already read. (None, None) means nothing usable.
+    """
+    available = {f.upper() for f in available}
+    if "AZW3" in available:
+        return "AZW3", None
+    if converter_configured:
+        source = next((f for f in KINDLE_USB_CONVERT_FROM if f in available), None)
+        if source:
+            return "AZW3", source
+    return next(((f, None) for f in KINDLE_USB_FORMATS if f in available), (None, None))
+
+
+@api_v1.route("/books/<int:book_id>/kindle-usb", methods=["POST"])
+@login_required_if_no_ano
+def prepare_kindle_usb(book_id):
+    """Pick (converting if needed) the file the browser should push to a USB-connected Kindle.
+
+    The Kindle itself is reached from the browser over WebUSB, so the server only prepares the file.
+    Conversion runs inline: the SPA has to wait for it before it can start the transfer. Returns
+    {format, converted, filename, download_url}.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    if not current_user.role_download():
+        return _err("forbidden", "You don't have download permission", 403)
+
+    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True)
+    if book is None:
+        return _err("not_found", "Book not found", 404)
+
+    available = [d.format.upper() for d in book.data]
+    chosen, source = kindle_usb_plan(available, bool(getattr(config, "config_converterpath", None)))
+    converted = False
+    if source:
+        err = convert_book_format(book.id, config.get_book_path(), source, chosen,
+                                  current_user.name, blocking=True)
+        if err:
+            # A MOBI/PDF already in the library is still worth sending; only fail when there is nothing else.
+            chosen, source = kindle_usb_plan([f for f in available if f != "AZW3"], False)
+            if not chosen:
+                return _err("convert_failed", "Could not convert this book for a Kindle: %s" % err, 502)
+        else:
+            converted = True
+            calibre_db.session.expire_all()
+    if not chosen:
+        return _err("no_kindle_format", "No format of this book can be sent to a Kindle", 422)
+
+    data = calibre_db.get_book_format(book.id, chosen)
+    if data is None:
+        return _err("not_found", "The %s file is missing" % chosen, 404)
+    authors = " & ".join(a.name.replace("|", ",") for a in book.authors)
+    stem = "%s - %s" % (book.title, authors) if authors else book.title
+    # The Kindle's storage is FAT-like: strip what it rejects on top of get_valid_filename.
+    stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", get_valid_filename(stem, replace_whitespace=False))
+    return jsonify({
+        "format": chosen,
+        "converted": converted,
+        "filename": stem + "." + chosen.lower(),
+        # The download route ignores its trailing name segment, so leave it off: titles can hold # and ?.
+        "download_url": "/download/%s/%s" % (book.id, chosen.lower()),
+    })
+
+
+@api_v1.route("/kindle-usb/resolve", methods=["POST"])
+@login_required_if_no_ano
+def resolve_kindle_usb_files():
+    """Tell the browser which library books the files on a USB Kindle are.
+
+    Body: {files: [filename, ...]}. Returns {items: [{file, book}]} in the same order, `book` being
+    null for a file this library does not know. Only books the user may see are matched.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    if not current_user.role_download():
+        return _err("forbidden", "You don't have download permission", 403)
+
+    data = request.get_json(silent=True)
+    files = data.get("files") if isinstance(data, dict) else None
+    if (not isinstance(files, list) or len(files) > kindle_usb.MAX_FILES
+            or not all(isinstance(f, str) and len(f) <= 512 for f in files)):
+        return _err("invalid_request", "A list of file names is required", 400)
+
+    wanted = set()
+    for name in files:
+        wanted.update(key for key, _ in kindle_usb.candidate_keys(name))
+    title_index = {}
+    if wanted:
+        rows = calibre_db.session.query(db.Books.id, db.Books.title) \
+            .filter(calibre_db.common_filters(allow_show_archived=True)).all()
+        for book_id, title in rows:
+            key = kindle_usb.name_key(title)
+            if key in wanted:
+                title_index.setdefault(key, []).append(book_id)
+
+    books = {}
+    ids = {i for group in title_index.values() for i in group}
+    if ids:
+        for book in calibre_db.session.query(db.Books).filter(db.Books.id.in_(ids)).all():
+            books[book.id] = book
+    author_keys = {i: kindle_usb.book_author_keys([a.name for a in b.authors]) for i, b in books.items()}
+
+    from .serializers import cover_url_for  # local import, as in the covers helper above
+
+    items = []
+    for name in files:
+        book_id = kindle_usb.match_book(name, title_index, lambda i: author_keys.get(i, set()))
+        book = books.get(book_id)
+        items.append({
+            "file": name,
+            "book": None if book is None else {
+                "id": book.id,
+                "title": book.title,
+                "authors": [a.name.replace("|", ",") for a in book.authors],
+                "cover_url": cover_url_for(book, "sm"),
+            },
+        })
+    return jsonify({"items": items})
 
 
 @api_v1.route("/send-recipients", methods=["GET"])

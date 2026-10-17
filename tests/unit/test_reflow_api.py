@@ -1110,3 +1110,101 @@ def test_requested_models_exclude_cached_readings_and_unbilled_local_failures(tm
     record.record(dict(kind='vision_dispatch', attempt='unsent', model='synthetic-reader'))
     record.record(dict(kind='reservation', event='released', attempt='unsent', reason='pre_dispatch'))
     assert record.totals()['models'] == {'synthetic-reader': 1}
+
+
+@pytest.mark.parametrize('mode,quoted_ceiling', [('sample', 1.2), ('full', 24.0)])
+def test_replayed_preparation_cannot_authorize_more_than_the_hard_job_cap(
+        mod, monkeypatch, pdf_on_disk, mode, quoted_ceiling):
+    """A coverage quote is not spending permission, even when reused with fresh consent.
+
+    Removing the ledger's per-job admission check must allow the oversized
+    reservation and make this test fail; no provider transport is used.
+    """
+    from cps.services.reflow import admission, ledger, shared_budget
+    _wire(mod, monkeypatch, pdf_on_disk, hard_cap=500)
+    quote = _paid(mod, monkeypatch)
+    monkeypatch.setattr(mod.config, 'config_reflow_instance_budget_usd', 100.0)
+    first, added = _start(mod, {'mode': 'sample', 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 5})
+    assert _status(first) == 202
+    earlier = added.call_args[0][1]
+    admission.release(5, earlier)
+    oversized, refused = _start(mod, {'mode': mode, 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 24})
+    assert _status(oversized) == 400
+    assert _json(oversized)['error']['code'] == 'invalid_cap'
+    refused.assert_not_called()
+    result, added = _start(mod, {'mode': mode, 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 5})
+    assert _status(result) == 202
+    task = added.call_args[0][1]
+    try:
+        assert earlier.options.consent_quote is quote
+        assert task.options.consent_quote is quote
+        assert _json(result)['reservation_ceiling_usd'] == pytest.approx(quoted_ceiling)
+        assert mod.tasks_reflow.hard_cap_usd() == task.options.cost_cap_usd == 5
+        store = mod.tasks_reflow.instance_budget_store()
+        path = os.path.join(mod.REFLOW_DIR, 'jobs', '5', task.job_id + '.jsonl')
+        actual = shared_budget.SharedLedger(path, task.options.cost_cap_usd,
+            job_id=task.job_id, store=store, book_id=5, user_id=7)
+        actual.record({'kind': 'job', 'event': 'start', 'cap_usd': 5}, durable=True)
+        # Two independently valid requests must share the same job allowance.
+        held = actual.reserve_attempt('synthetic-first', 4.9)
+        assert actual.pending_usd() == pytest.approx(4.9)
+        with pytest.raises(ledger.CapExceeded):
+            actual.reserve_attempt('synthetic-next', .2)
+        with pytest.raises(ledger.CapExceeded):
+            actual.reserve_attempt('synthetic-full-coverage', 24)
+        assert actual.pending_usd() == pytest.approx(4.9)
+        assert store.status()['remaining_usd'] == pytest.approx(95.1)
+        actual.release_attempt(held, 'pre_dispatch')
+        assert actual.spent() == actual.pending_usd() == 0
+        assert store.status()['remaining_usd'] == 100
+    finally:
+        admission.release(5, task)
+
+
+def test_replayed_preparation_cannot_reserve_the_same_remaining_admin_money_twice(
+        mod, monkeypatch, pdf_on_disk):
+    """The shared store admits every attempt against its current remaining budget.
+
+    Removing shared admission makes the over-remaining reservation succeed and
+    fails the assertions, even though the job's own five-dollar cap permits it.
+    """
+    from cps.services.reflow import admission, shared_budget
+    _wire(mod, monkeypatch, pdf_on_disk)
+    quote = _paid(mod, monkeypatch)
+    store = mod.tasks_reflow.instance_budget_store()
+    store.reserve('synthetic-earlier-charge', 4.25, job='earlier', book=9,
+                  user=7, context={})
+    store.finish('synthetic-earlier-charge', 4.25)
+    assert store.status()['remaining_usd'] == .75
+    first, added = _start(mod, {'mode': 'sample', 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 5})
+    assert _status(first) == 202
+    admission.release(5, added.call_args[0][1])
+    full, added = _start(mod, {'mode': 'full', 'review_mode': 'source_verified',
+        'consent': True, 'cost_cap_usd': 5})
+    assert _status(full) == 202
+    task = added.call_args[0][1]
+    try:
+        assert task.options.consent_quote is quote
+        assert _json(full)['reservation_ceiling_usd'] == pytest.approx(24)
+        actual = shared_budget.SharedLedger(
+            os.path.join(mod.REFLOW_DIR, 'jobs', '5', task.job_id + '.jsonl'),
+            task.options.cost_cap_usd, job_id=task.job_id,
+            store=store, book_id=5, user_id=7)
+        actual.record({'kind': 'job', 'event': 'start', 'cap_usd': 5}, durable=True)
+        with pytest.raises(shared_budget.BudgetError):
+            actual.reserve_attempt('synthetic-sample-coverage', 1.2)
+        assert actual.pending_usd() == 0
+        attempt = actual.reserve_attempt('synthetic-next', .7)
+        assert store.status()['remaining_usd'] == pytest.approx(.05)
+        with pytest.raises(shared_budget.BudgetError):
+            actual.reserve_attempt('synthetic-later', .1)
+        assert actual.pending_usd() == pytest.approx(.7)
+        actual.release_attempt(attempt, 'pre_dispatch')
+        assert store.status()['remaining_usd'] == .75
+        assert actual.spent() == actual.pending_usd() == 0
+    finally:
+        admission.release(5, task)

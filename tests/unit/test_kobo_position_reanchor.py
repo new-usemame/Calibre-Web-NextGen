@@ -109,6 +109,16 @@ def test_a_position_in_the_devices_own_form_is_left_alone(tmp_path, source):
     assert (row.location_source, row.location_value) == (source, "kobo.4.1")
 
 
+def test_a_position_in_the_devices_own_form_whose_chapter_vanished_is_still_re_placed(tmp_path):
+    _kepub(tmp_path / "new.kepub.epub", NEW)
+    new = reanchor.KepubIndex(str(tmp_path / "new.kepub.epub"))
+    row = _row(location_source="c65e568b-0000-0000-0000-000000000567!OEBPS!Gone.xhtml",
+               location_value="kobo.92.1", progress_percent=50.0)
+
+    assert positions.reanchor_position_rows(None, new, [row], log=LOG) == [row]
+    assert row.location_source == "OEBPS/chap0009.xhtml"
+
+
 def test_a_chapter_name_with_an_exclamation_mark_is_not_read_as_a_content_id(tmp_path):
     _kepub(tmp_path / "new.kepub.epub", [("OEBPS/Wow!.xhtml", [("kobo.1.1", "Wow. " * 20)])])
     new = reanchor.KepubIndex(str(tmp_path / "new.kepub.epub"))

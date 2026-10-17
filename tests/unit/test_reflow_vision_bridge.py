@@ -73,7 +73,7 @@ def test_parent_owns_dispatch_and_settles_exact_charge_before_reply(tmp_path, mo
     assert state.ledger.pending_usd() == 0
     assert state.child.read(image())['cached'] is True
     assert len(state.calls) == 1
-    assert len(state.ledger.entries('reservation')) == 3  # hold + parent/child same-attempt settlements
+    assert [row['event'] for row in state.ledger.entries('reservation')] == ['pending', 'reconciled']
 
 
 def test_bridge_preserves_native_source_repair_without_reread(tmp_path, monkeypatch):

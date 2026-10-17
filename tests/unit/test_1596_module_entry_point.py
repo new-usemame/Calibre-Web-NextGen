@@ -232,7 +232,9 @@ class TestS6UnitsUseTheModule:
     def test_unit_invokes_the_module_with_safe_path(self, unit):
         body = unit.read_text()
 
-        command = "/usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -P -m cps"
+        runtime_flags = "-X faulthandler " if unit == SVC_RUN else ""
+        command = ("/usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 "
+                   + runtime_flags + "-P -m cps")
         assert command in body, (
             f"{unit.name} must start the app with a clean import environment: "
             "-P excludes the /config cwd, -u excludes an injected PYTHONPATH, "

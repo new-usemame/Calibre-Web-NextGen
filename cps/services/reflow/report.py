@@ -660,6 +660,7 @@ def vision_numbers(result, ledger, review_mode):
         'fidelity': {'pages': len(rows),
             'pages_deterministic': len(result.get('native_pages', [])),
             'pages_model': sum(bool(r.get('request_id')) for r in rows),
+            'pages_local_ocr': sum(bool(r.get('local_ocr')) for r in rows),
             'pages_disclosed': sum(r.get('source') == 'original_source' for r in rows),
             'uncertain_total': result.get('disclosure_count', 0),
             'degraded_units': result.get('degraded_unit_count', 0)},
@@ -705,9 +706,10 @@ def finalize_vision(path, payload, *, include_report_page=True, show_cost=False)
                         continue
                     cost = payload['cost']
                     text = ('<h2>Conversion result</h2><p>%d source pages; %d native pages; '
-                            '%d pages with disclosed original images.</p>' %
+                            '%d pages with disclosed original images; '
+                            '%d pages with unverified local OCR.</p>' %
                             (payload['fidelity']['pages'], payload['fidelity']['pages_deterministic'],
-                             payload['fidelity']['pages_disclosed']))
+                             payload['fidelity']['pages_disclosed'], payload['fidelity'].get('pages_local_ocr', 0)))
                     if show_cost:
                         text += ('<p>$%.6f confirmed; up to $%.6f unresolved; '
                                  '$%.2f authorized cap.</p>' %

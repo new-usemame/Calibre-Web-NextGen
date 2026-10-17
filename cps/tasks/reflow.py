@@ -422,6 +422,7 @@ class TaskReflowPdf(CalibreTask):
             pages=len(result.get('pages', {})), source_pages=document.page_count,
             uncertain_total=result.get('disclosure_count', 0), native_pages=len(result.get('native_pages', [])),
             vision_pages=len(result.get('vision_pages', [])),
+            local_ocr_pages=sum(bool(row.get('local_ocr')) for row in result.get('pages', {}).values()),
             disclosed_pages=sum(row.get('source') == 'original_source' for row in result.get('pages', {}).values()),
             disclosures=result.get('disclosure_count', 0), review_mode=self.options.review_mode)
         ledger.record(dict(kind='vision_summary', summary=summary), durable=True)

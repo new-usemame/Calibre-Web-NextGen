@@ -72,7 +72,7 @@ def test_actual_task_calls_vision_reader_without_a_structural_fallback(rig, monk
 
 
 @pytest.mark.parametrize('scanned', [False, True])
-def test_real_no_key_task_publishes_vision_native_text_or_disclosed_page(rig, monkeypatch, scanned):
+def test_real_no_key_task_publishes_native_or_unverified_local_scan_text(rig, monkeypatch, scanned):
     import requests
 
     def forbidden(*args, **kwargs):
@@ -92,8 +92,14 @@ def test_real_no_key_task_publishes_vision_native_text_or_disclosed_page(rig, mo
     assert set(map(int, sidecar['pages'])) == {0, 1}
     if scanned:
         assert sidecar['native_pages'] == []
-        assert sidecar['degraded_unit_count'] == 2
-        assert {u['page'] for u in sidecar['degraded_units'] if u['block'] is None} == {0, 1}
+        assert sidecar['degraded_unit_count'] == 0
+        assert all(row['local_ocr'] and row['unverified_source_reading']
+                   and row['words'] >= 11 and row['marks'] > 0 for row in sidecar['pages'].values())
+        assert sidecar['app_report']['fidelity']['pages_local_ocr'] == 2
+        assert sidecar['app_report']['fidelity']['pages_model'] == 0
+        from zipfile import ZipFile
+        with ZipFile(path) as package:
+            assert b'2 pages with unverified local OCR' in package.read('OEBPS/vision-about.xhtml')
     else:
         assert sidecar['native_pages'] == [0, 1]
         assert sidecar['degraded_unit_count'] == 0
@@ -101,6 +107,8 @@ def test_real_no_key_task_publishes_vision_native_text_or_disclosed_page(rig, mo
                           cap_usd=0, job_id=task.job_id)
     assert audit.spent() == audit.pending_usd() == 0
     assert audit.entries('reservation') == []
+    if scanned:
+        assert audit.entries('vision_summary')[-1]['summary']['local_ocr_pages'] == 2
     artifact = audit.entries('artifact')[-1]
     assert artifact['sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert task.results['sha256'] == artifact['sha256']

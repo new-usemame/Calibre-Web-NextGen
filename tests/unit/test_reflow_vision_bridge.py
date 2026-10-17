@@ -201,14 +201,19 @@ def test_actual_native_worker_builds_vision_candidate_without_provider(tmp_path)
     ledger = Ledger(state / 'job.jsonl', 0, job_id='synthetic-job')
     reader = vision_reading.Reader(None, state / 'reading-cache', ledger)
     output = tmp_path / 'candidate.epub'
+    events = []
     with native_ipc.NativeDocument(source, scratch_root=state / 'native-scratch',
-                                   cache_root=state) as doc:
+                                   cache_root=state, progress=events.append) as doc:
         report = doc.convert_vision(output, reader, metadata={'title':'Synthetic garden guide'})
         assert report['native_pages'] == [0]
         assert report['vision_pages'] == []
         assert report['new_cost_usd'] == 0
         assert report['source_document_sha256'] == doc.fingerprint
         assert doc.reader_broker is None
+    assert events[0].stage == 'native_preparation'
+    assert events[0].page == 0 and events[0].pages == 1
+    assert events[0].message == 'Preparing native source pages'
+    assert next(e for e in events if e.stage == 'vision').page == 1
     assert ledger.spent() == ledger.pending_usd() == 0
     with zipfile.ZipFile(output) as epub:
         assert json.loads(epub.read('META-INF/reflow.json')) == json.loads(json.dumps(report))
@@ -338,3 +343,76 @@ def test_dispatch_journal_failure_releases_the_proven_unsent_request(tmp_path, m
     assert Ledger(state.ledger.path, .1).spent() == 0
     assert Ledger(state.ledger.path, .1).pending_usd() == 0
     assert list(state.parent.cache.glob('*.rejected'))
+
+
+def test_scanned_preparation_reports_before_second_reader_and_propagates_cancel(tmp_path, monkeypatch):
+    from cps.services.reflow import model, vision_pipeline
+    from tests.unit.test_reflow_app_vision_route import _source
+    from tests.unit.test_reflow_task import _PixelSession
+    source = tmp_path / 'source.pdf'
+    _source(source, scanned=True, pages=2)
+    ledger = Ledger(tmp_path / 'job.jsonl', .1)
+    reader = vision_reading.Reader('inert-key', tmp_path / 'cache', ledger,
+                                  confidence_protocol='tokens', reuse_legacy=True)
+    provider = _PixelSession()
+    monkeypatch.setattr(requests, 'post', provider.post)
+    calls = []; events = []; completed = []
+    original = reader.read_unit
+    def read_unit(*args, **kwargs):
+        calls.append(len(calls))
+        if len(calls) == 2:
+            assert ('source_reading', 1, 2) in events
+        return original(*args, **kwargs)
+    monkeypatch.setattr(reader, 'read_unit', read_unit)
+    def preparation(event):
+        events.append((event.stage, event.page, event.pages))
+        if event.stage == 'source_reading' and event.page == 1:
+            assert len(calls) == 1
+            assert completed == [], 'A prepared reading is not yet a compiled page'
+            raise model.AttemptCancelled('Synthetic stop after one prepared source')
+    output = tmp_path / 'candidate.epub'
+    with pymupdf.open(source) as document:
+        with pytest.raises(model.AttemptCancelled, match='one prepared source'):
+            vision_pipeline.convert(document, str(output), reader,
+                preparation_progress=preparation, progress=lambda *args: completed.append(args))
+    assert events == [('source_reading', 0, 2), ('source_reading', 1, 2)]
+    assert len(calls) == len(provider.calls) == 1
+    assert ledger.spent() == pytest.approx(provider.cost) and ledger.pending_usd() == 0
+    assert not output.exists()
+
+
+def test_real_worker_preparation_cancel_keeps_second_scan_unsent(tmp_path, monkeypatch):
+    from cps.services.reflow import model
+    from tests.unit.test_reflow_app_vision_route import _source
+    from tests.unit.test_reflow_task import _PixelSession
+    source = tmp_path / 'source.pdf'
+    _source(source, scanned=True, pages=2)
+    state = tmp_path / 'state'
+    ledger = Ledger(state / 'job.jsonl', .1)
+    reader = vision_reading.Reader('inert-key', state / 'cache', ledger,
+                                  confidence_protocol='tokens', reuse_legacy=True)
+    provider = _PixelSession()
+    monkeypatch.setattr(requests, 'post', provider.post)
+    stopped = []; events = []
+    def preparation(event):
+        events.append(event)
+        if event.stage == 'source_reading' and event.page == 1:
+            assert len(provider.calls) == 1
+            assert not any(e.stage == 'vision' for e in events)
+            stopped.append(True)
+    output = tmp_path / 'candidate.epub'
+    with native_ipc.NativeDocument(source, scratch_root=state / 'native-scratch',
+            cache_root=state, ledger=ledger, progress=preparation,
+            should_stop=lambda: bool(stopped)) as document:
+        quote = document.vision_quote()
+        process = document.process
+        with pytest.raises(model.AttemptCancelled):
+            document.convert_vision(output, reader, quote=quote)
+    reading_events = [e for e in events if e.stage == 'source_reading']
+    assert [(e.page, e.pages) for e in reading_events] == [(0, 2), (1, 2)]
+    assert reading_events[-1].message == 'Reading scanned source pages'
+    assert len(provider.calls) == 1
+    assert ledger.spent() == pytest.approx(provider.cost) and ledger.pending_usd() == 0
+    assert process.poll() is not None
+    assert not output.exists()
+    assert list((state / 'native-scratch').iterdir()) == []

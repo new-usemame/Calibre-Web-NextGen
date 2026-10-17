@@ -292,13 +292,18 @@ def serve(parent, cache_root, control):
                                 completed.add(number)
                                 progress(pipeline.Progress('vision', page=len(completed), pages=len(numbers),
                                     message='Reading printed pages'))
+                            def vision_preparation_progress(event):
+                                labels = {'native_preparation': 'Preparing native source pages',
+                                          'source_reading': 'Reading scanned source pages'}
+                                emit({'progress': {'stage': event.stage, 'page': int(event.page),
+                                    'pages': int(event.pages), 'message': labels[event.stage]}})
                             job_id = args['job_id']
                             if job_id is not None:
                                 unit_recovery._job_component(job_id)
                             scratch = Path(cache_root) / 'conversion-scratch' if job_id is not None else root / 'conversion-scratch'
                             value = vision_pipeline.convert(doc, str(root / 'candidate.epub'), child_reader,
                                 page_numbers=numbers, metadata=args['metadata'], progress=vision_progress,
-                                scratch_dir=str(scratch), job_id=job_id or 'vision')
+                                preparation_progress=vision_preparation_progress, scratch_dir=str(scratch), job_id=job_id or 'vision')
                         elif op == 'survey':
                             if args: raise ValueError('survey fields')
                             value = source_assessment.survey(doc)

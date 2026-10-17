@@ -107,46 +107,41 @@ def rig(tmp_path, monkeypatch):
                            folder=folder, root=str(tmp_path / "reflow"))
 
 
-class _ChoicesSession:
-    """Inert provider boundary; real source choices, ledger, native child and compiler."""
-    def __init__(self, decision='approve', error=None, malformed=False):
-        from tests.unit.test_reflow_typed_transport import Session
-        self.transport=Session(); self.decision=decision; self.error=error
-        self.malformed=malformed; self.calls=[]; self.proposals={}
 
-    def get(self,*args,**kwargs): return self.transport.get(*args,**kwargs)
-
+class _PixelSession:
+    """Synthetic metered responses at the parent HTTP boundary."""
+    cost=.000123456789
+    def __init__(self,error=None,malformed=False):
+        self.calls=[];self.error=error;self.malformed=malformed
     def post(self,*args,**kwargs):
-        import json
-        from tests.unit.test_reflow_typed_transport import reply, Session
-        from cps.services.reflow.structural_quote import maximum_legal_ids
-        wire=json.loads(kwargs['data']); self.calls.append(wire)
-        if self.error: raise self.error
-        body=json.loads(wire['messages'][1]['content'][1]['text'])
-        response=dict(body['empty_response']); source=body['source']
-        if self.malformed or (self.decision=='partial' and 'select' in response and self.proposals):
-            content='invalid source-choice response'
-        else:
-            if 'select' in response:
-                response['select']=maximum_legal_ids(source['candidates'])
-                self.proposals[source['snapshot_id']]=response
-            else:
-                response['approve']=[] if self.decision=='decline' else source['verification']['proposed_ids']
-                if self.decision=='stale': response['snapshot_id']='0'*64
-            content=json.dumps(response)
-        data=reply(content); data['model']=wire['model']
-        return Session(data).post()
+        import json,requests
+        wire=kwargs['json'];self.calls.append(wire)
+        if self.error:raise self.error
+        text='The clear sample remains readable. Another simple line follows the first.'
+        block=dict(id='body',role='body',bbox=[70,80,960,230],marker='',
+                   continues_previous=False,continues_next=False,
+                   tokens=[dict(text=v,low_confidence=False) for v in text.split()])
+        content='invalid synthetic response' if self.malformed else json.dumps({'blocks':[block]})
+        response=requests.Response();response.status_code=200
+        response._content=json.dumps(dict(id='synthetic-generation-'+str(len(self.calls)),
+            model=wire['model'],provider='OpenAI',usage=dict(cost=self.cost,prompt_tokens=100,completion_tokens=100),
+            choices=[dict(finish_reason='stop',message=dict(content=content))])).encode()
+        return response
 
 
-def _small_review_pdf(rig):
-    """Keep failure-path fixtures below the real bounded request admission."""
-    doc = F.new_doc()
-    for index in range(3):
-        page = doc.new_page(width=500, height=700)
-        page.insert_text((80,100), '"Original source words on page %s remain complete."' % index, fontsize=12)
-        for y in (180,195,210):
-            page.insert_text((50,y), 'Ordinary body context supports the source display.', fontsize=12)
-    doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
+def _run_pixel_response(rig,monkeypatch,session):
+    from cps.services.reflow import vision_quote
+    from tests.unit.test_reflow_app_vision_route import _source
+    path=rig.folder/'Book - Author.pdf'
+    _source(path,scanned=True,pages=2)
+    with F.pymupdf.open(path) as document:quote=vision_quote.measure(document)
+    monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
+    monkeypatch.setattr(model_mod.requests,'post',session.post)
+    task=rig.mod.TaskReflowPdf(5,7,dict(mode='full',review_mode='source_verified',cost_cap_usd=1))
+    task.options.consent_quote=quote
+    task.options.source_sha256=quote['source_sha256']
+    task.run(None)
+    return task
 
 
 def _run(rig, **options):
@@ -188,10 +183,9 @@ def test_a_book_whose_pages_do_not_open_is_not_filed_in_the_library(rig, monkeyp
     # cannot change the fresh child's module globals.
     from cps.services.reflow.native_ipc import NativeDocument
     import zipfile
-    build = NativeDocument.build
-    def malformed(self, *args, **kwargs):
-        result = build(self, *args, **kwargs)
-        path = result.path
+    build = NativeDocument.convert_vision
+    def malformed(self, path, *args, **kwargs):
+        result = build(self, path, *args, **kwargs)
         with zipfile.ZipFile(path) as archive:
             entries = [(item, archive.read(item.filename)) for item in archive.infolist()]
         with zipfile.ZipFile(path, 'w') as archive:
@@ -200,7 +194,7 @@ def test_a_book_whose_pages_do_not_open_is_not_filed_in_the_library(rig, monkeyp
                     data = data.replace(b'</body>', b'<p>Catalogue 9 & 29</p></body>')
                 archive.writestr(item, data)
         return result
-    monkeypatch.setattr(NativeDocument, 'build', malformed)
+    monkeypatch.setattr(NativeDocument, 'convert_vision', malformed)
 
     task = _run(rig, mode="full", cost_cap_usd=1.0)
 
@@ -280,7 +274,7 @@ def test_required_audit_ledger_failure_still_fails_closed(rig, monkeypatch):
     real_record = ledger_mod.Ledger.record
 
     def fail_required_audit(self, entry, durable=False):
-        if entry.get("kind") == "operation_audit":
+        if entry.get("kind") == "vision_artifact":
             raise OSError("injected required audit failure")
         return real_record(self, entry, durable=durable)
 
@@ -302,31 +296,28 @@ def test_a_cancelled_job_does_not_file_a_half_reviewed_conversion(rig):
 
 
 def test_the_epubs_own_sidecar_keeps_the_cost_private_unless_the_user_shows_it(rig):
-    """``show_cost_in_report`` decides whether what a conversion cost travels
-    inside the book. The about page honoured it; the machine-readable twin in
-    META-INF/reflow.json carried the confirmed spend, the held amount, the cap,
-    the token counts and the per-model bill regardless -- readable by anyone the
-    file is shared with. Breaks if the sidecar is written from the unredacted
-    report payload again."""
+    """Sharing the EPUB cannot reveal the bill unless its owner opts in."""
     from cps.services.reflow import build_epub
-
-    private = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=0.75)
-    shown = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=0.75,
-                 show_cost_in_report=True)
-    for task in (private, shown):
-        assert task.stat == STAT_FINISH_SUCCESS, task.error
-
-    hidden = build_epub.read_sidecar(rig.mod.sample_path(7, private.job_id))
-    public = build_epub.read_sidecar(rig.mod.sample_path(7, shown.job_id))
-    money = {"usd", "pending_usd", "cap_usd", "calls", "reused", "prompt_tokens",
-             "completion_tokens", "models", "unresolved_attempts"}
-    assert not money & set(hidden.get("spend") or {}), hidden.get("spend")
-    assert hidden["spend"] == {"shown": False}
-    # The job's own record is where the owner reads what was spent; it is untouched.
-    assert _ledger_rows(rig)[0]["cap_usd"] == pytest.approx(0.75)
-    # The same conversion with the cost shown carries every figure the page shows.
-    assert public["spend"]["cap_usd"] == pytest.approx(0.75)
-    assert money <= set(public["spend"])
+    hidden_task=_run(rig,mode='sample',sample_pages=2,cost_cap_usd=.75)
+    public_task=_run(rig,mode='sample',sample_pages=2,cost_cap_usd=.75,show_cost_in_report=True)
+    for task in (hidden_task,public_task):assert task.stat==STAT_FINISH_SUCCESS,task.error
+    hidden=build_epub.read_sidecar(hidden_task.results['path'])
+    public=build_epub.read_sidecar(public_task.results['path'])
+    assert hidden['app_report']['cost']=={'shown':False}
+    forbidden={'spend_usd','pending_usd','cap_usd','cost_usd','new_cost_usd','bound_usd',
+               'prompt_tokens','completion_tokens','input_tokens','output_tokens','unresolved_attempts'}
+    def check(value):
+        if isinstance(value,dict):
+            assert not forbidden.intersection(value),forbidden.intersection(value)
+            for child in value.values():check(child)
+        elif isinstance(value,list):
+            for child in value:check(child)
+    check(hidden)
+    assert _ledger_rows(rig)[0]['cap_usd']==pytest.approx(.75)
+    assert hidden_task.results['report']['cost']['cap_usd']==pytest.approx(.75)
+    assert public['app_report']['cost']['cap_usd']==pytest.approx(.75)
+    assert public['app_report']['cost']['spend_usd']==public_task.results['report']['cost']['spend_usd']
+    assert public['app_report']['cost']['pending_usd']==public_task.results['report']['cost']['pending_usd']
 
 
 # ── the record ───────────────────────────────────────────────────────────────
@@ -338,27 +329,28 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
     assert row["job_id"] == task.job_id
     assert row["mode"] == "sample"
     assert row["user_id"] == 7
-    assert row["status"] == "limited"  # Explicit review was requested, but no key was configured.
+    assert row["status"] == "done"  # Native text and disclosed source pages complete without a key.
+    assert row["spend_usd"] == row["pending_usd"] == 0
     assert row["cap_usd"] == pytest.approx(0.75)
     assert row["started"] and row["finished"]
 
 
-def test_a_conversion_with_rejected_model_answers_does_not_say_it_finished(rig, monkeypatch):
-    from cps.services.reflow.structural_pipeline import TwoStageClient
-    _small_review_pdf(rig)
-    session=_ChoicesSession(malformed=True)
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
-    task=_run(rig,mode='full',cost_cap_usd=1)
+def test_rejected_pixel_answers_publish_only_disclosed_originals_and_keep_the_bill(rig,monkeypatch):
+    session=_PixelSession(malformed=True)
+    task=_run_pixel_response(rig,monkeypatch,session)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert session.calls, _ledger_rows(rig)
-    assert os.path.isfile(str(rig.folder/'Book - Author.epub'))
+    assert session.calls
+    assert (rig.folder/'Book - Author.epub').is_file()
     row=_ledger_rows(rig)[0]
-    assert row['structural']['rejected']>0
-    assert row['structural']['approved_operations']==0
-    assert row['status']=='incomplete'
-    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1).entries('operation_audit')
-    assert [e['event'] for e in audit]==['validated','emitted','published']
-    assert audit[0]['operations']==audit[1]['operations']==[]
+    payload=task.results['report']
+    assert payload['fidelity']['pages_model']==0
+    assert payload['fidelity']['pages_disclosed']==2
+    assert payload['cost']['spend_usd']==pytest.approx(len(session.calls)*session.cost)
+    assert row['spend_usd']==payload['cost']['spend_usd'] and row['pending_usd']==0
+    sidecar=rig.mod.build_epub.read_sidecar(task.results['path'])
+    assert all(page['source']=='original_source' for page in sidecar['pages'].values())
+    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1)
+    assert len([r for r in audit.entries('reservation') if r['event']=='reconciled'])==len(session.calls)
 
 
 def test_a_finished_conversion_releases_the_books_reservation(rig):
@@ -423,69 +415,52 @@ def test_only_the_reservations_own_task_can_release_it(rig):
     assert admission.reserve(5, worker, second)
 
 
-def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(
-        rig, monkeypatch):
-    """client → ledger → pipeline → job row: reconciliation is the durable debit,
-    the page record references the same attempt, and a reload counts the charge
-    once -- never zero, never twice."""
-    from cps.services.reflow.structural_pipeline import TwoStageClient
-    # Keep this successful-billing fixture within the explicit 48KB prompt
-    # admission. Large previous-page context is a separate refusal scenario.
-    _small_review_pdf(rig)
-    session = _ChoicesSession()
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
-    task = _run(rig, mode="full", cost_cap_usd=1.0)
-
-    assert task.stat == STAT_FINISH_SUCCESS, task.error
-    row = _ledger_rows(rig)[0]
-    path = os.path.join(rig.root, "jobs", "5", "%s.jsonl" % task.job_id)
-    entries = ledger_mod.Ledger(path, cap_usd=1.0).entries()
-    reconciled = [e for e in entries
-                  if e.get("kind") == "reservation" and e.get("event") == "reconciled"]
-    assert len(reconciled)==len(session.calls)==6, "all three page proposals and reviews reconciled durably"
-    assert row["spend_usd"] == pytest.approx(sum(e["cost_usd"] for e in reconciled))
-    assert row["pending_usd"] == 0.0
-    assert all("cost_usd" not in e for e in entries if e.get("kind")=="typed_stage")
-    assert row["status"] == "done", row["structural"]
+def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(rig,monkeypatch):
+    session=_PixelSession()
+    task=_run_pixel_response(rig,monkeypatch,session)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1)
+    reconciled=[e for e in audit.entries('reservation') if e['event']=='reconciled']
+    assert len(session.calls)==1,'Identical page pixels must reuse the first paid response.'
+    assert len(reconciled)==len(session.calls)
+    assert all(e['cost_usd']==session.cost for e in reconciled)
+    row=_ledger_rows(rig)[0]
+    assert row['spend_usd']==pytest.approx(sum(e['cost_usd'] for e in reconciled))
+    assert row['pending_usd']==0
+    assert task.results['report']['cost']['spend_usd']==row['spend_usd']
+    assert task.results['report']['fidelity']['pages_model']==2
+    assert row['status']=='done'
 
 
-def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
-        rig, monkeypatch):
-    """A lost answer after dispatch: the book still ships (its pages keep their
-    deterministic text), and the job record tells the truth -- stopped early,
-    with the unresolved amount held rather than reported as spent or as zero."""
+def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(rig,monkeypatch):
     import requests
-
-    from cps.services.reflow.structural_pipeline import TwoStageClient
-    _small_review_pdf(rig)
-    session=_ChoicesSession(error=requests.ReadTimeout('lost answer'))
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
-    task = _run(rig, mode="full", cost_cap_usd=1.0)
-
-    assert task.stat == STAT_FINISH_SUCCESS, task.error
-    assert "unresolved" in task.message
-    row = _ledger_rows(rig)[0]
-    assert row["status"] == "billing_unknown"
-    assert row["pending_usd"] > 0
-    assert row["spend_usd"] == 0.0, "nothing was confirmed"
-    assert len(session.calls)==1, "unknown billing must not retry or buy another page"
-    audit = ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),cap_usd=1)
-    pending = [r for r in audit.entries('reservation') if r['event']=='pending']
+    session=_PixelSession(error=requests.ReadTimeout('lost answer'))
+    task=_run_pixel_response(rig,monkeypatch,session)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert 'unresolved' in task.message
+    row=_ledger_rows(rig)[0]
+    assert row['status']=='billing_unknown'
+    assert row['pending_usd']>0 and row['spend_usd']==0
+    assert len(session.calls)==1,'Unknown billing must not retry or buy another page.'
+    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1)
+    pending=[r for r in audit.entries('reservation') if r['event']=='pending']
     assert len(pending)==1 and row['pending_usd']==pending[0]['bound_usd']
+    assert task.results['report']['cost']['pending_usd']==row['pending_usd']
+    assert task.results['report']['fidelity']['pages_disclosed']==2
 
 
 def test_a_job_that_failed_says_so_rather_than_disappearing(rig):
     from cps.services.reflow import report as report_mod
 
     def _disagree(_payload, _ledger):
-        return ["pages_sent 3 in the report, 0 in the ledger"]
+        raise ValueError("pages_sent 3 in the report, 0 in the ledger")
 
-    original = report_mod.check_completion
-    report_mod.check_completion = _disagree
+    original = report_mod.check_vision_completion
+    report_mod.check_vision_completion = _disagree
     try:
         task = _run(rig, mode="full", cost_cap_usd=1.0)
     finally:
-        report_mod.check_completion = original
+        report_mod.check_vision_completion = original
 
     assert task.stat == STAT_FAIL
     assert rig.local_db.session.commits == 0
@@ -536,7 +511,7 @@ def test_a_sample_starts_at_the_book_and_not_at_its_front_matter(rig):
     assert task.stat == STAT_FINISH_SUCCESS, task.error
     report = task.results["report"]
     assert report["fidelity"]["pages"] == 2
-    assert [row["page"] for row in report["structural"]["pages"]] == [1, 2]
+    assert report["vision"]["pages"] == [1, 2]
 
 
 def test_a_sample_of_a_long_book_reads_only_the_pages_it_needs(rig, monkeypatch):
@@ -557,10 +532,10 @@ def test_a_sample_of_a_long_book_reads_only_the_pages_it_needs(rig, monkeypatch)
     assert task.stat == STAT_FINISH_SUCCESS, task.error
     assert set(read) <= set(range(15)), sorted(set(read))
     report = task.results["report"]
-    assert [row["page"] for row in report["structural"]["pages"]] == [1, 2, 3]
+    assert report["vision"]["pages"] == [1, 2, 3]
     assert report["source"]["pages"] == 40
-    assert report["structural"]["source_context_pages"] == 15
-    assert report["structural"]["source_pages"] == 40
+    assert report["vision"]["source_context_pages"] == 15
+    assert report["vision"]["source_pages"] == 40
     assert report["structure"]["scope"] == "sample_context"
 
 
@@ -572,7 +547,7 @@ def test_a_sample_is_as_long_as_asked_when_the_front_matter_outruns_the_search(r
     task = _run(rig, mode="sample", sample_pages=3, review_mode="deterministic")
     assert task.stat == STAT_FINISH_SUCCESS, task.error
     report = task.results["report"]
-    assert [row["page"] for row in report["structural"]["pages"]] == [0, 1, 2]
+    assert report["vision"]["pages"] == [0, 1, 2]
 
 
 @pytest.mark.parametrize("limit", ["pages", "size"])
@@ -730,134 +705,47 @@ def test_a_book_that_never_ran_has_nothing_to_recover(rig):
     assert rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[])) == []
 
 
-def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, monkeypatch):
-    from cps.services.reflow import assemble
-    task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
-    convert = task._convert
-    def uncertain_pages(*args, **kwargs):
-        result = convert(*args, **kwargs)
-        for pno in result.book.pages:
-            result.book.notes.append(assemble.Note(num=1, text='Uncertain reference',
-                pno=pno, uncertain=True, bbox=(40,500,350,550)))
-        from cps.services.reflow.enriched_source import prepare_source_page
-        for pno in result.page_html:
-            canonical=prepare_source_page(result.book,pno,{'layer':'native'})
-            result.source_pages[pno]=canonical;result.page_html[pno]=canonical.html
-        return result
-    monkeypatch.setattr(task, '_convert', uncertain_pages)
-    rendered = []
-    trace = rig.mod.runtime_diagnostics.BuildTrace.__call__
-    def cancel_after_first(self, event):
-        trace(self, event)
-        if event.get('kind') == 'evidence_page':
-            rendered.append(event['page']); task.stat = STAT_ENDED
-    monkeypatch.setattr(rig.mod.runtime_diagnostics.BuildTrace, '__call__', cancel_after_first)
+def test_cancel_during_original_evidence_stops_rendering_without_filing(rig,monkeypatch):
+    from tests.unit.test_reflow_app_vision_route import _source
+    _source(rig.folder/'Book - Author.pdf',scanned=True,pages=2)
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','review_mode':'deterministic'})
+    observed=[]
+    original=task._on_progress
+    def cancel_after_first(event):
+        original(event)
+        if event.stage=='vision':
+            observed.append(event.page-1);task.stat=STAT_ENDED
+    monkeypatch.setattr(task,'_on_progress',cancel_after_first)
     task.run(None)
-    assert rendered == [0], 'cancellation must stop before another evidence raster'
-    assert rig.local_db.session.commits == 0
-    assert not os.path.exists(str(rig.folder / 'Book - Author.epub'))
-    rows = _ledger_rows(rig)
-    assert len(rows) == 1 and rows[0]['status'] == 'cancelled'
+    assert observed==[0], 'cancellation must stop before another source-page progress event'
+    assert rig.local_db.session.commits==0
+    assert not (rig.folder/'Book - Author.epub').exists()
+    rows=_ledger_rows(rig)
+    assert len(rows)==1 and rows[0]['status']=='cancelled'
 
 
-def test_actual_task_prepares_full_source_for_sample_and_files_exact_hash(rig,monkeypatch):
+def test_actual_task_runs_selected_vision_scope_and_files_exact_hash(rig,monkeypatch):
     import hashlib
-    from cps.services.reflow import structural_pipeline
+    from cps.services.reflow.native_ipc import NativeDocument
     observed={}
-    real=structural_pipeline.run_structural
-    def run(*args,**kwargs):
-        result=real(*args,**kwargs)
-        observed.update(source_pages=set(result.book.pages),output_pages=set(result.page_html),
-                        evidence=set(result.source_pages),plans=result.operation_plans)
+    actual=NativeDocument.convert_vision
+    def run(self,*args,**kwargs):
+        result=actual(self,*args,**kwargs)
+        observed.update(source_pages=self.page_count,output_pages=set(map(int,result['pages'])),
+                        selected=set(kwargs['page_numbers']))
         return result
-    monkeypatch.setattr(structural_pipeline,'run_structural',run)
+    monkeypatch.setattr(NativeDocument,'convert_vision',run)
     task=_run(rig,mode='sample',sample_pages=1,cost_cap_usd=1)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert len(observed['source_pages'])==3
-    assert len(observed['output_pages'])==1 and observed['output_pages']==observed['evidence']
-    assert observed['plans']==[]
-    with open(task.results['path'],'rb') as f:data=f.read()
+    assert observed['source_pages']==3
+    assert len(observed['output_pages'])==1 and observed['output_pages']==observed['selected']
+    data=open(task.results['path'],'rb').read()
     assert task.results['sha256']==hashlib.sha256(data).hexdigest()
     assert task.results['bytes']==len(data)
-    ledger=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),cap_usd=1)
-    assert ledger.entries('artifact')[-1]['sha256']==task.results['sha256']
+    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1)
+    assert audit.entries('artifact')[-1]['sha256']==task.results['sha256']
     assert rig.local_db.session.commits==0
 
-
-def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key(rig,monkeypatch):
-    monkeypatch.setattr(rig.mod.structural_pipeline,'QUALITY_RELEASED',False)
-    import requests
-    monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
-    def forbidden(*args,**kwargs):raise AssertionError('quality-gated task attempted network')
-    monkeypatch.setattr(requests.sessions.Session,'request',forbidden)
-    task=_run(rig,mode='full',cost_cap_usd=1)
-    assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert task.results['report']['stopped']=='quality_gate'
-    structural=task.results['report']['structural']
-    assert structural['approved_operations']==0
-    assert structural['unreviewed']==structural['eligible']
-    assert task.results['report']['spend']['usd']==0
-
-
-@pytest.mark.parametrize('decision',['decline','approve','stale','audit_failure','partial'])
-def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(rig,monkeypatch,decision):
-    approve=decision in ('approve','audit_failure','partial')
-    import json,zipfile
-    doc=F.new_doc();page=doc.new_page(width=500,height=700)
-    page.insert_text((80,100),'"Original displayed words remain exactly as printed."',fontsize=12)
-    for y in (180,195,210):page.insert_text((50,y),'Ordinary body context supports the source display.',fontsize=12)
-    if decision=='partial':
-        page=doc.new_page(width=500,height=700)
-        page.insert_text((80,100),'"Another displayed quotation remains complete on its source page."',fontsize=12)
-        for y in (180,195,210):page.insert_text((50,y),'Ordinary context also supports this displayed source.',fontsize=12)
-    doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
-    session=_ChoicesSession(decision=decision)
-    # All HTTP uses the inert boundary; source choices and publication stay real.
-    monkeypatch.setattr(rig.mod.structural_pipeline,'QUALITY_RELEASED',True)
-    monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
-    monkeypatch.setattr(model_mod.requests,'get',session.get)
-    monkeypatch.setattr(model_mod.requests,'post',session.post)
-    real_record=rig.mod.operation_audit.record
-    if decision=='audit_failure':
-        def fail(*args,**kwargs):raise OSError('private audit storage unavailable')
-        monkeypatch.setattr(rig.mod.operation_audit,'record',fail)
-        failed=_run(rig,mode='full',cost_cap_usd=1)
-        assert failed.stat==STAT_FAIL and len(session.calls)==2
-        assert not (rig.folder/'Book - Author.epub').exists()
-        monkeypatch.setattr(rig.mod.operation_audit,'record',real_record)
-    task=_run(rig,mode='full',cost_cap_usd=1)
-    assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert len(session.calls)==(3 if decision=='partial' else 2)
-    payload=task.results['report']
-    assert payload['structural']['proposed_pages']==1
-    assert payload['structural']['approved_pages']==int(approve)
-    proposed = next(iter(session.proposals.values()))
-    assert payload['structural']['approved_operations']==(len(proposed['select']) if approve else 0)
-    assert payload['structural']['rejected']==int(decision in ('stale','partial'))
-    assert payload['spend']['usd']==(0 if decision=='audit_failure' else (3 if decision=='partial' else 2)*.000123456789)
-    row=_ledger_rows(rig)[0]
-    assert row['spend_usd']==payload['spend']['usd']
-    assert row['structural']['approved_pages']==int(approve)
-    with zipfile.ZipFile(task.results['path']) as z:
-        body=''.join(z.read(n).decode() for n in z.namelist() if '/ch' in n and n.endswith('.xhtml'))
-    assert ('<blockquote' in body)==approve
-    import hashlib
-    assert task.results['sha256']==hashlib.sha256(open(task.results['path'],'rb').read()).hexdigest()
-    assert rig.local_db.session.commits==1
-    audit=list(ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1).entries('operation_audit'))
-    assert [e['event'] for e in audit]==['validated','emitted','published']
-    assert len(audit[0]['operations'])==int(approve)
-    assert len(audit[1]['operations'])==int(approve)
-    if approve:
-        operation=audit[0]['operations'][0]
-        assert operation['kind']=='quote'
-        assert len(operation['selected_text_sha256'])==64
-        assert len(operation['raster_sha256'])==64
-        assert len(operation['requests'])==2
-        assert {r['stage'] for r in operation['requests']}=={'proposer','verifier'}
-        assert audit[1]['operations'][0]['status']=='verified'
-        assert audit[1]['operations'][0]['epub_entry'].startswith('OEBPS/ch')
-    assert audit[2]['sha256']==task.results['sha256']
 
 @pytest.mark.parametrize('failure',['validation','database','cancel'])
 @pytest.mark.parametrize('existing',[False,True])
@@ -884,10 +772,11 @@ def test_failed_publication_preserves_previous_file_and_no_partial_format(rig,mo
     assert target.read_bytes()==original if existing else not target.exists()
     assert not list(rig.folder.glob('.reflow-*'))
     assert _ledger_rows(rig)[0].get('artifact') is None
-    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1).entries('operation_audit')
-    assert audit[0]['event']=='validated'
-    assert not any(e['event']=='published' for e in audit)
-    assert any(e['event']=='emitted' for e in audit)==(failure!='validation')
+    journal=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1)
+    assert len(journal.entries('vision_summary'))==1
+    assert not journal.entries('vision_publication')
+    assert len(journal.entries('vision_artifact'))==int(failure!='validation')
+    assert all(e['event']=='validated' for e in journal.entries('vision_artifact'))
 
 @pytest.mark.parametrize('existing',[False,True])
 def test_process_death_after_publication_restores_consistent_library(rig,monkeypatch,existing):
@@ -988,23 +877,24 @@ def test_existing_epub_filename_is_the_actual_replacement_target(rig):
     assert not (rig.folder/'Book - Author.epub').exists()
 
 
-def test_explicit_deterministic_job_needs_no_key_or_model_candidate_preparation(rig,monkeypatch):
+def test_explicit_deterministic_job_needs_no_key_or_structural_candidate_preparation(rig,monkeypatch):
     from cps.services.reflow import structural_ops
-    def forbidden(*args,**kwargs):raise AssertionError('deterministic conversion prepared AI candidates')
+    def forbidden(*args,**kwargs):raise AssertionError('Source-only conversion prepared structural AI candidates')
     monkeypatch.setattr(structural_ops,'prepare',forbidden)
     task=rig.mod.TaskReflowPdf(5,7,{'mode':'sample','sample_pages':1,'review_mode':'deterministic','cost_cap_usd':4})
     task.run(None)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert task.results['report']['stopped'] is None
     assert task.options.cost_cap_usd==0
-    structural=task.results['report']['structural']
-    assert structural['review_mode']=='deterministic' and structural['eligibility_measured'] is False
-    assert structural['approved_operations']==0 and structural['attempted_stages']==0
+    payload=task.results['report']
+    assert payload['route']=='vision'
+    assert payload['model']['review_mode']=='deterministic' and payload['model']['used'] is False
+    assert payload['cost']['spend_usd']==payload['cost']['pending_usd']==payload['cost']['cap_usd']==0
     assert os.path.isfile(task.results['path'])
     import zipfile
     with zipfile.ZipFile(task.results['path']) as epub:
         reports=''.join(epub.read(name).decode() for name in epub.namelist() if name.endswith('.xhtml'))
-    assert 'Eligibility was not measured' in reports and 'Eligible pages</td>' not in reports
+    assert 'Clean native pages retain deterministic text.' in reports
+    assert 'Eligible pages</td>' not in reports
 
 
 def test_changed_queued_source_is_rejected_before_preparation_or_dispatch(rig,monkeypatch):
@@ -1020,13 +910,14 @@ def test_changed_queued_source_is_rejected_before_preparation_or_dispatch(rig,mo
 
 
 def test_sample_source_change_during_build_never_publishes(rig,monkeypatch):
-    original=rig.mod.build_epub.build
+    from cps.services.reflow.native_ipc import NativeDocument
+    original=NativeDocument.convert_vision
     def changed(*args,**kwargs):
         built=original(*args,**kwargs)
         path=rig.folder/'Book - Author.pdf'
         path.write_bytes(path.read_bytes()+b'\n% replaced during build\n')
         return built
-    monkeypatch.setattr(rig.mod.build_epub,'build',changed)
+    monkeypatch.setattr(NativeDocument,'convert_vision',changed)
     task=_run(rig,mode='sample',review_mode='deterministic')
     assert task.stat==STAT_FAIL and 'source changed' in (task.error or '').lower()
     assert not os.path.isfile(rig.mod.sample_path(7,task.job_id))
@@ -1131,10 +1022,11 @@ def test_a_staging_folder_orphaned_before_publication_is_removed_on_recovery(rig
     target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
     task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True,'review_mode':'deterministic'})
     def child():
-        def die(book,out_path,**_kwargs):
-            with open(out_path+'.tmp','wb') as partial:partial.write(b'PK half an EPUB')
+        def die(path):
+            assert os.path.basename(os.path.dirname(path))=='.reflow-%s-staging'%task.job_id
+            with open(path+'.tmp','wb') as partial:partial.write(b'PK half an EPUB')
             os._exit(86)
-        monkeypatch.setattr(rig.mod.build_epub,'build',die);task.run(None)
+        monkeypatch.setattr(rig.mod.build_epub,'validate',die);task.run(None)
     assert run_forked(child,60)==86
     assert list(rig.folder.glob('.reflow-*'))
     assert rig.mod.recover_interrupted_jobs()==[task.job_id]
@@ -1170,23 +1062,41 @@ def test_a_transient_failure_on_a_later_pass_never_moves_the_evidence(rig,monkey
     assert rig.mod.publication.pending(led) is not None
 
 
-def test_actual_free_task_files_builder_glyph_images_after_internal_validation(rig,monkeypatch):
-    """Exercise the actual task's builder/validator/publication seam, without AI."""
+def test_actual_free_task_discloses_original_pixels_for_an_unreadable_symbolic_font(rig,monkeypatch):
+    """A source-only pixel route keeps unresolved font ink as disclosed imagery."""
     from cps.services.reflow import extract
-    import zipfile
-    # Set the symbolic flag in the actual fixture PDF so the child sees the same
-    # mapping defect; no cross-process monkeypatch is part of the product contract.
-    path = rig.folder/'Book - Author.pdf'
+    from PIL import Image
+    import io,zipfile
+    path=rig.folder/'Book - Author.pdf'
     with extract.pymupdf.open(path) as doc:
         for font in doc[1].get_fonts():
-            doc.xref_set_key(font[0], 'FontDescriptor', '<< /Type /FontDescriptor /Flags 4 >>')
+            doc.xref_set_key(font[0],'FontDescriptor','<< /Type /FontDescriptor /Flags 4 >>')
         doc.saveIncr()
     task=_run(rig,mode='full',cost_cap_usd=0)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
     target=str(rig.folder/'Book - Author.epub')
     assert rig.mod.build_epub.validate(target)==[]
+    sidecar=rig.mod.build_epub.read_sidecar(target)
+    assert sidecar['pages']['1']['source']=='original_source'
+    assert sidecar['source_document_sha256']==extract.document_fingerprint(path)
+    original=next(unit for unit in sidecar['degraded_units'] if unit['page']==1 and unit['block'] is None)
     with zipfile.ZipFile(target) as archive:
-        assert any(b'class="source-glyph"' in archive.read(n) for n in archive.namelist() if n.endswith('.xhtml'))
+        name=original['source_image']
+        if not name.startswith('OEBPS/'):name='OEBPS/'+name
+        with Image.open(io.BytesIO(archive.read(name))) as image:
+            assert image.width>=500 and image.height>=700
+            assert image.convert('L').getextrema()[0]<200
+        from xml.etree import ElementTree as ET
+        roots=[ET.fromstring(archive.read(n)) for n in archive.namelist() if n.endswith('.xhtml')]
+        controls=[node for root in roots for node in root.iter()
+                  if node.get('id')==original['source_reference_origin']]
+        assert len(controls)==1 and controls[0].get('href','').startswith('#')
+        targets=[node for root in roots for node in root.iter()
+                 if node.get('id')==controls[0].get('href')[1:]]
+        assert len(targets)==1
+        assert any(node.tag.endswith('}img') and node.get('src')==original['source_image']
+                   for node in targets[0].iter())
+    assert task.results['report']['cost']['spend_usd']==0
     assert rig.local_db.session.commits==1
 
 

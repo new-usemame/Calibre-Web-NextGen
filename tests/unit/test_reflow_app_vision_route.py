@@ -1,11 +1,9 @@
 """Synthetic app jobs bind pixel conversion to the source and consented requests."""
 import base64
-import copy
 import hashlib
 import inspect
 import io
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pymupdf
@@ -210,7 +208,8 @@ def test_consent_authorizes_the_actual_reader_payload_once_per_allowance(tmp_pat
         authorizer.authorize(payload, context)
 
 
-@pytest.mark.parametrize('mutation', ['source', 'pixels', 'schema', 'prompt', 'model', 'bound', 'page'])
+@pytest.mark.parametrize('mutation', ['source', 'pixels', 'schema', 'prompt', 'model', 'bound', 'page',
+    'role', 'strict', 'usage', 'extra', 'content_type'])
 def test_consent_rejects_a_request_outside_its_exact_source_and_wire_contract(tmp_path, mutation):
     from cps.services.reflow import vision_quote
     from cps.services.reflow.unit_recovery import SourceIntegrityError
@@ -235,8 +234,42 @@ def test_consent_rejects_a_request_outside_its_exact_source_and_wire_contract(tm
         payload['model'] = 'synthetic-other-model'
     elif mutation == 'bound':
         context['bound_usd'] += .01
+    elif mutation == 'role':
+        payload['messages'][0]['role'] = 'system'
+    elif mutation == 'strict':
+        payload['response_format']['json_schema']['strict'] = False
+    elif mutation == 'usage':
+        payload['usage']['include'] = False
+    elif mutation == 'extra':
+        payload['seed'] = 7
+    elif mutation == 'content_type':
+        payload['messages'][0]['content'][0]['type'] = 'synthetic_other_type'
     else:
         context['page_index0'] = 1
     authorizer = vision_quote.Authorizer(quote, extract.document_fingerprint(source), [0])
     with pytest.raises(SourceIntegrityError, match='consented'):
         authorizer.authorize(payload, context)
+
+
+def test_disabling_the_report_removes_its_document_and_all_navigation_references(rig):
+    import zipfile
+    from xml.etree import ElementTree as ET
+    _source(rig.folder / 'Book - Author.pdf')
+    task = _run(rig, include_report_page=False)
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert build_epub.validate(task.results['path']) == []
+    with zipfile.ZipFile(task.results['path']) as archive:
+        assert 'OEBPS/vision-about.xhtml' not in archive.namelist()
+        for name in ('OEBPS/content.opf', 'OEBPS/nav.xhtml', 'OEBPS/toc.ncx'):
+            root = ET.fromstring(archive.read(name))
+            assert not any(node.get('href') == 'vision-about.xhtml' or
+                           node.get('src') == 'vision-about.xhtml' or
+                           node.get('id') == 'about' or node.get('idref') == 'about'
+                           for node in root.iter()), name
+        # Dropping the generated report must leave the converted book navigable.
+        opf = ET.fromstring(archive.read('OEBPS/content.opf'))
+        ns = '{http://www.idpf.org/2007/opf}'
+        manifest = {item.get('id'): item.get('href') for item in opf.find(ns + 'manifest')}
+        spine = [manifest[item.get('idref')] for item in opf.find(ns + 'spine')]
+        assert any(name.startswith('ch') and name.endswith('.xhtml') for name in spine)
+        assert build_epub.read_sidecar(task.results['path'])['app_report']['route'] == 'vision'

@@ -322,3 +322,19 @@ def test_actual_worker_sample_origin_is_native_and_validated(tmp_path):
         with pytest.raises(ValueError, match='sample size'):
             native.vision_sample_start(True)
     assert list((tmp_path / 'scratch').iterdir()) == []
+
+
+def test_dispatch_journal_failure_releases_the_proven_unsent_request(tmp_path, monkeypatch):
+    state = rig(tmp_path, monkeypatch)
+    record = state.ledger.record
+    def fail_dispatch(entry, durable=False):
+        if entry.get('kind') == 'vision_dispatch':
+            raise OSError('Synthetic dispatch journal failure')
+        return record(entry, durable=durable)
+    monkeypatch.setattr(state.ledger, 'record', fail_dispatch)
+    with pytest.raises(OSError, match='Synthetic dispatch journal failure'):
+        state.child.read(image())
+    assert state.calls == []
+    assert Ledger(state.ledger.path, .1).spent() == 0
+    assert Ledger(state.ledger.path, .1).pending_usd() == 0
+    assert list(state.parent.cache.glob('*.rejected'))

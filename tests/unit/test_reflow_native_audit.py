@@ -138,77 +138,83 @@ def test_parent_rejects_malformed_child_evidence(image_quote,tmp_path,monkeypatc
         with pytest.raises(ValueError):audit.capture(result,73,document=doc)
 
 
-def cached_fixture_conversion(book, raw, document, client, ledger, cache):
-    """Synthetic exact-current typed receipts, not a reused paid source receipt.
-    Keep the real pipeline's two-stage admission/cache/ledger path at cap0."""
-    from cps.services.reflow import enriched_source, pipeline, structural_pipeline, typed_model, prompts
-    from cps.services.reflow.operation_cache import OperationCache
-    canonical=enriched_source.prepare_source_page(book,0,{'layer':'native'})
-    prepared=ops.prepare(book,document,0,typed_model.SOURCE_REVISION,{'layer':'native'},
-        source_page=canonical,raw_page=raw)
-    selected=next(c['candidate_id'] for c in prepared.candidates() if c['kind']=='quote')
-    proposal=dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[selected])
-    plan=prepared.accept(book,document,proposal,source_page=canonical)
-    verification=ops.prepare_verification(book,document,plan,source_page=canonical)
-    # Public typed response contract is carried by the prompt, not invented here.
-    request1=prompts.operation_request(prepared.model_view())
-    request2=prompts.verification_request(verification.model_view())
-    import json
-    verify=json.loads(request2['messages'][1]['content'][1]['text'])['empty_response']
-    verify['approve']=[selected]
-    cache=OperationCache(cache.directory)
-    for stage,request,response in [('proposer',request1,proposal),('verifier',request2,verify)]:
-        wire=client.stages[stage].prepare_request(request,prepared.raster)
-        token,saved=cache.claim(wire.sha256)
-        if saved is None:cache.finish(wire.sha256,token,response=response)
-    value=pipeline.ReflowResult(book=book,raw_pages=[raw],page_html={0:build_epub.page_fragment(book,0)},
-        fingerprint=document.fingerprint)
-    return structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
-        prepared_result=value)
 
-
-@pytest.mark.parametrize('failure',[None,'death','cancel'])
-def test_real_task_audits_image_without_parent_native_work_or_publication_on_failure(
-        rig,image_quote,tmp_path,monkeypatch,failure):
-    import os,signal,shutil,pymupdf
+@pytest.mark.parametrize('failure', [None, 'death', 'cancel'])
+def test_real_task_audits_source_image_without_parent_native_work_or_publication_on_failure(
+        rig, image_quote, monkeypatch, failure):
+    import hashlib
+    import os
+    import signal
+    import pymupdf
     from pathlib import Path
-    from cps.services.reflow import structural_pipeline,ledger as ledger_mod
-    from cps.services.worker import STAT_FINISH_SUCCESS,STAT_FAIL,STAT_ENDED
-    result,original,_=image_quote;raw=extract.read_page(original,0)
-    shutil.copyfile(original.name,rig.folder/'Book - Author.pdf')
-    previous=rig.folder/'Book - Author.epub';previous.write_bytes(b'prior image-audit artifact')
-    rig.formats['EPUB']=SimpleNamespace(name='Book - Author',format='EPUB')
-    client=structural_pipeline.TwoStageClient('inert-never-sent',enabled=True)
-    monkeypatch.setattr(rig.mod,'make_client',lambda *_:client)
-    def convert(self,document,client,ledger,cache):
-        return cached_fixture_conversion(result.book,raw,document,client,ledger,cache)
-    monkeypatch.setattr(rig.mod.TaskReflowPdf,'_convert',convert)
-    monkeypatch.setattr(pymupdf,'open',lambda *a,**k: (_ for _ in ()).throw(AssertionError('parent native open')))
-    task=rig.mod.TaskReflowPdf(5,7,dict(mode='full',cost_cap_usd=0,replace_existing_epub=True))
-    real=NativeDocument.call;seen=[]
-    def call(self,op,args,**kw):
-        if op=='operation_audit':
+    from xml.etree import ElementTree as ET
+    from cps.services.reflow import ledger as ledger_mod
+    from cps.services.worker import STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED
+    _, original, _ = image_quote
+    pixels = original[0].get_pixmap().tobytes('png')
+    source_path = rig.folder / 'Book - Author.pdf'
+    with pymupdf.open() as scanned:
+        page = scanned.new_page(width=original[0].rect.width, height=original[0].rect.height)
+        page.insert_image(page.rect, stream=pixels)
+        scanned.save(source_path)
+    fingerprint = extract.document_fingerprint(source_path)
+    previous = rig.folder / 'Book - Author.epub'
+    previous.write_bytes(b'prior image-audit artifact')
+    rig.formats['EPUB'] = SimpleNamespace(name='Book - Author', format='EPUB')
+    monkeypatch.setattr(pymupdf, 'open', lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError('parent native open')))
+    task = rig.mod.TaskReflowPdf(5, 7, dict(mode='full', cost_cap_usd=0,
+                                         replace_existing_epub=True))
+    real = NativeDocument.call
+    seen = []
+    def call(self, op, args, **kw):
+        if op == 'vision_convert':
             seen.append(op)
-            assert set(args)=={'book_id','fingerprint','operations','stage_records'}
-            if failure=='death':os.kill(self.process.pid,signal.SIGKILL)
-            if failure=='cancel':task.stat=STAT_ENDED
-        return real(self,op,args,**kw)
-    monkeypatch.setattr(NativeDocument,'call',call)
+            assert args['page_numbers'] == [0]
+            assert args['reader']['enabled'] is False
+            if failure == 'death': os.kill(self.process.pid, signal.SIGKILL)
+            if failure == 'cancel': task.stat = STAT_ENDED
+        return real(self, op, args, **kw)
+    monkeypatch.setattr(NativeDocument, 'call', call)
     task.run(None)
     assert seen
-    assert task.stat=={None:STAT_FINISH_SUCCESS,'death':STAT_FAIL,'cancel':STAT_ENDED}[failure],task.error
-    entries=ledger_mod.Ledger(str(Path(rig.root)/'jobs/5'/f'{task.job_id}.jsonl'),0).entries('operation_audit')
-    row=_ledger_rows(rig)[0];assert row['spend_usd']==row['pending_usd']==0
-    assert not list((Path(rig.root)/'native-scratch').iterdir())
+    assert task.stat == {None: STAT_FINISH_SUCCESS, 'death': STAT_FAIL,
+                         'cancel': STAT_ENDED}[failure], task.error
+    entries = ledger_mod.Ledger(Path(rig.root) / 'jobs/5' / f'{task.job_id}.jsonl', 0).entries('vision_artifact')
+    row = _ledger_rows(rig)[0]
+    assert row['spend_usd'] == row['pending_usd'] == 0
+    assert not list((Path(rig.root) / 'native-scratch').iterdir())
     if failure:
-        assert previous.read_bytes()==b'prior image-audit artifact' and not entries
-        from cps import app,web
+        assert previous.read_bytes() == b'prior image-audit artifact' and not entries
+        assert rig.local_db.session.commits == 0
+        from cps import app, web
         with monkeypatch.context() as m:
-            m.setattr(app,'_got_first_request',app._got_first_request)
-            m.setattr(web,'config',SimpleNamespace(config_trustedhosts='',config_use_google_drive=False))
-            with app.test_client() as webclient:assert webclient.get('/__audit_parent_alive__').status_code==404
+            m.setattr(app, '_got_first_request', app._got_first_request)
+            m.setattr(web, 'config', SimpleNamespace(config_trustedhosts='', config_use_google_drive=False))
+            with app.test_client() as webclient:
+                assert webclient.get('/__audit_parent_alive__').status_code == 404
     else:
-        assert build_epub.validate(task.results['path'])==[]
-        observed=next(e for e in entries if e['event']=='emitted')
-        assert observed['operations'][0]['status']=='verified'
-        assert all(e['schema']==audit.VERSION for e in entries)
+        path = Path(task.results['path'])
+        assert build_epub.validate(str(path)) == []
+        assert len(entries) == 1 and entries[0]['event'] == 'validated'
+        assert entries[0]['sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+        assert entries[0]['bytes'] == path.stat().st_size
+        with zipfile.ZipFile(path) as archive:
+            import json
+            sidecar = json.loads(archive.read('META-INF/reflow.json'))
+            assert sidecar['source_document_sha256'] == fingerprint
+            assert sidecar['pages']['0']['source'] == 'original_source'
+            units = sidecar['degraded_units']
+            assert len(units) == 1 and units[0]['page'] == 0
+            unit = units[0]
+            image = archive.read('OEBPS/' + unit['source_image'])
+            assert image.startswith((b'\xff\xd8\xff', b'\x89PNG\r\n\x1a\n'))
+            documents = [ET.fromstring(archive.read(name)) for name in archive.namelist()
+                         if name.endswith('.xhtml')]
+            matches = [element for tree in documents for element in tree.iter()
+                       if element.get('id') == unit['source_reference']]
+            assert len(matches) == 1
+            assert any(element.tag.endswith('}img') and element.get('src') == unit['source_image']
+                       for element in matches[0].iter())
+            assert any(element.tag.endswith(('}p', '}figcaption')) and ''.join(element.itertext()).strip()
+                       for element in matches[0].iter())

@@ -135,7 +135,7 @@ def test_published_artifact_retained_but_unknown_cleanup_is_not_task_success(rig
     real_close = ipc.NativeDocument.close
     def close_unknown(self):
         real_close(self)
-        if self.last_phase == 'build': self.shutdown_evidence['group_state']='unknown'
+        if self.last_phase == 'vision_convert': self.shutdown_evidence['group_state']='unknown'
     monkeypatch.setattr(ipc.NativeDocument, 'close', close_unknown)
     task = _run(rig, mode='full')
     assert task.stat == STAT_FAIL

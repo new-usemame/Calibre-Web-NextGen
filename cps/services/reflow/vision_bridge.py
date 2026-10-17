@@ -234,6 +234,12 @@ class ParentBroker:
             raise
         marker = name.startswith('marker-')
         # Child input never selects an endpoint, header, timeout or credential.
+        try:
+            self.reader.ledger.record(dict(kind='vision_dispatch', attempt=attempt,
+                model=vision_reading.MODEL, page=context['page_index0']), durable=True)
+        except BaseException:
+            self.reader._reject_direct(pending, attempt, bound, 'local_pre_dispatch')
+            raise
         self.dispatched.add(attempt)
         response = self.reader._direct_post(payload, pending, attempt, bound,
             title='CWNG printed note marker' if marker else 'CWNG vision page reading',

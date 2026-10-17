@@ -225,8 +225,12 @@ class Ledger(object):
 
     def totals(self):
         gate = Counter(e.get("gate") for e in self._entries if e.get("gate"))
+        released = {e.get('attempt') for e in self.entries('reservation')
+                    if e.get('event') == 'released'}
         models = Counter(e.get("model") for e in self._entries
-                         if e.get("model") and e.get("kind") != "reservation")
+                         if e.get("model") and not e.get('cached')
+                         and e.get('attempt') not in released
+                         and e.get("kind") not in ("reservation", "job", "vision_reading"))
         _committed, pending, orphaned = self._financial_state()
         # A page served from the cache is evidence and belongs in the file, but it
         # is not a call: counting it would make a resumed job look like it spent

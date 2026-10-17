@@ -1,12 +1,14 @@
 """Synthetic scans exercise reserve/dispatch crash boundaries in a real worker."""
 import os
+import base64
+import json
 import signal
 import shutil
 from pathlib import Path
 import pytest
 import pymupdf
 import requests
-from cps.services.reflow import native_ipc, vision_bridge, vision_reading
+from cps.services.reflow import native_ipc, vision_bridge, vision_reading, model
 from cps.services.reflow.ledger import Ledger
 from cps.services.reflow.shared_budget import SharedLedger, Store
 
@@ -32,6 +34,7 @@ def test_real_child_crash_releases_only_absence_of_dispatch(tmp_path, monkeypatc
     led=SharedLedger(root/'jobs'/'5'/'job.jsonl',1,job_id='job',store=store,book_id=5,user_id=7)
     reader=vision_reading.Reader('inert-key',root/'cache',led,confidence_protocol='tokens')
     calls=[]
+    observed_images=[]
     def post(*a,**k):
         calls.append(True)
         raise requests.Timeout('Synthetic ambiguous outcome')
@@ -43,6 +46,9 @@ def test_real_child_crash_releases_only_absence_of_dispatch(tmp_path, monkeypatc
         os.kill(doc.process.pid,signal.SIGKILL)
         doc.process.wait(timeout=10)
     def handle(self, request):
+        if request.get('operation')=='post':
+            encoded=request['arguments']['payload']['messages'][0]['content'][1]['image_url']['url']
+            observed_images.append(base64.b64decode(encoded.split(',',1)[1]))
         if boundary=='after_pending' and request.get('operation')=='post':
             assert list(reader.cache.glob('*.pending'))
             kill()
@@ -78,9 +84,37 @@ def test_real_child_crash_releases_only_absence_of_dispatch(tmp_path, monkeypatc
     if boundary=='after_dispatch':
         assert len(markers)==1 and current.pending_usd()>0
         assert calls==[True]
+        with pytest.raises(model.UncertainBilling):
+            reader.read(observed_images[0])
+        assert calls==[True]  # no repeat transport for the marked attempt
     else:
         assert markers==[] and current.pending_usd()==0 and current.spent()==0
         assert calls==[] and store.status()['remaining_usd']==5
         assert list(reader.cache.glob('*.pending'))==[]
         assert reader.financial_dispatch_allowed()
         assert [e['event'] for e in current.entries('reservation')]==['pending','released']
+
+    if boundary=='after_pending':
+        # A new authorized attempt can read the exact previously-unsent image;
+        # reusing its new cache afterwards must not spend a second time.
+        from tests.unit.test_reflow_vision_bridge import reading, response
+        answer=reading('A synthetic reading of the clear printed page.')
+        block=answer['blocks'][0]
+        block['tokens']=[dict(text=word,low_confidence=False) for word in block.pop('text').split()]
+        block.pop('low_confidence')
+        def success(*a,**kw):
+            calls.append(True)
+            result=requests.Response();result.status_code=200
+            result._content=json.dumps(response(answer).json()).encode()
+            return result
+        monkeypatch.setattr(requests,'post',success)
+        retry_ledger=SharedLedger(root/'jobs'/'5'/'retry.jsonl',1,job_id='retry',store=store,book_id=5,user_id=7)
+        retry=vision_reading.Reader('inert-key',reader.cache,retry_ledger,confidence_protocol='tokens')
+        assert retry.read(observed_images[0])['new_cost_usd']==.0004
+        assert retry.read(observed_images[0])['new_cost_usd']==0
+        assert calls==[True]
+        old_attempt=current.entries('reservation')[0]['attempt']
+        new_attempt=retry_ledger.entries('reservation')[0]['attempt']
+        assert old_attempt!=new_attempt
+        assert retry_ledger.spent()==.0004 and retry_ledger.pending_usd()==0
+        assert Ledger(led.path,1).spent()==Ledger(led.path,1).pending_usd()==0

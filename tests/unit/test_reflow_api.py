@@ -62,7 +62,6 @@ def _quote(routed=100, pages=400, verdict="TEXT_CLEAN"):
 @pytest.fixture
 def mod(tmp_path, monkeypatch):
     from cps.api import reflow as module
-    monkeypatch.setattr(module.structural_pipeline, "QUALITY_RELEASED", True)
     monkeypatch.setattr(module, "REFLOW_DIR", str(tmp_path / "reflow"))
     monkeypatch.setattr(module.tasks_reflow, "REFLOW_DIR", str(tmp_path / "reflow"))
     return module
@@ -116,8 +115,9 @@ def test_fast_source_assessment_does_not_present_legacy_router_prices_as_typed_q
     assert body['pages']==400 and body['source_sha256']
     assert body['consent_contract']==mod.CONSENT_CONTRACT
     assert 'estimate_usd' not in body and 'routed_pages_estimate' not in body
-    assert body['review']['proposer']==mod.typed_model.STAGES['proposer'].model_id
-    assert body['review']['verifier']==mod.typed_model.STAGES['verifier'].model_id
+    assert body['review']['model']==mod.vision_reading.MODEL
+    assert body['review']['proposer']==mod.vision_reading.MODEL
+    assert body['review']['verifier']=='source-word and pixel evidence'
 
 
 @pytest.mark.unit
@@ -239,8 +239,8 @@ def _current_body(mod,body):
 def _paid(mod,monkeypatch):
     """An already measured server quote; transport/source measurement has its own seam tests."""
     monkeypatch.setattr(mod.config,'config_reflow_instance_budget_usd',5.0,raising=False)
-    quote={'source_context_pages':400,'first_body_page':4,
-           'pages':[{'page_index0':p,'proposer_bound_usd':.01,'verifier_bound_usd':.05,'full_bound_usd':.06} for p in range(400)]}
+    quote={'source_context_pages':400,'first_body_page':4,'sample_starts':{str(n):4 for n in range(1,61)},
+           'pages':[{'page_index0':p,'primary_bound_usd':.01,'retry_bound_usd':.02,'marker_bound_usd':.03,'proposer_bound_usd':.01,'verifier_bound_usd':.05,'full_bound_usd':.06} for p in range(400)]}
     monkeypatch.setattr(mod,'_quote_store',lambda:SimpleNamespace(ready=lambda *args:quote))
     return quote
 
@@ -267,7 +267,7 @@ def test_a_conversion_does_not_start_without_consent(mod, monkeypatch, pdf_on_di
 
 
 @pytest.mark.unit
-def test_cap_below_full_typed_ceiling_allows_honest_partial_review(mod,monkeypatch,pdf_on_disk):
+def test_cap_below_full_pixel_ceiling_allows_honest_partial_reading(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk);_paid(mod,monkeypatch)
     resp,added=_start(mod,{'mode':'full','review_mode':'source_verified','consent':True,'cost_cap_usd':.10})
     assert _status(resp)==202
@@ -317,12 +317,14 @@ def test_tiny_cap_never_gets_silently_increased_to_a_request_floor(mod,monkeypat
 
 
 @pytest.mark.unit
-def test_assessment_advertises_only_actual_current_two_stage_route(mod,monkeypatch,pdf_on_disk):
+def test_assessment_advertises_only_actual_current_pixel_route(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk)
     with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',_user()):
         body=_json(inspect.unwrap(mod.reflow_estimate)(5))
     assert 'tiers' not in body and 'default_tier' not in body
-    assert body['review']['provider']=='openai/flex' and body['review']['max_output_tokens']==4096
+    assert body['review']['provider']=='openai' and body['review']['max_output_tokens']==20000
+    assert body['review']['scope']=='printed-page pixel transcription'
+    assert body['review']['route_version']==mod.vision_quote.VERSION
 
 
 @pytest.mark.unit

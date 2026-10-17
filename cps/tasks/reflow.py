@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, retention, structural_pipeline, structural_quote, shared_budget, operation_audit, runtime_diagnostics
+    model, ocr, pipeline, publication, report, retention, vision_reading, vision_quote, unit_recovery, shared_budget, runtime_diagnostics
 
 log = logger.create()
 
@@ -42,18 +42,6 @@ log = logger.create()
 #: twice". The default is what the UI offers.
 SAMPLE_PAGES_DEFAULT = 20
 SAMPLE_PAGES_MAX = 60
-
-#: What a pipeline stop is called in the record the jobs list reads. ``cancelled``
-#: never reaches this table -- it has its own branch, because a conversion nobody
-#: waited for is not filed at all -- so what is left is the two ways a conversion
-#: ends holding a file that is less than the book it was asked for. Neither of them
-#: is ``done``: a run that stopped is a run the user has a reason to start again,
-#: and a jobs list that reports both endings with one word takes that reason away.
-#: ``billing_uncertain`` ends the same way but for a different cause: a dispatched
-#: request's billing could not be proven either way, and its bound stays held.
-STOP_STATUS = {"instance_budget_unavailable": "incomplete", "instance_budget_exhausted": "capped", "cost_cap": "capped", "model_errors": "incomplete", "model_rejections": "incomplete",
-               "billing_uncertain": "billing_unknown", "prior_request_pending": "billing_unknown",
-               "quality_gate": "limited", "not_configured": "limited", "estimate_stale": "limited", "source_changed": "incomplete", "billing_bound": "incomplete", "route_mismatch": "incomplete"}
 
 
 def reflow_dir(*parts):
@@ -141,7 +129,7 @@ def hard_cap_usd():
         cap = float(getattr(config, "config_reflow_hard_cap_usd", 0) or 0)
     except (TypeError, ValueError):
         cap = 0.0
-    return cap if math.isfinite(cap) and cap > 0 else 5.0
+    return min(5.0, cap) if math.isfinite(cap) and cap > 0 else 5.0
 
 
 #: The largest PDF one conversion reads when the administrator has not said
@@ -187,11 +175,11 @@ def _clamp_cap(value):
     return min(cap, ceiling)
 
 
-def make_client(review_mode):
-    """Only explicit current consent enables bounded source-format choices."""
-    return structural_pipeline.TwoStageClient(
-        (config.resolved_openrouter_key() or None) if review_mode=='source_verified' else None,
-        enabled=review_mode=='source_verified' and structural_pipeline.QUALITY_RELEASED)
+def make_client(review_mode, ledger=None):
+    """The same source-pixel reader is used with or without paid permission."""
+    return vision_reading.Reader(
+        (config.resolved_openrouter_key() or None) if review_mode == 'source_verified' else None,
+        reflow_dir('cache', 'vision'), ledger, confidence_protocol='tokens', reuse_legacy=True)
 
 
 class TaskReflowPdf(CalibreTask):
@@ -301,8 +289,8 @@ class TaskReflowPdf(CalibreTask):
                              "%s.jsonl" % self.job_id),
                 cap_usd=self.options.cost_cap_usd, job_id=self.job_id, **shared)
             self._job_ledger = ledger
-            cache = pipeline.PageCache(reflow_dir("cache"))
-            client = make_client(self.options.review_mode)
+            cache = None
+            client = make_client(self.options.review_mode, ledger)
 
             document = NativeDocument(source, scratch_root=reflow_dir('native-scratch'),
                 cache_root=REFLOW_DIR, should_stop=lambda: self.cancelled,
@@ -317,22 +305,13 @@ class TaskReflowPdf(CalibreTask):
                     raise ValueError("Source changed after consent; prepare the current PDF again.")
                 ledger.record({"kind": "job", "event": "start", "user_id": self.user_id,
                                "mode": self.options.mode, "title": book.title,
-                               "tier": client.describe().get("tier",self.options.model_tier),
+                               "tier": "pixel-reading", "model": vision_reading.MODEL, "route": vision_quote.VERSION,
                                "cap_usd": self.options.cost_cap_usd,
                                "pages": document.page_count,
                                # The record is tied to the exact file it spent on.
                                "source": extract.document_fingerprint(document)})
+                self._vision_metadata = _metadata(book)
                 result = self._convert(document, client, ledger, cache)
-                if result.recovery is not None:
-                    summary = result.recovery.summary()
-                    summary.pop("pages", None)
-                    ledger.record(dict(kind="recovery", **summary))
-                    # The concise historic summary is kept for job-list consumers.
-                    # Incidents additionally need the complete, text-free census
-                    # and the exact recovery choices it represents.
-                    ledger.record(runtime_diagnostics.recovery_record(
-                        result.recovery, self.options.source_recovery,
-                        self.options.ocr_language), durable=True)
                 if self._native_stop(document):
                     # The pages already paid for stay in the cache, so restarting is
                     # cheap — but a conversion nobody waited for does not become the
@@ -342,8 +321,8 @@ class TaskReflowPdf(CalibreTask):
                     pending = ledger.pending_usd()
                     held = (" · up to $%.4f unresolved" % pending) if pending else ""
                     self.message = ("cancelled after %d of %d pages · $%.2f%s"
-                                    % (result.pages_done, len(result.routed),
-                                       result.spend_usd, held))
+                                    % (len(result.get('pages', {})), document.page_count,
+                                       ledger.spent(), held))
                     return self._finish_cancelled()
                 built = self._write_epub(document, result, ledger, client, book,
                                          local_db)
@@ -361,10 +340,10 @@ class TaskReflowPdf(CalibreTask):
                     raise
 
             self.results.update(built)
-            self.results["spend_usd"] = result.spend_usd
+            self.results["spend_usd"] = ledger.spent()
             self.message = self._summary(result)
             ledger.record({"kind": "job", "event": "finish",
-                           "status": STOP_STATUS.get(result.stopped, "done")})
+                           "status": "billing_unknown" if ledger.pending_usd() else "done"})
             self._handleSuccess()
         except (ocr.OCRCancelled, build_epub.BuildCancelled, model.AttemptCancelled) as exc:
             # The user stopped the recognition stage: nothing was filed, the
@@ -383,6 +362,7 @@ class TaskReflowPdf(CalibreTask):
             log.error_or_exception(exc)
             self._handleError(str(exc))
         finally:
+            unit_recovery.remove_job_scratch(reflow_dir('conversion-scratch'), self.job_id)
             try:
                 local_db.session.close()
             except Exception:                                     # pragma: no cover
@@ -399,99 +379,76 @@ class TaskReflowPdf(CalibreTask):
         return self.cancelled
 
     def _convert(self, document, client, ledger, cache):
-        recovery_opts = {
-            "mode": self.options.source_recovery,
-            "language": self.options.ocr_language,
-            "cache_dir": reflow_dir("ocr-cache"),
-            "scratch_dir": reflow_dir("ocr-scratch"),
-        }
-        from ..services.reflow.structural_quote import consent_observer
-        quote=getattr(self.options,"consent_quote",None)
-        observer=consent_observer(quote,document) if quote is not None else None
-        sample=self.options.mode=='sample'
-        # A sample reads the front of the book, not all of it (N2): only a paid
-        # sample keeps the complete context, because its consent quote was
-        # measured against it (see structural_pipeline.run_structural).
-        result = structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
-                            sample_count=self.options.sample_pages if sample else None,
-                            sample_context=sample and observer is None,
-                            progress=self._on_progress,should_stop=lambda:self._native_stop(document),
-                            recovery_opts=recovery_opts,prepared_observer=observer,
-                            request_observer=(lambda stage,wire,p:structural_quote.assert_request_bound(quote,stage,wire,p)) if quote else None,
-                            measure_eligibility=self.options.review_mode=="source_verified")
-        result.structural["review_mode"]=self.options.review_mode
-        # The task/report ledger records the same final user-facing scope.
-        ledger.record({"kind":"structural_summary","summary":result.structural})
+        """Compile the vision EPUB in the supervised worker, not structural markup."""
+        quote = getattr(self.options, 'consent_quote', None)
+        if client.key and quote is None:
+            raise ValueError('Paid pixel reading requires a current consented vision estimate')
+        start = 0
+        if self.options.mode == 'sample':
+            start = (quote['sample_starts'][str(self.options.sample_pages)] if quote is not None
+                else document.vision_sample_start(self.options.sample_pages))
+        numbers = list(range(start, min(document.page_count, start + self.options.sample_pages))) \
+            if self.options.mode == 'sample' else list(range(document.page_count))
+        owner = reflow_dir('conversion-scratch', self.job_id)
+        candidate = os.path.join(owner, 'candidate.epub')
+        trace = runtime_diagnostics.BuildTrace(ledger)
+        trace({'kind': 'phase', 'phase': 'vision_start'})
+        result = document.convert_vision(candidate, client, page_numbers=numbers,
+            metadata=getattr(self, '_vision_metadata', None), quote=quote, job_id=self.job_id)
+        trace.finish()
+        if trace.degraded:
+            try: ledger.record(trace.degradation_record(), durable=True)
+            except OSError: log.warning('Optional vision runtime trace was unavailable')
+        from types import SimpleNamespace
+        rows = result.get('pages', {})
+        states = {}
+        for n in range(document.page_count):
+            row = rows.get(n, {})
+            states[n] = SimpleNamespace(layer=row.get('source', 'not_selected'),
+                words=row.get('words', 0), uncertain_words=row.get('marks', 0),
+                reused=bool(row.get('cached')))
+        ledger.record(runtime_diagnostics.recovery_record(SimpleNamespace(provenance=states),
+            self.options.source_recovery, self.options.ocr_language), durable=True)
+        result['_candidate'] = candidate
+        result['_source_pages'] = document.page_count
+        result['_sample_context_pages'] = (pipeline.sample_context(document.page_count,
+            self.options.sample_pages)[1] if self.options.mode == 'sample' else document.page_count)
+        for n, row in result.get('pages', {}).items():
+            if row.get('image_sha256') and row.get('config_sha256'):
+                ledger.record(dict(kind='vision_reading', page=int(n),
+                    request_sha256=row['image_sha256']+'-'+row['config_sha256'],
+                    cached=bool(row.get('cached')), model=row.get('actual_model') or vision_reading.MODEL, gate='PASS'))
+        summary = dict(pages_model=sum(bool(r.get('request_id')) for r in result.get('pages', {}).values()),
+            pages=len(result.get('pages', {})), source_pages=document.page_count,
+            uncertain_total=result.get('disclosure_count', 0), native_pages=len(result.get('native_pages', [])),
+            vision_pages=len(result.get('vision_pages', [])),
+            disclosed_pages=sum(row.get('source') == 'original_source' for row in result.get('pages', {}).values()),
+            disclosures=result.get('disclosure_count', 0), review_mode=self.options.review_mode)
+        ledger.record(dict(kind='vision_summary', summary=summary), durable=True)
         return result
 
     def _write_epub(self, document, result, ledger, client, book, local_db):
-        payload = report.numbers(result, ledger=ledger, client=client, document=document)
-        problems = report.check_completion(payload, ledger)
-        if problems:
-            # G4: the report and the ledger have to agree, and a report nobody can
-            # trust is worse than no report at all.
-            log.error("reflow: report does not match the ledger: %s", problems)
-            raise ValueError("the conversion report does not match the job ledger: %s"
-                             % "; ".join(problems))
-
+        from types import SimpleNamespace
+        payload = report.vision_numbers(result, ledger, self.options.review_mode)
+        report.check_vision_completion(payload, ledger)
+        report.finalize_vision(result['_candidate'], payload,
+            include_report_page=self.options.include_report_page,
+            show_cost=self.options.show_cost_in_report)
+        from ..services.reflow.image_budget import check
+        check(os.path.getsize(document.name), os.path.getsize(result['_candidate']))
         target = self._target_path(book, local_db)
-        if self.options.mode=='full':publication.relative(config.get_book_path(),target)
-        page = None
-        if self.options.include_report_page:
-            def page(links=None, losses=(), _payload=payload):
-                return report.about_page(_payload,
-                                         show_cost=self.options.show_cost_in_report,
-                                         links=links, losses=losses)
-            from ..services.reflow.native_ipc import NativeDocument
-            if isinstance(document, NativeDocument):
-                page = {'payload': payload, 'show_cost': self.options.show_cost_in_report}
-        # The staging folder is named in the job's journal before it exists, so a
-        # process that dies anywhere from here on -- mid-build is minutes on a long
-        # book -- leaves nothing the next recovery pass cannot find and remove.
-        # Before, such a folder stayed hidden in the book's folder forever (N4).
-        full=self.options.mode=='full'
-        staging=os.path.join(os.path.dirname(target),'.reflow-%s-staging'%self.job_id)
-        staging_path=os.path.relpath(staging,config.get_book_path() if full else REFLOW_DIR)
-        ledger.record(dict(kind='staging',event='created',root='library' if full else 'reflow',
-                           path=staging_path),durable=True)
-        os.mkdir(staging,0o700)
-        candidate=os.path.join(staging,'candidate.epub')
-        publication_prepared=False
+        full = self.options.mode == 'full'
+        if full: publication.relative(config.get_book_path(), target)
+        staging = os.path.join(os.path.dirname(target), '.reflow-%s-staging' % self.job_id)
+        staging_path = os.path.relpath(staging, config.get_book_path() if full else REFLOW_DIR)
+        ledger.record(dict(kind='staging', event='created', root='library' if full else 'reflow',
+                           path=staging_path), durable=True)
+        os.mkdir(staging, 0o700)
+        candidate = os.path.join(staging, 'candidate.epub')
+        publication_prepared = False
         try:
-            audit_rows,audit_matching=operation_audit.capture(result,self.book_id,document=document)
-            operation_audit.record(ledger,'validated',operations=audit_rows)
-            build_trace = runtime_diagnostics.BuildTrace(ledger)
-            build_trace({"kind": "phase", "phase": "assembly_start"})
-            built = build_epub.build(result.book, candidate, page_html=result.page_html,
-                                     metadata=_metadata(book), doc=document,
-                                     report_html=page,
-                                     sidecar=report.sidecar(
-                                         payload, show_cost=self.options.show_cost_in_report),
-                                     source_pages=getattr(result,'source_pages',None),
-                                     operation_plans=getattr(result,'operation_plans',None),
-                                     layout_plans=getattr(result,'layout_plans',None),
-                                     raw_pages={r.pno:r for r in result.raw_pages},
-                                     figure_transform=(result.recovery.figure_rect
-                                                       if result.recovery else None),
-                                     should_stop=lambda: self._native_stop(document),
-                                     evidence_progress=lambda done, total: self._on_progress(
-                                         pipeline.Progress("evidence", page=done, pages=total,
-                                             spend_usd=result.spend_usd,
-                                             message="preserving original evidence %d/%d" % (done, total))),
-                                     runtime_progress=build_trace)
-            build_trace.finish()
-            if build_trace.degraded:
-                # A trace marker is optional incident evidence.  Its failure must
-                # not be allowed to alter the required audit/budget/publication
-                # ledger behavior below.  The record is deliberately text-free.
-                try:
-                    ledger.record(build_trace.degradation_record(), durable=True)
-                except OSError:
-                    log.warning("reflow: runtime trace degraded; status record unavailable")
-            for warning in built.warnings:
-                # The reader is told the same thing in their own book, on the report
-                # page; this is the terser half, for whoever has to find out why.
-                log.warning("reflow: %s", warning)
+            shutil.copyfile(result['_candidate'], candidate)
+            built = SimpleNamespace(path=candidate)
             problems = build_epub.validate(built.path)
             if problems:
                 # A document a reader's parser stops on is not a chapter with a mistake
@@ -511,15 +468,15 @@ class TaskReflowPdf(CalibreTask):
             with open(built.path,'rb') as handle:
                 for chunk in iter(lambda:handle.read(1024*1024),b''):digest.update(chunk)
             artifact={'sha256':digest.hexdigest(),'bytes':os.path.getsize(built.path)}
-            operation_audit.record(ledger,'emitted',operations=operation_audit.observe(built.path,audit_rows,audit_matching),**artifact)
+            ledger.record(dict(kind='vision_artifact', event='validated', **artifact), durable=True)
             if self._native_stop(document):
                 raise build_epub.BuildCancelled('cancelled before publication')
-            if extract.document_fingerprint(self._pdf_path(local_db,book))!=result.fingerprint:
+            if extract.document_fingerprint(self._pdf_path(local_db,book))!=result['source_document_sha256']:
                 raise ValueError("Source changed during conversion; no EPUB was published.")
             if self.options.mode == "sample":
                 os.replace(built.path,target)
                 ledger.record(dict(kind='artifact',**artifact))
-                operation_audit.record(ledger,'published',mode='sample',**artifact)
+                ledger.record(dict(kind='vision_publication', mode='sample', **artifact), durable=True)
                 return dict(artifact,sample=os.path.basename(target),path=target,report=payload)
             with publication.lock(os.path.join(REFLOW_DIR,'publication-locks'),target):
                 if os.path.exists(target) and not self.options.replace_existing_epub:
@@ -527,7 +484,7 @@ class TaskReflowPdf(CalibreTask):
                 previous_format=_format_state(local_db,self.book_id)
                 desired_format=dict(name=os.path.splitext(os.path.basename(target))[0],size=artifact['bytes'])
                 record=publication.prepare(ledger,config.get_book_path(),self.book_id,book.path,
-                    self._pdf_path(local_db,book),target,staging,previous_format,desired_format,expected_source=result.fingerprint)
+                    self._pdf_path(local_db,book),target,staging,previous_format,desired_format,expected_source=result['source_document_sha256'])
                 publication_prepared=True
                 os.replace(built.path,target)
                 publication.sync(target);publication.sync(os.path.dirname(target))
@@ -543,7 +500,8 @@ class TaskReflowPdf(CalibreTask):
                     raise
                 publication.reconcile(ledger,config.get_book_path(),record,
                     _format_state(local_db,self.book_id),book.path,self._pdf_path(local_db,book))
-                operation_audit.record(ledger,'published',mode='full',**artifact)
+                ledger.record(dict(kind='vision_publication', mode='full', **artifact), durable=True)
+                ledger.record(dict(kind='artifact', **artifact), durable=True)
                 return dict(artifact,path=target,report=payload)
         finally:
             # A prepared publication owns durable recovery evidence. Never destroy
@@ -594,28 +552,10 @@ class TaskReflowPdf(CalibreTask):
         self.message = "%s%s" % (event.message or event.stage, spend)
 
     def _summary(self, result):
-        if hasattr(result,'structural'):
-            counts=result.structural
-            shared_stop = (str(shared_budget.BudgetError(result.stopped))+" "
-                if result.stopped in ('instance_budget_unavailable','instance_budget_exhausted') else '')
-            return shared_stop + ("%d pages prepared · %d formatting changes approved · %d eligible pages not reviewed · $%.6f confirmed · up to $%.6f unresolved"
-                % (result.pages,counts['approved_operations'],counts['unreviewed'],result.spend_usd,result.pending_usd))
-        if result.stopped == "billing_uncertain":
-            return ("stopped after %d of %d pages: a model answer was lost after "
-                    "dispatch and its billing could not be confirmed · $%.2f "
-                    "confirmed · up to $%.4f unresolved"
-                    % (result.pages_done, len(result.routed), result.spend_usd,
-                       result.pending_usd))
-        if result.stopped == "cost_cap":
-            return ("stopped at the cost cap after %d pages · $%.2f"
-                    % (result.pages_done, result.spend_usd))
-        if result.stopped == "model_errors":
-            return ("the model service stopped answering after %d of %d pages · $%.2f"
-                    % (result.pages_done, len(result.routed), result.spend_usd))
-        if result.routed:
-            return ("%d pages reviewed of %d · $%.2f"
-                    % (result.pages_done, len(result.routed), result.spend_usd))
-        return "%d pages, no page needed a model" % result.pages
+        led = self._job_ledger
+        return ('%d pages converted from source pixels and native text · '
+                '$%.6f confirmed · up to $%.6f unresolved' %
+                (len(result.get('pages', {})), led.spent(), led.pending_usd()))
 
     def _finish_cancelled(self):
         self.stat = STAT_ENDED

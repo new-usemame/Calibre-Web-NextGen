@@ -1,0 +1,2 @@
+### Fixed
+- **Kobo sync no longer fails with "database is locked" on books with a Kobo-reported position.** A position the device reports as `<id>!OEBPS!chapter.xhtml` was treated as a vanished chapter and re-placed by fraction on every sync; the uncommitted rewrite failed the sync and left every request erroring until restart. Positions in that form are now matched against the book's chapters and left alone.

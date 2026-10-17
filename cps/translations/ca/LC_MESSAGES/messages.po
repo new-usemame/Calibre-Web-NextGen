@@ -357,7 +357,7 @@ msgid ""
 "full sync with your Kobo Reader?"
 msgstr ""
 "Esteu segur que voleu suprimir la base de dades de sincronització de Calibre-"
-"Web NextGen per forçar una sincronització completa amb el vostre Kobo Reader?"
+"Web NextGen per forçar una sincronització completa amb el vostre lector Kobo?"
 
 #: cps/admin.py cps/spa_strings.py cps/templates/modal_dialogs.html
 #: cps/templates/user_table.html
@@ -2468,11 +2468,11 @@ msgstr "Llibres de %(name)s, incloses totes les subcategories"
 
 #: cps/api/browse.py cps/opds.py cps/web.py
 msgid "Tag hierarchy temporarily unavailable. Please try again."
-msgstr ""
+msgstr "La jerarquia d'etiquetes no està disponible temporalment. Torneu-ho a provar més tard."
 
 #: cps/opds.py
 msgid "All books in this tag group"
-msgstr ""
+msgstr "Tots els llibres d'aquest grup d'etiquetes"
 
 #: cps/opds.py
 #, python-brace-format
@@ -10957,9 +10957,9 @@ msgid ""
 "Your own cover is private to you and your e-reader deliveries. The library "
 "cover stays unchanged for everyone else."
 msgstr ""
-"La coberta que trieu només la veureu vós i s'inclourà en les còpies enviades "
-"als vostres lectors electrònics. La coberta de la biblioteca no canviarà per "
-"als altres usuaris."
+"Només veureu la coberta que trieu i s'inclourà en les còpies enviades als "
+"vostres lectors electrònics. La coberta de la biblioteca no canviarà per als "
+"altres usuaris."
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
@@ -11586,7 +11586,7 @@ msgstr "Desa la font de «Descobreix»"
 
 #: cps/spa_strings.py
 msgid "Change Discover source"
-msgstr ""
+msgstr "Canvia la font de «Descobreix»"
 
 #: cps/spa_strings.py cps/web.py
 msgid "Discover source saved."
@@ -11849,11 +11849,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/tag_tree.html
 msgid "All tags"
-msgstr ""
+msgstr "Totes les etiquetes"
 
 #: cps/spa_strings.py
 msgid "Could not load tags. Please try again."
-msgstr ""
+msgstr "No s'han pogut carregar les etiquetes. Torneu-ho a provar més tard."
 
 #: cps/spa_strings.py
 msgid "Allow completed DRM-free MOBI 6 books"
@@ -11955,7 +11955,7 @@ msgstr "La vostra valoració (estrelles)"
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "eReader attachment filename template"
-msgstr ""
+msgstr "Plantilla de nom de fitxer adjunt per al lector electrònic"
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 #, python-brace-format
@@ -11963,17 +11963,17 @@ msgid ""
 "Leave blank to keep the existing filename. Example: {series} #{series_index} "
 "- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
 "the file extension is added automatically."
-msgstr ""
+msgstr "Deixeu en blanc el camp per mantenir el nom de fitxer actual. Exemple: {series} #{series_index} - {title}. Els camps inclouen {title}, {authors}, {series} i {series_index}; l'extensió del fitxer s'afegeix automàticament."
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 #, python-brace-format
 msgid ""
 "Use {series:|(|) }{title} to omit the series prefix when no series is set."
-msgstr ""
+msgstr "Utilitzeu {series:|(|) }{title} per ometre el prefix de la sèrie quan no n'hi hagi cap."
 
 #: cps/spa_strings.py cps/templates/tag_tree.html
 msgid "Choose a tag group to browse books from it and its subtags."
-msgstr ""
+msgstr "Trieu un grup d'etiquetes per consultar-ne els llibres i les subetiquetes."
 
 #: cps/spa_strings.py
 msgid "Sleep screen"
@@ -12069,7 +12069,7 @@ msgstr ""
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
-msgstr ""
+msgstr "Etiqueta sense nom"
 
 #: cps/tasks_status.py
 msgid "Waiting"
@@ -12577,7 +12577,7 @@ msgstr "No s'ha trobat cap fitxer gmail.json vàlid amb informació d'OAuth"
 #: cps/services/mail_filename.py
 msgid ""
 "Use a valid attachment filename template with supported metadata fields."
-msgstr ""
+msgstr "Utilitzeu una plantilla de nom de fitxer adjunt vàlida amb camps de metadades compatibles."
 
 #: cps/services/opds_filename.py
 msgid "Conditional text needs both prefix and suffix separators."
@@ -18138,11 +18138,11 @@ msgstr "Tanca la sessió de l'usuari"
 
 #: cps/templates/index.html
 msgid "Breadcrumb"
-msgstr ""
+msgstr "Ruta de navegació"
 
 #: cps/templates/index.html
 msgid "Subtags"
-msgstr ""
+msgstr "Subetiquetes"
 
 #: cps/templates/index.html
 msgid "Subcategories"

@@ -707,6 +707,8 @@ def _recover_financial_ledgers(active_ids):
             continue
         led = ledger_mod.Ledger(path, cap_usd=0, job_id=path.stem)
         store.reconcile_ledger(led, worker_gone=True)
+        from ..services.reflow.vision_bridge import recover_unsent_receipts
+        recover_unsent_receipts(Path(REFLOW_DIR, 'cache', 'vision'), led)
 
 
 def recover_interrupted_jobs(worker=None):

@@ -25,7 +25,7 @@ def scan(path):
         doc.save(path)
 
 
-@pytest.mark.parametrize('boundary', ['after_reserve', 'store_only', 'after_dispatch'])
+@pytest.mark.parametrize('boundary', ['after_reserve', 'store_only', 'after_pending', 'after_dispatch'])
 def test_real_child_crash_releases_only_absence_of_dispatch(tmp_path, monkeypatch, boundary):
     source=tmp_path/'source.pdf';scan(source)
     root=tmp_path/'state';store=Store(root,lambda:5)
@@ -43,6 +43,10 @@ def test_real_child_crash_releases_only_absence_of_dispatch(tmp_path, monkeypatc
         os.kill(doc.process.pid,signal.SIGKILL)
         doc.process.wait(timeout=10)
     def handle(self, request):
+        if boundary=='after_pending' and request.get('operation')=='post':
+            assert list(reader.cache.glob('*.pending'))
+            kill()
+            raise native_ipc.ChildExited('Synthetic child exit before post')
         reply=real_handle(self,request)
         if boundary=='after_reserve' and request.get('operation')=='ledger' and request['arguments'].get('method')=='reserve_attempt':
             assert reply['ok'] and led.pending_usd()>0
@@ -77,4 +81,6 @@ def test_real_child_crash_releases_only_absence_of_dispatch(tmp_path, monkeypatc
     else:
         assert markers==[] and current.pending_usd()==0 and current.spent()==0
         assert calls==[] and store.status()['remaining_usd']==5
+        assert list(reader.cache.glob('*.pending'))==[]
+        assert reader.financial_dispatch_allowed()
         assert [e['event'] for e in current.entries('reservation')]==['pending','released']

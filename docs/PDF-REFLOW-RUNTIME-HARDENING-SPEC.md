@@ -43,19 +43,19 @@ launched with `-I` and a fixed installed worker script. The worker opens its own
 private PDF snapshot. It never inherits a live PDF/page object, web bootstrap,
 provider client, ledger object, credential environment, or Python pickle.
 
-The fixed operation vocabulary is open, survey, prepare, operations, and build.
-Native extraction/recovery/assembly, per-page structural evidence/raster preparation,
-and final native glyph/figure/source rendering execute in that process. The API's
-page count and source survey also use it; quote preparation retains its existing
-fresh-exec worker. Offline callers with actual PDF documents remain compatible.
+The application uses fixed open/survey, `vision_sample_start`, `vision_quote`
+and `vision_convert` operations. The worker prepares source rasters and performs
+native extraction, source alignment, EPUB assembly and source-evidence rendering.
+The API's source survey and quote preparation also use supervised native work.
+Offline callers with actual PDF documents remain compatible.
 
-The parent retains the existing structural orchestration and typed provider calls
-entirely, rather than delegating a provider RPC proxy. This smaller boundary leaves
-authentication, budgets, durable claims/reservations/reconciliation, typed request
-validation, source-authority factories, approval/adoption and publication unchanged.
-Only registered pure value types cross JSON; no dispatch instruction or secret does.
-Child-built candidates still pass the parent's original source fingerprint checks,
-EPUB validation, operation-emission audit and atomic publication transaction.
+The parent owns provider credentials and the page-reading client. A bounded broker
+connects the worker's page-reading requests to the parent's source-bound consent,
+shared budget, durable reservations and settlement. The worker never receives the
+provider key. The parent validates requested image/configuration identities against
+the prepared quote before dispatch. Source-authority, candidate validation and the
+existing atomic publication transaction remain enforced. Historical structural
+operations are not the application conversion route.
 
 The protocol has an exact version, explicit class registry, duplicate-key/unknown-
 field/nonfinite/depth/size rejection (256 MiB, depth 80), fixed manifest basenames,

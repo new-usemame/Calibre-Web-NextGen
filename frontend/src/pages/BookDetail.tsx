@@ -1348,7 +1348,7 @@ function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolea
       {canReflow && formats.some((f) => f.toLowerCase() === 'pdf') && (
         <p className={styles.reflowLine}>
           <Link href={`/book/${id}/reflow`} className={styles.reflowLink}>{t('Convert this PDF to EPUB…')}</Link>
-          {' '}{t('Create a source-based EPUB with original evidence for uncertain text. Optional AI formatting review has its own estimate and consent.')}
+          {' '}{t('Create an EPUB from native text and page-image readings, with original-source access for uncertainty. New AI readings have their own estimate and consent.')}
         </p>
       )}
 

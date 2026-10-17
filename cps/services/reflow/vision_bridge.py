@@ -125,6 +125,12 @@ class ParentBroker:
         self.should_stop = should_stop
         self.dispatched = set()
 
+    def finalize_worker_exit(self):
+        """Called only after the owned native worker has been reaped."""
+        recover = getattr(self.reader.ledger, 'recover_authoritative', None)
+        if recover is not None:
+            recover(worker_gone=True)
+
     def handle(self, request):
         try:
             value = self._handle(request)
@@ -191,6 +197,11 @@ class ParentBroker:
                         or type(values[1]) not in (float, int) or not math.isfinite(values[1]) or values[1] <= 0):
                     raise unit_recovery.SourceIntegrityError('Invalid source reading reservation')
             with self.reader._budget():
+                if args['method'] == 'reserve_attempt':
+                    # Provenance is committed in the store BEFORE the pending
+                    # mirror: recovery can identify a store-only reservation.
+                    return self.reader.ledger.reserve_attempt(*args['args'],
+                        context={'route_version': 'vision-parent-v1'})
                 return getattr(self.reader.ledger, args['method'])(*args['args'], **args['kwargs'])
         if operation == 'post':
             return self._post(args, context)

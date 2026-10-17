@@ -462,6 +462,9 @@ class NativeDocument:
             authorizer = vision_quote.Authorizer(quote, self.fingerprint, numbers)
         self.reader_broker = ParentBroker(reader, self.fingerprint, numbers,
             authorizer=authorizer, should_stop=self.should_stop)
+        brokers = getattr(self, '_vision_brokers', [])
+        brokers.append(self.reader_broker)
+        self._vision_brokers = brokers
         try:
             result = self.call('vision_convert', dict(page_numbers=numbers,
                 metadata=dict(metadata or {}), cache=str(relative), job_id=job_id, reader={
@@ -593,8 +596,14 @@ class NativeDocument:
         try:
             self._close_process()
         finally:
-            if self.resource_lease is not None:
-                self.resource_lease.close()
+            try:
+                if self.process is not None and self.process.poll() is not None:
+                    for broker in getattr(self, '_vision_brokers', []):
+                        broker.finalize_worker_exit()
+                    self._vision_brokers = []
+            finally:
+                if self.resource_lease is not None:
+                    self.resource_lease.close()
 
     def require_clean_shutdown(self):
         evidence = self.shutdown_evidence

@@ -203,18 +203,17 @@ def test_real_task_audits_source_image_without_parent_native_work_or_publication
             import json
             sidecar = json.loads(archive.read('META-INF/reflow.json'))
             assert sidecar['source_document_sha256'] == fingerprint
-            assert sidecar['pages']['0']['source'] == 'original_source'
-            units = sidecar['degraded_units']
-            assert len(units) == 1 and units[0]['page'] == 0
-            unit = units[0]
-            image = archive.read('OEBPS/' + unit['source_image'])
+            from tests.unit.round7_public_note_contract_support import local_ocr_visible
+            evidence = local_ocr_visible(path, sidecar, {0:[
+                'Polishing wood', 'Following ordinary prose establishes the wider printed body column.']})
+            image = archive.read(evidence[0]['full_image'])
             assert image.startswith((b'\xff\xd8\xff', b'\x89PNG\r\n\x1a\n'))
-            documents = [ET.fromstring(archive.read(name)) for name in archive.namelist()
-                         if name.endswith('.xhtml')]
-            matches = [element for tree in documents for element in tree.iter()
-                       if element.get('id') == unit['source_reference']]
+            documents = {name:ET.fromstring(archive.read(name)) for name in archive.namelist()
+                         if name.endswith('.xhtml')}
+            name, ident = evidence[0]['full_target']
+            matches = [element for element in documents[name].iter() if element.get('id') == ident]
             assert len(matches) == 1
-            assert any(element.tag.endswith('}img') and element.get('src') == unit['source_image']
+            assert any(element.tag.endswith('}img') and element.get('src') == evidence[0]['full_image'].removeprefix('OEBPS/')
                        for element in matches[0].iter())
             assert any(element.tag.endswith(('}p', '}figcaption')) and ''.join(element.itertext()).strip()
                        for element in matches[0].iter())

@@ -337,7 +337,7 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
     assert row["started"] and row["finished"]
 
 
-def test_rejected_pixel_answers_publish_only_disclosed_originals_and_keep_the_bill(rig,monkeypatch):
+def test_rejected_pixel_answers_publish_unverified_local_ocr_and_keep_the_bill(rig,monkeypatch):
     session=_PixelSession(malformed=True)
     task=_run_pixel_response(rig,monkeypatch,session)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
@@ -346,13 +346,16 @@ def test_rejected_pixel_answers_publish_only_disclosed_originals_and_keep_the_bi
     row=_ledger_rows(rig)[0]
     payload=task.results['report']
     assert payload['fidelity']['pages_model']==0
-    assert payload['fidelity']['pages_disclosed']==2
+    assert payload['fidelity']['pages_disclosed']==0
+    assert payload['fidelity']['pages_local_ocr']==2
     assert payload['cost']['spend_usd']==pytest.approx(len(session.calls)*session.cost)
     assert row['spend_usd']==payload['cost']['spend_usd'] and row['pending_usd']==0
     sidecar=rig.mod.build_epub.read_sidecar(task.results['path'])
-    assert all(page['source']=='original_source' for page in sidecar['pages'].values())
     audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1)
     assert len([r for r in audit.entries('reservation') if r['event']=='reconciled'])==len(session.calls)
+    from tests.unit.round7_public_note_contract_support import local_ocr_visible
+    local_ocr_visible(task.results['path'],sidecar,{n:['The clear sample remains readable.',
+        'Another simple line follows the first.'] for n in (0,1)})
 
 
 def test_a_finished_conversion_releases_the_books_reservation(rig):
@@ -480,7 +483,12 @@ def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(rig,mon
     pending=[r for r in audit.entries('reservation') if r['event']=='pending']
     assert len(pending)==1 and row['pending_usd']==pending[0]['bound_usd']
     assert task.results['report']['cost']['pending_usd']==row['pending_usd']
-    assert task.results['report']['fidelity']['pages_disclosed']==2
+    assert task.results['report']['fidelity']['pages_disclosed']==0
+    assert task.results['report']['fidelity']['pages_local_ocr']==2
+    from tests.unit.round7_public_note_contract_support import local_ocr_visible
+    sidecar=rig.mod.build_epub.read_sidecar(task.results['path'])
+    local_ocr_visible(task.results['path'],sidecar,{n:['The clear sample remains readable.',
+        'Another simple line follows the first.'] for n in (0,1)})
 
 
 def test_a_job_that_failed_says_so_rather_than_disappearing(rig):
@@ -1098,8 +1106,8 @@ def test_a_transient_failure_on_a_later_pass_never_moves_the_evidence(rig,monkey
     assert rig.mod.publication.pending(led) is not None
 
 
-def test_actual_free_task_discloses_original_pixels_for_an_unreadable_symbolic_font(rig,monkeypatch):
-    """A source-only pixel route keeps unresolved font ink as disclosed imagery."""
+def test_actual_free_task_reads_legible_pixels_despite_symbolic_font_flag(rig,monkeypatch):
+    """Changing a font descriptor flag leaves the authored source pixels legible."""
     from cps.services.reflow import extract
     from PIL import Image
     import io,zipfile
@@ -1113,27 +1121,19 @@ def test_actual_free_task_discloses_original_pixels_for_an_unreadable_symbolic_f
     target=str(rig.folder/'Book - Author.epub')
     assert rig.mod.build_epub.validate(target)==[]
     sidecar=rig.mod.build_epub.read_sidecar(target)
-    assert sidecar['pages']['1']['source']=='original_source'
     assert sidecar['source_document_sha256']==extract.document_fingerprint(path)
-    original=next(unit for unit in sidecar['degraded_units'] if unit['page']==1 and unit['block'] is None)
+    assert task.results['report']['cost']['spend_usd']==0
+    assert rig.local_db.session.commits==1
+    from tests.unit.round7_public_note_contract_support import local_ocr_visible
+    evidence=local_ocr_visible(target,sidecar,{1:[
+        'Every shelf in this imaginary workshop holds a labeled wooden']})
     with zipfile.ZipFile(target) as archive:
-        name=original['source_image']
-        if not name.startswith('OEBPS/'):name='OEBPS/'+name
+        name=evidence[1]['full_image']
         with Image.open(io.BytesIO(archive.read(name))) as image:
             assert image.width>=500 and image.height>=700
             assert image.convert('L').getextrema()[0]<200
-        from xml.etree import ElementTree as ET
-        roots=[ET.fromstring(archive.read(n)) for n in archive.namelist() if n.endswith('.xhtml')]
-        controls=[node for root in roots for node in root.iter()
-                  if node.get('id')==original['source_reference_origin']]
-        assert len(controls)==1 and controls[0].get('href','').startswith('#')
-        targets=[node for root in roots for node in root.iter()
-                 if node.get('id')==controls[0].get('href')[1:]]
-        assert len(targets)==1
-        assert any(node.tag.endswith('}img') and node.get('src')==original['source_image']
-                   for node in targets[0].iter())
-    assert task.results['report']['cost']['spend_usd']==0
-    assert rig.local_db.session.commits==1
+        # local_ocr_visible checks each live run's own crop, complete-page link,
+        # and exact return origin; the complete page also retains its dimensions.
 
 
 @pytest.mark.parametrize("failure", ["grown", "missing", "database", "protected"])

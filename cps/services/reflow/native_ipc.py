@@ -30,18 +30,21 @@ BUILD_DOCUMENT_CLOSE_GRACE_SECONDS = 30
 
 
 def operation_timeout(operation, arguments, page_count):
-    """Absolute operation walls, including progress and parent acknowledgements.
+    """Absolute native-work walls, including progress and local acknowledgements.
 
-    Preparation can perform bounded OCR for every selected page; it has no paid
-    reader. Give bulk work a page allowance, capped at six hours. Opening and
+    Bulk work can perform bounded OCR for every selected page. Give it a page
+    allowance capped at six hours; bounded parent transport waits are excluded. Opening and
     survey have smaller limits; neither performs OCR or model dispatch.
     """
     if operation == 'open':
         return 60
     if operation == 'survey':
         return min(3600, 120 + 2 * page_count)
-    if operation in ('prepare', 'build'):
-        selected = arguments.get('page_numbers') if operation == 'prepare' else arguments.get('page_html')
+    if operation == 'vision_sample_start':
+        selected = min(page_count, max(2 * arguments.get('count', 20) + 1, 12))
+        return min(21600, 1800 + 60 * selected)
+    if operation in ('prepare', 'build', 'vision_convert', 'vision_quote'):
+        selected = arguments.get('page_html') if operation == 'build' else arguments.get('page_numbers')
         pages = page_count if selected is None else len(selected)
         return min(21600, 1800 + 60 * pages)
     return 1800
@@ -56,7 +59,7 @@ class ChildExited(RuntimeError):
 
 
 def read_owned(root, name):
-    if name not in ('request.json', 'response.json', 'candidate.epub'):
+    if name not in ('request.json', 'response.json', 'reader-request.json', 'reader-response.json', 'candidate.epub'):
         raise ValueError('unknown native artifact')
     path = Path(root) / name
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -68,7 +71,7 @@ def read_owned(root, name):
 
 
 def write_owned(root, name, value):
-    if name not in ('request.json', 'response.json'):
+    if name not in ('request.json', 'response.json', 'reader-request.json', 'reader-response.json'):
         raise ValueError('unknown native manifest')
     raw = codec.dumps(value)
     path = Path(root) / name
@@ -174,13 +177,16 @@ class NativeDocument:
     """Named PDF handle whose parsing/rendering executes only in its child.
 
     The parent uses the original name only for SHA-256 checks. The child reads a
-    private snapshot and accepts a fixed operation vocabulary, never provider RPC,
-    credentials, a library destination, a Python callable, or an arbitrary path.
+    private snapshot and accepts a fixed operation vocabulary, never credentials,
+    a library destination, a Python callable, or an arbitrary path. Pixel-reader
+    transport and financial requests use a fixed, source-bound parent broker.
     """
     def __init__(self, source, *, scratch_root, cache_root=None, should_stop=None,
                  progress=None, ledger=None):
         from . import extract, ocr
         self.name = os.fspath(source)
+        self.cache_root = Path(cache_root).resolve() if cache_root else None
+        self.reader_broker = None
         self.should_stop = should_stop
         self.progress = progress
         self.ledger = ledger
@@ -333,6 +339,7 @@ class NativeDocument:
             operation, arguments, getattr(self, 'page_count', 0))
         try:
             self.process.stdin.write((str(self.seq) + '\n').encode()); self.process.stdin.flush()
+            bridge_sequence = 0
             while True:
                 self._cancel()
                 try:
@@ -341,6 +348,24 @@ class NativeDocument:
                     protocol_error('Invalid native control reply', error)
                 if not isinstance(message, dict) or message.get('seq') != self.seq:
                     protocol_error('Native reply sequence mismatch')
+                if set(message) == {'seq', 'reader_request'}:
+                    if (operation != 'vision_convert' or self.reader_broker is None
+                            or type(message['reader_request']) is not int
+                            or message['reader_request'] != bridge_sequence + 1):
+                        protocol_error('Unsolicited native reading request')
+                    bridge_sequence = message['reader_request']
+                    request = codec.loads(read_owned(self.root, 'reader-request.json'))
+                    # A native wall measures renderer work. Synchronous parent
+                    # finance/HTTP has its own fixed transport limits; a native
+                    # timeout must never kill a worker during an in-flight bill.
+                    started = time.monotonic()
+                    try:
+                        answer = self.reader_broker.handle(request)
+                    finally:
+                        self.operation_deadline += time.monotonic() - started
+                    write_owned(self.root, 'reader-response.json', answer)
+                    self.process.stdin.write(b'continue\n'); self.process.stdin.flush()
+                    continue
                 if set(message) == {'seq', 'progress'}:
                     event = message['progress']
                     if callback: callback(event)
@@ -403,6 +428,62 @@ class NativeDocument:
             raise ChildExited('Native PDF worker disconnected during ' + operation) from exc
         finally:
             self.operation_deadline = None
+
+    def vision_sample_start(self, count):
+        if type(count) is not int or not 1 <= count <= 60:
+            raise ValueError('Invalid native sample size')
+        value = self.call('vision_sample_start', {'count': count})
+        if type(value) is not int or not 0 <= value < self.page_count:
+            raise ValueError('Invalid native sample origin')
+        return value
+
+    def vision_quote(self, *, page_numbers=None):
+        return self.call('vision_quote', {'page_numbers': page_numbers})
+
+    def convert_vision(self, out_path, reader, *, page_numbers=None, metadata=None,
+                       quote=None, job_id=None):
+        from .vision_bridge import ParentBroker
+        from . import vision_reading
+        if not isinstance(reader, vision_reading.Reader):
+            raise ValueError('Native conversion requires the page Reader')
+        numbers = list(range(self.page_count)) if page_numbers is None else list(page_numbers)
+        if (not numbers or len(set(numbers)) != len(numbers) or any(
+                type(n) is not int or not 0 <= n < self.page_count for n in numbers)):
+            raise ValueError('Invalid native page scope')
+        if self.cache_root is None:
+            raise ValueError('Native vision conversion needs an owned cache root')
+        cache = reader.cache.resolve()
+        try:
+            relative = cache.relative_to(self.cache_root)
+        except ValueError as error:
+            raise ValueError('Reading cache must belong to the native data root') from error
+        if not relative.parts or any(part.startswith('.') for part in relative.parts):
+            raise ValueError('Invalid owned reading cache')
+        authorizer = None
+        if quote is not None:
+            from . import vision_quote
+            authorizer = vision_quote.Authorizer(quote, self.fingerprint, numbers)
+        self.reader_broker = ParentBroker(reader, self.fingerprint, numbers,
+            authorizer=authorizer, should_stop=self.should_stop)
+        try:
+            result = self.call('vision_convert', dict(page_numbers=numbers,
+                metadata=dict(metadata or {}), cache=str(relative), job_id=job_id, reader={
+                    'enabled': bool(reader.key), 'cap_usd': reader.ledger.cap_usd,
+                    'token_confidence': reader.token_confidence,
+                    'confidence_protocol': reader.confidence_protocol,
+                    'reuse_legacy': reader.reuse_legacy}))
+        finally:
+            self.reader_broker = None
+        if not isinstance(result, dict) or result.get('source_document_sha256') != self.fingerprint:
+            raise ValueError('Invalid native vision result source')
+        candidate = Path(self.root) / 'candidate.epub'
+        Path(out_path).parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(candidate, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, 'rb') as src, open(out_path, 'xb') as dst:
+            if not stat.S_ISREG(os.fstat(src.fileno()).st_mode):
+                raise ValueError('Invalid native vision candidate')
+            shutil.copyfileobj(src, dst)
+        return result
 
     def prepare_result(self, **arguments):
         arguments.pop('client', None); arguments.pop('ledger', None); arguments.pop('cache', None)

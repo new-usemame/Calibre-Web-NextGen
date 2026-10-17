@@ -146,6 +146,11 @@ class ParentBroker:
         if operation == 'financial_dispatch_allowed':
             if args:
                 raise unit_recovery.SourceIntegrityError('Invalid finance query')
+            # The application authorizes no further paid page after an unknown
+            # outcome. Cached readings and disclosed originals remain available.
+            with self.reader._budget():
+                if self.reader.ledger.pending_usd():
+                    return False
             return self.reader.financial_dispatch_allowed()
         if operation == 'ledger':
             if (set(args) != {'method', 'args', 'kwargs'} or args['method'] not in LEDGER_METHODS

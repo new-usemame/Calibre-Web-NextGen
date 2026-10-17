@@ -381,4 +381,4 @@ class SharedLedger(Ledger):
 
     def reconcile_attempt(self,attempt,cost_usd):
         self.store.finish(attempt,cost_usd)
-        self.record(dict(kind='reservation',event='reconciled',attempt=attempt,cost_usd=float(cost_usd)),durable=True)
+        super().reconcile_attempt(attempt, cost_usd)

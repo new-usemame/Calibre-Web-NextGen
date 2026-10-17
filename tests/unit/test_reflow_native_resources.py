@@ -56,7 +56,7 @@ def test_capacity_drop_cancels_owned_task_keeps_prior_file_and_unknown_hold(rig,
     owned = []
     unrelated = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
     def drop(self, operation, args, **kwargs):
-        if operation == 'build':
+        if operation == 'vision_convert':
             owned.append(self.process)
             # Represent already-confirmed work and an ambiguous posted attempt.
             first = self.ledger.reserve_attempt('confirmed', .02)
@@ -169,7 +169,10 @@ def test_quote_drop_reaps_owned_process_and_does_not_make_ready(tmp_path, monkey
 
 
 def test_parent_stop_checkpoint_prevents_provider_dispatch(rig, monkeypatch):
-    from cps.services.reflow import model
+    from cps.services.reflow import model, vision_quote
+    import pymupdf
+    with pymupdf.open(rig.folder / 'Book - Author.pdf') as doc:
+        quote = vision_quote.measure(doc)
     monkeypatch.setattr(rig.mod.config, 'resolved_openrouter_key', lambda: 'inert-not-a-key')
     sent = []
     monkeypatch.setattr(model.requests, 'post', lambda *a, **k: sent.append(k))
@@ -177,6 +180,7 @@ def test_parent_stop_checkpoint_prevents_provider_dispatch(rig, monkeypatch):
     def low(self, doc, client, ledger, cache):
         monkeypatch.setattr(resources, 'measure', lambda root: (0, 8 * 1024**3))
         doc.resource_lease.next_check = 0
+        self.options.consent_quote = quote
         return real(self, doc, client, ledger, cache)
     monkeypatch.setattr(rig.mod.TaskReflowPdf, '_convert', low)
     task = _run(rig, mode='full', review_mode='source_verified', cost_cap_usd=1)

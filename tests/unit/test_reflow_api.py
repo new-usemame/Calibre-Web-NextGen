@@ -1078,3 +1078,35 @@ def test_assessment_never_pairs_old_findings_with_a_new_content_fingerprint(
     monkeypatch.setattr(mod, "_survey", stale_survey)
     with pytest.raises(ValueError, match="changed"):
         mod._estimate_payload(book, source)
+
+
+@pytest.mark.unit
+def test_jobs_preserve_the_current_vision_summary(mod, monkeypatch, pdf_on_disk):
+    _wire(mod, monkeypatch, pdf_on_disk)
+    from cps.services.reflow import ledger as ledger_mod
+    path = os.path.join(mod.REFLOW_DIR, 'jobs', '5', 'abc123def4567890.jsonl')
+    record = ledger_mod.Ledger(path, 1, job_id='abc123def4567890')
+    record.record(dict(kind='job', event='start', user_id=7, mode='full', pages=3))
+    summary = dict(pages=3, source_pages=3, pages_model=1, native_pages=1,
+                   disclosed_pages=1, uncertain_total=2)
+    record.record(dict(kind='vision_summary', summary=summary))
+    record.record(dict(kind='job', event='finish', status='done'))
+    with _ctx('/api/v1/books/5/reflow/jobs'), patch.object(mod, 'current_user', _user()):
+        body = _json(inspect.unwrap(mod.reflow_jobs)(5))
+    assert body['items'][0]['vision'] == summary
+    assert body['items'][0]['structural'] is None
+
+
+@pytest.mark.unit
+def test_requested_models_exclude_cached_readings_and_unbilled_local_failures(tmp_path):
+    from cps.services.reflow.ledger import Ledger
+    record = Ledger(tmp_path / 'model-counts.jsonl', 1)
+    record.record(dict(kind='job', event='start', model='synthetic-reader'))
+    record.record(dict(kind='vision_reading', cached=True, model='synthetic-reader'))
+    assert record.totals()['models'] == {}
+    record.record(dict(kind='vision_dispatch', attempt='request-one', model='synthetic-reader'))
+    record.record(dict(kind='vision_reading', cached=False, model='synthetic-reader'))
+    assert record.totals()['models'] == {'synthetic-reader': 1}
+    record.record(dict(kind='vision_dispatch', attempt='unsent', model='synthetic-reader'))
+    record.record(dict(kind='reservation', event='released', attempt='unsent', reason='pre_dispatch'))
+    assert record.totals()['models'] == {'synthetic-reader': 1}

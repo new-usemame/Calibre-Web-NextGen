@@ -681,6 +681,7 @@ def reflow_jobs(book_id):
             "models": row.get("models", {}),
             "recovery": row.get("recovery", {}),
             "structural": row.get("structural"),
+            "vision": row.get("vision"),
             "artifact": row.get("artifact"),
             "error": row.get("error"),
             "sample_url": None,

@@ -62,7 +62,6 @@ def _quote(routed=100, pages=400, verdict="TEXT_CLEAN"):
 @pytest.fixture
 def mod(tmp_path, monkeypatch):
     from cps.api import reflow as module
-    monkeypatch.setattr(module.structural_pipeline, "QUALITY_RELEASED", True)
     monkeypatch.setattr(module, "REFLOW_DIR", str(tmp_path / "reflow"))
     monkeypatch.setattr(module.tasks_reflow, "REFLOW_DIR", str(tmp_path / "reflow"))
     return module
@@ -116,8 +115,9 @@ def test_fast_source_assessment_does_not_present_legacy_router_prices_as_typed_q
     assert body['pages']==400 and body['source_sha256']
     assert body['consent_contract']==mod.CONSENT_CONTRACT
     assert 'estimate_usd' not in body and 'routed_pages_estimate' not in body
-    assert body['review']['proposer']==mod.typed_model.STAGES['proposer'].model_id
-    assert body['review']['verifier']==mod.typed_model.STAGES['verifier'].model_id
+    assert body['review']['model']==mod.vision_reading.MODEL
+    assert body['review']['proposer']==mod.vision_reading.MODEL
+    assert body['review']['verifier']=='source-word and pixel evidence'
 
 
 @pytest.mark.unit
@@ -239,8 +239,8 @@ def _current_body(mod,body):
 def _paid(mod,monkeypatch):
     """An already measured server quote; transport/source measurement has its own seam tests."""
     monkeypatch.setattr(mod.config,'config_reflow_instance_budget_usd',5.0,raising=False)
-    quote={'source_context_pages':400,'first_body_page':4,
-           'pages':[{'page_index0':p,'proposer_bound_usd':.01,'verifier_bound_usd':.05,'full_bound_usd':.06} for p in range(400)]}
+    quote={'source_context_pages':400,'first_body_page':4,'sample_starts':{str(n):4 for n in range(1,61)},
+           'pages':[{'page_index0':p,'primary_bound_usd':.01,'retry_bound_usd':.02,'marker_bound_usd':.03,'proposer_bound_usd':.01,'verifier_bound_usd':.05,'full_bound_usd':.06} for p in range(400)]}
     monkeypatch.setattr(mod,'_quote_store',lambda:SimpleNamespace(ready=lambda *args:quote))
     return quote
 
@@ -267,7 +267,7 @@ def test_a_conversion_does_not_start_without_consent(mod, monkeypatch, pdf_on_di
 
 
 @pytest.mark.unit
-def test_cap_below_full_typed_ceiling_allows_honest_partial_review(mod,monkeypatch,pdf_on_disk):
+def test_cap_below_full_pixel_ceiling_allows_honest_partial_reading(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk);_paid(mod,monkeypatch)
     resp,added=_start(mod,{'mode':'full','review_mode':'source_verified','consent':True,'cost_cap_usd':.10})
     assert _status(resp)==202
@@ -317,12 +317,14 @@ def test_tiny_cap_never_gets_silently_increased_to_a_request_floor(mod,monkeypat
 
 
 @pytest.mark.unit
-def test_assessment_advertises_only_actual_current_two_stage_route(mod,monkeypatch,pdf_on_disk):
+def test_assessment_advertises_only_actual_current_pixel_route(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk)
     with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',_user()):
         body=_json(inspect.unwrap(mod.reflow_estimate)(5))
     assert 'tiers' not in body and 'default_tier' not in body
-    assert body['review']['provider']=='openai/flex' and body['review']['max_output_tokens']==4096
+    assert body['review']['provider']=='openai' and body['review']['max_output_tokens']==20000
+    assert body['review']['scope']=='printed-page pixel transcription'
+    assert body['review']['route_version']==mod.vision_quote.VERSION
 
 
 @pytest.mark.unit
@@ -1076,3 +1078,133 @@ def test_assessment_never_pairs_old_findings_with_a_new_content_fingerprint(
     monkeypatch.setattr(mod, "_survey", stale_survey)
     with pytest.raises(ValueError, match="changed"):
         mod._estimate_payload(book, source)
+
+
+@pytest.mark.unit
+def test_jobs_preserve_the_current_vision_summary(mod, monkeypatch, pdf_on_disk):
+    _wire(mod, monkeypatch, pdf_on_disk)
+    from cps.services.reflow import ledger as ledger_mod
+    path = os.path.join(mod.REFLOW_DIR, 'jobs', '5', 'abc123def4567890.jsonl')
+    record = ledger_mod.Ledger(path, 1, job_id='abc123def4567890')
+    record.record(dict(kind='job', event='start', user_id=7, mode='full', pages=3))
+    summary = dict(pages=3, source_pages=3, pages_model=1, native_pages=1,
+                   disclosed_pages=1, uncertain_total=2)
+    record.record(dict(kind='vision_summary', summary=summary))
+    record.record(dict(kind='job', event='finish', status='done'))
+    with _ctx('/api/v1/books/5/reflow/jobs'), patch.object(mod, 'current_user', _user()):
+        body = _json(inspect.unwrap(mod.reflow_jobs)(5))
+    assert body['items'][0]['vision'] == summary
+    assert body['items'][0]['structural'] is None
+
+
+@pytest.mark.unit
+def test_requested_models_exclude_cached_readings_and_unbilled_local_failures(tmp_path):
+    from cps.services.reflow.ledger import Ledger
+    record = Ledger(tmp_path / 'model-counts.jsonl', 1)
+    record.record(dict(kind='job', event='start', model='synthetic-reader'))
+    record.record(dict(kind='vision_reading', cached=True, model='synthetic-reader'))
+    assert record.totals()['models'] == {}
+    record.record(dict(kind='vision_dispatch', attempt='request-one', model='synthetic-reader'))
+    record.record(dict(kind='vision_reading', cached=False, model='synthetic-reader'))
+    assert record.totals()['models'] == {'synthetic-reader': 1}
+    record.record(dict(kind='vision_dispatch', attempt='unsent', model='synthetic-reader'))
+    record.record(dict(kind='reservation', event='released', attempt='unsent', reason='pre_dispatch'))
+    assert record.totals()['models'] == {'synthetic-reader': 1}
+
+
+@pytest.mark.parametrize('mode,quoted_ceiling', [('sample', 1.2), ('full', 24.0)])
+def test_replayed_preparation_cannot_authorize_more_than_the_hard_job_cap(
+        mod, monkeypatch, pdf_on_disk, mode, quoted_ceiling):
+    """A coverage quote is not spending permission, even when reused with fresh consent.
+
+    Removing the ledger's per-job admission check must allow the oversized
+    reservation and make this test fail; no provider transport is used.
+    """
+    from cps.services.reflow import admission, ledger, shared_budget
+    _wire(mod, monkeypatch, pdf_on_disk, hard_cap=500)
+    quote = _paid(mod, monkeypatch)
+    monkeypatch.setattr(mod.config, 'config_reflow_instance_budget_usd', 100.0)
+    first, added = _start(mod, {'mode': 'sample', 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 5})
+    assert _status(first) == 202
+    earlier = added.call_args[0][1]
+    admission.release(5, earlier)
+    oversized, refused = _start(mod, {'mode': mode, 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 24})
+    assert _status(oversized) == 400
+    assert _json(oversized)['error']['code'] == 'invalid_cap'
+    refused.assert_not_called()
+    result, added = _start(mod, {'mode': mode, 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 5})
+    assert _status(result) == 202
+    task = added.call_args[0][1]
+    try:
+        assert earlier.options.consent_quote is quote
+        assert task.options.consent_quote is quote
+        assert _json(result)['reservation_ceiling_usd'] == pytest.approx(quoted_ceiling)
+        assert mod.tasks_reflow.hard_cap_usd() == task.options.cost_cap_usd == 5
+        store = mod.tasks_reflow.instance_budget_store()
+        path = os.path.join(mod.REFLOW_DIR, 'jobs', '5', task.job_id + '.jsonl')
+        actual = shared_budget.SharedLedger(path, task.options.cost_cap_usd,
+            job_id=task.job_id, store=store, book_id=5, user_id=7)
+        actual.record({'kind': 'job', 'event': 'start', 'cap_usd': 5}, durable=True)
+        # Two independently valid requests must share the same job allowance.
+        held = actual.reserve_attempt('synthetic-first', 4.9)
+        assert actual.pending_usd() == pytest.approx(4.9)
+        with pytest.raises(ledger.CapExceeded):
+            actual.reserve_attempt('synthetic-next', .2)
+        with pytest.raises(ledger.CapExceeded):
+            actual.reserve_attempt('synthetic-full-coverage', 24)
+        assert actual.pending_usd() == pytest.approx(4.9)
+        assert store.status()['remaining_usd'] == pytest.approx(95.1)
+        actual.release_attempt(held, 'pre_dispatch')
+        assert actual.spent() == actual.pending_usd() == 0
+        assert store.status()['remaining_usd'] == 100
+    finally:
+        admission.release(5, task)
+
+
+def test_replayed_preparation_cannot_reserve_the_same_remaining_admin_money_twice(
+        mod, monkeypatch, pdf_on_disk):
+    """The shared store admits every attempt against its current remaining budget.
+
+    Removing shared admission makes the over-remaining reservation succeed and
+    fails the assertions, even though the job's own five-dollar cap permits it.
+    """
+    from cps.services.reflow import admission, shared_budget
+    _wire(mod, monkeypatch, pdf_on_disk)
+    quote = _paid(mod, monkeypatch)
+    store = mod.tasks_reflow.instance_budget_store()
+    store.reserve('synthetic-earlier-charge', 4.25, job='earlier', book=9,
+                  user=7, context={})
+    store.finish('synthetic-earlier-charge', 4.25)
+    assert store.status()['remaining_usd'] == .75
+    first, added = _start(mod, {'mode': 'sample', 'sample_pages': 20,
+        'review_mode': 'source_verified', 'consent': True, 'cost_cap_usd': 5})
+    assert _status(first) == 202
+    admission.release(5, added.call_args[0][1])
+    full, added = _start(mod, {'mode': 'full', 'review_mode': 'source_verified',
+        'consent': True, 'cost_cap_usd': 5})
+    assert _status(full) == 202
+    task = added.call_args[0][1]
+    try:
+        assert task.options.consent_quote is quote
+        assert _json(full)['reservation_ceiling_usd'] == pytest.approx(24)
+        actual = shared_budget.SharedLedger(
+            os.path.join(mod.REFLOW_DIR, 'jobs', '5', task.job_id + '.jsonl'),
+            task.options.cost_cap_usd, job_id=task.job_id,
+            store=store, book_id=5, user_id=7)
+        actual.record({'kind': 'job', 'event': 'start', 'cap_usd': 5}, durable=True)
+        with pytest.raises(shared_budget.BudgetError):
+            actual.reserve_attempt('synthetic-sample-coverage', 1.2)
+        assert actual.pending_usd() == 0
+        attempt = actual.reserve_attempt('synthetic-next', .7)
+        assert store.status()['remaining_usd'] == pytest.approx(.05)
+        with pytest.raises(shared_budget.BudgetError):
+            actual.reserve_attempt('synthetic-later', .1)
+        assert actual.pending_usd() == pytest.approx(.7)
+        actual.release_attempt(attempt, 'pre_dispatch')
+        assert store.status()['remaining_usd'] == .75
+        assert actual.spent() == actual.pending_usd() == 0
+    finally:
+        admission.release(5, task)

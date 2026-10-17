@@ -7,24 +7,24 @@ import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow } fro
 // preparation. This drives the compiled product SPA without paid dispatch or a
 // dependency on a seeded PDF. Actual routes/source/ledger have backend seam tests.
 function assessment(): SourceAssessment {
-  return { book_id: 1, title: 'Source conversion example', verdict: 'BORN_DIGITAL', pages: 60,
+  return { book_id: 1, title: 'Cached readings and source images example', verdict: 'BORN_DIGITAL', pages: 60,
     text_layer: true, sample_suggested: true, existing_epub: false, configured: true,
     hard_cap_usd: 5, sample_pages_default: 20, sample_pages_max: 60, sampled: 40, cached: true,
     assessment_scope: 'complete',
     instance_budget: { status: 'available', remaining_usd: 2, window_hours: 24 },
-    source_sha256: 'a'.repeat(64), consent_contract: 'source-layout-1',
+    source_sha256: 'a'.repeat(64), consent_contract: 'vision-page-1',
     review: { quality_released: true, route_version: 'test-route', source_revision: 'test-source',
-      provider: 'openai/flex', service_tier: 'flex', proposer: 'openai/gpt-5.6-luna',
-      verifier: 'openai/gpt-5.6-terra', max_output_tokens: 4096 },
+      provider: 'openai', service_tier: 'standard', model: 'openai/gpt-6-luna', scope: 'pixel_transcription', proposer: 'openai/gpt-6-luna',
+      verifier: 'openai/gpt-6-luna', max_output_tokens: 20000 },
     recovery: { ocr_candidates: 0, image_only: 0, damaged: 0, counts_estimated: false, sampled_pages: 60, estimated_seconds: 0,
       engine_available: true, engine_version: 'tesseract 5.3.4', engine_detail: '', language: 'eng',
       dpi: 300, pdf_sha256: 'a'.repeat(16), non_latin_share: 0 } };
 }
 function quote(): ReviewQuote {
   return { identity: 'b'.repeat(64), source_sha256: 'a'.repeat(64), source_context_pages: 60,
-    first_body_page: 4, eligible_pages: 3, limited_pages: 1, unsupported_pages: 1, no_choice_pages: 55,
-    proposer_bound_usd: .06, verifier_bound_usd: .3, full_bound_usd: .36, confirmed_usd: 0, held_usd: 0,
-    pages: [4, 12, 40].map((page_index0) => ({ page_index0, proposer_bound_usd: .02, verifier_bound_usd: .1 })),
+    first_body_page: 0, eligible_pages: 3, limited_pages: 1, unsupported_pages: 1, no_choice_pages: 55,
+    proposer_bound_usd: .06, verifier_bound_usd: .3, primary_bound_usd: .06, retry_bound_usd: .24, marker_bound_usd: .06, expected_usd: .018, target_usd: .5, full_bound_usd: .36, confirmed_usd: 0, held_usd: 0,
+    pages: [4, 12, 40].map((page_index0) => ({ page_index0, proposer_bound_usd: .02, verifier_bound_usd: .1, primary_bound_usd: .02, retry_bound_usd: .08, marker_bound_usd: .02, expected_usd: .006, full_bound_usd: .12 })),
     coverage: Array.from({ length: 60 }, (_, page) => ({ page,
       status: [4, 12, 40].includes(page) ? 'eligible' : page === 5 ? 'unsupported' : page === 6 ? 'limited' : 'no_choices' })) };
 }
@@ -77,11 +77,11 @@ async function stub(page: Page, est = assessment(), jobs: ReflowJob[] = []) {
   await expect(page.getByRole('heading', { name: 'Reflow PDF to EPUB', exact: true })).toBeVisible();
   return { state, errors };
 }
-const paidChoice = (page: Page) => page.getByRole('radio', { name: /^AI formatting choices/ });
-const consent = (page: Page) => page.getByRole('checkbox', { name: /^I authorize the displayed/ });
+const paidChoice = (page: Page) => page.getByRole('radio', { name: /^Read pages with AI/ });
+const consent = (page: Page) => page.getByRole('checkbox', { name: /^I authorize the displayed page-reading model/ });
 async function preparePaid(page: Page) {
   await paidChoice(page).check();
-  await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();
+  await page.getByRole('button', { name: 'Prepare page-reading estimate', exact: true }).click();
   await expect(page.getByText('Source estimate ready. No credit has been reserved.', { exact: true })).toBeVisible();
 }
 
@@ -95,8 +95,9 @@ test('complete and sampled source assessments disclose observed scope and unknow
   const recoveryCard = page.locator('section[aria-labelledby="reflow-recovery"]');
   await expect(assessmentCard).toContainText('Complete source assessment');
   await expect(assessmentCard).not.toContainText('Text findings and recovery counts are projected');
-  await expect(recoveryCard).toContainText('3 pages are only pictures of pages.');
-  await expect(recoveryCard).toContainText('about 18s for 3 pages');
+  await expect(recoveryCard).toContainText('Local English OCR supplies alignment evidence');
+  await expect(recoveryCard).toContainText('tesseract 5.3.4');
+  await expect(recoveryCard.getByRole('radio')).toHaveCount(0);
   assertNoPageErrors(completeRun.errors);
 
   const sampled = assessment();
@@ -108,10 +109,8 @@ test('complete and sampled source assessments disclose observed scope and unknow
   const sampledRecovery = page.locator('section[aria-labelledby="reflow-recovery"]');
   await expect(sampledAssessment).toContainText('Sampled 12 pages');
   await expect(sampledAssessment).toContainText('Text findings and recovery counts are projected for the rest of the PDF');
-  await expect(sampledRecovery).toContainText('Recovery counts are projected from 12 sampled pages. A zero does not prove that no other page needs recovery.');
-  await expect(sampledRecovery).toContainText('About 14 pages are projected to be only pictures of pages.');
-  await expect(sampledRecovery).toContainText('Not measured until recovery runs');
-  await expect(sampledRecovery).not.toContainText('about 0s');
+  await expect(sampledRecovery).toContainText('The model reads the original page image, including its printed script.');
+  await expect(sampledRecovery.getByRole('textbox')).toHaveCount(0);
   const findings = await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-assessment"]')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
@@ -128,17 +127,17 @@ test('keyless source conversion remains usable and cannot silently become paid r
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(accessibility.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
   await expect(paidChoice(page)).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Prepare AI estimate' })).toHaveCount(0);
-  const free = page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' });
+  await expect(page.getByRole('button', { name: 'Prepare page-reading estimate' })).toHaveCount(0);
+  const free = page.getByRole('checkbox', { name: 'Convert using cached readings and disclosed source images, without new model requests or provider charges.' });
   await free.focus(); await page.keyboard.press('Space');
   await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(1);
   expect(state.starts[0]).toMatchObject({ review_mode: 'deterministic', cost_cap_usd: 0,
-    consent_contract: 'source-layout-1', source_sha256: est.source_sha256 });
+    consent_contract: 'vision-page-1', source_sha256: est.source_sha256 });
   expect(state.starts[0]).not.toHaveProperty('model_tier');
   expect(state.preparations).toBe(0);
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: test.info().outputPath('source-conversion.jpg'), type: 'jpeg', quality: 75, fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('source-conversion.jpg'), type: 'jpeg', quality: 50, fullPage: true });
   assertNoPageErrors(errors);
 });
 
@@ -146,12 +145,12 @@ test('an unavailable shared budget disables only paid review without exposing ot
   const est = assessment(); est.instance_budget = { status: 'exhausted', remaining_usd: 0, window_hours: 24 };
   const { state, errors } = await stub(page, est);
   await expect(paidChoice(page)).toBeDisabled();
-  await expect(page.getByText('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.', { exact: true })).toBeVisible();
+  await expect(page.getByText('The shared 24-hour budget is exhausted. Cached readings and source images remain available.', { exact: true })).toBeVisible();
   await expect(paidChoice(page)).toHaveAttribute('aria-describedby', 'reflow-review-availability');
   const findings = await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-cost"]')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
-  await page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' }).check();
+  await page.getByRole('checkbox', { name: 'Convert using cached readings and disclosed source images, without new model requests or provider charges.' }).check();
   await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(1);
   expect(state.starts[0]).toMatchObject({ review_mode: 'deterministic', cost_cap_usd: 0 });
@@ -164,12 +163,12 @@ test('a budget exhausted during dispatch keeps the source conversion available a
   await preparePaid(page); await consent(page).check();
   state.startError = { code: 'instance_budget_exhausted' };
   await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
-  await expect(page.locator('p[role="alert"]').filter({ hasText: 'AI review is unavailable because the shared 24-hour budget is exhausted.' }))
-    .toHaveText('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.');
+  await expect(page.locator('p[role="alert"]').filter({ hasText: 'The shared 24-hour budget is exhausted.' }))
+    .toHaveText('The shared 24-hour budget is exhausted. Cached readings and source images remain available.');
   expect(state.starts).toHaveLength(1);
   state.startError = null;
-  await page.getByRole('radio', { name: /^Source conversion/ }).check();
-  await page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' }).check();
+  await page.getByRole('radio', { name: /^Cached readings and source images/ }).check();
+  await page.getByRole('checkbox', { name: 'Convert using cached readings and disclosed source images, without new model requests or provider charges.' }).check();
   await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(2);
   expect(state.starts[1]).toMatchObject({ review_mode: 'deterministic', cost_cap_usd: 0 });
@@ -183,14 +182,21 @@ test('prepared wire ceiling and cap stay distinct; changing cap or scope resets 
   await preparePaid(page);
   const card = page.locator('section[aria-labelledby="reflow-cost"]');
   await expect(card).toContainText('2');
-  await expect(card.getByText('$0.24', { exact: true })).toBeVisible();
-  await expect(page.getByText(/This cap may cover only part/)).toHaveCount(0);
+  await expect(card.getByText('Total request ceiling', { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText('$0.24');
+  await expect(card.getByText('First-reading ceiling', { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText('$0.04');
+  await expect(card.getByText('Targeted reread ceiling', { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText('$0.16');
+  await expect(card.getByText('Note-marker reading ceiling', { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText('$0.04');
+  await expect(card.getByText('Expected reading cost', { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText('$0.012');
+  await expect(card).toContainText('Per-book cost target');
+  await expect(card).not.toContainText('Planned proposer');
+  await expect(card).not.toContainText('Planned reviewer');
+  await expect(page.getByText(/This cap may cover only some/)).toHaveCount(0);
   const cap = page.getByRole('spinbutton', { name: /Stop after spending/ });
   await cap.focus(); await expect(cap).toBeFocused();
   const inputBox = await cap.boundingBox(); const headerBox = await page.locator('header').first().boundingBox();
   expect(inputBox!.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height);
   await cap.fill('0.10');
-  await expect(page.getByText(/This cap may cover only part/)).toBeVisible();
+  await expect(page.getByText(/This cap may cover only some/)).toBeVisible();
   await consent(page).check();
   await expect(page.getByRole('button', { name: 'Convert the sample', exact: true })).toBeEnabled();
   await cap.fill('0.20'); await expect(consent(page)).not.toBeChecked();
@@ -202,21 +208,24 @@ test('prepared wire ceiling and cap stay distinct; changing cap or scope resets 
   await page.getByRole('button', { name: 'Convert the book', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(1);
   expect(state.starts[0]).toMatchObject({ review_mode: 'source_verified', cost_cap_usd: .2,
-    preparation_id: 'd'.repeat(32), consent_contract: 'source-layout-1' });
+    preparation_id: 'd'.repeat(32), consent_contract: 'vision-page-1' });
   assertNoPageErrors(errors);
 });
 
-test('local preparation is cancellable and changed recovery invalidates ready consent', async ({ page }) => {
+test('local preparation is cancellable and stale source quotes cannot enable consent', async ({ page }) => {
   const est = assessment(); est.recovery.ocr_candidates = 1; est.recovery.image_only = 1;
   const { state, errors } = await stub(page, est); state.status = 'preparing';
-  await paidChoice(page).check(); await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();
+  await paidChoice(page).check(); await page.getByRole('button', { name: 'Prepare page-reading estimate', exact: true }).click();
   await expect(page.getByText('Preparing source context: 8 of 60', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Stop preparation', exact: true }).click();
   await expect(page.getByText('Source preparation stopped. No model request was sent.', { exact: true })).toBeVisible();
   await expect(consent(page)).toBeDisabled();
-  state.status = 'ready'; await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();
+  state.status = 'ready'; await page.getByRole('button', { name: 'Prepare page-reading estimate', exact: true }).click();
   await expect(consent(page)).toBeEnabled(); await consent(page).check();
-  await page.getByRole('textbox', { name: /Recognition language/ }).fill('fra');
+  est.source_sha256 = '9'.repeat(64);
+  await page.reload();
+  await paidChoice(page).check();
+  await page.getByRole('button', { name: 'Prepare page-reading estimate', exact: true }).click();
   await expect(consent(page)).not.toBeChecked(); await expect(consent(page)).toBeDisabled();
   expect(state.starts).toHaveLength(0); expect(state.cancellations).toBeGreaterThan(0);
   assertNoPageErrors(errors);
@@ -244,7 +253,7 @@ test('actual typed counts, microcharges, held costs and file identity stay separ
     await assertNoHorizontalOverflow(page);
     const findings = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
-    await page.screenshot({ path: test.info().outputPath(`typed-review-${theme}.jpg`), type: 'jpeg', quality: 75, fullPage: true });
+    await page.screenshot({ path: test.info().outputPath(`typed-review-${theme}.jpg`), type: 'jpeg', quality: 50, fullPage: true });
   }
   await page.reload(); await paidChoice(page).check();
   await expect(held).not.toBeChecked();
@@ -278,14 +287,14 @@ test('a sample says how much of the book it read and, once its file is removed, 
     const findings = await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-result"]')
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
-    await result.screenshot({ path: test.info().outputPath(`expired-sample-${theme}.jpg`), type: 'jpeg', quality: 75 });
+    await result.screenshot({ path: test.info().outputPath(`expired-sample-${theme}.jpg`), type: 'jpeg', quality: 50 });
   }
   assertNoPageErrors(errors);
 });
 
 test('invalid cap is associated with its field and a failed preparation buys nothing', async ({ page }) => {
   const { state, errors } = await stub(page); state.status = 'failed';
-  await paidChoice(page).check(); await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();
+  await paidChoice(page).check(); await page.getByRole('button', { name: 'Prepare page-reading estimate', exact: true }).click();
   await expect(page.getByText('Source estimate preparation failed. No model request was sent.', { exact: true })).toBeVisible();
   await expect(consent(page)).toBeDisabled();
   const cap = page.getByRole('spinbutton', { name: /Stop after spending/ });
@@ -314,5 +323,23 @@ test('a durable early failure replaces the old result and keeps its reason after
   const violations = (await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-result"]').analyze())
     .violations.filter((issue) => issue.impact === 'critical' || issue.impact === 'serious');
   expect(violations).toEqual([]);
+  assertNoPageErrors(errors);
+});
+
+test('vision results distinguish native text, model readings and disclosed pages without formatting approvals', async ({ page }) => {
+  const current: ReflowJob = { ...reviewed, structural: undefined, status: 'done', pending_usd: 0,
+    pages: 20, calls: 3, reused: 2, models: { 'openai/gpt-6-luna': 3 },
+    vision: { pages: 20, pages_native: 12, pages_model: 6, pages_disclosed: 2, uncertain_total: 4 } };
+  const { errors } = await stub(page, assessment(), [current]);
+  const result = page.locator('section[aria-labelledby="reflow-result"]');
+  for (const [label, value] of [['Pages in this file', '20'], ['Native pages preserved', '12'],
+    ['Pages read by a model', '6'], ['Pages disclosed as source images', '2'],
+    ['Uncertain readings recorded', '4'], ['Requests attempted', '3'], ['Cached readings reused', '2']]) {
+    await expect(result.getByText(label, { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText(value);
+  }
+  await expect(result).not.toContainText('Approved operations');
+  await expect(result).not.toContainText('Legacy requests');
+  await expect(result).toContainText('openai/gpt-6-luna');
+  await expect(result).toContainText('disclosures preserve access to the original page');
   assertNoPageErrors(errors);
 });

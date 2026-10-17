@@ -13,7 +13,7 @@ def main():
     name='_reflow_source_quote_runtime'
     spec=importlib.util.spec_from_file_location(name,root/'__init__.py',submodule_search_locations=[str(root)])
     module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module)
-    quote=importlib.import_module(name+'.structural_quote')
+    quote=importlib.import_module(name+'.vision_quote')
     import pymupdf
     request=json.load(sys.stdin);control=Path(request['control']);status=Path(request['progress'])
     # The web process names itself: reading getppid() here could already see the
@@ -27,7 +27,10 @@ def main():
         data={'stage':str(event.stage),'page':int(event.page),'pages':int(event.pages)}
         temp=status.with_suffix('.tmp');temp.write_text(json.dumps(data));os.replace(temp,status)
     options=request['options'];cache=Path(request['cache_root'])
-    with pymupdf.open(request['source']) as doc:
+    extract=importlib.import_module(name+'.extract')
+    limits=importlib.import_module(name+'.native_limits')
+    with extract.open_document(request['source']) as doc:
+        limits.check_document(doc)
         result=quote.measure(doc,recovery_opts={'mode':options['source_recovery'],
             'language':options['ocr_language'],'cache_dir':str(cache/'ocr-cache'),
             'scratch_dir':str(cache/'ocr-scratch')},progress=progress,should_stop=should_stop)

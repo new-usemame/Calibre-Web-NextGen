@@ -646,3 +646,111 @@ def _spend_section(payload):
                    % (escape(payload["model"]["model"]),
                       escape(payload["model"]["prompt_version"] or "n/a")))
     return out
+
+
+def vision_numbers(result, ledger, review_mode):
+    """App report uses exact vision outcomes and the authoritative money journal."""
+    totals = ledger.totals()
+    rows = list(result.get('pages', {}).values())
+    financial = result.get('recovery_financial_state', {})
+    return {
+        'route': 'vision', 'converter': result['converter'],
+        'converter_version': result['version'],
+        'source': {'pages': result.get('_source_pages', len(rows)), 'pdf_sha256': result['source_document_sha256']},
+        'fidelity': {'pages': len(rows),
+            'pages_deterministic': len(result.get('native_pages', [])),
+            'pages_model': sum(bool(r.get('request_id')) for r in rows),
+            'pages_disclosed': sum(r.get('source') == 'original_source' for r in rows),
+            'uncertain_total': result.get('disclosure_count', 0),
+            'degraded_units': result.get('degraded_unit_count', 0)},
+        'model': {'used': any(bool(r.get('request_id')) for r in rows), 'model': result['model'],
+                  'review_mode': review_mode},
+        'spend': {'shown': True, 'usd': totals['spend_usd'], 'pending_usd': totals['pending_usd']},
+        'cost': {k: totals[k] for k in ('spend_usd', 'pending_usd', 'cap_usd', 'calls', 'reused')},
+        'structure': {'scope': 'sample_context' if result.get('_sample_context_pages', len(rows)) < result.get('_source_pages', len(rows)) else 'complete'},
+        'vision': {'pages': sorted(int(n) for n in result.get('pages', {})),
+                   'source_context_pages': result.get('_sample_context_pages', len(rows)),
+                   'source_pages': result.get('_source_pages', len(rows))},
+        'text_quality': result.get('text_quality', {}),
+        'recovery_financial_state': financial,
+    }
+
+
+def check_vision_completion(payload, ledger):
+    for field, actual in (('spend_usd', ledger.spent()), ('pending_usd', ledger.pending_usd()),
+                          ('cap_usd', ledger.cap_usd)):
+        if payload['cost'][field] != actual:
+            raise ValueError('The vision report disagrees with the job ledger: ' + field)
+    financial = payload.get('recovery_financial_state', {})
+    if financial and (financial['cumulative_spend_usd'] != ledger.spent() or
+                      financial['held_usd'] != ledger.pending_usd()):
+        raise ValueError('The vision outcome disagrees with the job ledger')
+
+
+def finalize_vision(path, payload, *, include_report_page=True, show_cost=False):
+    """Add the exact app receipt without reassembling any source reading or image."""
+    import json
+    import os
+    from pathlib import Path
+    from zipfile import ZipFile
+    from xml.etree import ElementTree as ET
+    temporary = str(path) + '.report.tmp'
+    about = 'OEBPS/vision-about.xhtml'
+    try:
+        with ZipFile(path) as source, ZipFile(temporary, 'w') as output:
+            for info in source.infolist():
+                raw = source.read(info.filename)
+                if info.filename == about:
+                    if not include_report_page:
+                        continue
+                    cost = payload['cost']
+                    text = ('<h2>Conversion result</h2><p>%d source pages; %d native pages; '
+                            '%d pages with disclosed original images.</p>' %
+                            (payload['fidelity']['pages'], payload['fidelity']['pages_deterministic'],
+                             payload['fidelity']['pages_disclosed']))
+                    if show_cost:
+                        text += ('<p>$%.6f confirmed; up to $%.6f unresolved; '
+                                 '$%.2f authorized cap.</p>' %
+                                 (cost['spend_usd'], cost['pending_usd'], cost['cap_usd']))
+                    raw = raw.replace(b'</body>', text.encode() + b'</body>')
+                elif info.filename == 'META-INF/reflow.json':
+                    record = json.loads(raw); record['app_report'] = payload
+                    if not show_cost: record = _vision_without_finance(record)
+                    raw = json.dumps(record, ensure_ascii=False, allow_nan=False).encode()
+                elif not include_report_page and info.filename in (
+                        'OEBPS/content.opf', 'OEBPS/nav.xhtml', 'OEBPS/toc.ncx'):
+                    tree = ET.fromstring(raw)
+                    for parent in tree.iter():
+                        for node in list(parent):
+                            if (node.get('id') == 'about' or node.get('idref') == 'about' or
+                                node.get('href') == 'vision-about.xhtml' or
+                                any(child.get('href') == 'vision-about.xhtml' or
+                                    child.get('src') == 'vision-about.xhtml' for child in node.iter())):
+                                # Remove only the direct navigation item, not its enclosing list.
+                                local = node.tag.rsplit('}', 1)[-1]
+                                if local in ('item', 'itemref', 'li', 'navPoint'):
+                                    parent.remove(node)
+                    raw = ET.tostring(tree, encoding='utf-8', xml_declaration=True)
+                output.writestr(info, raw)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def _vision_without_finance(value):
+    """The shareable EPUB does not reveal the owner's financial/provider receipt."""
+    excluded = {'spend', 'cost', 'cost_usd', 'new_cost_usd', 'usage', 'request_id', 'actual_model',
+        'model', 'provider', 'seconds', 'recovery_financial_state', 'held_usd',
+        'bound_usd', 'reservation', 'attempt', 'cumulative_spend_usd', 'start_spend_usd',
+        'prompt_tokens', 'completion_tokens', 'cap_usd', 'spend_usd', 'pending_usd'}
+    if isinstance(value, dict):
+        clean = {k: _vision_without_finance(v) for k, v in value.items() if k not in excluded}
+        if 'app_report' in clean:
+            clean['app_report']['spend'] = {'shown': False}
+            clean['app_report']['cost'] = {'shown': False}
+        for key in ('reason', 'failure', 'cause_message', 'error'):
+            if isinstance(clean.get(key), str) and '$' in clean[key]:
+                clean[key] = re.sub(r'\$[0-9]+(?:\.[0-9]+)?', '[amount omitted]', clean[key])
+        return clean
+    if isinstance(value, list): return [_vision_without_finance(v) for v in value]
+    return value

@@ -25,7 +25,7 @@ export interface ReflowJob {
   job_id: string;
   mode: ReflowMode;
   /** ``capped`` and ``incomplete`` both stopped early with a file in hand: the
-   *  approved changes before the stop were written; all selected pages retain the complete source conversion. The first is
+   *  completed readings before the stop are retained; unsafe or unread pages disclose their source images. The first is
    *  the cap the user set, the second is the model service going away mid-book.
    *  ``billing_unknown`` stopped when a dispatched request's billing could not
    *  be proven either way: its bound stays held, and ``pending_usd`` says how
@@ -70,6 +70,10 @@ export interface ReflowJob {
   sample_expired?: boolean;
   sample_kept_days?: number;
   structural?: StructuralSummary | null;
+  /** Current pixel-reading route; structural summaries belong to older jobs. */
+  vision?: { pages?: number; native_pages?: number; vision_pages?: number; disclosed_pages?: number; pages_native?: number; pages_model?: number; pages_disclosed?: number;
+    pages_deterministic?: number; uncertain_total?: number; source_pages?: number;
+    native?: number; model?: number; disclosures?: number; requested_model?: string } | null;
   artifact?: { sha256: string; bytes: number } | null;
 }
 

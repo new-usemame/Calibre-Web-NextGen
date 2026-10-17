@@ -149,9 +149,15 @@ class Ledger(object):
         The page record references the same attempt id, so a completed run counts
         the charge once either way -- never zero, never twice.
         """
+        cost = float(cost_usd or 0.0)
+        previous = [e for e in self.entries('reservation')
+                    if e.get('attempt') == attempt and e.get('event') == 'reconciled']
+        if previous:
+            if any(float(e['cost_usd']) != cost for e in previous):
+                raise ValueError('Conflicting reconciliation for the same request')
+            return
         self.record({"kind": "reservation", "event": "reconciled",
-                     "attempt": attempt,
-                     "cost_usd": float(cost_usd or 0.0)})
+                     "attempt": attempt, "cost_usd": cost}, durable=True)
 
     # --------------------------------------------------------------- the record
 
@@ -219,8 +225,12 @@ class Ledger(object):
 
     def totals(self):
         gate = Counter(e.get("gate") for e in self._entries if e.get("gate"))
+        released = {e.get('attempt') for e in self.entries('reservation')
+                    if e.get('event') == 'released'}
         models = Counter(e.get("model") for e in self._entries
-                         if e.get("model") and e.get("kind") != "reservation")
+                         if e.get("model") and not e.get('cached')
+                         and e.get('attempt') not in released
+                         and e.get("kind") not in ("reservation", "job", "vision_reading"))
         _committed, pending, orphaned = self._financial_state()
         # A page served from the cache is evidence and belongs in the file, but it
         # is not a call: counting it would make a resumed job look like it spent
@@ -246,6 +256,8 @@ class Ledger(object):
             "models": dict(models),
             "pages": len(self.pages_done()),
             "recovery": recovery or {},
+            "vision": next((e['summary'] for e in reversed(self._entries)
+                            if e.get('kind') == 'vision_summary'), None),
             "structural": next((e['summary'] for e in reversed(self._entries)
                                 if e.get('kind')=='structural_summary'),None),
             "artifact": next(({k:e[k] for k in ('sha256','bytes')} for e in reversed(self._entries)

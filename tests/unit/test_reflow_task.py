@@ -434,6 +434,38 @@ def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(rig,mon
     assert row['status']=='done'
 
 
+def test_paid_task_uses_live_shared_admission_and_the_hard_job_cap(rig, monkeypatch):
+    from cps.services.reflow import shared_budget
+
+    store = rig.mod.instance_budget_store()
+    store.reserve('earlier', 4.25, job='earlier', book=9, user=7, context={})
+    store.finish('earlier', 4.25)
+    original_convert = rig.mod.TaskReflowPdf._convert
+    checked = []
+
+    def check_admission(self, document, client, ledger, cache):
+        assert ledger.cap_usd == 5
+        with pytest.raises(ledger_mod.CapExceeded):
+            ledger.reserve_attempt('too-large', 5.01)
+        with pytest.raises(shared_budget.BudgetError):
+            ledger.reserve_attempt('over-shared', 1)
+        attempt = ledger.reserve_attempt('pending', .7)
+        with pytest.raises(shared_budget.BudgetError):
+            ledger.reserve_attempt('over-remaining', .1)
+        ledger.release_attempt(attempt, 'pre_dispatch')
+        checked.append(True)
+        return original_convert(self, document, client, ledger, cache)
+
+    monkeypatch.setattr(rig.mod.TaskReflowPdf, '_convert', check_admission)
+    session = _PixelSession()
+    task = _run_pixel_response(rig, monkeypatch, session, cost_cap_usd=500)
+
+    assert checked == [True]
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert session.calls
+    assert store.status()['remaining_usd'] == pytest.approx(.75 - session.cost)
+
+
 def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(rig,monkeypatch):
     import requests
     session=_PixelSession(error=requests.ReadTimeout('lost answer'))

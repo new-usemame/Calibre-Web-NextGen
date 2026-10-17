@@ -694,6 +694,21 @@ def _remove_orphaned_staging(led):
     return count
 
 
+def _recover_financial_ledgers(active_ids):
+    """Called under exclusive native-resource ownership, after prior workers exit."""
+    store = instance_budget_store()
+    if not store.path.exists():
+        return
+    paths = set(store.vision_job_ledgers())
+    from pathlib import Path
+    paths.update(Path(REFLOW_DIR, 'jobs').glob('*/*.jsonl'))
+    for path in sorted(paths):
+        if path.stem in active_ids:
+            continue
+        led = ledger_mod.Ledger(path, cap_usd=0, job_id=path.stem)
+        store.reconcile_ledger(led, worker_gone=True)
+
+
 def recover_interrupted_jobs(worker=None):
     """Settle the record of every conversion its process did not finish.
 
@@ -708,9 +723,10 @@ def recover_interrupted_jobs(worker=None):
     this process owns is never terminalized.
 
     Recovery first reconciles prepared file publication against current library
-    identities and format metadata, then appends the terminal job record. Confirmed spend and
-    unresolved holds are the job's own history: no reservation is released,
-    reconciled, or zeroed because the process that wrote it is gone. A retry is
+    identities and format metadata, then appends the terminal job record. Under
+    exclusive native-resource ownership, authoritative settlements repair the job
+    mirror and proven unsent vision reservations are released. Dispatched unknown
+    outcomes retain their holds. A retry is
     a new job that reuses the page cache, never a silent resumption of this
     one's provider work.
 
@@ -718,10 +734,18 @@ def recover_interrupted_jobs(worker=None):
     a repeated run -- or a second process racing boot -- adds nothing. Returns
     the recovered job ids, for the startup log line.
     """
+    active_ids = _active_job_ids(worker)
+    from ..services.reflow.native_resources import recover_stale_scratch, ResourceBusy, ResourceUnavailable
+    try:
+        recover_stale_scratch(REFLOW_DIR,
+            on_exclusive=lambda: _recover_financial_ledgers(active_ids))
+    except (ResourceBusy, ResourceUnavailable, shared_budget.BudgetError, OSError) as exc:
+        # A live lease or damaged financial evidence cannot establish that an
+        # undispatched request is impossible. Preserve every ambiguous hold.
+        log.warning('reflow: finance recovery deferred: %s', exc)
     root = os.path.join(REFLOW_DIR, "jobs")
     if not os.path.isdir(root):
         return []
-    active_ids = _active_job_ids(worker)
     recovered = []
     for book_id in sorted(os.listdir(root)):
         directory = os.path.join(root, book_id)

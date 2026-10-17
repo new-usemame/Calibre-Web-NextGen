@@ -22333,3 +22333,135 @@ msgstr "Ce plafond prudent couvre les propositions et les validations des choix 
 #. Reflow conversion and reading interface.
 msgid "Warning: this highlight can’t be shown in the book"
 msgstr "Avertissement : ce surlignage ne peut pas être affiché dans le livre"
+
+msgid "AI page reading is not available in this build. Cached readings and source images remain available."
+msgstr "La lecture des pages par IA n’est pas disponible dans cette version. Les lectures en cache et les images sources restent disponibles."
+
+msgid "AI page reading needs a shared 24-hour administrator budget. Cached readings and source images remain available."
+msgstr "La lecture des pages par IA nécessite un budget partagé sur 24 heures défini par l’administrateur. Les lectures en cache et les images sources restent disponibles."
+
+msgid "Cached readings and source images"
+msgstr "Lectures en cache et images sources"
+
+msgid "Cached readings reused"
+msgstr "Lectures en cache réutilisées"
+
+msgid "Clean native pages keep their source text. For scans or damaged text, the model reads page images. Quality gates keep unsafe readings out of the EPUB and disclose the original page instead."
+msgstr "Les pages natives lisibles conservent leur texte source. Pour les pages numérisées ou le texte altéré, le modèle lit les images des pages. Les contrôles de qualité écartent les lectures non fiables de l’EPUB et présentent à la place la page d’origine avec une indication explicite."
+
+msgid "Configure an OpenRouter key to read new pages with AI."
+msgstr "Configurez une clé OpenRouter pour lire de nouvelles pages par IA."
+
+msgid "Convert using cached readings and disclosed source images, without new model requests or provider charges."
+msgstr "Convertir avec les lectures en cache et les images sources signalées, sans nouvelle requête au modèle ni frais de fournisseur."
+
+msgid "Converted with source-image disclosures"
+msgstr "Converti avec des images sources signalées"
+
+msgid "Create an EPUB from native text and page-image readings, with original-source access for uncertainty. New AI readings have their own estimate and consent."
+msgstr "Créez un EPUB à partir du texte natif et de lectures des images des pages, avec accès à la source en cas d’incertitude. Les nouvelles lectures par IA ont leur propre estimation et leur propre consentement."
+
+msgid "Expected reading cost"
+msgstr "Coût de lecture estimé"
+
+msgid "First-reading ceiling"
+msgstr "Plafond de la première lecture"
+
+msgid "Historical formatting-review job"
+msgstr "Ancienne tâche de révision de mise en forme"
+
+#, python-brace-format
+msgid "I authorize the displayed page-reading model through OpenRouter, up to {amount} for this job, including the quoted reread and note-marker allowances. Unreadable pages retain disclosed source images."
+msgstr "J’autorise le modèle de lecture de pages affiché, via OpenRouter, à dépenser jusqu’à {amount} pour cette tâche, y compris les montants annoncés pour les relectures et les appels de note. Les pages illisibles conservent leurs images sources avec une indication explicite."
+
+msgid "Native pages preserved"
+msgstr "Pages natives conservées"
+
+msgid "No new model requests or provider charges. Reuse verified cached readings; pages without a safe reading remain accessible as disclosed source images."
+msgstr "Aucune nouvelle requête au modèle ni aucuns frais de fournisseur. Les lectures vérifiées en cache sont réutilisées ; les pages sans lecture fiable restent accessibles sous forme d’images sources signalées."
+
+msgid "Note-marker reading ceiling"
+msgstr "Plafond de lecture des appels de note"
+
+msgid "Page reading"
+msgstr "Lecture des pages"
+
+msgid "Page reading ended early. Completed readings remain available, and pages without safe readings disclose source images. Compatible cached responses may be reused; unresolved requests are not retried automatically."
+msgstr "La lecture des pages s’est arrêtée avant la fin. Les lectures terminées restent disponibles et les pages sans lecture fiable sont présentées sous forme d’images sources signalées. Les réponses compatibles en cache peuvent être réutilisées ; les requêtes non résolues ne sont pas relancées automatiquement."
+
+#, python-brace-format
+msgid "Page reading stopped at the {amount} cap. Completed readings remain in the EPUB; pages without a safe reading disclose their source images."
+msgstr "La lecture des pages s’est arrêtée au plafond de {amount}. Les lectures terminées restent dans l’EPUB ; les pages sans lecture fiable présentent leurs images sources avec une indication explicite."
+
+msgid "Page-reading model"
+msgstr "Modèle de lecture des pages"
+
+msgid "Pages disclosed as source images"
+msgstr "Pages présentées sous forme d’images sources"
+
+msgid "Pages read by a model"
+msgstr "Pages lues par un modèle"
+
+msgid "Pages that may need model reading"
+msgstr "Pages pouvant nécessiter une lecture par modèle"
+
+msgid "Per-book cost target"
+msgstr "Coût visé par livre"
+
+msgid "Prepare page-reading estimate"
+msgstr "Préparer l’estimation de lecture des pages"
+
+msgid "Prepare the page-reading estimate before consenting. This identifies the selected page images and request ceilings locally, without sending a model request or reserving credit."
+msgstr "Préparez l’estimation de lecture des pages avant de donner votre consentement. Les images des pages sélectionnées et les plafonds des requêtes sont déterminés localement, sans envoyer de requête au modèle ni réserver de crédit."
+
+msgid "Read pages with AI"
+msgstr "Lire les pages par IA"
+
+msgid "Reading scanned pages"
+msgstr "Lecture des pages numérisées"
+
+msgid "Send page images to the displayed model for faithful transcription. Native pages stay local. Unsafe or unavailable readings retain disclosed original-source images."
+msgstr "Envoyez les images des pages au modèle affiché pour une transcription fidèle. Les pages natives restent locales. Les lectures non fiables ou indisponibles conservent les images sources d’origine avec une indication explicite."
+
+msgid "Targeted reread ceiling"
+msgstr "Plafond des relectures ciblées"
+
+msgid "The $0.50 target is advisory. The administrator limit and your authorized cap are hard limits. If a page cannot be read safely within them, its original image is disclosed."
+msgstr "L’objectif de 0,50 $ est indicatif. La limite de l’administrateur et le plafond que vous autorisez sont impératifs. Si une page ne peut pas être lue de façon fiable dans ces limites, son image d’origine est présentée avec une indication explicite."
+
+msgid "The ceiling includes first readings, one targeted reread and bounded note-marker readings. Expected cost is an estimate; neither amount is money already held. Your cap limits every new request."
+msgstr "Le plafond comprend les premières lectures, une relecture ciblée et des lectures limitées des appels de note. Le coût estimé est une estimation ; aucun de ces montants n’est déjà réservé. Votre plafond limite chaque nouvelle requête."
+
+msgid "The displayed model reads page images. There is no automatic switch to another model."
+msgstr "Le modèle affiché lit les images des pages. Aucun autre modèle n’est choisi automatiquement."
+
+msgid "The model reads the original page image, including its printed script. Local English OCR supplies alignment evidence; it does not replace the model reading. Unreadable or unsafe passages keep an explicitly disclosed source image."
+msgstr "Le modèle lit l’image de la page d’origine, y compris son écriture. La reconnaissance locale en anglais fournit des repères d’alignement ; elle ne remplace pas la lecture du modèle. Les passages illisibles ou non fiables conservent une image source explicitement signalée."
+
+msgid "The sample starts at the first body page found near the beginning of the PDF, or at page 1 if the bounded search finds none. It uses the same page-reading and quality gates as the whole book."
+msgstr "L’extrait commence à la première page de corps de texte trouvée au début du PDF, ou à la page 1 si la recherche limitée n’en trouve aucune. Il utilise la même lecture des pages et les mêmes contrôles de qualité que le livre entier."
+
+msgid "The sampled pages have OCR text behind page images. Recognition errors may remain; unsafe text needs a page-image reading or a disclosed source image."
+msgstr "Les pages échantillonnées contiennent du texte OCR derrière les images. Des erreurs de reconnaissance peuvent subsister ; un texte non fiable nécessite une lecture de l’image de la page ou une image source signalée."
+
+msgid "The shared 24-hour budget is exhausted. Cached readings and source images remain available."
+msgstr "Le budget partagé sur 24 heures est épuisé. Les lectures en cache et les images sources restent disponibles."
+
+msgid "This EPUB uses the page-reading converter. Native text, model readings and disclosed source images are counted separately; disclosures preserve access to the original page."
+msgstr "Cet EPUB utilise le convertisseur de lecture des pages. Le texte natif, les lectures du modèle et les images sources signalées sont comptés séparément ; ces indications préservent l’accès à la page d’origine."
+
+msgid "This PDF has OCR text behind page images. Recognition errors may remain; unsafe text needs a page-image reading or a disclosed source image."
+msgstr "Ce PDF contient du texte OCR derrière les images des pages. Des erreurs de reconnaissance peuvent subsister ; un texte non fiable nécessite une lecture de l’image de la page ou une image source signalée."
+
+msgid "This cap may cover only some page readings. The EPUB will disclose original-source images wherever a safe reading is unavailable."
+msgstr "Ce plafond peut ne couvrir qu’une partie des lectures de pages. L’EPUB présentera des images sources signalées lorsqu’aucune lecture fiable n’est disponible."
+
+msgid "Total request ceiling"
+msgstr "Plafond total des requêtes"
+
+msgid "Without a provider key, conversion uses cached readings and disclosed source images. New page readings need an OpenRouter key."
+msgstr "Sans clé de fournisseur, la conversion utilise les lectures en cache et des images sources signalées. De nouvelles lectures de pages nécessitent une clé OpenRouter."
+
+#, python-brace-format
+msgid "{amount} remains in the shared {hours}-hour AI budget. It is checked again before every request."
+msgstr "Il reste {amount} dans le budget IA partagé sur {hours} heures. Il est vérifié à nouveau avant chaque requête."

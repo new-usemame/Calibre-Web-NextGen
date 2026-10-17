@@ -1,6 +1,12 @@
-# Applied source-operation audit
+# Historical applied source-operation audit
 
-Each conversion's private job journal contains `operation_audit` records with
+This schema describes the earlier structural proposal/approval route and retained
+historical job evidence. New application conversions use the vision page-reading
+route described in [PDF Reflow application route](PDF-REFLOW-APP-ROUTE.md); their
+page census and publication receipts are recorded with the vision job summary.
+The historical schema below does not describe newly requested page readings.
+
+Each historical conversion's owner-scoped job journal contains `operation_audit` records with
 schema `applied-source-operations-1`. They follow the job's existing owner/library
 access policy and retention; they are not embedded in the downloadable EPUB or
 returned as additional public source text. The schema retains hashes, bounded

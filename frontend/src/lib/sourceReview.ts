@@ -1,4 +1,4 @@
-/** Current typed review: actual source-bound wire ceilings, never projected prices. */
+/** Vision readings: source-bound request ceilings, expected cost and selection scope. */
 import type { ReflowEstimate, ReflowMode } from './reflowMoney.ts';
 export type ReviewMode = 'deterministic' | 'source_verified';
 export type SourceRecovery = 'auto' | 'textless' | 'off';
@@ -14,14 +14,17 @@ export type SourceAssessment = Pick<ReflowEstimate,
     instance_budget: { status: InstanceBudgetStatus; remaining_usd: number | null; window_hours: 24 };
     consent_contract: string;
     review: { quality_released: boolean; route_version: string; source_revision: string;
-      provider: string; service_tier: string; proposer: string; verifier: string; max_output_tokens: number };
+      provider: string; service_tier: string; model?: string; scope?: string; proposer: string; verifier: string; max_output_tokens: number };
   };
 export interface ReviewQuote {
   identity: string; source_sha256: string; source_context_pages: number; first_body_page: number;
+  sample_starts?: Record<string, number>;
   eligible_pages: number; limited_pages: number; unsupported_pages: number; no_choice_pages: number;
   full_bound_usd: number; proposer_bound_usd: number; verifier_bound_usd: number;
+  primary_bound_usd?: number; retry_bound_usd?: number; marker_bound_usd?: number;
+  expected_usd?: number; target_usd?: number;
   confirmed_usd: number; held_usd: number;
-  pages: { page_index0: number; proposer_bound_usd: number; verifier_bound_usd: number; full_bound_usd?: number; batch_bound_usd?: number }[];
+  pages: { page_index0: number; proposer_bound_usd: number; verifier_bound_usd: number; full_bound_usd?: number; batch_bound_usd?: number; primary_bound_usd?: number; retry_bound_usd?: number; marker_bound_usd?: number; expected_usd?: number }[];
   coverage: { page: number; status: string; reason?: string }[];
 }
 export interface ReviewPreparation {
@@ -70,12 +73,16 @@ export function preparationNote(prep: ReviewPreparation | undefined, pending: bo
   return { kind: 'none' };
 }
 export function selectedReview(quote: ReviewQuote | undefined, mode: ReflowMode, samplePages: number) {
-  const start = mode === 'sample' ? (quote?.first_body_page ?? 0) : 0;
+  const start = mode === 'sample' ? (quote?.sample_starts?.[String(samplePages)] ?? quote?.first_body_page ?? 0) : 0;
   const end = Math.min(quote?.source_context_pages ?? 0, mode === 'sample' ? start + samplePages : Infinity);
   const rows = quote?.pages.filter((p) => p.page_index0 >= start && p.page_index0 < end) ?? [];
   const coverage = quote?.coverage.filter((p) => p.page >= start && p.page < end) ?? [];
-  return { start, end, eligible: rows.length,
-    bound: rows.reduce((sum, p) => sum + (p.full_bound_usd ?? (p.proposer_bound_usd + p.verifier_bound_usd + (p.batch_bound_usd ?? 0))), 0),
+  const primary = rows.reduce((sum, p) => sum + (p.primary_bound_usd ?? p.proposer_bound_usd ?? 0), 0);
+  const retry = rows.reduce((sum, p) => sum + (p.retry_bound_usd ?? p.verifier_bound_usd ?? 0), 0);
+  const markers = rows.reduce((sum, p) => sum + (p.marker_bound_usd ?? p.batch_bound_usd ?? 0), 0);
+  const expected = rows.reduce((sum, p) => sum + (p.expected_usd ?? 0), 0);
+  return { start, end, eligible: rows.length, primary, retry, markers, expected, target: quote?.target_usd ?? .5,
+    bound: rows.reduce((sum, p) => sum + (p.full_bound_usd ?? ((p.primary_bound_usd ?? p.proposer_bound_usd ?? 0) + (p.retry_bound_usd ?? p.verifier_bound_usd ?? 0) + (p.marker_bound_usd ?? p.batch_bound_usd ?? 0))), 0),
     limited: coverage.filter((p) => p.status === 'limited').length,
     unsupported: coverage.filter((p) => p.status === 'unsupported').length,
     noChoices: coverage.filter((p) => p.status === 'no_choices').length };

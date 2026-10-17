@@ -224,7 +224,7 @@ RUN \
   # You can read more about python wheels here: https://realpython.com/python-wheels/
   # The `--only-deps` flag was requires pip ≥ 26.2.
   /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
-    --only-deps /app/calibre-web-automated
+    --only-deps /app/calibre-web-automated[ldap]
 
 # STEP 4 - Install kepubify from the kepubify_mirror stage (GHCR mirror in CI,
 # public release CDN by default). Either way /kepubify arrives mode 0755 for the

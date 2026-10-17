@@ -93,10 +93,6 @@ dependencies = [
     "goodreads>=0.3.2,<0.4.0",
     "python-Levenshtein>=0.12.0,<0.28.0",
 
-    # ldap login
-    "python-ldap>=3.0.0,<3.5.0",
-    "Flask-SimpleLDAP>=1.4.0,<2.1.0",
-
     # oauth
     "Flask-Dance>=2.0.0,<7.2.0",
     "SQLAlchemy-Utils>=0.33.5,<0.42.0",
@@ -151,6 +147,11 @@ dev = [
 
     # Optional: E2E testing (Phase 3)
     # playwright>=1.40.0         # Uncomment for browser automation tests
+]
+ldap = [
+    # LDAP login (optional; needs a C compiler to build python-ldap on Windows)
+    "python-ldap>=3.0.0,<3.5.0",
+    "Flask-SimpleLDAP>=1.4.0,<2.1.0",
 ]
 
 [project.urls]

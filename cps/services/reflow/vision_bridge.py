@@ -21,6 +21,51 @@ LEDGER_METHODS = frozenset(('spent', 'pending_usd', 'remaining', 'would_exceed',
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
+def compact_report(report):
+    """Share equal report values before the existing bounded DAG transport.
+
+    Publication metrics can repeat once per marked word and in multiple sweeps.
+    Reports are value snapshots: sharing equal containers preserves every key,
+    value and Python container type while keeping that redundant representation
+    out of the native wire. The EPUB's complete JSON report is unchanged.
+    """
+    from . import native_codec
+    pool = {}; visited = {}; active = set()
+    def visit(value, depth=0):
+        if depth > native_codec.MAX_DEPTH:
+            raise ValueError('Native report nesting exceeds bound')
+        kind = type(value)
+        if value is None or kind in (str, bool, int):
+            return value, (kind.__name__, value)
+        if kind is float and math.isfinite(value):
+            return value, ('float', value.hex())
+        if kind not in (dict, list, tuple):
+            raise ValueError('Unsupported native report value')
+        identity = id(value)
+        if identity in active: raise ValueError('Cyclic native report')
+        if identity in visited: return visited[identity]
+        active.add(identity)
+        if kind is dict:
+            if any(type(key) not in (str, int) for key in value):
+                raise ValueError('Unsupported native report key')
+            rows = [(key, visit(item, depth + 1)) for key, item in value.items()]
+            signature = ('dict', tuple((type(key).__name__, key, item[1]) for key, item in rows))
+            create = lambda: {key: item[0] for key, item in rows}
+        else:
+            rows = [visit(item, depth + 1) for item in value]
+            signature = (kind.__name__, tuple(item[1] for item in rows))
+            create = lambda: kind(item[0] for item in rows)
+        active.remove(identity)
+        if signature not in pool:
+            pool[signature] = (create(), ('container', len(pool)))
+        result = pool[signature]
+        visited[identity] = result
+        return result
+    result, _ = visit(report)
+    if type(result) is not dict: raise ValueError('Invalid native vision report')
+    return result
+
+
 def error_reply(error):
     """Transport a fixed exception vocabulary, never a Python constructor."""
     if isinstance(error, ledger_mod.CapExceeded):

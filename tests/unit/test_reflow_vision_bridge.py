@@ -3,6 +3,7 @@ import base64
 from contextlib import contextmanager
 import hashlib
 import io
+import inspect
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,111 @@ from cps.services.reflow.ledger import CapExceeded, Ledger
 
 pytestmark = pytest.mark.unit
 SOURCE = 'a' * 64
+
+
+def _synthetic_report(source_sha):
+    return dict(source_document_sha256=source_sha, pages={0: dict(source='native',
+        words=[dict(text='token' + str(index), bbox=[1., 2., 3., 4.],
+            uncertain=True, source=dict(page=0, rect=[1., 2., 3., 4.]))
+            for index in range(5000)], page_geometry=(1., 2., 3., 4.))}, native_pages=[0], vision_pages=[],
+        new_cost_usd=0., recovery_financial_state=dict(cumulative_spend_usd=0., held_usd=0.))
+
+
+def test_real_native_worker_returns_complete_geometry_report_inside_original_bound(tmp_path, monkeypatch):
+    """Scale down the unchanged codec ceiling, rather than allocating huge inputs."""
+    from cps.services.reflow import native_codec, extract
+    source = tmp_path / 'source.pdf'
+    with pymupdf.open() as document:
+        document.new_page().insert_text((30, 40), 'A synthetic source page.')
+        document.save(source)
+    bound = 640 * 1024
+    expected = _synthetic_report(extract.document_fingerprint(source))
+    with monkeypatch.context() as context:
+        context.setattr(native_codec, 'MAX_BYTES', bound)
+        with pytest.raises(ValueError, match='payload exceeds size bound'):
+            native_codec.dumps(expected)
+        compact = vision_bridge.compact_report(expected)
+        assert len(native_codec.dumps(compact)) < bound
+        assert native_codec.loads(native_codec.dumps(compact)) == expected
+    worker = tmp_path / 'worker.py'
+    worker.write_text('''import importlib,importlib.util,os,sys,zipfile
+from pathlib import Path
+root=Path(ROOT_LITERAL)
+name='_reflow_native_runtime'
+spec=importlib.util.spec_from_file_location(name,root/'__init__.py',submodule_search_locations=[str(root)])
+module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module)
+runtime=importlib.import_module(name+'.native_worker_runtime')
+codec=importlib.import_module(name+'.native_codec');codec.MAX_BYTES=640*1024
+pipeline=importlib.import_module(name+'.vision_pipeline')
+extract=importlib.import_module(name+'.extract')
+REPORT_FACTORY
+def convert(doc,path,reader,**kwargs):
+ with zipfile.ZipFile(path,'w') as archive: archive.writestr('mimetype','application/epub+zip')
+ return _synthetic_report(extract.document_fingerprint(doc))
+pipeline.convert=convert
+with os.fdopen(int(sys.argv[3]),'w',buffering=1) as control:
+ raise SystemExit(runtime.serve(int(sys.argv[1]),sys.argv[2],control))
+'''.replace('ROOT_LITERAL', repr(str(native_ipc.WORKER.parent)))
+        .replace('REPORT_FACTORY', inspect.getsource(_synthetic_report)))
+    monkeypatch.setattr(native_ipc, 'WORKER', worker)
+    state = tmp_path / 'state'
+    reader = vision_reading.Reader(None, state / 'cache', Ledger(state / 'job.jsonl', 0))
+    with native_ipc.NativeDocument(source, scratch_root=state / 'scratch', cache_root=state) as native:
+        child = native.process
+        actual = native.convert_vision(tmp_path / 'output.epub', reader)
+        assert child.pid != os.getpid()
+        assert actual == expected
+        assert len(actual['pages'][0]['words']) == 5000
+        assert actual['pages'][0]['words'][-1]['bbox'] == [1., 2., 3., 4.]
+        assert actual['pages'][0]['page_geometry'] == (1., 2., 3., 4.)
+        assert actual['recovery_financial_state'] == expected['recovery_financial_state']
+    assert child.returncode == 0
+    assert list((state / 'scratch').iterdir()) == []
+    assert reader.ledger.spent() == reader.ledger.pending_usd() == 0
+
+
+def test_compact_report_preserves_types_keys_order_signed_zero_and_every_value():
+    import copy
+    import math
+    from cps.services.reflow import native_codec
+    original = dict(pages={0: dict(words=[dict(text='Synthetic token', bbox=[1., 2., 3., 4.]),
+        dict(text='Synthetic token', bbox=[1., 2., 3., 4.])], geometry=(1., 2., 3., 4.))},
+        numbers=[True, 1, 1., -0., 0.], keys={0: 'integer', '0': 'string'}, empty=[[], ()])
+    saved = copy.deepcopy(original)
+    compact = vision_bridge.compact_report(original)
+    assert original == saved
+    assert original['pages'][0]['words'][0] is not original['pages'][0]['words'][1]
+    assert compact['pages'][0]['words'][0] is compact['pages'][0]['words'][1]
+    actual = native_codec.loads(native_codec.dumps(compact))
+    assert actual == saved
+    assert list(actual['keys']) == [0, '0']
+    assert [type(value) for value in actual['numbers']] == [bool, int, float, float, float]
+    assert math.copysign(1, actual['numbers'][3]) == -1
+    assert math.copysign(1, actual['numbers'][4]) == 1
+    assert type(actual['pages'][0]['geometry']) is tuple
+    assert [type(value) for value in actual['empty']] == [list, tuple]
+
+
+@pytest.mark.parametrize('value', [dict(number=float('inf')), dict(number=float('nan')),
+    dict(number={1, 2}), dict(keys={True: 'boolean'}), ['not a report']])
+def test_compact_report_refuses_unsupported_values(value):
+    with pytest.raises(ValueError): vision_bridge.compact_report(value)
+
+
+def test_compact_report_refuses_cycles_and_excessive_depth(monkeypatch):
+    from cps.services.reflow import native_codec
+    cyclic = {}; cyclic['self'] = cyclic
+    with pytest.raises(ValueError, match='Cyclic'): vision_bridge.compact_report(cyclic)
+    monkeypatch.setattr(native_codec, 'MAX_DEPTH', 3)
+    with pytest.raises(ValueError, match='nesting'): vision_bridge.compact_report(dict(a=[dict(b=[1])]))
+
+
+def test_compact_report_keeps_the_original_wire_ceiling(monkeypatch):
+    from cps.services.reflow import native_codec
+    monkeypatch.setattr(native_codec, 'MAX_BYTES', 1024)
+    compact = vision_bridge.compact_report(dict(text='x' * 2048))
+    with pytest.raises(ValueError, match='payload exceeds size bound'):
+        native_codec.dumps(compact)
 
 
 def image():

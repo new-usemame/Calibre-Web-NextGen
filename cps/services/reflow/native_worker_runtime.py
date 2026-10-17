@@ -304,6 +304,7 @@ def serve(parent, cache_root, control):
                             value = vision_pipeline.convert(doc, str(root / 'candidate.epub'), child_reader,
                                 page_numbers=numbers, metadata=args['metadata'], progress=vision_progress,
                                 preparation_progress=vision_preparation_progress, scratch_dir=str(scratch), job_id=job_id or 'vision')
+                            value = vision_bridge.compact_report(value)
                         elif op == 'survey':
                             if args: raise ValueError('survey fields')
                             value = source_assessment.survey(doc)

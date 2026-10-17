@@ -129,7 +129,7 @@ class _PixelSession:
         return response
 
 
-def _run_pixel_response(rig,monkeypatch,session):
+def _run_pixel_response(rig,monkeypatch,session,**options):
     from cps.services.reflow import vision_quote
     from tests.unit.test_reflow_app_vision_route import _source
     path=rig.folder/'Book - Author.pdf'
@@ -137,7 +137,9 @@ def _run_pixel_response(rig,monkeypatch,session):
     with F.pymupdf.open(path) as document:quote=vision_quote.measure(document)
     monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
     monkeypatch.setattr(model_mod.requests,'post',session.post)
-    task=rig.mod.TaskReflowPdf(5,7,dict(mode='full',review_mode='source_verified',cost_cap_usd=1))
+    values=dict(mode='full',review_mode='source_verified',cost_cap_usd=1)
+    values.update(options)
+    task=rig.mod.TaskReflowPdf(5,7,values)
     task.options.consent_quote=quote
     task.options.source_sha256=quote['source_sha256']
     task.run(None)

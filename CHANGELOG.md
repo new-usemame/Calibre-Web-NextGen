@@ -16,6 +16,118 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.48] - 2026-10-18
+
+### Added
+
+- **Browse built-in tags as a hierarchy.** The New UI, Classic Tags and OPDS honor Calibre’s Tags hierarchy preference. Parent tag groups include their descendants, with distinct counts and the reader’s normal visibility restrictions. Exact tag maintenance remains available through All tags; OPDS parents offer an explicit entry for all books in the tag group.
+
+- **Table view supports selecting books and bulk editing.** Enter **Select**, use row checkboxes or Shift-click a range, and use **Select all** to include matching books beyond the loaded rows. The same permission-aware actions as the library grid are available, including metadata editing and personal-library removal. Failed books remain selected for retry; sorting, changing readers, library mode or permissions clears selection. Requested in #2266, with the Shift-click suggestion from @JoschD.
+
+- **Configurable filenames for books emailed to an eReader.** Administrators can set a metadata-based filename template for books emailed to an eReader, including Kindle. Both email settings forms support series numbers, safe names and a blank option that keeps the existing filename; conversion and filename-based sync use the same outgoing name. (#2442)
+
+- **Choose a sleep-screen image for each KOReader reader from Devices.** Set, preview, replace or remove a JPEG or PNG, with French and Dutch controls. CWNG prepares a clean grayscale image fitted to the reader's reported screen size, and the updated CWNG plugin applies it on the next online or manual sync. Removal restores the exact KOReader preferences saved before the first image. Supported readers are KOReader on Kindle and Kobo; the native Kindle lock screen remains unchanged.
+
+- **Catalan is available as an interface language.** Adds a complete Catalan translation for the classic and new interfaces.
+
+- **Choose which books each KOReader device keeps.** On the Devices page, use the account setting, all visible books, My Library, or selected shelves. A shelf selected for one device does not change another device's books. If a selected shelf disappears, remaining selected shelves stay in use; when none remains, the device uses the account setting and the page explains why. Kobo sync continues to use its account setting in this release.
+
+- **Choose the books each Kobo keeps from Devices.** Kobo rows now offer the same account, library and shelf choices as KOReader. Each Kobo removes only its own delivered books when they leave its scope, including archived, hidden and no-longer-visible books.
+
+### Changed
+
+- **Send books to an e-reader from the book page.** The New UI shows a labelled Send to e-reader button beside Read now for eligible readers. It opens the existing format and recipient form, and the gear menu still works. Drafts and delivery feedback stay with the book that opened the form; recipient suggestions follow current permissions. (#2367)
+
+- **The Discover source picker now sits behind a gear button (#2531).** The library's Discover strip no longer shows the source dropdown every time you open it. Click the gear next to Shuffle to change the source; the picker closes once you save. It still opens by itself when your saved source is gone or can't be loaded, so you can pick another. Thanks @magdalar.
+
+- **Examples and comments use neutral placeholders.** Sample names, hostnames
+  and private addresses in code comments and fixtures now use generic names and
+  documentation addresses. Nothing changes in how the app behaves.
+
+- **Source installs need Flask 3.1 or newer.** Upload size limits for reader fonts and sleep-screen images rely on per-request limits added in Flask 3.1. The Docker image already ships Flask 3.1.
+
+- **Removed unused duplicate stats-dashboard queries.** `scripts/cwa_db.py` had a
+  second, never-run copy of the activity heatmap, reading-pace and format queries.
+  Only that copy is gone. The dashboard shows the same numbers as before (#2545).
+
+- **Kobo devices can be given their own place and read status.** With **Share my place** off, each Kobo keeps its own reading. Tick the box in **Account → Devices** to share the latest place and status with your other checked devices.
+
+- **Checked Kobos can open at KOReader's exact place**, including a move back, when they hold the current KEPUB and the books align. Otherwise they retain their existing Location with the shared percentage; opening and closing there does not rewind other devices or undo Finished status. Real Kobo reading, including backward moves, reaches KOReader. These behaviours apply to devices with **Share my place** on.
+
+- **Exact Kobo places require download proof for the current KEPUB.** A queued restore is not proof that the book was downloaded. Missing or unreadable books use the guarded fallback; a Kobo with no held Location receives no shared bookmark, and its first opening does not rewind other devices. Unresolved Kobo requests retain the native Kobo Location. These behaviours apply to devices with **Share my place** on.
+
+- **Kobo download proof requires gevent to send a complete, non-empty full GET body matching its declared byte count.** Tornado, empty files, HEAD requests, byte ranges, interrupted or short downloads, streams without Content-Length, and delegated file transfers leave exact delivery unproven, while annotation restoration keeps its existing behaviour. Download proof is recorded for every full KEPUB download, whatever the switch says; exact delivery requires **Share my place** on.
+
+- **KOReader devices can keep their own place and read status.** With **Share my place** off, a paired device resumes its own reading. Tick the box in **Account → Devices** to share the latest place and status with your other checked devices.
+
+- **Place sharing is now a choice for each device.** Every device starts with **Share my place** off, including your existing devices and the web reader. Each keeps its own place and read status. To share again, open **Account → Devices** and tick **Share my place** on each device you want to sync.
+
+- **Each device gets back only its own highlights from CWNG.** When CWNG sends highlights to an e-reader, it now sends only the ones made on that device, not ones from the web reader or your other devices. Every device's highlights and notes still show together in the web reader, labelled by device. Older highlights without a recorded device remain available to readers of their original kind.
+
+- **Kobo's own cloud sync can still share highlights between Kobos for a while.** Until CWNG has fully imported a book's highlights from your Kobo, CWNG passes that book's highlights through from Kobo's cloud, so a highlight made on another Kobo signed in to the same Kobo account can still appear.
+
+- **KOReader needs the paired CWNG plugin for per-device control and device-only highlights.** A Kobo synced to CWNG also supports per-device control. E-readers that CWNG cannot identify keep their existing sync behaviour.
+
+- **Administrators can temporarily restore the previous place and read-status sync behaviour with `CWNG_SHARE_PLACE_GATES=0`.** This emergency switch leaves device-only highlights in effect.
+
+- **The web reader joins Share my place.** An unchecked web reader keeps its own place and read status; a checked web reader shares the latest place, including a move back, and resumes at a newer exact shared place. Web-reader EPUB places can reach a Kobo exactly when the books align and the Kobo has proven its current KEPUB download. The Devices page lists the account's web reader and shows a sharing control for each device.
+
+- **Each device has its own Share my place choice and read status.** The setting starts off for every device, including existing ones. The Devices page lets you choose which readers share their latest place and status.
+
+### Fixed
+
+- **Updated covers appear when returning to the library.** Shared or private cover changes now refresh cached lists, including custom-column pages and books on earlier loaded catalogue pages. Successful refreshes preserve the loaded pages, card order and scroll position, while respecting the reader's private cover choice. If the cover cannot be reread, only its affected saved catalogue resets so it can load again. Completes the client refresh portion of #1126, requested by @chloeroform in #989.
+
+- **The KOReader Library page fills in while the first sync adds your books (#2329).** During a first fill it said "Your books appear here after the first sync" until the very end, even though covers were being added the whole time, and then filled in all at once. Books now appear in batches as they are added. Thanks @magdalar.
+
+- **French settings fit phone screens.** The ingest folder settings save button wraps long translated labels without widening the administrator page or clipping its text.
+
+- **Translated administrator fields fit their columns.** Native font selectors shrink to their settings-grid width in Safari and WebKit, including French options with long names.
+
+- **Shelves show their first letters again on the collapsed sidebar (#2536).** Since v4.1.44 the narrow desktop sidebar showed an empty slot for each shelf. Each shelf now shows the start of its name there again, and the full name when the sidebar opens. Thanks @darkmatterpelican.
+
+- **PDF links to a page open on that page (#2537).** A reader URL like `/app/view/<id>/pdf#page=12` opened the book on page 1, because the new UI dropped the `#…` part before starting the PDF viewer. The viewer now gets it, so bookmarked pages work, along with the other PDF.js options such as `#zoom=page-width` and `#search=word`. Changing the `#page=` in the address bar while the book is open also moves the viewer. Thanks @darkmatterpelican.
+
+- **An import that can't tell which book it added now fails instead of changing a different book.** When Calibre reported no id for a newly added book, the importer picked the most recently changed book in the library, which could be one someone had just edited, and gave it this import's fetched metadata, generated cover, auto-send to Kindle and "Recently Added" date. It now stops, logs why, and keeps the source file. A kept original format is also no longer attached to the newest book when an import was skipped. ([#2544](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2544))
+
+- **Changing only the letter case of a title no longer deletes the book file.** On a case-insensitive library disk (default macOS APFS bind-mounted into the container, NTFS, exFAT, SMB), editing "The Folk of the Air trilogy" to "The Folk of the Air Trilogy" (by hand or by applying fetched metadata) treated the book's own file as a stale copy in the way and removed it, so the book kept its format listed but downloads returned 404. The book now keeps its file and downloads keep working; the folder and file take the new case where the disk allows a case-only rename (through a Docker Desktop bind mount the names on disk can keep the old case, which that disk treats as the same name). A genuinely different file at the destination is still replaced as before. Thanks to @jg120a for the report and the diagnosis.
+
+- **A Kobo sync no longer fails with "database is locked" when a library task is holding `app.db` (#2562, #2606).** While the KEPUB backfill or package repair sweep was running, a sync could build its whole response and then fail on its last write, so the Kobo showed "Sync Failed" and nothing arrived. That write is now best-effort: the sync waits a few seconds, then delivers the response anyway, and the next sync delivers again whatever could not be recorded. Waiting no longer pauses other people's requests. Thanks to @eeksock for the diagnosis and the fix, and to @branpg for the report.
+
+- **Volumes of one work no longer look like the same book in the KOReader library.** Books whose titles are the same for their first 42 characters and differ only later, such as "Main Title: Subtitle, Volume I: ..." and "... Volume II: ...", were given the same file name on the device, apart from the book number at the end, so a device that lists a file by its name showed both as one title. The device file name now carries the title past that point (a very long title is still cut, at about 180 bytes), with the author as before. Books whose titles are not that long keep the file name they already have, and a book whose name does change is renamed in place on the device with its reading position and notes kept, including on a device set to match books by file name. Fixes #2565.
+
+- **Large Kobo downloads with embedded metadata now start right away.** Updating metadata or a personal cover copies the rest of the book without recompressing it.
+
+- **Convert Library sends an epub straight to kepubify.** With kepub as the target format, every epub was first run through ebook-convert epub to epub because the format check compared ".epub" to "epub". That was slower, was one more step that could fail, and gave books without a cover a generated cover and title page. Epubs now go straight to kepubify, as they already did on ingest, so the kepub keeps the original book as it is. When converting another format to epub first does fail, the Convert Library log now includes the tool's own output.
+
+- **Previously imported highlights from another device are cleaned up on KOReader.** A successful annotation sync removes a local imported highlight only when its saved server origin proves it came from another device. Locally created or unproven highlights stay, and server notes, highlights and reading positions are kept.
+
+- **Keep each Kobo’s saved place, highlights and notes through removal.** Removal acknowledgements keep other devices’ deliveries and reading journals. A known re-download restores the device’s own saved place, unless a newer shared place wins. Reading activity without a later annotation upload holds removal for three eligible syncs, then logs a warning and removes it on the fourth. Permanent deletion retains only minimal UUID-bound capture evidence until acknowledgement; its existing content purge still applies.
+
+- **A Kobo's first report for a book is kept whole.** A Kobo's first sync of a book no longer loses a Finished. Opening a book on a Kobo for the first time no longer loses its read status or its clock: the server's empty reading-state rows used to be stamped with the server's own time, which counted as newer than the Kobo's report, so a "Finished" from that first sync was dropped, the Kobo was sent the server's clock instead of its own, and a second device's later update could be rejected. Empty rows now count as holding nothing until a device reports. Recently read now orders Kobo books by when they synced, the same as KOReader and the web reader, so a Kobo with a wrong clock no longer sinks or pins them.
+
+- **Kobo exact resume allows time for cold alignment.** With Share my place on, a proven Kobo place can open the web reader exactly even when the alignment cache is cold. This conversion has a bounded 250 ms default wait; stalled conversions still return the percentage offer. An explicit `CWA_KOBO_RESUME_TIMEOUT_SECONDS` overrides the default.
+
+- **The web reader now opens at a Kobo's exact place with Share my place on.** A newer Kobo place uses the book proven to have been downloaded to that Kobo; when an exact match cannot be established, the percentage offer remains available.
+
+  Books downloaded to a Kobo before this kind of download record existed keep getting the percentage offer until they're downloaded again.
+
+- **Data left behind by users deleted before v4.1.45 is now cleaned up.** Before v4.1.45, deleting a user left the account's e-readers and browsers (names, identities, storage snapshots), KOReader reading positions and magic shelves in the server's database. Since v4.1.45, deleting a user removes them, and now the server also clears what earlier deletions left behind each time it starts. Other accounts' data is not touched (#2563).
+
+- **An identified KOReader device cannot change or remove another device's highlights.** Copies left on the device from earlier syncs leave their owner's highlights and notes unchanged.
+
+- **Open without saving progress keeps your reading status unchanged**, including when the web reader has Share my place turned on.
+
+- **The web reader keeps your place private if CWNG cannot register it.** If CWNG temporarily cannot register the web reader, its reading place stays private while Hardcover progress updates continue as they do for an unchecked web reader.
+
+- **A web-reader place kept private no longer reaches KOReader.** After "Read from here", a later save from the web reader at the same percentage as the place it last shared could give KOReader that private spot as its exact place. Leaving the reader within a second of "Read from here" could also share the place. KOReader now gets an exact place only for the web reader's place that was actually shared, and the reader keeps the choice when it closes.
+
+- **With Share my place on, the web reader resumes from the account's own web reader.** An account with old web-reader entries could reopen a book at the web reader's older place instead of a newer place shared from another device.
+
+### Security
+
+- **Classic shelf names and rule-preview values remain literal text.** Ordinary shelf page titles and ordering headings preserve names containing markup-looking characters. Rule previews display matching book titles and error messages as text while retaining the same counts, controls and saved data.
+
 ## [v4.1.47] - 2026-10-09
 
 ### Changed

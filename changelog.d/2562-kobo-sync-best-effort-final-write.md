@@ -1,3 +1,0 @@
-### Fixed
-
-- **A Kobo sync no longer fails with "database is locked" when a library task is holding `app.db` (#2562, #2606).** While the KEPUB backfill or package repair sweep was running, a sync could build its whole response and then fail on its last write, so the Kobo showed "Sync Failed" and nothing arrived. That write is now best-effort: the sync waits a few seconds, then delivers the response anyway, and the next sync delivers again whatever could not be recorded. Waiting no longer pauses other people's requests. Thanks to @eeksock for the diagnosis and the fix, and to @branpg for the report.

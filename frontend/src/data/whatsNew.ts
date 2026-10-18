@@ -56,6 +56,132 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.48',
+    date: '2026-10-18',
+    summary: 'Each device now keeps its own reading place unless you choose to share it. To keep your devices in step as before, tick Share my place for each one under Account → Devices.',
+    items: [
+      {
+        title: 'Choose which devices share your reading place',
+        body: 'Every Kobo, KOReader device and the web reader now has its own Share my place box, and it starts unticked, including for devices you already use. An unticked device keeps its own place and read status; ticked devices share the latest place with each other, including a move back.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Each e-reader gets back only its own highlights',
+        body: 'When CWNG sends highlights to a device, it now sends only the ones made on that device. The web reader still shows every device\'s highlights and notes together, labelled by device. KOReader needs the updated CWNG plugin for this.',
+        category: 'Sync',
+      },
+      {
+        title: 'Pick the books each device keeps',
+        body: 'On the Devices page, each KOReader device and each Kobo can follow your account setting, all visible books, My Library or chosen shelves. A device removes only its own delivered books when they leave its choice, and keeps its saved place, highlights and notes if the book comes back.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Set a sleep-screen picture for each KOReader reader',
+        body: 'From Devices, set, preview, replace or remove a JPEG or PNG for a KOReader device on Kindle or Kobo. CWNG fits it to the reader\'s screen in grayscale, and the plugin applies it on the next sync. Removing it restores your earlier KOReader settings.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Select and edit many books in Table view',
+        body: 'Press Select, tick rows or Shift-click a range, or use Select all to include every matching book. You get the same actions as the library grid, such as metadata editing, and books that fail stay selected so you can retry.',
+        category: 'Library',
+        link: { to: '/table', label: 'Open Table view' },
+      },
+      {
+        title: 'Browse tags as a hierarchy',
+        body: 'If Calibre is set to treat tags as a hierarchy, the New UI, Classic tags and OPDS now group them that way. A parent tag includes the books in its child tags, and All tags still lists each tag on its own.',
+        category: 'Library',
+        link: { to: '/tags', label: 'Browse tags' },
+      },
+      {
+        title: 'Send a book to your e-reader from its page',
+        body: 'The book page now has a Send to e-reader button next to Read now. It opens the usual format and recipient form; the gear menu still has it too.',
+        category: 'Reading',
+      },
+      {
+        title: 'Open a PDF at a linked page',
+        body: 'A reader link ending in #page=12 now opens the PDF on page 12 instead of page 1, so bookmarked pages work again. Other PDF viewer options such as #zoom=page-width and #search=word work too.',
+        category: 'Reading',
+      },
+      {
+        title: 'Name the files you email to an e-reader',
+        body: 'Administrators can set a filename pattern, built from the book\'s metadata, for books emailed to a Kindle or other e-reader. Leave it blank to keep the current filename.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Catalan interface',
+        body: 'Both interfaces are now available in Catalan. Choose it in your account settings.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Discover\'s source picker moved behind a gear',
+        body: 'The Discover strip no longer shows its source menu every time. Click the gear next to Shuffle to change it. It still opens by itself if your saved source is gone.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'New covers show up when you go back to the library',
+        body: 'After you change a cover, lists you already loaded now show the new one, and your scroll position and loaded pages are kept.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Changing only a title\'s capitals keeps the book file',
+        body: 'On disks that ignore letter case (common on macOS, Windows and network shares), changing "trilogy" to "Trilogy" in a title deleted the book\'s file, so downloads failed. The file is now kept.',
+        category: 'Library',
+      },
+      {
+        title: 'Kobo sync no longer fails with "database is locked"',
+        body: 'While a library maintenance task was running, a Kobo sync could fail at its last step and show Sync Failed. The sync now delivers its books anyway and records what it could not on the next sync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOReader shows your books while the first sync runs',
+        body: 'The KOReader Library page now fills in batches as books are added during a first sync, instead of all at once at the end.',
+        category: 'Sync',
+      },
+      {
+        title: 'Volumes of a series stay separate on KOReader',
+        body: 'Books with long titles that differ only near the end, such as Volume I and Volume II, got the same file name on the device and looked like one book. File names now carry more of the title, and renamed books keep their reading position and notes.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo keeps your first reading report',
+        body: 'The first time a Kobo synced a book, a Finished status or its reading time could be lost. Recently read now also orders Kobo books by when they synced, so a Kobo with a wrong clock no longer moves them out of order.',
+        category: 'Sync',
+      },
+      {
+        title: 'Faster Kobo downloads for large books',
+        body: 'Books with updated metadata or a personal cover start downloading to a Kobo right away, because the rest of the file is no longer recompressed.',
+        category: 'Sync',
+      },
+      {
+        title: 'Imports never change the wrong book',
+        body: 'If Calibre does not report which book an import added, the import now stops and keeps its file, instead of applying the new metadata and cover to the most recently changed book.',
+        category: 'Admin',
+      },
+      {
+        title: 'Convert Library sends EPUBs straight to kepubify',
+        body: 'Converting to KEPUB no longer runs every EPUB through an extra conversion first, so it is faster and books keep their original look. When a conversion fails, the log now includes the converter\'s own output.',
+        category: 'Admin',
+      },
+      {
+        title: 'Interface fixes',
+        body: 'Shelves show their first letters again in the collapsed sidebar, French settings fit phone screens, translated font selectors fit their columns in Safari, and shelf names with symbols in Classic display exactly as typed.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Leftover data from deleted accounts is cleared',
+        body: 'Users deleted before v4.1.45 left their devices, KOReader positions and smart shelves in the database. The server now removes those on startup without touching other accounts. Source installs now need Flask 3.1 or newer; the Docker image already has it.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.47',
     date: '2026-10-09',
     items: [

@@ -973,19 +973,25 @@ def test_schema_capable_invalidation_hook_forces_reinspection(monkeypatch):
 @pytest.mark.unit
 def test_schema_capable_notices_schema_change_without_hook(monkeypatch):
     """A dropped or restored schema object is seen even if nobody invalidates."""
-    from cps import ub
     from cps.services import kobo_annotation_stage0
 
     engine = _stage0_engine()
     inspections = _count_inspections(monkeypatch)
     assert kobo_annotation_stage0.schema_capable(engine) is True
     with engine.begin() as conn:
+        trigger_sql = conn.execute(text(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' "
+            "AND name = 'trg_kabs_opaque_present_sticky'"
+        )).scalar_one()
         conn.execute(text("DROP TRIGGER trg_kabs_opaque_present_sticky"))
     assert kobo_annotation_stage0.schema_capable(engine) is False
     assert kobo_annotation_stage0.schema_capable(engine) is False
     assert len(inspections) == 2  # one per distinct schema, not per call
 
-    ub.migrate_kobo_two_way_annotation_sync(engine, None)
+    # Raw DDL rather than the migration, so the cached False must be dropped
+    # by the schema_version check alone (the migration also calls the hook).
+    with engine.begin() as conn:
+        conn.execute(text(trigger_sql))
     assert kobo_annotation_stage0.schema_capable(engine) is True
 
 

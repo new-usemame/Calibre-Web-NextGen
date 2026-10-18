@@ -94,6 +94,7 @@ def _sqlite_schema_version(engine):
         with engine.connect() as connection:
             return connection.exec_driver_sql("PRAGMA schema_version").scalar()
     except Exception:
+        log.debug("Kobo Stage 0 schema_version unreadable; capability not cached", exc_info=True)
         return None
 
 
@@ -101,7 +102,8 @@ def invalidate_schema_capable_cache(engine=None) -> None:
     """Forget cached schema verdicts so the next call re-inspects.
 
     Pass an engine to drop just that one; omit it to drop all. Safe to call at
-    any time; callers that run migrations should invoke it afterwards.
+    any time. The schema_version check already catches schema changes, so this
+    is an explicit signal for the Stage 0 migration rather than a requirement.
     """
     with _SCHEMA_CAPABLE_LOCK:
         if engine is None:

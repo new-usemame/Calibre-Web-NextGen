@@ -217,10 +217,13 @@
           {% if config.config_password_upper %}{% set _r = pw_rules.append(_('an uppercase letter')) %}{% endif %}
           {% if config.config_password_character %}{% set _r = pw_rules.append(_('a letter')) %}{% endif %}
           {% if config.config_password_special %}{% set _r = pw_rules.append(_('a special character')) %}{% endif %}
+          {% set pw_min = config.config_password_min_length or 0 %}
+          {% if pw_min > 0 or pw_rules %}
           <p class="cwng-pw-hint" id="password-rules-hint">
             {{ _('Password requirements:') }}
-            {{ ngettext('at least %(num)d character', 'at least %(num)d characters', config.config_password_min_length or 0, num=config.config_password_min_length or 0) }}{% if pw_rules %}, {{ _('including') }} {{ pw_rules|join(', ') }}{% endif %}.
+            {% if pw_min > 0 %}{{ ngettext('at least %(num)d character', 'at least %(num)d characters', pw_min, num=pw_min) }}{% if pw_rules %}, {% endif %}{% endif %}{% if pw_rules %}{{ _('including') }} {{ pw_rules|join(', ') }}{% endif %}.
           </p>
+          {% endif %}
           {% endif %}
         </div>
       {% endif %}

@@ -19299,6 +19299,53 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr "Wachtwoordvereisten:"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr "een letter"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr "een kleine letter"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr "een cijfer"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr "een speciaal teken"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr "een hoofdletter"
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr "minstens 1 teken"
+
+#: cps/spa_strings.py
+msgid "at least {count} characters"
+msgstr "minstens {count} tekens"
+
+#: cps/spa_strings.py
+msgid "including {rules}"
+msgstr "waaronder {rules}"
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr "waaronder"
+
+#: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] "minstens %(num)d teken"
+msgstr[1] "minstens %(num)d tekens"
+
 #~ msgid "Progress is not being saved."
 #~ msgstr "Voortgang wordt niet opgeslagen."
 

@@ -1998,6 +1998,15 @@ _("On shelf")
 _("Search library")
 _("Search title, author, series…")
 _("{failed} of {total} books could not be added. They remain selected.")
+_("Password requirements:")
+_("a letter")
+_("a lowercase letter")
+_("a number")
+_("a special character")
+_("an uppercase letter")
+_("at least 1 character")
+_("at least {count} characters")
+_("including {rules}")
 # ==== END AUTOGEN ====
 
 # New-user sync safety (#1057).

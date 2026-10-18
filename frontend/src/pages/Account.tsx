@@ -16,6 +16,7 @@ import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { PasswordInput } from '../components/PasswordInput';
 import { PasswordPolicyHint } from '../components/PasswordPolicyHint';
+import { passwordRequirementsText } from '../lib/passwordPolicy';
 import { ApiError } from '../lib/api';
 import { apiGet } from '../lib/api';
 import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
@@ -635,7 +636,10 @@ export function Account() {
               <PasswordInput id="acc-new" autoComplete="new-password" className={styles.input}
                 value={newPw} onChange={(e) => setNewPw(e.target.value)}
                 aria-invalid={pwMsg && !pwMsg.ok ? true : undefined}
-                aria-describedby={`acc-pw-rules${pwMsg && !pwMsg.ok ? ' acc-pw-msg' : ''}`} />
+                aria-describedby={[
+                  passwordRequirementsText(account.password_policy, t) ? 'acc-pw-rules' : '',
+                  pwMsg && !pwMsg.ok ? 'acc-pw-msg' : '',
+                ].filter(Boolean).join(' ') || undefined} />
               <PasswordPolicyHint policy={account.password_policy} id="acc-pw-rules" />
             </div>
             <div className={styles.field}>

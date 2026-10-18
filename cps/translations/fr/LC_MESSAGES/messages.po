@@ -19708,6 +19708,53 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr "Exigences du mot de passe :"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr "une lettre"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr "une lettre minuscule"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr "un chiffre"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr "un caractère spécial"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr "une lettre majuscule"
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr "au moins 1 caractère"
+
+#: cps/spa_strings.py
+msgid "at least {count} characters"
+msgstr "au moins {count} caractères"
+
+#: cps/spa_strings.py
+msgid "including {rules}"
+msgstr "dont {rules}"
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr "dont"
+
+#: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] "au moins %(num)d caractère"
+msgstr[1] "au moins %(num)d caractères"
+
 #~ msgid "Progress is not being saved."
 #~ msgstr "La progression n’est pas enregistrée."
 

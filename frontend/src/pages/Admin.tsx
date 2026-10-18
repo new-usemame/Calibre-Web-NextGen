@@ -15,6 +15,7 @@ import { IngestFolderLabels } from '../components/IngestFolderLabels';
 import { MyLibraryIntro } from '../components/MyLibraryIntro';
 import { PasswordInput } from '../components/PasswordInput';
 import { PasswordPolicyHint } from '../components/PasswordPolicyHint';
+import { passwordRequirementsText } from '../lib/passwordPolicy';
 import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
 import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
@@ -215,7 +216,7 @@ export function Admin() {
               <span>{t('Password')}</span>
               <PasswordInput
                 value={form.password} required autoComplete="new-password"
-                aria-describedby="new-user-password-rules"
+                aria-describedby={passwordRequirementsText(passwordPolicy, t) ? 'new-user-password-rules' : undefined}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
               <PasswordPolicyHint policy={passwordPolicy} id="new-user-password-rules" />

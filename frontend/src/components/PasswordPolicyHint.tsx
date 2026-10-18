@@ -8,5 +8,5 @@ export function PasswordPolicyHint({ policy, id }: { policy: PasswordPolicy | nu
   const t = useT();
   const text = passwordRequirementsText(policy, t);
   if (!text) return null;
-  return <p id={id} className={styles.hint}>{text}</p>;
+  return <span id={id} className={styles.hint}>{text}</span>;
 }

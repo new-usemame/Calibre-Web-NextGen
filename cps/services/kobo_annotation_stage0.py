@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import weakref
 from collections import Counter
 
 from sqlalchemy import inspect
@@ -77,42 +78,99 @@ def reset_metrics_for_testing():
         _METRICS.clear()
 
 
+# Per-engine memo of the last capability verdict, keyed weakly so a disposed
+# engine can be collected. Value is ``(schema_version, verdict)``.
+_SCHEMA_CAPABLE_CACHE = weakref.WeakKeyDictionary()
+_SCHEMA_CAPABLE_LOCK = threading.Lock()
+
+
+def _sqlite_schema_version(engine):
+    """Return SQLite's ``schema_version`` counter, or ``None`` if unavailable.
+
+    SQLite bumps this on every DDL change (including from another process or
+    worker), so it is a one-query fingerprint of "has the schema changed".
+    """
+    try:
+        with engine.connect() as connection:
+            return connection.exec_driver_sql("PRAGMA schema_version").scalar()
+    except Exception:
+        log.debug("Kobo Stage 0 schema_version unreadable; capability not cached", exc_info=True)
+        return None
+
+
+def invalidate_schema_capable_cache(engine=None) -> None:
+    """Forget cached schema verdicts so the next call re-inspects.
+
+    Pass an engine to drop just that one; omit it to drop all. Safe to call at
+    any time. The schema_version check already catches schema changes, so this
+    is an explicit signal for the Stage 0 migration rather than a requirement.
+    """
+    with _SCHEMA_CAPABLE_LOCK:
+        if engine is None:
+            _SCHEMA_CAPABLE_CACHE.clear()
+        else:
+            _SCHEMA_CAPABLE_CACHE.pop(engine, None)
+
+
 def schema_capable(engine) -> bool:
-    """Fail closed when any Stage 0 schema capability is absent."""
+    """Fail closed when any Stage 0 schema capability is absent.
+
+    The verdict is memoised per engine and revalidated against SQLite's
+    ``schema_version``, so a request normally costs one PRAGMA instead of a
+    full introspection. Any schema change (migration, dropped trigger or
+    index, another worker) alters the version and forces a fresh inspection;
+    both ``True`` and ``False`` verdicts are therefore safe to cache. If the
+    version cannot be read, nothing is cached.
+    """
+    version = _sqlite_schema_version(engine)
+    if version is not None:
+        with _SCHEMA_CAPABLE_LOCK:
+            cached = _SCHEMA_CAPABLE_CACHE.get(engine)
+        if cached is not None and cached[0] == version:
+            return cached[1]
+    verdict, cacheable = _inspect_schema_capable(engine)
+    if version is not None and cacheable:
+        with _SCHEMA_CAPABLE_LOCK:
+            _SCHEMA_CAPABLE_CACHE[engine] = (version, verdict)
+    return verdict
+
+
+def _inspect_schema_capable(engine):
+    """Run the full introspection. Returns ``(verdict, cacheable)``."""
     try:
         inspector = inspect(engine)
         tables = set(inspector.get_table_names())
         if not REQUIRED_TABLES <= tables or "annotation" not in tables:
-            return False
+            return False, True
         columns = {column["name"] for column in inspector.get_columns("annotation")}
         if not REQUIRED_ANNOTATION_COLUMNS <= columns:
-            return False
+            return False, True
         book_state_columns = {
             column["name"]
             for column in inspector.get_columns("kobo_annotation_book_state")
         }
         if not REQUIRED_BOOK_STATE_COLUMNS <= book_state_columns:
-            return False
+            return False, True
         seed_capture_columns = {
             column["name"]
             for column in inspector.get_columns("kobo_annotation_seed_capture")
         }
         if not REQUIRED_SEED_CAPTURE_COLUMNS <= seed_capture_columns:
-            return False
+            return False, True
         if "user" not in tables or "settings" not in tables:
-            return False
+            return False, True
         if "kobo_two_way_annotation_sync" not in {
             column["name"] for column in inspector.get_columns("user")
         }:
-            return False
+            return False, True
         if "config_kobo_two_way_annotation_sync" not in {
             column["name"] for column in inspector.get_columns("settings")
         }:
-            return False
+            return False, True
         for table_name, required in REQUIRED_INDEXES.items():
             actual = {index["name"] for index in inspector.get_indexes(table_name)}
             if not required <= actual:
-                return False
+                return False, True
         with engine.connect() as connection:
             triggers = {
                 row[0] for row in connection.exec_driver_sql(
@@ -121,11 +179,11 @@ def schema_capable(engine) -> bool:
                 )
             }
         if not REQUIRED_TRIGGERS <= triggers:
-            return False
-        return True
+            return False, True
+        return True, True
     except Exception:
         log.exception("Kobo Stage 0 schema capability check failed")
-        return False
+        return False, False
 
 
 def emergency_override_disables(environ=None) -> bool:

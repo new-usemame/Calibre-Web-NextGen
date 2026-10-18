@@ -20,6 +20,10 @@ from .. import ub
 UPLOAD_LIMIT = 10 * 1024 * 1024
 PNG_LIMIT = 8 * 1024 * 1024
 ACCOUNT_LIMIT = 64 * 1024 * 1024
+# Most of the art a zoom may crop away; past this the art is shown whole on white.
+ZOOM_CROP_LIMIT = 0.10
+# Bump when prepare() renders differently, so stored renditions are redone.
+PREPARE_VERSION = 2
 PLATFORMS = frozenset({'kindle', 'kobo', 'pocketbook', 'android', 'remarkable', 'emulator', 'other'})
 SUPPORTED_PLATFORMS = frozenset({'kindle', 'kobo', 'emulator'})
 ERROR_CODES = frozenset({'download_failed', 'invalid_image', 'checksum_mismatch',
@@ -101,6 +105,13 @@ def encode(image):
 def prepare(source_png, width, height):
     with Image.open(io.BytesIO(source_png)) as source:
         source.load()
+        # Art close to the screen's shape is zoomed to fill it (an even crop,
+        # never a stretch): a thin band reads as a defect on e-ink. Art far
+        # off the screen's shape is shown whole on white.
+        fit_scale = min(width / source.width, height / source.height)
+        fill_scale = max(width / source.width, height / source.height)
+        if 1 - fit_scale / fill_scale <= ZOOM_CROP_LIMIT:
+            return encode(ImageOps.fit(source, (width, height), method=Image.Resampling.LANCZOS))
         fit = ImageOps.contain(source, (width, height), method=Image.Resampling.LANCZOS)
         canvas = Image.new('L', (width, height), 255)
         canvas.paste(fit, ((width-fit.width)//2, (height-fit.height)//2))
@@ -210,12 +221,15 @@ def observe(device, report, session=None):
     previous = capability(device)
     row = row_for(device, session)
     prepared = None
-    changed = any(previous.get(key) != report.get(key) for key in ('supported', 'platform', 'screen_width', 'screen_height'))
+    changed = (previous.get('prepare_version') != PREPARE_VERSION
+               or any(previous.get(key) != report.get(key)
+                      for key in ('supported', 'platform', 'screen_width', 'screen_height')))
     if row and row.source_png and changed and report['supported']:
         prepared = prepare(row.source_png, report['screen_width'], report['screen_height'])
         check_quota(device, row.source_png, prepared, session)
-    device.sleep_screen_capability = report
-    if row and row.source_png and changed:
+    device.sleep_screen_capability = dict(report, prepare_version=PREPARE_VERSION)
+    # Identical bytes keep their revision, so the device downloads nothing new.
+    if row and row.source_png and changed and not (prepared and prepared == row.prepared_png):
         row.prepared_png = prepared
         advance(row, 'image' if prepared else 'waiting_for_device')
     return row

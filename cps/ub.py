@@ -5325,6 +5325,12 @@ def migrate_kobo_two_way_annotation_sync(engine, _session):
     # erases both records; ordinary state deletion leaves the knowledge guard.
     _ensure_kobo_opaque_present_guards(engine)
 
+    # Drop any memoised Stage 0 capability verdict for this engine. (The cache
+    # also revalidates against SQLite's schema_version, so this is belt and
+    # braces for the explicit "migration ran" signal.)
+    from .services import kobo_annotation_stage0
+    kobo_annotation_stage0.invalidate_schema_capable_cache(engine)
+
     log.info("[kobo-two-way-stage0] additive schema ready; runtime ownership unchanged")
 
 

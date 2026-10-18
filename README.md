@@ -830,9 +830,9 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
+| ca (`ca`) | `████████████████████` 99% | 4091/4126 | 0 |
 | Slovak (`sk`) | `████████████████████` 99% | 4086/4126 | 0 |
 | Russian (`ru`) | `████████████████████` 99% | 4076/4126 | 0 |
-| ca (`ca`) | `████████████████████` 99% | 4078/4126 | 0 |
 | French (`fr`) | `█████████████████░░░` 87% | 3592/4126 | 123 |
 | Swedish (`sv`) | `████████████████░░░░` 80% | 3299/4126 | 0 |
 | Dutch (`nl`) | `███████████████░░░░░` 76% | 3156/4126 | 279 |

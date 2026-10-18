@@ -128,16 +128,26 @@ def _plugin_files_at(tag: str) -> dict[str, str]:
         path = path.strip()
         if not path:
             continue
-        blob = _git("show", f"{tag}:{path}")
+        # Bytes, decoded like _plugin_files_now(): the plugin carries PNG
+        # fixtures, and a text-mode `git show` raises UnicodeDecodeError on
+        # them (first seen once v4.1.48 was tagged).
+        blob = subprocess.run(
+            ("git", "-C", str(REPO_ROOT), "show", f"{tag}:{path}"),
+            capture_output=True,
+            check=False,
+        )
         assert blob.returncode == 0, f"git show failed for {tag}:{path}"
-        files[path] = blob.stdout
+        files[path] = blob.stdout.decode("utf-8", errors="replace")
     return files
 
 
 def _plugin_files_now() -> dict[str, str]:
     return {
-        str(path.relative_to(REPO_ROOT)): path.read_text(
-            encoding="utf-8", errors="replace"
+        # Raw bytes, not read_text(): its newline translation turns the
+        # "\r\n" in a PNG header into "\n", so a binary fixture never matches
+        # its tagged blob and every release would look like a plugin change.
+        str(path.relative_to(REPO_ROOT)): path.read_bytes().decode(
+            "utf-8", errors="replace"
         )
         for path in sorted(PLUGIN.rglob("*"))
         if path.is_file() and path.name != ".DS_Store"

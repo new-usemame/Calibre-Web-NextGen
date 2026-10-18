@@ -39,7 +39,7 @@ from .cw_login import current_user
 from werkzeug.datastructures import Headers
 from sqlalchemy import String, case, cast, func, literal
 from sqlalchemy.sql.expression import and_, or_
-from sqlalchemy.exc import StatementError
+from sqlalchemy.exc import OperationalError, StatementError
 from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.sql import select
 import requests
@@ -3591,7 +3591,7 @@ def HandleSyncRequest():
                 "x-kobo-recent-reads",
             }
         }
-        kobo_sync_status.stage_pending_sync_page(
+        _page_durable = _stage_pending_page_best_effort(
             requesting_device_id,
             _sync_token_hash(raw_sync_token),
             response.headers[SyncToken.SyncToken.SYNC_TOKEN_HEADER],
@@ -3600,6 +3600,7 @@ def HandleSyncRequest():
             _serialize_pending_confirmation(confirmation),
         )
     else:
+        _page_durable = None
         # Authenticated production requests resolve a physical device. Keep the
         # historical fallback for synthetic callers that do not supply one.
         kobo_sync_status.add_synced_books_batch(
@@ -3610,7 +3611,9 @@ def HandleSyncRequest():
         for nudge in share_place_nudges_emitted:
             ub.session.delete(nudge)
 
-    if requesting_device_id and redownload_book_ids:
+    # A page that could not be stored leaves this whole response unrecorded,
+    # so its re-downloads are armed when they are delivered again.
+    if requesting_device_id and redownload_book_ids and _page_durable is not False:
         try:
             from .services.kobo_post_download_restore import arm_pending_restore
             arm_pending_restore(
@@ -3627,6 +3630,22 @@ def HandleSyncRequest():
                 capture_session=capture_session,
                 outgoing_cursor=sync_cursor_out,
             )
+
+    if _page_durable is False:
+        # The writer was held past the staging budget and the request was
+        # rolled back, so nothing this response delivered is recorded. The
+        # response itself is sound: deliver it, and the next request delivers
+        # again whatever this one could not record.
+        _mark_pending_page_reset_staged(False)
+        _log_sync_observability(
+            requesting_device_id,
+            sync_cursor_in,
+            sync_cursor_out,
+            observability,
+            response_mode="delivered_page_not_durable",
+            capture_session=capture_session,
+        )
+        return response
 
     # This commit makes only the replayable response durable. Confirmed
     # delivery state was promoted at the beginning of this request (when its
@@ -3651,6 +3670,101 @@ def HandleSyncRequest():
         capture_session=capture_session,
     )
     return response
+
+
+# app.db writer contention on the sync's final write (#2562, #2606).
+#
+# The KEPUB package repair and backfill sweeps can hold the app.db write lock
+# for tens of seconds while they work through the library. A sync with no
+# pending page to acknowledge has usually written nothing before it stages its
+# page, so that upsert is the write that waits for the lock, and losing it used
+# to turn a fully built response into a 500: the device showed "Sync Failed"
+# and its library never arrived. (A sync that wrote earlier already holds the
+# writer, so its staging cannot be refused.)
+#
+# The response is the deliverable; the staged page only records what it
+# delivered. So try briefly, then roll back and deliver anyway: the next
+# request finds no page and delivers again whatever this one could not record.
+
+# SQLite's busy wait runs on the hub thread (no monkey-patching), so each
+# attempt is kept short and the pause between attempts yields to other requests.
+_PENDING_STAGE_RETRY_BUDGET_S = 3.0
+_PENDING_STAGE_RETRY_SLEEP_S = 0.25
+_PENDING_STAGE_ATTEMPT_TIMEOUT_MS = 250
+
+
+def _is_sqlite_lock_error(error):
+    return "database is locked" in str(getattr(error, "orig", error)).lower()
+
+
+def _set_busy_timeout(timeout_ms):
+    """Set the busy timeout on ub.session's current connection; return the old one."""
+    driver = ub.session.connection().connection.driver_connection
+    previous = driver.execute("PRAGMA busy_timeout").fetchone()[0]
+    driver.execute("PRAGMA busy_timeout=%d" % int(timeout_ms))
+    return previous
+
+
+def _stage_pending_page_best_effort(*args):
+    """Stage the replayable page if the writer is free; never fail the sync.
+
+    Returns True when the page is staged, False when it was skipped. Each
+    attempt sets a short busy timeout on the session's current connection
+    (another greenlet may end the shared session's transaction during a pause,
+    and the next attempt may then run on a different pooled connection), and
+    the previous timeout is restored before the give-up rollback hands the
+    connection back to the pool.
+    """
+    started = monotonic()
+    deadline = started + _PENDING_STAGE_RETRY_BUDGET_S
+    attempt = 0
+    staged = False
+    reason = "budget spent"
+    while True:
+        attempt += 1
+        previous_timeout = None
+        try:
+            previous_timeout = _set_busy_timeout(_PENDING_STAGE_ATTEMPT_TIMEOUT_MS)
+        except Exception:  # noqa: BLE001 - the attempt still runs on the old timeout
+            pass
+        try:
+            kobo_sync_status.stage_pending_sync_page(*args)
+            staged = True
+        except OperationalError as error:
+            if not _is_sqlite_lock_error(error):
+                raise
+        finally:
+            if previous_timeout is not None:
+                try:
+                    _set_busy_timeout(previous_timeout)
+                except Exception:  # noqa: BLE001
+                    pass
+        if staged:
+            break
+        # A failed flush deactivates the transaction; nothing to retry.
+        if not ub.session.is_active:
+            reason = "transaction inactive"
+            break
+        if monotonic() >= deadline:
+            break
+        parallel.cooperative_sleep(_PENDING_STAGE_RETRY_SLEEP_S)
+    if staged:
+        if attempt > 1:
+            log.info(
+                "Kobo Sync: pending page staged on attempt %s after app.db "
+                "writer contention", attempt,
+            )
+        return True
+    log.warning(
+        "Kobo Sync: app.db writer unavailable after %.1fs (%s, %s attempts); "
+        "delivering the response without a staged page",
+        monotonic() - started, reason, attempt,
+    )
+    try:
+        ub.session.rollback()
+    except Exception:  # noqa: BLE001 - the response is still delivered
+        pass
+    return False
 
 
 def _dispatch_sync_request():

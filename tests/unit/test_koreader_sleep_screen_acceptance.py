@@ -692,3 +692,119 @@ def test_browser_writes_require_csrf_and_a_valid_upload_control(world):
     assert token_response.status_code == 200 and token
     assert with_token.status_code == 200, f"CSRF-authenticated valid upload returned HTTP {with_token.status_code}"
     assert without_token.status_code == 400
+
+
+def _square_marker_png(width, height, side):
+    """Mid-gray art with a centered black square, so scale per axis is measurable."""
+    image = Image.new("L", (width, height), 128)
+    left, top = (width - side) // 2, (height - side) // 2
+    image.paste(0, (left, top, left + side, top + side))
+    return _png(image)
+
+
+def _dark_extent(image, axis):
+    """Length of the dark run through the image center along one axis."""
+    width, height = image.size
+    if axis == "x":
+        values = [image.getpixel((x, height // 2)) for x in range(width)]
+    else:
+        values = [image.getpixel((width // 2, y)) for y in range(height)]
+    return sum(1 for value in values if value < 64)
+
+
+def _prepared(world, owner, device):
+    state = _metadata(owner, device.public_id).get_json() or {}
+    response = _image(owner, device.public_id, state.get("desired_revision", "missing"))
+    assert response.status_code == 200
+    return state, Image.open(io.BytesIO(response.data))
+
+
+def test_thin_letterbox_bars_are_zoomed_away_without_stretching_the_art(world):
+    """Art a little narrower than the screen fills it; art far off the screen's shape stays whole.
+
+    The near case is real: 896x1184 art on a 1072x1448 Kindle screen used to
+    leave a 15 px and a 16 px white band. The square marker
+    tells zooming (equal scale on both axes) apart from stretching.
+    """
+    _add_user(world, "alice")
+    owner = world.browser("alice")
+    near = _register_device(world, "alice", "near-shape-reader")
+    far = _register_device(world, "alice", "far-shape-reader", label="Kobo Libra")
+    _report(world, "alice", "near-shape-reader", width=1072, height=1448)
+    _report(world, "alice", "far-shape-reader", width=1072, height=1448)
+
+    near_upload = _upload(owner, near.public_id, _square_marker_png(896, 1184, 200), "portrait.png")
+    far_upload = _upload(owner, far.public_id, _square_marker_png(1000, 1000, 200), "square.png")
+    _, near_image = _prepared(world, owner, near)
+    _, far_image = _prepared(world, owner, far)
+
+    assert near_upload.status_code == far_upload.status_code == 200
+    assert near_image.size == far_image.size == (1072, 1448)
+    for y in (0, 1447):
+        assert max(near_image.getpixel((x, y)) for x in range(1072)) < 255, f"row {y} is a bar"
+    for x in (0, 1071):
+        assert max(near_image.getpixel((x, y)) for y in range(1448)) < 255, f"column {x} is a bar"
+    # Zoom, not stretch: the 200 px square scales by 1448/1184 on both axes.
+    assert abs(_dark_extent(near_image, "x") - _dark_extent(near_image, "y")) <= 2
+    assert abs(_dark_extent(near_image, "y") - round(200 * 1448 / 1184)) <= 2
+    # Zooming a square onto a tall screen would cut off a quarter of it, so it keeps its bars.
+    assert min(far_image.getpixel((x, 0)) for x in range(1072)) == 255
+    assert min(far_image.getpixel((x, 1447)) for x in range(1072)) == 255
+    assert min(far_image.getpixel((x, 724)) for x in range(1072)) < 255
+    assert abs(_dark_extent(far_image, "x") - round(200 * 1072 / 1000)) <= 2
+
+
+def test_an_image_prepared_with_bars_before_the_upgrade_is_redone_on_the_next_sync(world):
+    """Stored renditions follow the current rule without a re-upload, and only once.
+
+    The device row is put in the state an earlier server left it: capability
+    as that server stored it, prepared bytes letterboxed onto white. The next
+    unchanged report must publish a bar-free revision; a repeat must not. An
+    image whose rendition is unchanged keeps its revision, so the device does
+    not download the same bytes again.
+    """
+    _add_user(world, "alice")
+    owner = world.browser("alice")
+    thin = _register_device(world, "alice", "upgraded-thin")
+    far = _register_device(world, "alice", "upgraded-far", label="Kobo Libra")
+    for device_id in ("upgraded-thin", "upgraded-far"):
+        _report(world, "alice", device_id, width=100, height=135)
+    _upload(owner, thin.public_id, _square_marker_png(84, 111, 20), "portrait.png")
+    _upload(owner, far.public_id, _square_marker_png(100, 100, 20), "square.png")
+
+    screen_model = ub.DeviceSleepScreen
+    previous_revisions = {}
+    for device in (thin, far):
+        world.session.expire_all()
+        row = world.session.query(screen_model).filter_by(device_id=device.id).one()
+        stored = world.session.get(ub.Device, device.id)
+        with Image.open(io.BytesIO(row.source_png)) as source:
+            source.load()
+            letterboxed = Image.new("L", (100, 135), 255)
+            contained = source.resize(
+                (100, round(source.height * 100 / source.width)), Image.Resampling.LANCZOS)
+            letterboxed.paste(contained, (0, (135 - contained.height) // 2))
+        if device is thin:
+            row.prepared_png = _png(letterboxed)
+        stored.sleep_screen_capability = {
+            "platform": "kindle", "plugin_version": "4.2.0", "supported": True,
+            "screen_width": 100, "screen_height": 135,
+            "observed_at": "2026-10-14T13:49:00+00:00",
+        }
+        world.session.commit()
+        previous_revisions[device.id] = row.desired_revision
+
+    thin_report = _report(world, "alice", "upgraded-thin", width=100, height=135)
+    far_report = _report(world, "alice", "upgraded-far", width=100, height=135)
+    thin_state, thin_image = _prepared(world, owner, thin)
+    far_state, _ = _prepared(world, owner, far)
+    _report(world, "alice", "upgraded-thin", width=100, height=135)
+    repeat_state = _metadata(owner, thin.public_id).get_json() or {}
+
+    assert thin_report.status_code == far_report.status_code == 200
+    assert thin_state["state"] == "image"
+    assert thin_state["desired_revision"] != previous_revisions[thin.id]
+    assert max(thin_image.getpixel((x, 0)) for x in range(100)) < 255
+    assert max(thin_image.getpixel((x, 134)) for x in range(100)) < 255
+    assert repeat_state["desired_revision"] == thin_state["desired_revision"]
+    assert far_state["desired_revision"] == previous_revisions[far.id]

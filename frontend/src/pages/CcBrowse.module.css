@@ -4,6 +4,15 @@
   padding: var(--sp-6) var(--sp-5);
 }
 
+/* Edit mode gets the whole viewport width. Value lists are wide (long dotted
+   paths, a checkbox per row) and the 1400px cap left the editor looking like a
+   half-screen panel next to empty space. Only the WIDTH is relaxed; the reading
+   surfaces keep their measure, because a 3,000px-wide book grid reads worse. */
+.containerFull {
+  max-width: none;
+  width: 100%;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -27,6 +36,15 @@
   align-items: center;
   gap: var(--sp-2);
 }
+
+/* Edit / Done toggle, top-right of the column header. */
+.editToggle {
+  display: inline-flex; align-items: center; gap: var(--sp-1); cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  color: var(--text); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm);
+  white-space: nowrap; min-height: 34px;
+}
+.editToggle:hover { background: var(--surface-3); }
 
 .toolbarLabel {
   color: var(--text-muted);
@@ -131,11 +149,20 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
+  /* Vertical padding removed and the floor dropped to the button's own size, so
+     a row is exactly as tall as the edit-mode row: `.rowBtn` is 28x28 and
+     `.row` in CcValueEditor.module.css has no padding and no min-height, so an
+     editor row is 28px. Before this the browse row was 44px, and at 36px it
+     was still visibly taller than the editor's.
+
+     The HORIZONTAL padding stays at --sp-3 on purpose: `.children` anchors its
+     indent with `margin-left: calc(var(--sp-3) + 8px)`, so shrinking it would
+     slide every row's content out of alignment with the nesting guides. */
+  padding: 0 var(--sp-3);
   border-radius: var(--r-sm);
   cursor: pointer;
   list-style: none; /* hide the default disclosure marker; the chevron is ours */
-  min-height: 44px;
+  min-height: 28px;
 }
 
 /* Leaf rows use the same flex row (marker | name | count) but
@@ -299,13 +326,36 @@ div.treeSummary:hover { background: transparent; }
 .profile { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); text-decoration: underline; }
 .profile:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
+/* Disclosure chevron.
+
+   Was 44x44 -- a deliberate touch target, and the same size
+   `.requestError button` still uses -- but it is the tallest thing in the row
+   and made a long value list feel like a menu rather than a list. Now 28x28,
+   matching `.rowBtn` in CcValueEditor.module.css so the browse tree and the
+   value editor present the same control at the same size.
+
+   The row was reduced as well, and had to be: `.treeSummary` carried 8px of
+   vertical padding, so a 28px button inside it still produced the same 44px
+   row. Changing only the button would have looked like it did nothing.
+
+   Trade-off worth naming: 28px is below the 44px this file uses elsewhere for
+   touch. This control is the ONLY click target in its row -- the summary div is
+   not clickable -- so on a phone the target is now 28px. If that matters more
+   than density, expand the hit area without changing the look:
+
+     .disclosure::after {
+       content: ''; position: absolute; inset: -8px -8px;
+     }
+
+   with `.disclosure { position: relative }`. Deliberately not applied here,
+   because at this row height it would overlap the next row's button. */
 .disclosure {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: var(--r-sm);

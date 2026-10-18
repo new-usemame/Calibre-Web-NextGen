@@ -2,24 +2,64 @@
 {% from 'macros/hierarchy.html' import render_details_tree %}
 {% block body %}
 <h1 class="{{page}}">{{_(title)}}</h1>
-<div class="discover">
-  {% if hierarchical|default(true) %}
-    <p class="hierarchy-hint">{{_('Select a category to see the books assigned to it and all of its sub-categories.')}}</p>
-    <div class="btn-group hierarchy-actions" role="group">
-      <button id="hierarchy-expand-all" class="btn btn-default btn-sm">{{_('Expand all')}}</button>
-      <button id="hierarchy-collapse-all" class="btn btn-default btn-sm">{{_('Collapse all')}}</button>
-    </div>
-    <div class="hierarchy-tree" data-col-id="{{ col_id }}">{{ render_details_tree(entries, col_id) }}</div>
-  {% else %}
-    <p>{{_('Select a value to see the books assigned to it.')}}</p>
-    <ul class="list-unstyled">
-      {% for node in entries %}
-        <li><a href="{{ url_for('web.cc_category_list', column_id=col_id, category_path=node.path) }}">{{ node.name }} <span class="badge">{{ node.total_count }}</span></a></li>
-      {% endfor %}
-    </ul>
+{# The editor replaces the browse view IN PLACE — not a dialog over it. Both
+   views sit inside the same `.discover` frame, so they get its padding and the
+   page does not appear to jump when the user toggles between them.
+
+   may_edit_values is current_user.role_edit(), the same permission every
+   value-write endpoint enforces through _require_metadata_editor(). The new
+   interface once offered this panel ungated, so a signed-in non-editor got
+   working-looking controls that were all refused. #}
+<div class="discover cc-values-frame">
+  {# One toolbar row in BOTH views: Edit values and Done occupy the SAME
+     right-hand slot, so the control does not move when the mode changes. #}
+  <div class="cc-values-toolbar">
+    {% if not may_edit_values %}
+      {% if hierarchical|default(true) %}
+        <div class="btn-group" role="group">
+          <button id="hierarchy-expand-all" class="btn btn-default btn-sm">{{_('Expand all')}}</button>
+          <button id="hierarchy-collapse-all" class="btn btn-default btn-sm">{{_('Collapse all')}}</button>
+        </div>
+      {% endif %}
+    {% else %}
+      <span class="cc-values-toolbar-left">
+        {# Create lives here, beside the row tools. It was briefly dropped when
+           this toolbar was restructured, which left 'create' with no reachable
+           button at all -- a test now pins it. #}
+        <div class="btn-group" role="group">
+          <button type="button" class="btn btn-default btn-sm" id="ccValuesCreate">{{_('Create new')}}</button>
+          {% if hierarchical|default(true) %}
+            <button id="hierarchy-expand-all" class="btn btn-default btn-sm">{{_('Expand all')}}</button>
+            <button id="hierarchy-collapse-all" class="btn btn-default btn-sm">{{_('Collapse all')}}</button>
+          {% endif %}
+        </div>
+      </span>
+      <button class="btn btn-default btn-sm cc-values-toggle btn-cc-values-edit pull-right">{{_('Edit values')}}</button>
+    {% endif %}
+  </div>
+
+  <div class="cc-values-browse">
+    {% if hierarchical|default(true) %}
+      <p class="hierarchy-hint">{{_('Select a category to see the books assigned to it and all of its sub-categories.')}}</p>
+      <div class="hierarchy-tree" data-col-id="{{ col_id }}">{{ render_details_tree(entries, col_id) }}</div>
+    {% else %}
+      <p>{{_('Select a value to see the books assigned to it.')}}</p>
+      <ul class="list-unstyled">
+        {% for node in entries %}
+          <li><a href="{{ url_for('web.cc_category_list', column_id=col_id, category_path=node.path) }}">{{ node.name }} <span class="badge">{{ node.total_count }}</span></a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+
+  {% if may_edit_values %}
+    {% include 'cc_value_editor.html' %}
   {% endif %}
 </div>
 {% endblock %}
 {% block js %}
 {% if hierarchical|default(true) %}<script src="{{ url_for('static', filename='js/hierarchy.js') }}"></script>{% endif %}
+{% if may_edit_values %}
+<script src="{{ url_for('static', filename='js/cc_value_editor.js') }}"></script>
+{% endif %}
 {% endblock %}

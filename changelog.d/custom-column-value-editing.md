@@ -1,0 +1,4 @@
+### Added
+
+- **Edit custom column values.** Rename, merge, delete, move or create the values of a tag-like custom column in both the Classic interface and the New UI, under the same rules the tag editor follows. Values can also be moved up or down among their siblings, and that curated order survives renames; every change carries the value's books with it and is written to the activity log. Refusals (a value with children, a move into itself, a merge into a non-leaf) are decided server-side and shown before anything is sent.
+- **Set a custom column's hierarchy mode.** The UI Configuration page gains a per-column choice: automatic (derive the tree from the values, as every install does today), always a hierarchy, or never a hierarchy. A stored choice is authoritative — the answer no longer depends on which books happen to be filed under the column, so adding one book cannot flip a Dewey tree into a flat list mid-session.

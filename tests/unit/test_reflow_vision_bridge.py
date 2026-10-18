@@ -522,3 +522,129 @@ def test_real_worker_preparation_cancel_keeps_second_scan_unsent(tmp_path, monke
     assert process.poll() is not None
     assert not output.exists()
     assert list((state / 'native-scratch').iterdir()) == []
+
+
+def test_compact_report_releases_discarded_graphs_without_cyclic_collection(tmp_path):
+    """Distinct synthetic geometry must not remain owned after each return."""
+    import subprocess
+    import sys
+    script = tmp_path / 'compact_lifetime.py'
+    script.write_text(r'''import gc, json, math, sys, tracemalloc
+from pathlib import Path
+import socket
+def no_network(*args,**kwargs):
+ raise RuntimeError("Synthetic lifetime probe forbids network access")
+socket.getaddrinfo=no_network
+socket.create_connection=no_network
+sys.path.insert(0, sys.argv[1])
+from cps.services.reflow import native_codec, vision_bridge
+
+def report(generation):
+    return dict(pages={0: dict(words=[dict(text='token'+str(generation)+'_'+str(i),
+        bbox=[float(i),2.,float(i)+3.,4.], source=dict(page=0,rect=[float(i),2.,float(i)+3.,4.]))
+        for i in range(512)], geometry=(1.,2.,3.,4.))},
+        duplicates=[dict(value=[1,2]),dict(value=[1,2])],
+        numbers=[True,1,1.,-0.,0.],keys={0:'integer','0':'string'})
+
+# Exercise the existing transport outside the measured lifetime interval.
+original=report(-1)
+compact=vision_bridge.compact_report(original)
+assert native_codec.loads(native_codec.dumps(compact)) == original
+del original,compact
+gc.collect()
+gc.disable()
+# Exclude bounded allocator startup from discarded-report ownership measurement.
+warmup_input=report(-2)
+warmup_output=vision_bridge.compact_report(warmup_input)
+del warmup_input,warmup_output
+tracemalloc.start()
+baseline=tracemalloc.get_traced_memory()[0]
+for generation in range(6):
+    original=report(generation)
+    compact=vision_bridge.compact_report(original)
+    assert compact == original
+    assert compact['duplicates'][0] is compact['duplicates'][1]
+    assert original['duplicates'][0] is not original['duplicates'][1]
+    assert type(compact['pages'][0]['geometry']) is tuple
+    assert list(compact['keys']) == [0,'0']
+    assert [type(v) for v in compact['numbers']] == [bool,int,float,float,float]
+    assert math.copysign(1,compact['numbers'][3]) == -1
+    assert math.copysign(1,compact['numbers'][4]) == 1
+    del original,compact
+current,peak=tracemalloc.get_traced_memory()
+retained=current-baseline
+peak_delta=peak-baseline
+limit=max(256*1024,int(peak_delta*.20))
+print(json.dumps(dict(gc_enabled=gc.isenabled(),calls=6,retained_bytes=retained,
+    peak_delta_bytes=peak_delta,retained_bound_bytes=limit)),flush=True)
+assert not gc.isenabled()
+assert retained < limit, 'Discarded compact reports retain a per-call graph without cyclic collection'
+''')
+    completed = subprocess.run([sys.executable, '-I', str(script),
+        str(Path(__file__).resolve().parents[2])], text=True, capture_output=True, timeout=30)
+    (tmp_path / 'subprocess-observation.txt').write_text(completed.stdout + completed.stderr)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+def test_actual_worker_releases_repeated_report_graphs_before_strict_shutdown(tmp_path, monkeypatch):
+    """A synthetic worker must finish complete transport and unchanged cleanup."""
+    source = tmp_path / 'source.pdf'
+    with pymupdf.open() as document:
+        document.new_page().insert_text((30, 40), 'A synthetic source page.')
+        document.save(source)
+    receipt = tmp_path / 'lifetime.json'
+    worker = tmp_path / 'worker.py'
+    worker.write_text('''import importlib,importlib.util,os,sys,zipfile,contextlib,io,json
+from pathlib import Path
+import socket
+def no_network(*args,**kwargs):
+ raise RuntimeError("Synthetic lifetime probe forbids network access")
+socket.getaddrinfo=no_network
+socket.create_connection=no_network
+root=Path(ROOT_LITERAL)
+name='_reflow_native_runtime'
+spec=importlib.util.spec_from_file_location(name,root/'__init__.py',submodule_search_locations=[str(root)])
+module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module)
+runtime=importlib.import_module(name+'.native_worker_runtime')
+codec=importlib.import_module(name+'.native_codec')
+bridge=importlib.import_module(name+'.vision_bridge')
+pipeline=importlib.import_module(name+'.vision_pipeline')
+extract=importlib.import_module(name+'.extract')
+REPORT_FACTORY
+def convert(doc,path,reader,**kwargs):
+ capture=io.StringIO()
+ try:
+  with contextlib.redirect_stdout(capture):
+   exec(PROBE_LITERAL,{'native_codec':codec,'vision_bridge':bridge})
+ finally:
+  Path(RECEIPT_LITERAL).write_text(capture.getvalue())
+ with zipfile.ZipFile(path,'w') as archive: archive.writestr('mimetype','application/epub+zip')
+ return _synthetic_report(extract.document_fingerprint(doc))
+pipeline.convert=convert
+with os.fdopen(int(sys.argv[3]),'w',buffering=1) as control:
+ raise SystemExit(runtime.serve(int(sys.argv[1]),sys.argv[2],control))
+'''.replace('ROOT_LITERAL', repr(str(native_ipc.WORKER.parent)))
+        .replace('REPORT_FACTORY', inspect.getsource(_synthetic_report))
+        .replace('PROBE_LITERAL', repr("import gc, json, math, sys, tracemalloc\nfrom pathlib import Path\n\ndef report(generation):\n    return dict(pages={0: dict(words=[dict(text='token'+str(generation)+'_'+str(i),\n        bbox=[float(i),2.,float(i)+3.,4.], source=dict(page=0,rect=[float(i),2.,float(i)+3.,4.]))\n        for i in range(512)], geometry=(1.,2.,3.,4.))},\n        duplicates=[dict(value=[1,2]),dict(value=[1,2])],\n        numbers=[True,1,1.,-0.,0.],keys={0:'integer','0':'string'})\n\n# Exercise the existing transport outside the measured lifetime interval.\noriginal=report(-1)\ncompact=vision_bridge.compact_report(original)\nassert native_codec.loads(native_codec.dumps(compact)) == original\ndel original,compact\ngc.collect()\ngc.disable()\n# Exclude bounded allocator startup from discarded-report ownership measurement.\nwarmup_input=report(-2)\nwarmup_output=vision_bridge.compact_report(warmup_input)\ndel warmup_input,warmup_output\ntracemalloc.start()\nbaseline=tracemalloc.get_traced_memory()[0]\nfor generation in range(6):\n    original=report(generation)\n    compact=vision_bridge.compact_report(original)\n    assert compact == original\n    assert compact['duplicates'][0] is compact['duplicates'][1]\n    assert original['duplicates'][0] is not original['duplicates'][1]\n    assert type(compact['pages'][0]['geometry']) is tuple\n    assert list(compact['keys']) == [0,'0']\n    assert [type(v) for v in compact['numbers']] == [bool,int,float,float,float]\n    assert math.copysign(1,compact['numbers'][3]) == -1\n    assert math.copysign(1,compact['numbers'][4]) == 1\n    del original,compact\ncurrent,peak=tracemalloc.get_traced_memory()\nretained=current-baseline\npeak_delta=peak-baseline\nlimit=max(256*1024,int(peak_delta*.20))\nprint(json.dumps(dict(gc_enabled=gc.isenabled(),calls=6,retained_bytes=retained,\n    peak_delta_bytes=peak_delta,retained_bound_bytes=limit)),flush=True)\nassert not gc.isenabled()\nassert retained < limit, 'Discarded compact reports retain a per-call graph without cyclic collection'\n"))
+        .replace('RECEIPT_LITERAL', repr(str(receipt))))
+    monkeypatch.setattr(native_ipc, 'WORKER', worker)
+    from cps.services.reflow import extract
+    expected = _synthetic_report(extract.document_fingerprint(source))
+    state = tmp_path / 'state'
+    reader = vision_reading.Reader(None, state / 'cache', Ledger(state / 'job.jsonl', 0))
+    with native_ipc.NativeDocument(source, scratch_root=state / 'scratch', cache_root=state) as native:
+        child = native.process
+        actual = native.convert_vision(tmp_path / 'output.epub', reader)
+        assert actual == expected
+        assert child.pid != os.getpid()
+    native.require_clean_shutdown()
+    evidence = native.shutdown_evidence
+    assert evidence['exit_code'] == 0
+    assert evidence['direct_child_reaped'] is True
+    assert evidence['group_state'] == 'absent'
+    assert evidence['stderr_drain_complete'] is True
+    assert not any(signal.get('reason') == 'eof_timeout' for signal in evidence['signals'])
+    observations = json.loads(receipt.read_text())
+    assert observations['calls'] == 6 and observations['gc_enabled'] is False
+    assert observations['retained_bytes'] < observations['retained_bound_bytes']
+    assert list((state / 'scratch').iterdir()) == []
+    assert reader.ledger.spent() == reader.ledger.pending_usd() == 0

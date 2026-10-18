@@ -61,9 +61,16 @@ def compact_report(report):
         result = pool[signature]
         visited[identity] = result
         return result
-    result, _ = visit(report)
-    if type(result) is not dict: raise ValueError('Invalid native vision report')
-    return result
+    try:
+        result, _ = visit(report)
+        if type(result) is not dict: raise ValueError('Invalid native vision report')
+        return result
+    finally:
+        # The returned snapshot owns its values; traversal indexes are temporary.
+        pool.clear()
+        visited.clear()
+        active.clear()
+        visit = None
 
 
 def error_reply(error):

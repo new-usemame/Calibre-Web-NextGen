@@ -1,0 +1,3 @@
+### Added
+
+- **Send a book straight to a Kindle plugged into your computer, and see what is on it.** A "Send to device" button on the book page copies the book into the Kindle's documents folder over USB, converting it to AZW3 first when the book only exists as EPUB; once it is there the button reads "Already on device". A connected Kindle appears under Library in the sidebar with its books on its own device page at `/device/<id>` (several Kindles can be connected at once), and an Eject button releases it before you unplug. The browser talks to the Kindle itself over WebUSB, so this works even when the server runs elsewhere. It needs Chrome or Edge on an `https://` or `localhost` address; on Windows the Kindle needs a WinUSB driver.

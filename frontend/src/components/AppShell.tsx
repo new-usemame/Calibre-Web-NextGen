@@ -9,6 +9,8 @@ import { SkipLink } from './SkipLink';
 import { UserNoticeBanner } from './UserNotices';
 import { contextSidebarForLocation } from '../lib/contextSidebars';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
+import { useMe } from '../lib/queries';
+import { DevicesProvider } from '../lib/device';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -19,7 +21,14 @@ interface AppShellProps {
 }
 
 export function AppShell(props: AppShellProps) {
-  return <ShelfDragProvider><ShellContents {...props} /></ShelfDragProvider>;
+  const me = useMe().data;
+  // A device plugged in over USB is only offered to a signed-in account allowed to download books.
+  const devicesEnabled = !!me?.id && !me.role?.anonymous && !!me.role?.download;
+  return (
+    <DevicesProvider enabled={devicesEnabled}>
+      <ShelfDragProvider><ShellContents {...props} /></ShelfDragProvider>
+    </DevicesProvider>
+  );
 }
 
 function ShellContents({ userName, instanceName, onLogout, children }: AppShellProps) {

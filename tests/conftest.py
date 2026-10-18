@@ -723,6 +723,7 @@ from tests.quarantine import QUARANTINED  # noqa: E402
 LANE_BY_DIRECTORY = {
     "unit": "unit",
     "smoke": "smoke",
+    "fitness": "unit",
 }
 
 #: A test declaring one of these has already chosen its lane; the directory

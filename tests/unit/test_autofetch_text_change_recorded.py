@@ -93,7 +93,12 @@ def harness(monkeypatch, library):
     def fake_log(book, changed=None):
         if state["log_raises"]:
             raise OSError("change-log dir not writable")
-        state["logged"].append((book.id, dict(changed or {})))
+        entry = (book.id, dict(changed or {}))
+        if library.new or library.dirty:
+            # The enforcer reads the book back from metadata.db, so a record
+            # queued before the commit would embed the old values.
+            entry += ("queued before commit",)
+        state["logged"].append(entry)
 
     monkeypatch.setattr(helper, "log_metadata_change", fake_log)
     state["book"] = library.get(db.Books, 1)

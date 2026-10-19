@@ -56,6 +56,44 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.49',
+    date: '2026-10-19',
+    items: [
+      {
+        title: 'Choose how a sleep-screen picture fits each reader',
+        body: 'Image fit offers Automatic, Fill the screen and Show the whole image for each KOReader device. Automatic fills the screen when only a thin edge would be cropped. A change shows in the preview at once and applies on the next sync, with no re-upload.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'No more thin white bands on sleep screens',
+        body: 'A picture that is nearly the screen\'s shape is now zoomed just enough to fill it, cropped evenly and never stretched. Pictures you already set are redone on the device\'s next sync.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Kobo sync no longer stalls with "database is locked"',
+        body: 'Books with a reading position saved by the Kobo itself could fail every sync until the server restarted. Those positions are now recognised and left as they are.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOReader sync data is cleaned up with deleted accounts and books',
+        body: 'On older installs, saved KOReader progress could outlive the account or book it belonged to. The first start after updating repairs those tables and clears the leftovers.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Faster Kobo annotation sync',
+        body: 'Highlight and note requests from a Kobo no longer re-check the database layout every time, so busy syncs do less work.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Installs from source on Windows',
+        body: 'A source checkout now installs on Windows without a C compiler. LDAP login stays off there, as before.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.48',
     date: '2026-10-18',
     summary: 'Each device now keeps its own reading place unless you choose to share it. To keep your devices in step as before, tick Share my place for each one under Account → Devices.',

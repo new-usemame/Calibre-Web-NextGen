@@ -16,6 +16,26 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.49] - 2026-10-19
+
+### Added
+
+- **Choose how each KOReader sleep-screen image fits its device.** Image fit offers Automatic, Fill the screen and Show the whole image. Automatic fills the screen when only a thin edge would be cropped; the other choices always fill with an even crop or show the whole image on white. Changing the choice shows it at once, updates the preview and applies on the next sync, without uploading the image again.
+
+### Changed
+
+- **Kobo annotation requests no longer re-inspect the database schema every time.** The Stage 0 capability check now remembers its answer per database and re-checks only when SQLite reports a schema change (a migration, or a dropped trigger or index), so busy Kobo sync paths skip dozens of introspection queries per request while still failing closed if the schema regresses. Closes #2547.
+
+### Fixed
+
+- **A checkout installs on Windows without a C compiler.** `pip install .` failed on Windows because python-ldap has no Windows wheels and has to be built from source. python-ldap and Flask-SimpleLDAP are now skipped on Windows, where the app already runs with LDAP login turned off; Linux, macOS and the Docker image install them as before, so LDAP login keeps working there. Reported by @Rol3333 in #2342, with the platform-marker approach; tests from @theluckystrike's #2583.
+
+- **The KOReader sync tables get their cleanup rule even when an older install created them without one.** At startup the server checks that `kosync_progress` and `book_format_checksums` delete their rows along with the account or book they belong to. A table created with no such link at all was reported as fine, so progress and checksums for deleted accounts and books stayed behind for good. Those tables are now rebuilt with the link on the first start after updating, which also clears rows whose account or book no longer exists. If the check cannot read the schema, it now logs the reason and leaves the table alone instead of calling it healthy, and a rebuild that fails part-way is rolled back rather than left for the next write to save. (#2548)
+
+- **Kobo sync no longer fails with "database is locked" on books with a Kobo-reported position.** A position the device reports as `<id>!OEBPS!chapter.xhtml` was treated as a vanished chapter and re-placed by fraction on every sync; the uncommitted rewrite failed the sync and left every request erroring until restart. Positions in that form are now matched against the book's chapters and left alone. Reported by @johan-autohome in #2602, with the fix from their #2603.
+
+- **KOReader sleep screens no longer show thin white bands when the image is nearly the screen's shape.** An image that would leave a thin band above and below (or at the sides) is now zoomed just enough to fill the screen, cropping evenly and never stretching. An image far from the screen's shape, where a zoom would cut off more than a tenth of it, is still shown whole on white. Sleep screens set before this update are redone on the device's next sync, with no re-upload; a device whose image comes out the same downloads nothing new.
+
 ## [v4.1.48] - 2026-10-18
 
 ### Added

@@ -1,0 +1,3 @@
+### Fixed
+
+- **The KOReader sync tables get their cleanup rule even when an older install created them without one.** At startup the server checks that `kosync_progress` and `book_format_checksums` delete their rows along with the account or book they belong to. A table created with no such link at all was reported as fine, so progress and checksums for deleted accounts and books stayed behind for good. Those tables are now rebuilt with the link on the first start after updating, which also clears rows whose account or book no longer exists. If the check cannot read the schema, it now logs the reason and leaves the table alone instead of calling it healthy, and a rebuild that fails part-way is rolled back rather than left for the next write to save. (#2548)

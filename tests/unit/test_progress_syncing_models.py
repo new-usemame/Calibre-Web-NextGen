@@ -456,3 +456,117 @@ class TestCascadeDelete:
 
         # Should have 0 progress records remaining due to CASCADE DELETE
         assert progress_after == 0
+
+
+class _ForeignKeyInspectionFails:
+    """A sqlite3 connection whose foreign-key inspection raises (#2548)."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, *args):
+        if "foreign_key_list" in sql:
+            raise sqlite3.OperationalError("disk I/O error")
+        return self._conn.execute(sql, *args)
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+
+def _cascades(conn, table):
+    return {(row[3], row[2], row[6]) for row in
+            conn.execute(f"PRAGMA foreign_key_list({table})").fetchall()}
+
+
+@pytest.mark.unit
+class TestForeignKeyHealth:
+    """#2548: the CASCADE check must not call a table healthy that it has not seen to be."""
+
+    def test_kosync_progress_without_its_foreign_key_gets_one(self, tmp_path):
+        conn = sqlite3.connect(str(tmp_path / "app.db"))
+        conn.execute("CREATE TABLE user (id INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO user VALUES (1)")
+        conn.execute("""CREATE TABLE kosync_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+            document TEXT NOT NULL, progress TEXT NOT NULL, percentage REAL NOT NULL,
+            device TEXT NOT NULL, device_id TEXT, timestamp TIMESTAMP)""")
+        conn.execute("INSERT INTO kosync_progress (user_id, document, progress, percentage, device) "
+                     "VALUES (1, 'digest', '/body/p[3]', 40, 'Kindle')")
+        conn.commit()
+
+        from cps.progress_syncing.models import ensure_kosync_progress_table
+        ensure_kosync_progress_table(conn)
+
+        assert _cascades(conn, "kosync_progress") == {("user_id", "user", "CASCADE")}
+        assert conn.execute("SELECT user_id, document, percentage FROM kosync_progress").fetchall() \
+            == [(1, "digest", 40.0)]
+
+    def test_checksum_table_without_its_foreign_key_gets_one(self, tmp_path):
+        conn = sqlite3.connect(str(tmp_path / "metadata.db"))
+        conn.execute("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO books VALUES (7)")
+        conn.execute("""CREATE TABLE book_format_checksums (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, book INTEGER NOT NULL,
+            format TEXT NOT NULL, checksum TEXT NOT NULL,
+            version TEXT NOT NULL DEFAULT 'koreader', created TIMESTAMP)""")
+        conn.execute("INSERT INTO book_format_checksums (book, format, checksum) VALUES (7, 'EPUB', 'abc')")
+        conn.commit()
+
+        ensure_checksum_table(conn)
+
+        assert _cascades(conn, "book_format_checksums") == {("book", "books", "CASCADE")}
+        assert conn.execute("SELECT book, checksum FROM book_format_checksums").fetchall() == [(7, "abc")]
+
+    def test_failed_inspection_is_unhealthy_with_its_reason(self, tmp_path):
+        conn = sqlite3.connect(str(tmp_path / "app.db"))
+        from cps.progress_syncing.models import ensure_kosync_progress_table, check_cascade_delete_on_fk
+        ensure_kosync_progress_table(conn)
+
+        health = check_cascade_delete_on_fk(_ForeignKeyInspectionFails(conn), "kosync_progress",
+                                            {"user_id": "user"})
+
+        assert not health
+        assert "disk I/O error" in health.reason
+
+    def test_failed_inspection_does_not_rebuild_the_table(self, tmp_path, caplog):
+        """Unhealthy-because-unseen must not trigger the drop-and-copy migration."""
+        conn = sqlite3.connect(str(tmp_path / "app.db"))
+        conn.execute("CREATE TABLE user (id INTEGER PRIMARY KEY)")
+        from cps.progress_syncing.models import ensure_kosync_progress_table
+        ensure_kosync_progress_table(conn)
+        # A row whose user is gone: the rebuild would drop it.
+        conn.execute("INSERT INTO kosync_progress (user_id, document, progress, percentage, device) "
+                     "VALUES (99, 'digest', '/body/p[3]', 40, 'Kindle')")
+        conn.commit()
+
+        ensure_kosync_progress_table(_ForeignKeyInspectionFails(conn))
+
+        assert conn.execute("SELECT user_id FROM kosync_progress").fetchall() == [(99,)]
+        assert not any("Migrated kosync_progress" in r.message for r in caplog.records)
+        assert any("disk I/O error" in r.message for r in caplog.records)
+
+    def test_failed_checksum_migration_leaves_the_table_intact(self, tmp_path):
+        """A rebuild that fails part-way must not leave its DROP for the next commit."""
+        conn = sqlite3.connect(str(tmp_path / "metadata.db"))
+        conn.execute("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO books VALUES (7)")
+        conn.execute("""CREATE TABLE book_format_checksums (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, book INTEGER NOT NULL,
+            format TEXT NOT NULL, checksum TEXT NOT NULL,
+            version TEXT NOT NULL DEFAULT 'koreader', created TIMESTAMP)""")
+        conn.execute("INSERT INTO book_format_checksums (book, format, checksum) VALUES (7, 'EPUB', 'abc')")
+        conn.commit()
+
+        class RenameFails(_ForeignKeyInspectionFails):
+            def execute(self, sql, *args):
+                if "RENAME TO" in sql:
+                    raise sqlite3.OperationalError("disk I/O error")
+                return self._conn.execute(sql, *args)
+
+        ensure_checksum_table(RenameFails(conn))
+        conn.commit()  # whatever the caller commits next
+
+        assert conn.execute("SELECT book, checksum FROM book_format_checksums").fetchall() == [(7, "abc")]

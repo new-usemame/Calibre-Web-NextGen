@@ -7318,6 +7318,23 @@ msgstr ""
 "que ce compte peut voir — rien ne change pour lui pour l'instant."
 
 #: cps/spa_strings.py
+msgid "Applies when you choose My Library. The user adds books from the global library themselves. Not available once an account already syncs books to a Kobo."
+msgstr "S’applique au choix de Ma bibliothèque. L’utilisateur ajoute lui-même des livres depuis la bibliothèque globale. Indisponible dès qu’un compte synchronise déjà des livres avec une Kobo."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Give {name} an empty My Library? They start with no books and add what they want from the global library."
+msgstr "Donner Ma bibliothèque à {name}, sans aucun livre au départ ? L’utilisateur ajoute ceux qu’il veut depuis la bibliothèque globale."
+
+#: cps/spa_strings.py
+msgid "Needs the global-browse role: without it the user could not add any books."
+msgstr "Nécessite le rôle de consultation globale : sans lui, l’utilisateur ne pourrait ajouter aucun livre."
+
+#: cps/spa_strings.py
+msgid "Start My Library empty"
+msgstr "Démarrer Ma bibliothèque vide"
+
+#: cps/spa_strings.py
 msgid "Go to note"
 msgstr "Aller à la note"
 

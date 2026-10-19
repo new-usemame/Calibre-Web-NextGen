@@ -66,6 +66,7 @@ export function Admin() {
   // scrolled to a user's form it is off-screen and the add looked silent (#1939).
   const [libraryBookAdded, setLibraryBookAdded] = useState<Record<number, string>>({});
   const [modeHelpOpen, setModeHelpOpen] = useState<Record<number, boolean>>({});
+  const [startEmpty, setStartEmpty] = useState<Record<number, boolean>>({});
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !data) {
@@ -133,14 +134,18 @@ export function Admin() {
 
   const setLibraryMode = (user: AdminUser, mode: 'monolibrary' | 'personal_library') => {
     if (mode === user.library_mode || updateUser.isPending) return;
+    const emptyStart = mode === 'personal_library' && !user.my_library_seeded
+      && !!startEmpty[user.id] && user.roles.browse_global;
     const message = mode === 'monolibrary'
       ? t('Show {name} the global library again? Their selection is kept but no longer used, and their e-reader syncs the global library at the next update.', { name: user.name })
       : user.my_library_seeded
         ? t('Switch {name} back to My Library? Their chosen books are restored.', { name: user.name })
-        : t('Give {name} My Library? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
+        : emptyStart
+          ? t('Give {name} an empty My Library? They start with no books and add what they want from the global library.', { name: user.name })
+          : t('Give {name} My Library? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
     if (!window.confirm(message)) return;
     setBanner(null);
-    updateUser.mutate({ id: user.id, library_mode: mode }, {
+    updateUser.mutate({ id: user.id, library_mode: mode, ...(emptyStart ? { start_empty: true } : {}) }, {
       onSuccess: () => setBanner({ ok: true, text: mode === 'monolibrary'
         ? t('{name} sees the global library again.', { name: user.name })
         : t('{name} now uses My Library.', { name: user.name }) }),
@@ -316,6 +321,23 @@ export function Admin() {
                       <span className={styles.modeText}><strong>{t('My Library')}</strong><small>{t('Only the books chosen for this account.')}</small></span>
                     </label>
                   </div>
+                  {user.library_mode === 'monolibrary' && !user.my_library_seeded && (
+                    <label className={styles.modeOption}>
+                      <input type="checkbox"
+                        checked={!!startEmpty[user.id] && user.roles.browse_global}
+                        disabled={updateUser.isPending || !user.roles.browse_global}
+                        aria-describedby={`library-start-empty-help-${user.id}`}
+                        onChange={(e) => setStartEmpty((prev) => ({ ...prev, [user.id]: e.target.checked }))} />
+                      <span className={styles.modeText}>
+                        <strong>{t('Start My Library empty')}</strong>
+                        <small id={`library-start-empty-help-${user.id}`}>
+                          {user.roles.browse_global
+                            ? t('Applies when you choose My Library. The user adds books from the global library themselves. Not available once an account already syncs books to a Kobo.')
+                            : t('Needs the global-browse role: without it the user could not add any books.')}
+                        </small>
+                      </span>
+                    </label>
+                  )}
                   <p id={`library-mode-howto-${user.id}`} className={styles.settingsHint}
                     hidden={!modeHelpOpen[user.id]}>{t('Switching a user to My Library first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.')}</p>
                   {user.library_mode === 'personal_library' && !user.roles.browse_global &&

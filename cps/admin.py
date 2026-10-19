@@ -3622,9 +3622,17 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
     if desired_library_mode not in constants.LIBRARY_MODES:
         flash(_("Invalid library mode"), category="error")
         return "", 400
+    # The checkbox is only rendered before the seed fence exists, and only
+    # means something alongside the My Library radio.
+    library_start_empty = bool(
+        to_save.get("library_start_empty")
+        and desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+        and not bool(content.user_library_seeded)
+    )
     library_seed_prepared = False
     if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
-            and not bool(content.user_library_seeded)):
+            and not bool(content.user_library_seeded)
+            and not library_start_empty):
         try:
             # Seed before mutating the rest of the combined admin form. Its
             # bounded commits must never make unrelated half-validated edits
@@ -3847,6 +3855,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             desired_library_mode,
             seed_rows_prepared=library_seed_prepared,
             commit=False,
+            start_empty=library_start_empty,
         )
         ub.session.commit()
         flash(_("User '%(nick)s' updated", nick=content.name), category="success")

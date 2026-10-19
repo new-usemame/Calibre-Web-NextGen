@@ -253,7 +253,9 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         calibre_db_instance.session.add(tag)
                     if tag not in book.tags:
                         book.tags.append(tag)
-            updated = True
+                        # Only a tag the book lacked is a change: a recorded
+                        # change rewrites the file and re-sends it to a Kobo.
+                        updated = True
             
         # Update series if available and enabled in settings. Smart mode keeps an
         # existing series rather than overwriting it (fork #403).

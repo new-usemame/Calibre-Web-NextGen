@@ -143,3 +143,89 @@ def test_enforcement_record_failure_does_not_fail_the_fetch(harness):
 
     harness["cdb"].session.expire_all()
     assert harness["cdb"].session.get(db.Books, 1).comments[0].text == "A fetched description."
+
+
+def test_tags_the_book_already_has_record_nothing(harness):
+    # Each recorded change rewrites the book file and re-sends it to a Kobo, so
+    # a fetch whose tags are all present already must not count as a change.
+    harness["settings"] = _settings(auto_metadata_update_tags=True)
+    library = harness["cdb"].session
+    harness["book"].tags = [db.Tags(name="Fantasy")]
+    library.commit()
+
+    assert m._apply_metadata_to_book(harness["book"], _meta(tags=["Fantasy"]), harness["cdb"]) is False
+
+    assert _last_modified(harness["book"]) == OLD
+    assert harness["logged"] == []
+
+
+def test_a_new_tag_is_recorded(harness):
+    harness["settings"] = _settings(auto_metadata_update_tags=True)
+
+    assert m._apply_metadata_to_book(harness["book"], _meta(tags=["Fantasy"]), harness["cdb"]) is True
+
+    assert [t.name for t in harness["book"].tags] == ["Fantasy"]
+    assert harness["logged"] == [(1, {"metadata": True})]
+
+
+class _Stage:
+    def __init__(self, published):
+        self.published = published
+        self.discarded = False
+
+    def publish(self):
+        return (True, None) if self.published else (False, "disk full")
+
+    def discard(self):
+        self.discarded = True
+
+
+@pytest.fixture
+def with_cover(harness, monkeypatch):
+    monkeypatch.setattr(helper, "replace_cover_thumbnail_cache", lambda *a, **k: None)
+
+    def use(published):
+        stage = _Stage(published)
+        monkeypatch.setattr(m, "_apply_cover_from_metadata", lambda book, metadata: stage)
+        harness["settings"] = _settings(auto_metadata_update_description=True,
+                                        auto_metadata_update_cover=True)
+        return stage
+    return use
+
+
+def test_text_and_cover_queue_one_record_naming_both(harness, with_cover):
+    with_cover(published=True)
+
+    assert m._apply_metadata_to_book(
+        harness["book"], _meta(description="A fetched description."), harness["cdb"]) is True
+
+    assert harness["book"].has_cover == 1
+    assert _last_modified(harness["book"]) > OLD
+    assert harness["logged"] == [(1, {"cover": True, "metadata": True})]
+
+
+def test_failed_cover_publish_keeps_the_text_change_recorded(harness, with_cover):
+    stage = with_cover(published=False)
+
+    assert m._apply_metadata_to_book(
+        harness["book"], _meta(description="A fetched description."), harness["cdb"]) is True
+
+    assert stage.discarded
+    harness["cdb"].session.expire_all()
+    book = harness["cdb"].session.get(db.Books, 1)
+    assert book.has_cover == 0
+    assert _last_modified(book) > OLD
+    assert book.comments[0].text == "A fetched description."
+    assert harness["logged"] == [(1, {"metadata": True})]
+
+
+def test_failed_cover_publish_alone_restores_the_old_timestamp(harness, with_cover):
+    with_cover(published=False)
+    harness["settings"] = _settings(auto_metadata_update_cover=True)
+
+    assert m._apply_metadata_to_book(harness["book"], _meta(), harness["cdb"]) is False
+
+    harness["cdb"].session.expire_all()
+    book = harness["cdb"].session.get(db.Books, 1)
+    assert (book.has_cover, _last_modified(book)) == (0, OLD)
+    assert harness["logged"] == []

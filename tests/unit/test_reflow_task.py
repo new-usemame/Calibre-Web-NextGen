@@ -1126,7 +1126,8 @@ def test_actual_free_task_reads_legible_pixels_despite_symbolic_font_flag(rig,mo
     assert rig.local_db.session.commits==1
     from tests.unit.round7_public_note_contract_support import local_ocr_visible
     evidence=local_ocr_visible(target,sidecar,{1:[
-        'Every shelf in this imaginary workshop holds a labeled wooden']})
+        'Every shelf in this imaginary workshop holds a labeled wooden',
+        'At the start of each exercise']})
     with zipfile.ZipFile(target) as archive:
         name=evidence[1]['full_image']
         with Image.open(io.BytesIO(archive.read(name))) as image:

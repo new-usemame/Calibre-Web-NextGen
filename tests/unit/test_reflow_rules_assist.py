@@ -32,8 +32,12 @@ def test_product_sample_adopts_complete_pixel_reading_without_layout_generation(
     with zipfile.ZipFile(task.results['path']) as archive:
         chapters = [archive.read(name).decode() for name in archive.namelist()
                     if name.startswith('OEBPS/ch') and name.endswith('.xhtml')]
-    assert any('The clear sample remains readable.' in text and
-               'Another simple line follows the first.' in text for text in chapters)
+    import xml.etree.ElementTree as ET
+    from tests.unit.test_round4_defects import plain
+    ns = {'x': 'http://www.w3.org/1999/xhtml'}
+    readings = [plain(node) for text in chapters for node in
+                ET.fromstring(text).findall('.//x:span[@data-source-block]', ns)]
+    assert readings == ['The clear sample remains readable. Another simple line follows the first.']
     payload = session.calls[0]
     assert payload['model'] == vision_reading.MODEL
     assert payload['messages'][0]['content'][1]['type'] == 'image_url'

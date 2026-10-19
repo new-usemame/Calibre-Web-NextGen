@@ -253,7 +253,9 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         calibre_db_instance.session.add(tag)
                     if tag not in book.tags:
                         book.tags.append(tag)
-            updated = True
+                        # Only a tag the book lacked is a change: a recorded
+                        # change rewrites the file and re-sends it to a Kobo.
+                        updated = True
             
         # Update series if available and enabled in settings. Smart mode keeps an
         # existing series rather than overwriting it (fork #403).
@@ -338,6 +340,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         book.identifiers.append(new_identifier)
                         updated = True
         
+        # Text fields changed above. Recorded before the cover step, which also
+        # sets ``updated``, so the enforcement record below can tell them apart.
+        text_updated = updated
+
         # Cover image (fork #404): download and apply through the same
         # validated path the manual editor uses. Smart mode only fills a
         # missing cover; the per-book cover lock is honored in both modes.
@@ -351,7 +357,11 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 cover_updated = True
                 book.has_cover = 1
 
-        if cover_updated:
+        if updated:
+            # Any applied field is a book change and has to be recorded as one,
+            # so Kobo sync (``last_modified > sync_token``) picks up a fetched
+            # description or publisher too, not only a cover.
+            #
             # A replaced cover IS a book change and has to be recorded as one.
             # Writing cover.jpg alone leaves Books.last_modified untouched, and
             # that column is the version token every cover URL carries — so an
@@ -378,7 +388,11 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 if not published:
                     cover_stage.discard()
                     cover_stage = None
-                    book.has_cover, book.last_modified = previous_cover_metadata
+                    if text_updated:
+                        # The text fields did change, so keep their timestamp.
+                        book.has_cover = previous_cover_metadata[0]
+                    else:
+                        book.has_cover, book.last_modified = previous_cover_metadata
                     try:
                         calibre_db_instance.session.commit()
                     except Exception as compensation_error:
@@ -387,6 +401,8 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                             f"after publish failure {publish_error}: {compensation_error}"
                         )
                         calibre_db_instance.session.rollback()
+                    if text_updated:
+                        _queue_metadata_enforcement(book, {'metadata': True})
                     return updated_without_cover
                 cover_stage = None
                 # #707: the new cover must also be embedded into the book file,
@@ -395,10 +411,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 # AFTER the commit: the enforcer reads the book back out of
                 # metadata.db, so a record published ahead of the transaction
                 # can be consumed against the pre-commit row.
-                try:
-                    helper.log_metadata_change(book, {'cover': True})
-                except Exception as e:
-                    log.warning(f"Cover enforcement record failed for book {book.id}: {e}")
+                changed = {'cover': True}
+                if text_updated:
+                    changed['metadata'] = True
+                _queue_metadata_enforcement(book, changed)
                 # Regenerate the cached thumbnails so the new cover shows in
                 # the grid, same as a manual cover edit.
                 try:
@@ -407,6 +423,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         last_modified=getattr(book, 'last_modified', None))
                 except Exception as e:
                     log.warning(f"Cover thumbnail refresh failed for book {book.id}: {e}")
+            elif text_updated:
+                # Text-only fetch: queue the same file embed a manual edit gets,
+                # after the commit for the same reason as the cover above.
+                _queue_metadata_enforcement(book, {'metadata': True})
 
         return updated
         
@@ -417,6 +437,15 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             cover_stage.discard()
         book.has_cover, book.last_modified = previous_cover_metadata
         return False
+
+
+def _queue_metadata_enforcement(book, changed):
+    """Queue the file-level embed for ``book`` (#707). Best-effort, never raises."""
+    try:
+        from cps import helper
+        helper.log_metadata_change(book, changed)
+    except Exception as e:
+        log.warning(f"Metadata enforcement record failed for book {getattr(book, 'id', '?')}: {e}")
 
 
 def _rating_row(session, value):

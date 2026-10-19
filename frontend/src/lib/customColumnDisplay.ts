@@ -61,3 +61,11 @@ export function formatCustomColumnDate(value: string, locale?: string, options?:
   if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return value;
   return parsed.toLocaleDateString(browserLocale(locale), { ...options, timeZone: 'UTC' });
 }
+
+/** A book's publication date (YYYY-MM-DD) as a calendar day. A 1 January date
+ * is how a year-only publication date is stored, so it shows as the year. */
+export function formatPublishedDate(value: string, locale?: string): string {
+  const yearOnly = /^(\d{4})-01-01(?:$|T| )/.exec(value);
+  if (yearOnly && Number(yearOnly[1]) > 101) return yearOnly[1];
+  return formatCustomColumnDate(value, locale, { year: 'numeric', month: 'long', day: 'numeric' });
+}

@@ -95,6 +95,38 @@ def test_a_position_already_inside_the_new_book_is_left_alone(tmp_path):
     assert (row.location_source, row.location_value) == ("OEBPS/chap0009.xhtml", "kobo.4.1")
 
 
+@pytest.mark.parametrize("source", [
+    "c65e568b-0000-0000-0000-000000000567!OEBPS!chap0009.xhtml",
+    "c65e568b-0000-0000-0000-000000000567!!OEBPS/chap0009.xhtml",
+    "c65e568b-0000-0000-0000-000000000567!OEBPS!../OEBPS/chap0009.xhtml",
+])
+def test_a_position_in_the_devices_own_form_is_left_alone(tmp_path, source):
+    _kepub(tmp_path / "new.kepub.epub", NEW)
+    new = reanchor.KepubIndex(str(tmp_path / "new.kepub.epub"))
+    row = _row(location_source=source, location_value="kobo.4.1")
+
+    assert positions.reanchor_position_rows(None, new, [row], log=LOG) == []
+    assert (row.location_source, row.location_value) == (source, "kobo.4.1")
+
+
+def test_a_position_in_the_devices_own_form_whose_chapter_vanished_is_still_re_placed(tmp_path):
+    _kepub(tmp_path / "new.kepub.epub", NEW)
+    new = reanchor.KepubIndex(str(tmp_path / "new.kepub.epub"))
+    row = _row(location_source="c65e568b-0000-0000-0000-000000000567!OEBPS!Gone.xhtml",
+               location_value="kobo.92.1", progress_percent=50.0)
+
+    assert positions.reanchor_position_rows(None, new, [row], log=LOG) == [row]
+    assert row.location_source == "OEBPS/chap0009.xhtml"
+
+
+def test_a_chapter_name_with_an_exclamation_mark_is_not_read_as_a_content_id(tmp_path):
+    _kepub(tmp_path / "new.kepub.epub", [("OEBPS/Wow!.xhtml", [("kobo.1.1", "Wow. " * 20)])])
+    new = reanchor.KepubIndex(str(tmp_path / "new.kepub.epub"))
+    row = _row(location_source="OEBPS/Wow!.xhtml", location_value="kobo.1.1")
+
+    assert positions.reanchor_position_rows(None, new, [row], log=LOG) == []
+
+
 @pytest.fixture
 def session(monkeypatch):
     engine = create_engine("sqlite:///:memory:", future=True)
@@ -201,6 +233,29 @@ def test_serving_a_reading_state_whose_chapter_vanished_re_places_it_by_fraction
     assert session.query(ub.KoboBookmark).one().location_source == "OEBPS/a.xhtml"
     # The wire percent is the device's own number and is not rewritten.
     assert response["CurrentBookmark"]["ProgressPercent"] == 15
+
+
+def test_serving_a_reading_state_in_the_devices_own_form_leaves_it_untouched(
+    session, monkeypatch, tmp_path,
+):
+    """MEASURED 2026-10-14: a finished book's ``<uuid>!OEBPS!Cover.xhtml`` was
+    re-placed by fraction on every sync, and the unflushed rewrite failed the sync
+    with ``database is locked``."""
+    from cps import kobo
+    book = _library_book(tmp_path, monkeypatch)
+    _kepub(tmp_path / "lib" / "Brennan" / "new.kepub",
+           [("OEBPS/Cover.xhtml", [("kobo.1.1", "x" * 100)]),
+            ("OEBPS/b.xhtml", [("kobo.2.1", "y" * 100)])])
+    state = session.query(ub.KoboReadingState).one()
+    source = f"{book.uuid}!OEBPS!Cover.xhtml"
+    state.current_bookmark.location_source = source
+    state.current_bookmark.location_value = "kobo.1.1"
+    session.commit()
+
+    kobo.get_kobo_reading_state_response(book, state)
+
+    assert not session.dirty
+    assert session.query(ub.KoboBookmark).one().location_source == source
 
 
 def test_a_highlight_whose_chapter_name_was_reused_is_re_anchored_when_forced(tmp_path):

@@ -2468,7 +2468,9 @@ msgstr "Llibres de %(name)s, incloses totes les subcategories"
 
 #: cps/api/browse.py cps/opds.py cps/web.py
 msgid "Tag hierarchy temporarily unavailable. Please try again."
-msgstr "La jerarquia d'etiquetes no està disponible temporalment. Torneu-ho a provar més tard."
+msgstr ""
+"La jerarquia d'etiquetes no està disponible temporalment. Torneu-ho a provar "
+"més tard."
 
 #: cps/opds.py
 msgid "All books in this tag group"
@@ -11963,17 +11965,23 @@ msgid ""
 "Leave blank to keep the existing filename. Example: {series} #{series_index} "
 "- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
 "the file extension is added automatically."
-msgstr "Deixeu en blanc el camp per mantenir el nom de fitxer actual. Exemple: {series} #{series_index} - {title}. Els camps inclouen {title}, {authors}, {series} i {series_index}; l'extensió del fitxer s'afegeix automàticament."
+msgstr ""
+"Deixeu en blanc el camp per mantenir el nom de fitxer actual. Exemple: "
+"{series} #{series_index} - {title}. Els camps inclouen {title}, {authors}, "
+"{series} i {series_index}; l'extensió del fitxer s'afegeix automàticament."
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 #, python-brace-format
 msgid ""
 "Use {series:|(|) }{title} to omit the series prefix when no series is set."
-msgstr "Utilitzeu {series:|(|) }{title} per ometre el prefix de la sèrie quan no n'hi hagi cap."
+msgstr ""
+"Utilitzeu {series:|(|) }{title} per ometre el prefix de la sèrie quan no "
+"n'hi hagi cap."
 
 #: cps/spa_strings.py cps/templates/tag_tree.html
 msgid "Choose a tag group to browse books from it and its subtags."
-msgstr "Trieu un grup d'etiquetes per consultar-ne els llibres i les subetiquetes."
+msgstr ""
+"Trieu un grup d'etiquetes per consultar-ne els llibres i les subetiquetes."
 
 #: cps/spa_strings.py
 msgid "Sleep screen"
@@ -12065,6 +12073,30 @@ msgstr ""
 msgid ""
 "Remove this image? Your previous KOReader sleep-screen settings will return "
 "after the next sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -12577,7 +12609,9 @@ msgstr "No s'ha trobat cap fitxer gmail.json vàlid amb informació d'OAuth"
 #: cps/services/mail_filename.py
 msgid ""
 "Use a valid attachment filename template with supported metadata fields."
-msgstr "Utilitzeu una plantilla de nom de fitxer adjunt vàlida amb camps de metadades compatibles."
+msgstr ""
+"Utilitzeu una plantilla de nom de fitxer adjunt vàlida amb camps de "
+"metadades compatibles."
 
 #: cps/services/opds_filename.py
 msgid "Conditional text needs both prefix and suffix separators."

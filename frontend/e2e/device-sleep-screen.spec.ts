@@ -48,6 +48,7 @@ type SleepScreenMetadata = {
   applied_at: string | null;
   last_error: string | null;
   preview_url: string | null;
+  fit: 'auto' | 'fill' | 'whole';
 };
 
 const emptyScreen = (): SleepScreenMetadata => ({
@@ -64,6 +65,7 @@ const emptyScreen = (): SleepScreenMetadata => ({
   applied_at: null,
   last_error: null,
   preview_url: null,
+  fit: 'auto',
 });
 
 async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
@@ -71,6 +73,9 @@ async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
   let saves = 0;
   let removals = 0;
   let uploadError = false;
+  let fitError = false;
+  let fitHold: Promise<void> | null = null;
+  const fitBodies: unknown[] = [];
 
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -108,6 +113,31 @@ async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
           applied_status: null,
           last_error: null,
           preview_url: `/api/v1/devices/${reader.public_id}/sleep-screen/image?revision=image-${saves}`,
+        };
+        return route.fulfill({ json: current });
+      }
+      if (method === 'PATCH') {
+        fitBodies.push(request.postDataJSON());
+        if (fitHold) {
+          const hold = fitHold;
+          fitHold = null;
+          await hold;
+        }
+        if (fitError) {
+          fitError = false;
+          return route.fulfill({ status: 503, json: {
+            error: { code: 'sleep_screen_unavailable', message: 'Could not save sleep screen. Try again.' },
+          } });
+        }
+        const fit = (request.postDataJSON() as { fit: SleepScreenMetadata['fit'] }).fit;
+        const rerendered = current.preview_url !== null && fit !== current.fit;
+        const revision = rerendered ? `fit-${fitBodies.length}` : current.desired_revision;
+        current = {
+          ...current,
+          fit,
+          desired_revision: revision,
+          preview_url: current.preview_url
+            ? `/api/v1/devices/${reader.public_id}/sleep-screen/image?revision=${revision}` : null,
         };
         return route.fulfill({ json: current });
       }
@@ -155,6 +185,13 @@ async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
     savedCount: () => saves,
     removedCount: () => removals,
     failNextUpload: () => { uploadError = true; },
+    failNextFit: () => { fitError = true; },
+    holdNextFit: () => {
+      let release = () => {};
+      fitHold = new Promise<void>((resolve) => { release = resolve; });
+      return () => release();
+    },
+    fitBodies: () => fitBodies,
     acknowledgeCurrentImage: () => {
       current = {
         ...current,
@@ -234,6 +271,56 @@ test('a reader can set, replace, remove, and verify a device sleep screen from i
   }
   await expect.poll(api.removedCount).toBe(1);
   await expect(editor.getByText('Removal waiting for sync')).toBeVisible();
+
+  const scan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
+  expect(scan.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
+});
+
+test('a reader can choose how the image fits the screen, by pointer and by keyboard', async ({ page }) => {
+  const api = await mockDeviceAndSleepScreenApi(page);
+  await page.goto('/app/account/devices');
+  const card = page.getByRole('listitem').filter({ hasText: 'Bedroom Kindle' });
+  await card.getByRole('button', { name: 'More actions for Bedroom Kindle' }).click();
+  await card.getByRole('button', { name: 'Sleep screen', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Sleep screen for Bedroom Kindle' });
+  const fit = editor.getByRole('radiogroup', { name: 'Image fit' });
+  const preview = editor.getByRole('img', { name: 'Sleep screen preview for Bedroom Kindle' });
+
+  await expect(fit.getByRole('radio', { name: 'Automatic' })).toBeChecked();
+  await expect(fit.getByRole('radio', { name: 'Fill the screen' })).not.toBeChecked();
+  await expect(fit.getByRole('radio', { name: 'Show the whole image' })).not.toBeChecked();
+  await expect(editor.getByText('Automatic fills the screen when only a thin edge would be cut off.')).toBeVisible();
+
+  await editor.getByLabel('Choose an image').setInputFiles(imageFile);
+  await editor.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(api.savedCount).toBe(1);
+  await expect(preview).toHaveAttribute('src', /revision=image-1/);
+
+  await fit.getByRole('radio', { name: 'Fill the screen' }).click();
+  await expect.poll(api.fitBodies).toEqual([{ fit: 'fill' }]);
+  await expect(fit.getByRole('radio', { name: 'Fill the screen' })).toBeChecked();
+  await expect(preview).toHaveAttribute('src', /revision=fit-1/);
+  await expect(editor.getByText('Waiting for next sync')).toBeVisible();
+
+  api.failNextFit();
+  await fit.getByRole('radio', { name: 'Show the whole image' }).click();
+  await expect(editor.getByText('Could not change image fit. Try again.')).toBeVisible();
+  await expect(fit.getByRole('radio', { name: 'Fill the screen' })).toBeChecked();
+
+  await fit.getByRole('radio', { name: 'Fill the screen' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(api.fitBodies).toEqual([{ fit: 'fill' }, { fit: 'whole' }, { fit: 'whole' }]);
+  await expect(fit.getByRole('radio', { name: 'Show the whole image' })).toBeChecked();
+  await expect(fit.getByRole('radio', { name: 'Show the whole image' }), 'a keyboard change keeps focus in the group').toBeFocused();
+  await expect(editor.getByText('Could not change image fit. Try again.')).toHaveCount(0);
+  await expect.poll(api.savedCount).toBe(1);
+
+  const release = api.holdNextFit();
+  await fit.getByRole('radio', { name: 'Automatic' }).click();
+  await expect(fit.getByRole('radio', { name: 'Automatic' }), 'a slow change shows the new choice at once').toBeChecked();
+  release();
+  await expect.poll(api.fitBodies).toEqual([{ fit: 'fill' }, { fit: 'whole' }, { fit: 'whole' }, { fit: 'auto' }]);
+  await expect(fit.getByRole('radio', { name: 'Automatic' })).toBeChecked();
 
   const scan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
   expect(scan.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);

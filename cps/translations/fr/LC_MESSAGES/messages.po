@@ -12132,6 +12132,31 @@ msgstr ""
 "Supprimer cette image ? Vos réglages précédents d’écran de veille KOReader "
 "seront restaurés après la prochaine synchronisation."
 
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr "Cadrage de l’image"
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr "Automatique"
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr "Remplir l’écran"
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr "Afficher l’image entière"
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+"Automatique remplit l’écran quand seule une fine bordure serait rognée."
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr "Impossible de modifier le cadrage de l’image. Réessayez."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Étiquette sans nom"

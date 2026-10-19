@@ -1535,6 +1535,7 @@ class DeviceSleepScreen(Base):
     state = Column(String(24), nullable=False, default='waiting_for_device')
     source_png = Column(LargeBinary, nullable=True)
     prepared_png = Column(LargeBinary, nullable=True)
+    fit = Column(String(8), nullable=True)
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     applied_revision = Column(String(36), nullable=True)
     applied_status = Column(String(16), nullable=True)
@@ -4662,6 +4663,7 @@ def migrate_device_sleep_screen(engine, _session):
     _add_column_if_missing(engine, "device", "sleep_screen_capability",
                            "sleep_screen_capability JSON")
     DeviceSleepScreen.__table__.create(engine, checkfirst=True)
+    _add_column_if_missing(engine, "device_sleep_screen", "fit", "fit VARCHAR(8)")
 
 
 def migrate_device_share_place(engine, _session):
@@ -5324,6 +5326,12 @@ def migrate_kobo_two_way_annotation_sync(engine, _session):
     # and delete/reinsert downgrade attempts.  A deliberate privacy purge
     # erases both records; ordinary state deletion leaves the knowledge guard.
     _ensure_kobo_opaque_present_guards(engine)
+
+    # Drop any memoised Stage 0 capability verdict for this engine. (The cache
+    # also revalidates against SQLite's schema_version, so this is belt and
+    # braces for the explicit "migration ran" signal.)
+    from .services import kobo_annotation_stage0
+    kobo_annotation_stage0.invalidate_schema_capable_cache(engine)
 
     log.info("[kobo-two-way-stage0] additive schema ready; runtime ownership unchanged")
 

@@ -8,6 +8,11 @@
 .dimensions { text-align: center; }
 .status { font-weight: var(--fw-medium); margin: var(--sp-3) 0; }
 .fileLabel { display: block; font-weight: var(--fw-medium); margin: var(--sp-4) 0 var(--sp-2); }
+.fit { min-width: 0; margin: var(--sp-4) 0 0; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.fit legend { font-weight: var(--fw-medium); padding: 0 var(--sp-1); }
+.fitOption { display: flex; align-items: center; gap: var(--sp-2); min-height: 32px; cursor: pointer; }
+.fitOption input { flex: 0 0 24px; width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
+.fit:disabled .fitOption { opacity: .55; cursor: default; }
 .dialog input[type='file'] { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2); background: var(--surface-2); }
 .dialog input::file-selector-button { min-height: 28px; max-width: 100%; margin-right: var(--sp-2); border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface-3); color: var(--text); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }

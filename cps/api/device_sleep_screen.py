@@ -51,7 +51,7 @@ def _guard():
     return None
 
 
-@api_v1.route('/devices/<public_id>/sleep-screen', methods=['GET', 'PUT', 'DELETE'])
+@api_v1.route('/devices/<public_id>/sleep-screen', methods=['GET', 'PUT', 'PATCH', 'DELETE'])
 def device_sleep_screen(public_id):
     blocked = _guard()
     if blocked is not None:
@@ -64,6 +64,11 @@ def device_sleep_screen(public_id):
         return private(jsonify(screens.metadata(device, screens.row_for(device))))
     try:
         source = None
+        if request.method == 'PATCH':
+            body = request.get_json(silent=True)
+            if (not isinstance(body, dict) or set(body) != {'fit'}
+                    or not isinstance(body['fit'], str) or body['fit'] not in ('auto', 'fill', 'whole')):
+                return error('sleep_screen_invalid_fit', 'Choose a valid image fit', 400)
         if request.method == 'PUT':
             request.max_content_length = screens.UPLOAD_LIMIT + 256 * 1024
             upload = request.files.get('file')
@@ -77,7 +82,12 @@ def device_sleep_screen(public_id):
         if device is None:
             ub.session.rollback()
             return error('not_found', 'Device not found', 404)
-        row = screens.save(device, source) if request.method == 'PUT' else screens.remove(device)
+        if request.method == 'PUT':
+            row = screens.save(device, source)
+        elif request.method == 'PATCH':
+            row = screens.set_fit(device, body['fit'])
+        else:
+            row = screens.remove(device)
         ub.session.commit()
         return private(jsonify(screens.metadata(device, row)))
     except screens.SleepScreenError as exc:

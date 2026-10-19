@@ -24,7 +24,7 @@ import { EmptyState } from '../components/EmptyState';
 import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
 import { ApiError, resourceUrl, resourceSrcSet, TASK_FAILED, TASK_FINISHED, TASK_ENDED, TASK_CANCELLED } from '../lib/api';
 import { useT, useI18n } from '../lib/i18n';
-import { formatCustomColumnDate } from '../lib/customColumnDisplay';
+import { formatCustomColumnDate, formatPublishedDate } from '../lib/customColumnDisplay';
 import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
 import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
 import {
@@ -57,17 +57,9 @@ function formatBytes(bytes: number): string {
   return mb >= 0.1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
 }
 
-function formatDate(date: string, alwaysReturnFullDate = false): string {
-  // Try to parse as ISO date — return just the year if it looks like a date
+function formatDate(date: string): string {
   const d = new Date(date);
   if (!isNaN(d.getTime())) {
-    if (!alwaysReturnFullDate) {
-      // If the time portion is midnight UTC it's likely just a year+date, show full date
-      const year = d.getFullYear();
-      const month = d.getMonth();
-      const day = d.getDate();
-      if (month === 0 && day === 1) return String(year);
-    }
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   }
   return date;
@@ -1033,31 +1025,31 @@ export function BookDetail() {
                 <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
                   {t('Started reading')}
                 </dt>
-                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
+                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at)}</dd>
               </>
             )}
             {canAccessBook && book.kosync_progress_timestamp !== null && (
               <>
                 <dt className={styles.metaLabel}>{t('Last synced')}</dt>
-                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>
+                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp)}</dd>
               </>
             )}
             {book.pubdate && (
               <>
                 <dt className={styles.metaLabel}>{t('Published')}</dt>
-                <dd className={styles.metaValue}>{formatDate(book.pubdate)}</dd>
+                <dd className={styles.metaValue}>{formatPublishedDate(book.pubdate, locale)}</dd>
               </>
             )}
             {book.date_added && (
               <>
                 <dt className={styles.metaLabel}>{t('Date added')}</dt>
-                <dd className={styles.metaValue}><time dateTime={book.date_added}>{formatDate(book.date_added, true)}</time></dd>
+                <dd className={styles.metaValue}><time dateTime={book.date_added}>{formatDate(book.date_added)}</time></dd>
               </>
             )}
             {book.last_modified && (
               <>
                 <dt className={styles.metaLabel}>{t('Last modified')}</dt>
-                <dd className={styles.metaValue}><time dateTime={book.last_modified}>{formatDate(book.last_modified, true)}</time></dd>
+                <dd className={styles.metaValue}><time dateTime={book.last_modified}>{formatDate(book.last_modified)}</time></dd>
               </>
             )}
             {book.languages.length > 0 && (

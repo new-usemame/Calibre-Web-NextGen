@@ -18,7 +18,7 @@
 
 {{repo:README.md#whats-included}}
 
-See **[[Differences from Upstream]]** for the full behavior table.
+See **[[Differences from Upstream]]** for what still behaves differently from CWA.
 
 ---
 

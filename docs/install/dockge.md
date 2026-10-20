@@ -1,12 +1,12 @@
 # Install / switch with Dockge
 
 For [Dockge](https://github.com/louislam/dockge), the compose-file stack manager. Each app is
-a **stack** — a `compose.yaml` Dockge stores on disk and manages from the web UI. Works
+a **stack**: a `compose.yaml` Dockge stores on disk and manages from the web UI. Works
 whether you're installing fresh or switching from the standard Calibre-Web-Automated (CWA)
 image.
 
 **Your books, users, settings and the Read checkmarks you've set live in the volumes you bind
-into the container — not in the image — so switching keeps everything and is reversible.**
+into the container, not in the image, so switching keeps everything and is reversible.**
 
 > **Needs hardware verification:** these Dockge labels and steps are docs-verified, but we do not
 > yet have a real Dockge walkthrough or screenshots. Please use the help links below if your screen differs.
@@ -51,12 +51,12 @@ into the container — not in the image — so switching keeps everything and is
 ## Updating later
 
 1. Open your `calibre-web-nextgen` stack in Dockge.
-2. Click the stack's **update** control — Dockge shows an update indicator when a newer image
+2. Click the stack's **update** control. Dockge shows an update indicator when a newer image
    is available; use it, or just click **Deploy** again to re-pull and recreate. Dockge pulls
    the newest `ghcr.io/new-usemame/calibre-web-nextgen:latest` and recreates the container with
    your data intact.
 
-   *(A plain restart does not pull a new image — you have to re-pull, which Deploy does.)*
+   *(A plain restart does not pull a new image; you have to re-pull, which Deploy does.)*
 
 ---
 

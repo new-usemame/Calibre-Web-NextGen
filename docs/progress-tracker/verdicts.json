@@ -1,0 +1,2585 @@
+{
+ "crocodilestick/Calibre-Web-Automated#1026@2026-05-08T17:30:51Z": {
+  "hash": "85a1f05fee79e250",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1033@2026-06-22T20:04:58Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1055@2026-05-03T18:45:47Z": {
+  "hash": "51f548df80cb5ebd",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1072@2026-05-14T03:51:54Z": {
+  "hash": "4e2a421878a9850c",
+  "verdict": "not_fixed",
+  "quote": "All my volumes were SMB/CIFS and had this problem, including with @new-usemame image (v4.1.19).",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1072#issuecomment-5054965819",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1078@2026-05-03T18:53:23Z": {
+  "hash": "14eb65d8a8b45da5",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1086@2026-05-07T21:04:56Z": {
+  "hash": "072c682f34ae1bf5",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1086#issuecomment-5873181282",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1095@2026-05-08T16:41:09Z": {
+  "hash": "5899f2982660e70a",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1095#issuecomment-5873185921",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1097@2026-05-08T04:49:55Z": {
+  "hash": "fb970077db1d6317",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1097#issuecomment-5205209072",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1128@2026-05-08T07:21:11Z": {
+  "hash": "c76548ceba3ed5ee",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1130@2026-05-08T07:21:15Z": {
+  "hash": "7051eb575f958c97",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1130#issuecomment-5855862075",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1139@2026-05-08T13:14:38Z": {
+  "hash": "5383e716258d6073",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1144@2026-05-07T05:20:40Z": {
+  "hash": "2c5eb9ebf15daa32",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1155@2026-06-14T12:01:42Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1183@2026-05-07T21:04:03Z": {
+  "hash": "00491a136df3f492",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1188@2026-05-03T18:46:09Z": {
+  "hash": "d9569dee13775cc2",
+  "verdict": "content",
+  "quote": "Thank you so much @new-usemame!",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1188#issuecomment-4702533211",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1206@2026-05-03T18:53:14Z": {
+  "hash": "fb970077db1d6317",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1206#issuecomment-5205207870",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1210@2026-05-08T16:43:00Z": {
+  "hash": "178daf629b80f42c",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1210#issuecomment-5855861252",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1228@2026-05-08T11:14:50Z": {
+  "hash": "a1dbadfb9e3af22a",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1241@2026-05-08T14:14:29Z": {
+  "hash": "856236f1376a778c",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1256@2026-05-15T23:07:47Z": {
+  "hash": "01393c8647dd310a",
+  "verdict": "fixed",
+  "quote": "I've been using it and it's great - can confirm with the dupe thing that navels recommended to set it's working, thank you!",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1256#issuecomment-4464788722",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1257@2026-05-03T18:54:13Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1257#issuecomment-5203803253",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1264@2026-05-07T05:21:31Z": {
+  "hash": "d33081a8ff22a48b",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1264#issuecomment-4466440434",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1264@2026-05-17T22:19:47Z": {
+  "hash": "66a5b45caad5d39f",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1266@2026-05-08T15:14:13Z": {
+  "hash": "2acf5d79b8d0e4ef",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1267@2026-05-03T18:54:02Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1267#issuecomment-5203813052",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1270@2026-05-08T04:49:49Z": {
+  "hash": "fb970077db1d6317",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1274@2026-05-03T18:53:52Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1276@2026-05-08T16:14:23Z": {
+  "hash": "8b71f7c4210fcd22",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1278@2026-05-07T05:21:32Z": {
+  "hash": "3cc93ada05cf9357",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1288@2026-07-21T08:32:38Z": {
+  "hash": "f1558fb413b5a781",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1288#issuecomment-5873182302",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1290@2026-05-04T22:23:24Z": {
+  "hash": "2aa8d13a91dd6d14",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1290#issuecomment-5855863139",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1291@2026-05-03T18:53:47Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1291#issuecomment-5203812700",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1295@2026-05-13T18:37:02Z": {
+  "hash": "515150e55c80f5a8",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "crocodilestick/Calibre-Web-Automated#1296@2026-05-03T18:54:08Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1296#issuecomment-5203812344",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1299@2026-05-08T13:14:34Z": {
+  "hash": "e7594db06dfc24e4",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1305@2026-05-03T18:53:57Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1307@2026-05-17T21:47:57Z": {
+  "hash": "ba89f4537587b7da",
+  "verdict": "not_fixed",
+  "quote": "I am actually using the latest build of your FABULOUS Nextgen repo.",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1307#issuecomment-4700887622",
+  "by": "review"
+ },
+ "crocodilestick/Calibre-Web-Automated#1309@2026-05-08T14:15:08Z": {
+  "hash": "96c2c176fa83ded9",
+  "verdict": "none",
+  "quote": "Thanks for the heads up, I'll give it a try.",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1309#issuecomment-4409162139",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1310@2026-05-07T05:26:11Z": {
+  "hash": "b6f00fe6b487622d",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1310#issuecomment-5346321426",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1318@2026-05-04T22:10:18Z": {
+  "hash": "eb9cdebb5568533c",
+  "verdict": "content",
+  "quote": "Thanks @new-usemame !",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1318#issuecomment-4415295471",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1321@2026-05-03T18:45:54Z": {
+  "hash": "dcfb99f195d8a1d0",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1326@2026-05-04T21:31:20Z": {
+  "hash": "a617812758790b7f",
+  "verdict": "content",
+  "quote": "Thanks a lot for this very detailed and explanatory feedback ! ",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1326#issuecomment-4399927123",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1328@2026-05-04T20:36:11Z": {
+  "hash": "08052ce979a67681",
+  "verdict": "content",
+  "quote": "Thanks, I ended up using Claude and applying the same fix it looks like temporarily on my running copy, but I will probably move to that build to keep getting bugfixes.",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1328#issuecomment-4375850310",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1329@2026-05-03T18:53:31Z": {
+  "hash": "dfc950d93a8d9ef1",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1329#issuecomment-5205068486",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1334@2026-05-18T01:39:54Z": {
+  "hash": "bd4e57148ca0fe33",
+  "verdict": "fixed",
+  "quote": "All is fine, and stable without any problems, and restored functionality for lubimyczytac.",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1334#issuecomment-4474629619",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1335@2026-05-19T19:30:49Z": {
+  "hash": "00360fccfb6be3cf",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1335#issuecomment-5873186899",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1351@2026-05-17T22:01:26Z": {
+  "hash": "66320e0a918c9a46",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "crocodilestick/Calibre-Web-Automated#1353@2026-05-18T05:49:24Z": {
+  "hash": "4b58296921e23e20",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1353#issuecomment-4886107133",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1360@2026-05-21T04:54:00Z": {
+  "hash": "86f07be0595e1f8f",
+  "verdict": "content",
+  "quote": "Thanks, that's the right shape. The bug here is the full recursive walk on every poll interval, not polling per se.",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1360#issuecomment-4504959768",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1364@2026-05-21T04:03:40Z": {
+  "hash": "0f4975a4ad98a0fe",
+  "verdict": "content",
+  "quote": "Thank you, that was remarkably fast :)",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/issues/1364#issuecomment-4511493751",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1369@2026-06-14T12:01:34Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1369#issuecomment-5203809989",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1393@2026-07-02T12:13:32Z": {
+  "hash": "fb970077db1d6317",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1395@2026-06-22T20:04:50Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1395#issuecomment-5203809668",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1408@2026-07-02T12:13:23Z": {
+  "hash": "51162d70754bc44b",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#1420@2026-07-16T04:28:16Z": {
+  "hash": "ed333a71f64c29e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/crocodilestick/Calibre-Web-Automated/pull/1420#issuecomment-5203808185",
+  "by": "deepseek-v4.1-flash"
+ },
+ "crocodilestick/Calibre-Web-Automated#817@2026-05-08T20:08:29Z": {
+  "hash": "17c5ea10f9ab85b9",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1022@2026-07-24T14:45:15Z": {
+  "hash": "fc6d2b69f9837197",
+  "verdict": "partial",
+  "quote": "It's the reason why I had not marked this issue as fixed.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1022#issuecomment-5071907816",
+  "by": "review"
+ },
+ "issue#1023@2026-07-21T04:33:05Z": {
+  "hash": "38d5240647c194fc",
+  "verdict": "fixed",
+  "quote": "Thanks! Updated and it appears to work!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1023#issuecomment-5054783886",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1048@2026-07-21T06:49:10Z": {
+  "hash": "7f979e8d3ba5e5d5",
+  "verdict": "not_fixed",
+  "quote": "This happened three times in the old UI (with me successfully reconnecting the Calibre database between attempts)  and once in the new UI.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1048#issuecomment-5053559622",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1048@2026-07-25T20:16:04Z": {
+  "hash": "39a6358ac435c117",
+  "verdict": "fixed",
+  "quote": "Yes, this is looking good.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1048#issuecomment-5288796929",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1054@2026-08-05T17:36:13Z": {
+  "hash": "69bdb2f70bdac9b0",
+  "verdict": "fixed",
+  "quote": "Installed the dev. Works great, much neater. Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1054#issuecomment-5200028112",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1059@2026-10-02T22:28:30Z": {
+  "hash": "691755d18458a92f",
+  "verdict": "fixed",
+  "quote": "Всё работает, спасибо!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1059#issuecomment-6097553932",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1061@2026-07-21T12:29:24Z": {
+  "hash": "af4322c882e7bbf9",
+  "verdict": "fixed",
+  "quote": "Pulled `docker pull ghcr.io/new-usemame/calibre-web-nextgen:dev`, and can confirm that fixes the problem!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1061#issuecomment-5034872046",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1064@2026-07-21T14:42:17Z": {
+  "hash": "07c954a8c58724b4",
+  "verdict": "fixed",
+  "quote": "Pulled your latest dev and can confirm it's fixed. Thank you for such a fast response!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1064#issuecomment-5035712891",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1067@2026-07-21T16:51:05Z": {
+  "hash": "7484ba0a523add03",
+  "verdict": "fixed",
+  "quote": "Hi, yes, I can confirm this is working now. Thanks",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1067#issuecomment-5074762407",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1074@2026-07-25T04:26:54Z": {
+  "hash": "b6599c3199a285d3",
+  "verdict": "fixed",
+  "quote": "Updated to the latest version and verified that it is now working. Thank you so much!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1074#issuecomment-5092341622",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1089@2026-07-25T06:49:15Z": {
+  "hash": "277f2150f1e0478b",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.21.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1089#issuecomment-5082176207",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1094@2026-07-26T18:46:34Z": {
+  "hash": "44f3d5fd35da87e7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "issue#1095@2026-07-25T10:53:10Z": {
+  "hash": "277f2150f1e0478b",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.21.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1095#issuecomment-5082174267",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1108@2026-07-28T20:42:31Z": {
+  "hash": "dacb66bad91f4979",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.24.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1108#issuecomment-5117476721",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1110@2026-08-15T01:23:57Z": {
+  "hash": "6055a9e9fce57000",
+  "verdict": "fixed",
+  "quote": "There's no indication from the UI or the log that the conversion was done, but when I refresh the page I see there is an EPUB.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1110#issuecomment-6062840178",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1110@2026-10-09T01:10:59Z": {
+  "hash": "a1e49e9eeb72cfbe",
+  "verdict": "fixed",
+  "quote": "Works perfectly, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1110#issuecomment-6223219118",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1162@2026-07-29T00:33:28Z": {
+  "hash": "06563a45941d5634",
+  "verdict": "content",
+  "quote": "Yours is a cleaner fix!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1162#issuecomment-5122195711",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1164@2026-07-28T12:39:16Z": {
+  "hash": "7482bae52134d599",
+  "verdict": "fixed",
+  "quote": "I just reimported the same book, and it got the correct metadata, so I think it's good.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1164#issuecomment-5207624848",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1167@2026-08-01T20:40:53Z": {
+  "hash": "2037b3f24de77764",
+  "verdict": "fixed",
+  "quote": "Issue has not re-occurred in 4.1.27. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1167#issuecomment-5161550610",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1169@2026-07-28T10:52:57Z": {
+  "hash": "a236ac28bf01ff0a",
+  "verdict": "fixed",
+  "quote": "Finally got a chance to update and try this -- yes, this seems to have solved the problem! Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1169#issuecomment-5170234736",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1173@2026-10-04T08:25:20Z": {
+  "hash": "691755d18458a92f",
+  "verdict": "fixed",
+  "quote": "Всё работает, спасибо!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1173#issuecomment-6097555740",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1205@2026-07-31T04:19:24Z": {
+  "hash": "dff3048fb7e9a29a",
+  "verdict": "fixed",
+  "quote": "Confirmed done in v4.1.26.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1205#issuecomment-5140835535",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1205@2026-07-31T10:08:47Z": {
+  "hash": "31fe95bc1aa103ec",
+  "verdict": "content",
+  "quote": "Thanks @chloeroform for the PR, and thank you @new-usemame for helping it land.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1205#issuecomment-5144852651",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#121@2026-05-11T20:15:54Z": {
+  "hash": "1a4f42309210c09c",
+  "verdict": "fixed",
+  "quote": "I tested it again, this time not from the ebook reader but with my API testing tool (Bruno), and it seems to work correctly.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/121#issuecomment-4470001046",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1248@2026-07-30T10:50:47Z": {
+  "hash": "55f3fbd608295782",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.26.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1248#issuecomment-5140812807",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1254@2026-09-27T16:15:17Z": {
+  "hash": "4e114bb8a05023bf",
+  "verdict": "fixed",
+  "quote": "I just tested it and it works now, thanks a lot !",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1254#issuecomment-5873665446",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1287@2026-08-04T08:52:58Z": {
+  "hash": "3b9071cba2ba4ba4",
+  "verdict": "content",
+  "quote": "Looks good to me, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1287#issuecomment-5186697994",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1303@2026-08-03T10:43:33Z": {
+  "hash": "b256b5bfa9ff09af",
+  "verdict": "fixed",
+  "quote": "\"Next page\" is now correctly on the left side.\nThanks for the quick fix!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1303#issuecomment-5176495010",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1331@2026-08-14T11:13:56Z": {
+  "hash": "5dcc9058299a326f",
+  "verdict": "fixed",
+  "quote": "Functionally this fixes it",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1331#issuecomment-5292910343",
+  "by": "review"
+ },
+ "issue#134@2026-05-11T20:16:00Z": {
+  "hash": "a256774677752b38",
+  "verdict": "not_fixed",
+  "quote": "Unfortunately the same issue persists, and after adding a book the server gets 504.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/134#issuecomment-4426694532",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1372@2026-08-04T16:34:54Z": {
+  "hash": "603835c3996b226f",
+  "verdict": "not_fixed",
+  "quote": "after syncing the kobo ereader the series still don't appear after re-downloading all the books.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1372#issuecomment-5387916421",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1393@2026-08-30T18:12:48Z": {
+  "hash": "b521dee4dd0984e7",
+  "verdict": "fixed",
+  "quote": "Highlight count in chip is confirmed working in latest :dev - thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1393#issuecomment-5582320934",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1396@2026-08-08T00:57:52Z": {
+  "hash": "c1d61822b0f891f1",
+  "verdict": "fixed",
+  "quote": "The tag grid density is definitely readable now, thanks! The change from \"...\" to multi-line for long tags is welcomed. I'm quite happy with these results.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1396#issuecomment-5317624485",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1398@2026-08-14T23:11:01Z": {
+  "hash": "687190967f6c9652",
+  "verdict": "content",
+  "quote": "This is great, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1398#issuecomment-5302949002",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#139@2026-05-12T01:57:38Z": {
+  "hash": "8ae41e7c24bc2126",
+  "verdict": "partial",
+  "quote": "The YAML file now runs even without a configured PAT, but it still cannot update the MD files. Please configure the PAT so it can run properly.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/139#issuecomment-4429877928",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1428@2026-08-07T02:46:10Z": {
+  "hash": "593dc057c44cee6d",
+  "verdict": "partial",
+  "quote": "restarting causes the same issue",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1428#issuecomment-5212260311",
+  "by": "review"
+ },
+ "issue#1428@2026-08-07T08:30:53Z": {
+  "hash": "143cd0bfb23d7b0b",
+  "verdict": "fixed",
+  "quote": "I can confirm that v4.1.32 does indeed fix the startup, the stray file keeps being dropped but it no longer blocks startup.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1428#issuecomment-5223400912",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1437@2026-08-07T10:30:15Z": {
+  "hash": "081e00850210b495",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed with the release of v4.1.33.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1437#issuecomment-5229075671",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1443@2026-08-08T05:48:44Z": {
+  "hash": "7bdaa9f211b92aeb",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.33. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1443#issuecomment-5229074516",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1447@2026-08-07T21:01:42Z": {
+  "hash": "9783e063850c32a6",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed with v4.1.33. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1447#issuecomment-5229086317",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1462@2026-08-08T11:15:31Z": {
+  "hash": "677f9fe5a1b4d434",
+  "verdict": "partial",
+  "quote": "Thanks. The build process goes further now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1462#issuecomment-5225999215",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1462@2026-08-08T22:49:22Z": {
+  "hash": "186b1c16cf946ccc",
+  "verdict": "content",
+  "quote": "Oh I thought this issue had been closed. I'll close it now in favour of the new ones related to hardcoded paths. Thanks for the good work!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1462#issuecomment-5269015478",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#147@2026-05-13T17:39:24Z": {
+  "hash": "126e3b1a25962b4b",
+  "verdict": "partial",
+  "quote": "Although the AttributeError: 'NoneType' object has no attribute 'get' is indeed gone, the problem is effectively the same",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/147#issuecomment-4444697384",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#147@2026-05-17T03:14:19Z": {
+  "hash": "c44a8cc73a8a387c",
+  "verdict": "content",
+  "quote": "Thats great! Thanks a lot :)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/147#issuecomment-4482187505",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1556@2026-08-13T14:50:50Z": {
+  "hash": "3deff92f78a656a1",
+  "verdict": "partial",
+  "quote": "I confirm on current main branch, the 500 error is fixed, but not the hardcoded paths yet:",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556#issuecomment-5308065027",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1556@2026-08-21T04:26:47Z": {
+  "hash": "30df6287168c57b9",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "issue#1584@2026-08-13T19:35:45Z": {
+  "hash": "fec87ee28e5e3fd1",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed in v4.1.34. Thanks a lot. 🙂",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584#issuecomment-5286358713",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1608@2026-08-16T23:10:57Z": {
+  "hash": "90433c6f074cce0a",
+  "verdict": "fixed",
+  "quote": "just tried it out, works like a charm. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1608#issuecomment-5314411469",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#160@2026-05-13T21:27:38Z": {
+  "hash": "06eeae1d7c338d43",
+  "verdict": "partial",
+  "quote": "The language switching in opds works correctly when set via parameter/admin, but only the second half of the task was implemented.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/160#issuecomment-4446125958",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1628@2026-08-18T01:46:18Z": {
+  "hash": "96ad57d0a9a06b4c",
+  "verdict": "annoyed",
+  "quote": "Why did you leave this issue open when merging a commit that fixes it?",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1628#issuecomment-5337812986",
+  "by": "review"
+ },
+ "issue#1631@2026-08-17T21:06:00Z": {
+  "hash": "adea9c73d3ef0929",
+  "verdict": "annoyed",
+  "quote": "Burying this in docs instead of putting it in the ReadMe and implying the production code is safe even though it is built by AI are both very misleading.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1707#issuecomment-5320581420",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1634@2026-08-16T03:24:11Z": {
+  "hash": "704c1b573ff9655f",
+  "verdict": "partial",
+  "quote": "Similar behaviour for me on the calibre-web-nextgen:dev-kobo-sync-loop build , the only difference is mine defaults to 100 books still. Otherwise after those 100 books it completes and any attempts to sync again doesn't grab the missing books just like @roquemore92",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1634#issuecomment-5305785975",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1696@2026-08-17T20:58:34Z": {
+  "hash": "835245e5bff4639b",
+  "verdict": "fixed",
+  "quote": "the container updated smoothly to v4.1.38 and is running completely stable without any issues",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1696#issuecomment-5327509318",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1702@2026-08-21T11:35:37Z": {
+  "hash": "1656a414b4910dbb",
+  "verdict": "fixed",
+  "quote": "Huzzah! Thanks, this is very helpful. Works well for me!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1702#issuecomment-5371754829",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1706@2026-08-18T03:56:42Z": {
+  "hash": "3c130e2586866d2a",
+  "verdict": "fixed",
+  "quote": "works perfectly now, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1706#issuecomment-5382106351",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1734@2026-08-22T07:19:19Z": {
+  "hash": "fa0c3c8f34b3e35a",
+  "verdict": "not_fixed",
+  "quote": "functionality of the admin toggle \"edit public shelves\" has changed dramaticly since these changes.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734#issuecomment-5421955137",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1734@2026-08-26T16:40:43Z": {
+  "hash": "8a836b99161e6fc7",
+  "verdict": "content",
+  "quote": "is a solid quick fix",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734#issuecomment-5431741729",
+  "by": "review"
+ },
+ "issue#1755@2026-08-22T23:32:39Z": {
+  "hash": "6e06d17fb0dd8b53",
+  "verdict": "none",
+  "quote": "I dont know what to check because this error occurred one time and i didnt test if i could reproduce it thoroughly. I just hope it wont happen again ;)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1755#issuecomment-5387601995",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1799@2026-08-26T19:21:52Z": {
+  "hash": "577a0dd433ae1a3b",
+  "verdict": "fixed",
+  "quote": "I've replaced by your start_period and it's starting gracefully, no issue.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1799#issuecomment-5460442126",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1835@2026-08-24T04:08:46Z": {
+  "hash": "2b11c934799b893b",
+  "verdict": "fixed",
+  "quote": "Thank you for the quick resolution, I can confirm the sidebar scrolls as expected in my environment with 4.1.42.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1835#issuecomment-5457202890",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1845@2026-08-26T05:39:59Z": {
+  "hash": "e8ac0a62151a6678",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed in v4.1.41.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1845#issuecomment-5421100763",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1857@2026-08-29T05:29:49Z": {
+  "hash": "a034c7f4269d588f",
+  "verdict": "fixed",
+  "quote": "Well, everything seems to be working again for me. In any case, I can sync my Kobo reader without any issues or errors. New books are transferred to the device without any problems.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1857#issuecomment-5541906417",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1857@2026-09-05T07:06:00Z": {
+  "hash": "6f05610ad4d3e2ca",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1862@2026-08-28T11:18:34Z": {
+  "hash": "c571a38883fd7dd9",
+  "verdict": "partial",
+  "quote": "It's better but the \"quiet label\" is completely useless, and I am not convinced we need to separate the \"Delete\" button from the others.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1862#issuecomment-5461004074",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1903@2026-08-28T09:01:17Z": {
+  "hash": "52870a712257b917",
+  "verdict": "partial",
+  "quote": "Follow-up on Bug 2: LDAP bind support did land in #2012, but the endpoint still has no local-password fallback, so a local-only administrator gets `401` in the New UI while the same credentials work at `/login` (#1930 fixed only the classic form).",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1903#issuecomment-5861508500",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1910@2026-08-29T09:21:14Z": {
+  "hash": "e9448ed766d1b0e9",
+  "verdict": "not_fixed",
+  "quote": "I'm still unable to log in. Is there a log I can check for more information about my login failures?",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1910#issuecomment-5586124293",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#192@2026-05-15T21:22:17Z": {
+  "hash": "d13cc2fc6e265c96",
+  "verdict": "fixed",
+  "quote": "Verified fixed! Thank you for the quick, and comprehensive, fix.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/192#issuecomment-4464151873",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#193@2026-05-15T14:18:00Z": {
+  "hash": "e8dbb66e569f43b2",
+  "verdict": "partial",
+  "quote": "It would be good to get this fixed, because currently there is no health check solution monitoring stable operation; it only checks database consistency.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/193#issuecomment-4487090043",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#193@2026-05-19T19:13:28Z": {
+  "hash": "72c4e92563d5346b",
+  "verdict": "fixed",
+  "quote": "Looks ok to me, thanks. :tada:",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/193#issuecomment-4491362725",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1954@2026-08-29T12:34:48Z": {
+  "hash": "bc57224c147cfd3f",
+  "verdict": "none",
+  "quote": "Hello - do you have a sense of when the version I can test will be available? Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1954#issuecomment-5595780191",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1954@2026-09-22T23:46:27Z": {
+  "hash": "0e2df3a66a264dd2",
+  "verdict": "fixed",
+  "quote": "Yep, works fine now. Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1954#issuecomment-5903257997",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#205@2026-05-20T13:48:44Z": {
+  "hash": "dfe9ba120a71df07",
+  "verdict": "content",
+  "quote": "amazing, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/205#issuecomment-4501301150",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2103@2026-09-01T23:18:42Z": {
+  "hash": "cd7de3e507fcf6e1",
+  "verdict": "content",
+  "quote": "Thanks for the fix.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2103#issuecomment-5529441771",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2103@2026-09-03T22:40:14Z": {
+  "hash": "49ebfd018645c894",
+  "verdict": "annoyed",
+  "quote": "Pinging this, as it was marked completed due to one PR, but per your last comment it should remain open",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2103#issuecomment-5608143659",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2169@2026-09-05T20:46:06Z": {
+  "hash": "fa1e1d9fb7d0286f",
+  "verdict": "fixed",
+  "quote": "Yup, seems to all be good!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2169#issuecomment-5990793534",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2180@2026-09-07T18:36:05Z": {
+  "hash": "ede280f9d5768384",
+  "verdict": "fixed",
+  "quote": "Just made changes and it looks like we're in business!!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2180#issuecomment-5696870856",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#218@2026-05-21T15:40:49Z": {
+  "hash": "d3fbcc705e0544c9",
+  "verdict": "not_fixed",
+  "quote": "i got a bad request",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/218#issuecomment-4558896120",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#218@2026-06-05T22:23:30Z": {
+  "hash": "54954e87e15ef648",
+  "verdict": "partial",
+  "quote": "I just try the new 4.0.151 and some parts works but it don't reload all the metadata",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/218#issuecomment-4636677943",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#219@2026-05-18T20:49:15Z": {
+  "hash": "1672cf7ae96766c3",
+  "verdict": "fixed",
+  "quote": "Confirmed working.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/219#issuecomment-4482579602",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2201@2026-09-08T16:51:35Z": {
+  "hash": "c946e8c027da1b71",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed in v4.1.44. Kobo sync is working great now, including syncing more than 100 books. Thanks a lot for the very quick fix!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2201#issuecomment-5855062470",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2211@2026-09-24T05:16:58Z": {
+  "hash": "3dacd85cc0f9f71e",
+  "verdict": "fixed",
+  "quote": "This works well, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2211#issuecomment-5913437161",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2219@2026-09-23T20:47:16Z": {
+  "hash": "7b35c01e45dd5c6a",
+  "verdict": "fixed",
+  "quote": "TL/DR:  Mostly good; Page refresh resolves remaining issue.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2219#issuecomment-5863919280",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2223@2026-10-02T04:50:37Z": {
+  "hash": "1fd703f7ac0283d4",
+  "verdict": "partial",
+  "quote": "Thanks a lot, but two little things however:",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2223#issuecomment-6072587874",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2223@2026-10-09T09:31:23Z": {
+  "hash": "f527636bed537fdc",
+  "verdict": "content",
+  "quote": "Man this is perfect!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2223#issuecomment-6090207728",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#222@2026-05-19T21:51:01Z": {
+  "hash": "11e3a0a314df3cc6",
+  "verdict": "partial",
+  "quote": "The theme switcher icon has disappeared from the top, but on the container’s first startup a notification still appears at the bottom saying that it is disabled until version 5. This notification is no longer needed.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/222#issuecomment-4496768176",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2235@2026-09-23T13:05:57Z": {
+  "hash": "ac411315862f2aca",
+  "verdict": "fixed",
+  "quote": "Yup, looks good! I removed a book from a shelf in a few different ways, and the sidebar updated immediately every time.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2235#issuecomment-5914756737",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#223@2026-05-19T21:30:22Z": {
+  "hash": "a5bac9b3936e8e93",
+  "verdict": "none",
+  "quote": "Just a small observation: from a UX perspective, it might be better if after submitting the form and the page reloads, it would scroll back to the section where the action was triggered — for example, to make copying the newly generated password easier.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/223#issuecomment-4492445200",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2248@2026-10-07T13:29:07Z": {
+  "hash": "2eded2fecc3a049b",
+  "verdict": "fixed",
+  "quote": "Aside from that, the feature is working as expected, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2248#issuecomment-6238373802",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2249@2026-09-23T05:41:09Z": {
+  "hash": "d210dc995832d5c2",
+  "verdict": "fixed",
+  "quote": "looks good",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2249#issuecomment-5906736781",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#224@2026-05-19T22:11:36Z": {
+  "hash": "4f541a55b9e3a1b6",
+  "verdict": "fixed",
+  "quote": "Tested, and looks ok to me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/224#issuecomment-4496671051",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#224@2026-05-20T12:56:01Z": {
+  "hash": "1b9c1975969ea155",
+  "verdict": "fixed",
+  "quote": "Tested and looks good, it now returns an XML error message for 401 responses as well.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/224#issuecomment-4499548265",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2251@2026-09-22T23:46:27Z": {
+  "hash": "a34835e50229da9a",
+  "verdict": "fixed",
+  "quote": "Tested v4.1.44 and it fixes both halves.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2251#issuecomment-5897821788",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2251@2026-09-29T20:26:40Z": {
+  "hash": "713d6cc6dd9772fa",
+  "verdict": "content",
+  "quote": "Thanks for the extra fixes.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2264#issuecomment-5900764884",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#225@2026-05-22T02:01:08Z": {
+  "hash": "27bccf5f659c72a4",
+  "verdict": "fixed",
+  "quote": "It works! Thanks for doing this, and thanks for getting to it so quickly.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/225#issuecomment-4523131875",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2289@2026-09-25T09:08:39Z": {
+  "hash": "bc35eb93230208ae",
+  "verdict": "fixed",
+  "quote": "all the syncing seems to be working well between web, devices and Hardcover!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2289#issuecomment-5856167541",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2291@2026-09-26T13:32:55Z": {
+  "hash": "499964705db21df0",
+  "verdict": "fixed",
+  "quote": "Yes, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2291#issuecomment-5983657713",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2296@2026-09-25T01:06:27Z": {
+  "hash": "6ab192afe3ed4d31",
+  "verdict": "fixed",
+  "quote": "Tested: All good now. Thank you",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2296#issuecomment-5825037871",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2328@2026-09-27T00:36:45Z": {
+  "hash": "008f5a0cb8ead9f9",
+  "verdict": "fixed",
+  "quote": "Confirmed, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2328#issuecomment-5913309550",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2329@2026-09-27T04:33:52Z": {
+  "hash": "70c5327f7ec2c5b1",
+  "verdict": "not_fixed",
+  "quote": "I tried the latest cwng github supplied plugin and ran into the same problems as mentioned above.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-5867915543",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2329@2026-10-01T04:34:44Z": {
+  "hash": "53f279fe926d2acd",
+  "verdict": "fixed",
+  "quote": "I've successfully activated this on my son's BigMe B6 device (also Android under the covers), with a 330 book library. It had some visible progress while it was in its lock-up phase, which is great.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6085199208",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2329@2026-10-09T20:42:53Z": {
+  "hash": "9ee0287b35081c13",
+  "verdict": "partial",
+  "quote": "App startup (on pixel9pro) has a blank white screen",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6126610643",
+  "by": "review"
+ },
+ "issue#2334@2026-09-27T08:53:23Z": {
+  "hash": "9a9cfc87320961c0",
+  "verdict": "fixed",
+  "quote": "Found it!! :) Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2334#issuecomment-5860673128",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2338@2026-09-27T16:37:26Z": {
+  "hash": "15860669b2f23b1b",
+  "verdict": "content",
+  "quote": "This looks great, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2338#issuecomment-5913286081",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2341@2026-09-27T21:07:10Z": {
+  "hash": "e8892822009799ca",
+  "verdict": "fixed",
+  "quote": "Fixed, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2341#issuecomment-6097234235",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2343@2026-09-28T00:49:18Z": {
+  "hash": "654c24cab6288de4",
+  "verdict": "fixed",
+  "quote": "I think it is ok now",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2343#issuecomment-5983004986",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2351@2026-09-29T04:33:44Z": {
+  "hash": "f62c81be756f7806",
+  "verdict": "not_fixed",
+  "quote": "Both Kindles still appear as one device.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2351#issuecomment-5931171117",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2355@2026-09-28T12:44:06Z": {
+  "hash": "ca867299a33eb2b5",
+  "verdict": "fixed",
+  "quote": "Yep, confirmed in dev it works like a charm now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2355#issuecomment-5880695120",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2358@2026-09-28T16:54:23Z": {
+  "hash": "7e953d6360047c71",
+  "verdict": "fixed",
+  "quote": "Confirmed on a live library with #2359's frontend (built from `b8a88f5fd`, served against a v4.1.44 backend).",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2358#issuecomment-5874805146",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2371@2026-09-29T16:33:33Z": {
+  "hash": "250385c63ffadd39",
+  "verdict": "fixed",
+  "quote": "Updated my local container to 4.1.45 and just tested. Looks good!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2371#issuecomment-5901710744",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2386@2026-10-04T19:29:15Z": {
+  "hash": "ec0ef1e66631cc63",
+  "verdict": "not_fixed",
+  "quote": "I have installed the new version but the behavior is the same. The covers loading and loading again. On each access the covers keep on loading.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2386#issuecomment-6063295261",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2386@2026-10-09T00:16:13Z": {
+  "hash": "9d7ccd95e7dd1459",
+  "verdict": "fixed",
+  "quote": "Perfect, now it works nice! Thank you for your help!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2386#issuecomment-6095686446",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2386@2026-10-10T12:09:34Z": {
+  "hash": "ffbacec2d75ef566",
+  "verdict": "partial",
+  "quote": "Sorry, for the first view it worked fine. But as soon I login again, the covers start loading again from scratch.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2386#issuecomment-6098087376",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2387@2026-09-30T20:52:40Z": {
+  "hash": "f9649eb35d78b6ad",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "issue#2442@2026-10-11T05:10:11Z": {
+  "hash": "62b35a4277da21d6",
+  "verdict": "partial",
+  "quote": "It pulls the data properly now with one exception so far. Titles with a colon : in the name are converted to underscore _. Other than that it seems to work as it should.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2442#issuecomment-6250095576",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2479@2026-10-07T16:49:58Z": {
+  "hash": "31244e0e33e87d38",
+  "verdict": "content",
+  "quote": "Thanks @new-usemame, merged in #2505 with the volume-name handling on top. Closing.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2479#issuecomment-6112419525",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2504@2026-10-08T12:08:31Z": {
+  "hash": "501298cd390c169a",
+  "verdict": "content",
+  "quote": "No worries, thanks for the help and the great fork.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2504#issuecomment-6065381226",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2518@2026-10-09T04:55:17Z": {
+  "hash": "7a64cc8398f8bf96",
+  "verdict": "fixed",
+  "quote": "Yep, confirmed it's writing to the .epub on disk.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2518#issuecomment-6090433832",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2536@2026-10-10T01:29:28Z": {
+  "hash": "ba0b5212dc10545f",
+  "verdict": "fixed",
+  "quote": "Tested ok in 4.1.148. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2536#issuecomment-6250770820",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2537@2026-10-10T09:02:08Z": {
+  "hash": "b7390a42e6e05402",
+  "verdict": "fixed",
+  "quote": "Works in 4.1.48, thank you so much, that'll save me time!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2537#issuecomment-6250789739",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#256@2026-05-19T23:19:02Z": {
+  "hash": "3755aabc005c989d",
+  "verdict": "partial",
+  "quote": "Functionally it works fine, but I would improve the appearance a bit. As shown in the image, the arrows are vertically misaligned, and it would also be good to add at least 20px bottom margin.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/256#issuecomment-4496710767",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#256@2026-05-20T21:07:32Z": {
+  "hash": "1d346c2ce765197b",
+  "verdict": "content",
+  "quote": "Perfect.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/256#issuecomment-4502827154",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2602@2026-10-18T21:24:40Z": {
+  "hash": "abf2af961aa8d1c5",
+  "verdict": "fixed",
+  "quote": "I have forced a re-send of the affected book on v4.1.49 and the sync completed with no reanchor and no lock error.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2602#issuecomment-6274045414",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2606@2026-10-17T08:33:10Z": {
+  "hash": "9b89269b3a1a830a",
+  "verdict": "fixed",
+  "quote": "Hi! Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2606#issuecomment-6250731100",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2647@2026-10-19T12:16:45Z": {
+  "hash": "c3113d2c8233a912",
+  "verdict": "partial",
+  "quote": "Just tried the web reader again, and sure enough, it opened to the cover. The checkbox is set for that.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2647#issuecomment-6267096452",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#276@2026-05-21T20:53:22Z": {
+  "hash": "dab949a11c3712d5",
+  "verdict": "fixed",
+  "quote": "That's fantastic, thank you! Works well for me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/276#issuecomment-4512957199",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#283@2026-05-21T17:41:55Z": {
+  "hash": "7ce2a64b0a8dc649",
+  "verdict": "partial",
+  "quote": "The last two buttons still overflow at certain widths.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/283#issuecomment-4511655002",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#283@2026-05-22T03:38:15Z": {
+  "hash": "c6d336069c1b8580",
+  "verdict": "fixed",
+  "quote": "The buttons and layout look good.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/283#issuecomment-4517275960",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#303@2026-07-14T02:47:33Z": {
+  "hash": "75fa8fa41dc3c0dc",
+  "verdict": "not_fixed",
+  "quote": "I can find most of the books on goodreads, but fetch metadata is not returning anything.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/303#issuecomment-5230805373",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#303@2026-08-10T08:23:56Z": {
+  "hash": "e5c48c2328d35ab3",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#304@2026-07-12T21:12:41Z": {
+  "hash": "f9e07fc153d8430e",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/304#issuecomment-5237613979",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#304@2026-08-10T08:23:56Z": {
+  "hash": "f668f702605dddc6",
+  "verdict": "none",
+  "quote": "updated above comment with NextGen findings",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/304#issuecomment-5237722812",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#308@2026-05-27T05:31:40Z": {
+  "hash": "6c372fc3ff554997",
+  "verdict": "fixed",
+  "quote": "Updated. All working now",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/308#issuecomment-4552443007",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#312@2026-05-27T03:30:48Z": {
+  "hash": "e13e61f7b1a7b531",
+  "verdict": "content",
+  "quote": "That's really cool",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/312#issuecomment-4587281207",
+  "by": "review"
+ },
+ "issue#312@2026-06-09T22:38:56Z": {
+  "hash": "fae578487e6b49fe",
+  "verdict": "fixed",
+  "quote": "Yes, everything is fine, thank you.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/312#issuecomment-4942834438",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#315@2026-07-14T02:47:33Z": {
+  "hash": "3d40102061872bdd",
+  "verdict": "fixed",
+  "quote": "It works really well!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/315#issuecomment-5188558764",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#319@2026-05-26T20:48:29Z": {
+  "hash": "96ac2ef64c3f9547",
+  "verdict": "annoyed",
+  "quote": "this single \"feature\" and how it is being handled has massively undermined my confidence in the stewardship of this fork.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/319#issuecomment-4548770395",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#319@2026-05-28T02:10:48Z": {
+  "hash": "ce3df934e051ff97",
+  "verdict": "partial",
+  "quote": "The new icons are good, but it would be better if they were consistent.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/319#issuecomment-4563102232",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#319@2026-06-05T21:36:55Z": {
+  "hash": "9072fa224775f0dd",
+  "verdict": "partial",
+  "quote": "The icon change looks good and now it fits, but it's still not consistent throughout the system. The old icon is still displayed in the listing views; that should also be replaced with this check/unchecked icon pair.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/319#issuecomment-4689823096",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#319@2026-06-12T23:05:55Z": {
+  "hash": "871f72c5b5c4794c",
+  "verdict": "partial",
+  "quote": "The icon change looks good, but the checked icon is also displayed for books that are already marked as read.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/319#issuecomment-4699707973",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#320@2026-06-07T05:17:19Z": {
+  "hash": "490d7bc180b16479",
+  "verdict": "partial",
+  "quote": "I just signed in to make this very same observation known.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/320#issuecomment-4644113610",
+  "by": "review"
+ },
+ "issue#320@2026-06-08T00:15:43Z": {
+  "hash": "1ca25dc2ec86bec4",
+  "verdict": "not_fixed",
+  "quote": "Appears to be the same after updating to 4.0.158.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/320#issuecomment-4650308868",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#320@2026-06-09T00:28:48Z": {
+  "hash": "f9f19054aadc0a16",
+  "verdict": "partial",
+  "quote": "The reorder shelf view still has the oversized icon. The mechanics of the screen work fine though and the enhancement is great!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/320#issuecomment-4661785360",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#320@2026-06-09T17:20:25Z": {
+  "hash": "d54285dbdc5e91eb",
+  "verdict": "fixed",
+  "quote": "Updated to Dev 135 version and all is well with the change order screen now. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/320#issuecomment-4665292678",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#323@2026-06-12T18:06:22Z": {
+  "hash": "4f541a55b9e3a1b6",
+  "verdict": "fixed",
+  "quote": "Tested, and looks ok to me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/323#issuecomment-4742025696",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#324@2026-08-03T02:31:28Z": {
+  "hash": "7c78c488c7907dec",
+  "verdict": "not_fixed",
+  "quote": "it isn't really synchronizing the positions",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-5184010179",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#331@2026-05-27T05:31:40Z": {
+  "hash": "37e3645bd674d007",
+  "verdict": "partial",
+  "quote": "This documentation is a cool first step.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/331#issuecomment-4552475022",
+  "by": "review"
+ },
+ "issue#331@2026-06-06T23:05:12Z": {
+  "hash": "19fc11b1c9631ab1",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed on v4.0.167 — the buffer workaround is no longer needed. Kobo sync works over HTTPS through Synology's native reverse proxy with default nginx buffer sizes.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/331#issuecomment-4753137239",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#334@2026-06-07T04:56:13Z": {
+  "hash": "256209091e53bdbf",
+  "verdict": "content",
+  "quote": "Thanks again :)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/334#issuecomment-4665599995",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#336@2026-05-29T15:30:04Z": {
+  "hash": "abc321195c89ffae",
+  "verdict": "fixed",
+  "quote": "And now it is working well.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/336#issuecomment-4577977612",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#343@2026-05-29T00:43:02Z": {
+  "hash": "0af0ab0a49994e3c",
+  "verdict": "fixed",
+  "quote": "Loaded it up and it's looking good!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/343#issuecomment-4570548350",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#346@2026-06-06T20:34:47Z": {
+  "hash": "16592cd20af7a8e8",
+  "verdict": "not_fixed",
+  "quote": "The original filename (\"Imported as\") is no longer visible in the New UI.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/346#issuecomment-4893164864",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#347@2026-06-19T22:02:00Z": {
+  "hash": "baf7bc089b0285e5",
+  "verdict": "not_fixed",
+  "quote": "I have this issue on 4.1.33 syncing to a Kobo Libra Color.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/347#issuecomment-5288347142",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#351@2026-07-12T18:00:09Z": {
+  "hash": "deae442b66730e20",
+  "verdict": "fixed",
+  "quote": "Thank you very much; it looks great now and is very easy to read!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/351#issuecomment-5091760096",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#354@2026-06-04T16:43:11Z": {
+  "hash": "7573a71e9e5cc94e",
+  "verdict": "fixed",
+  "quote": "Yes, this iteration successfully resolved the issue.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/354#issuecomment-4641515555",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#359@2026-06-05T20:44:25Z": {
+  "hash": "d4ad6a335b0aa735",
+  "verdict": "not_fixed",
+  "quote": "The fix doesn't appear to deliver Magic Shelf membership for my setup - the Kobo still only shows the regular \"For Kobo\" collection.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/359#issuecomment-4636080847",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#359@2026-06-06T00:03:11Z": {
+  "hash": "dda015c8c26438de",
+  "verdict": "not_fixed",
+  "quote": "v4.0.155 — still no Magic Shelf collections delivered in sync-all mode",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/359#issuecomment-4639760503",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#400@2026-06-17T18:53:20Z": {
+  "hash": "4f1e24a23c388fc5",
+  "verdict": "content",
+  "quote": "The feature is fantastic!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/400#issuecomment-4735812775",
+  "by": "review"
+ },
+ "issue#400@2026-07-16T22:34:06Z": {
+  "hash": "0fc1ab97242cab87",
+  "verdict": "fixed",
+  "quote": "This worked like a charm, but latest build (v4.1.33) seems wrong",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/400#issuecomment-5309455730",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#425@2026-06-10T15:58:23Z": {
+  "hash": "24e4d0a14016c4dd",
+  "verdict": "fixed",
+  "quote": "It is working as expected now! Thank you for the quick turnaround.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/425#issuecomment-4672231284",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#428@2026-06-12T20:11:08Z": {
+  "hash": "ffa5ba55937d931c",
+  "verdict": "fixed",
+  "quote": "Thats amazing! Works like a charm. And impressive how fast this went from request to finish. Thanks a lot :)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/428#issuecomment-4698679923",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#431@2026-06-12T16:05:36Z": {
+  "hash": "d3e66b6b89c35911",
+  "verdict": "fixed",
+  "quote": "Updated to the latest version, fix is present and working.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/431#issuecomment-4705490474",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#433@2026-06-12T04:04:04Z": {
+  "hash": "09fa9bff238266e0",
+  "verdict": "fixed",
+  "quote": "I immediately opened/closed the book on KOReader again, refreshed the Hardcover App and saw the book was now marked as \"Currently Reading\" and went from 0 to 28%.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/433#issuecomment-4691223103",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#461@2026-06-17T18:31:36Z": {
+  "hash": "504bd499ae5763b0",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed on v4.0.166.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/461#issuecomment-4734583012",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#465@2026-06-17T18:44:51Z": {
+  "hash": "406f0370a3512b6b",
+  "verdict": "fixed",
+  "quote": "Confirmed working. Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/465#issuecomment-4734616720",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#467@2026-07-12T17:40:34Z": {
+  "hash": "e019bb553e858bd9",
+  "verdict": "not_fixed",
+  "quote": "I am not seeing Publication Date and Date Added as options in the dropdown box!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/467#issuecomment-4953013272",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#467@2026-07-16T01:16:09Z": {
+  "hash": "d0d048af44c51a82",
+  "verdict": "fixed",
+  "quote": "Working. Thanks",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/467#issuecomment-5030143554",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#468@2026-06-17T20:39:31Z": {
+  "hash": "a6be45422fbf3928",
+  "verdict": "not_fixed",
+  "quote": "I dropped my total shelf count to under 100 and it seems to still delete.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/468#issuecomment-4746643071",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#468@2026-06-22T19:25:13Z": {
+  "hash": "23329c1a4e6b6ecf",
+  "verdict": "partial",
+  "quote": "Most of the new additions show as unread but I have seen one recent one that said \"download\"",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/468#issuecomment-4871703294",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#470@2026-06-16T12:06:54Z": {
+  "hash": "f8dd9026d5d5051d",
+  "verdict": "fixed",
+  "quote": "Confirmed working in latest update, thanks for the fix.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/470#issuecomment-4728345071",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#479@2026-06-17T22:03:15Z": {
+  "hash": "a52fc286b6f1bc41",
+  "verdict": "fixed",
+  "quote": "the issue as i encountered it seems to be resolved.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/479#issuecomment-4756137102",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#499@2026-06-19T18:07:12Z": {
+  "hash": "db4363715237d389",
+  "verdict": "fixed",
+  "quote": "Yep, that fixed it, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/499#issuecomment-4874902161",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#502@2026-06-22T19:22:00Z": {
+  "hash": "449743298f83fbe9",
+  "verdict": "fixed",
+  "quote": "Works perfectly! Closing out this issue, thank you for such swift resolution.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/502#issuecomment-4772945628",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#503@2026-06-22T19:17:43Z": {
+  "hash": "822af0411c21289a",
+  "verdict": "fixed",
+  "quote": "All settings are now visible, although the settings modal still looks a little strange.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/503#issuecomment-4772941630",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#503@2026-06-23T12:07:23Z": {
+  "hash": "532e6ad69158dbd7",
+  "verdict": "fixed",
+  "quote": "Yes! Looks great now, thank you.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/503#issuecomment-4871529515",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#509@2026-06-24T23:55:04Z": {
+  "hash": "f7dd60948d588e9d",
+  "verdict": "partial",
+  "quote": "I can see the badge. \n\n<img width=\"1484\" height=\"518\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/6ba27184-9e0f-4181-8234-260212cff049\" />\n\nBut, there's no Koreader progress. Any thoughts on that?",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/509#issuecomment-4808642476",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#509@2026-07-12T21:50:09Z": {
+  "hash": "93d5d38997dbdb34",
+  "verdict": "partial",
+  "quote": "Is there a way to make it work when a book is downloaded and the other is sideloaded?",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/509#issuecomment-5204249491",
+  "by": "review"
+ },
+ "issue#514@2026-06-23T18:14:07Z": {
+  "hash": "21f163d13cbead57",
+  "verdict": "fixed",
+  "quote": "are confirmed fixed in 4.0.170.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/514#issuecomment-4782305624",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#521@2026-07-12T17:40:34Z": {
+  "hash": "1ea076147452dbc1",
+  "verdict": "fixed",
+  "quote": "The books I have are properly ordered.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/521#issuecomment-4952789671",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#522@2026-06-26T22:13:12Z": {
+  "hash": "a25592173810e7a1",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.0.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/522#issuecomment-4845244804",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#523@2026-06-26T05:27:42Z": {
+  "hash": "cd562b93880ef904",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed in 4.1.0.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/523#issuecomment-4845177435",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#525@2026-07-03T10:34:46Z": {
+  "hash": "f6f957d22e23bf3f",
+  "verdict": "fixed",
+  "quote": "Thanks, this appears to be working (at least for the one file I tested it with). You have just solved one of my major annoyances in my reading setup!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/525#issuecomment-4878851878",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#533@2026-06-27T06:06:42Z": {
+  "hash": "13e929e1436059d2",
+  "verdict": "content",
+  "quote": "Implemented in 4.1.0.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/533#issuecomment-4845210456",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#536@2026-06-27T02:04:45Z": {
+  "hash": "a25592173810e7a1",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.0.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/536#issuecomment-4845203341",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#553@2026-06-30T14:10:42Z": {
+  "hash": "ceea28baef519be2",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.0 (using my reproduction protocol, I did not test all cases).",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/553#issuecomment-4845223605",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#561@2026-07-03T03:01:11Z": {
+  "hash": "fa21593c159d420a",
+  "verdict": "not_fixed",
+  "quote": "Instead of falling back, it seems there is one retry.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/561#issuecomment-4878634583",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#561@2026-07-12T17:40:34Z": {
+  "hash": "690e9d1e2d22fb45",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed in v4.1.12! Good job!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/561#issuecomment-4965765429",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#571@2026-07-01T18:55:53Z": {
+  "hash": "5d0d1fb881d3f788",
+  "verdict": "fixed",
+  "quote": "Confirmex fixed in 4.1.1. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/571#issuecomment-4859767009",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#572@2026-07-02T16:45:53Z": {
+  "hash": "1ea8b07c2658b20f",
+  "verdict": "fixed",
+  "quote": "Yes, this is great, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/572#issuecomment-4887479129",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#572@2026-07-25T19:16:32Z": {
+  "hash": "7042ed7845ef3bc2",
+  "verdict": "fixed",
+  "quote": "I think all parts of this are resolved now. Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/572#issuecomment-5913413818",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#573@2026-07-02T16:41:27Z": {
+  "hash": "9f48535d4f17452a",
+  "verdict": "content",
+  "quote": "Perfect, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/573#issuecomment-4887480189",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#574@2026-07-01T19:00:50Z": {
+  "hash": "8bbc8c3deb07db2b",
+  "verdict": "fixed",
+  "quote": "Yes!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/574#issuecomment-4887676111",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#576@2026-07-01T19:03:36Z": {
+  "hash": "8b1113dfd41756da",
+  "verdict": "not_fixed",
+  "quote": "Cant test this, because when updated to v4.1.2 got a survey",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/576#issuecomment-4860231940",
+  "by": "review"
+ },
+ "issue#576@2026-07-01T22:24:44Z": {
+  "hash": "c12c80f0c7bbdb68",
+  "verdict": "fixed",
+  "quote": "No this is long gone :)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/576#issuecomment-5384704809",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#577@2026-07-01T19:35:30Z": {
+  "hash": "eea137d5d5a3b272",
+  "verdict": "fixed",
+  "quote": "The translation is correct now tnx and .1.3 makes it workable again.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/577#issuecomment-4865515559",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#578@2026-07-01T19:13:53Z": {
+  "hash": "a82cd2071bdf4897",
+  "verdict": "not_fixed",
+  "quote": "Even scrolling down the first page (without clicking Load more) doesn't keep its scroll position.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/578#issuecomment-4860078729",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#578@2026-07-01T23:21:08Z": {
+  "hash": "e1ae0eb261a8c7a1",
+  "verdict": "fixed",
+  "quote": "Can confirm this is fixed in 4.1.4. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/578#issuecomment-4869811819",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#580@2026-07-01T17:43:04Z": {
+  "hash": "5f526f5006c6662a",
+  "verdict": "fixed",
+  "quote": "Change confirmed. Looks great, thanks @new-usemame!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/580#issuecomment-4879494266",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#582@2026-07-01T19:29:04Z": {
+  "hash": "a138916f95e087ef",
+  "verdict": "fixed",
+  "quote": "The links are now working like in the old UI thanks",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/582#issuecomment-4864922693",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#584@2026-07-02T16:43:31Z": {
+  "hash": "09caf31cd4da21f2",
+  "verdict": "partial",
+  "quote": "Yes it no longer replaces the current window but we still should keep it to later get these settings into the new UI so the old one can be gone for good",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/584#issuecomment-4872818512",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#585@2026-07-02T16:44:55Z": {
+  "hash": "b1cd30cce88c7b99",
+  "verdict": "partial",
+  "quote": "yes the disbar is now respecting the choices in the old UI\n\nBut we can’t set these in the new UI yet should I open a seperate ticket for that?",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/585#issuecomment-4872807979",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#585@2026-07-04T15:57:49Z": {
+  "hash": "863c84b0f6d745fc",
+  "verdict": "partial",
+  "quote": "As I don’t see the possibility to move the smart shelfs in the sidebar I would like to keep it open (or been moved to a own ticket)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/585#issuecomment-5384511511",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#586@2026-07-02T04:08:30Z": {
+  "hash": "a1189e6615827ec5",
+  "verdict": "fixed",
+  "quote": "Yes the app password works fine in the koreader plugin now",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/586#issuecomment-4887098709",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#587@2026-07-01T19:38:49Z": {
+  "hash": "a223946e20f62448",
+  "verdict": "fixed",
+  "quote": "Yes it works thanks for the fast implementation",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/587#issuecomment-4864895854",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#603@2026-07-02T16:23:19Z": {
+  "hash": "7f771105c30b1f1b",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.4. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/603#issuecomment-4868599487",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#608@2026-07-02T06:31:34Z": {
+  "hash": "e651fab9a4658bb0",
+  "verdict": "none",
+  "quote": "I may be blind, but I can't even find the table view anymore.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/608#issuecomment-4889980960",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#609@2026-07-02T14:34:10Z": {
+  "hash": "6c4c565ec45f72b5",
+  "verdict": "fixed",
+  "quote": "Working now, thanks",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/609#issuecomment-4870476565",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#612@2026-07-02T08:29:22Z": {
+  "hash": "48da4c0d38adcb9c",
+  "verdict": "fixed",
+  "quote": "Sorry, yes, it's fixed, thank you for the prompt response and all the work put into this project.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/612#issuecomment-4887167867",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#613@2026-08-14T13:17:02Z": {
+  "hash": "608047e3c0ce6548",
+  "verdict": "not_fixed",
+  "quote": "i do think its fair to warn new users that the new UI is a work in progress",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/613#issuecomment-5388617306",
+  "by": "review"
+ },
+ "issue#615@2026-07-10T23:36:21Z": {
+  "hash": "915018ccde4e6b7f",
+  "verdict": "fixed",
+  "quote": "the reported bug are fixed (again) in 4.1.9.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/615#issuecomment-4942454918",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#615@2026-07-12T20:50:29Z": {
+  "hash": "71f584905f6bb9b8",
+  "verdict": "partial",
+  "quote": "The discover section is correctly translated. I've tracked other sections partially or not translated:",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/615#issuecomment-5080308080",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#615@2026-07-29T04:47:46Z": {
+  "hash": "5c2239cc39ead38a",
+  "verdict": "fixed",
+  "quote": "on mobile, it seems to be translated everywhere, thank you very much. Closing this as a consequence !",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/615#issuecomment-5188418649",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#627@2026-07-03T10:34:46Z": {
+  "hash": "51c04deb8ccb8a29",
+  "verdict": "not_fixed",
+  "quote": "now synchronization isn't working again—not even when I open KOReader on my Android tablet and sync the book...",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/627#issuecomment-4951008399",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#627@2026-07-12T21:50:09Z": {
+  "hash": "f5da36e63773c4c2",
+  "verdict": "not_fixed",
+  "quote": "Is the sync supposed to work with this update? If so, it only seems to happen between the devices without creating an entry; here are two screenshots—one from before and one from now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/627#issuecomment-4965808131",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#627@2026-07-15T04:58:38Z": {
+  "hash": "123651e0331ab58c",
+  "verdict": "not_fixed",
+  "quote": "I just installed the new version v4.1.16 and the new Koreader plugin 4.1.16, but unfortunately, there is still no synchronization when I send the book using \"send to reader\".",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/627#issuecomment-5011623473",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#627@2026-07-25T19:01:09Z": {
+  "hash": "2e685378a48b38f6",
+  "verdict": "fixed",
+  "quote": "I'm happy—it works. Thank you very much for the quick implementation.🥰",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/627#issuecomment-5082563880",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#633@2026-07-03T10:34:46Z": {
+  "hash": "637e487b29dbf7ef",
+  "verdict": "not_fixed",
+  "quote": "Unfortunately, it doesn't look like it fixed the issue that I am having.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/633#issuecomment-4879365951",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#633@2026-07-07T01:18:35Z": {
+  "hash": "341ee62775f2b148",
+  "verdict": "not_fixed",
+  "quote": "I'm still seeing the problem.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/633#issuecomment-4911226266",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#633@2026-07-11T05:21:29Z": {
+  "hash": "75b07645f5cd8801",
+  "verdict": "fixed",
+  "quote": "Pretty good results from the latest update. It seems to be properly setting furthest progress.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/633#issuecomment-4976194136",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#634@2026-07-03T12:58:41Z": {
+  "hash": "5830d58ad359f495",
+  "verdict": "fixed",
+  "quote": "It works as described for me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/634#issuecomment-4877264912",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#634@2026-07-06T16:16:48Z": {
+  "hash": "aac7c5ea57482231",
+  "verdict": "fixed",
+  "quote": "It works as expected 👍",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/634#issuecomment-5072320128",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#638@2026-07-03T18:16:08Z": {
+  "hash": "56edd280ccebb632",
+  "verdict": "fixed",
+  "quote": "thx alot. should be fine for now? i dont see any issue yet in this so far",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/638#issuecomment-4901253972",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#641@2026-07-10T23:30:29Z": {
+  "hash": "46f061462984e74b",
+  "verdict": "fixed",
+  "quote": "It's reeaaaaally better. Thanks a lot.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/641#issuecomment-4945015106",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#667@2026-07-05T02:26:25Z": {
+  "hash": "19da0609a50274d4",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.16.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/667#issuecomment-4899603607",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#668@2026-07-06T20:30:52Z": {
+  "hash": "19da0609a50274d4",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.16.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/668#issuecomment-4899604282",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#669@2026-07-07T01:37:15Z": {
+  "hash": "19da0609a50274d4",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.16.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/669#issuecomment-4899605627",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#672@2026-07-11T06:48:48Z": {
+  "hash": "97c792cc14f330ac",
+  "verdict": "content",
+  "quote": "Awesome. thanks chief.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/672#issuecomment-4949391880",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#683@2026-07-06T14:12:20Z": {
+  "hash": "1ef6f3e86d1cb67e",
+  "verdict": "partial",
+  "quote": "Thanks a lot—the percentages are gone, but \"currently reading\" is still there...",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/683#issuecomment-4900523234",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#683@2026-07-08T02:17:56Z": {
+  "hash": "12a8c29288fbe5b6",
+  "verdict": "content",
+  "quote": "Many thanks to all the developers for the quick implementation... you guys are great!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/683#issuecomment-4912032927",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#684@2026-07-05T00:21:40Z": {
+  "hash": "d847550f272a26a4",
+  "verdict": "fixed",
+  "quote": "This issue was resolved with the uodate and the issue can be closed.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/684#issuecomment-5070792814",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#690@2026-07-08T02:17:56Z": {
+  "hash": "4df6f42e9822eeb0",
+  "verdict": "fixed",
+  "quote": "@new-usemame just tested this and can confirm it works now. Thanks for the quick turnaround!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/690#issuecomment-4925975051",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#699@2026-07-12T21:50:09Z": {
+  "hash": "4add0956954cc35e",
+  "verdict": "content",
+  "quote": "Thanks for the quick follow up!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/699#issuecomment-4963233908",
+  "by": "review"
+ },
+ "issue#699@2026-07-14T01:19:52Z": {
+  "hash": "0236deb74b244f68",
+  "verdict": "partial",
+  "quote": "Highlight 1 (from phone, now also on webUI) does NOT sync to device 2 (tablet)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/699#issuecomment-4990621085",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#699@2026-07-20T18:14:05Z": {
+  "hash": "a12bc0327b1ced4b",
+  "verdict": "not_fixed",
+  "quote": "As mentioned in my latest comment in #920, sadly i still get a server push error (not ignoring the amount of work you've done on this topic already, so thanks a lot for that!)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/699#issuecomment-5032235773",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#699@2026-07-29T22:55:33Z": {
+  "hash": "a2bc771b4efc9c8f",
+  "verdict": "fixed",
+  "quote": "V4.1.25 fixes the deleted highlight server push failed error! The syncing works as expected now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/699#issuecomment-5128546372",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#707@2026-07-08T02:17:56Z": {
+  "hash": "f0e0a608f19e852d",
+  "verdict": "fixed",
+  "quote": "@new-usemame I have verified and on v4.1.7 it works just as expected! Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/707#issuecomment-4913176456",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#716@2026-07-07T08:31:39Z": {
+  "hash": "a833db385307f2e4",
+  "verdict": "not_fixed",
+  "quote": "Still having the same problem, I’m running it as a Home Screen app.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/716#issuecomment-4948494241",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#716@2026-08-02T16:33:13Z": {
+  "hash": "43fd0d60c185d27c",
+  "verdict": "content",
+  "quote": "🙏👌",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/716#issuecomment-5159374342",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#719@2026-07-08T20:25:45Z": {
+  "hash": "c91d377d102f2afb",
+  "verdict": "partial",
+  "quote": "These buttons on the first screen redirect you to the old interface. And some of the text there isn't translated.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/719#issuecomment-4950708702",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#719@2026-07-12T20:50:29Z": {
+  "hash": "d907dc46928dc3bd",
+  "verdict": "fixed",
+  "quote": "No, all the labels are now translated correctly.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/719#issuecomment-4965815602",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#723@2026-07-12T17:23:00Z": {
+  "hash": "8c36a458ac55ed17",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.11. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/723#issuecomment-4952768422",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#724@2026-07-08T02:17:56Z": {
+  "hash": "d4f4db14ee12ae41",
+  "verdict": "fixed",
+  "quote": "That worked perfectly - thank you for fixing it @new-usemame!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/724#issuecomment-4912612785",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#724@2026-07-11T04:37:04Z": {
+  "hash": "253b2daa7da93742",
+  "verdict": "not_fixed",
+  "quote": "trying to configure kfx input plugin, and it is not working for me",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/724#issuecomment-5990324719",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#736@2026-07-12T04:45:46Z": {
+  "hash": "694e4cea58c5485c",
+  "verdict": "fixed",
+  "quote": "Finally have a light theme!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/736#issuecomment-5029322707",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#737@2026-07-10T00:59:11Z": {
+  "hash": "b60063d1f9937d07",
+  "verdict": "fixed",
+  "quote": "I believe it's fixed, but #1048 makes it hard to check!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/737#issuecomment-5029317752",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#739@2026-07-11T00:29:24Z": {
+  "hash": "aaad1f6141e85b43",
+  "verdict": "partial",
+  "quote": "I'm still finding (in 4.1.11) that going to any admin page under \"More Server Configuration\" switches to the classic UI. The only difference since I reported it is that the top button now says \"Back to New UI\" instead of \"Switch to new UI\"",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/739#issuecomment-4954006357",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#743@2026-07-09T12:13:59Z": {
+  "hash": "315efc8715fe0427",
+  "verdict": "fixed",
+  "quote": "This issue is fixed (the token can now be set from the env variable)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/743#issuecomment-4955181793",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#750@2026-07-10T00:54:59Z": {
+  "hash": "015a85dafeaed94d",
+  "verdict": "fixed",
+  "quote": "It's okay in v4.1.18, thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/750#issuecomment-4931254380",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#765@2026-07-14T02:14:13Z": {
+  "hash": "3cee49302ec05608",
+  "verdict": "content",
+  "quote": "Done in 0f879db.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/765#issuecomment-4964823896",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#769@2026-07-11T00:23:54Z": {
+  "hash": "cf5fb2e662b13b86",
+  "verdict": "content",
+  "quote": "Thanks chief!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/769#issuecomment-4942166165",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#771@2026-07-11T06:47:49Z": {
+  "hash": "3f4f9b666de520a7",
+  "verdict": "fixed",
+  "quote": "Fixed! Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/771#issuecomment-4989449872",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#776@2026-07-11T00:11:41Z": {
+  "hash": "17499a15856d9ef1",
+  "verdict": "fixed",
+  "quote": "This one is fixed, thanks",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/776#issuecomment-5033506333",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#778@2026-07-10T23:37:36Z": {
+  "hash": "4d79aef9049062e6",
+  "verdict": "fixed",
+  "quote": "Yes, it's done and it's cool!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/778#issuecomment-4943300738",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#779@2026-07-11T05:28:12Z": {
+  "hash": "eb6bb893ab6c27a6",
+  "verdict": "not_fixed",
+  "quote": "Yes, the design itself has changed. But it doesn't work in the new interface. I can't select stars when changing the rating.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/779#issuecomment-5029030917",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#782@2026-07-11T00:32:25Z": {
+  "hash": "efdf5c890c5d7fc9",
+  "verdict": "fixed",
+  "quote": "I confirm the fix in 4.1.9, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/782#issuecomment-4942461599",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#784@2026-07-10T22:38:10Z": {
+  "hash": "3c600dcb594e6765",
+  "verdict": "fixed",
+  "quote": "I can confirm that the shelves are indeed loading in the new UI and the classic UI. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/784#issuecomment-4943852515",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#797@2026-07-11T06:41:39Z": {
+  "hash": "72a30d5fbc0bcd47",
+  "verdict": "fixed",
+  "quote": "This particular issue seems to be fixed, but I'm routinely seeing cases where I retrieve metadata that _should_ include covers and the cover isn't being saved.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/797#issuecomment-5029198172",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#798@2026-07-11T04:48:00Z": {
+  "hash": "6245c8e74597c02f",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.10, thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/798#issuecomment-4949306704",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#799@2026-07-11T04:41:38Z": {
+  "hash": "f0aec1c3c0370510",
+  "verdict": "fixed",
+  "quote": "Definitely!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/799#issuecomment-5028335494",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#801@2026-07-11T06:44:42Z": {
+  "hash": "a1f62a271e0c588a",
+  "verdict": "fixed",
+  "quote": "you need to follow the instructions in the log to clear them--basically editing the metadata for the book.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/801#issuecomment-5395142891",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#802@2026-07-11T19:34:07Z": {
+  "hash": "31fe6c635865d135",
+  "verdict": "fixed",
+  "quote": "Works for me!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/802#issuecomment-5029176970",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#803@2026-07-11T20:05:29Z": {
+  "hash": "68c9102ac80aed95",
+  "verdict": "fixed",
+  "quote": "Button now there and does delete! Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/803#issuecomment-4949660580",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#805@2026-07-11T20:00:04Z": {
+  "hash": "15c952b2d7c6fcb6",
+  "verdict": "fixed",
+  "quote": "Tested with a few books and seems to work!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/805#issuecomment-4949658102",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#807@2026-07-11T19:26:48Z": {
+  "hash": "f338bb40858356d0",
+  "verdict": "fixed",
+  "quote": "Confirming that it's working for me! Thanks for the quick address!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/807#issuecomment-4949439281",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#807@2026-07-13T22:25:17Z": {
+  "hash": "1b396f9fce8a89a0",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/807#issuecomment-4965545496",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#819@2026-07-11T16:01:03Z": {
+  "hash": "dbe9a1b40e3ea31c",
+  "verdict": "fixed",
+  "quote": "Appears to be working correctly now, thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/819#issuecomment-4950353966",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#821@2026-07-11T16:01:03Z": {
+  "hash": "20b65861c3b377ce",
+  "verdict": "fixed",
+  "quote": "Just checked and the task is running while I type this.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/821#issuecomment-4950719396",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#824@2026-07-12T17:04:12Z": {
+  "hash": "47571f1027136326",
+  "verdict": "fixed",
+  "quote": "Working for me, thanks! I logged on about 24 hours ago, and just returned now, and it sent me to the login page as soon as I tried to do anything.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/824#issuecomment-4964626901",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#850@2026-07-12T17:23:00Z": {
+  "hash": "8c36a458ac55ed17",
+  "verdict": "fixed",
+  "quote": "Fixed in 4.1.11. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/850#issuecomment-4952765239",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#863@2026-07-19T05:25:12Z": {
+  "hash": "ceb6c91efdf24948",
+  "verdict": "fixed",
+  "quote": "I can see that the read now button and the Edit button now appear side-by-side, and no longer overlap.  They're also consistently aligned to the bottom of the book card, so I think you can mark this one as complete.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/863#issuecomment-5277573499",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#868@2026-07-19T20:22:56Z": {
+  "hash": "2a891c63a7533615",
+  "verdict": "fixed",
+  "quote": "For total startup it's gone from > 5m to 46s! Brilliant work, guys!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/868#issuecomment-5074826251",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#874@2026-07-16T08:48:03Z": {
+  "hash": "6f48be5972a394a3",
+  "verdict": "content",
+  "quote": "Closing in favor of #941.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/874#issuecomment-4998381405",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#875@2026-07-19T20:22:56Z": {
+  "hash": "9949de2ca658f9a9",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.19.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/875#issuecomment-5031831821",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#876@2026-07-14T10:41:49Z": {
+  "hash": "3eefeafae5641d3e",
+  "verdict": "fixed",
+  "quote": "I ran another manual auto-fetch and did not see any errors like last time",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/876#issuecomment-5278327311",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#877@2026-07-14T16:19:25Z": {
+  "hash": "27dfa371c2d682bf",
+  "verdict": "fixed",
+  "quote": "its works now thanks i just try it",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/877#issuecomment-5305456105",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#878@2026-07-14T01:53:07Z": {
+  "hash": "9ae5b310a973e9af",
+  "verdict": "fixed",
+  "quote": "I updated to v4.1.13 and the missing fields in the new UI are there. Thx.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/878#issuecomment-4979997521",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#928@2026-07-16T14:33:57Z": {
+  "hash": "b1a676774a66f94d",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.15.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/928#issuecomment-4998363761",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#944@2026-07-16T10:45:40Z": {
+  "hash": "9717fe80b56fcbbf",
+  "verdict": "fixed",
+  "quote": "Same group, re-triggered after the full 2 minutes passed, resolved cleanly with no cooldown skip.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/944#issuecomment-4993711092",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#948@2026-07-16T20:41:34Z": {
+  "hash": "b1a676774a66f94d",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.15.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/948#issuecomment-4998360835",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#954@2026-07-16T16:44:24Z": {
+  "hash": "26c0ac54e9838ffb",
+  "verdict": "fixed",
+  "quote": "Verified! Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/954#issuecomment-4998580161",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#973@2026-08-04T12:31:19Z": {
+  "hash": "f111af82ad9e41f6",
+  "verdict": "fixed",
+  "quote": "Thanks! This is working well now, both on the main screen, and the per-tag screen.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/973#issuecomment-5193426514",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#984@2026-07-29T14:35:37Z": {
+  "hash": "945f2cba8f6248d8",
+  "verdict": "partial",
+  "quote": "it works, but requires auto-convert to be enabled. otherwise there is a log entry saying sth like _no suitable plugin found_",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/984#issuecomment-5436815220",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#984@2026-08-28T05:03:10Z": {
+  "hash": "2d76b38273b9c6f7",
+  "verdict": "partial",
+  "quote": "I think I may have found the remaining edge case.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/984#issuecomment-5760510228",
+  "by": "review"
+ },
+ "issue#987@2026-07-19T15:02:32Z": {
+  "hash": "0f8cf4999b75798d",
+  "verdict": "fixed",
+  "quote": "Fixed in v4.1.18.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/987#issuecomment-5020245107",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#989@2026-07-25T20:13:54Z": {
+  "hash": "eb48b6737ee99e61",
+  "verdict": "fixed",
+  "quote": "Fixed in the `/cwa/app/book/<id>/edit` page in v4.1.21.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/989#issuecomment-5082212051",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#991@2026-07-28T08:28:09Z": {
+  "hash": "56bd8e98c2e44098",
+  "verdict": "fixed",
+  "quote": "All apologies, was on my network side, a forgotten VPN switch enabled router-side that caused the timeouts.... seems in order now! Thanks a lot for the help and fix for the KoReader synching part !",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/991#issuecomment-5117218745",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#997@2026-07-29T17:02:01Z": {
+  "hash": "1ac091bf4a6066dc",
+  "verdict": "fixed",
+  "quote": "My issue was resolved a few versions back. I'm all good!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/997#issuecomment-5226113891",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#997@2026-08-08T22:03:24Z": {
+  "hash": "90ec97cb04394811",
+  "verdict": "fixed",
+  "quote": "I was traveling when the fix was released but happy to report that I'm in good shape as well. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/997#issuecomment-5382487235",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#2651@2026-05-27T05:45:00Z": {
+  "hash": "7078897888b3dbd7",
+  "verdict": "none",
+  "quote": "Thank you @new-usemame but I'm not running nginx but the problem persists, and my Kobo doesn't throw any errors; it simply refuses to sync.",
+  "evidence": "https://github.com/janeczku/calibre-web/issues/2651#issuecomment-4552150242",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#2816@2026-05-17T20:01:15Z": {
+  "hash": "e0e7a117f22eb311",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3274@2026-05-08T20:32:06Z": {
+  "hash": "e278589ea148ecf9",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/janeczku/calibre-web/issues/3274#issuecomment-4494133856",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3298@2026-05-17T22:19:11Z": {
+  "hash": "ff0ed4bf3e5ebe02",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/janeczku/calibre-web/issues/3298#issuecomment-4875711071",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3437@2026-05-08T08:14:40Z": {
+  "hash": "d38f074e520bff4a",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3596@2026-05-08T08:14:33Z": {
+  "hash": "9f7e3ab9421e67a4",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "janeczku/calibre-web#3606@2026-05-18T01:36:43Z": {
+  "hash": "0cfb0ff44df068a2",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3639@2026-05-20T22:15:27Z": {
+  "hash": "869df60767029ae7",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/janeczku/calibre-web/issues/3639#issuecomment-5403135617",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3648@2026-05-21T16:57:23Z": {
+  "hash": "1d9f2f65f6bcc139",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "janeczku/calibre-web#3668@2026-07-09T20:03:20Z": {
+  "hash": "298290233b259825",
+  "verdict": "content",
+  "quote": "Glad the fix carried over to NextGen!",
+  "evidence": "https://github.com/janeczku/calibre-web/pull/3668#issuecomment-4946910756",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#107@2026-05-08T23:52:40Z": {
+  "hash": "4528b24b26f51816",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#1152@2026-07-28T18:16:42Z": {
+  "hash": "f551d3d9a4af5831",
+  "verdict": "content",
+  "quote": "Makes sense. Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1152#issuecomment-5108152537",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#1231@2026-07-29T18:52:41Z": {
+  "hash": "acba6bfc4475c677",
+  "verdict": "content",
+  "quote": "I agree with the `pyproject.toml` modification. See my \"For the future\" comments for more explanation about this change.\r\n\r\nThanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1231#issuecomment-5122325799",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#1274@2026-07-31T14:52:20Z": {
+  "hash": "5e43ec16657e920d",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1274#issuecomment-5144624729",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#1333@2026-08-03T18:21:13Z": {
+  "hash": "8b1ad64f1e59bd26",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1333#issuecomment-5170201759",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#1438@2026-08-08T02:24:20Z": {
+  "hash": "ee879c924d388dfa",
+  "verdict": "content",
+  "quote": "Thank you very much @new-usemame !",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1438#issuecomment-5224124940",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#1548@2026-08-13T11:08:43Z": {
+  "hash": "f15df5ed9681bf53",
+  "verdict": "content",
+  "quote": "Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1548#issuecomment-5279652424",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#2086@2026-09-01T02:13:04Z": {
+  "hash": "889bd8bfc4e4bd92",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#2096@2026-09-01T16:59:21Z": {
+  "hash": "535acf17ab34dce8",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2096#issuecomment-5507720560",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#2231@2026-09-28T20:58:34Z": {
+  "hash": "d0d1b7813773f4fe",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "pr#350@2026-06-04T18:03:57Z": {
+  "hash": "3c8842bc19569824",
+  "verdict": "content",
+  "quote": "Thanks for the effort pulling these!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/350#issuecomment-4637750608",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#386@2026-06-12T07:43:58Z": {
+  "hash": "f7fe8724f11ca194",
+  "verdict": "content",
+  "quote": "This is wonderful!! Exactly why earlier on i had some major trouble after using calibre desktop..thanks a lot!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/386#issuecomment-4698758470",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#387@2026-06-12T07:31:25Z": {
+  "hash": "8fab23969b63e553",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/387#issuecomment-4690602935",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#443@2026-06-12T23:02:27Z": {
+  "hash": "216d73ca88aadc90",
+  "verdict": "content",
+  "quote": "Nice, thank your for the quick response!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/443#issuecomment-4697605729",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#945@2026-07-16T12:11:55Z": {
+  "hash": "8e1c718a1e0e0c52",
+  "verdict": "none",
+  "quote": "I will test it out later this evening",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/945#issuecomment-4992655372",
+  "by": "deepseek-v4.1-flash"
+ },
+ "pr#970@2026-07-17T10:14:43Z": {
+  "hash": "dcae4db02e5b58aa",
+  "verdict": "content",
+  "quote": "Cool, no problem, bro",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/970#issuecomment-5003017866",
+  "by": "deepseek-v4.1-flash"
+ }
+}

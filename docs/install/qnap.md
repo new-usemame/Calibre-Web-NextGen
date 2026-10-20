@@ -5,7 +5,7 @@ docker-compose files). Works whether you're installing fresh or switching from t
 Calibre-Web-Automated (CWA) image.
 
 **Your books, users, settings and the Read checkmarks you've set all live in the folders
-mapped into the container — nothing gets converted or deleted, and you can undo the whole
+mapped into the container; nothing gets converted or deleted, and you can undo the whole
 thing** by starting your old application again.
 
 > **Needs hardware verification:** these QNAP labels and steps are docs-verified, but we do not
@@ -19,7 +19,7 @@ thing** by starting your old application again.
    `/cwa-book-ingest` (Container Station shows these under the container's **Storage** /
    volume settings).
 3. Note the `PUID`, `PGID`, and `TZ` from its **Environment** settings.
-4. **Stop** the old container — but **don't delete it.** A stopped container is your instant
+4. **Stop** the old container, but **don't delete it.** A stopped container is your instant
    undo.
 
 *(Fresh install? Skip the four steps above and just decide which QNAP shared folders you want
@@ -53,10 +53,10 @@ for `/config`, `/calibre-library` and `/cwa-book-ingest`, and your `PUID`/`PGID`
    switching), so your existing library and settings carry over. To find a QNAP path, browse
    the folder in **File Station** and read the path at the top.
 3. **Create.** Container Station pulls the image from ghcr.io and starts it. Open
-   `http://<qnap-ip>:8083` and log in with your usual account — your library, users and Read
+   `http://<qnap-ip>:8083` and log in with your usual account. Your library, users and Read
    checkmarks are all there.
 
-## Updating later — important
+## Updating later (important)
 
 Restarting the container does **not** pull a newer image. To actually update:
 
@@ -69,7 +69,7 @@ Restarting the container does **not** pull a newer image. To actually update:
    If your Container Station version has no "recreate/pull" option, delete the **container**
    first (your data in the shared folders is untouched), then delete the cached
    `ghcr.io/new-usemame/calibre-web-nextgen:latest` image under **Images**, then **Create** the
-   application again from the same YAML — that forces a fresh pull.
+   application again from the same YAML. That forces a fresh pull.
 
 ---
 

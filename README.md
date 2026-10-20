@@ -7,42 +7,85 @@
 [![Open issues](https://img.shields.io/github/issues/new-usemame/Calibre-Web-NextGen)](https://github.com/new-usemame/Calibre-Web-NextGen/issues)
 [![Sponsor](https://img.shields.io/badge/Sponsor-nothing%20paywalled-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/new-usemame)
 
+Calibre-Web-NextGen (CWNG) is a self-hosted ebook library you use from a browser, an e-reader or any OPDS app. It's built on [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated) (CWA) and works as a drop-in replacement for its Docker image. Community fixes and new features ship in frequent releases.
+
 ---
 
 ## Switch from upstream CWA
+
+Change one line in your compose file:
 
 ```diff
 - image: crocodilestick/calibre-web-automated:latest
 + image: ghcr.io/new-usemame/calibre-web-nextgen:latest
 ```
 
+Then pull and recreate the container:
+
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-Library, settings, users, OAuth tokens, and KOReader sync state are preserved. Switching back is the reverse one-line change.
+Your library, settings, users, OAuth tokens and KOReader sync state live in your volumes and carry over. To switch back, reverse the line.
 
-> **Not using a terminal?** If you run Docker through a NAS or a GUI, follow a step-by-step guide instead — they cover both a fresh install and switching from CWA, with the exact buttons for your platform: **[Synology](docs/install/synology.md) · [Unraid](docs/install/unraid.md) · [Portainer](docs/install/portainer.md) · [TrueNAS SCALE](docs/install/truenas.md) · [all guides](docs/install/)**. Configuration not matching? [Open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [ask on Discord](https://discord.gg/B8NXZmcp32) and we'll walk you through it.
+Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step guide for your platform. Each one covers a fresh install and a switch from CWA, button by button: [Synology](docs/install/synology.md) · [Unraid](docs/install/unraid.md) · [Portainer](docs/install/portainer.md) · [TrueNAS SCALE](docs/install/truenas.md) · [all guides](docs/install/). If your screens don't match, [open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [ask on Discord](https://discord.gg/B8NXZmcp32).
 
-- **Bug?** [File it here.](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md)
-- **Feature idea?** [Open a request.](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md) Anything goes, no checklist required — even half-formed ideas are welcome and help prioritize what to look at next.
-- **New here?** See [Quick start](#quick-start) below.
-- **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
-- **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
-- **Wondering how AI is used here?** [How AI is used](#how-ai-is-used) — used heavily to develop this fork, not at all in the software you run, and what gates it.
+- New install? Start with the [Quick start](#quick-start).
+- Found a bug? [File it here](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml).
+- Have an idea, even a half-formed one? [Open a feature request](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.yml). No checklist required.
+- Setting up with an AI assistant? Point it at [`AI_README.md`](AI_README.md), a guide written for the assistant to follow, verify and hand back to you working.
+- AI does much of the development work on this fork and none of the work in the app you run. [How AI is used](#how-ai-is-used) explains the review gates.
+- Want to back the work? [Sponsor on GitHub](https://github.com/sponsors/new-usemame), one-time or monthly. Nothing is paywalled.
+
+---
+
+## Progress tracker
+
+<!-- progress-tracker:start (regenerate with scripts/progress_tracker.py; do not hand-edit) -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-throughput-dark.svg">
+  <img alt="Pull request throughput: 42 open, 1,761 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-outcomes-dark.svg">
+  <img alt="Fix outcomes by week: 250 happy, 79 not fixed, 428 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
+</picture>
+
+On October 20, 2026, 42 pull requests were open and 1,761 closed, 1,620 of them merged. Of 757 fixes delivered to a person, 33% heard back happy, 10% not fixed and 57% got no reply. When someone did answer, the answer was happy 76% of the time.
+
+A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model and checked by a second; where they disagree the thread is reread and settled. Every verdict and the quote behind it are in [docs/progress-tracker](docs/progress-tracker/). Replies on Discord and Reddit are not counted.
+
+<details><summary>The numbers by month</summary>
+
+| Month | PRs opened | PRs closed | Open, daily average | Happy | Not fixed | No reply |
+|---|---:|---:|---:|---:|---:|---:|
+| May 2026 | 270 | 266 | 2 | 38 | 16 | 169 |
+| Jun 2026 | 168 | 168 | 4 | 32 | 13 | 26 |
+| Jul 2026 | 359 | 362 | 3 | 107 | 26 | 70 |
+| Aug 2026 | 578 | 573 | 11 | 35 | 14 | 71 |
+| Sep 2026 | 224 | 218 | 12 | 23 | 4 | 33 |
+| Oct 2026 | 204 | 174 | 29 | 15 | 6 | 59 |
+
+Regenerate with `python3 scripts/progress_tracker.py fetch`, then `queue`, judge the new replies, `apply` and `render`.
+
+</details>
+<!-- progress-tracker:end -->
 
 ---
 
 ## Table of contents
 
-> **Prefer a browsable version?** The same guides live in the **[project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki)** — install, configuration, KOReader/Kobo sync, and troubleshooting, split into pages with a sidebar.
+Prefer separate pages with a sidebar? The [project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki) carries these same guides.
 
 - [Why this fork exists](#why-this-fork-exists)
 - [What's included](#whats-included)
 - [Quick start](#quick-start)
 - [Full Docker Compose setup](#full-docker-compose-setup)
-- [Runtime path overrides for packagers](#runtime-path-overrides-for-packagers)
+  - [What goes in each volume](#what-goes-in-each-volume)
+  - [Running with Podman](#running-with-podman)
 - [First run](#first-run)
+- [Updating](#updating)
 - [Migrating](#migrating)
   - [From upstream CWA](#from-upstream-cwa)
   - [From stock Calibre-Web](#from-stock-calibre-web)
@@ -51,13 +94,15 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
   - [Network shares (NFS, SMB, ZFS)](#network-shares-nfs-smb-zfs)
   - [Calibre desktop coexistence](#calibre-desktop-coexistence)
   - [Calibre plugins (DeDRM and others)](#calibre-plugins-dedrm-and-others)
-  - [Reverse proxy with a prefix](#reverse-proxy-with-a-prefix)
   - [Reverse proxy / Cloudflare Tunnel](#reverse-proxy--cloudflare-tunnel)
+  - [Reverse proxy with a prefix](#reverse-proxy-with-a-prefix)
   - [Hardcover metadata provider](#hardcover-metadata-provider)
   - [KOReader sync](#koreader-sync)
   - [Kobo sync](#kobo-sync)
+  - [Writable cache storage](#writable-cache-storage)
 - [Troubleshooting](#troubleshooting)
 - [Differences from upstream](#differences-from-upstream)
+- [Translations](#translations)
 - [Contributing](#contributing)
 - [Supporting the project](#supporting-the-project)
 - [How AI is used](#how-ai-is-used)
@@ -67,35 +112,32 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 
 ## Why this fork exists
 
-CWA has an open PR queue with community-submitted bug fixes that aren't in the latest published image. This build picks the safe ones, ships them in regular releases, and adds fresh fixes for high-impact bugs that don't have an upstream PR yet. Feature work happens here too, driven by what users ask for in the issue tracker.
+The goal is to get fixes to users quickly. Community pull requests, including ones waiting in CWA's queue, are reviewed and merged here, and bugs reported here get fixed whether or not someone has sent a patch. Feature work follows what people ask for in the issue tracker, and all of it ships in regular releases.
 
-The data format and configuration are byte-compatible with upstream, so swapping images is reversible and migrations aren't needed in either direction.
+The data format and configuration match upstream CWA, so switching images is reversible and needs no migration in either direction.
 
 ---
 
 ## What's included
 
-Everything CWA has, plus the patches in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md). A representative slice of fixes that are in this build but not in `crocodilestick/calibre-web-automated:latest`:
+CWNG is built on CWA and adds the changes listed in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md). Some you'll notice:
 
-- Cover saves from Hardcover, Google Books, iTunes, and Open Library (was returning "not a valid image" since 4.0.6).
-- Metadata search and the book-delete button on Safari.
-- Generate Kobo Auth Token (was returning a blank page).
-- Kobo bookmark sync no longer crashes when the client omits `Location`.
-- Auth check added to 14 admin routes (`cwa_logs`, `convert`, `epub_fixer`, and others) that previously didn't require admin.
-- Cover-enforcer shell-injection on filenames containing quotes.
-- Reverse proxy: user-profile saves honor the path prefix.
-- Docker healthcheck follows the `/ → /login` 302 instead of failing on it.
-- `.cbr` and `.cbz` use IANA-registered mimetypes in OPDS feeds.
-- Higher-resolution covers from Google Books, Amazon, and an iTunes-backed fallback for high-DPI e-readers (Libra Color, etc.).
-- Translation PRs merged: ja, fr, cs, hu, zh_Hans, zh_Hant, and others.
+- A redesigned interface, the New UI, with the Classic interface still available.
+- On a Kindle or any e-reader running KOReader, the plugin opens on your library's covers, downloads a book when you tap it, and syncs position, read status and highlights back. See [Your library on a Kindle](docs/koreader-kindle.md).
+- Kobo sync of the shelves you choose, which appear on the device as collections. See [Choosing which books go to your Kobo](docs/kobo-shelves.md).
+- [Reading status](docs/reading-status.md), [ratings](docs/personal-book-ratings.md) and [private reviews](docs/private-book-reviews.md) kept per account.
+- Sharper covers for high-DPI e-readers, a [cover designer](docs/cover-designer.md) for books that have none, and [ISBN lookup inside book files](docs/file-isbn.md).
+- [Book sources (Beta)](docs/book-sources.md): request books from OPDS catalogs and Newznab/Torznab indexers and have them imported through the normal ingest. New UI only, off by default.
+- A Docker healthcheck that also fails when the library database, the ingest service or the metadata-change service is down.
+- An update helper in the app that gives the exact update command for your setup.
 
 ---
 
 ## Quick start
 
-Requirements: Docker and Docker Compose.
+You need Docker with Docker Compose.
 
-1. Make a folder for your library:
+1. Make folders for your library:
 
    ```bash
    mkdir -p ~/calibre-web/{config,library,ingest}
@@ -128,17 +170,17 @@ Requirements: Docker and Docker Compose.
    docker compose up -d
    ```
 
-4. Open `http://localhost:8083`, log in with `admin` / `admin123`, change the password.
+4. Open `http://localhost:8083`, sign in as `admin` / `admin123`, and change the password.
 
-Drop an `.epub` into `./ingest/` and it will appear in your library within a few seconds.
+Drop an `.epub` into `./ingest/` and it shows up in your library within a few seconds.
 
-> Files in your library and ingest folders should be owned by your `PUID:PGID` user (1000 by default), not root. If you've copied books in as root, run once: `sudo chown -R 1000:1000 ~/calibre-web`.
+> Files in your library and ingest folders should belong to your `PUID:PGID` user (1000 by default), not root. If you copied books in as root, fix that once with `sudo chown -R 1000:1000 ~/calibre-web`.
 
 ---
 
 ## Full Docker Compose setup
 
-A more complete compose file, with each option documented:
+A fuller compose file, with a comment on each option:
 
 ```yaml
 services:
@@ -146,55 +188,55 @@ services:
     image: ghcr.io/new-usemame/calibre-web-nextgen:latest
     container_name: calibre-web
     environment:
-      # Match your host user/group so files in your library
-      # are writable from both the container and the host.
+      # Match your host user and group (run `id` to see them) so the
+      # container and the host can both write to your library.
       - PUID=1000
       - PGID=1000
 
       # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
       - TZ=America/New_York
 
-      # Override the in-container port if you need to.
-      # If set below 1024, also uncomment cap_add below.
+      # Port inside the container. If you set it below 1024,
+      # also uncomment cap_add below.
       - CWA_PORT_OVERRIDE=8083
 
-      # Set this if your /config or /calibre-library volumes are
-      # on an NFS or SMB share. See "Network shares" below.
+      # Set to true if /config or /calibre-library is on an NFS or
+      # SMB share. See "Network shares" below.
       - NETWORK_SHARE_MODE=false
 
-      # If you sit behind multiple proxies (e.g. Cloudflare Tunnel
-      # then nginx then CWA), set this to the total proxy count so
-      # session protection sees the right client IP. Default 1.
+      # How many proxies sit in front of the container (for example
+      # Cloudflare Tunnel, then nginx), so session protection sees
+      # the real client IP. Default 1.
       - TRUSTED_PROXY_COUNT=1
 
-      # Optional: Hardcover API token for the Hardcover metadata
-      # provider. Free; sign up at https://hardcover.app/account/api
+      # Optional: token for the Hardcover metadata provider.
+      # Free at https://hardcover.app/account/api
       # - HARDCOVER_TOKEN=eyJhbGciOiJIUzI1NiI...
 
-      # Optional: your own ComicVine API key. ComicVine works without
-      # one, on a key shared by every install, so it can hit the rate
-      # limit. Free; sign up at https://comicvine.gamespot.com/api/
+      # Optional: your own ComicVine API key. Without one, ComicVine
+      # uses a key shared by every install and can hit its rate limit.
+      # Free at https://comicvine.gamespot.com/api/
       # - COMICVINE_API_KEY=...
 
-      # Optional: override paths inside the container. The matching
-      # volume targets below must use the same paths.
+      # Optional: paths inside the container. The volume targets
+      # below must use the same paths.
       # - CWA_INGEST_FOLDER=/cwa-book-ingest
       # - CWA_CALIBRE_LIBRARY_DIR=/calibre-library
       # - CWA_TMP_CONVERSION_DIR=/config/.cwa_conversion_tmp
 
     volumes:
-      # Settings, user database, logs. Empty folder for new installs;
-      # for existing CWA users, point at your existing /config.
+      # Settings, user database, logs. New install: an empty folder.
+      # Coming from CWA: your existing /config.
       - /path/to/config:/config
 
-      # Your Calibre library. New install? Use an empty folder and
-      # CWA will set one up. Existing user? Point at the folder
-      # containing your metadata.db.
+      # Your Calibre library. New install: an empty folder, and CWNG
+      # creates a library in it. Existing library: the folder that
+      # holds metadata.db.
       - /path/to/library:/calibre-library
 
       # Drop new books here to import them. WARNING: files in this
-      # folder are DELETED after processing. Don't point this at a
-      # folder you also use as long-term storage.
+      # folder are DELETED after processing. Never point it at a
+      # folder you also use for long-term storage.
       - /path/to/ingest:/cwa-book-ingest
 
       # Optional: bind your existing Calibre plugins folder
@@ -212,87 +254,57 @@ services:
 
 ### What goes in each volume
 
-| Volume | What it is | Notes |
+| Volume | What it holds | Notes |
 |---|---|---|
-| `/config` | App settings, user accounts, OAuth tokens, KOReader sync state, logs | Empty folder for new installs. Carries over from CWA verbatim. |
-| `/calibre-library` | Books and Calibre's `metadata.db` | If empty, CWA creates a fresh library. If multiple `metadata.db` files exist inside, CWA picks the largest. |
-| `/cwa-book-ingest` | Drop zone for new books | Files here are **deleted** after processing. Don't park books here long-term. |
+| `/config` | App settings, user accounts, OAuth tokens, KOReader sync state, logs | Empty folder for a new install. Carries over from CWA as is. |
+| `/calibre-library` | Your books and Calibre's `metadata.db` | If it's empty, CWNG creates a new library. If it holds several `metadata.db` files, CWNG uses the largest. |
+| `/cwa-book-ingest` | Drop zone for new books | Files here are **deleted** after processing. Don't keep books here. |
 
-> Don't nest the binds. All three should be separate top-level folders. Putting `ingest` inside `library` produces recursive ingest behavior.
+Keep all three as separate top-level folders. Nesting `ingest` inside `library` makes ingest run recursively.
 
----
+Packaging CWNG outside Docker, as a distro package or a systemd service? [Runtime path overrides for packagers](docs/runtime-paths.md) covers the path variables and `dirs.json`.
 
-## Runtime path overrides for packagers
+### Running with Podman
 
-Bare-metal and distro packages can configure all three runtime paths from the
-process environment instead of editing `dirs.json` inside the installation:
-
-| Environment variable | `dirs.json` fallback | Compiled-in default |
-|---|---|---|
-| `CWA_INGEST_FOLDER` | `ingest_folder` | `/cwa-book-ingest` |
-| `CWA_CALIBRE_LIBRARY_DIR` | `calibre_library_dir` | `/calibre-library` |
-| `CWA_TMP_CONVERSION_DIR` | `tmp_conversion_dir` | `/config/.cwa_conversion_tmp` |
-
-Each non-blank environment value wins for its key. If it is unset or blank,
-CWNG reads that key from the file selected by `CWA_DIRS_JSON`; a missing or
-malformed file, a non-object document, or a null/blank value falls back to the
-compiled-in default. Existing hand-edited `dirs.json` files therefore remain
-supported.
-
-Runtime path values are trimmed and lexically normalized, and must be absolute,
-non-root paths without a `..` component. Repeated separators, `.` components,
-and trailing separators are collapsed without resolving symlinks. A non-blank
-environment or `dirs.json` value that violates that contract stops the affected
-startup service instead of letting an unsafe path reach file watchers or
-recursive ownership operations.
-
-For example, a systemd unit can load a packager-owned file:
-
-```ini
-[Service]
-EnvironmentFile=/etc/calibre-web-nextgen/paths.env
-```
+The image is a standard OCI image, so Podman runs it unchanged:
 
 ```bash
-CWA_INGEST_FOLDER=/srv/calibre-web-nextgen/ingest
-CWA_CALIBRE_LIBRARY_DIR=/srv/calibre/library
-CWA_TMP_CONVERSION_DIR=/var/cache/calibre-web-nextgen/conversion
+podman run -d --name calibre-web \
+  -e PUID=1000 -e PGID=1000 -e TZ=America/New_York \
+  -p 8083:8083 \
+  -v /path/to/config:/config \
+  -v /path/to/library:/calibre-library \
+  -v /path/to/ingest:/cwa-book-ingest \
+  ghcr.io/new-usemame/calibre-web-nextgen:latest
 ```
 
-When `CWA_CALIBRE_LIBRARY_DIR` is set, it is authoritative. Automatic library
-discovery will leave `dirs.json` unchanged; if discovery finds a different
-library, startup stops and reports both paths so the environment file can be
-corrected.
+Rootless Podman remaps user IDs, so if the container can't write to your volumes, add `--userns=keep-id` or run it rootful. Podman also has its own automatic updates with rollback (`podman auto-update`). A step-by-step guide will follow once this recipe has been verified against the image.
 
 ---
 
 ## First run
 
-1. Open the UI at `http://your-host:8083`.
-2. Log in with `admin` / `admin123`.
-3. Change the admin password (Profile → Account).
-4. Go to Admin → Edit Basic Configuration → Feature Configuration and enable **Allow Uploads**. Without this, the metadata-fetch and cover-from-URL features can't write to your library.
-5. Drop a book into your ingest folder. It should appear in the library within a few seconds.
+1. Open `http://your-host:8083`.
+2. Sign in as `admin` / `admin123`.
+3. Change the admin password under Profile → Account.
+4. Under Admin → Edit Basic Configuration → Feature Configuration, turn on **Allow Uploads**. Metadata fetch and cover-from-URL need it to write to your library.
+5. Drop a book into your ingest folder. It appears in the library within a few seconds.
 
-The Admin → Settings panel has many optional toggles (auto-convert formats, automatic backups, EPUB fixer, KOReader sync, OAuth, etc.). The [upstream wiki](https://github.com/crocodilestick/Calibre-Web-Automated/wiki) is the source of truth for those; this fork doesn't change them.
-
-For deployment-managed Generic OIDC credentials and endpoint settings, see the [environment configuration guide](docs/OAUTH-ENVIRONMENT-CONFIGURATION.md).
+Admin → Settings holds many optional switches: auto-convert formats, automatic backups, the EPUB fixer, KOReader sync, OAuth and more. The [upstream CWA wiki](https://github.com/crocodilestick/Calibre-Web-Automated/wiki) documents them. For Generic OIDC credentials and endpoints managed by your deployment, see the [environment configuration guide](docs/OAUTH-ENVIRONMENT-CONFIGURATION.md).
 
 ---
 
 ## Updating
 
-Calibre-Web NextGen ships new versions regularly — often weekly. Updating means pulling the new image and recreating the container; your library, settings and reading progress live in the mounted volumes, so they're left untouched.
-
-**Update once, by hand:**
+Updating means pulling the new image and recreating the container. Your library, settings and reading progress live in the mounted volumes, so they stay as they are.
 
 ```bash
 docker compose pull calibre-web && docker compose up -d calibre-web
 ```
 
-(Use your own service name if it isn't `calibre-web`.)
+Use your own service name if it isn't `calibre-web`. On most NAS web UIs, a restart does **not** pull a new image. The [platform guides](docs/install/) show how to update on Synology, Unraid, Portainer and TrueNAS.
 
-**Update automatically** with [Watchtower](https://github.com/nicholas-fedor/watchtower) (the maintained fork). Add it alongside CWA and label the CWA service so Watchtower only ever touches this one container — your other containers are left alone:
+To update automatically, run [Watchtower](https://github.com/nicholas-fedor/watchtower) (the maintained fork) next to CWNG. The label limits Watchtower to this one container, so your other containers are left alone:
 
 ```yaml
 services:
@@ -308,23 +320,7 @@ services:
     restart: unless-stopped
 ```
 
-The in-app **Admin → NextGen Settings → Automatic updates** panel shows these same steps, and the "Update available" banner has an **Update now** button that gives the right command for your setup (Compose, `docker run`, Unraid, Portainer/Synology).
-
-### Running with Podman
-
-Calibre-Web NextGen is a standard OCI image, so it runs under Podman too — same image, no separate build:
-
-```bash
-podman run -d --name calibre-web \
-  -e PUID=1000 -e PGID=1000 -e TZ=America/New_York \
-  -p 8083:8083 \
-  -v /path/to/config:/config \
-  -v /path/to/library:/calibre-library \
-  -v /path/to/ingest:/cwa-book-ingest \
-  ghcr.io/new-usemame/calibre-web-nextgen:latest
-```
-
-Rootless Podman remaps user IDs, so if the container can't write to your volumes, add `--userns=keep-id` (or run it rootful). Podman also has native automatic updates (`podman auto-update`) with rollback — a step-by-step guide is coming once we've verified it against this image.
+In the app, **Admin → NextGen Settings → Automatic updates** shows the same steps, and the "Update available" banner's **Update now** button gives the right command for your setup (Compose, `docker run`, Unraid, Portainer or Synology).
 
 ---
 
@@ -332,40 +328,29 @@ Rootless Podman remaps user IDs, so if the container can't write to your volumes
 
 ### From upstream CWA
 
-One line. Stop the container, swap the image, start it.
-
-```diff
-- image: crocodilestick/calibre-web-automated:latest
-+ image: ghcr.io/new-usemame/calibre-web-nextgen:latest
-```
-
-```bash
-docker compose pull && docker compose up -d
-```
-
-Settings, users, OAuth tokens, and KOReader sync state are preserved. The data format is identical, so reverting is the reverse one-line change.
+Change the `image:` line to `ghcr.io/new-usemame/calibre-web-nextgen:latest` and run `docker compose pull && docker compose up -d`, as in [Switch from upstream CWA](#switch-from-upstream-cwa). Settings, users, OAuth tokens and KOReader sync state are preserved. The data format is identical, so reverting is the same one-line change in reverse.
 
 ### From stock Calibre-Web
 
-1. Stop your existing Calibre-Web container.
-2. In the new compose file, point `/config` at the same `/config` folder you used for Calibre-Web.
-3. Whatever you bound as `/books` in Calibre-Web should be bound as `/calibre-library` here.
-4. Pick an empty folder for `/cwa-book-ingest` (it's CWA-specific; no equivalent in stock CW).
+1. Stop your Calibre-Web container.
+2. In the new compose file, point `/config` at the same folder Calibre-Web used for `/config`.
+3. Bind whatever was `/books` in Calibre-Web as `/calibre-library`.
+4. Give `/cwa-book-ingest` an empty folder. Stock Calibre-Web has no equivalent.
 5. Start the container.
 
-Users, settings, and shelves carry over. The first launch takes a few extra seconds while CWA registers itself with the existing app database.
+Users, settings and shelves carry over. The first start takes a few extra seconds while CWNG registers itself with the existing app database.
 
 ---
 
 ## Pair with Shelfmark
 
-[Shelfmark](https://github.com/calibrain/shelfmark) by @calibrain is a self-hosted book search and request interface. Users search across torrent, usenet, IRC, and direct sources from a single UI; Shelfmark hands the download to your client of choice and drops the finished file straight into the CWA ingest folder, where this build picks it up automatically. Multi-user requests are built in, so you can share an instance with household readers and approve their picks.
+[Shelfmark](https://github.com/calibrain/shelfmark) by @calibrain is a self-hosted book search and request service. It searches torrent, usenet, IRC and direct sources from one page, hands the download to your client of choice, and drops the finished file into CWNG's ingest folder, where it's imported automatically. Requests are multi-user, so household readers can ask for books and you approve them.
 
-This release does not include a built-in Store / Discover page or an Anna's Archive download provider. Configure acquisition sources in the separate Shelfmark service.
+CWNG's own [Book sources (Beta)](docs/book-sources.md) covers OPDS catalogs and Newznab/Torznab indexers from the New UI. It has no Anna's Archive provider; for sources it doesn't cover, use Shelfmark.
 
-**With My Library enabled:** files delivered through the shared ingest folder enter the global library. The folder does not identify the Shelfmark requester, so the import does not automatically add the book to that person's selection. Readers with Global Library access can find and add it there; an administrator can add it for a managed account. Accounts using the whole-library mode continue to see permitted imports automatically.
+With My Library on, books that arrive through the shared ingest folder join the global library. The folder doesn't say who requested a book, so it isn't added to the requester's selection automatically. Readers with Global Library access can find it and add it there, and an administrator can add it for a managed account. Accounts in whole-library mode see permitted imports automatically.
 
-Add it alongside `calibre-web` in the same compose file:
+Add Shelfmark next to `calibre-web` in the same compose file:
 
 ```yaml
   shelfmark:
@@ -377,27 +362,27 @@ Add it alongside `calibre-web` in the same compose file:
       - TZ=America/New_York
       - SEARCH_MODE=universal
 
-      # Point Shelfmark at CWA's app.db (read-only mount below) so users
-      # log in to Shelfmark with their existing CWA credentials.
+      # Read CWNG's app.db (read-only mount below) so users sign in
+      # to Shelfmark with their existing CWNG accounts.
       - CWA_DB_PATH=/auth/cw-config/app.db
 
-      # Optional: shows a "Library" button in Shelfmark's header that
-      # links back to this CWA instance.
+      # Optional: shows a "Library" button in Shelfmark's header
+      # that links back to CWNG.
       - CALIBRE_WEB_URL=http://your-host:8083
 
     volumes:
       - /path/to/shelfmark-config:/config
 
-      # Read-only mount of your CWA config dir for the auth integration.
+      # Your CWNG config folder, read-only, for the sign-in integration.
       - /path/to/cwa-config:/auth/cw-config:ro
 
-      # Shelfmark's destination folder = CWA's ingest folder.
-      # Downloads land here and this build ingests them on the next watch tick.
+      # Shelfmark's destination folder is CWNG's ingest folder.
+      # Downloads land here and are imported on the next watch tick.
       - /path/to/cwa-ingest:/books
 
-      # If you use a torrent or usenet client, mount its downloads dir
-      # at the same path you mounted in the client itself, so Shelfmark
-      # can locate the completed file.
+      # Using a torrent or usenet client? Mount its downloads folder
+      # at the same path you mounted in the client itself, so
+      # Shelfmark can find the completed file.
       - /path/to/downloads:/downloads
 
     ports:
@@ -405,32 +390,15 @@ Add it alongside `calibre-web` in the same compose file:
     restart: unless-stopped
 ```
 
-After Shelfmark starts, open it and pick **Settings → Security → Authentication Method → Calibre-Web Database**, then **Sync from Calibre-Web** to import users. The [Shelfmark docs](https://github.com/calibrain/shelfmark#readme) cover Prowlarr, qBittorrent, SABnzbd, and IRC source setup.
+Once Shelfmark is running, open it, choose **Settings → Security → Authentication Method → Calibre-Web Database**, then **Sync from Calibre-Web** to import your users. The [Shelfmark docs](https://github.com/calibrain/shelfmark#readme) cover Prowlarr, qBittorrent, SABnzbd and IRC setup.
 
-> Shelfmark went into maintenance-only status in May 2026; the v1.3.0 build is stable and the integration with CWA is settled, but new feature work upstream has paused. If you want to pin for reproducibility, use `ghcr.io/calibrain/shelfmark:v1.3.0` instead of `:latest`.
+> Shelfmark moved to maintenance-only status in May 2026. The v1.3.0 build is stable and its CWA integration is settled, but new feature work has paused. To pin it, use `ghcr.io/calibrain/shelfmark:v1.3.0` instead of `:latest`.
 
 ---
 
 ## Common configurations
 
-### Writable cache storage
-
-The general derived cache defaults to `cache/` under the configured application
-config directory (`/config/cache` in Docker). Set `CACHE_DIR` to keep an explicit
-cache location; that directory must be writable by the service user. Existing
-thumbnail storage stays at `/config/thumbnails`, and metadata change logs and
-scratch storage keep their existing locations under the config directory.
-
-Upgrades regenerate disposable general cache entries in the new default location.
-The old `cps/cache` directory is left untouched; no user data or existing
-thumbnail cache is moved or deleted. Deployments that explicitly set `CACHE_DIR`
-keep that location. Startup no longer creates or changes ownership of the
-image-owned `cps/cache` directory.
-
-
 ### Network shares (NFS, SMB, ZFS)
-
-See [`examples/.env.example`](examples/.env.example) for the complete environment-variable reference and defaults.
 
 If `/config` or `/calibre-library` lives on a network share, set:
 
@@ -439,50 +407,36 @@ If `/config` or `/calibre-library` lives on a network share, set:
 ```
 
 This:
-- Disables SQLite WAL mode (NFS and SMB don't reliably support it; without this you'll see "database is locked").
-- Skips the recursive ownership-fix at startup (slow on NFS, often fails on SMB).
-- Switches the ingest watcher from inotify to polling (network-FS inotify events are unreliable).
+- Turns off SQLite WAL mode, which NFS and SMB don't reliably support. Without it you'll see "database is locked".
+- Skips the recursive ownership fix at startup, which is slow on NFS and often fails on SMB.
+- Switches the ingest watcher from inotify to polling, because inotify events are unreliable on network filesystems.
 
-Tested and supported. Ingest is a few seconds slower; everything else behaves the same.
+It's tested and supported. Ingest is a few seconds slower; everything else behaves the same.
 
-> If files end up owned by root after a copy: this build chowns files back to your `PUID:PGID` after each metadata-change cycle, but if you've copied files in as root before upgrading, run once: `docker exec calibre-web chown -R abc:abc /calibre-library` (replace `abc` if you've customized the user).
+> Files owned by root after a copy? CWNG chowns files back to your `PUID:PGID` after each metadata-change cycle. For files you copied in as root before upgrading, run once: `docker exec calibre-web chown -R abc:abc /calibre-library` (replace `abc` if you've customized the user).
+
+[`examples/.env.example`](examples/.env.example) lists every environment variable with its default.
 
 ### Calibre desktop coexistence
 
-**Docker Desktop on macOS: give native Mac Calibre exclusive access to a
-host-bind-mounted library.** Stop the calibre-web-nextgen container before
-opening that library in Mac Calibre, and fully quit Mac Calibre before starting
-the container again. This also applies to native Mac `calibredb` commands.
-Stopping ingest alone leaves other application and metadata writers active.
+**On macOS with Docker Desktop, give native Mac Calibre the library to itself.** If the library is a host bind mount, stop the CWNG container before you open it in Mac Calibre or run native `calibredb`, and quit Mac Calibre completely before you start the container again. Stopping ingest alone isn't enough, because other parts of the app still write to the library.
 
-The compatibility flags below do not make simultaneous Mac and Linux-container
-access safe. In a finite Docker Desktop bind-mount test, an exclusive byte-range
-lock held on either side blocked another process on the same side but did not
-block the opposite side. A separate concurrent library-write test produced a
-malformed database even with both flags enabled and library DELETE journal mode. Use
-exclusive access rather than relying on a lock wait across this boundary.
+The flags below don't make simultaneous Mac and container access safe. In a Docker Desktop bind-mount test, an exclusive lock held on one side blocked processes on that side but not on the other, and a concurrent-write test produced a malformed database even with both flags on and the library in DELETE journal mode.
 
-For deployments where desktop and server processes share working filesystem
-locks, set both flags to release the web application's database connection
-between requests:
+Where desktop Calibre and the server do share working filesystem locks, set both flags:
 
 ```yaml
 - NETWORK_SHARE_MODE=true
 - DESKTOP_COMPAT_MODE=true
 ```
 
-By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
+By default CWNG holds one SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` opens one per request instead, so edits, adds and deletes made in Calibre desktop show up in the web UI on the next page load, with no restart. It doesn't replace filesystem locking.
 
-On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
-
-Trade-offs:
-- Each web request pays a small extra overhead to open and close the database connection.
-- Where filesystem locks are shared correctly, a web request can wait up to 60 seconds for an active desktop writer. Heavy simultaneous use can slow the web UI.
-- Designed for home-server use where calibre desktop is opened occasionally for bulk edits, not for concurrent heavy use of both.
+The cost is a little overhead on every request, and a request can wait up to 60 seconds while desktop Calibre is writing. It suits a home server where desktop Calibre comes out now and then for bulk edits, not heavy use of both at once.
 
 ### Calibre plugins (DeDRM and others)
 
-calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you install yourself — the same plugin `.zip` files Calibre desktop uses. This is how you add things like DRM removal (DeDRM, Obok) or `.acsm` fulfillment (the ACSM Input plugin): you supply the plugins, and they run automatically during ingest, library conversion, and metadata embedding.
+CWNG ships no Calibre plugins, but it loads the ones you install: the same `.zip` files Calibre desktop uses, such as DeDRM and Obok for DRM removal or ACSM Input for `.acsm` fulfillment. They run automatically during ingest, library conversion and metadata embedding.
 
 1. Turn the feature on in your compose environment, then restart:
 
@@ -490,39 +444,63 @@ calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you i
    - CWA_CALIBRE_USER_PLUGINS=true
    ```
 
-2. Copy the plugin `.zip` files into the `plugins` folder inside your config volume — from the host that's `<your config folder>/.config/calibre/plugins/` (the folder is created automatically once the option is on).
+2. Copy the plugin `.zip` files into `<your config folder>/.config/calibre/plugins/` on the host. The folder appears once the option is on.
 
-3. Restart the container again. Each plugin is registered at startup; confirm with:
+3. Restart the container again. Each plugin registers at startup; confirm with:
 
    ```
    docker logs calibre-web 2>&1 | grep "Registered Calibre plugin"
    ```
 
-Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input wants an Adobe login) keep their settings in files next to the zips. Easiest path: configure the plugin in Calibre desktop on your computer first, then copy its settings files (e.g. `plugins/dedrm.json`, the `plugins/DeACSM/` folder) from your desktop Calibre configuration folder into the same container `plugins/` folder and restart.
+Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input an Adobe login) keep their settings in files next to the zips. Set the plugin up in Calibre desktop first, then copy its settings files (for example `plugins/dedrm.json` or the `plugins/DeACSM/` folder) from your desktop Calibre configuration into the container's `plugins/` folder and restart.
 
-The book editor's conversion choices come from the configured Calibre install's active input and output plugins. For example, a KFX input plugin makes KFX books eligible as sources; a KFX output choice appears only when Calibre reports an installed output plugin that can write KFX. Plugins are not bundled, and a separate comic/KPF workflow does not by itself add an `ebook-convert` output format. The capability check uses the same `CWA_CALIBRE_USER_PLUGINS` setting as conversion jobs, refreshes at least once a minute, and hides Calibre conversion choices if the local capability probe is unavailable or invalid. Directory-only OEB output is excluded because book conversion stores one file. The separate EPUB-to-KEPUB option remains available when `kepubify` is configured.
-
-ACSM tickets use Calibre’s import hooks before ordinary book processing. Auto-Convert off imports the fulfilled EPUB/PDF as returned; when enabled, conversion applies to that resulting book. A failed optional conversion keeps the fulfilled book. A missing or unsuccessful ACSM plugin preserves the original ticket in the failed-books folder, and no raw ACSM format is added to the library. Successful source receipts prevent duplicate imports and repeated fulfillment after completion. Configure the plugin’s account authorization first; installing its zip alone cannot authorize Adobe fulfillment.
-
-Before import, the fulfilled book is stored under `processed_books/acsm_fulfilled/<ticket SHA-256>/` with its original ticket basename and a manifest binding the ticket and book bytes. If import fails, the original ticket and fulfilled book remain; retry uses the validated book without spending the ticket again. The recovery entry is removed only after a confirmed library import. An interrupted or damaged entry stops automatic fulfillment and prints its path for manual recovery: preserve these files, inspect the downloaded EPUB/PDF, and import that book directly if needed. Do not delete a recovery entry merely to retry an already consumed ticket.
-
-To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
+To add another plugin **after** the first batch has registered, drop its zip in the same folder and run:
 
 ```
 docker exec -e HOME=/config calibre-web /opt/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
 ```
 
-The feature is off by default because it runs third-party plugin code inside your container — only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
+The feature is off by default because plugins run third-party code inside your container. Install only plugins you trust, from their official release pages; which plugins you use is your call.
+
+How plugins change the book editor's conversion formats, and how `.acsm` tickets are fulfilled and recovered, is in [Calibre plugins: conversion formats and ACSM tickets](docs/calibre-plugins.md). If an ACSM import fails, don't delete its entry under `processed_books/acsm_fulfilled/`: the ticket may already be spent, and that entry holds the fulfilled book.
+
+### Reverse proxy / Cloudflare Tunnel
+
+Behind a proxy, CWNG has to know which forwarded headers to believe. If it gets that wrong, it may see a different client IP on each request and raise Session Protection warnings that force a new sign-in on every page, or mistake an externally secure OIDC callback for plain HTTP.
+
+Set `TRUSTED_PROXY_COUNT` to the number of trusted proxy hops. The default is `1`. Cloudflare Tunnel in front of nginx is `2`, and so is HAProxy in front of traefik:
+
+```yaml
+- TRUSTED_PROXY_COUNT=2
+```
+
+The count picks which entry in each header to believe. With `X-Forwarded-Proto: https, http`, `1` selects the inner hop's `http` and `2` selects the browser-facing `https`. One count covers `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix`. If your layers append or replace those headers differently, override the first three separately. They map to ProxyFix's `x_for`, `x_proto` and `x_host`, and fall back to `TRUSTED_PROXY_COUNT`, then `1`:
+
+```yaml
+- PROXYFIX_X_FOR=2
+- PROXYFIX_X_PROTO=1
+- PROXYFIX_X_HOST=1
+```
+
+Count only proxies you control that overwrite or sanitize the header in question.
+
+CWNG also checks where the proxy connects from. By default it believes forwarded headers only from this host, private networks (the Docker network and your LAN) and Tailscale's `100.64.0.0/10`. A client that reaches CWNG directly from anywhere else is taken at its own address and scheme, whatever headers it sends. If your proxy connects from a public address, add it to `TRUSTED_PROXY_NETWORKS`. That includes Cloudflare's proxy forwarding straight to the container with no proxy of your own in between: list Cloudflare's published IP ranges.
+
+```yaml
+- TRUSTED_PROXY_NETWORKS=private, 203.0.113.7, 198.51.100.0/24
+```
+
+Separate entries with commas or spaces. `private` stands for the default list, so keep it when you add your proxy. `*` trusts every peer, which was the behaviour before this setting existed. Without the right entry, CWNG sees every visitor as the proxy: sign-in pacing is shared by everyone, links come out as `http://` behind an HTTPS proxy, and sign-in providers may reject the callback address. The log then says `Ignoring reverse-proxy headers from <address>`.
+
+A `Rejected cross-site` warning comes from the New UI's API Origin guard. The guard accepts a same-host HTTPS origin even when the proxy-derived URL is HTTP, so TLS terminated upstream doesn't block writes, but an HTTP origin against an HTTPS-derived URL is still rejected. Check `TRUSTED_PROXY_COUNT` and the forwarded headers first. If the proxy rewrites Host without keeping the public host in `X-Forwarded-Host`, set `CWNG_TRUSTED_ORIGINS` to your public origin (comma-separated for several). Generated URLs and other scheme-sensitive behavior still need correct proxy headers.
 
 ### Reverse proxy with a prefix
 
-To deploy CWA behind a reverse proxy, configure your reverse proxy to forward
-requests to the CWA service and handle the path prefix (e.g. `/cwa/`). For
-instance, with Nginx:
+To serve CWNG under a path such as `/cwa/`, the proxy forwards requests to the container and strips the prefix, and the app is told what the prefix is. With nginx:
 
-```
+```nginx
 location /cwa/ {
-    proxy_pass http://calibre-web-automated:8083/;
+    proxy_pass http://calibre-web:8083/;
 
     proxy_set_header Host              $http_host;
     proxy_set_header X-Real-IP         $remote_addr;
@@ -531,204 +509,103 @@ location /cwa/ {
 }
 ```
 
-The trailing slash on `proxy_pass` matters: it strips `/cwa/` before the request
-reaches CWA. The headers are written out rather than pulled in with
-`include proxy_params;` because that file ships with Debian and Ubuntu's nginx
-package only — the official `nginx` Docker images don't have it, and nginx
-refuses to start when the include is missing.
+The trailing slash on `proxy_pass` matters: it strips `/cwa/` before the request reaches CWNG. The headers are written out instead of pulled in with `include proxy_params;` because that file ships only with Debian and Ubuntu's nginx package. The official `nginx` Docker images don't have it, and nginx refuses to start when an include is missing.
 
-You must also configure the application with the external URL prefix by setting
-the following environment variable in your Docker compose file:
+Then give the app the external prefix in your compose file:
 
 ```yaml
 environment:
   - PROXY_SCRIPT_NAME=/cwa
 ```
 
-Leave the trailing slash off `PROXY_SCRIPT_NAME` — CWA joins it to each path
-directly, so `/cwa/` would generate doubled-slash URLs.
+Leave the trailing slash off. CWNG joins the value to each path directly, so `/cwa/` would generate doubled-slash URLs.
 
-This ensures that CWA correctly generates URLs when it is served from the
-prefix path instead of the web server root.
-
-For TLS, upload limits, and the larger proxy buffers Kobo sync needs, see
-[`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) — the
-settings there apply to a prefixed deployment too.
-
-### Reverse proxy / Cloudflare Tunnel
-
-Behind multiple proxies (e.g. Cloudflare Tunnel then nginx then CWA), set the proxy count:
-
-```yaml
-- TRUSTED_PROXY_COUNT=2
-```
-
-Set `TRUSTED_PROXY_COUNT` to the number of trusted proxy hops: for
-HAProxy → traefik → container, use `2`. With `X-Forwarded-Proto: https, http`,
-the default of `1` selects the inner hop's `http`; `2` selects the browser-facing
-`https`. If headers have different chain lengths, use the per-header overrides below.
-
-The New UI's API Origin guard accepts a same-host HTTPS origin even when the
-proxy-derived URL is HTTP, so upstream TLS termination does not block writes.
-The reverse direction (HTTP origin against an HTTPS-derived URL) is still rejected.
-For a `Rejected cross-site` warning, check `TRUSTED_PROXY_COUNT` and the forwarded
-headers. If the proxy rewrites Host without preserving the public host in
-`X-Forwarded-Host`, set `CWNG_TRUSTED_ORIGINS` to your public origin
-(comma-separated for multiple origins). Correct proxy configuration is still
-needed for generated URLs and other scheme-sensitive behavior.
-
-Without this, CWA may see different client IPs across requests and trigger Session Protection warnings, forcing re-login on every page load. It can also mistake an externally secure OIDC callback for plain HTTP. Default is `1`.
-
-`TRUSTED_PROXY_COUNT` applies one trust depth to `X-Forwarded-For`,
-`X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-Prefix`. If your
-proxy chain appends or replaces those headers at different layers, override the
-first three independently; each falls back to `TRUSTED_PROXY_COUNT`, then `1`:
-
-```yaml
-- PROXYFIX_X_FOR=2
-- PROXYFIX_X_PROTO=1
-- PROXYFIX_X_HOST=1
-```
-
-The corresponding ProxyFix arguments are `x_for`, `x_proto`, and `x_host`.
-Count only proxies you control and that overwrite or sanitize the corresponding
-header.
-
-These headers are believed only when the connection comes from a trusted proxy
-network. By default that is this host, private networks (the docker network,
-your LAN), and Tailscale's `100.64.0.0/10`. A client that reaches CWNG directly
-from anywhere else is taken at its own address and scheme, whatever headers it
-sends. If your proxy connects from a public address, add it to
-`TRUSTED_PROXY_NETWORKS`. That includes Cloudflare's proxy forwarding straight
-to the container, with no proxy of your own in between: list Cloudflare's
-published IP ranges.
-
-Without the setting, CWNG sees every visitor as the proxy. Sign-in pacing is
-then shared by everyone, links come out as `http://` behind an HTTPS proxy,
-and sign-in providers may reject the callback address. The log says
-`Ignoring reverse-proxy headers from <address>` when this applies.
-
-```yaml
-- TRUSTED_PROXY_NETWORKS=private, 203.0.113.7, 198.51.100.0/24
-```
-
-Entries are addresses or networks, separated by commas or spaces. `private`
-stands for the default list, so keep it when you add your proxy. `*` trusts
-every peer, which was the behaviour before this setting existed.
+For TLS, upload limits and the larger proxy buffers Kobo sync needs, see [`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf). Its settings apply to a prefixed deployment too.
 
 ### Hardcover metadata provider
 
-[Hardcover](https://hardcover.app/) is a free metadata provider. To enable it:
+[Hardcover](https://hardcover.app/) is a free metadata provider. To turn it on:
 
-1. Sign up at https://hardcover.app and grab an API token at https://hardcover.app/account/api.
-2. Add to your compose env:
+1. Sign up at https://hardcover.app and copy an API token from https://hardcover.app/account/api.
+2. Add it to your compose environment:
 
    ```yaml
    - HARDCOVER_TOKEN=eyJhbGciOiJIUzI1NiI...
    ```
 
-   Or paste it into Admin → Edit Basic Configuration → Hardcover API Key in the UI.
-3. Restart the container.
+   Or paste it into Admin → Edit Basic Configuration → Hardcover API Key.
+3. Restart the container. Hardcover now appears in the Fetch Metadata dialog.
 
-Hardcover then appears in the Fetch Metadata modal.
-
-If you set the token through the `HARDCOVER_TOKEN` environment variable, the **Hardcover API Key** field in the admin UI stays empty — that field only shows a key entered through the UI, and an environment-supplied token is not echoed back into the page. The admin page identifies whether `HARDCOVER_TOKEN` or `HARDCOVER_TOKEN_FILE` is active without displaying its value; a key typed into the field overrides either environment source.
-
-To keep the token out of your compose file entirely, point `HARDCOVER_TOKEN_FILE` at a file containing just the token (docker-secrets style):
+To keep the token out of your compose file, point `HARDCOVER_TOKEN_FILE` at a file that contains only the token (Docker secrets style):
 
 ```yaml
-   - HARDCOVER_TOKEN_FILE=/run/secrets/hardcover_token
+- HARDCOVER_TOKEN_FILE=/run/secrets/hardcover_token
 ```
 
-Precedence: UI-configured key → `HARDCOVER_TOKEN` → `HARDCOVER_TOKEN_FILE`.
+A key typed into the admin UI wins, then `HARDCOVER_TOKEN`, then `HARDCOVER_TOKEN_FILE`. The **Hardcover API Key** field shows only a key entered there, so it stays empty when the token comes from the environment. The admin page says which variable is active without showing its value.
 
-Enable the server-wide integration once under Admin → Edit Basic Configuration → **Enable Hardcover Sync**. This single switch controls both scheduled Hardcover ID fetching and Kobo/KOReader reading-progress sync. A declarative deployment can override it instead:
+Turn on **Enable Hardcover Sync** once under Admin → Edit Basic Configuration. That one switch controls both scheduled Hardcover ID fetching and Kobo/KOReader reading-progress sync. A declarative deployment can set it instead:
 
 ```yaml
-   - HARDCOVER_SYNC_ENABLED=true
+- HARDCOVER_SYNC_ENABLED=true
 ```
 
-Accepted true values are `true`, `1`, `yes`, and `on`; false values are `false`, `0`, `no`, and `off` (case-insensitive). When the variable is set, the UI shows the effective state but leaves changes to the deployment configuration.
+True values are `true`, `1`, `yes` and `on`; false values are `false`, `0`, `no` and `off`, in any case. While the variable is set, the UI shows the effective state and leaves changes to your deployment configuration.
 
 ### KOReader sync
 
-CWA has built-in KOReader sync; no separate kosync server is needed. With the plugin, a Kindle or any KOReader e-reader opens on your library: covers of every book (or of the shelves you choose for e-readers), downloaded when you open them, with reading position, read status and highlights synced automatically. **Setup and daily use: [docs/koreader-kindle.md](docs/koreader-kindle.md).**
+KOReader sync is built in, so you don't need a separate kosync server. With the plugin, a Kindle or any KOReader e-reader opens on your library: covers of every book (or of the shelves you choose for e-readers), each downloaded when you open it, with reading position, read status and highlights synced automatically. **Setup and daily use: [docs/koreader-kindle.md](docs/koreader-kindle.md).**
 
-1. In CWA open **E-readers ▸ Pair a Kobo or KOReader** and either download the **ready-made plugin** (copy one folder over USB; nothing to type on the e-reader) or **pair with a code** shown on the e-reader.
-2. To install the plain plugin by hand instead, visit `http://your-cwa:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
-3. Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.
+1. In CWNG, open **E-readers ▸ Pair a Kobo or KOReader** and either download the **ready-made plugin** (copy one folder over USB, nothing to type on the e-reader) or **pair with a code** shown on the e-reader.
+2. To install the plain plugin by hand instead, visit `http://your-host:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
+3. Read on any device. Progress syncs back to CWNG, and from there to Kobo if Kobo sync is on.
 
-**Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.
+To keep the plugin updated, point KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) or [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases), not this one. Both update it in place. The plugin is released only when it changes, and its version is the server version it last changed in, so it can trail your server version with nothing wrong. An update manager still pointed at this repository keeps working, but it sees the plugin only on releases that change it, which looks like "no update available". To update by hand, `/kosync` always serves the plugin bundled with your running server.
 
-If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
+For matching OPDS filenames across devices, turn on **Use server filenames** in KOReader's OPDS catalog settings. By default KOReader builds `Author - Title.epub` from the feed, while the server suggests `Title - Author.epub` with only the first author. With the setting on, KOReader uses the server's name. Administrators can change that name with the OPDS download filename template preference; a blank preference keeps the current naming. Fields, examples and device limits: [OPDS download filenames](docs/opds-filename-template.md).
 
-For matching OPDS filenames across devices, enable Use server filenames in KOReader's OPDS catalog configuration. KOReader normally builds `Author - Title.epub` from the feed. The server normally suggests `Title - Author.epub`, with only the first author. With Use server filenames enabled, KOReader uses the server's suggested name.
-
-Administrators can change that name through the OPDS download filename template preference. For fields, examples, and device limits, see [OPDS download filenames](docs/opds-filename-template.md). A blank preference keeps the existing naming behavior.
-
-For books emailed to a reader, **eReader attachment filename template** in the administrator's email settings controls the outgoing attachment name, including series and series numbers. See [Names for emailed book attachments](docs/send-filename-template.md) for examples.
+For books emailed to a reader, the **eReader attachment filename template** in the administrator's email settings sets the attachment name, series and series number included. See [Names for emailed book attachments](docs/send-filename-template.md).
 
 ### Kobo sync
 
-Read your CWA library on a Kobo e-reader, with reading progress syncing both ways. Sync runs against your own server, so your library never leaves your network.
+Read your library on a Kobo e-reader, with reading progress syncing both ways. Sync runs against your own server, so your library never leaves your network.
 
 1. In Admin → Edit Basic Configuration, turn on **Enable Kobo sync**.
 2. Open your user page (Admin → Users → your user, or your own profile) and click **Create/View** next to **Kobo Sync Token**. The dialog shows the exact `api_endpoint=` line for your account.
-3. Plug the Kobo into a computer over USB and open `.kobo/Kobo/Kobo eReader.conf` in a text editor. Add or replace the `api_endpoint=` line with the one from the dialog, save, and eject the device cleanly.
-4. On the Kobo, sync. Books on your Kobo Sync shelves appear on the device, and progress flows back to CWA.
+3. Connect the Kobo to a computer over USB and open `.kobo/Kobo/Kobo eReader.conf` in a text editor. Add or replace the `api_endpoint=` line with the one from the dialog, save, and eject the device cleanly.
+4. Sync on the Kobo. Books on your Kobo Sync shelves appear on the device, and progress flows back to CWNG.
 
-> ### ℹ️ Where your highlights travel, and how to check
->
-> `api_endpoint` routes **library sync**. Your **highlights and notes** travel over a separate
-> reading-services channel governed by a different key, `reading_services_host`.
->
-> **You should not normally need to touch that key.** CWA advertises the right value during sync
-> initialization, and a device that performs a full initialization against your server adopts it on
-> its own. That is the supported path.
->
-> 🚨 **Do not hand-edit `reading_services_host` in the conf file.** Doing so has been measured to
-> break syncing outright on at least one device — a Kobo Clara BW on firmware 4.42.23291 began
-> failing every sync with `FailedSync / WebRequestErr`, and recovered only when the key was set back
-> to `readingservices.kobo.com`. A Kobo Libra Colour on 4.45.23697 is unaffected and routes
-> annotations through CWA happily, so this is **not** universal — but we cannot yet predict which
-> devices tolerate it, and the failure leaves you with a reader that will not sync and no obvious
-> cause.
->
-> **If your sync has already broken after editing that key:** set `reading_services_host` back to
-> `readingservices.kobo.com`, save, eject cleanly, and sync again.
->
-> **To see whether annotations are reaching CWA**, make a highlight on the device, sync, and watch:
->
-> ```bash
-> docker logs -f calibre-web 2>&1 | grep -iE "annotations|reading services"
-> ```
->
-> Silence means your highlights are going to Kobo's servers rather than yours. The safe way to
-> change that is to get the device to perform a **full initialization** against CWA — re-generate
-> the Kobo Sync Token and re-pair — rather than editing the key by hand.
->
-> This matters because CWA's protection against a Kobo deleting its own highlights after a sync
-> (upstream [calibre-web#2610](https://github.com/janeczku/calibre-web/issues/2610)) works by
-> answering that channel, and it cannot protect a request it never receives. Until the device is
-> routing annotations through CWA, treat highlights made on it as device-only and back them up.
-
-To confirm the device is reaching your server, watch the logs while you sync — you should see requests to `/kobo/<token>/v1/...`:
+To choose which shelves reach the device, see [Choosing which books go to your Kobo](docs/kobo-shelves.md). To confirm the device is reaching your server, watch for requests to `/kobo/<token>/v1/...` while it syncs:
 
 ```bash
 docker logs -f calibre-web 2>&1 | grep /kobo/
 ```
 
-**Behind a reverse proxy (nginx, Nginx Proxy Manager, Caddy, Cloudflare Tunnel)**
+> **Don't hand-edit `reading_services_host` in the conf file.** `api_endpoint` routes library sync. Highlights and notes travel over a separate reading-services channel set by `reading_services_host`. CWNG advertises the right value during sync initialization, and a device that does a full initialization against your server adopts it on its own.
+>
+> A hand edit has been measured to break syncing outright. A Kobo Clara BW on firmware 4.42.23291 failed every sync with `FailedSync / WebRequestErr` until the key went back to `readingservices.kobo.com`. A Kobo Libra Colour on 4.45.23697 is unaffected and routes annotations through CWNG, but there's no way yet to predict which devices tolerate the edit, and a device that fails can't sync and shows no obvious cause.
+>
+> **If sync broke after you edited that key**, set `reading_services_host` back to `readingservices.kobo.com`, save, eject cleanly and sync again.
+>
+> **To see whether highlights reach CWNG**, make one on the device, sync, and watch:
+>
+> ```bash
+> docker logs -f calibre-web 2>&1 | grep -iE "annotations|reading services"
+> ```
+>
+> Silence means your highlights are going to Kobo's servers instead of yours. To change that safely, regenerate the Kobo Sync Token and re-pair so the device does a full initialization against CWNG. This matters because CWNG's protection against a Kobo deleting its own highlights after a sync (upstream [calibre-web#2610](https://github.com/janeczku/calibre-web/issues/2610)) works by answering that channel, and it can't protect a request it never receives. Until a device routes annotations through CWNG, treat highlights made on it as device-only and back them up.
 
-Kobo devices sync over HTTPS, so the `api_endpoint` has to be your public `https://` address. Put a proxy with a valid certificate in front and point it at the container's plain HTTP port:
+#### Behind a reverse proxy
 
-- Proxy target is `http://<container-host>:8083`. The proxy terminates TLS on 443; the connection from the proxy to CWA stays HTTP. WebSocket support is not needed for Kobo sync.
-- Generate the token while visiting CWA through the HTTPS address, so the `api_endpoint=` line the dialog shows already carries your public hostname.
+Kobo devices sync over HTTPS, so `api_endpoint` has to be your public `https://` address. Put a proxy with a valid certificate (nginx, Nginx Proxy Manager, Caddy or Cloudflare Tunnel) in front and point it at the container's plain HTTP port:
+
+- The proxy target is `http://<container-host>:8083`. The proxy terminates TLS on 443, and the hop from the proxy to CWNG stays HTTP. Kobo sync doesn't need WebSocket support.
+- Generate the token while visiting CWNG through the HTTPS address, so the `api_endpoint=` line in the dialog already carries your public hostname.
 - If you stack proxies (for example Cloudflare Tunnel in front of nginx), set [`TRUSTED_PROXY_COUNT`](#reverse-proxy--cloudflare-tunnel) to the number of proxies.
 
-**nginx buffer sizes (important for Kobo sync)**
+#### nginx buffer sizes
 
-Kobo's `/v1/library/sync` response carries large headers (auth, sync tokens, library state). Nginx's default `proxy_buffer_size` (4 KB) and `proxy_buffers` (8 × 4 KB) are too small; the response is silently dropped before it reaches the device, and the Kobo shows *"Sync failed, please try again"* with **no error in the CWA log**. The nginx error log shows `upstream sent too big header while reading response header from upstream`. Add these to the `location /` block proxying CWA:
+Kobo's `/v1/library/sync` response carries large headers (auth, sync tokens, library state), and nginx's default `proxy_buffer_size` (4 KB) and `proxy_buffers` (8 × 4 KB) are too small for them. nginx silently drops the response before it reaches the device: the Kobo shows *"Sync failed, please try again"*, the CWNG log shows no error, and the nginx error log shows `upstream sent too big header while reading response header from upstream`. Add these to the `location` block that proxies CWNG, then reload nginx:
 
 ```nginx
 proxy_buffer_size       32k;
@@ -736,15 +613,19 @@ proxy_buffers           4 32k;
 proxy_busy_buffers_size 64k;
 ```
 
-(Larger libraries may need `128k / 4 256k / 256k`.) Reload nginx after the change. On Synology DSM, the built-in reverse-proxy GUI doesn't expose these directives — drop a custom config at `/etc/nginx/conf.d/http.calibre_web.conf` that mirrors the DSM entry plus the buffer lines, then disable the DSM entry. DSM rewrites `nginx.conf` on reboot, so a Task Scheduler boot-event job that runs `nginx -s reload` reapplies the custom file. Nginx Proxy Manager users: add the three lines under the proxy host's *Advanced* tab.
+Larger libraries may need `128k`, `4 256k` and `256k`. In Nginx Proxy Manager, add the three lines under the proxy host's *Advanced* tab. Synology DSM's reverse-proxy screen doesn't expose these directives: drop a custom config at `/etc/nginx/conf.d/http.calibre_web.conf` that mirrors the DSM entry plus the buffer lines, then disable the DSM entry. DSM rewrites `nginx.conf` on reboot, so add a Task Scheduler boot-up job that runs `nginx -s reload` to reapply the custom file. [`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) is a complete reference.
 
-See [`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) for a complete reference snippet.
+#### If you keep a Kobo account signed in
 
-**If you keep a Kobo account signed in**
+Signing in to a Kobo account, or a factory reset, can rewrite the `api_endpoint=` line back to Kobo's own server, which sends sync to Kobo instead of your library. After signing in, re-check the line over USB and set it back if it changed. Many sideloaded setups stay signed out so the device stops resetting the endpoint.
 
-Signing into a Kobo account, or doing a factory reset, can rewrite the `api_endpoint=` line back to Kobo's own server, which sends sync to Kobo instead of your library. After signing in, re-check the conf line over USB and set it back if it changed. Many sideloaded setups sign out of the Kobo account so the device stops resetting the endpoint.
+To use the Kobo Store and your library at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), CWNG answers any request it doesn't recognize with an empty response. That's fine for a sideload-only device, but store features won't load.
 
-To keep the Kobo Store and your library working at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), any request CWA doesn't recognize gets an empty response — fine for a sideload-only device, but store features won't load.
+### Writable cache storage
+
+The general cache defaults to `cache/` under the app's config directory (`/config/cache` in Docker). Set `CACHE_DIR` to put it somewhere else; the service user must be able to write there. Thumbnails stay in `/config/thumbnails`, and metadata change logs and scratch storage keep their existing places under the config directory.
+
+After an upgrade, disposable cache entries are regenerated in the new default location. The old `cps/cache` directory is left untouched, no user data or thumbnail cache is moved or deleted, and startup no longer creates or chowns that directory. Deployments that set `CACHE_DIR` keep their location.
 
 ---
 
@@ -752,7 +633,7 @@ To keep the Kobo Store and your library working at the same time, turn on **Prox
 
 ### "Cover-file is not a valid image file, or could not be stored"
 
-Fixed in v4.0.13 and later. If you're still seeing it after upgrading, you probably have `root:root`-owned book directories from a pre-fix install. Run once:
+Fixed in v4.0.13. If you still see it after upgrading, your book folders are probably owned by `root:root` from an older install. Run once:
 
 ```bash
 docker exec calibre-web chown -R abc:abc /calibre-library
@@ -760,76 +641,69 @@ docker exec calibre-web chown -R abc:abc /calibre-library
 
 ### "Generate Kobo Auth Token" returns a blank page
 
-Fixed in v4.0.14 and later. Upgrade the image.
+Fixed in v4.0.14. Upgrade the image.
 
 ### Kobo says "Sync failed, please try again"
 
 Almost always one of these:
 
-1. The device isn't reaching your server. The `api_endpoint=` line in `.kobo/Kobo/Kobo eReader.conf` must point at your CWA address (not `storeapi.kobo.com`), and that address must be reachable over HTTPS. See [Kobo sync](#kobo-sync).
+1. The device isn't reaching your server. The `api_endpoint=` line in `.kobo/Kobo/Kobo eReader.conf` must point at your CWNG address (not `storeapi.kobo.com`), and that address must be reachable over HTTPS. See [Kobo sync](#kobo-sync).
 2. A Kobo account is signed in and **Proxy unknown requests to Kobo Store** is off, so the device's store calls get an empty response mid-sync. Turn that setting on, or sign out of the Kobo account on the device.
-3. Behind a reverse proxy, the proxy can't reach the container. Confirm the proxy target is `http://<host>:8083` and that the certificate is valid.
-4. **nginx is silently dropping the sync response because its default buffers are too small for Kobo's library-sync headers.** The CWA log shows the request arriving but nothing else; the nginx error log shows `upstream sent too big header`. Add `proxy_buffer_size 32k; proxy_buffers 4 32k; proxy_busy_buffers_size 64k;` to the proxy location. See the [nginx buffer sizes](#kobo-sync) note in the Kobo sync section.
+3. Behind a reverse proxy, the proxy can't reach the container. Confirm the proxy target is `http://<host>:8083` and the certificate is valid.
+4. nginx is dropping the sync response because its default buffers are too small for Kobo's library-sync headers. The CWNG log shows the request arriving and nothing else; the nginx error log shows `upstream sent too big header`. Raise the buffers as shown in [nginx buffer sizes](#nginx-buffer-sizes).
 
 ### "Database is locked" / app frozen
 
-If your library is on a network share, set `NETWORK_SHARE_MODE=true` (see above). On local disk, this usually means a previous container shutdown was unclean: restart Docker, then the container.
+If your library is on a network share, set `NETWORK_SHARE_MODE=true` (see [Network shares](#network-shares-nfs-smb-zfs)). On local disk this usually means the last container shutdown was unclean: restart Docker, then the container.
 
 ### Session Protection warnings, forced re-login on every page
 
-Set `TRUSTED_PROXY_COUNT` to match your proxy depth. See [Reverse proxy](#reverse-proxy--cloudflare-tunnel).
+Set `TRUSTED_PROXY_COUNT` to match your proxy depth. See [Reverse proxy / Cloudflare Tunnel](#reverse-proxy--cloudflare-tunnel).
 
 ### Books in `/cwa-book-ingest` aren't picked up
 
-Three common causes:
-
-1. Files owned by root. Make sure ingest files are owned by your `PUID:PGID` user.
-2. Watcher missed them. Click the **Refresh Library** button on the navbar; it does a one-shot scan.
-3. Format isn't allowed. Check Admin → CWA Settings → Ingest for your allowed formats.
+1. Files owned by root. Ingest files must belong to your `PUID:PGID` user.
+2. The watcher missed them. Click **Refresh Library** in the navbar for a one-off scan.
+3. The format isn't allowed. Check Admin → CWA Settings → Ingest for your allowed formats.
 
 ### Default login isn't working
 
-The defaults are `admin` / `admin123` (lowercase). If you've already changed the password and forgotten it: stop the container, delete `config/app.db`, and restart. This resets the database. User accounts are lost; the library itself is untouched.
+The defaults are `admin` / `admin123`, lowercase. If you changed the password and forgot it, stop the container, delete `config/app.db` and start it again. That resets the app database: user accounts are lost, and the library itself is untouched.
 
 ### Something else
 
-Check the [issue tracker](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [open a new issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new). Useful information:
+Search the [issue tracker](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [open a new issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new) with:
 
-- The version: `docker exec calibre-web printenv CWA_INSTALLED_VERSION`
-- Recent logs: `docker logs calibre-web 2>&1 | tail -50`
-- What you did and what you expected to happen
+- the version: `docker exec calibre-web printenv CWA_INSTALLED_VERSION`
+- recent logs: `docker logs calibre-web 2>&1 | tail -50`
+- what you did and what you expected to happen
 
 ---
 
 ## Differences from upstream
 
-| Behavior | Upstream CWA `:latest` | This build |
-|---|---|---|
-| Cover saves from Hardcover/Google Books/iTunes/Open Library | Returns "not a valid image" | Saves and persists |
-| Generate Kobo Auth Token | Blank page | Works |
-| Safari metadata search | Silent 400 | Works |
-| Safari book-delete button | Broken since the Feb-4 commit | Works |
-| Kobo bookmark sync with missing `Location` | Crashes | Tolerates |
-| `/kobo_auth/generate_auth_token` IDOR | Open (any user can mint another user's token) | Closed |
-| Reverse-proxy user-profile updates | Drops path prefix | Honors `getPath()` |
-| Docker healthcheck on `/ → /login` 302 | Trips on `curl -f` | Uses dedicated endpoint with service health checks |
-| `.cbr` / `.cbz` OPDS mimetypes | Non-IANA | IANA-compliant |
-| Cover resolution on high-DPI readers | Often 290×475 (Hardcover thumbnail) | 1000×1500+ via booster |
-| Admin routes (`cwa_logs`, `convert`, `epub_fixer`, …) | 14 unauthenticated | All require admin |
-| Translations: ja, fr, cs, hu, zh_Hans, zh_Hant | Open in PRs | Merged |
+CWA v4.0.7 and v4.0.8 (September 2026) include many of the fixes that used to be listed here. Checked against CWA v4.0.8 in October 2026, these behaviors the two builds share still differ:
 
-Backports are conservative. Anything that touches auth, schema, or dependencies gets a manual review before merging.
+| Behavior | CWA v4.0.8 | This build |
+|---|---|---|
+| Docker healthcheck | Probes the web page at `/` | Probes `/health`, which fails when the library database, the ingest service or the metadata-change service is down |
+| Google Books covers | Requested at up to 800×900 | Requested at up to 1280×1920, for high-DPI e-readers such as the Kobo Libra Colour |
+
+Features CWNG adds are in [What's included](#whats-included). [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md) lists every change in this build, with its author and the release it shipped in. Backports are conservative: anything that touches auth, schema or dependencies gets a manual review before merging.
 
 ---
 
 ## Translations
 
-The interface ships with the locales below. Completion is auto-refreshed on every push to `main` by [`scripts/generate_translation_status.py`](scripts/generate_translation_status.py); to contribute a translation, edit the `.po` file under [`cps/translations/`](cps/translations/) for your language and open a PR.
+Completion refreshes automatically on every push to `main`, via [`scripts/generate_translation_status.py`](scripts/generate_translation_status.py). To help translate, edit the `.po` file for your language under [`cps/translations/`](cps/translations/) and open a PR.
+
+<details>
+<summary>Completion by language</summary>
 
 <!-- TRANSLATION_STATUS_START -->
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
-| English (source) | 100% | source | — |
+| English (source) | 100% | source | n/a |
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4126/4132 | 0 |
 | ca (`ca`) | `████████████████████` 99% | 4091/4132 | 0 |
 | Slovak (`sk`) | `████████████████████` 99% | 4086/4132 | 0 |
@@ -861,56 +735,45 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 242/4132 | 330 |
 <!-- TRANSLATION_STATUS_END -->
 
+</details>
+
 ---
 
 ## Contributing
 
-- **Bug reports:** [open a bug issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md). Reproduction steps, version tag, and a `docker logs` snippet help a lot.
-- **Feature requests:** [open a feature issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md). The bar is low — bug reports get prioritized for code work, but feature requests shape what gets looked at when the bug queue is quiet, and they help upstream see what users actually want. Don't worry about whether it's "in scope"; just file it.
-- **Pull requests:** welcome. The merge bar is "doesn't break anything that currently works." Changes touching auth, schema, or dependencies get a closer review. Backports keep the original author's handle in the commit message.
-- **CWA PR authors with stalled work upstream:** if you'd like your PR shipped here too, open an issue or send the PR our way.
+- Bug reports: [open a bug issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml). Reproduction steps, the version tag and a `docker logs` snippet help a lot.
+- Feature requests: [open a feature issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.yml). The bar is low, and you don't need to judge whether it's in scope. Bugs come first for code work; feature requests shape what gets picked up when the bug queue is quiet.
+- Pull requests are welcome. The merge bar is "doesn't break anything that currently works", and changes touching auth, schema or dependencies get a closer review. Backports keep the original author's handle in the commit message.
+- Have a PR open on CWA that you'd like shipped here too? Open an issue or send the PR over.
 
-Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contributing details: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contribution details: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 
 ## Supporting the project
 
-<!-- funding-stats:start (regenerate with scripts/funding-stats.sh — do not hand-edit) -->
+<!-- funding-stats:start (regenerate with scripts/funding-stats.sh; do not hand-edit) -->
 Since May 2026: **188 releases, 673 merged pull requests, 262 issues closed, and 155 contributors credited by name.**
 <!-- funding-stats:end -->
 
-This build exists to ship community bug fixes on a fast, regular release cadence — real fixes,
-written by real people, packaged so they reach users quickly. It complements the upstream
-projects it builds on, and their maintainers have our respect and our credits below.
+Nothing here is paywalled, and nothing ever will be: no sponsor-only features, no private Discord, no early access, no "pro" tier. Every line is GPL-3.0-or-later and free whether you contribute or not. Sponsorship keeps the work going.
 
-**Nothing here is paywalled and nothing ever will be.** No sponsor-only features, no private
-Discord, no early access, no "pro" tier. Every line is GPL-3.0 and free whether you contribute
-or not. Sponsorship supports one thing: keeping this going.
+If the project has been useful to you, a few dollars is a fair trade, and it's appreciated. If it hasn't, that's fine; it stays free either way.
 
-If the project has been useful to you, a few dollars is a fair trade and genuinely appreciated.
-If it hasn't, that's completely fine — it stays free either way.
+- [GitHub Sponsors](https://github.com/sponsors/new-usemame): one-time or monthly. GitHub takes 0%, so all of it arrives.
+- [Ko-fi](https://ko-fi.com/calibrewebnextgen): the same, if you already have an account there.
 
-- **[GitHub Sponsors](https://github.com/sponsors/new-usemame)** — one-time or monthly. GitHub takes 0%, so all of it arrives.
-- **[Ko-fi](https://ko-fi.com/calibrewebnextgen)** — the same thing, if you already have an account there.
-
-The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks. That helps more than a few dollars does.
+The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml) when something breaks.
 
 ---
 
 ## How AI is used
 
-The codebase itself is Calibre-Web and Calibre-Web-Automated — written over many years by their
-human maintainers and contributors, who are credited in [Credits](#credits). What this fork adds
-on top — its own fixes, their regression tests, the changelog and most issue replies — is largely
-produced by an AI assistant working from a written brief, with human review gates: merges require
-CI plus a regression test verified to fail without the fix, and anything adding a dependency,
-changing a licence or introducing an external URL is decided by a person.
+The codebase itself is Calibre-Web and Calibre-Web-Automated, written over many years by their human maintainers and contributors, who are listed in [Credits](#credits). What this fork adds on top (its own fixes, their regression tests, the changelog and most issue replies) is largely produced by an AI assistant working from a written brief, behind human review gates. A merge needs CI plus a regression test verified to fail without the fix, and a person decides anything that adds a dependency, changes a licence or introduces an external URL.
 
-**The shipped application itself contains no AI:** no model dependency, no inference call, no
-telemetry, and your library is not sent anywhere.
+**The application you run contains no AI:** no model dependency, no inference call, no telemetry, and your library is not sent anywhere.
 
-[**Read the full disclosure →**](docs/AI-USAGE.md)
+[Read the full disclosure](docs/AI-USAGE.md).
 
 ---
 
@@ -918,13 +781,11 @@ telemetry, and your library is not sent anywhere.
 
 Built on:
 
-- **Calibre-Web-Automated** ([@crocodilestick](https://github.com/crocodilestick) and contributors) — the core software this build is based on. Original PR authors are credited by handle in every backport commit.
-- **Calibre-Web** ([@janeczku](https://github.com/janeczku) and contributors) — the web UI underneath CWA.
-- **Calibre** ([@kovidgoyal](https://github.com/kovidgoyal)) — the library underneath all of it.
+- [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated) by [@crocodilestick](https://github.com/crocodilestick) and contributors, the software this build is based on.
+- [Calibre-Web](https://github.com/janeczku/calibre-web) by [@janeczku](https://github.com/janeczku) and contributors, the web app underneath CWA.
+- [Calibre](https://github.com/kovidgoyal/calibre) by [@kovidgoyal](https://github.com/kovidgoyal), the library underneath all of it.
 
-Every backported patch is credited to its original author by GitHub handle in the commit message and in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md).
-
-If this build is useful to you, see [Supporting the project](#supporting-the-project). To support the upstream project it builds on, [@crocodilestick has a Ko-fi](https://ko-fi.com/crocodilestick) too.
+Every backported patch credits its original author by GitHub handle, in the commit message and in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md). To support the upstream project, [@crocodilestick has a Ko-fi](https://ko-fi.com/crocodilestick) too.
 
 ---
 

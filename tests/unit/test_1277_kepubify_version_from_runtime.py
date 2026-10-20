@@ -344,10 +344,12 @@ def test_no_tracked_file_reads_or_writes_the_kepubify_stamp():
     """Mirrors the #1231/#1274 sweep for ``CALIBRE_RELEASE``. Matches the
     *path* form only — ``ARG KEPUBIFY_RELEASE`` and ``$KEPUBIFY_RELEASE`` are
     the build pin that selects which binary to download, and they stay.
+    ``docs/progress-tracker/`` is exempt for the same reason Markdown is: the
+    README tracker's ledger quotes GitHub thread titles, and it is never run.
     """
     offenders = []
     for rel in _tracked_files():
-        if rel.startswith("tests/") or rel.endswith(".md"):
+        if rel.startswith(("tests/", "docs/progress-tracker/")) or rel.endswith(".md"):
             continue
         path = _REPO_ROOT / rel
         try:

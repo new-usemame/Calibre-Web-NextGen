@@ -16,6 +16,22 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.50] - 2026-10-20
+
+### Added
+
+- **A square SVG of the app icon for dashboards.** Homepage, Heimdall and similar dashboards can use `/static/CalibreWebNextgen-square.svg`, which loads without signing in. Contributed by @Retrograde-i486 in #2616.
+
+### Fixed
+
+- **Switching versions no longer deletes settings.** On every start the app removed any setting it didn't recognise from its settings database, so moving to an older version (or trying a newer one and coming back) erased whatever you had set for options that version doesn't have. Those settings are now left alone and come back when you return to a version that uses them. #2549.
+
+- **The book page shows the publication date you saved.** In time zones west of UTC (the Americas) it showed the day before, and a year-only date showed as 31 December of the previous year. Reported by @gueland in #2634.
+
+- **Metadata filled in by automatic fetch is now written into the book file.** When fetch on ingest changed only text fields (description, publisher, published date, rating and the others it can set), the change was saved to the library but never queued for the file, so with enforcement on the file kept its old metadata, and the book was not marked as changed for a Kobo that had already synced it. A fetched cover already did both. Text changes now do the same. Contributed by @splitsec2 in #2612.
+
+- **Simplified Chinese stays translated across the interface.** Complete 2,934 previously empty or fuzzy entries, including reading states, account settings, and book-source messages, and incorporate the first proofreading pass. Existing confirmed translations remain unchanged. Contributed by @jkluiopopop in #2604.
+
 ## [v4.1.49] - 2026-10-19
 
 ### Added

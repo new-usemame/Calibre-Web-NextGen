@@ -4,7 +4,7 @@ For DSM 7.2+ with **Container Manager**. Works whether you're installing fresh o
 from the standard Calibre-Web-Automated (CWA) image.
 
 **Your books, users, settings and the Read checkmarks you've set all live in the folders
-mapped into the container — nothing gets converted or deleted, and you can undo the whole
+mapped into the container; nothing gets converted or deleted, and you can undo the whole
 thing in one click** by starting your old container again.
 
 **Hardware verification:** the update steps below were recorded on a real DSM 7.2 Container
@@ -13,7 +13,7 @@ The project-creation steps still need a clean-install recording on Synology hard
 
 > DSM is often shown in your local language. Where a button has a German label we list both,
 > e.g. *Speicherplatz / Volume*. If yours is in another language, the menu **position** is the
-> same — match the screenshots, and use the help links at the bottom if anything looks off.
+> same. Match the screenshots, and use the help links at the bottom if anything looks off.
 
 ## Switching from CWA? Note your current setup first
 
@@ -23,10 +23,10 @@ The project-creation steps still need a clean-install recording on Synology hard
    `/config`, `/calibre-library`, and `/cwa-book-ingest`.
 3. On the **Umgebung / Environment** tab, note `PUID`, `PGID`, `TZ`.
 4. Back in **Container**, select it → **Aktion / Action → Anhalten / Stop**.
-   **Leave it — don't delete it.** A stopped container is your instant undo.
+   **Leave it. Don't delete it.** A stopped container is your instant undo.
 
 *(Fresh install? Skip the four steps above and just decide which Synology folders you want for
-`/config`, `/calibre-library` and `/cwa-book-ingest`, and your `PUID`/`PGID` — usually your
+`/config`, `/calibre-library` and `/cwa-book-ingest`, and your `PUID`/`PGID`, usually your
 own user's, shown under Control Panel → User → your account → details.)*
 
 ## Create the NextGen project
@@ -56,12 +56,12 @@ own user's, shown under Control Panel → User → your account → details.)*
    ```
 
 6. Click through (**Weiter / Next**, then **Fertig / Done**). Container Manager pulls the image
-   from ghcr.io on its own — no registry setup needed — and starts it.
+   from ghcr.io on its own (no registry setup needed) and starts it.
 7. Open the same web address you always use for Calibre-Web (the `8083` you mapped, or whatever
    host port you chose), and log in with your usual account. Your library, users and Read
    checkmarks are all there.
 
-## Updating later — important
+## Updating later (important)
 
 On Synology, **stopping and starting a container does NOT pull a newer image.** To actually
 update NextGen:
@@ -69,7 +69,7 @@ update NextGen:
 1. **Container Manager → Projekt / Project** → your `calibre-web-nextgen` project →
    **Aktion / Action → Stop**.
 2. **Container Manager → Container** → select the `calibre-web-nextgen` container →
-   **Aktion / Action → Löschen / Delete**. Do this *before* the next step — an image can't be
+   **Aktion / Action → Löschen / Delete**. Do this *before* the next step: an image can't be
    removed while a container still uses it (even a stopped one), so deleting the image first
    gives an "in use" error. Deleting the container is safe: your books, users and settings
    live in the mounted folders, and the project's compose file recreates the container for you

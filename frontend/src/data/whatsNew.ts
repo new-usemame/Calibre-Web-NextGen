@@ -56,6 +56,37 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.50',
+    date: '2026-10-20',
+    items: [
+      {
+        title: 'Publication dates show the day you saved',
+        body: 'In time zones west of UTC the book page showed the day before, and a year-only date showed as 31 December of the year before. The page now shows the date as you entered it.',
+        category: 'Library',
+      },
+      {
+        title: 'Fetched metadata reaches the book file',
+        body: 'When fetch on ingest filled in only text, such as a description or publisher, the change stayed in the library and never reached the file or a Kobo that had already synced the book. It now does, like a fetched cover already did.',
+        category: 'Library',
+      },
+      {
+        title: 'Settings survive a version switch',
+        body: 'Moving to an older version, or trying a newer one and coming back, used to erase settings that version did not know about. They are now kept and come back when you return.',
+        category: 'Admin',
+      },
+      {
+        title: 'Simplified Chinese is complete',
+        body: 'Nearly 3,000 missing or unconfirmed Simplified Chinese entries are now translated, including reading states, account settings and book-source messages.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'A square app icon for dashboards',
+        body: 'Homepage, Heimdall and similar dashboards can use /static/CalibreWebNextgen-square.svg, which loads without signing in.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.49',
     date: '2026-10-19',
     items: [

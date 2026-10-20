@@ -43,7 +43,11 @@ def scheduler(monkeypatch):
     saved_executor_level = executor.level
 
     from cps.services.background_scheduler import BackgroundScheduler
-    monkeypatch.setattr(BackgroundScheduler, '_instance', None)
+    # __new__ stores the scheduler, log and lock on the class, so restore all of
+    # them or a singleton built earlier would point at the stopped scheduler.
+    for attr in ('_instance', 'scheduler', 'log', '_schedule_lock'):
+        monkeypatch.setattr(BackgroundScheduler, attr, None, raising=False)
+    saved_logger_class = logging.getLoggerClass()
     wrapper = BackgroundScheduler()
     sink = _Collect()
     executor.addHandler(sink)
@@ -53,6 +57,8 @@ def scheduler(monkeypatch):
         executor.removeHandler(sink)
         wrapper.scheduler.shutdown(wait=False)
         executor.setLevel(saved_executor_level)
+        logging.setLoggerClass(saved_logger_class)
+        logging.captureWarnings(False)
         package.setLevel(saved_package_level)
         for h in list(root.handlers):
             if h not in saved_handlers:
@@ -107,4 +113,11 @@ def test_debug_level_brings_the_per_run_lines_back(scheduler):
     logging.root.setLevel(logging.WARNING)
     cwa_logger.setup(cwa_logger.LOG_TO_STDERR, logging.DEBUG)
     _run_job(wrapper, lambda: None, 'debug job')
-    assert any('executed successfully' in r.getMessage() for r in sink.records)
+    assert _wait_for(lambda: any('executed successfully' in r.getMessage() for r in sink.records))
+
+
+def test_a_stricter_admin_level_is_not_loosened(scheduler):
+    _, sink = scheduler
+    cwa_logger.setup(cwa_logger.LOG_TO_STDERR, logging.ERROR)
+    logging.getLogger(EXECUTOR).warning('Run time of job "x" was missed by 0:00:01')
+    assert sink.records == []

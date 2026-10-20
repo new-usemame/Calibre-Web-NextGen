@@ -259,7 +259,7 @@ def _setup(log_file, log_level=None):
     # missed runs log at ERROR/WARNING. At DEBUG the per-run lines come back,
     # set on this logger itself because the root level is left alone below INFO.
     logging.getLogger('apscheduler.executors.default').setLevel(
-        logging.WARNING if log_level >= logging.INFO else log_level)
+        max(logging.WARNING, log_level) if log_level >= logging.INFO else log_level)
 
     # Decide whether to also attach a file handler. The legacy
     # stream-only tokens disable file logging; anything else resolves

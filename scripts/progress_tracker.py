@@ -492,7 +492,8 @@ def pr_open_spans(pr: dict, now: dt.datetime) -> list[tuple[dt.datetime, dt.date
 
 
 def throughput(cache: dict) -> list[dict]:
-    """Per UTC day: time-weighted open PRs, PRs opened so far, PRs closed by the day's end."""
+    """Per UTC day: time-weighted open PRs, PRs opened so far, PRs closed by the day's end.
+    The last row also carries open_now, the count open when the cache was fetched."""
     now = ts(cache["fetched_at"])
     spans = [pr_open_spans(p, now) for p in cache["prs"]]
     created = sorted(ts(p["createdAt"]) for p in cache["prs"])
@@ -506,6 +507,7 @@ def throughput(cache: dict) -> list[dict]:
         still_open = sum(1 for s in spans if any(a < end < b or (a < end and b == now) for a, b in s))
         rows.append({"day": day.date(), "open_avg": open_avg, "opened": made, "closed": made - still_open})
         day += dt.timedelta(days=1)
+    rows[-1]["open_now"] = sum(1 for s in spans if s and s[-1][1] == now)
     return rows
 
 
@@ -633,11 +635,11 @@ def render_charts(rows: list[dict], attempts: list[dict], today: dt.date) -> dic
     out = {}
     for theme, c in THEMES.items():
         ch = Chart(theme, x0, x1, "Pull request throughput",
-                   f"{now['open_avg']:.0f} pull requests open on {today:%b} {today.day}; "
+                   f"{now['open_now']} pull requests open on {today:%b} {today.day}; "
                    f"{fmt(now['closed'])} closed since {x0:%B %Y}.")
         ch.panel("Open pull requests, daily average",
                  [{"name": "open", "color": c["series"], "points": [(r["day"], r["open_avg"]) for r in rows],
-                   "end_label": f"{now['open_avg']:.0f} open"}], height=110)
+                   "end_label": f"{now['open_now']} open"}], height=110)
         ch.panel("Pull requests closed, running total",
                  [{"name": "closed", "color": c["series"], "points": [(r["day"], r["closed"]) for r in rows],
                    "end_label": f"{fmt(now['closed'])} closed"}], height=140)
@@ -691,13 +693,13 @@ def readme_block(rows: list[dict], attempts: list[dict], cache: dict, today: dt.
     heard = totals["happy"] + totals["not_fixed"]
     share = lambda k: f"{100 * totals[k] / max(len(attempts), 1):.0f}%"  # noqa: E731
     return "\n".join([
-        picture("progress-throughput", f"Pull request throughput: {now['open_avg']:.0f} open, "
+        picture("progress-throughput", f"Pull request throughput: {now['open_now']} open, "
                 f"{fmt(now['closed'])} closed since {rows[0]['day']:%B %Y}."),
         "",
         picture("progress-outcomes", f"Fix outcomes by week: {totals['happy']} happy, "
                 f"{totals['not_fixed']} not fixed, {totals['no_reply']} no reply."),
         "",
-        f"On {today:%B} {today.day}, {today.year}, {now['open_avg']:.0f} pull requests were open and "
+        f"On {today:%B} {today.day}, {today.year}, {now['open_now']} pull requests were open and "
         f"{fmt(now['closed'])} closed, {fmt(merged)} of them merged. Of {fmt(len(attempts))} fixes delivered "
         f"to a person, {share('happy')} heard back happy, {share('not_fixed')} not fixed and "
         f"{share('no_reply')} got no reply. When someone did answer, the answer was happy "

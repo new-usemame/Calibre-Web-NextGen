@@ -44,7 +44,7 @@ Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step
 <!-- progress-tracker:start (regenerate with scripts/progress_tracker.py; do not hand-edit) -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-throughput-dark.svg">
-  <img alt="Pull request throughput: 41 open, 1,761 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
+  <img alt="Pull request throughput: 42 open, 1,761 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
 </picture>
 
 <picture>
@@ -52,7 +52,7 @@ Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step
   <img alt="Fix outcomes by week: 250 happy, 79 not fixed, 428 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
 </picture>
 
-On October 20, 2026, 41 pull requests were open and 1,761 closed, 1,620 of them merged. Of 757 fixes delivered to a person, 33% heard back happy, 10% not fixed and 57% got no reply. When someone did answer, the answer was happy 76% of the time.
+On October 20, 2026, 42 pull requests were open and 1,761 closed, 1,620 of them merged. Of 757 fixes delivered to a person, 33% heard back happy, 10% not fixed and 57% got no reply. When someone did answer, the answer was happy 76% of the time.
 
 A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model and checked by a second; where they disagree the thread is reread and settled. Every verdict and the quote behind it are in [docs/progress-tracker](docs/progress-tracker/). Replies on Discord and Reddit are not counted.
 

@@ -131,3 +131,14 @@ def test_reopening_your_own_close_is_not_a_failed_fix(pt):
     # Reopening our close still counts against the fix.
     ours = [closed("2026-06-02T00:00:00Z"), reopened("2026-06-04T00:00:00Z", "reporter")]
     assert outcomes(pt, [issue(1, "reporter", events=ours)]) == {"not_fixed": 1}
+
+
+def test_the_open_count_is_what_is_open_when_fetched(pt):
+    # A PR opened late on the last day is open now, though the day's average barely counts it.
+    prs = [pr(10, "a", None), pr(11, "b", None)]
+    prs[1]["createdAt"] = "2026-06-02T09:00:00Z"
+    cache = {"fetched_at": "2026-06-02T12:00:00Z", "issues": [], "prs": prs, "upstream": []}
+    rows = pt.throughput(cache)
+    block = pt.readme_block(rows, [], cache, rows[-1]["day"], 0)
+    assert "2 pull requests were open" in block
+    assert "Pull request throughput: 2 open" in block

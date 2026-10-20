@@ -22,20 +22,27 @@ docker compose pull && docker compose up -d
 
 Library, settings, users, OAuth tokens, and KOReader sync state are preserved. Switching back is the reverse one-line change.
 
-> **Not using a terminal?** If you run Docker through a NAS or a GUI, follow a step-by-step guide instead — they cover both a fresh install and switching from CWA, with the exact buttons for your platform: **[Synology](docs/install/synology.md) · [Unraid](docs/install/unraid.md) · [Portainer](docs/install/portainer.md) · [TrueNAS SCALE](docs/install/truenas.md) · [all guides](docs/install/)**. Configuration not matching? [Open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [ask on Discord](https://discord.gg/B8NXZmcp32) and we'll walk you through it.
+> **Not using a terminal?** If you run Docker through a NAS or a GUI, follow a step-by-step guide instead. Each one covers both a fresh install and switching from CWA, with the exact buttons for your platform: **[Synology](docs/install/synology.md) · [Unraid](docs/install/unraid.md) · [Portainer](docs/install/portainer.md) · [TrueNAS SCALE](docs/install/truenas.md) · [all guides](docs/install/)**. Configuration not matching? [Open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [ask on Discord](https://discord.gg/B8NXZmcp32) and we'll walk you through it.
 
 - **Bug?** [File it here.](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md)
-- **Feature idea?** [Open a request.](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md) Anything goes, no checklist required — even half-formed ideas are welcome and help prioritize what to look at next.
+- **Feature idea?** [Open a request.](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md) Anything goes and no checklist is required. Even half-formed ideas are welcome, and they help us decide what to look at next.
 - **New here?** See [Quick start](#quick-start) below.
-- **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
-- **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
-- **Wondering how AI is used here?** [How AI is used](#how-ai-is-used) — used heavily to develop this fork, not at all in the software you run, and what gates it.
+- **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame): no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
+- **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md), a setup guide written for the assistant to follow, verify, and hand back to you working.
+- **Wondering how AI is used here?** Heavily in developing this fork, and not at all in the software you run. [How AI is used](#how-ai-is-used) explains what gates it.
+
+---
+
+## Progress tracker
+
+<!-- progress-tracker:start (regenerate with scripts/progress_tracker.py; do not hand-edit) -->
+<!-- progress-tracker:end -->
 
 ---
 
 ## Table of contents
 
-> **Prefer a browsable version?** The same guides live in the **[project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki)** — install, configuration, KOReader/Kobo sync, and troubleshooting, split into pages with a sidebar.
+> **Prefer a browsable version?** The same guides live in the **[project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki)**: install, configuration, KOReader/Kobo sync, and troubleshooting, split into pages with a sidebar.
 
 - [Why this fork exists](#why-this-fork-exists)
 - [What's included](#whats-included)
@@ -282,7 +289,7 @@ For deployment-managed Generic OIDC credentials and endpoint settings, see the [
 
 ## Updating
 
-Calibre-Web NextGen ships new versions regularly — often weekly. Updating means pulling the new image and recreating the container; your library, settings and reading progress live in the mounted volumes, so they're left untouched.
+Calibre-Web NextGen ships new versions regularly, often weekly. Updating means pulling the new image and recreating the container; your library, settings and reading progress live in the mounted volumes, so they're left untouched.
 
 **Update once, by hand:**
 
@@ -292,7 +299,7 @@ docker compose pull calibre-web && docker compose up -d calibre-web
 
 (Use your own service name if it isn't `calibre-web`.)
 
-**Update automatically** with [Watchtower](https://github.com/nicholas-fedor/watchtower) (the maintained fork). Add it alongside CWA and label the CWA service so Watchtower only ever touches this one container — your other containers are left alone:
+**Update automatically** with [Watchtower](https://github.com/nicholas-fedor/watchtower) (the maintained fork). Add it alongside CWA and label the CWA service so Watchtower only ever touches this one container and leaves your other containers alone:
 
 ```yaml
 services:
@@ -312,7 +319,7 @@ The in-app **Admin → NextGen Settings → Automatic updates** panel shows thes
 
 ### Running with Podman
 
-Calibre-Web NextGen is a standard OCI image, so it runs under Podman too — same image, no separate build:
+Calibre-Web NextGen is a standard OCI image, so it runs under Podman too, with the same image and no separate build:
 
 ```bash
 podman run -d --name calibre-web \
@@ -324,7 +331,7 @@ podman run -d --name calibre-web \
   ghcr.io/new-usemame/calibre-web-nextgen:latest
 ```
 
-Rootless Podman remaps user IDs, so if the container can't write to your volumes, add `--userns=keep-id` (or run it rootful). Podman also has native automatic updates (`podman auto-update`) with rollback — a step-by-step guide is coming once we've verified it against this image.
+Rootless Podman remaps user IDs, so if the container can't write to your volumes, add `--userns=keep-id` (or run it rootful). Podman also has native automatic updates (`podman auto-update`) with rollback. A step-by-step guide is coming once we've verified it against this image.
 
 ---
 
@@ -473,7 +480,7 @@ between requests:
 
 By default, calibre-web-nextgen holds a single SQLite connection open for the life of the process. `DESKTOP_COMPAT_MODE=true` switches to per-request connections so the connection is released between web requests. It does not coordinate native Mac and Linux-container writers or replace filesystem locking.
 
-On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load — no restart needed.
+On those deployments, changes you make in calibre desktop (edits, adds, deletes) appear in the web UI on the next page load, with no restart needed.
 
 Trade-offs:
 - Each web request pays a small extra overhead to open and close the database connection.
@@ -482,7 +489,7 @@ Trade-offs:
 
 ### Calibre plugins (DeDRM and others)
 
-calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you install yourself — the same plugin `.zip` files Calibre desktop uses. This is how you add things like DRM removal (DeDRM, Obok) or `.acsm` fulfillment (the ACSM Input plugin): you supply the plugins, and they run automatically during ingest, library conversion, and metadata embedding.
+calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you install yourself: the same plugin `.zip` files Calibre desktop uses. This is how you add things like DRM removal (DeDRM, Obok) or `.acsm` fulfillment (the ACSM Input plugin): you supply the plugins, and they run automatically during ingest, library conversion, and metadata embedding.
 
 1. Turn the feature on in your compose environment, then restart:
 
@@ -490,7 +497,7 @@ calibre-web-nextgen doesn't ship any Calibre plugins, but it can load ones you i
    - CWA_CALIBRE_USER_PLUGINS=true
    ```
 
-2. Copy the plugin `.zip` files into the `plugins` folder inside your config volume — from the host that's `<your config folder>/.config/calibre/plugins/` (the folder is created automatically once the option is on).
+2. Copy the plugin `.zip` files into the `plugins` folder inside your config volume. From the host, that's `<your config folder>/.config/calibre/plugins/` (the folder is created automatically once the option is on).
 
 3. Restart the container again. Each plugin is registered at startup; confirm with:
 
@@ -512,7 +519,7 @@ To add another plugin **after** the first batch is registered, drop the zip in t
 docker exec -e HOME=/config calibre-web /opt/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
 ```
 
-The feature is off by default because it runs third-party plugin code inside your container — only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
+The feature is off by default because it runs third-party plugin code inside your container, so only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
 
 ### Reverse proxy with a prefix
 
@@ -534,7 +541,7 @@ location /cwa/ {
 The trailing slash on `proxy_pass` matters: it strips `/cwa/` before the request
 reaches CWA. The headers are written out rather than pulled in with
 `include proxy_params;` because that file ships with Debian and Ubuntu's nginx
-package only — the official `nginx` Docker images don't have it, and nginx
+package only. The official `nginx` Docker images don't have it, and nginx
 refuses to start when the include is missing.
 
 You must also configure the application with the external URL prefix by setting
@@ -545,14 +552,14 @@ environment:
   - PROXY_SCRIPT_NAME=/cwa
 ```
 
-Leave the trailing slash off `PROXY_SCRIPT_NAME` — CWA joins it to each path
+Leave the trailing slash off `PROXY_SCRIPT_NAME`. CWA joins it to each path
 directly, so `/cwa/` would generate doubled-slash URLs.
 
 This ensures that CWA correctly generates URLs when it is served from the
 prefix path instead of the web server root.
 
 For TLS, upload limits, and the larger proxy buffers Kobo sync needs, see
-[`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) — the
+[`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf). The
 settings there apply to a prefixed deployment too.
 
 ### Reverse proxy / Cloudflare Tunnel
@@ -632,7 +639,7 @@ every peer, which was the behaviour before this setting existed.
 
 Hardcover then appears in the Fetch Metadata modal.
 
-If you set the token through the `HARDCOVER_TOKEN` environment variable, the **Hardcover API Key** field in the admin UI stays empty — that field only shows a key entered through the UI, and an environment-supplied token is not echoed back into the page. The admin page identifies whether `HARDCOVER_TOKEN` or `HARDCOVER_TOKEN_FILE` is active without displaying its value; a key typed into the field overrides either environment source.
+If you set the token through the `HARDCOVER_TOKEN` environment variable, the **Hardcover API Key** field in the admin UI stays empty. That field only shows a key entered through the UI, and an environment-supplied token is not echoed back into the page. The admin page identifies whether `HARDCOVER_TOKEN` or `HARDCOVER_TOKEN_FILE` is active without displaying its value; a key typed into the field overrides either environment source.
 
 To keep the token out of your compose file entirely, point `HARDCOVER_TOKEN_FILE` at a file containing just the token (docker-secrets style):
 
@@ -658,9 +665,9 @@ CWA has built-in KOReader sync; no separate kosync server is needed. With the pl
 2. To install the plain plugin by hand instead, visit `http://your-cwa:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
 3. Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.
 
-**Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.
+**Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases), not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.
 
-If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
+If your update manager is still pointed at this repository, switch it. That setup keeps working: a release that changes the plugin attaches the plugin download. But the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
 
 For matching OPDS filenames across devices, enable Use server filenames in KOReader's OPDS catalog configuration. KOReader normally builds `Author - Title.epub` from the feed. The server normally suggests `Title - Author.epub`, with only the first author. With Use server filenames enabled, KOReader uses the server's suggested name.
 
@@ -687,10 +694,10 @@ Read your CWA library on a Kobo e-reader, with reading progress syncing both way
 > its own. That is the supported path.
 >
 > 🚨 **Do not hand-edit `reading_services_host` in the conf file.** Doing so has been measured to
-> break syncing outright on at least one device — a Kobo Clara BW on firmware 4.42.23291 began
+> break syncing outright on at least one device. A Kobo Clara BW on firmware 4.42.23291 began
 > failing every sync with `FailedSync / WebRequestErr`, and recovered only when the key was set back
 > to `readingservices.kobo.com`. A Kobo Libra Colour on 4.45.23697 is unaffected and routes
-> annotations through CWA happily, so this is **not** universal — but we cannot yet predict which
+> annotations through CWA happily, so this is **not** universal, but we cannot yet predict which
 > devices tolerate it, and the failure leaves you with a reader that will not sync and no obvious
 > cause.
 >
@@ -704,15 +711,15 @@ Read your CWA library on a Kobo e-reader, with reading progress syncing both way
 > ```
 >
 > Silence means your highlights are going to Kobo's servers rather than yours. The safe way to
-> change that is to get the device to perform a **full initialization** against CWA — re-generate
-> the Kobo Sync Token and re-pair — rather than editing the key by hand.
+> change that is to get the device to perform a **full initialization** against CWA (re-generate
+> the Kobo Sync Token and re-pair) rather than editing the key by hand.
 >
 > This matters because CWA's protection against a Kobo deleting its own highlights after a sync
 > (upstream [calibre-web#2610](https://github.com/janeczku/calibre-web/issues/2610)) works by
 > answering that channel, and it cannot protect a request it never receives. Until the device is
 > routing annotations through CWA, treat highlights made on it as device-only and back them up.
 
-To confirm the device is reaching your server, watch the logs while you sync — you should see requests to `/kobo/<token>/v1/...`:
+To confirm the device is reaching your server, watch the logs while you sync. You should see requests to `/kobo/<token>/v1/...`:
 
 ```bash
 docker logs -f calibre-web 2>&1 | grep /kobo/
@@ -736,7 +743,7 @@ proxy_buffers           4 32k;
 proxy_busy_buffers_size 64k;
 ```
 
-(Larger libraries may need `128k / 4 256k / 256k`.) Reload nginx after the change. On Synology DSM, the built-in reverse-proxy GUI doesn't expose these directives — drop a custom config at `/etc/nginx/conf.d/http.calibre_web.conf` that mirrors the DSM entry plus the buffer lines, then disable the DSM entry. DSM rewrites `nginx.conf` on reboot, so a Task Scheduler boot-event job that runs `nginx -s reload` reapplies the custom file. Nginx Proxy Manager users: add the three lines under the proxy host's *Advanced* tab.
+(Larger libraries may need `128k / 4 256k / 256k`.) Reload nginx after the change. On Synology DSM, the built-in reverse-proxy GUI doesn't expose these directives. Instead, drop a custom config at `/etc/nginx/conf.d/http.calibre_web.conf` that mirrors the DSM entry plus the buffer lines, then disable the DSM entry. DSM rewrites `nginx.conf` on reboot, so a Task Scheduler boot-event job that runs `nginx -s reload` reapplies the custom file. Nginx Proxy Manager users: add the three lines under the proxy host's *Advanced* tab.
 
 See [`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) for a complete reference snippet.
 
@@ -744,7 +751,7 @@ See [`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) for
 
 Signing into a Kobo account, or doing a factory reset, can rewrite the `api_endpoint=` line back to Kobo's own server, which sends sync to Kobo instead of your library. After signing in, re-check the conf line over USB and set it back if it changed. Many sideloaded setups sign out of the Kobo account so the device stops resetting the endpoint.
 
-To keep the Kobo Store and your library working at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), any request CWA doesn't recognize gets an empty response — fine for a sideload-only device, but store features won't load.
+To keep the Kobo Store and your library working at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), any request CWA doesn't recognize gets an empty response. That is fine for a sideload-only device, but store features won't load.
 
 ---
 
@@ -829,7 +836,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 <!-- TRANSLATION_STATUS_START -->
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
-| English (source) | 100% | source | — |
+| English (source) | 100% | source | n/a |
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4126/4132 | 0 |
 | ca (`ca`) | `████████████████████` 99% | 4091/4132 | 0 |
 | Slovak (`sk`) | `████████████████████` 99% | 4086/4132 | 0 |
@@ -866,7 +873,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 ## Contributing
 
 - **Bug reports:** [open a bug issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md). Reproduction steps, version tag, and a `docker logs` snippet help a lot.
-- **Feature requests:** [open a feature issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md). The bar is low — bug reports get prioritized for code work, but feature requests shape what gets looked at when the bug queue is quiet, and they help upstream see what users actually want. Don't worry about whether it's "in scope"; just file it.
+- **Feature requests:** [open a feature issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md). The bar is low. Bug reports get prioritized for code work, but feature requests shape what gets looked at when the bug queue is quiet, and they help upstream see what users actually want. Don't worry about whether it's "in scope"; just file it.
 - **Pull requests:** welcome. The merge bar is "doesn't break anything that currently works." Changes touching auth, schema, or dependencies get a closer review. Backports keep the original author's handle in the commit message.
 - **CWA PR authors with stalled work upstream:** if you'd like your PR shipped here too, open an issue or send the PR our way.
 
@@ -876,11 +883,11 @@ Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contributing details: [`CONTRIBUTI
 
 ## Supporting the project
 
-<!-- funding-stats:start (regenerate with scripts/funding-stats.sh — do not hand-edit) -->
+<!-- funding-stats:start (regenerate with scripts/funding-stats.sh; do not hand-edit) -->
 Since May 2026: **188 releases, 673 merged pull requests, 262 issues closed, and 155 contributors credited by name.**
 <!-- funding-stats:end -->
 
-This build exists to ship community bug fixes on a fast, regular release cadence — real fixes,
+This build exists to ship community bug fixes on a fast, regular release cadence: real fixes,
 written by real people, packaged so they reach users quickly. It complements the upstream
 projects it builds on, and their maintainers have our respect and our credits below.
 
@@ -889,10 +896,10 @@ Discord, no early access, no "pro" tier. Every line is GPL-3.0 and free whether 
 or not. Sponsorship supports one thing: keeping this going.
 
 If the project has been useful to you, a few dollars is a fair trade and genuinely appreciated.
-If it hasn't, that's completely fine — it stays free either way.
+If it hasn't, that's completely fine. It stays free either way.
 
-- **[GitHub Sponsors](https://github.com/sponsors/new-usemame)** — one-time or monthly. GitHub takes 0%, so all of it arrives.
-- **[Ko-fi](https://ko-fi.com/calibrewebnextgen)** — the same thing, if you already have an account there.
+- **[GitHub Sponsors](https://github.com/sponsors/new-usemame)**: one-time or monthly. GitHub takes 0%, so all of it arrives.
+- **[Ko-fi](https://ko-fi.com/calibrewebnextgen)**: the same thing, if you already have an account there.
 
 The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks. That helps more than a few dollars does.
 
@@ -900,9 +907,9 @@ The most useful thing you can do costs nothing: [file a bug](https://github.com/
 
 ## How AI is used
 
-The codebase itself is Calibre-Web and Calibre-Web-Automated — written over many years by their
+The codebase itself is Calibre-Web and Calibre-Web-Automated, written over many years by their
 human maintainers and contributors, who are credited in [Credits](#credits). What this fork adds
-on top — its own fixes, their regression tests, the changelog and most issue replies — is largely
+on top (its own fixes, their regression tests, the changelog and most issue replies) is largely
 produced by an AI assistant working from a written brief, with human review gates: merges require
 CI plus a regression test verified to fail without the fix, and anything adding a dependency,
 changing a licence or introducing an external URL is decided by a person.
@@ -918,9 +925,9 @@ telemetry, and your library is not sent anywhere.
 
 Built on:
 
-- **Calibre-Web-Automated** ([@crocodilestick](https://github.com/crocodilestick) and contributors) — the core software this build is based on. Original PR authors are credited by handle in every backport commit.
-- **Calibre-Web** ([@janeczku](https://github.com/janeczku) and contributors) — the web UI underneath CWA.
-- **Calibre** ([@kovidgoyal](https://github.com/kovidgoyal)) — the library underneath all of it.
+- **Calibre-Web-Automated** ([@crocodilestick](https://github.com/crocodilestick) and contributors): the core software this build is based on. Original PR authors are credited by handle in every backport commit.
+- **Calibre-Web** ([@janeczku](https://github.com/janeczku) and contributors): the web UI underneath CWA.
+- **Calibre** ([@kovidgoyal](https://github.com/kovidgoyal)): the library underneath all of it.
 
 Every backported patch is credited to its original author by GitHub handle in the commit message and in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md).
 

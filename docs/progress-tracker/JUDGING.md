@@ -44,8 +44,9 @@ bucket (happy: `fixed` or `content`; not fixed: `partial`, `not_fixed` or
 `annoyed`; or `none`), the first model's verdict is kept and `by` names it.
 When they disagree, or a spot-check finds them both wrong, the thread is read
 again and settled, and `by` is `review`. On the first full run (October 20,
-2026, 369 windows) the two models put 94% of the windows they both judged in
-the same bucket, and review settled the other 20 plus 2 shared mistakes.
+2026, 369 windows) the two models put 94% of them in the same bucket. Review
+settled the 22 they split on and one both got wrong, and a random sample of
+56 they agreed on turned up no other mistakes.
 
 ## Answer format
 

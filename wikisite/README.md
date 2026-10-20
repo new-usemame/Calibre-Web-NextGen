@@ -84,9 +84,9 @@ the `.jpg` names with width/height/lazy/async wired up. Match these aspect ratio
 npx wrangler deploy   # from repo/wikisite — BY HAND; nothing auto-deploys this
 ```
 
-Every public release rebuilds and deploys it right after the GitHub wiki sync, from the
-released commit, so the two stay in step. `dist/` and `node_modules/` are build output
-and are not committed; a deploy always builds first.
+It is rebuilt from `main` right after each GitHub wiki sync and deployed whenever the
+build changed, so the two stay in step and every release is covered. `dist/` and
+`node_modules/` are build output and are not committed; a deploy always builds first.
 
 Do not touch the sibling `cwng-homepage` / `cwng-feedback` workers or their config.
 

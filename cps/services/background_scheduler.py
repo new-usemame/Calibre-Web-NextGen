@@ -35,6 +35,10 @@ class BackgroundScheduler:
             cls._instance = super(BackgroundScheduler, cls).__new__(cls)
             cls.log = logger.create()
             logger.logging.getLogger('tzlocal').setLevel(logger.logging.WARNING)
+            # APScheduler logs "Running job" / "executed successfully" at INFO on every
+            # run. The acquisition queue job fires every 5 seconds, so that is two lines
+            # every 5 seconds forever. Failures and missed runs log at WARNING or above.
+            logger.logging.getLogger('apscheduler.executors.default').setLevel(logger.logging.WARNING)
             cls.scheduler = BScheduler()
             cls.scheduler.start()
             cls._schedule_lock = threading.Lock()  # Prevent concurrent task scheduling

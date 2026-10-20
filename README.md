@@ -76,7 +76,7 @@ Regenerate with `python3 scripts/progress_tracker.py fetch`, then `queue`, judge
 
 ## Table of contents
 
-Prefer separate pages with a sidebar? The [project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki) carries these same guides.
+Prefer separate pages with a sidebar? The same guides are on the searchable [docs site](https://wiki.calibrewebnextgen.com) and in the [project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki).
 
 - [Why this fork exists](#why-this-fork-exists)
 - [What's included](#whats-included)

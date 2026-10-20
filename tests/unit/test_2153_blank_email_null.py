@@ -3,7 +3,6 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -87,7 +86,8 @@ def test_new_ui_admin_creates_two_users_without_email(session, monkeypatch):
         config_default_show=1, config_theme=1)
     monkeypatch.setattr(admin, 'config', cfg)
     monkeypatch.setattr(admin, 'valid_password', lambda value: value)
-    app = Flask(__name__)
+    # The real application object, not a private Flask(...) (fork #2546 ratchet).
+    from cps import app
     for name in ('test1', 'test2'):
         with app.test_request_context('/api/v1/admin/users', method='POST', json={
                 'name': name, 'password': 'Private-test-2153', 'email': ''}):

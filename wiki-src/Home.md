@@ -22,6 +22,12 @@ See **[[Differences from Upstream]]** for the full behavior table.
 
 ---
 
+## Progress tracker
+
+{{repo:README.md#progress-tracker}}
+
+---
+
 ## Where to go next
 
 | I want to… | Page |

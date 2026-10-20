@@ -31,8 +31,8 @@ Your library, settings, users, OAuth tokens and KOReader sync state live in your
 Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step guide for your platform. Each one covers a fresh install and a switch from CWA, button by button: [Synology](docs/install/synology.md) · [Unraid](docs/install/unraid.md) · [Portainer](docs/install/portainer.md) · [TrueNAS SCALE](docs/install/truenas.md) · [all guides](docs/install/). If your screens don't match, [open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [ask on Discord](https://discord.gg/B8NXZmcp32).
 
 - New install? Start with the [Quick start](#quick-start).
-- Found a bug? [File it here](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md).
-- Have an idea, even a half-formed one? [Open a feature request](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md). No checklist required.
+- Found a bug? [File it here](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml).
+- Have an idea, even a half-formed one? [Open a feature request](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.yml). No checklist required.
 - Setting up with an AI assistant? Point it at [`AI_README.md`](AI_README.md), a guide written for the assistant to follow, verify and hand back to you working.
 - AI does much of the development work on this fork and none of the work in the app you run. [How AI is used](#how-ai-is-used) explains the review gates.
 - Want to back the work? [Sponsor on GitHub](https://github.com/sponsors/new-usemame), one-time or monthly. Nothing is paywalled.
@@ -741,8 +741,8 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 
 ## Contributing
 
-- Bug reports: [open a bug issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md). Reproduction steps, the version tag and a `docker logs` snippet help a lot.
-- Feature requests: [open a feature issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.md). The bar is low, and you don't need to judge whether it's in scope. Bugs come first for code work; feature requests shape what gets picked up when the bug queue is quiet.
+- Bug reports: [open a bug issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml). Reproduction steps, the version tag and a `docker logs` snippet help a lot.
+- Feature requests: [open a feature issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=feature_request.yml). The bar is low, and you don't need to judge whether it's in scope. Bugs come first for code work; feature requests shape what gets picked up when the bug queue is quiet.
 - Pull requests are welcome. The merge bar is "doesn't break anything that currently works", and changes touching auth, schema or dependencies get a closer review. Backports keep the original author's handle in the commit message.
 - Have a PR open on CWA that you'd like shipped here too? Open an issue or send the PR over.
 
@@ -763,7 +763,7 @@ If the project has been useful to you, a few dollars is a fair trade, and it's a
 - [GitHub Sponsors](https://github.com/sponsors/new-usemame): one-time or monthly. GitHub takes 0%, so all of it arrives.
 - [Ko-fi](https://ko-fi.com/calibrewebnextgen): the same, if you already have an account there.
 
-The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks.
+The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml) when something breaks.
 
 ---
 

@@ -4,20 +4,9 @@ Bug reports, fixes, translations, and small features welcome.
 
 ## Reporting a bug
 
-[Open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new). Useful template:
+[Open a bug report](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.yml). The form asks for the version, how you run it, where it happens, your browser or device, and the container logs. Only the description and the version are required. If you reach the app through a reverse proxy or a URL prefix, say so under Anything else.
 
-```
-**Version**: v4.0.x (from container env or `/about`)
-**Browser / client**: Safari 17 / Chrome 124 / KOReader 2024.04 / Kobo Libra Color
-**Reverse proxy**: yes/no, with path prefix?
-**Repro steps**:
-1. ...
-2. ...
-**Expected vs actual**: ...
-**Container logs (last 50 lines)**: ...
-```
-
-Bug reports without a version + repro are still useful — we'll just ask follow-ups before we can act on them.
+A report without steps to reproduce is still useful. We'll ask follow-up questions before we can act on it.
 
 ## Submitting a PR
 

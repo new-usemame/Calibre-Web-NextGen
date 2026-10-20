@@ -156,7 +156,7 @@ function HelpMenu() {
   const unread = useWhatsNewUnread();
   // Prefill the issue with the version, the route SHAPE and a coarse browser,
   // instead of handing over a blank form and asking the reporter to look all
-  // that up — which is what .github/ISSUE_TEMPLATE/bug_report.md does today.
+  // that up, which is what the .github/ISSUE_TEMPLATE/bug_report.yml form does.
   // Composed on open (so the route is the one the user is actually on) and
   // never sent: the user reviews and edits it in GitHub's own form.
   const reportHref = open

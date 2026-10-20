@@ -1,0 +1,13 @@
+# Blank issues stay on: the app's Help menu opens /issues/new with the version,
+# page and browser already filled in, and turning them off would drop that text.
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question
+    url: https://github.com/new-usemame/Calibre-Web-NextGen/discussions/categories/q-a
+    about: Setup help, "how do I...", and anything you're not sure is a bug.
+  - name: Chat on Discord
+    url: https://discord.gg/B8NXZmcp32
+    about: Quick questions, and talking with other people who run it.
+  - name: Report a security problem
+    url: https://github.com/new-usemame/Calibre-Web-NextGen/security/advisories/new
+    about: Privately, so it isn't public before there's a fix.

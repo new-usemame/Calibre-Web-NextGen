@@ -105,3 +105,29 @@ def test_upstream_note_pointing_at_the_fork_is_a_delivery_and_a_thumbs_up_from_t
     thread["comments"]["nodes"] = [comment("new-usemame", "2026-06-01T00:00:00Z", "Could you share logs?", 0),
                                    comment("reporter", "2026-06-02T00:00:00Z", "here you go", 3)]
     assert outcomes(pt, upstream=[thread]) == {}
+
+
+def test_a_judged_reply_outranks_the_pushback_label(pt):
+    # The person pushed back, then found it was their own network: their last word decides.
+    comments = [comment("reporter", "2026-06-03T00:00:00Z", "still broken", 1),
+                comment("reporter", "2026-06-04T00:00:00Z", "my VPN was the problem, works now", 2)]
+    events = [closed("2026-06-02T00:00:00Z"),
+              {"__typename": "LabeledEvent", "createdAt": "2026-06-03T01:00:00Z", "label": {"name": "pushback"}}]
+    thread = issue(1, "reporter", comments=comments, events=events)
+    attempt = pt.resolved_attempts({"fetched_at": "", "issues": [thread], "prs": [], "upstream": []}, {})[0]
+    assert outcomes(pt, [thread]) == {"unread": 1}
+    fixed = {attempt["id"]: {"hash": attempt["hash"], "verdict": "fixed"}}
+    assert outcomes(pt, [thread], verdicts=fixed) == {"happy": 1}
+    silent = {attempt["id"]: {"hash": attempt["hash"], "verdict": "none"}}
+    assert outcomes(pt, [thread], verdicts=silent) == {"not_fixed": 1}
+
+
+def test_reopening_your_own_close_is_not_a_failed_fix(pt):
+    prs = [pr(10, "fix: thing (#1)", "2026-06-01T00:00:00Z")]
+    own = [closed("2026-06-02T00:00:00Z", "reporter"), reopened("2026-06-04T00:00:00Z", "reporter")]
+    assert outcomes(pt, [issue(1, "reporter", events=own + [closed("2026-06-05T00:00:00Z", "reporter")])], prs) == {"happy": 1}
+    # Reopened and left open: their earlier close no longer says they were happy.
+    assert outcomes(pt, [issue(1, "reporter", events=own)], prs) == {"no_reply": 1}
+    # Reopening our close still counts against the fix.
+    ours = [closed("2026-06-02T00:00:00Z"), reopened("2026-06-04T00:00:00Z", "reporter")]
+    assert outcomes(pt, [issue(1, "reporter", events=ours)]) == {"not_fixed": 1}

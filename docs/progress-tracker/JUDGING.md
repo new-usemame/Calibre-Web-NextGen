@@ -11,9 +11,16 @@ editing its entry in `verdicts.json` and running `render` again.
 ## Whose words count
 
 The person is whoever opened the thread. Another user who had the same problem
-counts too when they say whether the fix worked for them. Our own comments
+counts too when they say whether the fix worked for them, but when the person
+and another user disagree, the person's word decides. Our own comments
 (role `us`) are context only. Upstream maintainers discussing the fork, a
 bystander's "+1" and bot output do not count.
+
+On an upstream CWA or Calibre-Web thread, what we delivered is a note pointing
+at this fork's build or a suggested fix, and a reply counts only when it speaks
+to that: they tried the build, applied the suggestion, or thanked us for it.
+Someone saying the bug still happens on upstream's own release, or asking
+upstream to merge a fix, is talking about upstream, so it is `none`.
 
 ## Verdicts
 
@@ -29,6 +36,16 @@ bystander's "+1" and bot output do not count.
 When the person changes their mind inside one window ("works", then later
 "broke again"), their last word decides. A new, different bug reported
 alongside "this one works" is still `fixed`.
+
+## Two judges, then review
+
+Two models judge every window on their own. When both put it in the same chart
+bucket (happy: `fixed` or `content`; not fixed: `partial`, `not_fixed` or
+`annoyed`; or `none`), the first model's verdict is kept and `by` names it.
+When they disagree, or a spot-check finds them both wrong, the thread is read
+again and settled, and `by` is `review`. On the first full run (October 20,
+2026, 369 windows) the two models put 94% of the windows they both judged in
+the same bucket, and review settled the other 20 plus 2 shared mistakes.
 
 ## Answer format
 

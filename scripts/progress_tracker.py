@@ -291,6 +291,15 @@ def build_threads(cache: dict) -> list[dict]:
                     continue  # we took the close back before anyone answered
                 t["events"].append({"at": e["createdAt"], "kind": "deliver", "via": "closed"})
             elif kind == "ReopenedEvent" and is_outside(login(e)):
+                prev = next((x for x in reversed(tl[:idx]) if x["__typename"] == "ClosedEvent"), None)
+                if prev and login(prev) == t["person"] and login(e) == t["person"]:
+                    # They reopened their own close: it no longer says they are happy,
+                    # and it is not a fix of ours failing. Their words, if any, are judged.
+                    for k in range(len(t["events"]) - 1, -1, -1):
+                        if t["events"][k]["kind"] == "person_closed":
+                            del t["events"][k]
+                            break
+                    continue
                 t["events"].append({"at": e["createdAt"], "kind": "reopen", "who": login(e)})
             elif kind == "LabeledEvent" and e["label"]["name"] == "pushback":
                 t["events"].append({"at": e["createdAt"], "kind": "pushback"})
@@ -364,9 +373,9 @@ def outcome(a: dict, verdicts: dict) -> tuple[str, str]:
     kinds = {e["kind"] for e in a["events"]}
     if "reopen" in kinds:
         return "not_fixed", "reopened by the person"
-    if "pushback" in kinds:
-        return "not_fixed", "pushback label"
     if a["hash"]:
+        # A judged reply outranks our pushback label: the label marks that they
+        # pushed back, but their last word (a false alarm, a retest) decides.
         v = verdicts.get(a["id"])
         if not v or v.get("hash") != a["hash"]:
             return "unread", "reply not judged yet"
@@ -374,6 +383,8 @@ def outcome(a: dict, verdicts: dict) -> tuple[str, str]:
             return "happy", f"reply: {v['verdict']}"
         if v["verdict"] in BAD_VERDICTS:
             return "not_fixed", f"reply: {v['verdict']}"
+    if "pushback" in kinds:
+        return "not_fixed", "pushback label"
     reacts = [e["content"] for e in a["events"] if e["kind"] == "reaction"]
     if any(r in NEGATIVE_REACTIONS for r in reacts):
         return "not_fixed", "reaction"
@@ -695,10 +706,12 @@ def readme_block(rows: list[dict], attempts: list[dict], cache: dict, today: dt.
         "",
         "A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, "
         "their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or "
-        "Calibre-Web thread pointing them here. Happy means they said it works or were content. Not fixed "
-        "means they reopened it, said it is still broken in whole or part, or were unhappy with how it went; "
-        "every close in a close-and-reopen cycle counts. A model reads each reply once, and its verdict and "
-        "the quote behind it are kept in [docs/progress-tracker](docs/progress-tracker/) for anyone to check. "
+        "Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content "
+        "with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy "
+        "with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came "
+        "back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model "
+        "and checked by a second; where they disagree the thread is reread and settled. Every verdict and the "
+        "quote behind it are in [docs/progress-tracker](docs/progress-tracker/). "
         "Replies on Discord and Reddit are not counted.",
         "",
         "<details><summary>The numbers by month</summary>",

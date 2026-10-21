@@ -107,3 +107,28 @@ def test_kobo_keeps_only_a_valid_isbn():
     assert provider._validate_isbn(DUNE_10) == DUNE_10
     assert provider._validate_isbn("9780441013594") is None
     assert provider._validate_isbn("ISBN:9780441013593") is None   # digits only, as before
+
+
+def test_hardcover_scores_an_isbn10_against_its_isbn13_as_an_isbn_match():
+    from cps.metadata_provider.hardcover import Hardcover
+    record = NS(identifiers={"isbn": DUNE_13}, title="Dune", authors=["Frank Herbert"])
+    assert Hardcover.calculate_confidence_score(record, "Dune", ["Frank Herbert"], query_isbn=DUNE_10) == (
+        1.0, "ISBN exact match")
+    junk = NS(identifiers={"isbn": "9780000000000"}, title="Other", authors=["Someone"])
+    score, reason = Hardcover.calculate_confidence_score(junk, "Dune", ["Frank Herbert"], query_isbn="9780000000000")
+    assert reason != "ISBN exact match"
+
+
+def test_goodreads_other_books_hides_an_owned_book_whichever_isbn_form_each_side_holds(monkeypatch):
+    pytest.importorskip("goodreads")
+    from cps.services import goodreads_support
+
+    def gr_book(isbn, gid, title):
+        return NS(isbn=isbn, gid=gid, _book_dict={"title_without_series": title})
+
+    owned = gr_book(DUNE_13, 1, "Dune: Deluxe Edition With Extras")
+    other = gr_book("9780441172719", 2, "Children of Dune")
+    library = [NS(title="Dune", identifiers=[NS(val=DUNE_10)])]
+    monkeypatch.setattr(goodreads_support, "Levenshtein", None)   # judge by ISBN alone
+    found = list(goodreads_support.get_other_books(NS(books=[owned, other]), library))
+    assert found == [other]

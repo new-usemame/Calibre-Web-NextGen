@@ -11561,5 +11561,65 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2616@2026-10-19T09:19:20Z"
+ },
+ {
+  "date": "2026-10-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2673",
+  "title": "[bug] Log flooded with APScheduler \"Running job / executed successfully\" lines every 5 seconds",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2675"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2673@2026-10-20T16:18:06Z"
+ },
+ {
+  "date": "2026-10-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2674",
+  "title": "Stop logging every scheduled job run at INFO",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2674@2026-10-20T16:18:34Z"
+ },
+ {
+  "date": "2026-10-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2153",
+  "title": "Email isn't so \"optional\", after all?",
+  "person": "bcsteeve",
+  "delivered_via": [
+   "PR #2683"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2153@2026-10-21T01:40:35Z"
+ },
+ {
+  "date": "2026-10-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2672",
+  "title": "Store a blank user email as NULL so more than one account can omit it (#2153)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2672@2026-10-21T01:41:14Z"
  }
 ]

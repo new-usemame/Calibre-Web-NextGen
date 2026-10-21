@@ -744,10 +744,20 @@ $("#nav_new a:contains('Recently')").contents().filter(function () {
 });
 
 // Change shelf textValue
-shelfText = $(".shelf .discover h2:first").text().replace(":", " —").replace(/\'/g, "");
+// The server renders the heading as "Shelf: 'Name'". Turn that into
+// "Shelf — Name" by dropping only the quotes that wrap the name, so an
+// apostrophe inside the name ("Children's Fiction") or in a translated
+// label survives (#1704).
+function formatShelfHeading(text) {
+    return text
+        .replace(/:(\s*)'([\s\S]*)'(\s*)$/, ":$1$2$3")
+        .replace(":", " —");
+}
+
+shelfText = formatShelfHeading($(".shelf .discover h2:first").text());
 $(".shelf .discover h2:first").text(shelfText);
 
-shelfText = $(".shelfreorder .col-sm-10 .col-sm-6.col-lg-6.col-xs-6 h2:first").text().replace(':', ' —').replace(/\'/g, "");
+shelfText = formatShelfHeading($(".shelfreorder .col-sm-10 .col-sm-6.col-lg-6.col-xs-6 h2:first").text());
 $(".shelfreorder .col-sm-10 .col-sm-6.col-lg-6.col-xs-6 h2:first").text(shelfText);
 
 

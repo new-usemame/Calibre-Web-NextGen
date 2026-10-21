@@ -367,6 +367,8 @@ export function Reader({ id }: { id: string }) {
   // data.json on mount so a tapped highlight can show its note without a
   // round-trip, and kept in step with every create/edit/remove.
   const notesRef = useRef<Map<string, string>>(new Map());
+  // True while a composer create is waiting on the server (#2550).
+  const createInFlightRef = useRef(false);
   /* public_id -> label, from the same response as the rows. An OLDER backend
    * omits the envelope entirely, which is how a client can tell; an empty map
    * then means every row is simply unlabelled rather than wrong. */
@@ -859,10 +861,12 @@ export function Reader({ id }: { id: string }) {
   // so the just-created highlight is immediately removable (#782).
   // Write a new highlight (optionally carrying a note) and paint it. Takes the
   // selection explicitly rather than reading `pendingSel`, because the note
-  // composer clears that state before it saves.
+  // composer clears that state before it saves. Resolves false when the server
+  // refused the write; the caller tells the reader and keeps what they need to
+  // retry (#2550), so the text selection is only cleared after a stored write.
   const persistHighlight = useCallback(async (
     cfiRange: string, text: string, color: string, note: string,
-  ) => {
+  ): Promise<boolean> => {
     try {
       // The create route answers with the stored row (`_data_json_row`), so the
       // listed row is built from what the SERVER recorded, falling back to what
@@ -891,18 +895,26 @@ export function Reader({ id }: { id: string }) {
         position_type: created?.position_type ?? 'cfi',
       }]);
       paintHighlight(cfiRange, color, newId, !!note);
-    } catch { /* surfaced as no-op; user can retry */ }
+    } catch {
+      return false;
+    }
     try {
       (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
     } catch { /* noop */ }
+    return true;
   }, [id, paintHighlight]);
 
-  const createHighlight = useCallback((color: string) => {
+  // One-tap colour highlight. On a refused write the selection and its colour
+  // choices come back, so another tap retries the same highlight.
+  const createHighlight = useCallback(async (color: string) => {
     const sel = pendingSel;
     if (!sel) return;
     setPendingSel(null);
-    void persistHighlight(sel.cfiRange, sel.text, color, '');
-  }, [pendingSel, persistHighlight]);
+    if (!await persistHighlight(sel.cfiRange, sel.text, color, '')) {
+      setPendingSel(sel);
+      announce(t('Could not save that highlight.'), { assertive: true });
+    }
+  }, [pendingSel, persistHighlight, announce, t]);
 
   // "Add note" on a fresh selection — hand the selection to the composer, which
   // creates the highlight and its note together on save.
@@ -966,6 +978,25 @@ export function Reader({ id }: { id: string }) {
     c: NonNullable<typeof composer>, rawNote: string,
   ) => {
     const note = rawNote.trim();
+    if (c.mode === 'create') {
+      // The composer stays open until the server has the highlight, so a failed
+      // save keeps the selection and the typed note for a retry (#2550). While a
+      // save is in flight a second press is ignored: it would store the same
+      // highlight twice.
+      if (createInFlightRef.current) return;
+      createInFlightRef.current = true;
+      try {
+        if (!await persistHighlight(c.cfiRange, c.text, c.color, note)) {
+          announce(t('Could not save that note.'), { assertive: true });
+          return;
+        }
+      } finally {
+        createInFlightRef.current = false;
+      }
+      setComposer(null);
+      announce(note ? t('Note saved') : t('Highlight saved'));
+      return;
+    }
     setComposer(null);
     if (c.mode === 'standalone') {
       // An empty standalone note is nothing at all — the backend rejects it, and
@@ -987,11 +1018,6 @@ export function Reader({ id }: { id: string }) {
         }]);
         announce(t('Note saved'));
       } catch { announce(t('Could not save that note.'), { assertive: true }); }
-      return;
-    }
-    if (c.mode === 'create') {
-      await persistHighlight(c.cfiRange, c.text, c.color, note);
-      announce(note ? t('Note saved') : t('Highlight saved'));
       return;
     }
     if (!c.annotationId) return;
@@ -2585,7 +2611,7 @@ export function Reader({ id }: { id: string }) {
           <span className={styles.hiliteLabel}>{t('Highlight')}</span>
           {HILITE_ORDER.map((c) => (
             <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
-              onClick={() => createHighlight(c)} aria-label={colorLabel(c)} title={colorLabel(c)} />
+              onClick={() => { void createHighlight(c); }} aria-label={colorLabel(c)} title={colorLabel(c)} />
           ))}
           <button className={styles.hiliteNote} onClick={startNoteForSelection} title={t('Add note')}>
             <StickyNote size={15} aria-hidden="true" focusable={false} />

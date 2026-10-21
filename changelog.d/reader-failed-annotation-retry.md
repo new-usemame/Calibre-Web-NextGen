@@ -1,0 +1,1 @@
+- Web reader: when saving a new highlight or note fails, the reader now says so and keeps your selection and typed note, so you can try again. Before, the failure was silent and the selection was cleared. A second press while a save is still in progress no longer stores the highlight twice. Thanks @jay23606 (#2550, #2554).

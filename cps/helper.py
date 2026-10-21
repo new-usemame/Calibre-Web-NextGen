@@ -2037,7 +2037,8 @@ def check_email(email, user_id=None):
 
     Pass ``user_id`` when changing an existing account's address."""
     email = valid_email(email)
-    if _taken_by_another_user(ub.User.email, email, user_id):
+    # A blank address is "no email", not a value to collide on (#2153).
+    if email and _taken_by_another_user(ub.User.email, email, user_id):
         log.error("Found an existing account for this Email address")
         raise Exception(_("Found an existing account for this Email address"))
     return email

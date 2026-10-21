@@ -455,13 +455,15 @@ test.describe('reader notes (#325)', () => {
     // press must not send a second create (one highlight, not two).
     await page.getByRole('button', { name: 'Save note' }).click();
     await expect.poll(() => payloads.length).toBe(2);
+    // The catch keeps this passing if the busy button ever becomes truly disabled;
+    // the payload count below is what catches a duplicate create.
     await page.getByRole('button', { name: 'Save note' }).click({ timeout: 2_000 }).catch(() => {});
     releaseRetry();
     await expect(page.getByRole('dialog', { name: 'Add note' })).toBeHidden();
     expect(payloads).toHaveLength(2);
     expect(payloads[1]).toEqual(payloads[0]);
     await expect.poll(async () => (await paintCounts(page)).noted).toBe(before.noted + 1);
-    await restoreAnnotations(page, bookId!, []);
+    // Every create here is answered by the route, so the server holds nothing to clean up.
   });
 
   test('a failed one-tap highlight keeps the colour choice open and retries the same payload', async ({ page }, testInfo) => {
@@ -488,7 +490,6 @@ test.describe('reader notes (#325)', () => {
     await expect.poll(() => payloads.length).toBe(2);
     expect(payloads[1]).toEqual(payloads[0]);
     await expect.poll(async () => (await paintCounts(page)).plain).toBeGreaterThan(before.plain);
-    await restoreAnnotations(page, bookId!, []);
   });
 
   test('the one-tap colour highlight still creates without a note', async ({ page }, testInfo) => {

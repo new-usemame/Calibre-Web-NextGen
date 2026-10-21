@@ -369,6 +369,7 @@ export function Reader({ id }: { id: string }) {
   const notesRef = useRef<Map<string, string>>(new Map());
   // True while a composer create is waiting on the server (#2550).
   const createInFlightRef = useRef(false);
+  const [composerSaving, setComposerSaving] = useState(false);
   /* public_id -> label, from the same response as the rows. An OLDER backend
    * omits the envelope entirely, which is how a client can tell; an empty map
    * then means every row is simply unlabelled rather than wrong. */
@@ -548,6 +549,10 @@ export function Reader({ id }: { id: string }) {
     color: string;
     note: string;
   } | null>(null);
+  // The composer as last rendered, for a save that resolves after the reader
+  // may have closed it or opened another (#2550).
+  const composerRef = useRef(composer);
+  composerRef.current = composer;
 
   const epubFormat = book?.formats.find((f) => f.format.toLowerCase() === 'epub');
   const epubContentUrl = epubFormat
@@ -911,7 +916,7 @@ export function Reader({ id }: { id: string }) {
     if (!sel) return;
     setPendingSel(null);
     if (!await persistHighlight(sel.cfiRange, sel.text, color, '')) {
-      setPendingSel(sel);
+      setPendingSel((cur) => cur ?? sel);
       announce(t('Could not save that highlight.'), { assertive: true });
     }
   }, [pendingSel, persistHighlight, announce, t]);
@@ -985,14 +990,22 @@ export function Reader({ id }: { id: string }) {
       // highlight twice.
       if (createInFlightRef.current) return;
       createInFlightRef.current = true;
+      setComposerSaving(true);
+      let saved = false;
       try {
-        if (!await persistHighlight(c.cfiRange, c.text, c.color, note)) {
-          announce(t('Could not save that note.'), { assertive: true });
-          return;
-        }
+        saved = await persistHighlight(c.cfiRange, c.text, c.color, note);
       } finally {
         createInFlightRef.current = false;
+        setComposerSaving(false);
       }
+      if (!saved) {
+        announce(t('Could not save that note.'), { assertive: true });
+        return;
+      }
+      // Close only the composer that made this save: the reader may have
+      // cancelled it and opened another while the request was in flight.
+      const open = composerRef.current;
+      if (!open || open.mode !== 'create' || open.cfiRange !== c.cfiRange) return;
       setComposer(null);
       announce(note ? t('Note saved') : t('Highlight saved'));
       return;
@@ -2673,6 +2686,7 @@ export function Reader({ id }: { id: string }) {
             <div className={styles.noteColors} role="group" aria-label={t('Highlight color')}>
               {HILITE_ORDER.map((c) => (
                 <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
+                  disabled={composerSaving}
                   onClick={() => setComposer((s) => (s ? { ...s, color: c } : s))}
                   aria-pressed={composer.color === c} aria-label={colorLabel(c)} title={colorLabel(c)} />
               ))}
@@ -2680,6 +2694,7 @@ export function Reader({ id }: { id: string }) {
           )}
           <textarea ref={noteFieldRef} className={styles.noteInput} rows={3}
             value={composer.note} aria-label={t('Note')} placeholder={t('Write a note…')}
+            readOnly={composerSaving}
             onChange={(e) => setComposer((s) => (s ? { ...s, note: e.target.value } : s))}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
@@ -2691,7 +2706,8 @@ export function Reader({ id }: { id: string }) {
                 <span>{t('Remove note')}</span>
               </button>
             )}
-            <Button variant="primary" className={styles.noteSave} onClick={saveNote}>
+            <Button variant="primary" className={styles.noteSave} onClick={saveNote}
+              aria-disabled={composerSaving || undefined} aria-busy={composerSaving || undefined}>
               {t('Save note')}
             </Button>
           </div>

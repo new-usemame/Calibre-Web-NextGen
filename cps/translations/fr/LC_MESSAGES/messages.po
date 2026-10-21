@@ -21067,3 +21067,175 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
+
+#: cps/spa_strings.py
+msgid "Becomes"
+msgstr "Devient"
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr "Devient (séparer par des virgules pour scinder)"
+
+#: cps/spa_strings.py
+msgid "By name"
+msgstr "Par nom"
+
+#: cps/spa_strings.py
+msgid "Change {n} books now?"
+msgstr "Modifier {n} livres maintenant ?"
+
+#: cps/spa_strings.py
+msgid "Changed {n} books."
+msgstr "{n} livres modifiés."
+
+#: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr "Impossible de charger les règles."
+
+#: cps/spa_strings.py
+msgid "Could not read that file: {error}"
+msgstr "Impossible de lire ce fichier : {error}"
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr "Couverte par une règle"
+
+#: cps/spa_strings.py
+msgid "Discard"
+msgstr "Abandonner"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr "Supprimer cette valeur"
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr "Supprimée"
+
+#: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr "Saisissez la valeur à reconnaître."
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr "Indiquez ce qu’elle devient, ou choisissez Supprimer."
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr "Chaque valeur est couverte par une règle."
+
+#: cps/spa_strings.py
+msgid "Field"
+msgstr "Champ"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr "Filtrer les valeurs"
+
+#: cps/spa_strings.py
+msgid "History"
+msgstr "Historique"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr "Valeur entrante"
+
+#: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr "Nettoyage des métadonnées"
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr "L’application des métadonnées est désactivée : les fichiers des livres gardent leurs anciennes métadonnées."
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr "Le plus de livres d’abord"
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr "Aucun livre ne changerait avec les règles enregistrées."
+
+#: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr "Aucune règle pour l’instant. Ajoutez-en une ci-dessus, ou importez un fichier de règles JSON."
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr "Aucune valeur ne correspond."
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr "Rien n’a encore été appliqué."
+
+#: cps/spa_strings.py
+msgid "One map per field. A rule turns a value into another (rename), several (split) or none (drop), matching regardless of case and accents. Values no rule covers stay as they are. Nothing changes in the library until you apply the preview."
+msgstr "Un ensemble de règles par champ. Une règle transforme une valeur en une autre (renommer), en plusieurs (scinder) ou en aucune (supprimer), sans tenir compte de la casse ni des accents. Les valeurs qu’aucune règle ne couvre restent telles quelles. Rien ne change dans la bibliothèque tant que vous n’appliquez pas l’aperçu."
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr "Seulement les valeurs sans règle"
+
+#: cps/spa_strings.py
+msgid "Remove the rule for {value}"
+msgstr "Retirer la règle pour {value}"
+
+#: cps/spa_strings.py
+msgid "Removed {n} values no book uses now."
+msgstr "{n} valeurs qu’aucun livre n’utilise plus ont été retirées."
+
+#: cps/spa_strings.py
+msgid "Restored {n} books."
+msgstr "{n} livres restaurés."
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr "Règles"
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr "Règles enregistrées. L’aperçu ci-dessous est à jour."
+
+#: cps/spa_strings.py
+msgid "Save rules"
+msgstr "Enregistrer les règles"
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr "Enregistrez les règles pour mettre à jour l’aperçu."
+
+#: cps/spa_strings.py
+msgid "Sort values"
+msgstr "Trier les valeurs"
+
+#: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr "Les fichiers des livres sont aussi en cours de mise à jour."
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr "Il existe déjà une règle pour cette valeur."
+
+#: cps/spa_strings.py
+msgid "Undone"
+msgstr "Annulé"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr "Modifications des règles non enregistrées."
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr "Valeurs de votre bibliothèque"
+
+#: cps/spa_strings.py
+msgid "{n} books"
+msgstr "{n} livres"
+
+#: cps/spa_strings.py
+msgid "{n} books could not be changed: {list}"
+msgstr "{n} livres n’ont pas pu être modifiés : {list}"
+
+#: cps/spa_strings.py
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr "{n} ignorés, car modifiés depuis l’aperçu ou laissés de côté."

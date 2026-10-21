@@ -69,6 +69,7 @@ def html2text(html: str) -> str:
 class LubimyCzytac(Metadata):
     __name__ = "LubimyCzytac.pl"
     __id__ = "lubimyczytac"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
 
     BASE_URL = "https://lubimyczytac.pl"
 

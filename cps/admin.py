@@ -61,6 +61,8 @@ from .services.kobo_reconcile import (
     build_reconciliation_preview,
     scan_from_candidates,
 )
+from .services import cover_flag_repair
+from .services.calibre_db_lock import metadata_db_write_lock
 from .services.support_policy import validate_support_settings
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
@@ -1860,6 +1862,101 @@ def kobo_reconcile_confirm(user_id):
         "skipped_unresolved": preview.skipped_unresolved,
     }
     return _render_kobo_reconcile(user, result=result)
+
+
+_COVER_FLAG_TOKEN_SALT = "cover-flag-repair-preview"
+_COVER_FLAG_TOKEN_MAX_AGE = 30 * 60
+
+
+def _cover_flag_serializer():
+    return URLSafeTimedSerializer(
+        current_app.config["SECRET_KEY"], salt=_COVER_FLAG_TOKEN_SALT)
+
+
+def _render_cover_flag_repair(preview=None, confirmation_token=None,
+                              result=None, error=None):
+    return render_title_template(
+        "cover_flag_repair.html",
+        preview=preview,
+        confirmation_token=confirmation_token,
+        result=result,
+        error=error,
+        gdrive=bool(config.config_use_google_drive),
+        title=_("Restore missing covers"),
+        page="admin",
+    )
+
+
+@admi.route("/admin/cover-flags", methods=["GET", "POST"])
+@user_login_required
+@admin_required
+def cover_flag_repair_scan():
+    if request.method == "GET":
+        return _render_cover_flag_repair()
+    if config.config_use_google_drive:
+        return _render_cover_flag_repair(
+            error=_("This is not available for Google Drive libraries.")), 400
+
+    rows = cover_flag_repair.book_rows(calibre_db.session, db.Books)
+    candidates = cover_flag_repair.find_candidates(rows, config.get_book_path())
+    confirmation_token = None
+    if candidates:
+        confirmation_token = _cover_flag_serializer().dumps({
+            "books": [[candidate.book_id, candidate.title] for candidate in candidates],
+        })
+    return _render_cover_flag_repair(
+        preview=candidates, confirmation_token=confirmation_token)
+
+
+@admi.route("/admin/cover-flags/confirm", methods=["POST"])
+@user_login_required
+@admin_required
+def cover_flag_repair_confirm():
+    if config.config_use_google_drive:
+        return _render_cover_flag_repair(
+            error=_("This is not available for Google Drive libraries.")), 400
+    try:
+        payload = _cover_flag_serializer().loads(
+            request.form.get("confirmation_token", ""),
+            max_age=_COVER_FLAG_TOKEN_MAX_AGE,
+        )
+        preview_ids = {int(book_id) for book_id, _title in payload.get("books", [])}
+    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        return _render_cover_flag_repair(
+            error=_("This preview is invalid or expired. Scan the library again.")), 400
+
+    try:
+        selected_ids = list(dict.fromkeys(
+            int(book_id) for book_id in request.form.getlist("book_id")))
+    except ValueError:
+        selected_ids = None
+    if selected_ids is None or any(book_id not in preview_ids for book_id in selected_ids):
+        return _render_cover_flag_repair(
+            error=_("The selected books do not match this preview. Scan the library again.")), 400
+    if not selected_ids:
+        return _render_cover_flag_repair(
+            error=_("Select at least one book to restore.")), 400
+
+    books_by_id = {
+        book.id: book for book in
+        calibre_db.session.query(db.Books).filter(db.Books.id.in_(selected_ids)).all()
+    }
+    try:
+        with metadata_db_write_lock():
+            outcome = cover_flag_repair.restore_flags(
+                books_by_id, selected_ids, config.get_book_path())
+            calibre_db.session.commit()
+    except Exception as ex:
+        calibre_db.session.rollback()
+        log.error_or_exception(ex)
+        return _render_cover_flag_repair(
+            error=_("Could not update the library database. No covers were changed.")), 500
+    for book_id in outcome.fixed:
+        helper.clear_cover_thumbnail_cache(book_id)
+    log.info("Restored the cover flag on %d book(s); %d skipped",
+             len(outcome.fixed), outcome.skipped)
+    return _render_cover_flag_repair(
+        result={"fixed": len(outcome.fixed), "skipped": outcome.skipped})
 
 
 def check_valid_read_column(column):

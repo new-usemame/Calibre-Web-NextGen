@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="discover">
+  <h2>{{ _('Restore missing covers') }}</h2>
+  <p>
+    {{ _('Find books that have a cover.jpg in their folder but are marked as having no cover, so the cover is never shown.') }}
+  </p>
+  <div class="alert alert-warning" role="alert">
+    <p>{{ _('A cover that was removed on purpose in the book editor also looks like this. Select only the books whose cover you want back.') }}</p>
+  </div>
+
+  {% if gdrive %}
+  <div class="alert alert-info" role="alert">{{ _('This is not available for Google Drive libraries.') }}</div>
+  {% endif %}
+
+  {% if error %}
+  <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if result %}
+  <div class="alert alert-success" role="status">
+    {{ _('%(count)d covers were restored.', count=result.fixed) }}
+  </div>
+  {% if result.skipped %}
+  <p>{{ _('%(count)d books were skipped because they changed since the scan.', count=result.skipped) }}</p>
+  {% endif %}
+  {% endif %}
+
+  {% if preview is not none %}
+  <h3>{{ _('Preview') }}</h3>
+  <p>
+    {{ _('%(count)d books have a cover file but are marked as having no cover.', count=preview|length) }}
+  </p>
+  {% if preview %}
+  <form method="POST" action="{{ url_for('admin.cover_flag_repair_confirm') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>{{ _('Restore') }}</th>
+          <th>{{ _('Title') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for book in preview %}
+        <tr>
+          <td>
+            <input type="checkbox" name="book_id" value="{{ book.book_id }}"
+                   aria-label="{{ _('Restore the cover of %(title)s', title=book.title) }}">
+          </td>
+          <td>{{ book.title }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button class="btn btn-primary" type="submit" data-confirm="{{ _('Restore the covers of the selected books?') }}" onclick="return confirm(this.dataset.confirm);">
+      {{ _('Restore selected covers') }}
+    </button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if not gdrive %}
+  <hr>
+  <form method="POST" action="{{ url_for('admin.cover_flag_repair_scan') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-default" type="submit">{{ _('Scan library') }}</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

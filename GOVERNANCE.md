@@ -41,7 +41,7 @@ The fork should never go dark just because one person stops showing up. That's t
 
 ## Code of conduct
 
-Be respectful in PRs, issues, and Discussions. No personal attacks, no harassment, no off-topic political flame wars. Disagree on the technical question, not the person. Project lead can lock or remove abusive comments and ban repeat offenders.
+Be respectful in PRs, issues, and Discussions. No personal attacks, no harassment, no off-topic political flame wars. Disagree on the technical question, not the person. Project lead can lock or remove abusive comments and ban repeat offenders. The full text, and how to report something, is in [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
 Specific to this fork: **no hostility toward upstream or its maintainer**. We are guests in their ecosystem. If you can't keep that tone, don't post here.
 

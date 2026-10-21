@@ -1,0 +1,90 @@
+name: Bug report
+description: Something broke, or works differently than it should.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Only the first two boxes are required. Fill in what you can, and we'll ask about the rest.
+
+        Found a security problem? Please [report it privately](https://github.com/new-usemame/Calibre-Web-NextGen/security/advisories/new) instead of here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and what you expected instead.
+      placeholder: I opened a book on my Kobo and the page I was on was lost after the next sync.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: It's under About in the menu, in either interface. If you can't open the app, the image tag you pulled will do.
+      placeholder: v4.1.50
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - docker compose (terminal)
+        - Unraid
+        - Synology
+        - Portainer
+        - TrueNAS SCALE
+        - QNAP
+        - Dockge
+        - Kubernetes
+        - Something else
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - New UI
+        - Classic UI
+        - Web reader
+        - Kobo sync
+        - KOReader sync
+        - OPDS
+        - Send to e-reader or email
+        - Importing books
+        - Metadata or covers
+        - Admin settings or users
+        - Somewhere else
+  - type: input
+    id: client
+    attributes:
+      label: Browser or device
+      placeholder: Safari 18 on iPhone, Kobo Libra Colour, KOReader 2026.03
+  - type: dropdown
+    id: came-from
+    attributes:
+      label: Did you switch from another image?
+      options:
+        - No, this is a fresh install
+        - Yes, from Calibre-Web-Automated
+        - Yes, from Calibre-Web
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The last 50 or so lines of `docker logs <container>` from around when it happened. Look them over for anything private before posting.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, a reverse proxy or URL prefix, settings you changed. You can drag images in here.

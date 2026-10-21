@@ -16,6 +16,38 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.51] - 2026-10-21
+
+### Changed
+
+- **The docs site at [wiki.calibrewebnextgen.com](https://wiki.calibrewebnextgen.com) is current again and linked from the README.** It now updates alongside the GitHub wiki whenever the guides change, and the progress charts on its home page load from the site itself and follow its light and dark theme switch.
+
+- **Filing a bug on GitHub now walks you through a short form.** It asks for your version, how you run Calibre-Web-NextGen, where the problem happens, your browser or device and the logs, and only the description and the version are required. The Help menu's report link still opens an issue with your version, page and browser already filled in. The new issue page also links to Q&A, Discord and private security reporting, and the project now has a code of conduct.
+
+- **The README opens with a progress tracker and reads faster.** Two charts above the table of contents show pull requests open and closed over time, and how each fix delivered to someone landed: happy, not fixed, or no reply. Every verdict, the rule it follows and the quote behind it are in `docs/progress-tracker/`. The rest of the README is shorter and leads each section with what to do; runtime path overrides and Calibre plugin internals moved to their own pages under `docs/`.
+
+### Fixed
+
+- **More than one user can now be created without an email address.** Previously the first account without an email worked and the second failed with "An account already exists for this email or name", because a blank email was stored as an empty value that the unique constraint treated as taken. A blank email is now stored as "no email", and existing installs are corrected automatically at startup. Reported by @bcsteeve, fixed by @sgreadly in #2672.
+
+- **Scheduled jobs no longer log two lines every 5 seconds.** With book sources (acquisition) enabled, every run of the import queue job was logged as "Running job" and "executed successfully", burying real messages and growing the log files. Successful scheduled runs are now quiet at the default log level; failed or missed runs are still logged, and the DEBUG log level shows every run. Reported and fixed by @sgreadly in #2673 and #2674.
+
+## [v4.1.50] - 2026-10-20
+
+### Added
+
+- **A square SVG of the app icon for dashboards.** Homepage, Heimdall and similar dashboards can use `/static/CalibreWebNextgen-square.svg`, which loads without signing in. Contributed by @Retrograde-i486 in #2616.
+
+### Fixed
+
+- **Switching versions no longer deletes settings.** On every start the app removed any setting it didn't recognise from its settings database, so moving to an older version (or trying a newer one and coming back) erased whatever you had set for options that version doesn't have. Those settings are now left alone and come back when you return to a version that uses them. #2549.
+
+- **The book page shows the publication date you saved.** In time zones west of UTC (the Americas) it showed the day before, and a year-only date showed as 31 December of the previous year. Reported by @gueland in #2634.
+
+- **Metadata filled in by automatic fetch is now written into the book file.** When fetch on ingest changed only text fields (description, publisher, published date, rating and the others it can set), the change was saved to the library but never queued for the file, so with enforcement on the file kept its old metadata, and the book was not marked as changed for a Kobo that had already synced it. A fetched cover already did both. Text changes now do the same. Contributed by @splitsec2 in #2612.
+
+- **Simplified Chinese stays translated across the interface.** Complete 2,934 previously empty or fuzzy entries, including reading states, account settings, and book-source messages, and incorporate the first proofreading pass. Existing confirmed translations remain unchanged. Contributed by @jkluiopopop in #2604.
+
 ## [v4.1.49] - 2026-10-19
 
 ### Added

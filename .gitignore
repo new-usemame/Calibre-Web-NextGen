@@ -28,6 +28,8 @@ docs/*
 # clean clone or in CI with 'no such file'. Track the markdown; keep
 # ignoring everything else that lands in docs/.
 !docs/*.md
+# The README progress tracker's verdicts and ledger (scripts/progress_tracker.py).
+!docs/progress-tracker/
 .venv-activate.sh
 test_venv
 cwa.code-workspace

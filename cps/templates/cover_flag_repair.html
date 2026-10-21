@@ -38,7 +38,12 @@
     <table class="table table-striped">
       <thead>
         <tr>
-          <th>{{ _('Restore') }}</th>
+          <th>
+            <input type="checkbox" id="cover-flag-select-all"
+                   aria-label="{{ _('Select all') }}"
+                   onclick="document.querySelectorAll('input[name=book_id]').forEach(function (box) { box.checked = this.checked; }, this);">
+            {{ _('Restore') }}
+          </th>
           <th>{{ _('Title') }}</th>
         </tr>
       </thead>

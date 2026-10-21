@@ -9,6 +9,7 @@ cover route is the one that serves the result.
 """
 
 import contextlib
+import re
 
 import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
@@ -174,7 +175,7 @@ def test_split_library_covers_are_looked_up_in_the_books_directory(tmp_path):
 
 
 @pytest.mark.unit
-def test_template_gives_every_candidate_its_own_unchecked_checkbox():
+def test_template_gives_every_candidate_its_own_unchecked_checkbox_and_a_select_all():
     from cps.services.cover_flag_repair import CoverFlagCandidate
 
     environment = Environment(loader=ChoiceLoader([
@@ -191,5 +192,6 @@ def test_template_gives_every_candidate_its_own_unchecked_checkbox():
         confirmation_token="token", result=None, error=None, gdrive=False)
 
     assert html.count('name="book_id"') == 2
-    assert "checked" not in html
+    assert html.count('id="cover-flag-select-all"') == 1, "one control selects every row"
+    assert not re.search(r'name="book_id"[^>]*\bchecked\b', html), "rows start unselected"
     assert 'name="confirmation_token" value="token"' in html

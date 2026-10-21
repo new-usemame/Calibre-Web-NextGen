@@ -112,15 +112,13 @@ def test_selected_book_gets_its_cover_served_and_deselected_book_does_not(librar
 
 @pytest.mark.unit
 def test_confirm_refuses_empty_tampered_and_expired_selections(library, handlers, monkeypatch):
-    from cps import admin
-
     scan, confirm, cleared = handlers
     token = scan()["confirmation_token"]
 
     empty_context, empty_status = confirm(token)
     outside_context, outside_status = confirm(token, 2)  # flagged: never in the preview
     garbage_context, garbage_status = confirm("not-a-token", 1)
-    monkeypatch.setattr(admin, "_COVER_FLAG_TOKEN_MAX_AGE", -1)
+    monkeypatch.setattr(cover_flag_repair, "TOKEN_MAX_AGE", -1)
     expired_context, expired_status = confirm(token, 1)
 
     assert (empty_status, outside_status, garbage_status, expired_status) == (400, 400, 400, 400)

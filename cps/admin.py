@@ -1864,15 +1864,6 @@ def kobo_reconcile_confirm(user_id):
     return _render_kobo_reconcile(user, result=result)
 
 
-_COVER_FLAG_TOKEN_SALT = "cover-flag-repair-preview"
-_COVER_FLAG_TOKEN_MAX_AGE = 30 * 60
-
-
-def _cover_flag_serializer():
-    return URLSafeTimedSerializer(
-        current_app.config["SECRET_KEY"], salt=_COVER_FLAG_TOKEN_SALT)
-
-
 def _render_cover_flag_repair(preview=None, confirmation_token=None,
                               result=None, error=None):
     return render_title_template(
@@ -1901,9 +1892,8 @@ def cover_flag_repair_scan():
     candidates = cover_flag_repair.find_candidates(rows, config.get_book_path())
     confirmation_token = None
     if candidates:
-        confirmation_token = _cover_flag_serializer().dumps({
-            "books": [[candidate.book_id, candidate.title] for candidate in candidates],
-        })
+        confirmation_token = cover_flag_repair.make_token(
+            current_app.config["SECRET_KEY"], candidates)
     return _render_cover_flag_repair(
         preview=candidates, confirmation_token=confirmation_token)
 
@@ -1916,43 +1906,32 @@ def cover_flag_repair_confirm():
         return _render_cover_flag_repair(
             error=_("This is not available for Google Drive libraries.")), 400
     try:
-        payload = _cover_flag_serializer().loads(
-            request.form.get("confirmation_token", ""),
-            max_age=_COVER_FLAG_TOKEN_MAX_AGE,
-        )
-        preview_ids = {int(book_id) for book_id, _title in payload.get("books", [])}
+        preview_ids = cover_flag_repair.read_token(
+            current_app.config["SECRET_KEY"], request.form.get("confirmation_token", ""))
     except (BadSignature, SignatureExpired, TypeError, ValueError):
         return _render_cover_flag_repair(
             error=_("This preview is invalid or expired. Scan the library again.")), 400
 
     try:
-        selected_ids = list(dict.fromkeys(
-            int(book_id) for book_id in request.form.getlist("book_id")))
-    except ValueError:
-        selected_ids = None
-    if selected_ids is None or any(book_id not in preview_ids for book_id in selected_ids):
-        return _render_cover_flag_repair(
-            error=_("The selected books do not match this preview. Scan the library again.")), 400
-    if not selected_ids:
-        return _render_cover_flag_repair(
-            error=_("Select at least one book to restore.")), 400
+        selected_ids = cover_flag_repair.parse_selection(
+            request.form.getlist("book_id"), preview_ids)
+    except cover_flag_repair.SelectionError as selection_error:
+        messages = {
+            "empty": _("Select at least one book to restore."),
+            "invalid": _("The selected books do not match this preview. Scan the library again."),
+            "outside_preview": _("The selected books do not match this preview. Scan the library again."),
+        }
+        return _render_cover_flag_repair(error=messages[selection_error.code]), 400
 
-    books_by_id = {
-        book.id: book for book in
-        calibre_db.session.query(db.Books).filter(db.Books.id.in_(selected_ids)).all()
-    }
     try:
-        with metadata_db_write_lock():
-            outcome = cover_flag_repair.restore_flags(
-                books_by_id, selected_ids, config.get_book_path())
-            calibre_db.session.commit()
+        outcome = cover_flag_repair.apply_selection(
+            calibre_db.session, db.Books, selected_ids, config.get_book_path(),
+            write_lock=metadata_db_write_lock,
+            on_fixed=helper.clear_cover_thumbnail_cache)
     except Exception as ex:
-        calibre_db.session.rollback()
         log.error_or_exception(ex)
         return _render_cover_flag_repair(
             error=_("Could not update the library database. No covers were changed.")), 500
-    for book_id in outcome.fixed:
-        helper.clear_cover_thumbnail_cache(book_id)
     log.info("Restored the cover flag on %d book(s); %d skipped",
              len(outcome.fixed), outcome.skipped)
     return _render_cover_flag_repair(

@@ -22,10 +22,16 @@ looked up where covers are actually served from.
 from __future__ import annotations
 
 import os
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
+
+from itsdangerous import URLSafeTimedSerializer
 
 COVER_FILENAME = "cover.jpg"
+
+TOKEN_SALT = "cover-flag-repair-preview"
+TOKEN_MAX_AGE = 30 * 60
 
 
 @dataclass(frozen=True)
@@ -100,3 +106,79 @@ def book_rows(session, books_model) -> Iterable[tuple]:
         .order_by(books_model.sort)
         .all()
     )
+
+
+class SelectionError(ValueError):
+    """The submitted selection is unusable; ``code`` says why."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+def _serializer(secret_key) -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(secret_key, salt=TOKEN_SALT)
+
+
+def make_token(secret_key, candidates: Iterable[CoverFlagCandidate]) -> str:
+    """Sign the ids a scan found, so a confirm can only name books it listed."""
+    return _serializer(secret_key).dumps({"books": [c.book_id for c in candidates]})
+
+
+def read_token(secret_key, token: str, max_age: float | None = None) -> set[int]:
+    """The ids in a preview token.
+
+    Raises ``itsdangerous.BadSignature`` (``SignatureExpired`` included) for a
+    forged or old token, and ``ValueError``/``TypeError`` for a malformed one.
+    """
+    payload = _serializer(secret_key).loads(
+        token or "", max_age=TOKEN_MAX_AGE if max_age is None else max_age)
+    return {int(book_id) for book_id in payload.get("books", [])}
+
+
+def parse_selection(raw_ids: Iterable, preview_ids: set[int]) -> list[int]:
+    """Validated, de-duplicated selection, in the order given.
+
+    Raises ``SelectionError`` with code ``invalid`` (not integers),
+    ``outside_preview`` (an id the scan never listed) or ``empty``.
+    """
+    try:
+        selected = list(dict.fromkeys(int(book_id) for book_id in raw_ids))
+    except (TypeError, ValueError):
+        raise SelectionError("invalid") from None
+    if any(book_id not in preview_ids for book_id in selected):
+        raise SelectionError("outside_preview")
+    if not selected:
+        raise SelectionError("empty")
+    return selected
+
+
+def apply_selection(
+    session,
+    books_model,
+    selected_ids: Sequence[int],
+    books_root: str,
+    *,
+    write_lock: Callable[[], AbstractContextManager],
+    on_fixed: Callable[[int], None],
+) -> CoverFlagRepairResult:
+    """Restore the flag on the selected books and commit.
+
+    The commit happens under ``write_lock``. On any failure the session is
+    rolled back, nothing is changed, and the exception propagates. ``on_fixed``
+    runs per restored book only after the commit succeeded.
+    """
+    books_by_id = {
+        book.id: book for book in
+        session.query(books_model).filter(books_model.id.in_(list(selected_ids))).all()
+    }
+    try:
+        with write_lock():
+            outcome = restore_flags(books_by_id, selected_ids, books_root)
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    for book_id in outcome.fixed:
+        on_fixed(book_id)
+    return outcome

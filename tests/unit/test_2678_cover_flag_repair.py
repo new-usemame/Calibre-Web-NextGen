@@ -10,10 +10,12 @@ cover route is the one that serves the result.
 
 import contextlib
 import re
+from types import SimpleNamespace
 
 import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 
+from cps import db
 from cps.services import cover_flag_repair
 from tests.unit.koreader_library_world import LibraryWorld
 
@@ -195,3 +197,105 @@ def test_template_gives_every_candidate_its_own_unchecked_checkbox_and_a_select_
     assert html.count('id="cover-flag-select-all"') == 1, "one control selects every row"
     assert not re.search(r'name="book_id"[^>]*\bchecked\b', html), "rows start unselected"
     assert 'name="confirmation_token" value="token"' in html
+
+
+# -- the JSON API behind the new interface ----------------------------------
+
+SCAN = "/api/v1/admin/cover-flags/scan"
+RESTORE = "/api/v1/admin/cover-flags/restore"
+
+
+@pytest.fixture
+def api(library, monkeypatch):
+    from cps import constants
+    from cps.api import cover_flags
+
+    cleared = []
+    monkeypatch.setattr(cover_flags, "calibre_db", library.cdb)
+    monkeypatch.setattr(cover_flags, "metadata_db_write_lock", contextlib.nullcontext)
+    monkeypatch.setattr(cover_flags.helper, "clear_cover_thumbnail_cache", cleared.append)
+    library.enable_web()
+    admin = library.add_user("root")
+    admin.role |= constants.ROLE_ADMIN
+    library.session.commit()
+    library.add_user("reader")
+    return SimpleNamespace(
+        world=library, cleared=cleared,
+        admin=library.browser("root"), reader=library.browser("reader"),
+        anonymous=library.browser())
+
+
+@pytest.mark.unit
+def test_api_is_for_signed_in_admins_only(api):
+    assert api.anonymous.post(SCAN).status_code == 401
+    assert api.reader.post(SCAN).status_code == 403
+    assert api.reader.post(RESTORE, json={"token": "x", "book_ids": [1]}).status_code == 403
+    assert _flag(api.world, 1) == 0
+
+
+@pytest.mark.unit
+def test_api_scan_lists_candidates_and_writes_nothing(api):
+    response = api.admin.post(SCAN)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert {book["id"] for book in body["books"]} == {1, 5}
+    assert body["count"] == 2 and body["token"]
+    assert _flag(api.world, 1) == 0
+
+
+@pytest.mark.unit
+def test_api_restore_fixes_only_the_selected_book_and_it_is_served(api):
+    token = api.admin.post(SCAN).get_json()["token"]
+
+    response = api.admin.post(RESTORE, json={"token": token, "book_ids": [1]})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"fixed": 1, "skipped": 0}
+    assert _flag(api.world, 1) == 1
+    assert _flag(api.world, 5) is None
+    assert api.cleared == [1]
+    assert _served_mimetype(api.world, 1) == "image/jpeg"
+
+
+@pytest.mark.unit
+def test_api_restore_refuses_bad_requests_with_distinct_codes(api, monkeypatch):
+    token = api.admin.post(SCAN).get_json()["token"]
+
+    def code(payload):
+        response = api.admin.post(RESTORE, json=payload)
+        assert response.status_code == 400
+        return response.get_json()["error"]["code"]
+
+    assert code({"token": token, "book_ids": []}) == "empty_selection"
+    assert code({"token": token, "book_ids": [2]}) == "invalid_selection"  # never listed
+    assert code({"token": token, "book_ids": ["one"]}) == "invalid_selection"
+    assert code({"token": "forged", "book_ids": [1]}) == "invalid_token"
+    assert code({"token": token}) == "invalid_request"
+    monkeypatch.setattr(cover_flag_repair, "TOKEN_MAX_AGE", -1)
+    assert code({"token": token, "book_ids": [1]}) == "invalid_token"
+    assert _flag(api.world, 1) == 0
+    assert api.cleared == []
+
+
+@pytest.mark.unit
+def test_api_skips_books_that_changed_since_the_scan(api):
+    token = api.admin.post(SCAN).get_json()["token"]
+    api.world.session.get(db.Books, 5).has_cover = 1
+    api.world.session.commit()
+
+    response = api.admin.post(RESTORE, json={"token": token, "book_ids": [1, 5]})
+
+    assert response.get_json() == {"fixed": 1, "skipped": 1}
+
+
+@pytest.mark.unit
+def test_api_is_not_offered_for_google_drive_libraries(api, monkeypatch):
+    from cps.api import cover_flags
+
+    monkeypatch.setattr(cover_flags.config, "config_use_google_drive", True)
+
+    for url, payload in ((SCAN, None), (RESTORE, {"token": "x", "book_ids": [1]})):
+        response = api.admin.post(url, json=payload)
+        assert response.status_code == 400
+        assert response.get_json()["error"]["code"] == "not_available"

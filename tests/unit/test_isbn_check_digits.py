@@ -74,3 +74,36 @@ def test_a_provider_isbn_that_fails_its_check_digit_is_not_written(monkeypatch):
         book, _meta(identifiers={"isbn": "9780441013594", "isbn_10": DUNE_10, "goodreads": "234225"}),
         _FakeCDB())
     assert {i.type: i.val for i in book.identifiers} == {"isbn_10": DUNE_10, "goodreads": "234225"}
+
+
+# --- the other places an ISBN picks something --------------------------------
+
+def test_the_cover_booster_skips_an_isbn_that_fails_its_check_digit():
+    from cps.services import cover_booster
+    # The first value is the wrong-digit form of the second; only the valid one is used.
+    assert cover_booster._isbn_from({"isbn": "9780441013594", "isbn_10": DUNE_10}) == DUNE_10
+    assert cover_booster._isbn_from({"isbn": "9780000000000"}) is None
+    assert cover_booster._to_isbn10("9780441013594") is None
+    assert cover_booster._to_isbn10(DUNE_13) == DUNE_10
+
+
+def test_the_cover_picker_probes_no_amazon_key_for_an_invalid_isbn(monkeypatch):
+    from cps.services import cover_booster
+    monkeypatch.setattr(cover_booster, "_AMAZON_CDN_ENABLED", True)
+    assert cover_booster.amazon_cdn_keys(isbns=["0441013598", DUNE_13]) == [DUNE_10]
+
+
+def test_apple_books_only_routes_a_valid_isbn_to_its_isbn_lookup():
+    from cps.metadata_provider import apple_books
+    provider = apple_books.AppleBooks()
+    assert provider._looks_like_isbn("978-0-441-01359-3")
+    assert not provider._looks_like_isbn("978-0-441-01359-4")
+
+
+def test_kobo_keeps_only_a_valid_isbn():
+    from cps.metadata_provider.kobo import Kobo
+    provider = Kobo()
+    assert provider._validate_isbn("978-0-441-01359-3") == DUNE_13
+    assert provider._validate_isbn(DUNE_10) == DUNE_10
+    assert provider._validate_isbn("9780441013594") is None
+    assert provider._validate_isbn("ISBN:9780441013593") is None   # digits only, as before

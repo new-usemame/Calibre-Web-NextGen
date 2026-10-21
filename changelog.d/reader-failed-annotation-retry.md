@@ -1,1 +1,3 @@
-- Web reader: when saving a new highlight or note fails, the reader now says so and keeps your selection and typed note, so you can try again. Before, the failure was silent and the selection was cleared. Thanks @jay23606 (#2550, #2554).
+### Fixed
+
+- **A failed highlight or note save in the web reader can be retried.** Before, when saving a new highlight or note failed, the reader said nothing and cleared the selection, so a typed note was lost. Now it says the save failed and keeps the selection and the note, and saving again sends the same highlight. Thanks @jay23606 (#2550, #2554).

@@ -528,8 +528,8 @@ def _library_series_like(calibre_db_instance, name):
     """The library's existing series that ``name`` is another spelling of, or None.
 
     Sources disagree on what to call a series (Open Library's "Dune Chronicles",
-    Wikidata's "Dune"), and every new spelling became a second series beside
-    the first. Only an exact key match counts, and only when it is unique.
+    Hardcover's "The Chronicles of Narnia (Publication Order)"), and every new
+    spelling became a second series beside the first. Only an exact key match counts, and only when it is unique.
     """
     wanted = _series_key(name)
     if not wanted:

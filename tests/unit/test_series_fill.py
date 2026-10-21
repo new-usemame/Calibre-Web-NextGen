@@ -135,18 +135,18 @@ def test_a_series_left_empty_is_filled_from_the_next_series_provider(monkeypatch
 
 
 def test_the_configured_order_comes_first_then_providers_it_leaves_out(monkeypatch):
-    wikidata = _Provider("wikidata", [_hit("Alex Cross", 23)])
+    dnb = _Provider("dnb", [_hit("Alex Cross", 23)])
     kobo = _Provider("kobo", [_hit("", 0)])
     hardcover = _Provider("hardcover", [_hit("Alex Cross", 23.0)])
-    filled, _ = _fill(monkeypatch, [wikidata, kobo, hardcover], ["ibdb", "kobo", "hardcover"])
-    assert filled and kobo.queries and hardcover.queries and wikidata.queries == []
+    filled, _ = _fill(monkeypatch, [dnb, kobo, hardcover], ["ibdb", "kobo", "hardcover"])
+    assert filled and kobo.queries and hardcover.queries and dnb.queries == []
 
 
 def test_a_provider_outside_the_order_is_asked_last(monkeypatch):
-    wikidata = _Provider("wikidata", [_hit("Alex Cross", 23)])
+    dnb = _Provider("dnb", [_hit("Alex Cross", 23)])
     hardcover = _Provider("hardcover", [])
-    filled, book = _fill(monkeypatch, [wikidata, hardcover], ["ibdb", "hardcover"])
-    assert filled and hardcover.queries and wikidata.queries
+    filled, book = _fill(monkeypatch, [dnb, hardcover], ["ibdb", "hardcover"])
+    assert filled and hardcover.queries and dnb.queries
     assert [s.name for s in book.series] == ["Alex Cross"]
 
 
@@ -250,3 +250,11 @@ def test_the_provider_already_applied_is_not_asked_again(monkeypatch):
     monkeypatch.setattr(m, "metadata_providers", [kobo, hardcover])
     assert m._fill_missing_series(_book(), "q", "kobo", ["kobo", "hardcover"], {}, _SeriesCDB([]))
     assert kobo.queries == [] and hardcover.queries
+
+
+def test_a_provider_that_is_off_by_default_is_asked_only_when_turned_on(monkeypatch):
+    goodreads = _Provider("goodreads", [_hit("Alex Cross", 23)])
+    filled, _ = _fill(monkeypatch, [goodreads], ["ibdb"])
+    assert not filled and goodreads.queries == []
+    filled, _ = _fill(monkeypatch, [goodreads], ["ibdb"], enabled={"goodreads": True})
+    assert filled and goodreads.queries

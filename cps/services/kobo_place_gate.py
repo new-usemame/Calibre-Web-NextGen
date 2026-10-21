@@ -491,8 +491,10 @@ def arm_download_place_nudge(device_id, book_id, *, session):
     makes the delivered span exact.
 
     Armed only where the turn-on nudge would be: the box is on and the shared
-    place beats this Kobo's own report. A Kobo with a report of its own is
-    already covered by the own-place restore armed at download time.
+    place beats this Kobo's own report. For a Kobo with an older report of
+    its own, the own-place restore armed at download time sends the same
+    place, and the sync drops the nudge's copy as a duplicate; the nudge is
+    what covers a Kobo with no report, or one past that restore's window.
     Returns whether a nudge was armed.
     """
     device = session.execute(

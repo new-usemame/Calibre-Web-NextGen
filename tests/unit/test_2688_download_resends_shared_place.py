@@ -125,3 +125,57 @@ def test_a_kobo_whose_own_place_is_newer_keeps_it(monkeypatch, placed):
 
     assert _nudges(sw) == 0
     assert sw.synced_location(sw.checked) == span_location(own["source"], own["span"])
+
+
+def _sent_locations(sw, syncs=4):
+    """The Location of every state the next ``syncs`` syncs send for the book."""
+    from tests.unit.share_place_span_world import location_of, _states
+    sent = []
+    for _ in range(syncs):
+        for state in _states(sw.sync(sw.checked)).get(sw.book.uuid, []):
+            sent.append(location_of(state.get("CurrentBookmark")))
+    return sent
+
+
+def test_a_kobo_whose_own_place_is_older_gets_only_the_shared_place(monkeypatch, kobo):
+    """The Kobo reported a place of its own, then KOReader shared a later one.
+    The download arms both the own-place restore and this nudge; the Kobo is
+    sent the shared place, never its older own place, and then nothing."""
+    sw = kobo
+    own = span_rows()[5]
+    sw.put(sw.checked, own["source"], own["span"], 5, after_now(-120))
+    sw.settle(sw.checked)
+    late = span_rows()[300]
+    sw.push(late["xpointer"], 40)
+    sw.settle(sw.checked)
+    exact = span_location(late["source"], late["span"])
+
+    _download(monkeypatch, sw)
+    sent = _sent_locations(sw)
+
+    assert sent and sent[0] == exact
+    assert all(location == exact for location in sent), sent
+    assert not _sent_for_book(sw, sw.sync(sw.checked))
+    assert _nudges(sw) == 0
+
+
+def test_a_second_download_re_sends_the_shared_place_again(monkeypatch, placed):
+    sw = placed
+    _download(monkeypatch, sw)
+    assert sw.synced_location(sw.checked) == sw.exact
+    sw.settle(sw.checked)
+
+    _download(monkeypatch, sw)
+
+    assert sw.synced_location(sw.checked) == sw.exact
+
+
+def test_turning_the_box_off_after_the_download_disarms_the_re_send(monkeypatch, placed):
+    sw = placed
+    _download(monkeypatch, sw)
+    assert _nudges(sw) == 1
+
+    sw.share(sw.checked, False)
+
+    assert _nudges(sw) == 0
+    assert not _sent_for_book(sw, sw.sync(sw.checked))

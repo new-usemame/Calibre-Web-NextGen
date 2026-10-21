@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from werkzeug.wsgi import ClosingIterator
@@ -272,12 +272,36 @@ def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
             table.c.restore_state != RESTORE_ARMED,
         ).values(completed_at=_now()))
         session.commit()
-        return result.rowcount == 1
+        confirmed = result.rowcount == 1
     except SQLAlchemyError:
         session.rollback()
         log.warning("Could not confirm Kobo file download proof for attempt %s",
                     download_id, exc_info=True)
         return False
+    if confirmed:
+        _re_send_shared_place(download_id, session=session, log=log)
+    return confirmed
+
+
+def _re_send_shared_place(download_id, *, session, log):
+    """Arm the one-time re-send of the shared place for a proven download.
+
+    Separate from the proof's own commit: failing here must never undo the
+    proof, so it rolls back only its own work (#2688).
+    """
+    table = ub.KoboDeviceBookDownload.__table__
+    try:
+        row = session.execute(
+            select(table.c.device_id, table.c.book_id).where(table.c.id == download_id)
+        ).first()
+        if row is not None:
+            from .kobo_place_gate import arm_download_place_nudge
+            arm_download_place_nudge(row.device_id, row.book_id, session=session)
+        session.commit()
+    except Exception:
+        session.rollback()
+        log.warning("Could not arm the shared place re-send for download %s",
+                    download_id, exc_info=True)
 
 
 def completed_download_body(body, *, application, bind, download_id,

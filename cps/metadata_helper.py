@@ -502,7 +502,7 @@ def _normalize_isbn(value):
 # "Dune Chronicles" is the library's "Dune", "Red Rising Saga" its "Red Rising".
 _SERIES_KIND_WORDS = frozenset({
     "series", "saga", "trilogy", "chronicles", "cycle", "sequence", "novels",
-    "duology", "quartet", "quintet",
+    "duology", "dilogy", "dylogy", "quartet", "quintet",
 })
 
 # How many series-capable providers the fill step may ask per book.
@@ -511,8 +511,10 @@ _SERIES_FILL_LIMIT = 3
 
 def _series_key(name):
     """A series name folded for comparison: case, accents, punctuation, a
-    leading "The" and trailing kind words (``_SERIES_KIND_WORDS``) ignored."""
-    text = unicodedata.normalize("NFKD", name or "")
+    leading "The", trailing kind words (``_SERIES_KIND_WORDS``) and a trailing
+    note in brackets ("(Publication Order)") ignored."""
+    text = re.sub(r"\s*[(\[][^()\[\]]*[)\]]\s*$", "", name or "")
+    text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
     words = re.sub(r"[^0-9a-z]+", " ", text).split()
     if words[:1] == ["the"] and len(words) > 1:

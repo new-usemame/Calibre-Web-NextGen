@@ -36,6 +36,8 @@ pytestmark = pytest.mark.unit
     ("Alex Cross", "Alex Cross Series"),
     ("The Expanse", "Expanse"),
     ("Montréal Noir", "montreal noir"),
+    ("The Chronicles of Narnia", "The Chronicles of Narnia (Publication Order)"),
+    ("New Tales of the Vampires", "New Tales of the Vampires dylogy"),
 ])
 def test_other_spellings_of_one_series_share_a_key(a, b):
     assert m._series_key(a) == m._series_key(b)

@@ -21067,3 +21067,87 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
+
+#: cps/spa_strings.py
+msgid "Restore missing covers"
+msgstr "Restaurer les couvertures manquantes"
+
+#: cps/spa_strings.py
+msgid "Find books that have a cover.jpg in their folder but are marked as having no cover, so the cover is never shown."
+msgstr "Trouve les livres dont le dossier contient un fichier cover.jpg mais qui sont marqués comme n’ayant pas de couverture, de sorte que la couverture n’est jamais affichée."
+
+#: cps/spa_strings.py
+msgid "A cover that was removed on purpose in the book editor also looks like this. Select only the books whose cover you want back."
+msgstr "Une couverture supprimée volontairement dans l’éditeur de livre apparaît aussi de cette façon. Sélectionnez uniquement les livres dont vous voulez retrouver la couverture."
+
+#: cps/spa_strings.py
+msgid "Scan library"
+msgstr "Analyser la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Scanning…"
+msgstr "Analyse en cours…"
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
+msgstr "Impossible d’analyser la bibliothèque."
+
+#: cps/spa_strings.py
+msgid "{count} book(s) have a cover file but are marked as having no cover."
+msgstr "{count} livre(s) ont un fichier de couverture mais sont marqués comme n’ayant pas de couverture."
+
+#: cps/spa_strings.py
+msgid "No books need their cover restored."
+msgstr "Aucun livre n’a besoin que sa couverture soit restaurée."
+
+#: cps/spa_strings.py
+msgid "{count} cover(s) restored."
+msgstr "{count} couverture(s) restaurée(s)."
+
+#: cps/spa_strings.py
+msgid "{count} book(s) were skipped because they changed since the scan."
+msgstr "{count} livre(s) ont été ignorés car ils ont changé depuis l’analyse."
+
+#: cps/spa_strings.py
+msgid "Could not restore covers."
+msgstr "Impossible de restaurer les couvertures."
+
+#: cps/spa_strings.py
+msgid "This is not available for Google Drive libraries."
+msgstr "Cette fonction n’est pas disponible pour les bibliothèques Google Drive."
+
+#: cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr "Cet aperçu est invalide ou a expiré. Analysez de nouveau la bibliothèque."
+
+#: cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr "Sélectionnez au moins un livre à restaurer."
+
+#: cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr "Les livres sélectionnés ne correspondent pas à cet aperçu. Analysez de nouveau la bibliothèque."
+
+#: cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr "Impossible de mettre à jour la base de données de la bibliothèque. Aucune couverture n’a été modifiée."
+
+#: cps/spa_strings.py
+msgid "{selected} of {count} selected"
+msgstr "{selected} sur {count} sélectionné(s)"
+
+#: cps/spa_strings.py
+msgid "Books with a cover file but no cover"
+msgstr "Livres avec un fichier de couverture mais sans couverture"
+
+#: cps/spa_strings.py
+msgid "Restore the cover of {title}"
+msgstr "Restaurer la couverture de {title}"
+
+#: cps/spa_strings.py
+msgid "Restore selected covers"
+msgstr "Restaurer les couvertures sélectionnées"
+
+#: cps/spa_strings.py
+msgid "Select all books"
+msgstr "Sélectionner tous les livres"

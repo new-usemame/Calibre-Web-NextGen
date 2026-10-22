@@ -469,22 +469,24 @@ def _get_ingest_owner_id(variable):
 
 
 def _safe_upload_basename(filename):
-    """Keep the upload's extension when sanitizing the staging basename.
+    """Sanitize an upload's name for the ingest staging file, keeping its extension.
 
     ``secure_filename()`` transliterates to ASCII and then strips leading and
-    trailing dots.  A filename whose stem contains no ASCII characters at all
-    (``龙蛋.epub``, ``файл.epub``) therefore collapses to ``epub``, without the
-    dot.  The ingest service identifies the format from the staged filename's
-    extension, so it rejects and deletes the file while the upload endpoint has
-    already reported success.  Build the safe name from a sanitized stem plus
-    the original extension instead; compound extensions such as ``.fb2.zip``
-    are preserved.
+    trailing dots, so a name whose stem has no ASCII characters (``龙蛋.epub``,
+    ``файл.epub``) collapses to ``epub`` with no dot.  The ingest service reads
+    the format from the staged name's last suffix, so it rejected and deleted
+    such files after the upload had already been reported as queued (#2701).
+
+    The stem and the last suffix are sanitized separately: the suffix is the
+    same one ``_validate_uploaded_file`` checked, and a stem that sanitizes to
+    nothing becomes ``book``.  The browser-supplied name still reaches ingest
+    unchanged through the sidecar's ``original_filename``.
     """
     name = os.path.basename(filename or "")
-    stem, dot, extension = name.partition(".")
-    safe_stem = secure_filename(stem) or "book"
+    stem, dot, extension = name.rpartition(".")
     if not dot:
-        return safe_stem
+        return secure_filename(name) or "book"
+    safe_stem = secure_filename(stem) or "book"
     safe_extension = secure_filename(extension)
     return f"{safe_stem}.{safe_extension}" if safe_extension else safe_stem
 

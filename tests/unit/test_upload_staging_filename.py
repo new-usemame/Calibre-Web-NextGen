@@ -1,50 +1,50 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Regression tests for ingest staging filenames built from upload names.
+"""Ingest staging filenames built from upload names (#2701).
 
-Werkzeug's secure_filename() drops a basename that is entirely non-ASCII and
-then strips the dot before the extension. The ingest service detects formats
-from the staged filename, so "龙蛋.epub" used to be staged as "..._epub" and
-silently deleted. _safe_upload_basename() must keep the extension.
+The ingest service picks the format from the staged file's last suffix. Werkzeug's
+secure_filename() reduces "龙蛋.epub" to "epub", so the staged file had no suffix
+and ingest deleted it after the upload API had already answered "queued".
 """
 import os
+from pathlib import Path
 
 import pytest
+from werkzeug.utils import secure_filename
 
 from cps import editbooks
 
 
-@pytest.mark.unit
-@pytest.mark.parametrize("filename,expected", [
-    ("龙蛋.epub", "book.epub"),
-    ("中文 书名.epub", "book.epub"),
-    ("日本語.epub", "book.epub"),
-    ("файл.epub", "book.epub"),
-    ("龙蛋 Long Dan.epub", "Long_Dan.epub"),
-    ("book.epub", "book.epub"),
-    ("My Book.epub", "My_Book.epub"),
-    ("书.fb2.zip", "book.fb2.zip"),
-    ("../../龙蛋.epub", "book.epub"),
-    (".epub", "book.epub"),
-    ("龙蛋", "book"),
-    ("book.", "book"),
-])
-def test_safe_upload_basename_keeps_extension(filename, expected):
-    assert editbooks._safe_upload_basename(filename) == expected
-
-
-@pytest.mark.unit
-def test_get_ingest_path_keeps_extension_for_non_ascii_upload(monkeypatch, tmp_path):
+@pytest.fixture
+def stage(monkeypatch, tmp_path):
     monkeypatch.setattr(editbooks, "get_ingest_dir", lambda: str(tmp_path))
     monkeypatch.setattr(editbooks, "network_share_mode_enabled", lambda: True)
     monkeypatch.setattr(editbooks, "_ensure_ingest_dir_writable", lambda *a, **k: None)
-    monkeypatch.setattr(editbooks, "_get_ingest_owner_id", lambda *a: 1000)
-    monkeypatch.setattr(editbooks.os, "chown", lambda *a: None)
 
-    class Uploaded:
-        filename = "龙蛋.epub"
+    def _stage(filename):
+        class Uploaded:
+            pass
+        Uploaded.filename = filename
+        path = editbooks._get_ingest_path(Uploaded())
+        assert os.path.dirname(path) == str(tmp_path)
+        return Path(path)
+    return _stage
 
-    path = editbooks._get_ingest_path(Uploaded())
-    assert os.path.dirname(path) == str(tmp_path)
-    assert os.path.basename(path).endswith("_book.epub")
-    assert path.endswith(".epub")
+
+@pytest.mark.unit
+@pytest.mark.parametrize("filename", [
+    "龙蛋.epub", "中文 书名.epub", "файл.epub", "龙蛋.EPUB", "1. 龙蛋.pdf",
+    "第一卷.龙蛋.mobi", "../../龙蛋.epub", "书.fb2.zip",
+])
+def test_non_ascii_upload_keeps_the_suffix_ingest_reads(stage, filename):
+    staged = stage(filename)
+    assert staged.suffix == Path(filename).suffix
+    assert staged.stem  # never a bare ".epub" that ingest would treat as hidden
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("filename", [
+    "book.epub", "My Book.epub", "Dr. Who.epub", "My.Book.v2.epub", "x.fb2.zip",
+])
+def test_ascii_upload_names_stage_as_before(stage, filename):
+    assert stage(filename).name.endswith("_" + secure_filename(filename))

@@ -468,6 +468,27 @@ def _get_ingest_owner_id(variable):
         return 1000
 
 
+def _safe_upload_basename(filename):
+    """Keep the upload's extension when sanitizing the staging basename.
+
+    ``secure_filename()`` transliterates to ASCII and then strips leading and
+    trailing dots.  A filename whose stem contains no ASCII characters at all
+    (``龙蛋.epub``, ``файл.epub``) therefore collapses to ``epub``, without the
+    dot.  The ingest service identifies the format from the staged filename's
+    extension, so it rejects and deletes the file while the upload endpoint has
+    already reported success.  Build the safe name from a sanitized stem plus
+    the original extension instead; compound extensions such as ``.fb2.zip``
+    are preserved.
+    """
+    name = os.path.basename(filename or "")
+    stem, dot, extension = name.partition(".")
+    safe_stem = secure_filename(stem) or "book"
+    if not dot:
+        return safe_stem
+    safe_extension = secure_filename(extension)
+    return f"{safe_stem}.{safe_extension}" if safe_extension else safe_stem
+
+
 def _get_ingest_path(uploaded_file, prefix_parts=None):
     ingest_dir = get_ingest_dir()
     try:
@@ -493,7 +514,7 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
 
     _ensure_ingest_dir_writable(ingest_dir)
 
-    base_name = secure_filename(uploaded_file.filename)
+    base_name = _safe_upload_basename(uploaded_file.filename)
     # CWA change: use timestamp for more predictable sorting vs uuid
     unique = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     prefix = "_".join([str(p) for p in (prefix_parts or []) if p])

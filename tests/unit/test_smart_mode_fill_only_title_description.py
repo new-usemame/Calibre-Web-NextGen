@@ -42,3 +42,11 @@ def test_normal_mode_still_overwrites_the_title(monkeypatch):
     book.title = "Old"
     m._apply_metadata_to_book(book, _meta(title="New"), _FakeCDB())
     assert book.title == "New"
+
+
+def test_blank_description_is_filled(monkeypatch):
+    _patch_settings(monkeypatch, auto_metadata_smart_application=True)
+    book = _Book()
+    book.comments = _List([_Comment("  \n")])
+    m._apply_metadata_to_book(book, _meta(description="The real blurb."), _FakeCDB())
+    assert book.comments[0].text == "The real blurb."

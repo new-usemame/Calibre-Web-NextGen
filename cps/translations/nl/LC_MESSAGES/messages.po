@@ -15799,11 +15799,16 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched metadata"
+" will replace existing data as-is from the preferred provider."
 msgstr ""
+"Als dit is ingeschakeld, vult opgehaalde metadata alleen aan wat een boek "
+"mist (bijvoorbeeld een lege beschrijving, of een ontbrekende reeks of omslag)"
+" en voegt nieuwe labels toe, maar vervangt nooit gegevens die het boek al "
+"heeft. Als dit is uitgeschakeld, vervangt opgehaalde metadata de bestaande "
+"gegevens ongewijzigd vanuit de voorkeursbron."
 
 #: cps/templates/cwa_settings.html
 #, fuzzy

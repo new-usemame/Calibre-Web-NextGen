@@ -7,7 +7,7 @@
 
 import json
 import re
-import types
+import copy
 import unicodedata
 from difflib import SequenceMatcher
 
@@ -80,6 +80,7 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
             
         # Try each provider in order
         metadata_found = False
+        series_fill = _NOT_ASKED
         for provider_id in provider_hierarchy:
             # Check if explicitly disabled (default is enabled if not specified)
             from cps.metadata_constants import metadata_provider_enabled
@@ -124,12 +125,20 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 # rather than the book we changed (fork #1164).
                 searched_title = book.title
 
+                # A matched record without a series takes one from a provider
+                # that carries series, applied with the rest of the record.
+                if not (getattr(metadata, "series", None) or "").strip():
+                    if series_fill is _NOT_ASKED:
+                        series_fill = _find_missing_series(book, search_query, provider_id,
+                                                           provider_hierarchy, enabled_map)
+                    if series_fill:
+                        metadata = copy.copy(metadata)
+                        metadata.series, metadata.series_index = series_fill
+
                 # Apply metadata to book
                 if _apply_metadata_to_book(book, metadata, calibre_db_instance):
                     log.info(f"Successfully applied metadata from {provider.__name__} for book: {searched_title}")
                     metadata_found = True
-                    _fill_missing_series(book, search_query, provider_id, provider_hierarchy,
-                                         enabled_map, calibre_db_instance)
                     break
                     
             except Exception as e:
@@ -270,7 +279,7 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             hasattr(metadata, 'series') and metadata.series and metadata.series.strip() and
             not (use_smart_application and book.series)):
             series = (calibre_db_instance.get_series_by_name(metadata.series.strip())
-                      or _library_series_like(calibre_db_instance, metadata.series.strip()))
+                      or _library_series_like(calibre_db_instance, metadata.series.strip(), book))
             if not series:
                 series = db.Series(metadata.series.strip(), metadata.series.strip())
                 calibre_db_instance.session.add(series)
@@ -518,6 +527,9 @@ _SERIES_FILL_LIMIT = 3
 # the administrator put it in the order.
 _SERIES_FILL_EXTRAS = ("hardcover", "kobo")
 
+# The fill has not run yet for this book (None means it ran and found nothing).
+_NOT_ASKED = object()
+
 # A trailing note in brackets: "(Publication Order)", "[Legends]".
 _SERIES_NOTE = re.compile(r"\s*[(\[][^()\[\]]*[)\]]\s*$")
 
@@ -546,7 +558,7 @@ def _series_note(name):
     return found.group(0).strip(" ()[]").casefold() if found else ""
 
 
-def _library_series_like(calibre_db_instance, name):
+def _library_series_like(calibre_db_instance, name, book=None):
     """The library's existing series that ``name`` is another spelling of, or None.
 
     Sources disagree on what to call a series (Open Library's "Dune Chronicles",
@@ -569,50 +581,61 @@ def _library_series_like(calibre_db_instance, name):
         row_name = getattr(row, "name", "")
         row_note = _series_note(row_name)
         return (_series_key(row_name) == wanted
-                and not (note and row_note and note != row_note))
+                and not (note and row_note and note != row_note)
+                and _shares_an_author(row, book))
 
     matches = [row for row in rows if same_series(row)]
     return matches[0] if len(matches) == 1 else None
 
 
-def _fill_missing_series(book, search_query, applied_provider_id, provider_hierarchy,
-                         enabled_map, calibre_db_instance):
-    """Ask series-capable providers for a series the applied record left empty.
+def _shares_an_author(series_row, book):
+    """False when the library series holds books and none is by one of the
+    book's authors: a stem shared across authors ("Inheritance Cycle",
+    "Inheritance Trilogy") is two series, not two spellings of one."""
+    if book is None:
+        return True
+    shelved = list(getattr(series_row, "books", None) or [])
+    if not shelved:
+        return True
+    wanted = {getattr(a, "name", "").casefold() for a in getattr(book, "authors", None) or []}
+    wanted.discard("")
+    return any(getattr(a, "name", "").casefold() in wanted
+               for other in shelved for a in (getattr(other, "authors", None) or []))
+
+
+def _find_missing_series(book, search_query, applied_provider_id, provider_hierarchy,
+                         enabled_map):
+    """Ask series-capable providers for the series a matched record left empty.
 
     Auto-fetch applies the first provider whose result passes the match gate
     and stops. When that provider carries no series (Google Books, Open Library
     and IBDb never do), a provider further down that has one was never asked.
     This asks the providers marked ``FILLS_SERIES``: those in the configured
-    order first, then ``_SERIES_FILL_EXTRAS`` if the order leaves them out, at most
-    ``_SERIES_FILL_LIMIT`` of them, and applies only the series and position
-    of the first result that passes the same gate. Returns True when a series
-    was written.
+    order first, then ``_SERIES_FILL_EXTRAS`` if the order leaves them out, at
+    most ``_SERIES_FILL_LIMIT`` of them, and returns ``(series, position)``
+    from the first result that passes the same gate, or None.
 
-    Never raises: the caller runs this after committing the main record and
-    before leaving its provider loop, so an exception would send the loop on
-    to apply the next provider's whole record over that one.
+    The caller folds the answer into the record it is about to apply, so the
+    book gets one commit and one file-embed record. Never raises: the caller
+    is inside its provider loop, and an exception there would send the loop on
+    to the next provider's whole record.
     """
     try:
-        return _fill_missing_series_unguarded(book, search_query, applied_provider_id,
-                                              provider_hierarchy, enabled_map,
-                                              calibre_db_instance)
+        return _find_missing_series_unguarded(book, search_query, applied_provider_id,
+                                              provider_hierarchy, enabled_map)
     except Exception as e:
         log.warning(f"Series fill failed for book {getattr(book, 'id', 'unknown')}: {e}")
-        try:
-            calibre_db_instance.session.rollback()
-        except Exception:
-            pass
-        return False
+        return None
 
 
-def _fill_missing_series_unguarded(book, search_query, applied_provider_id, provider_hierarchy,
-                                   enabled_map, calibre_db_instance):
+def _find_missing_series_unguarded(book, search_query, applied_provider_id, provider_hierarchy,
+                                   enabled_map):
     try:
         cwa_settings = CWA_DB().get_cwa_settings()
     except Exception:
-        return False
+        return None
     if not cwa_settings.get('auto_metadata_update_series', True) or getattr(book, "series", None):
-        return False
+        return None
     from cps.metadata_constants import metadata_provider_enabled
     by_id = {p.__id__: p for p in metadata_providers}
     ordered = [pid for pid in provider_hierarchy if pid in by_id]
@@ -633,17 +656,13 @@ def _fill_missing_series_unguarded(book, search_query, applied_provider_id, prov
             continue
         chosen = _select_metadata_result(results, _book_isbn(book),
                                          book_title=book.title, book_authors=book.authors) if results else None
-        if chosen is None or not (getattr(chosen, "series", None) or "").strip():
+        series = (getattr(chosen, "series", None) or "") if chosen is not None else ""
+        if not isinstance(series, str) or not series.strip():
             continue
-        series_only = types.SimpleNamespace(
-            title="", authors=[], description="", publisher="", tags=[], publishedDate=None,
-            rating=None, identifiers={}, cover=None,
-            series=chosen.series.strip(), series_index=getattr(chosen, "series_index", None))
-        if _apply_metadata_to_book(book, series_only, calibre_db_instance):
-            log.info(f"Series fill: {chosen.series.strip()} #{getattr(chosen, 'series_index', '')} "
-                     f"from {provider.__name__} for book {book.id}")
-            return True
-    return False
+        position = getattr(chosen, "series_index", None)
+        log.info(f"Series fill: {series.strip()} #{position or ''} from {provider.__name__} for book {book.id}")
+        return series.strip(), position
+    return None
 
 
 def _book_isbn(book):

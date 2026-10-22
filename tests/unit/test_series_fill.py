@@ -82,6 +82,16 @@ def test_a_new_spelling_reuses_the_librarys_series():
     assert found is not None and found.name == "Dune"
 
 
+def test_a_shared_stem_by_another_author_is_another_series():
+    paolini = NS(name="The Inheritance Cycle",
+                 books=[NS(authors=[NS(name="Christopher Paolini")])])
+    cdb = _SeriesCDB([])
+    cdb.session.query = lambda model: NS(all=lambda: [paolini])
+    jemisin = _Book(authors=["N. K. Jemisin"])
+    assert m._library_series_like(cdb, "Inheritance Trilogy", jemisin) is None
+    assert m._library_series_like(cdb, "Inheritance Trilogy", _Book(authors=["Christopher Paolini"])) is paolini
+
+
 def test_two_library_series_with_one_key_reuse_neither():
     assert m._library_series_like(_SeriesCDB(["Dune", "The Dune Saga"]), "Dune Chronicles") is None
 
@@ -133,20 +143,17 @@ def _fill(monkeypatch, providers, hierarchy, enabled=None, **settings):
     _patch_settings(monkeypatch, **settings)
     monkeypatch.setattr(m, "metadata_providers", providers)
     book = _book()
-    filled = m._fill_missing_series(book, "Cross Justice James Patterson", "ibdb", hierarchy,
-                                    enabled or {}, _SeriesCDB([]))
+    filled = m._find_missing_series(book, "Cross Justice James Patterson", "ibdb", hierarchy,
+                                    enabled or {})
     return filled, book
 
 
-def test_a_series_left_empty_is_filled_from_the_next_series_provider(monkeypatch, _no_file_embed):
+def test_a_series_left_empty_is_found_at_the_next_series_provider(monkeypatch):
     ibdb = _Provider("ibdb", [_hit("", 0)], fills=False)
     hardcover = _Provider("hardcover", [_hit("Alex Cross", 23)])
-    filled, book = _fill(monkeypatch, [ibdb, hardcover], ["ibdb", "google", "hardcover"])
-    assert filled and [s.name for s in book.series] == ["Alex Cross"] and book.series_index == "23.0"
+    found, _ = _fill(monkeypatch, [ibdb, hardcover], ["ibdb", "google", "hardcover"])
+    assert found == ("Alex Cross", 23)
     assert ibdb.queries == []          # the provider already applied is not asked again
-    # Only the series changed: the record's title was not applied.
-    assert book.title == "Cross Justice"
-    assert _no_file_embed == [{"metadata": True}]   # the file gets the series too
 
 
 def test_the_configured_order_comes_first_then_providers_it_leaves_out(monkeypatch):
@@ -167,15 +174,14 @@ def test_outside_the_order_only_hardcover_and_kobo_are_asked(monkeypatch):
     kobo = _Provider("kobo", [_hit("Alex Cross", 23)])
     hardcover = _Provider("hardcover", [])
     filled, book = _fill(monkeypatch, [amazon, amazon_jp, hardcover, kobo], ["ibdb", "dnb"])
-    assert filled and hardcover.queries and kobo.queries
+    assert filled == ("Alex Cross", 23) and hardcover.queries and kobo.queries
     assert amazon.queries == [] and amazon_jp.queries == []
-    assert [s.name for s in book.series] == ["Alex Cross"]
 
 
 def test_a_different_book_is_not_a_source_of_series(monkeypatch):
     wrong = _Provider("hardcover", [_hit("Women's Murder Club", 7, title="7th Heaven")])
     filled, book = _fill(monkeypatch, [wrong], ["hardcover"])
-    assert not filled and list(book.series) == []
+    assert filled is None
 
 
 def test_disabled_failing_and_non_series_providers_are_skipped(monkeypatch):
@@ -205,7 +211,7 @@ def test_nothing_is_asked_when_series_are_off_or_already_set(monkeypatch, settin
     book = _book()
     if has_series:
         book.series.append(NS(name="Alex Cross"))
-    assert not m._fill_missing_series(book, "q", "ibdb", ["hardcover"], {}, _SeriesCDB([]))
+    assert m._find_missing_series(book, "q", "ibdb", ["hardcover"], {}) is None
     assert hardcover.queries == []
 
 
@@ -230,12 +236,15 @@ def _auto_fetch(monkeypatch, providers, hierarchy):
     return m.fetch_and_apply_metadata(book.id), book
 
 
-def test_auto_fetch_fills_the_series_the_matched_record_lacked(monkeypatch):
+def test_auto_fetch_fills_the_series_the_matched_record_lacked(monkeypatch, _no_file_embed):
     ibdb = _Provider("ibdb", [_record()], fills=False)
     hardcover = _Provider("hardcover", [_hit("Alex Cross", 23)])
     applied, book = _auto_fetch(monkeypatch, [ibdb, hardcover], ["ibdb", "hardcover"])
     assert applied and [s.name for s in book.series] == ["Alex Cross"]
     assert book.series_index == "23.0" and len(hardcover.queries) == 1
+    # One apply, one file-embed record: two records written in the same second
+    # share a file name, and the second one dropped the first one's cover flag.
+    assert _no_file_embed == [{"metadata": True}]
 
 
 def test_auto_fetch_stops_at_the_first_record_even_when_the_fill_breaks(monkeypatch):
@@ -307,7 +316,7 @@ def test_the_provider_already_applied_is_not_asked_again(monkeypatch):
     kobo = _Provider("kobo", [_hit("Alex Cross", 23)])
     hardcover = _Provider("hardcover", [_hit("Alex Cross", 23)])
     monkeypatch.setattr(m, "metadata_providers", [kobo, hardcover])
-    assert m._fill_missing_series(_book(), "q", "kobo", ["kobo", "hardcover"], {}, _SeriesCDB([]))
+    assert m._find_missing_series(_book(), "q", "kobo", ["kobo", "hardcover"], {})
     assert kobo.queries == [] and hardcover.queries
 
 
@@ -328,4 +337,4 @@ def test_a_failing_fill_never_reaches_the_provider_loop(monkeypatch):
         raise AttributeError("result without authors")
     monkeypatch.setattr(m, "_select_metadata_result", broken_gate)
     filled, book = _fill(monkeypatch, [_Provider("hardcover", [_hit("Alex Cross", 23)])], ["hardcover"])
-    assert filled is False and list(book.series) == []
+    assert filled is None

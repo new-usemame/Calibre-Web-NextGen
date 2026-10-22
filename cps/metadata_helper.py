@@ -512,20 +512,38 @@ _SERIES_KIND_WORDS = frozenset({
 # How many series-capable providers the fill step may ask per book.
 _SERIES_FILL_LIMIT = 3
 
+# Series-capable providers the fill asks even when the configured order leaves
+# them out: both carry series data of their own. Any other provider (Amazon,
+# Goodreads and the rest scrape pages that throttle bots) is asked only when
+# the administrator put it in the order.
+_SERIES_FILL_EXTRAS = ("hardcover", "kobo")
+
+# A trailing note in brackets: "(Publication Order)", "[Legends]".
+_SERIES_NOTE = re.compile(r"\s*[(\[][^()\[\]]*[)\]]\s*$")
+
 
 def _series_key(name):
-    """A series name folded for comparison: case, accents, punctuation, a
+    """A series name folded for comparison: case, Latin accents, punctuation, a
     leading "The", trailing kind words (``_SERIES_KIND_WORDS``) and a trailing
-    note in brackets ("(Publication Order)") ignored."""
-    text = re.sub(r"\s*[(\[][^()\[\]]*[)\]]\s*$", "", name or "")
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
-    words = re.sub(r"[^0-9a-z]+", " ", text).split()
+    note in brackets ("(Publication Order)") ignored. Letters of every script
+    are kept, so two Japanese titles never fold to the same bare number."""
+    text = _SERIES_NOTE.sub("", name or "")
+    folded = []
+    for ch in unicodedata.normalize("NFC", text):
+        base = unicodedata.normalize("NFD", ch)[0]
+        folded.append(base if base.isascii() else ch)
+    words = re.findall(r"[^\W_]+", "".join(folded).casefold())
     if words[:1] == ["the"] and len(words) > 1:
         words = words[1:]
     while len(words) > 1 and words[-1] in _SERIES_KIND_WORDS:
         words = words[:-1]
     return " ".join(words)
+
+
+def _series_note(name):
+    """The trailing bracketed note of a series name, folded, or ""."""
+    found = _SERIES_NOTE.search(name or "")
+    return found.group(0).strip(" ()[]").casefold() if found else ""
 
 
 def _library_series_like(calibre_db_instance, name):
@@ -542,7 +560,18 @@ def _library_series_like(calibre_db_instance, name):
         rows = calibre_db_instance.session.query(db.Series).all()
     except Exception:
         return None
-    matches = [row for row in rows if _series_key(getattr(row, "name", "")) == wanted]
+    note = _series_note(name)
+
+    def same_series(row):
+        # Two different notes name two different series: "Star Wars (Legends)"
+        # is not "Star Wars (Canon)", and a publication-order position is
+        # wrong inside a chronological-order series.
+        row_name = getattr(row, "name", "")
+        row_note = _series_note(row_name)
+        return (_series_key(row_name) == wanted
+                and not (note and row_note and note != row_note))
+
+    matches = [row for row in rows if same_series(row)]
     return matches[0] if len(matches) == 1 else None
 
 
@@ -554,7 +583,7 @@ def _fill_missing_series(book, search_query, applied_provider_id, provider_hiera
     and stops. When that provider carries no series (Google Books, Open Library
     and IBDb never do), a provider further down that has one was never asked.
     This asks the providers marked ``FILLS_SERIES``: those in the configured
-    order first, then the enabled ones the order leaves out, at most
+    order first, then ``_SERIES_FILL_EXTRAS`` if the order leaves them out, at most
     ``_SERIES_FILL_LIMIT`` of them, and applies only the series and position
     of the first result that passes the same gate. Returns True when a series
     was written.
@@ -587,7 +616,7 @@ def _fill_missing_series_unguarded(book, search_query, applied_provider_id, prov
     from cps.metadata_constants import metadata_provider_enabled
     by_id = {p.__id__: p for p in metadata_providers}
     ordered = [pid for pid in provider_hierarchy if pid in by_id]
-    ordered += sorted(pid for pid in by_id if pid not in ordered)
+    ordered += [pid for pid in _SERIES_FILL_EXTRAS if pid in by_id and pid not in ordered]
     asked = 0
     for provider_id in ordered:
         provider = by_id[provider_id]

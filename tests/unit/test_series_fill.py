@@ -51,6 +51,21 @@ def test_different_series_keep_different_keys(a, b):
     assert m._series_key(a) != m._series_key(b)
 
 
+@pytest.mark.parametrize("a, b", [
+    ("進撃の巨人 2", "ワンピース 2"),        # non-Latin letters are letters, not punctuation
+    ("Re:Zero", "Re:Zero 外伝"),
+])
+def test_non_latin_names_keep_their_letters(a, b):
+    assert m._series_key(a) != m._series_key(b)
+
+
+def test_two_different_bracket_notes_are_two_series():
+    cdb = _SeriesCDB(["Chronicles of Narnia (Chronological Order)", "Star Wars (Canon)"])
+    assert m._library_series_like(cdb, "The Chronicles of Narnia (Publication Order)") is None
+    assert m._library_series_like(cdb, "Star Wars (Legends)") is None
+    assert m._library_series_like(cdb, "Star Wars").name == "Star Wars (Canon)"
+
+
 def test_a_kind_word_alone_is_kept():
     assert m._series_key("The Trilogy") == "trilogy"
 
@@ -142,11 +157,18 @@ def test_the_configured_order_comes_first_then_providers_it_leaves_out(monkeypat
     assert filled and kobo.queries and hardcover.queries and dnb.queries == []
 
 
-def test_a_provider_outside_the_order_is_asked_last(monkeypatch):
-    dnb = _Provider("dnb", [_hit("Alex Cross", 23)])
+def test_outside_the_order_only_hardcover_and_kobo_are_asked(monkeypatch):
+    # A stock order (google, openlibrary, ibdb, dnb, douban) names no
+    # scraper. Amazon and the like throttle bots, so the fill must not start
+    # scraping them for every book without a series; Hardcover and Kobo carry
+    # series data and are asked after the order.
+    amazon = _Provider("amazon", [_hit("Alex Cross", 23)])
+    amazon_jp = _Provider("amazon_jp", [_hit("Alex Cross", 23)])
+    kobo = _Provider("kobo", [_hit("Alex Cross", 23)])
     hardcover = _Provider("hardcover", [])
-    filled, book = _fill(monkeypatch, [dnb, hardcover], ["ibdb", "hardcover"])
-    assert filled and hardcover.queries and dnb.queries
+    filled, book = _fill(monkeypatch, [amazon, amazon_jp, hardcover, kobo], ["ibdb", "dnb"])
+    assert filled and hardcover.queries and kobo.queries
+    assert amazon.queries == [] and amazon_jp.queries == []
     assert [s.name for s in book.series] == ["Alex Cross"]
 
 
@@ -187,11 +209,48 @@ def test_nothing_is_asked_when_series_are_off_or_already_set(monkeypatch, settin
     assert hardcover.queries == []
 
 
-def test_auto_fetch_runs_the_fill_after_a_successful_apply():
-    import inspect
-    source = inspect.getsource(m.fetch_and_apply_metadata)
-    applied = source.index("if _apply_metadata_to_book(book, metadata, calibre_db_instance):")
-    assert source.index("_fill_missing_series(", applied) < source.index("break", applied)
+def _record(title="Cross Justice"):
+    """A complete provider record with no series, as IBDb or Google return."""
+    return NS(title=title, authors=["James Patterson"], description="", publisher="", tags=[],
+              publishedDate=None, rating=None, identifiers={}, cover=None, series="", series_index=None)
+
+
+def _auto_fetch(monkeypatch, providers, hierarchy):
+    """Run fetch_and_apply_metadata for one ingested book against fakes."""
+    _patch_settings(monkeypatch, auto_metadata_fetch_enabled=True,
+                    metadata_provider_hierarchy=json.dumps(hierarchy))
+    monkeypatch.setattr(m, "metadata_providers", providers)
+    book = _book()
+    book.title = "Cross Justice"
+    cdb = _SeriesCDB([])
+    cdb.get_book = lambda book_id: book
+    cdb.session.close = lambda: None
+    monkeypatch.setattr(m.db, "CalibreDB", lambda *a, **k: cdb)
+    monkeypatch.setattr(m.db.CalibreDB, "session_factory", object(), raising=False)
+    return m.fetch_and_apply_metadata(book.id), book
+
+
+def test_auto_fetch_fills_the_series_the_matched_record_lacked(monkeypatch):
+    ibdb = _Provider("ibdb", [_record()], fills=False)
+    hardcover = _Provider("hardcover", [_hit("Alex Cross", 23)])
+    applied, book = _auto_fetch(monkeypatch, [ibdb, hardcover], ["ibdb", "hardcover"])
+    assert applied and [s.name for s in book.series] == ["Alex Cross"]
+    assert book.series_index == "23.0" and len(hardcover.queries) == 1
+
+
+def test_auto_fetch_stops_at_the_first_record_even_when_the_fill_breaks(monkeypatch):
+    # Before the guard, an exception in the fill sent the provider loop on to
+    # apply the next provider's whole record over the first one.
+    def broken_gate(results, *args, **kwargs):
+        if results and results[0].title == "Cross Justice" and results[0].series:
+            raise AttributeError("result without authors")
+        return results[0] if results else None
+    monkeypatch.setattr(m, "_select_metadata_result", broken_gate)
+    ibdb = _Provider("ibdb", [_record()], fills=False)
+    hardcover = _Provider("hardcover", [_hit("Alex Cross", 23)])
+    other = _Provider("google", [_record("A Different Record")], fills=False)
+    applied, book = _auto_fetch(monkeypatch, [ibdb, hardcover, other], ["ibdb", "google"])
+    assert applied and book.title == "Cross Justice" and other.queries == []
 
 
 # --- fractional positions in the parsers --------------------------------------
@@ -254,9 +313,9 @@ def test_the_provider_already_applied_is_not_asked_again(monkeypatch):
 
 def test_a_provider_that_is_off_by_default_is_asked_only_when_turned_on(monkeypatch):
     goodreads = _Provider("goodreads", [_hit("Alex Cross", 23)])
-    filled, _ = _fill(monkeypatch, [goodreads], ["ibdb"])
+    filled, _ = _fill(monkeypatch, [goodreads], ["ibdb", "goodreads"])
     assert not filled and goodreads.queries == []
-    filled, _ = _fill(monkeypatch, [goodreads], ["ibdb"], enabled={"goodreads": True})
+    filled, _ = _fill(monkeypatch, [goodreads], ["ibdb", "goodreads"], enabled={"goodreads": True})
     assert filled and goodreads.queries
 
 

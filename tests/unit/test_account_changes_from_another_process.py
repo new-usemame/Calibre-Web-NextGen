@@ -15,15 +15,14 @@ second sqlite3 connection to the same file.
 
 import sqlite3
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
-import flask
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from werkzeug.security import generate_password_hash
 
 from cps import constants, ub, usermanagement
+from tests.unit.account_reread_world import basic_auth
 
 
 pytestmark = pytest.mark.unit
@@ -55,22 +54,12 @@ def _change_outside(path, sql, *args):
     con.close()
 
 
-def _basic_auth(username, password):
-    app = flask.Flask(__name__)
-    with app.test_request_context("/opds"), \
-            patch.object(usermanagement, "limiter", MagicMock()), \
-            patch.object(usermanagement, "_verify_app_password_digest", return_value=False), \
-            patch.object(usermanagement, "_verify_app_password_older", return_value=False), \
-            patch.object(usermanagement.config, "config_login_type", constants.LOGIN_STANDARD, create=True):
-        return usermanagement.verify_password(username, password)
-
-
 def test_a_password_set_by_another_process_is_used_on_the_next_sign_in(app_db):
-    assert _basic_auth("reader@example.com", "first-password") is not None    # loads and keeps the User
+    assert basic_auth("reader@example.com", "first-password") is not None    # loads and keeps the User
     _change_outside(app_db.path, "update user set password=? where id=?",
                     generate_password_hash("second-password"), app_db.user_id)
-    assert _basic_auth("reader@example.com", "second-password") is not None
-    assert _basic_auth("reader@example.com", "first-password") is None
+    assert basic_auth("reader@example.com", "second-password") is not None
+    assert basic_auth("reader@example.com", "first-password") is None
 
 
 def test_a_role_removed_by_another_process_is_seen_by_the_next_request(app_db):
@@ -84,4 +73,4 @@ def test_an_account_deleted_by_another_process_is_gone_on_the_next_request(app_d
     assert usermanagement.load_user(app_db.user_id, None, None) is not None
     _change_outside(app_db.path, "delete from user where id=?", app_db.user_id)
     assert usermanagement.load_user(app_db.user_id, None, None) is None
-    assert _basic_auth("reader@example.com", "first-password") is None
+    assert basic_auth("reader@example.com", "first-password") is None

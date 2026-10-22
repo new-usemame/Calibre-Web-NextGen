@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Check, ChevronLeft, Download, Plus, RotateCcw, Trash2, Upload, Wand2 } from 'lucide-react';
 import { ApiError, apiGet, apiPost, apiPut } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { useT } from '../lib/i18n';
 import { EmptyState } from '../components/EmptyState';
 import { SpinnerCentered } from '../components/Spinner';
@@ -368,7 +369,7 @@ function FieldPanel({ field }: { field: Field }) {
                     }} />
                     <span>
                       <Link href={`/book/${change.book_id}`} className={styles.bookTitle}>{change.title}</Link>
-                      {change.authors.length > 0 && <span className={styles.authors}> · {change.authors.join(', ')}</span>}
+                      {change.authors.length > 0 && <span className={styles.authors}> · {formatAuthors(change.authors)}</span>}
                     </span>
                   </label>
                   <div className={styles.diff}>

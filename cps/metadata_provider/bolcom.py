@@ -35,6 +35,7 @@ log = logger.create()
 class BolCom(Metadata):
     __name__ = "bol.com (best effort)"
     __id__ = "bolcom"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
     DESCRIPTION = __name__
     META_URL = "https://www.bol.com/"
     SEARCH_URL = "https://www.bol.com/nl/nl/s/?searchtext={}"

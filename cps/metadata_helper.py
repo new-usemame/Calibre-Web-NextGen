@@ -7,6 +7,7 @@
 
 import json
 import re
+import types
 import unicodedata
 from difflib import SequenceMatcher
 
@@ -127,6 +128,8 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 if _apply_metadata_to_book(book, metadata, calibre_db_instance):
                     log.info(f"Successfully applied metadata from {provider.__name__} for book: {searched_title}")
                     metadata_found = True
+                    _fill_missing_series(book, search_query, provider_id, provider_hierarchy,
+                                         enabled_map, calibre_db_instance)
                     break
                     
             except Exception as e:
@@ -266,7 +269,8 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         if (cwa_settings.get('auto_metadata_update_series', True) and
             hasattr(metadata, 'series') and metadata.series and metadata.series.strip() and
             not (use_smart_application and book.series)):
-            series = calibre_db_instance.get_series_by_name(metadata.series.strip())
+            series = (calibre_db_instance.get_series_by_name(metadata.series.strip())
+                      or _library_series_like(calibre_db_instance, metadata.series.strip()))
             if not series:
                 series = db.Series(metadata.series.strip(), metadata.series.strip())
                 calibre_db_instance.session.add(series)
@@ -496,6 +500,102 @@ def _apply_cover_from_metadata(book, metadata):
 def _normalize_isbn(value):
     """Strip separators and upper-case so ISBNs compare regardless of formatting."""
     return "".join(ch for ch in str(value) if ch.isalnum()).upper()
+
+
+# Trailing words that name the kind of series rather than the series itself:
+# "Dune Chronicles" is the library's "Dune", "Red Rising Saga" its "Red Rising".
+_SERIES_KIND_WORDS = frozenset({
+    "series", "saga", "trilogy", "chronicles", "cycle", "sequence", "novels",
+    "duology", "dilogy", "dylogy", "quartet", "quintet",
+})
+
+# How many series-capable providers the fill step may ask per book.
+_SERIES_FILL_LIMIT = 3
+
+
+def _series_key(name):
+    """A series name folded for comparison: case, accents, punctuation, a
+    leading "The", trailing kind words (``_SERIES_KIND_WORDS``) and a trailing
+    note in brackets ("(Publication Order)") ignored."""
+    text = re.sub(r"\s*[(\[][^()\[\]]*[)\]]\s*$", "", name or "")
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
+    words = re.sub(r"[^0-9a-z]+", " ", text).split()
+    if words[:1] == ["the"] and len(words) > 1:
+        words = words[1:]
+    while len(words) > 1 and words[-1] in _SERIES_KIND_WORDS:
+        words = words[:-1]
+    return " ".join(words)
+
+
+def _library_series_like(calibre_db_instance, name):
+    """The library's existing series that ``name`` is another spelling of, or None.
+
+    Sources disagree on what to call a series (Open Library's "Dune Chronicles",
+    Hardcover's "The Chronicles of Narnia (Publication Order)"), and every new
+    spelling became a second series beside the first. Only an exact key match counts, and only when it is unique.
+    """
+    wanted = _series_key(name)
+    if not wanted:
+        return None
+    try:
+        rows = calibre_db_instance.session.query(db.Series).all()
+    except Exception:
+        return None
+    matches = [row for row in rows if _series_key(getattr(row, "name", "")) == wanted]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _fill_missing_series(book, search_query, applied_provider_id, provider_hierarchy,
+                         enabled_map, calibre_db_instance):
+    """Ask series-capable providers for a series the applied record left empty.
+
+    Auto-fetch applies the first provider whose result passes the match gate
+    and stops. When that provider carries no series (Google Books, Open Library
+    and IBDb never do), a provider further down that has one was never asked.
+    This asks the providers marked ``FILLS_SERIES``: those in the configured
+    order first, then the enabled ones the order leaves out, at most
+    ``_SERIES_FILL_LIMIT`` of them, and applies only the series and position
+    of the first result that passes the same gate. Returns True when a series
+    was written.
+    """
+    try:
+        cwa_settings = CWA_DB().get_cwa_settings()
+    except Exception:
+        return False
+    if not cwa_settings.get('auto_metadata_update_series', True) or getattr(book, "series", None):
+        return False
+    from cps.metadata_constants import metadata_provider_enabled
+    by_id = {p.__id__: p for p in metadata_providers}
+    ordered = [pid for pid in provider_hierarchy if pid in by_id]
+    ordered += sorted(pid for pid in by_id if pid not in ordered)
+    asked = 0
+    for provider_id in ordered:
+        provider = by_id[provider_id]
+        if (provider_id == applied_provider_id or not getattr(provider, "FILLS_SERIES", False)
+                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map)):
+            continue
+        if asked >= _SERIES_FILL_LIMIT:
+            break
+        asked += 1
+        try:
+            results = provider.search(search_query, "", "en") or []
+        except Exception as e:
+            log.info(f"Series fill: {provider.__name__} failed for book {book.id}: {e}")
+            continue
+        chosen = _select_metadata_result(results, _book_isbn(book),
+                                         book_title=book.title, book_authors=book.authors) if results else None
+        if chosen is None or not (getattr(chosen, "series", None) or "").strip():
+            continue
+        series_only = types.SimpleNamespace(
+            title="", authors=[], description="", publisher="", tags=[], publishedDate=None,
+            rating=None, identifiers={}, cover=None,
+            series=chosen.series.strip(), series_index=getattr(chosen, "series_index", None))
+        if _apply_metadata_to_book(book, series_only, calibre_db_instance):
+            log.info(f"Series fill: {chosen.series.strip()} #{getattr(chosen, 'series_index', '')} "
+                     f"from {provider.__name__} for book {book.id}")
+            return True
+    return False
 
 
 def _book_isbn(book):

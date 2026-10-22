@@ -558,7 +558,26 @@ def _fill_missing_series(book, search_query, applied_provider_id, provider_hiera
     ``_SERIES_FILL_LIMIT`` of them, and applies only the series and position
     of the first result that passes the same gate. Returns True when a series
     was written.
+
+    Never raises: the caller runs this after committing the main record and
+    before leaving its provider loop, so an exception would send the loop on
+    to apply the next provider's whole record over that one.
     """
+    try:
+        return _fill_missing_series_unguarded(book, search_query, applied_provider_id,
+                                              provider_hierarchy, enabled_map,
+                                              calibre_db_instance)
+    except Exception as e:
+        log.warning(f"Series fill failed for book {getattr(book, 'id', 'unknown')}: {e}")
+        try:
+            calibre_db_instance.session.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def _fill_missing_series_unguarded(book, search_query, applied_provider_id, provider_hierarchy,
+                                   enabled_map, calibre_db_instance):
     try:
         cwa_settings = CWA_DB().get_cwa_settings()
     except Exception:

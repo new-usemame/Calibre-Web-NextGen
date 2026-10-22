@@ -258,3 +258,15 @@ def test_a_provider_that_is_off_by_default_is_asked_only_when_turned_on(monkeypa
     assert not filled and goodreads.queries == []
     filled, _ = _fill(monkeypatch, [goodreads], ["ibdb"], enabled={"goodreads": True})
     assert filled and goodreads.queries
+
+
+def test_a_failing_fill_never_reaches_the_provider_loop(monkeypatch):
+    # The fill runs inside fetch_and_apply_metadata's per-provider try, after
+    # the main record was committed and before the loop's break. Anything it
+    # raised there made the loop move on and apply the NEXT provider's whole
+    # record over the one just written. It must report "no series" instead.
+    def broken_gate(*args, **kwargs):
+        raise AttributeError("result without authors")
+    monkeypatch.setattr(m, "_select_metadata_result", broken_gate)
+    filled, book = _fill(monkeypatch, [_Provider("hardcover", [_hit("Alex Cross", 23)])], ["hardcover"])
+    assert filled is False and list(book.series) == []

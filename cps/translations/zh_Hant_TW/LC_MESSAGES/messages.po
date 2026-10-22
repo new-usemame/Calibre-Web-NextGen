@@ -5964,6 +5964,10 @@ msgid "Could not save reader settings."
 msgstr "無法儲存閱讀器設定。"
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr "無法儲存該筆記。"
 

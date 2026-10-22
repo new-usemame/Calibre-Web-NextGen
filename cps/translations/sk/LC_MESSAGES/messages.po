@@ -6262,6 +6262,10 @@ msgid "Could not save reader settings."
 msgstr "Nastavenia čítačky sa nepodarilo uložiť."
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr "Túto poznámku sa nepodarilo uložiť."
 

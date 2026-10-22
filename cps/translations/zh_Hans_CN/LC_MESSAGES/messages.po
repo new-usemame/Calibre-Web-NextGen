@@ -52,7 +52,9 @@ msgstr "成功！书籍已排队进行元数据备份，请检查任务列表以
 msgid ""
 "Error: Hardcover sync is disabled. Enable it in Basic Configuration or with "
 "HARDCOVER_SYNC_ENABLED."
-msgstr "错误：Hardcover 同步已禁用。请在“基本配置”中或通过 HARDCOVER_SYNC_ENABLED 启用。"
+msgstr ""
+"错误：Hardcover 同步已禁用。请在“基本配置”中或通过 HARDCOVER_SYNC_ENABLED 启"
+"用。"
 
 #: cps/admin.py
 msgid ""
@@ -226,7 +228,9 @@ msgid ""
 "Support settings were not saved. Use an HTTP or HTTPS URL without "
 "credentials, with a URL up to 2048 characters and a label up to 80 "
 "characters."
-msgstr "设置未保存。请使用不含登录凭据的 HTTP 或 HTTPS 网址，网址最多 2048 个字符，标签最多 80 个字符。"
+msgstr ""
+"设置未保存。请使用不含登录凭据的 HTTP 或 HTTPS 网址，网址最多 2048 个字符，标"
+"签最多 80 个字符。"
 
 #: cps/admin.py
 msgid "Invalid default body font option"
@@ -248,7 +252,9 @@ msgstr "无效的限制栏目"
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
-msgstr "书名排序规则已保存，但重新排列现有书库失败。在您重试或编辑书籍之前，它们可能仍保持原来的顺序。"
+msgstr ""
+"书名排序规则已保存，但重新排列现有书库失败。在您重试或编辑书籍之前，它们可能"
+"仍保持原来的顺序。"
 
 #: cps/admin.py
 msgid "Calibre-Web NextGen configuration updated"
@@ -314,13 +320,17 @@ msgstr "您确定要更改 Calibre 库位置吗？"
 msgid ""
 "Calibre-Web NextGen will search for updated Covers and update Cover "
 "Thumbnails, this may take a while?"
-msgstr "Calibre-Web NextGen 将检查封面更新并刷新封面缩略图，可能需要一些时间。是否继续？"
+msgstr ""
+"Calibre-Web NextGen 将检查封面更新并刷新封面缩略图，可能需要一些时间。是否继"
+"续？"
 
 #: cps/admin.py
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
-msgstr "您确定要删除 Calibre-Web NextGen 的同步数据库来强制与您的 Kobo Reader 完全同步吗？"
+msgstr ""
+"您确定要删除 Calibre-Web NextGen 的同步数据库来强制与您的 Kobo Reader 完全同"
+"步吗？"
 
 #: cps/admin.py cps/spa_strings.py cps/templates/modal_dialogs.html
 #: cps/templates/user_table.html
@@ -532,7 +542,8 @@ msgstr "发送至 %(email)s 的测试公告邮件已加入队列，请在“任�
 msgid ""
 "Announcement email queued for %(num)s recipient(s) — check Tasks for "
 "delivery."
-msgstr "向 %(num)s 位收件人发送的公告邮件已加入队列，请在“任务”中查看发送状态。"
+msgstr ""
+"向 %(num)s 位收件人发送的公告邮件已加入队列，请在“任务”中查看发送状态。"
 
 #: cps/admin.py
 #, python-format
@@ -687,7 +698,8 @@ msgstr "数据库不可写入"
 msgid ""
 "The managed Calibre content server requires a POSIX platform. Use the Linux "
 "container on Windows."
-msgstr "托管的 Calibre 内容服务器需要 POSIX 平台。在 Windows 上请使用 Linux 容器。"
+msgstr ""
+"托管的 Calibre 内容服务器需要 POSIX 平台。在 Windows 上请使用 Linux 容器。"
 
 #: cps/admin.py
 msgid ""
@@ -768,7 +780,8 @@ msgstr "密码长度必须在1到40之间"
 msgid ""
 "KEPUB conversion was not queued. Check that the preference and Kepubify path "
 "are enabled."
-msgstr "KEPUB 转换未加入队列。请检查相关选项是否开启，以及 Kepubify 路径是否已启用。"
+msgstr ""
+"KEPUB 转换未加入队列。请检查相关选项是否开启，以及 Kepubify 路径是否已启用。"
 
 #: cps/admin.py
 msgid "Database Settings updated"
@@ -869,7 +882,8 @@ msgstr "连接错误：%(error)s"
 msgid ""
 "Metadata is missing required OIDC fields: %(fields)s. This may not be a "
 "valid OIDC metadata endpoint."
-msgstr "元数据缺少必需的 OIDC 字段：%(fields)s。这可能是无效的 OIDC 元数据端点。"
+msgstr ""
+"元数据缺少必需的 OIDC 字段：%(fields)s。这可能是无效的 OIDC 元数据端点。"
 
 #: cps/admin.py
 #, python-format
@@ -1492,7 +1506,10 @@ msgid ""
 "%(failure_count)s failed%(failed_ids_message)s. One or more failed books may "
 "have had files renamed before the database update failed; their files and "
 "database entries may now be inconsistent."
-msgstr "批量编辑已完成，但出现错误：%(success_count)s 本成功，%(failure_count)s 本失败%(failed_ids_message)s。部分失败书籍可能在数据库更新失败之前已重命名文件，其文件与数据库记录目前可能不一致。"
+msgstr ""
+"批量编辑已完成，但出现错误：%(success_count)s 本成功，%(failure_count)s 本失"
+"败%(failed_ids_message)s。部分失败书籍可能在数据库更新失败之前已重命名文件，"
+"其文件与数据库记录目前可能不一致。"
 
 #: cps/editbooks.py
 msgid "File type isn't allowed to be uploaded to this server"
@@ -1834,7 +1851,9 @@ msgstr "创建封面路径失败"
 msgid ""
 "Cover could not be stored: the server has no permission to write into the "
 "book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s)."
-msgstr "无法保存封面：服务器没有写入书籍文件夹 %(folder)s 的权限（文件夹所有者 UID 为 %(owner)s，服务器 UID 为 %(uid)s）。"
+msgstr ""
+"无法保存封面：服务器没有写入书籍文件夹 %(folder)s 的权限（文件夹所有者 UID "
+"为 %(owner)s，服务器 UID 为 %(uid)s）。"
 
 #: cps/helper.py
 #, python-format
@@ -1858,7 +1877,9 @@ msgstr "执行 UnRar 时出错"
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
-msgstr "检测到不支持的架构：%(arch)s，Calibre-Web NextGen 针对 x86_64 和 aarch64 进行了优化。"
+msgstr ""
+"检测到不支持的架构：%(arch)s，Calibre-Web NextGen 针对 x86_64 和 aarch64 进行"
+"了优化。"
 
 #: cps/helper.py
 msgid "Could not find the specified directory"
@@ -1894,7 +1915,9 @@ msgstr "将所有书籍加入元数据备份队列"
 msgid ""
 "Please access Calibre-Web NextGen from non localhost to get valid "
 "api_endpoint for kobo device"
-msgstr "请使用非 localhost 地址访问 Calibre-Web NextGen，以获取 Kobo 设备可用的 api_endpoint"
+msgstr ""
+"请使用非 localhost 地址访问 Calibre-Web NextGen，以获取 Kobo 设备可用的 "
+"api_endpoint"
 
 #: cps/kobo_auth.py
 msgid "Kobo Setup"
@@ -2296,7 +2319,9 @@ msgstr "成功！请返回您的设备"
 msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
-msgstr "重复书籍检测需要先进行一次完整扫描，之后才能在导入和元数据变更后进行快速检查。 "
+msgstr ""
+"重复书籍检测需要先进行一次完整扫描，之后才能在导入和元数据变更后进行快速检"
+"查。 "
 
 #: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
 #: cps/templates/user_table.html
@@ -2417,7 +2442,9 @@ msgstr "Calibre-Web NextGen %(latest)s 可用 — 您正在使用 %(current)s."
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
-msgstr "帮助改进 Calibre-Web NextGen 的%(language)s翻译，还有 %(count)s 条文本需要翻译。"
+msgstr ""
+"帮助改进 Calibre-Web NextGen 的%(language)s翻译，还有 %(count)s 条文本需要翻"
+"译。"
 
 #: cps/api/auth.py cps/render_template.py cps/spa_strings.py
 msgid "Contact support"
@@ -2458,13 +2485,16 @@ msgstr "高级搜索"
 msgid ""
 "This book is not in your library. Ask an administrator to add it to My "
 "Library before adding it to a shelf."
-msgstr "此书不在您的书库中。请先让管理员将其添加到“我的书库”，然后再添加到书架。"
+msgstr ""
+"此书不在您的书库中。请先让管理员将其添加到“我的书库”，然后再添加到书架。"
 
 #: cps/shelf.py
 msgid ""
 "This book is not in the shelf owner's library. The shelf owner cannot browse "
 "the global library; an administrator must add it to their My Library first."
-msgstr "此书不在书架所有者的书库中。书架所有者无法浏览全局书库；管理员必须先将其添加到该用户的“我的书库”。"
+msgstr ""
+"此书不在书架所有者的书库中。书架所有者无法浏览全局书库；管理员必须先将其添加"
+"到该用户的“我的书库”。"
 
 #: cps/shelf.py
 msgid "This book cannot be added to this shelf. Ask an administrator for help."
@@ -2676,7 +2706,10 @@ msgid ""
 "allow MOBI. Normal conversion settings apply; without conversion, MOBI can "
 "be downloaded but cannot be opened in the web reader. Download clients have "
 "a separate format opt-in."
-msgstr "仅适用于此目录。服务器的上传格式设置也必须允许 MOBI。常规转换设置仍然适用；未经转换的 MOBI 可以下载，但无法在网页阅读器中打开。下载客户端需要单独启用此格式。"
+msgstr ""
+"仅适用于此目录。服务器的上传格式设置也必须允许 MOBI。常规转换设置仍然适用；未"
+"经转换的 MOBI 可以下载，但无法在网页阅读器中打开。下载客户端需要单独启用此格"
+"式。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2719,7 +2752,9 @@ msgstr "每本书必须保留至少一种格式。"
 msgid ""
 "{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
 "warnings; {failed} failed."
-msgstr "已永久删除 {succeeded} 本书；{warnings} 本已删除但存在清理警告；{failed} 本失败。"
+msgstr ""
+"已永久删除 {succeeded} 本书；{warnings} 本已删除但存在清理警告；{failed} 本失"
+"败。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2951,7 +2986,9 @@ msgid ""
 "Permanently delete {n} selected book(s) from the global library for every "
 "user? The books and all their files will be erased from the server. This "
 "cannot be undone."
-msgstr "确定要从所有用户的全局书库中永久删除选中的 {n} 本书吗？这些书籍及其所有文件都将从服务器中清除。此操作无法撤销。"
+msgstr ""
+"确定要从所有用户的全局书库中永久删除选中的 {n} 本书吗？这些书籍及其所有文件都"
+"将从服务器中清除。此操作无法撤销。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2962,7 +2999,11 @@ msgid ""
 "bookmarks, and reading progress are kept. If you use Kobo's built-in sync, "
 "the books also leave each Kobo device on your account at its next sync; "
 "other e-readers keep downloaded copies."
-msgstr "确定要从您的书库中移除选中的 {n} 本书吗？它们将从您的书库、OPDS 订阅源以及您添加过的普通书架中移除。全局书库中的书籍不会被删除，高亮、笔记、书签和阅读进度也会保留。如果您使用 Kobo 内置同步，您账户下的各台 Kobo 设备也会在下次同步时移除这些书籍；其他电子阅读器会保留已下载的副本。"
+msgstr ""
+"确定要从您的书库中移除选中的 {n} 本书吗？它们将从您的书库、OPDS 订阅源以及您"
+"添加过的普通书架中移除。全局书库中的书籍不会被删除，高亮、笔记、书签和阅读进"
+"度也会保留。如果您使用 Kobo 内置同步，您账户下的各台 Kobo 设备也会在下次同步"
+"时移除这些书籍；其他电子阅读器会保留已下载的副本。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -2983,7 +3024,9 @@ msgstr "服务器拒绝了过大的批量请求。"
 msgid ""
 "Delete \"{title}\" from the global library? The book and all its files are "
 "permanently erased for every member. This cannot be undone."
-msgstr "确定要从全局书库中删除“{title}”吗？此书及其所有文件将被永久清除，所有成员都将无法访问。此操作无法撤销。"
+msgstr ""
+"确定要从全局书库中删除“{title}”吗？此书及其所有文件将被永久清除，所有成员都将"
+"无法访问。此操作无法撤销。"
 
 #: cps/spa_strings.py
 msgid "Delete from the global library"
@@ -3006,7 +3049,9 @@ msgstr "请输入有效的书籍 ID。"
 msgid ""
 "Give {name} their own selection? It starts as a copy of everything they can "
 "see now — nothing changes for them yet."
-msgstr "为 {name} 创建个人选书列表吗？初始列表包含该用户目前能看到的所有书籍，因此暂时不会改变其可见内容。"
+msgstr ""
+"为 {name} 创建个人选书列表吗？初始列表包含该用户目前能看到的所有书籍，因此暂"
+"时不会改变其可见内容。"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Global Library"
@@ -3026,7 +3071,9 @@ msgid ""
 "Keep your own selection again? Your library goes back to the books you had "
 "chosen — nothing was lost while you saw everything. At its next update, your "
 "e-reader returns to your selection."
-msgstr "重新使用个人选书列表吗？您的书库将恢复为之前选定的书籍；在您查看全部书籍期间，选书列表一直保留。电子阅读器将在下次更新时恢复为您的选书列表。"
+msgstr ""
+"重新使用个人选书列表吗？您的书库将恢复为之前选定的书籍；在您查看全部书籍期"
+"间，选书列表一直保留。电子阅读器将在下次更新时恢复为您的选书列表。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Library contents"
@@ -3052,14 +3099,17 @@ msgstr "不在您的书库中"
 msgid ""
 "Nothing is deleted: the book stays in the global library, and your "
 "highlights, notes and reading progress are kept."
-msgstr "不会删除任何内容：此书仍保留在全局书库中，您的高亮、笔记和阅读进度也会保留。"
+msgstr ""
+"不会删除任何内容：此书仍保留在全局书库中，您的高亮、笔记和阅读进度也会保留。"
 
 #: cps/spa_strings.py
 msgid ""
 "Nothing is missing — the whole library is still on the server. What you see "
 "here is your own selection. Add books from the global library; they appear "
 "here and on your e-reader."
-msgstr "书籍并未丢失，完整书库仍保存在服务器上。这里显示的是您个人选择的书籍。您可以从全局书库添加书籍，它们将出现在这里及您的电子阅读器上。"
+msgstr ""
+"书籍并未丢失，完整书库仍保存在服务器上。这里显示的是您个人选择的书籍。您可以"
+"从全局书库添加书籍，它们将出现在这里及您的电子阅读器上。"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Only an administrator can add it back."
@@ -3120,7 +3170,10 @@ msgid ""
 "every book it can currently see—not only books it has shelved, read, or "
 "downloaded. Users can curate from there by removing books. Accounts already "
 "set up are never reseeded."
-msgstr "为所有非匿名账户设置“我的书库”吗？每个账户的初始书库将包含其目前可见的全部书籍，而不仅是已加入书架、已阅读或已下载的书籍。用户之后可以移除书籍来整理个人书库。已完成设置的账户不会重新填充。"
+msgstr ""
+"为所有非匿名账户设置“我的书库”吗？每个账户的初始书库将包含其目前可见的全部书"
+"籍，而不仅是已加入书架、已阅读或已下载的书籍。用户之后可以移除书籍来整理个人"
+"书库。已完成设置的账户不会重新填充。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -3129,7 +3182,10 @@ msgid ""
 "see. Anonymous accounts such as Guest are left unchanged; use their per-user "
 "controls to set up a curated public library. Accounts set up before are "
 "never reseeded."
-msgstr "为所有非匿名用户设置“我的书库”吗？每个账户将先填入其目前可见的全部书籍，再切换为个人选书列表。访客等匿名账户保持不变；可通过各用户的设置为其配置精选公共书库。已完成设置的账户不会重新填充。"
+msgstr ""
+"为所有非匿名用户设置“我的书库”吗？每个账户将先填入其目前可见的全部书籍，再切"
+"换为个人选书列表。访客等匿名账户保持不变；可通过各用户的设置为其配置精选公共"
+"书库。已完成设置的账户不会重新填充。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3141,28 +3197,35 @@ msgstr "已设置 {accounts} 个账户，共 {books} 本书。{errors} 个错误
 msgid ""
 "Left anonymous accounts unchanged: {accounts}. Use their per-user controls "
 "to set up a curated public library."
-msgstr "以下匿名账户保持不变：{accounts}。可通过各用户的设置为其配置精选公共书库。"
+msgstr ""
+"以下匿名账户保持不变：{accounts}。可通过各用户的设置为其配置精选公共书库。"
 
 #: cps/spa_strings.py
 msgid ""
 "Show the whole library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"
 "reader syncs the whole library."
-msgstr "重新显示整个书库吗？您的选书列表将完整保留，随时切换回来仍可使用。电子阅读器将在下次更新时同步整个书库。"
+msgstr ""
+"重新显示整个书库吗？您的选书列表将完整保留，随时切换回来仍可使用。电子阅读器"
+"将在下次更新时同步整个书库。"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "Show {name} the whole library again? Their selection is kept but no longer "
 "used, and their e-reader syncs the whole library at the next update."
-msgstr "让 {name} 重新看到整个书库吗？其选书列表会保留，但暂不使用；电子阅读器将在下次更新时同步整个书库。"
+msgstr ""
+"让 {name} 重新看到整个书库吗？其选书列表会保留，但暂不使用；电子阅读器将在下"
+"次更新时同步整个书库。"
 
 #: cps/spa_strings.py
 msgid ""
 "Start your own selection? It begins as everything you can see now, so "
 "nothing changes until you remove books yourself. Your e-reader keeps the "
 "same books at its next update."
-msgstr "开始使用个人选书列表吗？初始列表包含您目前可见的全部书籍，因此在您自行移除书籍之前，可见内容不会改变。电子阅读器在下次更新时仍会保留相同的书籍。"
+msgstr ""
+"开始使用个人选书列表吗？初始列表包含您目前可见的全部书籍，因此在您自行移除书"
+"籍之前，可见内容不会改变。电子阅读器在下次更新时仍会保留相同的书籍。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3175,21 +3238,28 @@ msgid ""
 "Switching a user to their own selection first fills it with everything they "
 "can see now, so nothing changes for them until they remove books themselves. "
 "Switching back keeps the selection intact but unused."
-msgstr "将用户切换为个人选书列表时，会先填入其目前可见的全部书籍，因此在用户自行移除书籍之前，可见内容不会改变。切换回全部书籍后，选书列表会完整保留，但暂不使用。"
+msgstr ""
+"将用户切换为个人选书列表时，会先填入其目前可见的全部书籍，因此在用户自行移除"
+"书籍之前，可见内容不会改变。切换回全部书籍后，选书列表会完整保留，但暂不使"
+"用。"
 
 #: cps/spa_strings.py
 msgid ""
 "The library is shared and holds every book once — what you keep is your own "
 "selection. Nothing you had is gone. Every book, new arrivals included, is "
 "under Global Library in the menu."
-msgstr "书库由所有人共享，每本书只存储一次；您保留的是个人选书列表。您原有的书籍并未丢失。包括新书在内的所有书籍，都可以在菜单中的“全局书库”找到。"
+msgstr ""
+"书库由所有人共享，每本书只存储一次；您保留的是个人选书列表。您原有的书籍并未"
+"丢失。包括新书在内的所有书籍，都可以在菜单中的“全局书库”找到。"
 
 #: cps/spa_strings.py
 msgid ""
 "The library is shared and holds every book once — what you keep is your own "
 "selection. Nothing you had is gone. Your administrator manages what enters "
 "your selection."
-msgstr "书库由所有人共享，每本书只存储一次；您保留的是个人选书列表。您原有的书籍并未丢失。管理员负责管理加入您选书列表的书籍。"
+msgstr ""
+"书库由所有人共享，每本书只存储一次；您保留的是个人选书列表。您原有的书籍并未"
+"丢失。管理员负责管理加入您选书列表的书籍。"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "It leaves your library and your OPDS feed."
@@ -3200,7 +3270,9 @@ msgid ""
 "If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. "
 "Other e-readers keep downloaded copies, and KOReader progress sync keeps "
 "working."
-msgstr "如果您使用 Kobo 内置同步，此书也会在下次同步时从 Kobo 上移除。其他电子阅读器会保留已下载的副本，KOReader 阅读进度同步仍可正常使用。"
+msgstr ""
+"如果您使用 Kobo 内置同步，此书也会在下次同步时从 Kobo 上移除。其他电子阅读器"
+"会保留已下载的副本，KOReader 阅读进度同步仍可正常使用。"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "The whole archive. Add books to your library from here."
@@ -3230,7 +3302,9 @@ msgstr "您没有访问全局书库的权限。请联系管理员授权。"
 msgid ""
 "Your administrator chooses which books are in your library. Ask them to add "
 "books, or to let you browse the global library."
-msgstr "管理员负责选择您书库中的书籍。请联系管理员添加书籍，或授予您浏览全局书库的权限。"
+msgstr ""
+"管理员负责选择您书库中的书籍。请联系管理员添加书籍，或授予您浏览全局书库的权"
+"限。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html cps/web.py
 msgid "Your library contents are managed by an administrator."
@@ -3325,7 +3399,9 @@ msgstr "无法将此书加入设备队列。"
 msgid ""
 "Merge {n} books into the first selected? The others are removed after their "
 "formats are copied over."
-msgstr "将 {n} 本书合并到最先选中的书籍中吗？其他书籍的格式文件复制完成后，它们将被移除。"
+msgstr ""
+"将 {n} 本书合并到最先选中的书籍中吗？其他书籍的格式文件复制完成后，它们将被移"
+"除。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3645,7 +3721,9 @@ msgstr "删除书籍"
 msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
-msgstr "删除 \"{title}\"？这会从您的书库中永久删除该书籍及其所有的文件，此操作无法复原。"
+msgstr ""
+"删除 \"{title}\"？这会从您的书库中永久删除该书籍及其所有的文件，此操作无法复"
+"原。"
 
 #: cps/spa_strings.py
 msgid "Deleting…"
@@ -4382,7 +4460,8 @@ msgstr ">"
 msgid ""
 "A one-time full duplicate scan is needed. Run it from CWA settings, then "
 "return here."
-msgstr "需要先进行一次完整的重复书籍扫描。请在 CWA 设置中运行扫描，然后返回此处。"
+msgstr ""
+"需要先进行一次完整的重复书籍扫描。请在 CWA 设置中运行扫描，然后返回此处。"
 
 #: cps/spa_strings.py
 msgid "Date Added"
@@ -4833,7 +4912,9 @@ msgstr "共享阅读位置"
 msgid ""
 "Devices with this on open each book where you last stopped on any of them. "
 "Turn it off for a device someone else reads on."
-msgstr "启用此选项的设备会从您在其中任一设备上最后停下的位置打开书籍。如果某台设备由其他人使用，请为其关闭此选项。"
+msgstr ""
+"启用此选项的设备会从您在其中任一设备上最后停下的位置打开书籍。如果某台设备由"
+"其他人使用，请为其关闭此选项。"
 
 #: cps/spa_strings.py
 msgid "Could not save Share my place. Try again."
@@ -4843,7 +4924,8 @@ msgstr "无法保存“共享阅读位置”设置。请重试。"
 msgid ""
 "Always shares its place. Install or update the NextGen Sync plugin on this "
 "device to choose."
-msgstr "始终共享阅读位置。请在此设备上安装或更新 NextGen Sync 插件，以便自行选择。"
+msgstr ""
+"始终共享阅读位置。请在此设备上安装或更新 NextGen Sync 插件，以便自行选择。"
 
 #: cps/spa_strings.py
 msgid "Books on this device"
@@ -4865,7 +4947,9 @@ msgstr "仅这些书架"
 msgid ""
 "Choose which books this device keeps. Books you take off are removed from "
 "the device at its next sync; your place, highlights and notes stay saved."
-msgstr "选择此设备保留哪些书籍。取消选择的书籍将在下次同步时从设备上移除；阅读位置、高亮和笔记仍会保留。"
+msgstr ""
+"选择此设备保留哪些书籍。取消选择的书籍将在下次同步时从设备上移除；阅读位置、"
+"高亮和笔记仍会保留。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5320,7 +5404,8 @@ msgstr "测试版"
 msgid ""
 "Between {min} and {max} px. Locked to 2:3, the ratio every cover frame in "
 "the app uses."
-msgstr "介于 {min} 和 {max} 像素之间。比例固定为 2:3，与应用中所有封面框的比例一致。"
+msgstr ""
+"介于 {min} 和 {max} 像素之间。比例固定为 2:3，与应用中所有封面框的比例一致。"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
@@ -5407,13 +5492,17 @@ msgstr "正在初始化同步数据的书籍"
 msgid ""
 "Books that are not on a Kobo-sync shelf are then removed from the device on "
 "its next sync. They stay in your library here."
-msgstr "不在 Kobo 同步书架上的书籍将在下次同步时从设备上移除，但仍保留在这里的书库中。"
+msgstr ""
+"不在 Kobo 同步书架上的书籍将在下次同步时从设备上移除，但仍保留在这里的书库"
+"中。"
 
 #: cps/spa_strings.py
 msgid ""
 "Books that are not on an e-reader sync shelf then leave the e-reader's "
 "library on its next sync. They stay in your library here."
-msgstr "不在电子阅读器同步书架上的书籍将在下次同步时从阅读器书库中移除，但仍保留在这里的书库中。"
+msgstr ""
+"不在电子阅读器同步书架上的书籍将在下次同步时从阅读器书库中移除，但仍保留在这"
+"里的书库中。"
 
 #: cps/spa_strings.py
 msgid "Browse by Column"
@@ -5423,7 +5512,9 @@ msgstr "按列浏览"
 msgid ""
 "Browse the catalogs your administrator has added. A book you pick is "
 "imported into the library here — it is not just downloaded to your device."
-msgstr "浏览管理员添加的目录。您选中的书籍将被导入这里的书库，而不只是下载到您的设备。"
+msgstr ""
+"浏览管理员添加的目录。您选中的书籍将被导入这里的书库，而不只是下载到您的设"
+"备。"
 
 #: cps/spa_strings.py
 msgid "Browse this catalog"
@@ -5474,7 +5565,10 @@ msgid ""
 "limits. NZBGet needs credentials that can read configuration, queue and "
 "history. qBittorrent needs an existing category. Transmission uses the "
 "configured folder and label."
-msgstr "CWNG 会复制此连接及服务器格式设置所允许的已下载书籍，不会移动文件、删除客户端下载任务或更改做种限制。NZBGet 需要能够读取配置、队列和历史记录的凭据。qBittorrent 需要使用已有分类。Transmission 使用配置的文件夹和标签。"
+msgstr ""
+"CWNG 会复制此连接及服务器格式设置所允许的已下载书籍，不会移动文件、删除客户端"
+"下载任务或更改做种限制。NZBGet 需要能够读取配置、队列和历史记录的凭据。"
+"qBittorrent 需要使用已有分类。Transmission 使用配置的文件夹和标签。"
 
 #: cps/spa_strings.py
 msgid "Can browse and request"
@@ -5699,7 +5793,8 @@ msgstr "确认新密码"
 msgid ""
 "Connect the Kobo to a computer and open .kobo/Kobo/Kobo eReader.conf in a "
 "text editor."
-msgstr "将 Kobo 连接到计算机，并用文本编辑器打开 .kobo/Kobo/Kobo eReader.conf。"
+msgstr ""
+"将 Kobo 连接到计算机，并用文本编辑器打开 .kobo/Kobo/Kobo eReader.conf。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5948,6 +6043,10 @@ msgid "Could not save reader settings."
 msgstr "无法保存阅读器设置。"
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr "无法保存该笔记。"
 
@@ -6024,7 +6123,9 @@ msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
 "scope selected above."
-msgstr "封面来源及其 API 密钥属于此服务器，不随封面适用范围变化。它们用于搜索图片；在此选择图片后，只会将其保存到上方选定的范围。"
+msgstr ""
+"封面来源及其 API 密钥属于此服务器，不随封面适用范围变化。它们用于搜索图片；在"
+"此选择图片后，只会将其保存到上方选定的范围。"
 
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
@@ -6388,7 +6489,9 @@ msgstr "下载 {format}"
 msgid ""
 "Downloaded {file}. It holds a password for this account: delete the zip once "
 "the plugin is on the e-reader."
-msgstr "已下载 {file}。其中包含此账户的密码：将插件安装到电子阅读器后，请删除该 ZIP 文件。"
+msgstr ""
+"已下载 {file}。其中包含此账户的密码：将插件安装到电子阅读器后，请删除该 ZIP "
+"文件。"
 
 #: cps/spa_strings.py
 msgid "Downloaded, waiting to import"
@@ -6440,7 +6543,9 @@ msgstr "电子阅读器"
 msgid ""
 "Each account starts with every book it can currently see—not only books it "
 "has shelved, read, or downloaded."
-msgstr "每个账户的初始书库包含其目前可见的全部书籍，而不仅是已加入书架、已阅读或已下载的书籍。"
+msgstr ""
+"每个账户的初始书库包含其目前可见的全部书籍，而不仅是已加入书架、已阅读或已下"
+"载的书籍。"
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -6733,7 +6838,9 @@ msgstr "各行字体、文字内容、封面尺寸"
 msgid ""
 "For an e-reader you can plug into this computer. The plugin already knows "
 "your server and account: nothing to type on the e-reader."
-msgstr "适用于可连接到此计算机的电子阅读器。插件已配置好服务器和账户，无需在阅读器上输入。"
+msgstr ""
+"适用于可连接到此计算机的电子阅读器。插件已配置好服务器和账户，无需在阅读器上"
+"输入。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Force full kobo sync"
@@ -6811,7 +6918,9 @@ msgstr "为您的智能书架命名。"
 msgid ""
 "Give {name} My Library? It starts as a copy of everything they can see now — "
 "nothing changes for them yet."
-msgstr "为 {name} 启用“我的书库”吗？初始书库包含该用户目前可见的全部书籍，因此暂时不会改变其可见内容。"
+msgstr ""
+"为 {name} 启用“我的书库”吗？初始书库包含该用户目前可见的全部书籍，因此暂时不"
+"会改变其可见内容。"
 
 #: cps/spa_strings.py
 msgid "Go to note"
@@ -7002,7 +7111,9 @@ msgid ""
 "If Prowlarr redirects to another source on your local network, list its "
 "exact origin here. Separate origins with commas. Credentials stay scoped to "
 "their original origin."
-msgstr "如果 Prowlarr 重定向到局域网中的其他来源，请在此列出其准确的源地址。多个源之间以逗号分隔。凭据仍仅用于其原始源。"
+msgstr ""
+"如果 Prowlarr 重定向到局域网中的其他来源，请在此列出其准确的源地址。多个源之"
+"间以逗号分隔。凭据仍仅用于其原始源。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7190,7 +7301,9 @@ msgstr "将字段留空可使用其默认值。"
 msgid ""
 "Leave the credential blank to keep it. Saving switches the connection off "
 "and expires old selections; test it before enabling it again."
-msgstr "凭据留空即可保留现有凭据。保存后将关闭连接，并使之前的选择失效；重新启用前请先测试。"
+msgstr ""
+"凭据留空即可保留现有凭据。保存后将关闭连接，并使之前的选择失效；重新启用前请"
+"先测试。"
 
 #: cps/spa_strings.py
 msgid "Left"
@@ -7217,7 +7330,9 @@ msgid ""
 "Let people request books from an OPDS catalog or an indexer connected to a "
 "download client. A requested book is imported into this library through the "
 "normal ingest path, credited to the account that asked for it."
-msgstr "允许用户从 OPDS 目录或连接到下载客户端的索引器请求书籍。请求的书籍会通过常规导入流程加入此书库，并记录发起请求的账户。"
+msgstr ""
+"允许用户从 OPDS 目录或连接到下载客户端的索引器请求书籍。请求的书籍会通过常规"
+"导入流程加入此书库，并记录发起请求的账户。"
 
 #: cps/spa_strings.py
 msgid "Lettering"
@@ -7240,7 +7355,9 @@ msgid ""
 "List the exact HTTP, HTTPS or UDP tracker origins you trust, separated by "
 "commas. Torrents using other trackers are blocked. Source credentials are "
 "never sent to trackers."
-msgstr "列出您信任的 HTTP、HTTPS 或 UDP Tracker 的准确源地址，以逗号分隔。使用其他 Tracker 的种子会被阻止。书源凭据绝不会发送给 Tracker。"
+msgstr ""
+"列出您信任的 HTTP、HTTPS 或 UDP Tracker 的准确源地址，以逗号分隔。使用其他 "
+"Tracker 的种子会被阻止。书源凭据绝不会发送给 Tracker。"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Literata"
@@ -7520,7 +7637,9 @@ msgstr "新功能！"
 msgid ""
 "New authors, tags, publishers, and languages will be added after each book's "
 "existing values. Filled single-value fields will be replaced."
-msgstr "新的作者、标签、出版社和语言将追加到每本书的现有值之后。已填写的单值字段会被替换。"
+msgstr ""
+"新的作者、标签、出版社和语言将追加到每本书的现有值之后。已填写的单值字段会被"
+"替换。"
 
 #: cps/spa_strings.py
 msgid "New password"
@@ -7635,7 +7754,8 @@ msgstr "未找到重复组。"
 msgid ""
 "No e-reader is waiting with this code. Check it, or get a new code on the e-"
 "reader."
-msgstr "没有电子阅读器正在使用此代码等待连接。请检查代码，或在阅读器上获取新代码。"
+msgstr ""
+"没有电子阅读器正在使用此代码等待连接。请检查代码，或在阅读器上获取新代码。"
 
 #: cps/spa_strings.py
 msgid "No excluded tags"
@@ -7787,7 +7907,9 @@ msgid ""
 "Nothing is missing — the global library is still on the server. What you see "
 "here is your selection in My Library. Add books from the global library; "
 "they appear here and on your e-reader."
-msgstr "书籍并未丢失，全局书库仍保存在服务器上。这里显示的是您在“我的书库”中选择的书籍。从全局书库添加书籍后，它们会出现在这里及您的电子阅读器上。"
+msgstr ""
+"书籍并未丢失，全局书库仍保存在服务器上。这里显示的是您在“我的书库”中选择的书"
+"籍。从全局书库添加书籍后，它们会出现在这里及您的电子阅读器上。"
 
 #: cps/spa_strings.py
 msgid "Nothing on this page"
@@ -7819,7 +7941,9 @@ msgstr "默认关闭。开启前不会获取任何内容，也不会更改权限
 msgid ""
 "Off by default. While in beta, opting in only records your preference and "
 "recovery evidence — it does not change what your Kobo receives yet."
-msgstr "默认关闭。在测试阶段，启用后只记录您的偏好和恢复依据，暂时不会改变 Kobo 接收的内容。"
+msgstr ""
+"默认关闭。在测试阶段，启用后只记录您的偏好和恢复依据，暂时不会改变 Kobo 接收"
+"的内容。"
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -7844,13 +7968,17 @@ msgstr "位于书架 {name}"
 msgid ""
 "On the e-reader, open Tools ▸ CWNG library ▸ Connect this device and choose "
 "Connect with a code."
-msgstr "在电子阅读器上打开 Tools ▸ CWNG library ▸ Connect this device，然后选择 Connect with a code。"
+msgstr ""
+"在电子阅读器上打开 Tools ▸ CWNG library ▸ Connect this device，然后选择 "
+"Connect with a code。"
 
 #: cps/spa_strings.py
 msgid ""
 "On the e-reader, open Tools ▸ CWNG library ▸ Connect this device and choose "
 "Sign in with username and password."
-msgstr "在电子阅读器上打开 Tools ▸ CWNG library ▸ Connect this device，然后选择 Sign in with username and password。"
+msgstr ""
+"在电子阅读器上打开 Tools ▸ CWNG library ▸ Connect this device，然后选择 Sign "
+"in with username and password。"
 
 #: cps/spa_strings.py
 msgid "On this device"
@@ -7864,7 +7992,9 @@ msgstr "单栏"
 msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
-msgstr "只同步您在下方选中的书籍。切换到此模式后，初始没有选中任何书籍，需要您逐本选择。"
+msgstr ""
+"只同步您在下方选中的书籍。切换到此模式后，初始没有选中任何书籍，需要您逐本选"
+"择。"
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -7874,7 +8004,9 @@ msgstr "打开账户"
 msgid ""
 "Open NextGen using an address your e-reader can reach before copying these "
 "settings. Localhost only points back to the device itself."
-msgstr "复制这些设置前，请使用电子阅读器能访问的地址打开 NextGen。Localhost 只会指向设备自身。"
+msgstr ""
+"复制这些设置前，请使用电子阅读器能访问的地址打开 NextGen。Localhost 只会指向"
+"设备自身。"
 
 #: cps/spa_strings.py
 msgid "Open administration"
@@ -7929,7 +8061,8 @@ msgstr "正在打开…"
 msgid ""
 "Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
 "you can edit it first."
-msgstr "在 GitHub 上打开预填好的问题报告。您可以先编辑，只有点击发布后才会发送。"
+msgstr ""
+"在 GitHub 上打开预填好的问题报告。您可以先编辑，只有点击发布后才会发送。"
 
 #: cps/spa_strings.py
 msgid "Opens in classic view"
@@ -7943,7 +8076,9 @@ msgstr "选择加入 Kobo 双向批注同步"
 msgid ""
 "Opting in does not sync a book straight away. Each book is set up and "
 "checked first — its real state is shown here."
-msgstr "启用后不会立即同步书籍。每本书都需要先完成设置和检查，其实际状态会显示在这里。"
+msgstr ""
+"启用后不会立即同步书籍。每本书都需要先完成设置和检查，其实际状态会显示在这"
+"里。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -8259,7 +8394,9 @@ msgid ""
 "Reload metadata for \"{title}\" from the file on disk? Any title, author or "
 "series you edited here is replaced by what the file contains. This cannot be "
 "undone."
-msgstr "从磁盘文件重新加载“{title}”的元数据吗？您在此编辑的书名、作者或丛书信息都将被文件中的内容替换。此操作无法撤销。"
+msgstr ""
+"从磁盘文件重新加载“{title}”的元数据吗？您在此编辑的书名、作者或丛书信息都将被"
+"文件中的内容替换。此操作无法撤销。"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
@@ -8361,7 +8498,8 @@ msgstr "替换现有"
 msgid ""
 "Replace metadata for {n} selected book(s)? Those books will lose their "
 "existing values in every filled field."
-msgstr "替换选中的 {n} 本书的元数据吗？这些书籍中与已填写字段对应的现有值将被覆盖。"
+msgstr ""
+"替换选中的 {n} 本书的元数据吗？这些书籍中与已填写字段对应的现有值将被覆盖。"
 
 #: cps/spa_strings.py
 msgid "Report Issue on Discord"
@@ -8473,7 +8611,9 @@ msgstr "重试"
 msgid ""
 "Retry finishes the remaining accounts without changing completed selections. "
 "Undo restores the settings from before setup began."
-msgstr "重试会继续处理剩余账户，不会更改已完成的选书列表。撤销会恢复开始设置前的配置。"
+msgstr ""
+"重试会继续处理剩余账户，不会更改已完成的选书列表。撤销会恢复开始设置前的配"
+"置。"
 
 #: cps/spa_strings.py
 msgid "Retrying."
@@ -8488,7 +8628,9 @@ msgstr "反向代理标头登录"
 msgid ""
 "Revoke the app password \"{label}\"? Any device still using it loses access "
 "immediately, and the password cannot be recovered."
-msgstr "撤销应用专用密码“{label}”吗？仍在使用该密码的设备会立即失去访问权限，且该密码无法恢复。"
+msgstr ""
+"撤销应用专用密码“{label}”吗？仍在使用该密码的设备会立即失去访问权限，且该密码"
+"无法恢复。"
 
 #: cps/spa_strings.py
 msgid "Right"
@@ -8965,7 +9107,9 @@ msgid ""
 "Show the global library again? Your selection is kept exactly as you left it "
 "— switch back any time and it is still there. At its next update, your e-"
 "reader syncs the global library."
-msgstr "重新显示全局书库吗？您的选书列表将完整保留，随时切换回来仍可使用。电子阅读器将在下次更新时同步全局书库。"
+msgstr ""
+"重新显示全局书库吗？您的选书列表将完整保留，随时切换回来仍可使用。电子阅读器"
+"将在下次更新时同步全局书库。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8977,7 +9121,9 @@ msgstr "显示 {name}"
 msgid ""
 "Show {name} the global library again? Their selection is kept but no longer "
 "used, and their e-reader syncs the global library at the next update."
-msgstr "让 {name} 重新看到全局书库吗？其选书列表会保留，但暂不使用；电子阅读器将在下次更新时同步全局书库。"
+msgstr ""
+"让 {name} 重新看到全局书库吗？其选书列表会保留，但暂不使用；电子阅读器将在下"
+"次更新时同步全局书库。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9068,7 +9214,8 @@ msgstr "找不到智能书架。"
 msgid ""
 "Smart shelves collect books automatically using rules. Hidden shelves stay "
 "here so you can show them again."
-msgstr "智能书架根据规则自动收集书籍。隐藏的书架仍保留在这里，您可以重新显示它们。"
+msgstr ""
+"智能书架根据规则自动收集书籍。隐藏的书架仍保留在这里，您可以重新显示它们。"
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
@@ -9111,7 +9258,9 @@ msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
 "at its next update."
-msgstr "启用“我的书库”吗？初始书库包含您目前可见的全部书籍，因此在您自行移除书籍之前，可见内容不会改变。电子阅读器在下次更新时仍会保留相同的书籍。"
+msgstr ""
+"启用“我的书库”吗？初始书库包含您目前可见的全部书籍，因此在您自行移除书籍之"
+"前，可见内容不会改变。电子阅读器在下次更新时仍会保留相同的书籍。"
 
 #: cps/spa_strings.py
 msgid "Start the only OAuth provider automatically"
@@ -9163,7 +9312,9 @@ msgid ""
 "Switch back to My Library? Your library goes back to the books you had "
 "chosen — nothing was lost while you saw everything. At its next update, your "
 "e-reader returns to your selection."
-msgstr "切换回“我的书库”吗？您的书库将恢复为之前选定的书籍；在您查看全部书籍期间，选书列表一直保留。电子阅读器将在下次更新时恢复为您的选书列表。"
+msgstr ""
+"切换回“我的书库”吗？您的书库将恢复为之前选定的书籍；在您查看全部书籍期间，选"
+"书列表一直保留。电子阅读器将在下次更新时恢复为您的选书列表。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9175,7 +9326,9 @@ msgid ""
 "Switching a user to My Library first fills it with everything they can see "
 "now, so nothing changes for them until they remove books themselves. "
 "Switching back keeps the selection intact but unused."
-msgstr "将用户切换到“我的书库”时，会先填入其目前可见的全部书籍，因此在用户自行移除书籍之前，可见内容不会改变。切换回全部书籍后，选书列表会完整保留，但暂不使用。"
+msgstr ""
+"将用户切换到“我的书库”时，会先填入其目前可见的全部书籍，因此在用户自行移除书"
+"籍之前，可见内容不会改变。切换回全部书籍后，选书列表会完整保留，但暂不使用。"
 
 #: cps/spa_strings.py
 msgid "Sync only my selected shelves"
@@ -9269,7 +9422,8 @@ msgstr "该账户已无权请求书籍。"
 msgid ""
 "That address cannot be reached on a local network. Loopback, link-local and "
 "cloud metadata addresses are never allowed."
-msgstr "无法通过局域网访问该地址。不允许使用回环地址、链路本地地址或云元数据地址。"
+msgstr ""
+"无法通过局域网访问该地址。不允许使用回环地址、链路本地地址或云元数据地址。"
 
 #: cps/spa_strings.py
 msgid "That catalog no longer exists."
@@ -9340,7 +9494,9 @@ msgstr "无法加载审批队列，可能有等待处理但未显示的请求。
 msgid ""
 "The authors, tags, publishers, and languages you enter will be removed from "
 "each selected book. Books without them are left unchanged."
-msgstr "您输入的作者、标签、出版社和语言将从每本选中的书籍中移除。不包含这些值的书籍保持不变。"
+msgstr ""
+"您输入的作者、标签、出版社和语言将从每本选中的书籍中移除。不包含这些值的书籍"
+"保持不变。"
 
 #: cps/spa_strings.py
 msgid "The background scheduler is not running."
@@ -9355,7 +9511,9 @@ msgstr "书籍仍在打开中。请稍后重试。"
 msgid ""
 "The book record, metadata, shelves, and reading state stay available. If "
 "this is the last format, you can add a replacement later."
-msgstr "书籍记录、元数据、书架和阅读状态仍会保留。如果这是最后一种格式，您可以稍后添加替代文件。"
+msgstr ""
+"书籍记录、元数据、书架和阅读状态仍会保留。如果这是最后一种格式，您可以稍后添"
+"加替代文件。"
 
 #: cps/spa_strings.py
 msgid "The catalog could not be changed."
@@ -9509,7 +9667,8 @@ msgstr "此封面由服务器绘制；应用之前不会保存。"
 msgid ""
 "The server-wide option is also off, so nothing can sync yet. An "
 "administrator can enable it in the classic server settings."
-msgstr "服务器全局选项也已关闭，因此暂时无法同步。管理员可以在经典服务器设置中启用。"
+msgstr ""
+"服务器全局选项也已关闭，因此暂时无法同步。管理员可以在经典服务器设置中启用。"
 
 #: cps/spa_strings.py
 msgid "The setting could not be changed."
@@ -9520,13 +9679,17 @@ msgid ""
 "The shared library holds every book once — My Library is your own selection. "
 "Nothing is gone: every book, new arrivals included, is under Global Library "
 "in the menu."
-msgstr "共享书库中每本书只存储一次，“我的书库”是您的个人选书列表。书籍并未丢失，包括新书在内的所有书籍，都可以在菜单中的“全局书库”找到。"
+msgstr ""
+"共享书库中每本书只存储一次，“我的书库”是您的个人选书列表。书籍并未丢失，包括"
+"新书在内的所有书籍，都可以在菜单中的“全局书库”找到。"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
 "The shared library holds every book once — My Library is your own selection. "
 "Nothing is gone: your administrator manages what enters it."
-msgstr "共享书库中每本书只存储一次，“我的书库”是您的个人选书列表。书籍并未丢失，管理员负责管理加入其中的书籍。"
+msgstr ""
+"共享书库中每本书只存储一次，“我的书库”是您的个人选书列表。书籍并未丢失，管理"
+"员负责管理加入其中的书籍。"
 
 #: cps/spa_strings.py
 msgid "The source asked us to wait."
@@ -9552,7 +9715,9 @@ msgstr "书源重定向到了此连接不允许的网络地址。"
 msgid ""
 "The submission could not be confirmed. Check the download client queue and "
 "history before trying again; CWNG will not blindly send a duplicate."
-msgstr "无法确认是否提交成功。重试前请检查下载客户端的队列和历史记录；CWNG 不会在未确认的情况下重复提交。"
+msgstr ""
+"无法确认是否提交成功。重试前请检查下载客户端的队列和历史记录；CWNG 不会在未确"
+"认的情况下重复提交。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9616,7 +9781,9 @@ msgstr "下载客户端中不存在此分类。"
 msgid ""
 "This changes only your view of this book and copies delivered to your e-"
 "readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr "这只会更改您看到的封面及发送到您电子阅读器的副本。共享书籍封面和其他人看到的封面保持不变。"
+msgstr ""
+"这只会更改您看到的封面及发送到您电子阅读器的副本。共享书籍封面和其他人看到的"
+"封面保持不变。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9672,14 +9839,18 @@ msgstr "此高亮没有已保存的位置"
 msgid ""
 "This is a torrent release. Choose qBittorrent or Transmission for this "
 "indexer. Usenet clients accept NZB releases."
-msgstr "这是种子资源。请为此索引器选择 qBittorrent 或 Transmission。Usenet 客户端接受 NZB 资源。"
+msgstr ""
+"这是种子资源。请为此索引器选择 qBittorrent 或 Transmission。Usenet 客户端接"
+"受 NZB 资源。"
 
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
 "Change and enter the address the e-reader can use, such as "
 "http://192.168.1.20:8083."
-msgstr "这是此计算机自身的地址，电子阅读器无法访问。请选择“更改”，输入阅读器可访问的地址，例如 http://192.168.1.20:8083。"
+msgstr ""
+"这是此计算机自身的地址，电子阅读器无法访问。请选择“更改”，输入阅读器可访问的"
+"地址，例如 http://192.168.1.20:8083。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9725,7 +9896,9 @@ msgstr "此连接不信任该资源的下载地址。"
 msgid ""
 "This request came from a different network than the one you are using. If "
 "you did not just ask for a code on your own e-reader, choose Deny."
-msgstr "此请求来自与您当前使用的网络不同的网络。如果您刚才没有在自己的电子阅读器上请求代码，请选择“拒绝”。"
+msgstr ""
+"此请求来自与您当前使用的网络不同的网络。如果您刚才没有在自己的电子阅读器上请"
+"求代码，请选择“拒绝”。"
 
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
@@ -9739,7 +9912,8 @@ msgstr "此书架是空的。请从任何书籍的页面加入书籍。"
 msgid ""
 "This torrent already exists outside this request. CWNG will not adopt or "
 "change an unrelated client job."
-msgstr "此种子已存在于本请求之外的任务中。CWNG 不会接管或更改无关的客户端任务。"
+msgstr ""
+"此种子已存在于本请求之外的任务中。CWNG 不会接管或更改无关的客户端任务。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9839,7 +10013,10 @@ msgid ""
 "catalog, indexer or download client on a 192.168 or 10.x address. It applies "
 "to this connection only. Loopback, link-local and cloud metadata addresses "
 "are never allowed."
-msgstr "如果连接运行在您自己的网络上，例如位于 192.168 或 10.x 地址的目录、索引器或下载客户端，请开启此选项。此设置仅适用于当前连接。不允许使用回环地址、链路本地地址或云元数据地址。"
+msgstr ""
+"如果连接运行在您自己的网络上，例如位于 192.168 或 10.x 地址的目录、索引器或下"
+"载客户端，请开启此选项。此设置仅适用于当前连接。不允许使用回环地址、链路本地"
+"地址或云元数据地址。"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -9849,7 +10026,9 @@ msgstr "双栏"
 msgid ""
 "Two ways to connect. Each gives the e-reader its own app password, which you "
 "can revoke on your account page."
-msgstr "有两种连接方式，都会为电子阅读器创建独立的应用专用密码。您可以在账户页面撤销该密码。"
+msgstr ""
+"有两种连接方式，都会为电子阅读器创建独立的应用专用密码。您可以在账户页面撤销"
+"该密码。"
 
 #: cps/spa_strings.py
 msgid "Two-way sync active"
@@ -9934,7 +10113,9 @@ msgstr "未命名链接"
 msgid ""
 "Unzip the download and copy the cwngsync.koplugin folder into koreader/"
 "plugins on the e-reader (on a Kobo, .adds/koreader/plugins)."
-msgstr "解压下载文件，将 cwngsync.koplugin 文件夹复制到电子阅读器上的 koreader/plugins 中（Kobo 上为 .adds/koreader/plugins）。"
+msgstr ""
+"解压下载文件，将 cwngsync.koplugin 文件夹复制到电子阅读器上的 koreader/"
+"plugins 中（Kobo 上为 .adds/koreader/plugins）。"
 
 #: cps/spa_strings.py
 msgid "Update failed."
@@ -10088,7 +10269,9 @@ msgid ""
 "We repaired this book for your Kobo. If you were having trouble "
 "highlighting, try after sync — and if it still doesn’t work, remove the book "
 "from your Kobo and let it download again."
-msgstr "已为您的 Kobo 修复此书。如果之前无法正常添加高亮，请在同步后重试；若仍然无效，请从 Kobo 中移除此书并重新下载。"
+msgstr ""
+"已为您的 Kobo 修复此书。如果之前无法正常添加高亮，请在同步后重试；若仍然无"
+"效，请从 Kobo 中移除此书并重新下载。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -10096,7 +10279,10 @@ msgid ""
 "highlighting, try after sync — and if it still doesn’t work, remove the book "
 "from your Kobo and let it download again. If you read it some other way, "
 "download it again to get the repaired copy."
-msgstr "已为您的 Kobo 修复此书。如果之前无法正常添加高亮，请在同步后重试；若仍然无效，请从 Kobo 中移除此书并重新下载。如果您通过其他方式阅读，请重新下载以获取修复后的副本。"
+msgstr ""
+"已为您的 Kobo 修复此书。如果之前无法正常添加高亮，请在同步后重试；若仍然无"
+"效，请从 Kobo 中移除此书并重新下载。如果您通过其他方式阅读，请重新下载以获取"
+"修复后的副本。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10104,7 +10290,9 @@ msgid ""
 "We repaired {count} books for your Kobo. If you were having trouble "
 "highlighting, try after sync — and if it still doesn’t work, remove them "
 "from your Kobo and let them download again."
-msgstr "已为您的 Kobo 修复 {count} 本书。如果之前无法正常添加高亮，请在同步后重试；若仍然无效，请从 Kobo 中移除这些书籍并重新下载。"
+msgstr ""
+"已为您的 Kobo 修复 {count} 本书。如果之前无法正常添加高亮，请在同步后重试；若"
+"仍然无效，请从 Kobo 中移除这些书籍并重新下载。"
 
 #: cps/spa_strings.py
 msgid "Web reader"
@@ -10139,7 +10327,9 @@ msgid ""
 "With automatic start on, the login page goes straight to the provider. Add ?"
 "local=1 to the login URL to reach the password form, which keeps working as "
 "long as standard password login is left enabled."
-msgstr "开启自动跳转后，登录页面会直接转到身份提供商。在登录网址后添加 ?local=1 即可进入密码表单；只要标准密码登录保持启用，该表单就仍可使用。"
+msgstr ""
+"开启自动跳转后，登录页面会直接转到身份提供商。在登录网址后添加 ?local=1 即可"
+"进入密码表单；只要标准密码登录保持启用，该表单就仍可使用。"
 
 #: cps/spa_strings.py
 msgid "Write a note"
@@ -10157,14 +10347,18 @@ msgstr "您无权编辑此书架"
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
-msgstr "您可能已使用 calibre-web 很长时间。欢迎告诉我们此功能是否适合您的使用习惯，以及原因。"
+msgstr ""
+"您可能已使用 calibre-web 很长时间。欢迎告诉我们此功能是否适合您的使用习惯，以"
+"及原因。"
 
 #: cps/spa_strings.py
 msgid ""
 "Your Kobo is still set to sync your whole library, so marking this shelf "
 "does nothing on its own. Switch your account to shelf-only syncing to make "
 "it take effect."
-msgstr "您的 Kobo 仍设置为同步整个书库，因此仅标记此书架不会生效。请将账户切换为仅同步书架，使其生效。"
+msgstr ""
+"您的 Kobo 仍设置为同步整个书库，因此仅标记此书架不会生效。请将账户切换为仅同"
+"步书架，使其生效。"
 
 #: cps/spa_strings.py
 msgid "Your Library"
@@ -10174,13 +10368,17 @@ msgstr "您的书库"
 msgid ""
 "Your OPDS feed includes all visible shelves. Enable selected shelves only in "
 "your account settings to choose individual shelves."
-msgstr "您的 OPDS 订阅源包含所有可见书架。请在账户设置中启用“仅选定书架”，以便逐个选择书架。"
+msgstr ""
+"您的 OPDS 订阅源包含所有可见书架。请在账户设置中启用“仅选定书架”，以便逐个选"
+"择书架。"
 
 #: cps/spa_strings.py
 msgid ""
 "Your account currently syncs the whole library. Select shelf-only sync in "
 "your account settings to use shelf marks."
-msgstr "您的账户当前同步整个书库。请在账户设置中选择仅同步书架，才能使用书架同步标记。"
+msgstr ""
+"您的账户当前同步整个书库。请在账户设置中选择仅同步书架，才能使用书架同步标"
+"记。"
 
 #: cps/spa_strings.py
 msgid "Your administrator has disabled sharing your own shelves."
@@ -10203,13 +10401,17 @@ msgid ""
 "Your e-readers are still set to sync your whole library, so marking this "
 "shelf does nothing on its own. Switch your account to shelf-only syncing to "
 "make it take effect."
-msgstr "您的电子阅读器仍设置为同步整个书库，因此仅标记此书架不会生效。请将账户切换为仅同步书架，使其生效。"
+msgstr ""
+"您的电子阅读器仍设置为同步整个书库，因此仅标记此书架不会生效。请将账户切换为"
+"仅同步书架，使其生效。"
 
 #: cps/spa_strings.py
 msgid ""
 "Your own cover is private to you and your e-reader deliveries. The library "
 "cover stays unchanged for everyone else."
-msgstr "您的个人封面仅对您自己及发送到您电子阅读器的副本生效。其他人看到的书库封面保持不变。"
+msgstr ""
+"您的个人封面仅对您自己及发送到您电子阅读器的副本生效。其他人看到的书库封面保"
+"持不变。"
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
@@ -10541,7 +10743,9 @@ msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
 "shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
 "library."
-msgstr "新账户仅同步选定书架。如果没有收到书籍，请将书籍添加到书架，并开启该书架的电子阅读器同步标记。取消勾选此项可同步整个书库。"
+msgstr ""
+"新账户仅同步选定书架。如果没有收到书籍，请将书籍添加到书架，并开启该书架的电"
+"子阅读器同步标记。取消勾选此项可同步整个书库。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10560,7 +10764,9 @@ msgstr "收藏"
 msgid ""
 "Choose fonts you are allowed to share with this server’s readers. Files stay "
 "in the configuration volume across upgrades."
-msgstr "请选择您有权与此服务器读者分享的字体。字体文件保存在配置卷中，升级后仍会保留。"
+msgstr ""
+"请选择您有权与此服务器读者分享的字体。字体文件保存在配置卷中，升级后仍会保"
+"留。"
 
 #: cps/spa_strings.py
 msgid "Could not load reader fonts."
@@ -10732,13 +10938,17 @@ msgstr "导入文件夹标签"
 msgid ""
 "Add ingest subfolder names to book tags or an existing custom column. "
 "Existing values are kept; files in the ingest root add no labels."
-msgstr "将导入子文件夹名称添加为书籍标签，或写入现有自定义列。现有值会保留；导入根目录中的文件不会添加标签。"
+msgstr ""
+"将导入子文件夹名称添加为书籍标签，或写入现有自定义列。现有值会保留；导入根目"
+"录中的文件不会添加标签。"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 msgid ""
 "For example, ingest/James/scifi adds James by default. Include nested "
 "folders to add scifi too."
-msgstr "例如，ingest/James/scifi 默认添加 James 标签。启用包含嵌套文件夹后，也会添加 scifi。"
+msgstr ""
+"例如，ingest/James/scifi 默认添加 James 标签。启用包含嵌套文件夹后，也会添加 "
+"scifi。"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 msgid "Write subfolder names to"
@@ -10752,7 +10962,9 @@ msgstr "包含嵌套文件夹"
 msgid ""
 "Custom columns must already exist and use comma-separated text, like tags. "
 "Create them in Calibre desktop first."
-msgstr "自定义列必须已存在，且像标签一样使用逗号分隔文本。请先在 Calibre 桌面版中创建。"
+msgstr ""
+"自定义列必须已存在，且像标签一样使用逗号分隔文本。请先在 Calibre 桌面版中创"
+"建。"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 #, python-brace-format
@@ -10887,7 +11099,9 @@ msgstr "已将 {n} 本书添加到 {shelf}。"
 msgid ""
 "{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
 "for retry."
-msgstr "已将 {succeeded} 本书添加到 {shelf}；{failed} 本失败。失败的书籍仍保持选中状态，便于重试。"
+msgstr ""
+"已将 {succeeded} 本书添加到 {shelf}；{failed} 本失败。失败的书籍仍保持选中状"
+"态，便于重试。"
 
 #: cps/spa_strings.py
 msgid "Could not add books to the shelf. Please try again."
@@ -10919,7 +11133,9 @@ msgstr "留空可保留当前使用书名和第一作者的文件名。请勿包
 msgid ""
 "Missing metadata becomes empty text. Title and series use their sort names. "
 "Slashes become underscores, not folders."
-msgstr "缺失的元数据会替换为空文本。书名和丛书使用其排序名称。斜杠会替换为下划线，不会创建文件夹。"
+msgstr ""
+"缺失的元数据会替换为空文本。书名和丛书使用其排序名称。斜杠会替换为下划线，不"
+"会创建文件夹。"
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "OPDS download filename template"
@@ -11062,7 +11278,9 @@ msgid ""
 "Applies only to this download client. The server upload-format setting must "
 "also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
 "can be downloaded but cannot be opened in the web reader."
-msgstr "仅适用于此下载客户端。服务器的上传格式设置也必须允许 MOBI。常规转换设置仍然适用；未经转换的 MOBI 可以下载，但无法在网页阅读器中打开。"
+msgstr ""
+"仅适用于此下载客户端。服务器的上传格式设置也必须允许 MOBI。常规转换设置仍然适"
+"用；未经转换的 MOBI 可以下载，但无法在网页阅读器中打开。"
 
 #: cps/spa_strings.py cps/templates/personal_rating.html
 msgid "Could not load your rating."
@@ -11086,7 +11304,9 @@ msgid ""
 "Off by default. Only opted-in ratings count, and names are never shown. If "
 "you are the only person sharing a rating for a book, the average is your "
 "score."
-msgstr "默认关闭。只统计选择分享的评分，且不显示姓名。如果只有您分享了某本书的评分，平均分就是您的评分。"
+msgstr ""
+"默认关闭。只统计选择分享的评分，且不显示姓名。如果只有您分享了某本书的评分，"
+"平均分就是您的评分。"
 
 #: cps/spa_strings.py cps/templates/personal_rating.html
 msgid "Save rating"
@@ -11129,7 +11349,8 @@ msgstr "个人评分，从低到高"
 msgid ""
 "Your score does not change the Calibre library rating. Sharing is off unless "
 "you opt in in your account."
-msgstr "您的评分不会更改 Calibre 书库评分。除非您在账户中主动开启，否则不会分享评分。"
+msgstr ""
+"您的评分不会更改 Calibre 书库评分。除非您在账户中主动开启，否则不会分享评分。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11150,7 +11371,9 @@ msgid ""
 "Leave blank to keep the existing filename. Example: {series} #{series_index} "
 "- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
 "the file extension is added automatically."
-msgstr "留空可保留现有文件名。示例：{series} #{series_index} - {title}。可用字段包括 {title}、{authors}、{series} 和 {series_index}；文件扩展名会自动添加。"
+msgstr ""
+"留空可保留现有文件名。示例：{series} #{series_index} - {title}。可用字段包括 "
+"{title}、{authors}、{series} 和 {series_index}；文件扩展名会自动添加。"
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 #, python-brace-format
@@ -11943,7 +12166,9 @@ msgstr "转换缺少 KEPUB 的 Kobo 书籍"
 msgid ""
 "%(processed)d/%(total)d processed: %(converted)d converted, %(skipped)d "
 "skipped, %(failed)d failed"
-msgstr "已处理 %(processed)d/%(total)d：%(converted)d 本已转换，%(skipped)d 本已跳过，%(failed)d 本失败"
+msgstr ""
+"已处理 %(processed)d/%(total)d：%(converted)d 本已转换，%(skipped)d 本已跳"
+"过，%(failed)d 本失败"
 
 #: cps/tasks/kepub_backfill.py
 msgid "Kepubify is not configured"
@@ -11982,7 +12207,9 @@ msgstr "不支持 Google Drive KEPUB 修复"
 msgid ""
 "%(clean)d clean, %(repaired)d repaired, %(unsupported)d unsupported, "
 "%(failed)d failed"
-msgstr "%(clean)d 本无需修复，%(repaired)d 本已修复，%(unsupported)d 本不支持，%(failed)d 本失败"
+msgstr ""
+"%(clean)d 本无需修复，%(repaired)d 本已修复，%(unsupported)d 本不支"
+"持，%(failed)d 本失败"
 
 #: cps/tasks/kepub_package_repair.py
 #, python-format
@@ -12024,7 +12251,9 @@ msgstr "EPUB 修复程序"
 msgid ""
 "%(processed)d/%(total)d processed: %(generated)d generated, %(skipped)d "
 "skipped, %(failed)d failed"
-msgstr "已处理 %(processed)d/%(total)d：%(generated)d 本已生成，%(skipped)d 本已跳过，%(failed)d 本失败"
+msgstr ""
+"已处理 %(processed)d/%(total)d：%(generated)d 本已生成，%(skipped)d 本已跳"
+"过，%(failed)d 本失败"
 
 #: cps/tasks/thumbnail.py
 msgid "Cover Thumbnails"
@@ -12339,7 +12568,9 @@ msgstr "管理&nbsp;&nbsp;🚀"
 msgid ""
 "Sanitized: safe to attach to a public GitHub issue. Passwords, tokens, IPs, "
 "and install paths are scrubbed."
-msgstr "已移除敏感信息，可安全附加到公开的 GitHub 问题中。密码、令牌、IP 地址和安装路径均已移除。"
+msgstr ""
+"已移除敏感信息，可安全附加到公开的 GitHub 问题中。密码、令牌、IP 地址和安装路"
+"径均已移除。"
 
 #: cps/templates/admin.html
 msgid "Get Support Pack"
@@ -12425,7 +12656,9 @@ msgid ""
 "Upload your Kobo device's %(filename)s file to import every highlight and "
 "note you've made. Highlights for books that exist in this library will be "
 "added to your account; sideloaded books not in the library are skipped."
-msgstr "上传 Kobo 设备的 %(filename)s 文件，导入您创建的所有高亮和笔记。本书库中已有书籍的高亮将添加到您的账户；不在书库中的侧载书籍会被跳过。"
+msgstr ""
+"上传 Kobo 设备的 %(filename)s 文件，导入您创建的所有高亮和笔记。本书库中已有"
+"书籍的高亮将添加到您的账户；不在书库中的侧载书籍会被跳过。"
 
 #: cps/templates/annotations_import.html
 msgid ""
@@ -12668,7 +12901,9 @@ msgid ""
 "Some metadata sources need an API key. Adding a key here improves cover "
 "quality and unblocks rate-limited services. Keys are stored once for the "
 "whole instance — admins only."
-msgstr "部分元数据来源需要 API 密钥。在此添加密钥可提高封面质量，并解除服务的请求频率限制。密钥由整个实例共用，仅管理员可设置。"
+msgstr ""
+"部分元数据来源需要 API 密钥。在此添加密钥可提高封面质量，并解除服务的请求频率"
+"限制。密钥由整个实例共用，仅管理员可设置。"
 
 #: cps/templates/book_edit.html
 msgid "Loading..."
@@ -12852,7 +13087,9 @@ msgstr "邮件服务器尚未配置，无法发送公告。"
 msgid ""
 "Compose a message and send it by email to your users. Messages are queued "
 "and sent in the background — check Tasks for delivery status."
-msgstr "撰写消息并通过电子邮件发送给用户。邮件将加入队列并在后台发送，可在“任务”中查看发送状态。"
+msgstr ""
+"撰写消息并通过电子邮件发送给用户。邮件将加入队列并在后台发送，可在“任务”中查"
+"看发送状态。"
 
 #: cps/templates/broadcast_email.html
 msgid "Subject"
@@ -12870,7 +13107,9 @@ msgstr "在此撰写您的公告。允许使用 HTML（链接、粗体、清单�
 msgid ""
 "HTML is allowed for formatting (e.g. links and bold). Recipients on plain-"
 "text mail clients automatically get a text-only version."
-msgstr "允许使用 HTML 格式（例如链接和粗体）。使用纯文本邮件客户端的收件人会自动收到纯文本版本。"
+msgstr ""
+"允许使用 HTML 格式（例如链接和粗体）。使用纯文本邮件客户端的收件人会自动收到"
+"纯文本版本。"
 
 #: cps/templates/broadcast_email.html
 msgid "Use current announcement banner text"
@@ -12917,7 +13156,9 @@ msgid ""
 "If you have been sent to this page after updating or migrating, there was a "
 "problem mounting your Calibre Database (metadata.db), or less likely, a "
 "problem with your app.db."
-msgstr "如果您在更新或迁移后被转到此页面，可能是 Calibre 数据库（metadata.db）挂载出现问题，也可能是 app.db 出现问题，但后者较少见。"
+msgstr ""
+"如果您在更新或迁移后被转到此页面，可能是 Calibre 数据库（metadata.db）挂载出"
+"现问题，也可能是 app.db 出现问题，但后者较少见。"
 
 #: cps/templates/config_db.html
 msgid "Common causes include:"
@@ -12933,14 +13174,18 @@ msgstr "NextGen 和 Calibre 正在同时使用同一个数据库或书库。"
 msgid ""
 "NextGen, or part of it, is running over a network share without "
 "%(network_share_mode)s enabled in your Docker Compose configuration."
-msgstr "NextGen 或其部分组件运行在网络共享上，但 Docker Compose 配置中未启用 %(network_share_mode)s。"
+msgstr ""
+"NextGen 或其部分组件运行在网络共享上，但 Docker Compose 配置中未启用 "
+"%(network_share_mode)s。"
 
 #: cps/templates/config_db.html
 #, python-format
 msgid ""
 "NextGen is running on %(unionfs)s or %(mergerfs)s without "
 "%(network_share_mode)s enabled."
-msgstr "NextGen 运行在 %(unionfs)s 或 %(mergerfs)s 上，但未启用 %(network_share_mode)s。"
+msgstr ""
+"NextGen 运行在 %(unionfs)s 或 %(mergerfs)s 上，但未启用 "
+"%(network_share_mode)s。"
 
 #: cps/templates/config_db.html
 msgid "The path to your Calibre Database changed or is incorrect."
@@ -12962,14 +13207,17 @@ msgstr "要解决这些问题，请确保："
 msgid ""
 "No other application, including Calibre, accesses the same Calibre Database "
 "while NextGen is running."
-msgstr "NextGen 运行时，没有其他应用（包括 Calibre）访问同一个 Calibre 数据库。"
+msgstr ""
+"NextGen 运行时，没有其他应用（包括 Calibre）访问同一个 Calibre 数据库。"
 
 #: cps/templates/config_db.html
 #, python-format
 msgid ""
 "If you use a network share, unionfs, or mergerfs, enable "
 "%(network_share_mode)s in your Docker Compose configuration."
-msgstr "如果使用网络共享、unionfs 或 mergerfs，请在 Docker Compose 配置中启用 %(network_share_mode)s。"
+msgstr ""
+"如果使用网络共享、unionfs 或 mergerfs，请在 Docker Compose 配置中启用 "
+"%(network_share_mode)s。"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -12980,7 +13228,9 @@ msgstr "Calibre 数据库（metadata.db）的路径正确，且 NextGen 可以�
 msgid ""
 "The Calibre Database file (metadata.db) exists and is not corrupted. Try "
 "opening it with Calibre to verify its integrity."
-msgstr "Calibre 数据库文件（metadata.db）存在且未损坏。可尝试使用 Calibre 打开它以验证完整性。"
+msgstr ""
+"Calibre 数据库文件（metadata.db）存在且未损坏。可尝试使用 Calibre 打开它以验"
+"证完整性。"
 
 #: cps/templates/config_db.html
 msgid "NextGen has permission to access the Calibre Database file."
@@ -12990,13 +13240,16 @@ msgstr "NextGen 有权访问 Calibre 数据库文件。"
 msgid ""
 "If the problem remains after checking all of the above, restore your Calibre "
 "Database from a backup or create a new one."
-msgstr "如果检查以上各项后问题仍然存在，请从备份恢复 Calibre 数据库，或新建数据库。"
+msgstr ""
+"如果检查以上各项后问题仍然存在，请从备份恢复 Calibre 数据库，或新建数据库。"
 
 #: cps/templates/config_db.html
 msgid ""
 "You can also use Last Resort Restore at the bottom of this page to try "
 "rebuilding your Calibre Database from the OPF files in your library."
-msgstr "您也可以使用本页底部的“最后手段：恢复”功能，尝试根据书库中的 OPF 文件重建 Calibre 数据库。"
+msgstr ""
+"您也可以使用本页底部的“最后手段：恢复”功能，尝试根据书库中的 OPF 文件重建 "
+"Calibre 数据库。"
 
 #: cps/templates/config_db.html
 msgid "Location of Calibre Database (metadata.db file)"
@@ -13016,13 +13269,25 @@ msgid ""
 "any, it will automatically create and mount a new one. For more details,\n"
 "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 "wiki/Configuration#database-configuration\">see here</a>!"
-msgstr "NextGen 的配置要求 Calibre 数据库（<code>metadata.db</code> 文件）始终位于 <code>/calibre-library</code> 内。\n        NextGen 启动时会自动搜索 docker-compose 文件中绑定到 <code>/calibre-library</code> 的目录，查找现有 Calibre\n        书库或 metadata.db 文件。如果只找到一个现有书库，会自动挂载；如果找到多个，默认\n        自动挂载最大的书库；如果没有找到，则会自动创建并挂载新书库。有关详情，\n        请<a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-configuration\">查看这里</a>！"
+msgstr ""
+"NextGen 的配置要求 Calibre 数据库（<code>metadata.db</code> 文件）始终位于 "
+"<code>/calibre-library</code> 内。\n"
+"        NextGen 启动时会自动搜索 docker-compose 文件中绑定到 <code>/calibre-"
+"library</code> 的目录，查找现有 Calibre\n"
+"        书库或 metadata.db 文件。如果只找到一个现有书库，会自动挂载；如果找到"
+"多个，默认\n"
+"        自动挂载最大的书库；如果没有找到，则会自动创建并挂载新书库。有关详"
+"情，\n"
+"        请<a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
+"wiki/Configuration#database-configuration\">查看这里</a>！"
 
 #: cps/templates/config_db.html
 msgid ""
 "Therefore, when configuring your docker-compose file for NextGen, <b>DO NOT "
 "CHANGE THE PATHS IN THE VOLUMES SECTION ON THE RIGHT SIDE OF THE COLONS!</b>"
-msgstr "因此，为 NextGen 配置 docker-compose 文件时，<b>请勿更改 volumes 部分冒号右侧的路径！</b>"
+msgstr ""
+"因此，为 NextGen 配置 docker-compose 文件时，<b>请勿更改 volumes 部分冒号右侧"
+"的路径！</b>"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -13033,7 +13298,12 @@ msgid ""
 "your\n"
 "        library, use the <b>Separate Book Files from Library Option below "
 "and there, enter the path to the rest of the library</b>"
-msgstr "这些路径仅供 NextGen 内部使用。您可以按需更改左侧的绑定路径，但没有必要\n        更改右侧路径。<br><br>如果您希望将 <code>metadata.db</code> 文件与书库的其余内容\n        分开存放，请使用下方的<b>将书籍文件与书库分离选项，并在那里输入书库其余内容的路径</b>"
+msgstr ""
+"这些路径仅供 NextGen 内部使用。您可以按需更改左侧的绑定路径，但没有必要\n"
+"        更改右侧路径。<br><br>如果您希望将 <code>metadata.db</code> 文件与书"
+"库的其余内容\n"
+"        分开存放，请使用下方的<b>将书籍文件与书库分离选项，并在那里输入书库其"
+"余内容的路径</b>"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -13093,7 +13363,10 @@ msgid ""
 "to restore it from the OPF files in your library. This will <b>erase all per-"
 "book data</b> (reading progress, bookmarks, shelf links, downloads, etc.) in "
 "the app database, but will not affect user accounts or settings."
-msgstr "如果 Calibre 书库损坏且无法打开，您可以尝试根据书库中的 OPF 文件恢复。这会<b>清除应用数据库中所有与单本书籍相关的数据</b>（阅读进度、书签、书架关联、下载记录等），但不会影响用户账户或设置。"
+msgstr ""
+"如果 Calibre 书库损坏且无法打开，您可以尝试根据书库中的 OPF 文件恢复。这会<b>"
+"清除应用数据库中所有与单本书籍相关的数据</b>（阅读进度、书签、书架关联、下载"
+"记录等），但不会影响用户账户或设置。"
 
 #: cps/templates/config_db.html
 #, python-format
@@ -13134,7 +13407,9 @@ msgstr "使用 OAuth 认证"
 msgid ""
 "Generic OIDC is managed by the environment. Its settings and secret cannot "
 "be changed here; secret-file rotation takes effect after restart."
-msgstr "通用 OIDC 由环境配置管理，无法在此更改设置和密钥；轮换密钥文件后，重启才会生效。"
+msgstr ""
+"通用 OIDC 由环境配置管理，无法在此更改设置和密钥；轮换密钥文件后，重启才会生"
+"效。"
 
 #: cps/templates/config_edit.html
 #, python-format
@@ -13238,7 +13513,9 @@ msgid ""
 "New books imported without a cover get a generated cover in the default "
 "design instead of the grey placeholder. Books that already have a cover are "
 "never touched."
-msgstr "新导入且没有封面的书籍将使用默认设计生成封面，替代灰色占位图。已有封面的书籍不会被更改。"
+msgstr ""
+"新导入且没有封面的书籍将使用默认设计生成封面，替代灰色占位图。已有封面的书籍"
+"不会被更改。"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13272,7 +13549,10 @@ msgid ""
 "during upgrades. When enabled, each user gets a hide button on the book "
 "detail page that drops the book out of their own index/search/OPDS without "
 "affecting other users. Recovery is via the profile page (Hidden Books link)."
-msgstr "全新安装时默认开启；升级时保留已有选择。启用后，每位用户都会在书籍详情页看到隐藏按钮，可将书籍从自己的索引、搜索和 OPDS 中隐藏，不影响其他用户。可通过个人资料页的“隐藏书籍”链接恢复。"
+msgstr ""
+"全新安装时默认开启；升级时保留已有选择。启用后，每位用户都会在书籍详情页看到"
+"隐藏按钮，可将书籍从自己的索引、搜索和 OPDS 中隐藏，不影响其他用户。可通过个"
+"人资料页的“隐藏书籍”链接恢复。"
 
 #: cps/templates/config_edit.html
 msgid "Allow Kobo two-way annotation sync"
@@ -13283,7 +13563,9 @@ msgid ""
 "Stage 0 records exact Kobo annotation evidence only. Device responses remain "
 "unchanged. This opt-in defaults off and must also be enabled for each user "
 "before a later rollout stage can use local authority."
-msgstr "阶段 0 仅记录 Kobo 批注的精确原始数据，设备响应保持不变。此选项默认关闭，还需要为各用户单独开启，后续推出阶段才能以本地数据为准。"
+msgstr ""
+"阶段 0 仅记录 Kobo 批注的精确原始数据，设备响应保持不变。此选项默认关闭，还需"
+"要为各用户单独开启，后续推出阶段才能以本地数据为准。"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13303,7 +13585,8 @@ msgstr "产生并优先使用 KEPUB 格式发送到 Kobo"
 msgid ""
 "Kepubify was not found. Set its path under External binaries before this "
 "preference can convert books."
-msgstr "未找到 Kepubify。请先在“外部二进制程序”中设置其路径，此选项才能转换书籍。"
+msgstr ""
+"未找到 Kepubify。请先在“外部二进制程序”中设置其路径，此选项才能转换书籍。"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13324,7 +13607,9 @@ msgid ""
 "On by default. Books already acknowledged by the same reader are protected "
 "for every sync-token shape. Use Full Sync or resend to deliberately deliver "
 "them again."
-msgstr "默认开启。无论同步令牌采用何种形式，都不会重复发送同一阅读器已确认接收的书籍。若要主动重新发送，请使用“完整同步”或“重新发送”。"
+msgstr ""
+"默认开启。无论同步令牌采用何种形式，都不会重复发送同一阅读器已确认接收的书"
+"籍。若要主动重新发送，请使用“完整同步”或“重新发送”。"
 
 #: cps/templates/config_edit.html
 msgid "Server External Port (for port forwarded API calls)"
@@ -13343,7 +13628,9 @@ msgid ""
 "Eliminates the white letterbox bars that Kobo devices show on covers whose "
 "aspect ratio does not match the screen. Padding is applied server-side; "
 "original cover files on disk are unchanged."
-msgstr "消除封面宽高比与屏幕不匹配时 Kobo 设备显示的白色边条。填充在服务器端进行，磁盘上的原始封面文件保持不变。"
+msgstr ""
+"消除封面宽高比与屏幕不匹配时 Kobo 设备显示的白色边条。填充在服务器端进行，磁"
+"盘上的原始封面文件保持不变。"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Kobo Libra Color / Libra 2 (1264x1680)"
@@ -13394,7 +13681,9 @@ msgid ""
 "127.0.0.1 keeps the content server reachable only from this machine. Enter "
 "0.0.0.0 to expose it on the network, which is required to reach it from "
 "another container or host."
-msgstr "127.0.0.1 仅允许本机访问内容服务器。输入 0.0.0.0 可将其开放到网络；从其他容器或主机访问时需要此设置。"
+msgstr ""
+"127.0.0.1 仅允许本机访问内容服务器。输入 0.0.0.0 可将其开放到网络；从其他容器"
+"或主机访问时需要此设置。"
 
 #: cps/templates/config_edit.html
 msgid "Allow Anonymous Writes (no username or password required)"
@@ -13406,7 +13695,10 @@ msgid ""
 "read the whole library. Behind Docker port mapping or a reverse proxy on "
 "this machine, every client appears to come from the same address, so "
 "allowing that address lets everyone write."
-msgstr "未设置用户名和密码时，任何能访问监听地址的人都能读取整个书库。通过本机的 Docker 端口映射或反向代理访问时，所有客户端看起来都来自同一个地址，因此允许该地址写入就等于允许所有人写入。"
+msgstr ""
+"未设置用户名和密码时，任何能访问监听地址的人都能读取整个书库。通过本机的 "
+"Docker 端口映射或反向代理访问时，所有客户端看起来都来自同一个地址，因此允许该"
+"地址写入就等于允许所有人写入。"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13418,7 +13710,9 @@ msgid ""
 "Leave empty to allow unauthenticated writes only from this machine. Every "
 "address listed here can add, edit and delete books in the library without "
 "any credentials, so keep it as narrow as possible."
-msgstr "留空则仅允许本机免身份验证写入。此处列出的每个地址都可以在不提供凭据的情况下添加、编辑和删除书库中的书籍，因此请尽量缩小范围。"
+msgstr ""
+"留空则仅允许本机免身份验证写入。此处列出的每个地址都可以在不提供凭据的情况下"
+"添加、编辑和删除书库中的书籍，因此请尽量缩小范围。"
 
 #: cps/templates/config_edit.html
 msgid "Content Server Username"
@@ -13457,7 +13751,8 @@ msgstr "通过一个设置控制 Hardcover 自动获取和阅读进度同步。"
 msgid ""
 "Managed by HARDCOVER_SYNC_ENABLED; change the environment variable to enable "
 "or disable Hardcover sync."
-msgstr "由 HARDCOVER_SYNC_ENABLED 管理；请更改此环境变量以启用或禁用 Hardcover 同步。"
+msgstr ""
+"由 HARDCOVER_SYNC_ENABLED 管理；请更改此环境变量以启用或禁用 Hardcover 同步。"
 
 #: cps/templates/config_edit.html
 msgid "Hardcover API Key"
@@ -13467,19 +13762,25 @@ msgstr "Hardcover API Key"
 msgid ""
 "Free key from https://hardcover.app/account/api — required for Hardcover "
 "metadata results."
-msgstr "可在 https://hardcover.app/account/api 免费获取密钥；获取 Hardcover 元数据结果需要此密钥。"
+msgstr ""
+"可在 https://hardcover.app/account/api 免费获取密钥；获取 Hardcover 元数据结"
+"果需要此密钥。"
 
 #: cps/templates/config_edit.html
 msgid ""
 "A token from the HARDCOVER_TOKEN environment variable is currently active. "
 "It is not shown here; a key entered in this field would override it."
-msgstr "当前正在使用 HARDCOVER_TOKEN 环境变量中的令牌。此处不会显示该令牌；在本字段输入密钥会覆盖它。"
+msgstr ""
+"当前正在使用 HARDCOVER_TOKEN 环境变量中的令牌。此处不会显示该令牌；在本字段输"
+"入密钥会覆盖它。"
 
 #: cps/templates/config_edit.html
 msgid ""
 "A token from the file named by HARDCOVER_TOKEN_FILE is currently active. It "
 "is not shown here; a key entered in this field would override it."
-msgstr "当前正在使用 HARDCOVER_TOKEN_FILE 指定文件中的令牌。此处不会显示该令牌；在本字段输入密钥会覆盖它。"
+msgstr ""
+"当前正在使用 HARDCOVER_TOKEN_FILE 指定文件中的令牌。此处不会显示该令牌；在本"
+"字段输入密钥会覆盖它。"
 
 #: cps/templates/config_edit.html
 msgid "Token status: not configured."
@@ -13511,7 +13812,10 @@ msgid ""
 "IP / day, which is easily exhausted on shared servers (HTTP 429). Free key "
 "at https://console.cloud.google.com — enable the \"Books API\" and create an "
 "API key."
-msgstr "可选。不使用密钥时，Google Books 限制每个 IP 每天约 1,000 次请求，共享服务器很容易耗尽配额（HTTP 429）。可在 https://console.cloud.google.com 免费获取密钥：启用“Books API”，然后创建 API 密钥。"
+msgstr ""
+"可选。不使用密钥时，Google Books 限制每个 IP 每天约 1,000 次请求，共享服务器"
+"很容易耗尽配额（HTTP 429）。可在 https://console.cloud.google.com 免费获取密"
+"钥：启用“Books API”，然后创建 API 密钥。"
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -13802,7 +14106,8 @@ msgstr "OAuth 组声明"
 msgid ""
 "OIDC claim containing group names. The claim may be a list, or a comma- or "
 "space-separated string."
-msgstr "包含组名称的 OIDC 声明。该声明可以是列表，也可以是以逗号或空格分隔的字符串。"
+msgstr ""
+"包含组名称的 OIDC 声明。该声明可以是列表，也可以是以逗号或空格分隔的字符串。"
 
 #: cps/templates/config_edit.html
 msgid "Require OAuth Group Membership"
@@ -13822,7 +14127,8 @@ msgstr "OAuth 允许的组"
 msgid ""
 "Comma- or space-separated OAuth groups allowed to log in via Generic OAuth. "
 "Leave empty only if group membership is not required."
-msgstr "允许通过通用 OAuth 登录的组，以逗号或空格分隔。仅在不要求组成员身份时留空。"
+msgstr ""
+"允许通过通用 OAuth 登录的组，以逗号或空格分隔。仅在不要求组成员身份时留空。"
 
 #: cps/templates/config_edit.html
 msgid "OAuth group for Admin"
@@ -13880,7 +14186,9 @@ msgid ""
 "These permissions are applied only when a new user is created via Generic "
 "OAuth. Admin group membership still grants admin privileges when OAuth group-"
 "based admin management is enabled. Existing users are not changed."
-msgstr "这些权限仅在通过通用 OAuth 创建新用户时应用。启用基于 OAuth 组的管理员管理后，管理员组成员仍会获得管理员权限。现有用户保持不变。"
+msgstr ""
+"这些权限仅在通过通用 OAuth 创建新用户时应用。启用基于 OAuth 组的管理员管理"
+"后，管理员组成员仍会获得管理员权限。现有用户保持不变。"
 
 #: cps/templates/config_edit.html
 msgid "Login Button Text"
@@ -13947,7 +14255,10 @@ msgid ""
 "page starts it automatically. Add ?local=1 to the login URL to open the "
 "normal login page instead. That page still accepts a username and password "
 "only while the setting above is left off."
-msgstr "启用后，如果恰好有一个 OAuth 提供商处于启用状态，访问登录页时会自动启动其登录流程。在登录网址后添加 ?local=1 可打开普通登录页。只有上方设置保持关闭时，该页面才仍接受用户名和密码。"
+msgstr ""
+"启用后，如果恰好有一个 OAuth 提供商处于启用状态，访问登录页时会自动启动其登录"
+"流程。在登录网址后添加 ?local=1 可打开普通登录页。只有上方设置保持关闭时，该"
+"页面才仍接受用户名和密码。"
 
 #: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
@@ -14091,7 +14402,9 @@ msgstr "选择自定义栏目作为书籍可见性"
 msgid ""
 "Restrict book visibility based on values in a Calibre text, enumeration, or "
 "Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
-msgstr "根据 Calibre 文本、枚举或布尔类型自定义列的值限制书籍可见性。布尔列区分“是”“否”和“未定义”。"
+msgstr ""
+"根据 Calibre 文本、枚举或布尔类型自定义列的值限制书籍可见性。布尔列区"
+"分“是”“否”和“未定义”。"
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -14126,7 +14439,9 @@ msgid ""
 "When project support links are hidden, readers can use this destination "
 "instead. Leave blank to hide those links without a replacement. Use an "
 "absolute HTTP or HTTPS URL without username or password."
-msgstr "隐藏项目支持链接后，读者可以改用此地址。留空则隐藏链接且不提供替代链接。请使用不含用户名或密码的完整 HTTP 或 HTTPS 网址。"
+msgstr ""
+"隐藏项目支持链接后，读者可以改用此地址。留空则隐藏链接且不提供替代链接。请使"
+"用不含用户名或密码的完整 HTTP 或 HTTPS 网址。"
 
 #: cps/templates/config_view_edit.html
 msgid "Your support link label"
@@ -14152,7 +14467,9 @@ msgstr "留空可隐藏横幅。横幅显示在每页顶部，直到各用户自
 msgid ""
 "Up to 500 characters. HTML is escaped. Each user dismisses the banner "
 "independently; editing the text re-shows it for everyone."
-msgstr "最多 500 个字符。HTML 会被转义。每位用户独立关闭横幅；编辑文字后会再次向所有人显示。"
+msgstr ""
+"最多 500 个字符。HTML 会被转义。每位用户独立关闭横幅；编辑文字后会再次向所有"
+"人显示。"
 
 #: cps/templates/config_view_edit.html
 msgid "Custom CSS"
@@ -14167,7 +14484,8 @@ msgstr "例如 .navbar { background: #2b2b2b; }"
 msgid ""
 "Injected into every page as the last stylesheet, so it overrides the built-"
 "in themes. Applies to all users. Leave blank to disable."
-msgstr "作为最后一个样式表插入每个页面，以覆盖内置主题。对所有用户生效，留空可禁用。"
+msgstr ""
+"作为最后一个样式表插入每个页面，以覆盖内置主题。对所有用户生效，留空可禁用。"
 
 #: cps/templates/config_view_edit.html
 msgid "Default Settings for New Users"
@@ -14218,7 +14536,9 @@ msgid ""
 "Used for anonymous OPDS feed responses when the client does not send an "
 "Accept-Language header and the request does not include a ?lang= override. "
 "Authenticated users keep their own selected locale."
-msgstr "当客户端未发送 Accept-Language 标头，且请求中没有 ?lang= 覆盖参数时，用于匿名 OPDS 订阅源响应。已登录用户仍使用各自选择的语言。"
+msgstr ""
+"当客户端未发送 Accept-Language 标头，且请求中没有 ?lang= 覆盖参数时，用于匿"
+"名 OPDS 订阅源响应。已登录用户仍使用各自选择的语言。"
 
 #: cps/templates/config_view_edit.html
 msgid "OPDS Downloads"
@@ -14249,7 +14569,8 @@ msgstr "添加显示或隐藏书籍的自定义栏目值"
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
 "the cover embedded in the book itself."
-msgstr "从任意受支持来源选择封面、粘贴网址、上传文件，或使用书籍本身的内嵌封面。"
+msgstr ""
+"从任意受支持来源选择封面、粘贴网址、上传文件，或使用书籍本身的内嵌封面。"
 
 #: cps/templates/cover_picker.html
 msgid "Use a URL"
@@ -14264,7 +14585,9 @@ msgid ""
 "Some metadata sources need an API key. Adding one here improves cover "
 "quality and unblocks rate-limited services. Keys are stored once for the "
 "whole instance — admins only."
-msgstr "部分元数据来源需要 API 密钥。在此添加密钥可提高封面质量，并解除服务的请求频率限制。密钥由整个实例共用，仅管理员可设置。"
+msgstr ""
+"部分元数据来源需要 API 密钥。在此添加密钥可提高封面质量，并解除服务的请求频率"
+"限制。密钥由整个实例共用，仅管理员可设置。"
 
 #: cps/templates/cover_picker.html
 msgid "Show how each cover would look on your e-reader"
@@ -14453,14 +14776,19 @@ msgid ""
 "what you see in Calibre-Web. It is the library-wide version of the on-edit "
 "NextGen Automatic Cover & Metadata Enforcement Service toggled in CWA "
 "Settings."
-msgstr "此服务会重写书库中每本电子书文件内部的封面和元数据，使磁盘文件始终与 Calibre-Web 中显示的内容一致。它是 CWA 设置中“编辑时自动执行”的 NextGen 自动封面与元数据写入服务的全书库版本。"
+msgstr ""
+"此服务会重写书库中每本电子书文件内部的封面和元数据，使磁盘文件始终与 Calibre-"
+"Web 中显示的内容一致。它是 CWA 设置中“编辑时自动执行”的 NextGen 自动封面与元"
+"数据写入服务的全书库版本。"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
 "Upon loading this page, if you have previously started a run of the NextGen "
 "Cover & Metadata Enforcement service either here in the Web UI or through "
 "the CLI, you will see the output of the most recent previous run below."
-msgstr "加载本页时，如果您之前曾在网页界面或命令行中运行过 NextGen 封面与元数据写入服务，下方会显示最近一次运行的输出。"
+msgstr ""
+"加载本页时，如果您之前曾在网页界面或命令行中运行过 NextGen 封面与元数据写入服"
+"务，下方会显示最近一次运行的输出。"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
@@ -14468,7 +14796,9 @@ msgid ""
 "want to check on the run's progress. If you wish to cancel a run that is "
 "still in progress, simply press the Cancel button above and the run will "
 "terminate ASAP."
-msgstr "开始运行后，您可以离开本页，随时返回查看进度。如果想取消正在进行的运行，请点击上方“取消”按钮，运行将尽快终止。"
+msgstr ""
+"开始运行后，您可以离开本页，随时返回查看进度。如果想取消正在进行的运行，请点"
+"击上方“取消”按钮，运行将尽快终止。"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Bulk Processing"
@@ -14732,7 +15062,10 @@ msgid ""
 "converted to the target format specified below (epub by default) \n"
 "        <em>EXCEPT</em> those you have specifically told NextGen to ignore "
 "below."
-msgstr "默认开启。启用后，所有导入的书籍都会自动转换为下方指定的目标格式（默认为 epub），\n        <em>但不包括</em>您在下方明确指定让 NextGen 忽略的格式。"
+msgstr ""
+"默认开启。启用后，所有导入的书籍都会自动转换为下方指定的目标格式（默认为 "
+"epub），\n"
+"        <em>但不包括</em>您在下方明确指定让 NextGen 忽略的格式。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Automatic Cover & Metadata Enforcement Service"
@@ -14747,7 +15080,13 @@ msgid ""
 "        are only applied to what you see in the Web UI, not the ebook files "
 "themselves. This feature currently only supports files in EPUB \n"
 "        or AZW3 format."
-msgstr "默认开启。启用后，每当您在网页界面中编辑元数据和/或封面图片，NextGen 元数据写入服务\n        就会将更改写入电子书文件本身。在原版 CW 中或禁用此设置时，所做更改通常\n        只影响网页界面的显示，不会写入电子书文件。此功能目前仅支持 EPUB\n        或 AZW3 格式文件。"
+msgstr ""
+"默认开启。启用后，每当您在网页界面中编辑元数据和/或封面图片，NextGen 元数据写"
+"入服务\n"
+"        就会将更改写入电子书文件本身。在原版 CW 中或禁用此设置时，所做更改通"
+"常\n"
+"        只影响网页界面的显示，不会写入电子书文件。此功能目前仅支持 EPUB\n"
+"        或 AZW3 格式文件。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -14761,7 +15100,12 @@ msgid ""
 "particularly useful for users who frequently send EPUB files to their Kindle "
 "devices and have experienced issues with \n"
 "        file rejections or formatting problems."
-msgstr "启用后，NextGen 会检查并修复其处理的所有 EPUB 文件的编码等属性，以尽可能兼容\n        Amazon 的 Send-to-Kindle 服务。对于经常向 Kindle 发送 EPUB 文件，并曾遇到\n        文件被拒收或排版问题的用户，此功能尤为有用。"
+msgstr ""
+"启用后，NextGen 会检查并修复其处理的所有 EPUB 文件的编码等属性，以尽可能兼"
+"容\n"
+"        Amazon 的 Send-to-Kindle 服务。对于经常向 Kindle 发送 EPUB 文件，并曾"
+"遇到\n"
+"        文件被拒收或排版问题的用户，此功能尤为有用。"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -14782,7 +15126,9 @@ msgid ""
 "When enabled, NextGen exposes the /kosync endpoints and stores KOReader-"
 "compatible checksums in metadata.db for progress syncing. Requires the "
 "KOReader plugin on your device."
-msgstr "启用后，NextGen 会开放 /kosync 端点，并在 metadata.db 中存储兼容 KOReader 的校验和，用于同步阅读进度。需要在设备上安装 KOReader 插件。"
+msgstr ""
+"启用后，NextGen 会开放 /kosync 端点，并在 metadata.db 中存储兼容 KOReader 的"
+"校验和，用于同步阅读进度。需要在设备上安装 KOReader 插件。"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -14820,7 +15166,13 @@ msgid ""
 "already-correct file. Zip-based archives (.cbz) only; .cbr/.cb7/.cbt are not "
 "zip containers and are left as-is. Your original download is never modified, "
 "only the copy that gets imported."
-msgstr "ComicInfo.xml 标准要求该文件位于压缩包根目录；comicapi 及我们已知的其他阅读器也只会在那里查找。有些 .cbz 资源却将其放在下一层文件夹中，导致书名、丛书、作者和出版社无法识别。启用后，导入流程会先重写压缩包副本，将放错位置的 ComicInfo.xml 移至根目录，再导入；文件已位于正确位置时不会改动。仅支持 ZIP 格式的压缩包（.cbz）；.cbr、.cb7 和 .cbt 不是 ZIP 容器，会保持原样。原始下载文件不会被修改，只修改用于导入的副本。"
+msgstr ""
+"ComicInfo.xml 标准要求该文件位于压缩包根目录；comicapi 及我们已知的其他阅读器"
+"也只会在那里查找。有些 .cbz 资源却将其放在下一层文件夹中，导致书名、丛书、作"
+"者和出版社无法识别。启用后，导入流程会先重写压缩包副本，将放错位置的 "
+"ComicInfo.xml 移至根目录，再导入；文件已位于正确位置时不会改动。仅支持 ZIP 格"
+"式的压缩包（.cbz）；.cbr、.cb7 和 .cbt 不是 ZIP 容器，会保持原样。原始下载文"
+"件不会被修改，只修改用于导入的副本。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Archived Book Cleanup"
@@ -14949,7 +15301,10 @@ msgid ""
 "(title, author, description, cover, etc.) for newly ingested books using the "
 "configured metadata provider hierarchy. This helps improve the quality of "
 "book information, especially for books with poor or missing metadata."
-msgstr "启用后，NextGen 会按配置的元数据提供商优先级，自动尝试为新导入的书籍获取并应用元数据（书名、作者、简介、封面等）。这有助于改善书籍信息，尤其适用于元数据质量较差或缺失的书籍。"
+msgstr ""
+"启用后，NextGen 会按配置的元数据提供商优先级，自动尝试为新导入的书籍获取并应"
+"用元数据（书名、作者、简介、封面等）。这有助于改善书籍信息，尤其适用于元数据"
+"质量较差或缺失的书籍。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Smart Metadata Application"
@@ -15160,7 +15515,9 @@ msgid ""
 "Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync "
 "separately in Basic Configuration when you want reading-progress or "
 "annotation sync."
-msgstr "Hardcover 同步和自动获取均已关闭。如需同步阅读进度或批注，请在“基本配置”中单独启用 Hardcover 同步。"
+msgstr ""
+"Hardcover 同步和自动获取均已关闭。如需同步阅读进度或批注，请在“基本配置”中单"
+"独启用 Hardcover 同步。"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15243,7 +15600,9 @@ msgid ""
 "You can manually trigger the Hardcover auto-fetch task from the Admin panel "
 "at any time. Check the NextGen Stats page to see progress and review queued "
 "matches that need manual approval."
-msgstr "您可以随时从管理面板手动触发 Hardcover 自动获取任务。在 NextGen 统计页可查看进度，并审核等待人工批准的匹配项。"
+msgstr ""
+"您可以随时从管理面板手动触发 Hardcover 自动获取任务。在 NextGen 统计页可查看"
+"进度，并审核等待人工批准的匹配项。"
 
 #: cps/templates/cwa_settings.html
 msgid "Web UI Settings"
@@ -15269,13 +15628,18 @@ msgid ""
 "update itself from inside its container (nothing running inside a container "
 "can), so a small companion called Watchtower does it for you: it watches for "
 "a new image and swaps NextGen in safely, leaving your other containers alone."
-msgstr "新版本会定期发布，通常每周一次。Calibre-Web NextGen 无法从容器内部更新自身（任何在容器内运行的程序都无法做到），因此可以使用一个名为 Watchtower 的小工具代劳：它会检查新镜像并安全更新 NextGen，不影响其他容器。"
+msgstr ""
+"新版本会定期发布，通常每周一次。Calibre-Web NextGen 无法从容器内部更新自身"
+"（任何在容器内运行的程序都无法做到），因此可以使用一个名为 Watchtower 的小工"
+"具代劳：它会检查新镜像并安全更新 NextGen，不影响其他容器。"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
-msgstr "将这两个服务添加到 docker-compose 文件，然后运行“docker compose up -d”。此后即可自动保持更新，无需点击按钮。"
+msgstr ""
+"将这两个服务添加到 docker-compose 文件，然后运行“docker compose up -d”。此后"
+"即可自动保持更新，无需点击按钮。"
 
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html
 #: cps/templates/user_edit.html
@@ -15287,13 +15651,17 @@ msgid ""
 "The label means Watchtower only ever touches Calibre-Web NextGen. The 86400 "
 "interval checks once a day; \"cleanup\" removes the old image after each "
 "update."
-msgstr "该标签确保 Watchtower 只处理 Calibre-Web NextGen。86400 的间隔表示每天检查一次；“cleanup”会在每次更新后移除旧镜像。"
+msgstr ""
+"该标签确保 Watchtower 只处理 Calibre-Web NextGen。86400 的间隔表示每天检查一"
+"次；“cleanup”会在每次更新后移除旧镜像。"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Running under Podman instead? Native \"podman auto-update\" works too — a "
 "setup guide is coming once we have verified it against this image."
-msgstr "使用 Podman？原生的“podman auto-update”也可以使用；待我们验证其与此镜像的兼容性后，会提供配置指南。"
+msgstr ""
+"使用 Podman？原生的“podman auto-update”也可以使用；待我们验证其与此镜像的兼容"
+"性后，会提供配置指南。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Contribute Translations Notifications"
@@ -15371,7 +15739,9 @@ msgid ""
 "make zip archives of all the backed up converted, imported and failed files "
 "from that day. This helps keep the backup subdirectories organised and "
 "minimises disk space usage."
-msgstr "启用后，cwa-auto-zipper 服务会在每天午夜前，将当天备份的已转换、已导入和失败文件打包为 ZIP 归档。这有助于整理备份子目录并减少磁盘占用。"
+msgstr ""
+"启用后，cwa-auto-zipper 服务会在每天午夜前，将当天备份的已转换、已导入和失败"
+"文件打包为 ZIP 归档。这有助于整理备份子目录并减少磁盘占用。"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Conversion Target Format - EPUB by Default"
@@ -15395,7 +15765,9 @@ msgid ""
 "Note: NextGen's Metadata Enforcement service can currently only support file "
 "in either EPUB and AZW3 format. Files in other formats will simply be "
 "ignored by the service"
-msgstr "注意：NextGen 元数据写入服务目前仅支持 EPUB 和 AZW3 格式，其他格式的文件会被忽略"
+msgstr ""
+"注意：NextGen 元数据写入服务目前仅支持 EPUB 和 AZW3 格式，其他格式的文件会被"
+"忽略"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Convert - Ignored Formats"
@@ -15417,7 +15789,9 @@ msgid ""
 "they have been converted to the target format. However, if the format is in "
 "the \"NextGen Auto-Ingest - Ignored Formats\" list, it will not be imported. "
 "Note that the target format is always retained."
-msgstr "此处选定的格式即使已转换为目标格式，也会保留并添加到书库。但是，如果该格式位于“NextGen 自动导入 — 忽略格式”列表中，则不会导入。目标格式始终会保留。"
+msgstr ""
+"此处选定的格式即使已转换为目标格式，也会保留并添加到书库。但是，如果该格式位"
+"于“NextGen 自动导入 — 忽略格式”列表中，则不会导入。目标格式始终会保留。"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Ingest Automerge"
@@ -15458,7 +15832,9 @@ msgid ""
 "The formats selected here will be ignored by NextGen's Auto-Ingest feature, "
 "meaning files in these formats won't be added to the library by NextGen "
 "during the ingest process"
-msgstr "NextGen 自动导入功能会忽略此处选定的格式，即导入过程中不会将这些格式的文件添加到书库"
+msgstr ""
+"NextGen 自动导入功能会忽略此处选定的格式，即导入过程中不会将这些格式的文件添"
+"加到书库"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Duplicate Detection System"
@@ -16226,7 +16602,10 @@ msgid ""
 "Sent over HTTPS to a server we run and saved as just your feedback — like "
 "unmarked mail. The network edge briefly sees your IP to stop spam; we only "
 "use a one-way hash of it for about a minute and never store it."
-msgstr "通过 HTTPS 发送到我们运营的服务器，只保存您的反馈，如同一封不署名的信。网络入口会短暂获取您的 IP 以防止垃圾信息；我们只使用其单向哈希值约一分钟，且从不存储该 IP。"
+msgstr ""
+"通过 HTTPS 发送到我们运营的服务器，只保存您的反馈，如同一封不署名的信。网络入"
+"口会短暂获取您的 IP 以防止垃圾信息；我们只使用其单向哈希值约一分钟，且从不存"
+"储该 IP。"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
@@ -16412,13 +16791,17 @@ msgid ""
 "CWA now uses a duplicate index to keep duplicate checks fast during imports "
 "and metadata changes. Before incremental scans can run, the index needs an "
 "initial baseline."
-msgstr "CWA 现在使用重复书籍索引，以便在导入和元数据变更时快速检查重复项。在运行增量扫描之前，需要先建立索引基准。"
+msgstr ""
+"CWA 现在使用重复书籍索引，以便在导入和元数据变更时快速检查重复项。在运行增量"
+"扫描之前，需要先建立索引基准。"
 
 #: cps/templates/duplicates.html
 msgid ""
 "Click \"Run Full Duplicate Scan\" to build it. This may take several minutes "
 "on large libraries, and you can keep using CWA while it runs."
-msgstr "点击“运行完整重复书籍扫描”即可建立索引。大型书库可能需要几分钟，扫描期间您可以继续使用 CWA。"
+msgstr ""
+"点击“运行完整重复书籍扫描”即可建立索引。大型书库可能需要几分钟，扫描期间您可"
+"以继续使用 CWA。"
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scan is running."
@@ -16600,7 +16983,9 @@ msgstr "SMTP 密码"
 msgid ""
 "Message included with books sent to an eReader and in test emails. Sent as "
 "plain text, in any language. Leave blank to use the default."
-msgstr "随发送到电子阅读器的书籍以及测试邮件一同发送的消息。以纯文本发送，支持任意语言。留空使用默认内容。"
+msgstr ""
+"随发送到电子阅读器的书籍以及测试邮件一同发送的消息。以纯文本发送，支持任意语"
+"言。留空使用默认内容。"
 
 #: cps/templates/email_edit.html
 msgid "Attachment Size Limit"
@@ -16863,7 +17248,8 @@ msgstr "将 %(title)s 加入我的书库"
 msgid ""
 "Upload this user's KoboReader.sqlite to find device books whose UUID no "
 "longer exists in this library."
-msgstr "上传此用户的 KoboReader.sqlite，以查找设备上 UUID 已不在本书库中的书籍。"
+msgstr ""
+"上传此用户的 KoboReader.sqlite，以查找设备上 UUID 已不在本书库中的书籍。"
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -16876,19 +17262,24 @@ msgid ""
 "No genuine Kobo Store purchase was available for validation. Kobo Store "
 "books may appear in the preview, and the evidence shown is not proof that "
 "this server delivered a book."
-msgstr "验证时未能使用真实购买的 Kobo 商店书籍。Kobo 商店书籍可能出现在预览中，所显示的依据也不能证明某本书由此服务器发送。"
+msgstr ""
+"验证时未能使用真实购买的 Kobo 商店书籍。Kobo 商店书籍可能出现在预览中，所显示"
+"的依据也不能证明某本书由此服务器发送。"
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Select only books you know came from this server. Selecting a book schedules "
 "its device copy for archival on the next sync."
-msgstr "请只选择您确认来自此服务器的书籍。选择后，其设备副本将在下次同步时归档。"
+msgstr ""
+"请只选择您确认来自此服务器的书籍。选择后，其设备副本将在下次同步时归档。"
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Recorded sync means this server retained a UUID-bearing delivery record. No "
 "does not prove the book was never delivered by an older version."
-msgstr "“有同步记录”表示此服务器保留了带 UUID 的发送记录。“否”不能证明旧版本从未发送过该书。"
+msgstr ""
+"“有同步记录”表示此服务器保留了带 UUID 的发送记录。“否”不能证明旧版本从未发送"
+"过该书。"
 
 #: cps/templates/kobo_reconcile.html
 msgid "The uploaded database is deleted as soon as the preview is built."
@@ -17204,7 +17595,9 @@ msgstr "忘记密码？"
 msgid ""
 "Log in with Magic\n"
 "      Link"
-msgstr "通过免密\n      链接登录"
+msgstr ""
+"通过免密\n"
+"      链接登录"
 
 #: cps/templates/login.html
 msgid "Log in with SSO"
@@ -17327,7 +17720,9 @@ msgid ""
 "Deleting this book also tries to archive its copy on paired Kobo devices the "
 "next time they sync. If that update cannot be recorded, the book may remain "
 "on a device."
-msgstr "删除此书时，还会尝试在已配对的 Kobo 设备下次同步时归档其副本。如果无法记录该更新，书籍可能仍保留在设备上。"
+msgstr ""
+"删除此书时，还会尝试在已配对的 Kobo 设备下次同步时归档其副本。如果无法记录该"
+"更新，书籍可能仍保留在设备上。"
 
 #: cps/templates/modal_dialogs.html
 msgid "It disappears from every member's library and e-reader."
@@ -17868,7 +18263,9 @@ msgid ""
 "Updating pulls the new image and recreates the container. It is quick, and "
 "your library, settings and reading progress are safe — they live in your "
 "mounted volumes, not in the container."
-msgstr "更新会拉取新镜像并重建容器，过程很快。您的书库、设置和阅读进度保存在挂载卷中，而非容器内，因此不会丢失。"
+msgstr ""
+"更新会拉取新镜像并重建容器，过程很快。您的书库、设置和阅读进度保存在挂载卷"
+"中，而非容器内，因此不会丢失。"
 
 #: cps/templates/update_now_modal.html
 msgid "How do you run Calibre-Web NextGen?"
@@ -17912,7 +18309,9 @@ msgstr "拉取新镜像，然后使用与最初启动时相同的选项重建容
 msgid ""
 "Then stop and remove the old container and start a new one with your usual "
 "docker run command. Your mounted volumes keep all data."
-msgstr "然后停止并移除旧容器，使用您惯用的 docker run 命令启动新容器。挂载卷会保留所有数据。"
+msgstr ""
+"然后停止并移除旧容器，使用您惯用的 docker run 命令启动新容器。挂载卷会保留所"
+"有数据。"
 
 #: cps/templates/update_now_modal.html
 msgid "Open the Docker tab in the Unraid web UI."
@@ -17922,13 +18321,17 @@ msgstr "在 Unraid 网页界面中打开 Docker 分页。"
 msgid ""
 "Click the Calibre-Web NextGen container icon and choose Force update (check "
 "for updates first if you want to see what changed)."
-msgstr "点击 Calibre-Web NextGen 容器图标，选择“Force update”（强制更新；如需查看变更，可先检查更新）。"
+msgstr ""
+"点击 Calibre-Web NextGen 容器图标，选择“Force update”（强制更新；如需查看变"
+"更，可先检查更新）。"
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "For hands-off updates, install the \"CA Auto Update Applications\" plugin "
 "from Community Applications."
-msgstr "如需自动更新，请从 Community Applications 安装“CA Auto Update Applications”插件。"
+msgstr ""
+"如需自动更新，请从 Community Applications 安装“CA Auto Update Applications”插"
+"件。"
 
 #: cps/templates/update_now_modal.html
 msgid "Portainer:"
@@ -17938,7 +18341,9 @@ msgstr "Portainer："
 msgid ""
 "Images → pull the image below, then Containers → select Calibre-Web NextGen "
 "→ Recreate with \"Re-pull image\" enabled."
-msgstr "进入 Images，拉取下方镜像；然后进入 Containers，选择 Calibre-Web NextGen，点击 Recreate，并启用“Re-pull image”。"
+msgstr ""
+"进入 Images，拉取下方镜像；然后进入 Containers，选择 Calibre-Web NextGen，点"
+"击 Recreate，并启用“Re-pull image”。"
 
 #: cps/templates/update_now_modal.html
 msgid "Synology Container Manager:"
@@ -17948,7 +18353,9 @@ msgstr "Synology Container Manager："
 msgid ""
 "Registry → download the image below (tag: latest), then stop the container → "
 "Action → Reset to recreate it."
-msgstr "进入 Registry，下载下方镜像（标签：latest）；然后停止容器，选择 Action → Reset 以重建容器。"
+msgstr ""
+"进入 Registry，下载下方镜像（标签：latest）；然后停止容器，选择 Action → "
+"Reset 以重建容器。"
 
 #: cps/templates/update_now_modal.html
 msgid "Set up automatic updates"
@@ -18086,7 +18493,9 @@ msgstr "重新发送"
 msgid ""
 "Clears the sync record for one book so the device re-downloads it on next "
 "sync. Find the book ID in the book detail page URL."
-msgstr "清除单本书的同步记录，使设备在下次同步时重新下载。书籍 ID 可在书籍详情页的网址中找到。"
+msgstr ""
+"清除单本书的同步记录，使设备在下次同步时重新下载。书籍 ID 可在书籍详情页的网"
+"址中找到。"
 
 #: cps/templates/user_edit.html
 msgid "Reconcile books deleted before Kobo archival tracking"
@@ -18096,7 +18505,9 @@ msgstr "核对启用 Kobo 归档跟踪之前已删除的书籍"
 msgid ""
 "Upload this user's KoboReader.sqlite, then select only books you know this "
 "server delivered and that are no longer in the library."
-msgstr "上传此用户的 KoboReader.sqlite，然后只选择您确认由此服务器发送、且已不在书库中的书籍。"
+msgstr ""
+"上传此用户的 KoboReader.sqlite，然后只选择您确认由此服务器发送、且已不在书库"
+"中的书籍。"
 
 #: cps/templates/user_edit.html
 msgid "Sync only books in selected shelves with Kobo"
@@ -18106,14 +18517,18 @@ msgstr "仅同步所选书架中的书籍到 Kobo"
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
 "shelf and enable its Kobo sync mark. Uncheck this to sync your whole library."
-msgstr "新账户仅同步选定书架。如果没有收到书籍，请将书籍添加到书架，并开启该书架的 Kobo 同步标记。取消勾选此项可同步整个书库。"
+msgstr ""
+"新账户仅同步选定书架。如果没有收到书籍，请将书籍添加到书架，并开启该书架的 "
+"Kobo 同步标记。取消勾选此项可同步整个书库。"
 
 #: cps/templates/user_edit.html
 msgid ""
 "Defaults off. Stage 0 only captures recovery evidence and does not change "
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
-msgstr "默认关闭。阶段 0 仅收集恢复依据，不会更改返回给 Kobo 的批注。管理员还必须单独开启实例级选项。"
+msgstr ""
+"默认关闭。阶段 0 仅收集恢复依据，不会更改返回给 Kobo 的批注。管理员还必须单独"
+"开启实例级选项。"
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
@@ -18262,7 +18677,10 @@ msgid ""
 "HTTP Basic auth. Create an app password here, label it for the device "
 "that'll use it, and copy the token shown after creation. You can revoke any "
 "app password at any time without affecting your active web session."
-msgstr "OPDS 阅读器和 KOReader 无法通过您的身份提供商（IdP）登录，只支持 HTTP 基本身份验证。请在此创建应用专用密码，以使用它的设备命名，并复制创建后显示的令牌。您可以随时撤销任一应用专用密码，不影响当前网页会话。"
+msgstr ""
+"OPDS 阅读器和 KOReader 无法通过您的身份提供商（IdP）登录，只支持 HTTP 基本身"
+"份验证。请在此创建应用专用密码，以使用它的设备命名，并复制创建后显示的令牌。"
+"您可以随时撤销任一应用专用密码，不影响当前网页会话。"
 
 #: cps/templates/user_edit.html
 msgid "New app password"

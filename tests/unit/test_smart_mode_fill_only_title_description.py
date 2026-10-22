@@ -16,7 +16,8 @@ def test_existing_title_kept_against_a_longer_one(monkeypatch):
     _patch_settings(monkeypatch, auto_metadata_smart_application=True)
     book = _Book()
     book.title = "Outgrowing God"
-    m._apply_metadata_to_book(book, _meta(title="SUMMARY: Outgrowing God (Unofficial Summary and Analysis)"), _FakeCDB())
+    changed = m._apply_metadata_to_book(book, _meta(title="SUMMARY: Outgrowing God (Unofficial Summary and Analysis)"), _FakeCDB())
+    assert changed is False
     assert book.title == "Outgrowing God"
 
 
@@ -32,7 +33,8 @@ def test_existing_description_kept_against_a_longer_one(monkeypatch):
     _patch_settings(monkeypatch, auto_metadata_smart_application=True)
     book = _Book()
     book.comments = _List([_Comment("The real blurb.")])
-    m._apply_metadata_to_book(book, _meta(description="Disclaimer: this is an unofficial summary. " * 5), _FakeCDB())
+    changed = m._apply_metadata_to_book(book, _meta(description="Disclaimer: this is an unofficial summary. " * 5), _FakeCDB())
+    assert changed is False
     assert book.comments[0].text == "The real blurb."
 
 
@@ -50,3 +52,19 @@ def test_blank_description_is_filled(monkeypatch):
     book.comments = _List([_Comment("  \n")])
     m._apply_metadata_to_book(book, _meta(description="The real blurb."), _FakeCDB())
     assert book.comments[0].text == "The real blurb."
+
+
+def test_markup_only_description_is_filled(monkeypatch):
+    _patch_settings(monkeypatch, auto_metadata_smart_application=True)
+    book = _Book()
+    book.comments = _List([_Comment("<div><p>&nbsp;</p></div>")])
+    m._apply_metadata_to_book(book, _meta(description="The real blurb."), _FakeCDB())
+    assert book.comments[0].text == "The real blurb."
+
+
+def test_description_with_text_in_markup_is_kept(monkeypatch):
+    _patch_settings(monkeypatch, auto_metadata_smart_application=True)
+    book = _Book()
+    book.comments = _List([_Comment("<p>The real blurb.</p>")])
+    m._apply_metadata_to_book(book, _meta(description="A much longer unofficial summary blurb."), _FakeCDB())
+    assert book.comments[0].text == "<p>The real blurb.</p>"

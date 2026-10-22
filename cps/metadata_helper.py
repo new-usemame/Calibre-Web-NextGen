@@ -210,7 +210,7 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             # Smart mode only fills a missing description, for the same reason as
             # the title: the longer text is often a summary's disclaimer.
             if use_smart_application:
-                if not (current_description or "").strip():
+                if not _has_meaningful_description(current_description):
                     if book.comments:
                         book.comments[0].text = metadata.description.strip()
                     else:
@@ -777,6 +777,14 @@ def _has_meaningful_title(book):
     """True if the book has a title other than empty or Calibre's 'Unknown'."""
     title = (getattr(book, "title", "") or "").strip().lower()
     return title not in ("", "unknown")
+
+
+def _has_meaningful_description(text):
+    """True if the description has visible text. Markup with no text in it
+    (``<p></p>``, ``&nbsp;``) counts as missing, so smart mode can fill it."""
+    visible = re.sub(r"<[^>]*>", " ", text or "")
+    visible = re.sub(r"&nbsp;|&#160;|\u00a0", " ", visible)
+    return bool(visible.strip())
 
 
 def _has_meaningful_authors(book):

@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.52] - 2026-10-22
+
+### Fixed
+
+- **A Kobo that downloads a book now opens at the place you were reading in the web reader.** Before, a book downloaded (or re-downloaded) to a Kobo opened at the cover showing 1%, and stayed there until the web reader saved a new position, even though the Kobo had already synced that place. After a Kobo finishes downloading the book as a KEPUB, the next sync sends the shared place once, if Share my place is on for that Kobo and the Kobo has no newer place of its own. Reported by @sgreadly (#2688).
+
+- **A failed highlight or note save in the web reader can be retried.** Before, when saving a new highlight or note failed, the reader said nothing and cleared the selection, so a typed note was lost. Now it says the save failed and keeps the selection and the note, and saving again sends the same highlight. Thanks @jay23606 (#2550, #2554).
+
+- **Smart metadata mode no longer replaces an existing title or description with a longer one.** It only fills a title or description that is missing (empty, or Calibre's "Unknown" for the title), the way it already treated series, publisher, date, rating and cover. A summary or study guide's title and blurb are nearly always longer than the real book's, so "longer wins" put another product's metadata on the book. The setting's description on the settings page now says what smart mode does. Thanks to @splitsec2 (#2669).
+
 ## [v4.1.51] - 2026-10-21
 
 ### Changed

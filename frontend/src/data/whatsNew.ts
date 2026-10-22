@@ -56,6 +56,27 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.52',
+    date: '2026-10-22',
+    items: [
+      {
+        title: 'A book downloaded to your Kobo opens where you left off',
+        body: 'A book downloaded or re-downloaded to a Kobo used to open at the cover, showing 1%, even when you had read further in the web reader. Once the Kobo finishes downloading it, the next sync now sends your place, as long as Share my place is on for that Kobo and it has no newer place of its own.',
+        category: 'Sync',
+      },
+      {
+        title: 'A highlight or note that fails to save can be saved again',
+        body: 'When saving a new highlight or note failed, the web reader said nothing and cleared your selection, so a typed note was lost. It now tells you the save failed and keeps the selection and the note, so you can try again.',
+        category: 'Reading',
+      },
+      {
+        title: 'Smart metadata mode keeps your title and description',
+        body: 'Smart mode used to replace a title or description with a longer one from a metadata source, which often put a summary or study guide\'s details on the real book. It now only fills a title or description that is missing, the same way it already treats series, publisher, date, rating and cover.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
     version: 'v4.1.51',
     date: '2026-10-21',
     items: [

@@ -1246,9 +1246,9 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2606@2026-10-17T08:33:10Z": {
-  "hash": "9b89269b3a1a830a",
+  "hash": "42877a9fdc51cc67",
   "verdict": "fixed",
-  "quote": "Hi! Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
+  "quote": "Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2606#issuecomment-6250731100",
   "by": "deepseek-v4.1-flash"
  },
@@ -1257,6 +1257,13 @@
   "verdict": "partial",
   "quote": "Just tried the web reader again, and sure enough, it opened to the cover. The checkbox is set for that.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2647#issuecomment-6267096452",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2673@2026-10-20T16:18:06Z": {
+  "hash": "c8e6583e3471fa99",
+  "verdict": "fixed",
+  "quote": "Yep looks good. Logs only display in DEBUG",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2673#issuecomment-6313775324",
   "by": "deepseek-v4.1-flash"
  },
  "issue#276@2026-05-21T20:53:22Z": {
@@ -1405,6 +1412,13 @@
   "quote": "it isn't really synchronizing the positions",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-5184010179",
   "by": "deepseek-v4.1-flash"
+ },
+ "issue#324@2026-09-24T04:46:25Z": {
+  "hash": "64dbe44f2aa4439e",
+  "verdict": "fixed",
+  "quote": "Confirmed on v4.1.50: web reader to Kobo now seeks to the exact place, and Kobo to web reader opens at the exact page.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-6312466818",
+  "by": "review"
  },
  "issue#331@2026-05-27T05:31:40Z": {
   "hash": "37e3645bd674d007",

@@ -9862,11 +9862,11 @@
   "delivered_via": [
    "PR #2280"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "Confirmed on v4.1.50: web reader to Kobo now seeks to the exact place, and Kobo to web reader opens at the exact page.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-6312466818",
+  "judged_by": "review",
   "id": "issue#324@2026-09-24T04:46:25Z"
  },
  {
@@ -11315,7 +11315,7 @@
   ],
   "outcome": "happy",
   "basis": "reply: fixed",
-  "quote": "Hi! Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
+  "quote": "Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2606#issuecomment-6250731100",
   "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2606@2026-10-17T08:33:10Z"
@@ -11570,11 +11570,11 @@
   "delivered_via": [
    "PR #2675"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "Yep looks good. Logs only display in DEBUG",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2673#issuecomment-6313775324",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2673@2026-10-20T16:18:06Z"
  },
  {
@@ -11609,6 +11609,22 @@
  },
  {
   "date": "2026-10-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2688",
+  "title": "[bug] Kobo opens at the cover after a (re)download until the web reader saves a new position",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2690",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2688@2026-10-21T16:29:24Z"
+ },
+ {
+  "date": "2026-10-21",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2672",
   "title": "Store a blank user email as NULL so more than one account can omit it (#2153)",
   "person": "sgreadly",
@@ -11621,5 +11637,50 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2672@2026-10-21T01:41:14Z"
+ },
+ {
+  "date": "2026-10-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2689",
+  "title": "Re-send the shared place to a Kobo once its download is proven (#2688)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2689@2026-10-21T16:29:52Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2554",
+  "title": "fix(reader): keep failed annotation creates retryable",
+  "person": "jay23606",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2554@2026-10-22T00:36:18Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2669",
+  "title": "Smart metadata mode only fills a missing title or description, never a longer one over an existing one",
+  "person": "splitsec2",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2669@2026-10-22T04:38:07Z"
  }
 ]

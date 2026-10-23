@@ -56,6 +56,27 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.53',
+    date: '2026-10-23',
+    items: [
+      {
+        title: 'Automatic metadata fetch fills in a missing series',
+        body: 'When the source that matched a book has no series, a few of the series sources in your provider order are asked next, and only the series and its number are taken from a result that is the same book. Another source\'s spelling of a series you already have, such as "Dune Chronicles", now joins your existing "Dune" instead of starting a second series, and numbers such as 24.5 are no longer rounded down.',
+        category: 'Library',
+      },
+      {
+        title: 'Books with non-ASCII filenames upload again',
+        body: 'A file named only in Chinese, Cyrillic or another non-Latin script, such as 龙蛋.epub, was reported as queued and then dropped before import. It now imports normally.',
+        category: 'Library',
+      },
+      {
+        title: 'Long series names wrap on book cards',
+        body: 'A series name too long for one line under a book now takes up to two lines before it is shortened, with the series number still visible. Cards in a row stay aligned.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
     version: 'v4.1.52',
     date: '2026-10-22',
     items: [

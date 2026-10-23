@@ -1,5 +1,0 @@
-### Fixed
-
-- **Automatic metadata fetch fills in a missing series from another source.** When the source that matched a book gives no series (Google Books, Open Library and IBDb never do), up to three of the series sources in your provider order are asked next, then Hardcover and Kobo if your order leaves them out, and only the series and position are taken from a result that is the same book. Amazon, Goodreads and the other page scrapers are asked only when you put them in the order.
-- **A source's other spelling of a series you already have no longer creates a second series.** "Dune Chronicles" or "Red Rising Saga" join the library's "Dune" and "Red Rising". Names with two different notes, such as "Star Wars (Legends)" and "Star Wars (Canon)", stay separate.
-- **Series positions such as 24.5 are no longer rounded down** from Kobo and Amazon, and Goodreads books whose page only names the series in the title, as in "Cross Kill (Alex Cross, #23.5)", now get that series. The "(Series, #N)" suffix is no longer kept in the Goodreads title.

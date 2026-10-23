@@ -2559,19 +2559,19 @@ msgid "Invalid series specified"
 msgstr "السلسلة المحددة غير صالحة"
 
 #: cps/shelf.py
-#, fuzzy, python-format
+#, python-format
 msgid "Series has no books you can see: %(name)s"
-msgstr "تعذر إضافة الكتب إلى الرف: %(sname)s"
+msgstr "لا تحتوي السلسلة على كتب يمكنك رؤيتها: %(name)s"
 
 #: cps/shelf.py
-#, fuzzy, python-format
+#, python-format
 msgid "All books of series '%(name)s' are already on shelf: %(sname)s"
-msgstr "الكتب جزء بالفعل من الرف: %(name)s"
+msgstr "جميع كتب السلسلة %(name)s موجودة بالفعل على الرف: %(sname)s"
 
 #: cps/shelf.py
-#, fuzzy, python-format
+#, python-format
 msgid "%(count)d books of series '%(name)s' added to shelf: %(sname)s"
-msgstr "تمت إضافة الكتب إلى الرف: %(sname)s"
+msgstr "تمت إضافة %(count)d من كتب السلسلة %(name)s إلى الرف: %(sname)s"
 
 #: cps/shelf.py
 #, python-format
@@ -2658,9 +2658,8 @@ msgid "Could not save order"
 msgstr ""
 
 #: cps/shelf.py cps/templates/layout.html
-#, fuzzy
 msgid "Reorder Shelves"
-msgstr "استبعاد الرفوف"
+msgstr "إعادة ترتيب الرفوف"
 
 #: cps/shelf.py
 msgid "Name (A → Z)"
@@ -11429,14 +11428,12 @@ msgid "Language: %(name)s"
 msgstr "اللغة: %(name)s"
 
 #: cps/web.py
-#, fuzzy
 msgid "Favorite Books"
-msgstr "الكتب الرائجة"
+msgstr "الكتب المفضلة"
 
 #: cps/templates/user_edit.html cps/web.py
-#, fuzzy
 msgid "Hidden Books"
-msgstr "كتاب مخفي"
+msgstr "الكتب المخفية"
 
 #: cps/web.py
 msgid "Error loading smart shelf"
@@ -11461,18 +11458,16 @@ msgid "No rules provided"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Invalid rules format"
-msgstr "تنسيق عنوان البريد الإلكتروني غير صالح"
+msgstr "تنسيق القواعد غير صالح"
 
 #: cps/web.py
 msgid "Error processing rules"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Invalid request"
-msgstr "دور غير صالح"
+msgstr "طلب غير صالح"
 
 #: cps/web.py
 msgid "Permission denied to share shelves"
@@ -11487,9 +11482,8 @@ msgid "Shelf name too long (max 100 characters)"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error creating shelf"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء إنشاء الرف"
 
 #: cps/web.py
 msgid "Only the shelf owner can change Kobo sync"
@@ -11500,28 +11494,24 @@ msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error updating shelf"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء تحديث الرف"
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf not found"
-msgstr "لم يتم العثور على المستخدم"
+msgstr "لم يتم العثور على الرف"
 
 #: cps/web.py
 msgid "Permission denied"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf duplicated successfully"
-msgstr "تم حذف {} مستخدم(ين) بنجاح"
+msgstr "تم نسخ الرف بنجاح"
 
 #: cps/web.py
-#, fuzzy
 msgid "Error duplicating shelf"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء نسخ الرف"
 
 #: cps/templates/magic_shelf_edit.html cps/web.py
 msgid ""
@@ -11530,9 +11520,8 @@ msgid ""
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error deleting shelf"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء حذف الرف"
 
 #: cps/api/magicshelves.py cps/web.py
 msgid ""
@@ -11544,18 +11533,16 @@ msgid "Shelf already hidden"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error hiding shelf"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء إخفاء الرف"
 
 #: cps/web.py
 msgid "Shelf was not hidden"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error unhiding shelf"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء إظهار الرف"
 
 #: cps/templates/admin.html cps/templates/cwa_stats_i18n.html cps/web.py
 msgid "Downloads"
@@ -11601,9 +11588,9 @@ msgid "Additional email addresses are disabled for your account."
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
-msgstr "نجاح! تم وضع الكتاب في قائمة الانتظار للإرسال إلى %(eReadermail)s"
+msgstr ""
+"تمت العملية بنجاح! أُضيف الكتاب إلى قائمة الإرسال إلى العناوين المحددة!"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -11632,18 +11619,18 @@ msgid "Success! Confirmation Email has been sent."
 msgstr "نجاح! تم إرسال بريد إلكتروني للتأكيد."
 
 #: cps/web.py
-#, fuzzy
 msgid ""
 "Authentication loop detected. If you're experiencing login issues, please "
 "contact your administrator."
-msgstr "مثيل Calibre-Web غير مهيأ، يرجى الاتصال بمسؤول النظام"
+msgstr ""
+"تم اكتشاف حلقة مصادقة متكررة. إذا كنت تواجه مشكلات في تسجيل الدخول، يرجى "
+"الاتصال بمسؤول النظام."
 
 #: cps/web.py
-#, fuzzy
 msgid ""
 "OAuth authentication is not properly configured. Please contact "
 "administrator."
-msgstr "عفوًا! خادم البريد الإلكتروني غير مهيأ، يرجى الاتصال بمسؤول النظام."
+msgstr "لم يتم إعداد مصادقة OAuth بشكل صحيح. يرجى الاتصال بمسؤول النظام."
 
 #: cps/web.py
 msgid "Cannot activate LDAP authentication"
@@ -11667,18 +11654,18 @@ msgid "you are now logged in as: '%(nickname)s'"
 msgstr "لقد قمت الآن بتسجيل الدخول باسم: '%(nickname)s'"
 
 #: cps/web.py
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Welcome! Your account has been automatically created. You are now logged in "
 "as: '%(nickname)s'"
-msgstr "تم بنجاح! أنت الآن مسجل الدخول باسم: %(nickname)s"
+msgstr ""
+"أهلًا بك! تم إنشاء حسابك تلقائيًا. تم تسجيل دخولك باسم: %(nickname)s"
 
 #: cps/web.py
-#, fuzzy
 msgid ""
 "Authentication successful, but account creation failed. Please contact your "
 "administrator."
-msgstr "مثيل Calibre-Web غير مهيأ، يرجى الاتصال بمسؤول النظام"
+msgstr "نجحت المصادقة، لكن تعذر إنشاء الحساب. يرجى الاتصال بمسؤول النظام."
 
 #: cps/web.py
 msgid ""
@@ -11744,9 +11731,8 @@ msgid "App password '%(label)s' revoked."
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Invalid book ID."
-msgstr "دور غير صالح"
+msgstr "معرّف الكتاب غير صالح."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
@@ -11851,23 +11837,20 @@ msgid "Auto-fetching Hardcover IDs"
 msgstr ""
 
 #: cps/tasks/auto_send.py
-#, fuzzy
 msgid "Preparing to send to eReader..."
-msgstr "%(book)s إرسال إلى القارئ الإلكتروني"
+msgstr "جارٍ التحضير للإرسال إلى القارئ الإلكتروني..."
 
 #: cps/tasks/auto_send.py
 msgid "Checking available formats..."
 msgstr ""
 
 #: cps/tasks/auto_send.py
-#, fuzzy
 msgid "Sending to eReader..."
-msgstr "إرسال إلى القارئ الإلكتروني"
+msgstr "جارٍ الإرسال إلى القارئ الإلكتروني..."
 
 #: cps/tasks/auto_send.py
-#, fuzzy
 msgid "Auto-send completed successfully"
-msgstr "تم حذف {} مستخدم(ين) بنجاح"
+msgstr "اكتمل الإرسال التلقائي بنجاح"
 
 #: cps/tasks/auto_send.py
 msgid "Auto-Send"
@@ -11930,9 +11913,8 @@ msgid "Clean archived book references"
 msgstr ""
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Duplicate scan"
-msgstr "حذف الكتاب"
+msgstr "فحص التكرارات"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Duplicate scan skipped: import in progress"
@@ -11952,19 +11934,16 @@ msgid "Building duplicate index: no books"
 msgstr ""
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Finding duplicate groups"
-msgstr "حذف الكتاب"
+msgstr "جارٍ البحث عن مجموعات التكرارات"
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Updating duplicate cache"
-msgstr "فك ضغط حزمة التحديث"
+msgstr "جارٍ تحديث ذاكرة التخزين المؤقت للتكرارات"
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Duplicate scan pending: manual scan required"
-msgstr "لم يتم العثور على نتائج"
+msgstr "فحص التكرارات معلّق: يلزم إجراء فحص يدوي"
 
 #: cps/tasks/duplicate_scan.py
 #, python-format
@@ -11986,9 +11965,8 @@ msgid "Syncing shelf additions to Hardcover"
 msgstr ""
 
 #: cps/tasks/hardcover_sync.py
-#, fuzzy
 msgid "Hardcover Sync"
-msgstr "تمكين مزامنة Kobo"
+msgstr "مزامنة Hardcover"
 
 #: cps/tasks/hardcover_sync.py
 msgid "Marking books read on Hardcover"
@@ -12072,9 +12050,8 @@ msgid "Convert Library – full run"
 msgstr ""
 
 #: cps/tasks/ops.py
-#, fuzzy
 msgid "Convert Library"
-msgstr "في المكتبة"
+msgstr "تحويل المكتبة"
 
 #: cps/tasks/ops.py
 msgid "EPUB Fixer – full run"
@@ -12105,43 +12082,36 @@ msgid "Clearing cover thumbnail cache"
 msgstr "مسح ذاكرة التخزين المؤقت لصور الغلاف المصغرة"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Book organizer"
-msgstr "الكتب منظمة في أرفف"
+msgstr "منظّم الكتب"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Change sort order"
-msgstr "تغيير كلمة المرور"
+msgstr "تغيير ترتيب الفرز"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Select multiple books"
-msgstr "إنشاء رف"
+msgstr "تحديد عدة كتب"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Display settings"
-msgstr "إعدادات الأمان"
+msgstr "إعدادات العرض"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Cover Settings"
-msgstr "الإعدادات"
+msgstr "إعدادات الغلاف"
 
 #: cps/templates/_book_organizer.html
 msgid "Hide shelf badges on covers"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Selection actions"
-msgstr "اختر خيارًا"
+msgstr "إجراءات التحديد"
 
 #: cps/templates/_book_organizer.html cps/templates/book_table.html
-#, fuzzy
 msgid "Add to Shelf"
-msgstr "إضافة إلى الرف"
+msgstr "إضافة إلى رف"
 
 #: cps/templates/_book_organizer.html cps/templates/detail.html
 #: cps/templates/feed.xml cps/templates/index.html cps/templates/layout.html
@@ -12159,19 +12129,16 @@ msgid "Downloads, fewest first"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Downloads, most first"
-msgstr "تنزيل"
+msgstr "التنزيلات، الأكثر أولًا"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Date added, newest first"
-msgstr "الفرز حسب تاريخ الكتاب، الأحدث أولاً"
+msgstr "تاريخ الإضافة، الأحدث أولًا"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Date added, oldest first"
-msgstr "الفرز حسب تاريخ الكتاب، الأقدم أولاً"
+msgstr "تاريخ الإضافة، الأقدم أولًا"
 
 #: cps/templates/_book_organizer.html
 msgid "Title A → Z"
@@ -12182,24 +12149,20 @@ msgid "Title Z → A"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Author A → Z"
-msgstr "المؤلف"
+msgstr "المؤلف من أ إلى ي"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Author Z → A"
-msgstr "المؤلف"
+msgstr "المؤلف من ي إلى أ"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Published, newest first"
-msgstr "نشر قبل "
+msgstr "تاريخ النشر، الأحدث أولًا"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Published, oldest first"
-msgstr "نشر قبل "
+msgstr "تاريخ النشر، الأقدم أولًا"
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, ascending"
@@ -12210,14 +12173,12 @@ msgid "Series number, descending"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Added to shelf, newest first"
-msgstr "الفرز حسب تاريخ إضافة الكتاب إلى الرف، الأحدث أولاً"
+msgstr "تاريخ الإضافة إلى الرف، الأحدث أولًا"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Added to shelf, oldest first"
-msgstr "الفرز حسب تاريخ إضافة الكتاب إلى الرف، الأقدم أولاً"
+msgstr "تاريخ الإضافة إلى الرف، الأقدم أولًا"
 
 #: cps/templates/admin.html
 msgid "Users&nbsp;&nbsp;👤"
@@ -12228,9 +12189,8 @@ msgid "Send to eReader Email"
 msgstr "إرسال إلى بريد قارئ الكتب الإلكترونية"
 
 #: cps/templates/admin.html cps/templates/user_edit.html
-#, fuzzy
 msgid "Send to eReader Subject"
-msgstr "إرسال إلى القارئ الإلكتروني"
+msgstr "موضوع رسالة الإرسال إلى القارئ الإلكتروني"
 
 #: cps/templates/admin.html
 msgid "View Books"
@@ -12249,9 +12209,8 @@ msgid "Import LDAP Users"
 msgstr "استيراد مستخدمي LDAP"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Email Server Settings&nbsp;&nbsp;📬"
-msgstr "إعدادات خادم البريد الإلكتروني"
+msgstr "إعدادات خادم البريد الإلكتروني&nbsp;&nbsp;📬"
 
 #: cps/templates/admin.html cps/templates/email_edit.html
 msgid "SMTP Hostname"
@@ -12342,9 +12301,8 @@ msgid "Manage reader fonts"
 msgstr ""
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Scheduled Tasks&nbsp;&nbsp;⌛"
-msgstr "المهام المجدولة"
+msgstr "المهام المجدولة&nbsp;&nbsp;⌛"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 #: cps/templates/tasks.html
@@ -12416,9 +12374,8 @@ msgid "Run Hardcover Auto-Fetch"
 msgstr ""
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Administration&nbsp;&nbsp;🚀"
-msgstr "الإدارة"
+msgstr "الإدارة&nbsp;&nbsp;🚀"
 
 #: cps/templates/admin.html
 msgid ""
@@ -12452,9 +12409,8 @@ msgid "Shutdown"
 msgstr "إيقاف التشغيل"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Version Information&nbsp;&nbsp;📜"
-msgstr "معلومات الإصدار"
+msgstr "معلومات الإصدار&nbsp;&nbsp;📜"
 
 #: cps/templates/admin.html
 msgid "Version"
@@ -12465,14 +12421,12 @@ msgid "Details"
 msgstr "التفاصيل"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Update available"
-msgstr "فشل التحديث:"
+msgstr "يتوفر تحديث"
 
 #: cps/templates/admin.html cps/templates/layout.html
-#, fuzzy
 msgid "Update now"
-msgstr "قناة التحديث"
+msgstr "التحديث الآن"
 
 #: cps/templates/admin.html
 msgid "Current Version"
@@ -12546,9 +12500,8 @@ msgid "different or undated device entries older than server state (skipped)"
 msgstr ""
 
 #: cps/templates/annotations_import.html
-#, fuzzy
 msgid "for books not in this library (skipped)"
-msgstr "الكتب في هذه المكتبة"
+msgstr "للكتب غير الموجودة في هذه المكتبة (تم تخطيها)"
 
 #: cps/templates/annotations_import.html
 msgid "hidden on device (reported, not applied)"
@@ -12580,14 +12533,12 @@ msgid "Uploading..."
 msgstr "جاري التحميل..."
 
 #: cps/templates/annotations_import.html
-#, fuzzy
 msgid "Import failed."
-msgstr "فشل التحديث:"
+msgstr "فشل الاستيراد."
 
 #: cps/templates/annotations_import.html
-#, fuzzy
 msgid "Network error."
-msgstr "خطأ في الاتصال"
+msgstr "خطأ في الشبكة."
 
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
@@ -12612,9 +12563,9 @@ msgid "Chapter progress: %(pct)d%%"
 msgstr ""
 
 #: cps/templates/annotations_view.html
-#, fuzzy, python-format
+#, python-format
 msgid "Source: %(s)s"
-msgstr "السلسلة: %(serie)s"
+msgstr "المصدر: %(s)s"
 
 #: cps/templates/annotations_view.html cps/templates/read.html
 msgid "No annotations on this book yet."
@@ -12675,9 +12626,8 @@ msgid "Upload Format"
 msgstr "تحميل التنسيق"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
-#, fuzzy
 msgid " Exchange author & title"
-msgstr "تبديل المؤلف والعنوان"
+msgstr " تبديل المؤلف والعنوان"
 
 #: cps/templates/book_edit.html cps/templates/book_table.html
 msgid "Series ID"
@@ -12721,9 +12671,8 @@ msgid "Upload Cover from Local Disk"
 msgstr "تحميل الغلاف من القرص المحلي"
 
 #: cps/templates/book_edit.html
-#, fuzzy
 msgid "Hardcover Sync Blacklist"
-msgstr "تمكين مزامنة Kobo"
+msgstr "استثناءات مزامنة Hardcover"
 
 #: cps/templates/book_edit.html
 msgid "Blacklist annotations from syncing to Hardcover"
@@ -12797,18 +12746,16 @@ msgid "This Field is Required"
 msgstr "هذا الحقل مطلوب"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Select all"
-msgstr "تحديد"
+msgstr "تحديد الكل"
 
 #: cps/templates/book_table.html
 msgid "Clear all"
 msgstr ""
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Update Title Sort automatically  "
-msgstr "تحديث ترتيب العنوان تلقائيًا"
+msgstr "تحديث فرز العنوان تلقائيًا  "
 
 #: cps/templates/book_table.html
 msgid "Update Author Sort automatically"
@@ -12867,14 +12814,12 @@ msgid "Comments"
 msgstr "التعليقات"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Archived?"
-msgstr "مؤرشف"
+msgstr "مؤرشف؟"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Read?"
-msgstr "قراءة"
+msgstr "مقروء؟"
 
 #: cps/templates/book_table.html
 msgid "Enter "
@@ -12930,9 +12875,8 @@ msgstr ""
 "بفواصل (مثل \"اسم1, اسم2\")."
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Select a Shelf"
-msgstr "إنشاء رف"
+msgstr "اختر رفًّا"
 
 #: cps/templates/book_table.html
 msgid "Please select a shelf to add the selected books to:"
@@ -12943,10 +12887,10 @@ msgid "-- Select a Shelf --"
 msgstr ""
 
 #: cps/templates/broadcast_email.html
-#, fuzzy
 msgid ""
 "The email server is not configured yet, so announcements cannot be sent."
-msgstr "عفوًا! خادم البريد الإلكتروني غير مهيأ، يرجى الاتصال بمسؤول النظام."
+msgstr ""
+"لم يتم إعداد خادم البريد الإلكتروني بعد، لذلك لا يمكن إرسال الإعلانات."
 
 #: cps/templates/broadcast_email.html
 msgid ""
@@ -12981,9 +12925,8 @@ msgid "Recipients"
 msgstr ""
 
 #: cps/templates/broadcast_email.html
-#, fuzzy
 msgid "Select all users with an email address"
-msgstr "تم إرسال كلمة مرور جديدة إلى عنوان بريدك الإلكتروني"
+msgstr "تحديد جميع المستخدمين الذين لديهم عنوان بريد إلكتروني"
 
 #: cps/templates/broadcast_email.html
 msgid "No users have an email address set, so there is no one to send to yet."
@@ -12994,9 +12937,8 @@ msgid "Send announcement"
 msgstr ""
 
 #: cps/templates/broadcast_email.html
-#, fuzzy
 msgid "Send test to me"
-msgstr "إرسال إلى القارئ الإلكتروني"
+msgstr "إرسال رسالة تجريبية إليّ"
 
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
@@ -13101,9 +13043,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Location of Calibre Database (metadata.db file)"
-msgstr "موقع قاعدة بيانات Calibre"
+msgstr "موقع قاعدة بيانات Calibre (ملف metadata.db)"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -13181,9 +13122,8 @@ msgid "Revoke"
 msgstr "إلغاء"
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Last Resort: Restore Calibre Database (experimental)"
-msgstr "إعادة الاتصال بقاعدة بيانات Calibre"
+msgstr "الملاذ الأخير: استعادة قاعدة بيانات Calibre (تجريبي)"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -13205,14 +13145,12 @@ msgid "A restore log will be saved alongside the backups."
 msgstr ""
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Are you sure? This cannot be undone."
-msgstr "هل أنت متأكد أنك تريد إيقاف التشغيل؟"
+msgstr "هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء."
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Restore Calibre Database (Last Resort)"
-msgstr "إعادة الاتصال بقاعدة بيانات Calibre"
+msgstr "استعادة قاعدة بيانات Calibre (الملاذ الأخير)"
 
 #: cps/templates/config_db.html
 msgid "New db location is invalid, please enter valid path"
@@ -13280,9 +13218,8 @@ msgid "Logfile Configuration"
 msgstr "تهيئة ملف السجل"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Location and name of logfile (/dev/stdout for no entry)"
-msgstr "موقع واسم ملف سجل الوصول (access.log لعدم وجود إدخال)"
+msgstr "موقع واسم ملف السجل (/dev/stdout لعدم وجود إدخال)"
 
 #: cps/templates/config_edit.html
 msgid "Enable Access Log"
@@ -13546,9 +13483,8 @@ msgid "Goodreads API Key"
 msgstr "مفتاح API لـ Goodreads"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Enable Hardcover Sync"
-msgstr "تمكين مزامنة Kobo"
+msgstr "تفعيل مزامنة Hardcover"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13592,9 +13528,8 @@ msgid "Token status: valid."
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Token status: rejected or expired."
-msgstr "انتهت صلاحية الرمز"
+msgstr "حالة الرمز: مرفوض أو منتهي الصلاحية."
 
 #: cps/templates/config_edit.html
 msgid "Token status: present; validation is temporarily unavailable."
@@ -13605,9 +13540,8 @@ msgid "Expiry: not provided by this token."
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Google Books API Key"
-msgstr "مفتاح API لـ Goodreads"
+msgstr "مفتاح واجهة برمجة تطبيقات Google Books"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13782,9 +13716,8 @@ msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Test Metadata"
-msgstr "جلب البيانات الوصفية"
+msgstr "اختبار البيانات الوصفية"
 
 #: cps/templates/config_edit.html
 msgid "Leave empty to use manual configuration below"
@@ -13801,9 +13734,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Manual Endpoint Configuration"
-msgstr "تحرير تهيئة واجهة المستخدم"
+msgstr "الإعداد اليدوي لنقاط النهاية"
 
 #: cps/templates/config_edit.html
 msgid "OAuth Base URL"
@@ -13814,23 +13746,20 @@ msgid "Authorization Endpoint"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Token Endpoint"
-msgstr "لم يتم العثور على الرمز"
+msgstr "نقطة نهاية الرمز"
 
 #: cps/templates/config_edit.html
 msgid "UserInfo Endpoint"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Test Connection"
-msgstr "خطأ في الاتصال"
+msgstr "اختبار الاتصال"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Scopes"
-msgstr "إعدادات OAuth"
+msgstr "نطاقات OAuth"
 
 #: cps/templates/config_edit.html
 msgid "Space-separated list of OAuth scopes"
@@ -13854,14 +13783,12 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Client Id"
-msgstr "معرف عميل OAuth لـ %(provider)s"
+msgstr "معرّف عميل OAuth"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Client Secret"
-msgstr "سر عميل OAuth لـ %(provider)s"
+msgstr "سر عميل OAuth"
 
 #: cps/templates/config_edit.html
 msgid "Supplied by environment"
@@ -13874,32 +13801,28 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Field Mapping Configuration"
-msgstr "تهيئة العرض"
+msgstr "إعداد ربط الحقول"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Username Field"
-msgstr "اسم المستخدم"
+msgstr "حقل اسم المستخدم"
 
 #: cps/templates/config_edit.html
 msgid "JWT field to extract username from"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Email Field"
-msgstr "خدمة البريد الإلكتروني"
+msgstr "حقل البريد الإلكتروني"
 
 #: cps/templates/config_edit.html
 msgid "JWT field to extract email from"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Group Claim"
-msgstr "اسم مجموعة LDAP"
+msgstr "مطالبة المجموعة في OAuth"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -13939,9 +13862,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Default Permissions for New Generic OAuth Users"
-msgstr "الإعدادات الافتراضية للمستخدمين الجدد"
+msgstr "الأذونات الافتراضية لمستخدمي OAuth العام الجدد"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html
@@ -14148,9 +14070,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Default Theme"
-msgstr "افتراضي"
+msgstr "المظهر الافتراضي"
 
 #: cps/templates/config_view_edit.html
 msgid "caliBlur! Dark Theme"
@@ -14179,9 +14100,9 @@ msgid "Link Read/Unread Status to Calibre Column"
 msgstr "ربط حالة المقروء/غير المقروء بعمود Calibre"
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Sync read/unread status with a Calibre boolean custom column."
-msgstr "ربط حالة المقروء/غير المقروء بعمود Calibre"
+msgstr ""
+"مزامنة حالة القراءة (مقروء/غير مقروء) مع عمود مخصص منطقي في Calibre."
 
 #: cps/templates/config_view_edit.html
 msgid "View Restrictions based on Calibre column"
@@ -14204,9 +14125,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Site Customization"
-msgstr "تهيئة العرض"
+msgstr "تخصيص الموقع"
 
 #: cps/templates/config_view_edit.html
 msgid "Show Calibre-Web NextGen support links to readers"
@@ -14256,9 +14176,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Custom CSS"
-msgstr "مرشح مخصص"
+msgstr "CSS مخصص"
 
 #: cps/templates/config_view_edit.html
 #, python-brace-format
@@ -14280,36 +14199,32 @@ msgid "These settings will be applied to all newly created user accounts."
 msgstr ""
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Permissions"
-msgstr "الإصدار"
+msgstr "الأذونات"
 
 #: cps/templates/config_view_edit.html cps/templates/user_edit.html
 msgid "Admin User"
 msgstr "مستخدم مسؤول"
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Language & Display"
-msgstr "عرض صفحة واحدة"
+msgstr "اللغة والعرض"
 
 #: cps/templates/config_view_edit.html
 msgid "Default Language"
 msgstr "اللغة الافتراضية"
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Default interface language for new users."
-msgstr "الإعدادات الافتراضية للمستخدمين الجدد"
+msgstr "لغة الواجهة الافتراضية للمستخدمين الجدد."
 
 #: cps/templates/config_view_edit.html
 msgid "Default Visible Language of Books"
 msgstr "اللغة المرئية الافتراضية للكتب"
 
 #: cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Default book language filter for new users."
-msgstr "الرؤى الافتراضية للمستخدمين الجدد"
+msgstr "مرشح لغة الكتب الافتراضي للمستخدمين الجدد."
 
 #: cps/templates/config_view_edit.html
 msgid "OPDS Default Locale for Anonymous Clients"
@@ -14362,9 +14277,8 @@ msgid "Use a URL"
 msgstr ""
 
 #: cps/templates/cover_picker.html
-#, fuzzy
 msgid "Upload a file"
-msgstr "تحميل"
+msgstr "تحميل ملف"
 
 #: cps/templates/cover_picker.html
 msgid ""
@@ -14519,15 +14433,13 @@ msgstr ""
 
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "Run Archive"
-msgstr "أرشفة"
+msgstr "تشغيل الأرشفة"
 
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/cwa_read_log.html
-#, fuzzy
 msgid "Download Log"
-msgstr "تنزيل"
+msgstr "تنزيل السجل"
 
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/index.xml
@@ -14614,43 +14526,36 @@ msgid "Run on selected book"
 msgstr ""
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "EPUB Fixer scheduled successfully"
-msgstr "تم حذف {} مستخدم(ين) بنجاح"
+msgstr "تمت جدولة مصلح EPUB بنجاح"
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "Error scheduling EPUB Fixer"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء جدولة مصلح EPUB"
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "No matches found"
-msgstr "لم يتم العثور على نتائج"
+msgstr "لم يتم العثور على نتائج مطابقة"
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "Enter a search term"
-msgstr "أدخل اسم المستخدم"
+msgstr "أدخل عبارة بحث"
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "Failed to search library"
-msgstr "البحث في المكتبة"
+msgstr "فشل البحث في المكتبة"
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "Select a book first"
-msgstr "إنشاء رف"
+msgstr "حدد كتابًا أولًا"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "EPUB Fixer started for selected book"
 msgstr ""
 
 #: cps/templates/cwa_epub_fixer.html
-#, fuzzy
 msgid "Error starting EPUB Fixer"
-msgstr "خطأ في حذف الرف"
+msgstr "حدث خطأ أثناء بدء مصلح EPUB"
 
 #: cps/templates/cwa_library_stats.html cps/templates/stats.html
 msgid "Library Statistics"
@@ -14937,9 +14842,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Enable Archived Book Cleanup"
-msgstr "الكتب المؤرشفة"
+msgstr "تفعيل تنظيف الكتب المؤرشفة"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15077,9 +14981,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Metadata Fields to Update"
-msgstr "تم تحديث البيانات الوصفية بنجاح"
+msgstr "حقول البيانات الوصفية المراد تحديثها"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15093,14 +14996,12 @@ msgid "Tags/Genres"
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Identifiers (ISBN, etc.)"
-msgstr "المعرفات"
+msgstr "المعرّفات (ISBN وغيره)"
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Cover Image"
-msgstr "الغلاف"
+msgstr "صورة الغلاف"
 
 #: cps/templates/cwa_settings.html cps/templates/user_edit.html
 msgid "Tip"
@@ -15217,9 +15118,8 @@ msgid "Unchecked providers are disabled globally."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Hardcover Auto-Fetch Settings"
-msgstr "إعدادات OAuth"
+msgstr "إعدادات الجلب التلقائي من Hardcover"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15333,9 +15233,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Web UI Settings"
-msgstr "الإعدادات"
+msgstr "إعدادات واجهة الويب"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Update Notifications"
@@ -15348,9 +15247,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Automatic updates"
-msgstr "إعدادات OAuth"
+msgstr "التحديثات التلقائية"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15418,9 +15316,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Automatic Backup Settings"
-msgstr "إعدادات OAuth"
+msgstr "إعدادات النسخ الاحتياطي التلقائي"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Import Auto-Backup"
@@ -15474,9 +15371,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Choose a target format:"
-msgstr "اختر سمة أدناه:"
+msgstr "اختر التنسيق المطلوب:"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15559,9 +15455,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Enable Duplicate Detection"
-msgstr "تمكين التسجيل العام"
+msgstr "تفعيل اكتشاف التكرارات"
 
 #: cps/templates/cwa_settings.html
 msgid "When enabled, NextGen will scan for duplicate books after each import"
@@ -15590,9 +15485,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Automatic Duplicate Scanning"
-msgstr "إعدادات OAuth"
+msgstr "الفحص التلقائي للتكرارات"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15718,9 +15612,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Enable Duplicate Notifications"
-msgstr "تمكين التسجيل العام"
+msgstr "تفعيل إشعارات التكرارات"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15730,9 +15623,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Enable Automatic Duplicate Resolution"
-msgstr "تمكين التسجيل العام"
+msgstr "تفعيل الحل التلقائي للتكرارات"
 
 #: cps/templates/cwa_settings.html cps/templates/duplicates.html
 msgid "Warning:"
@@ -15765,9 +15657,8 @@ msgid "Delete newer copies, keep the earliest added"
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Merge Formats"
-msgstr "حذف التنسيقات:"
+msgstr "دمج التنسيقات"
 
 #: cps/templates/cwa_settings.html
 msgid "Merge formats into the newest book, delete the rest"
@@ -15782,9 +15673,8 @@ msgid "Prefer formats based on your Duplicate Format Priority Ranking"
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Keep Most Metadata"
-msgstr "جلب البيانات الوصفية"
+msgstr "الإبقاء على أكبر قدر من البيانات الوصفية"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep book with most complete information"
@@ -15803,9 +15693,8 @@ msgid "Choose which book to keep when duplicates are automatically resolved."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
-#, fuzzy
 msgid "Rate Limiting"
-msgstr "التقييم"
+msgstr "تحديد معدل الطلبات"
 
 #: cps/templates/cwa_settings.html
 msgid "Cooldown Period (minutes)"
@@ -16324,24 +16213,20 @@ msgid "Mark As Read"
 msgstr "وضع علامة كـ مقروء"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Marked as read"
-msgstr "وضع علامة كـ غير مقروء"
+msgstr "تم وضع علامة «مقروء»"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Marked as unread"
-msgstr "وضع علامة كـ غير مقروء"
+msgstr "تم وضع علامة «غير مقروء»"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Added to favorites"
-msgstr "إضافة إلى الأرشيف"
+msgstr "تمت الإضافة إلى المفضلة"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Removed from favorites"
-msgstr "استعادة من الأرشيف"
+msgstr "تمت الإزالة من المفضلة"
 
 #: cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Restore from archive"
@@ -16352,9 +16237,8 @@ msgid "Add to archive"
 msgstr "إضافة إلى الأرشيف"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Restored from archive"
-msgstr "استعادة من الأرشيف"
+msgstr "تمت الاستعادة من الأرشيف"
 
 #: cps/templates/detail.html
 msgid "Reloaded metadata from disk"
@@ -16369,9 +16253,8 @@ msgid "Unhide from your library"
 msgstr ""
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Hide from your library"
-msgstr "البحث في المكتبة"
+msgstr "إخفاء من مكتبتك"
 
 #: cps/templates/detail.html
 msgid "Unhidden"
@@ -16413,28 +16296,24 @@ msgid "Copy UUID"
 msgstr ""
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "File sizes"
-msgstr "أحجام الخطوط"
+msgstr "أحجام الملفات"
 
 #: cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Description:"
 msgstr "الوصف:"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Select eReader Email Addresses"
-msgstr "إرسال إلى بريد قارئ الكتب الإلكترونية"
+msgstr "تحديد عناوين البريد الإلكتروني للقارئ الإلكتروني"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Choose email addresses:"
-msgstr "إرسال إلى بريد قارئ الكتب الإلكترونية"
+msgstr "اختر عناوين البريد الإلكتروني:"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Select All"
-msgstr "تحديد"
+msgstr "تحديد الكل"
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"
@@ -16453,19 +16332,16 @@ msgid "Enter one or more email addresses separated by commas"
 msgstr ""
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Select format:"
-msgstr "حذف التنسيقات:"
+msgstr "اختر التنسيق:"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Failed to update tags"
-msgstr "فشل في إنشاء مسار الغلاف"
+msgstr "فشل تحديث العلامات"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Failed to update shelves"
-msgstr "فشل في إنشاء مسار الغلاف"
+msgstr "فشل تحديث الرفوف"
 
 #: cps/templates/duplicates.html
 msgid "NextGen Duplicates Manager"
@@ -16478,28 +16354,24 @@ msgid ""
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Run Full Duplicate Scan"
-msgstr "حذف الكتاب"
+msgstr "تشغيل فحص كامل للتكرارات"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Scan for Duplicates Now"
-msgstr "عرض الكتب الأعلى تقييمًا"
+msgstr "فحص التكرارات الآن"
 
 #: cps/templates/duplicates.html
 msgid "Select Duplicates"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Select None"
-msgstr "تحديد"
+msgstr "إلغاء التحديد"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Delete Selected"
-msgstr "حذف هذا الرف"
+msgstr "حذف المحدد"
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scanning needs a one-time full scan."
@@ -16519,9 +16391,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Duplicate scan is running."
-msgstr "حذف الكتاب"
+msgstr "فحص التكرارات قيد التشغيل."
 
 #: cps/templates/duplicates.html
 msgid "You can keep using CWA while it runs."
@@ -16580,33 +16451,28 @@ msgid "This will permanently delete books. Original files will be backed up to"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Merge Selected"
-msgstr "دمج الكتب المختارة"
+msgstr "دمج المحدد"
 
 #: cps/templates/duplicates.html
 msgid "Dismiss this duplicate group"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "View book details"
-msgstr "تفاصيل الكتاب"
+msgstr "عرض تفاصيل الكتاب"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Edit book metadata"
-msgstr "تحرير البيانات الوصفية"
+msgstr "تحرير البيانات الوصفية للكتاب"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Archive/delete book"
-msgstr "الكتب المؤرشفة"
+msgstr "أرشفة الكتاب/حذفه"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "No Duplicate Books Found"
-msgstr "لم يتم العثور على نتائج"
+msgstr "لم يتم العثور على كتب مكررة"
 
 #: cps/templates/duplicates.html
 msgid "Your library has no books with duplicate title and author combinations."
@@ -16629,33 +16495,28 @@ msgid ""
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Selected strategy:"
-msgstr "حذف التنسيقات:"
+msgstr "الاستراتيجية المحددة:"
 
 #: cps/templates/duplicates.html
 msgid "This action cannot be undone!"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "The following books will be permanently deleted:"
-msgstr "سيتم مسح هذا الكتاب بشكل دائم من قاعدة البيانات"
+msgstr "سيتم حذف الكتب التالية نهائيًا:"
 
 #: cps/templates/duplicates.html cps/templates/layout.html
-#, fuzzy
 msgid "Merge Books"
-msgstr "الكتب غير المقروءة"
+msgstr "دمج الكتب"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "The following book will be kept:"
-msgstr "سيتم مسح هذا الكتاب بشكل دائم من قاعدة البيانات"
+msgstr "سيتم الاحتفاظ بالكتاب التالي:"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "The following books will be merged into it (and then deleted):"
-msgstr "سيتم مسح هذا الكتاب بشكل دائم من قاعدة البيانات"
+msgstr "سيتم دمج الكتب التالية فيه (ثم حذفها):"
 
 #: cps/templates/duplicates.html
 msgid "Note: File formats from source books will be added to the target book."
@@ -16790,14 +16651,12 @@ msgid ""
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Reject All Pending"
-msgstr "تحديد"
+msgstr "رفض جميع التطابقات المعلقة"
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Search Query"
-msgstr "مصطلح البحث:"
+msgstr "استعلام البحث"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Candidate Matches"
@@ -16817,27 +16676,24 @@ msgid "Match Reason"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "View on Hardcover"
-msgstr "عرض الكتاب عند الحفظ"
+msgstr "عرض على Hardcover"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Select This Match"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Reject All"
-msgstr "تحديد"
+msgstr "رفض الكل"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Skip for Now"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Processing..."
-msgstr "جاري التحميل..."
+msgstr "جارٍ المعالجة..."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✓ Select This Match"
@@ -16848,38 +16704,35 @@ msgid "Failed to apply match"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid ""
 "Are you sure you want to reject all matches for this book? This cannot be "
 "undone."
 msgstr ""
-"هل أنت متأكد أنك تريد تغيير الدور المحدد للمستخدم (المستخدمين) المحدد(ين)؟"
+"هل أنت متأكد من رغبتك في رفض جميع التطابقات لهذا الكتاب؟ لا يمكن التراجع "
+"عن هذا الإجراء."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✗ Reject All Matches"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Failed to reject match"
-msgstr "فشل في إنشاء مسار الغلاف"
+msgstr "فشل رفض التطابق"
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid ""
 "Are you sure you want to reject all pending matches? This cannot be undone."
 msgstr ""
-"هل أنت متأكد أنك تريد تغيير الدور المحدد للمستخدم (المستخدمين) المحدد(ين)؟"
+"هل أنت متأكد من رغبتك في رفض جميع التطابقات المعلقة؟ لا يمكن التراجع عن "
+"هذا الإجراء."
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "✗ Reject All Pending"
-msgstr "تحديد"
+msgstr "✗ رفض جميع التطابقات المعلقة"
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Failed to reject all pending matches"
-msgstr "فشل في إنشاء مسار الغلاف"
+msgstr "فشل رفض جميع التطابقات المعلقة"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "→ Skip for Now"
@@ -16890,11 +16743,10 @@ msgid "Failed to skip match"
 msgstr ""
 
 #: cps/templates/http_error.html
-#, fuzzy
 msgid ""
 "Calibre-Web NextGen Instance is unconfigured, please contact your "
 "administrator"
-msgstr "مثيل Calibre-Web غير مهيأ، يرجى الاتصال بمسؤول النظام"
+msgstr "لم يتم إعداد نسخة Calibre-Web NextGen، يرجى الاتصال بمسؤول النظام"
 
 #: cps/templates/http_error.html
 msgid ""
@@ -16947,33 +16799,28 @@ msgid "Refresh shelf to update with latest changes"
 msgstr ""
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Edit shelf rules"
-msgstr "تحرير رف"
+msgstr "تحرير قواعد الرف"
 
 #: cps/templates/index.html
 msgid "Hide this shelf from your sidebar"
 msgstr ""
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Show this shelf in your sidebar"
-msgstr "مزامنة هذا الرف مع جهاز Kobo"
+msgstr "عرض هذا الرف في الشريط الجانبي"
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Show Shelf"
-msgstr "إظهار الكل"
+msgstr "إظهار الرف"
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Hide Shelf"
-msgstr "رف عام"
+msgstr "إخفاء الرف"
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Add Series to Shelf"
-msgstr "إضافة إلى الرف"
+msgstr "إضافة السلسلة إلى رف"
 
 #: cps/templates/index.html
 #, python-format
@@ -17156,27 +17003,24 @@ msgid "Search Library"
 msgstr "البحث في المكتبة"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Switch to the new Calibre-Web NextGen interface"
-msgstr "كتالوج الكتب الإلكترونية Calibre-Web"
+msgstr "انتقل إلى واجهة Calibre-Web NextGen الجديدة"
 
 #: cps/templates/layout.html
 msgid "Logout"
 msgstr "تسجيل الخروج"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Refresh Library"
-msgstr "البحث في المكتبة"
+msgstr "تحديث المكتبة"
 
 #: cps/templates/layout.html
 msgid "See Changelog"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Open Duplicates"
-msgstr "حذف الكتاب"
+msgstr "افتح التكرارات"
 
 #: cps/templates/layout.html
 msgid "Contribute here!"
@@ -17187,7 +17031,6 @@ msgid "Please do not refresh the page"
 msgstr "يرجى عدم تحديث الصفحة"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Create Shelf"
 msgstr "إنشاء رف"
 
@@ -17196,19 +17039,16 @@ msgid "Book Details"
 msgstr "تفاصيل الكتاب"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "This cannot be undone."
-msgstr "هل أنت متأكد أنك تريد إيقاف التشغيل؟"
+msgstr "لا يمكن التراجع عن هذا الإجراء."
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Will be deleted"
-msgstr "حذف هذا الرف"
+msgstr "سيتم حذفه"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Formats:"
-msgstr "تحميل التنسيق"
+msgstr "التنسيقات:"
 
 #: cps/templates/layout.html
 msgid "Will be kept"
@@ -17219,27 +17059,24 @@ msgid "Format conflicts — choose what to do:"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Result will have formats:"
-msgstr "حذف التنسيقات:"
+msgstr "ستكون تنسيقات النتيجة:"
 
 #: cps/templates/layout.html
 msgid "Merge &amp; Delete Source"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Duplicate Books Detected"
-msgstr "حذف الكتاب"
+msgstr "تم اكتشاف كتب مكررة"
 
 #: cps/templates/layout.html
 msgid "You have unresolved duplicate books in your library"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Duplicate Groups Found"
-msgstr "لم يتم العثور على نتائج"
+msgstr "تم العثور على مجموعات تكرارات"
 
 #: cps/templates/layout.html
 msgid "Remind Me Later"
@@ -17250,24 +17087,21 @@ msgid "View & Resolve Duplicates"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Scroll to top"
-msgstr "مقياس إلى الأفضل"
+msgstr "العودة إلى الأعلى"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Top"
-msgstr "إلى:"
+msgstr "الأعلى"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Confirm"
-msgstr "التهيئة"
+msgstr "تأكيد"
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Added {n} books to {shelf}"
-msgstr "إضافة إلى الرف"
+msgstr "تمت إضافة {n} من الكتب إلى {shelf}"
 
 #: cps/templates/layout.html
 #, python-brace-format
@@ -17280,24 +17114,23 @@ msgid "All {n} book(s) were already on {shelf}."
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Marked {n} books as read"
-msgstr "وضع علامة كـ غير مقروء"
+msgstr "تم وضع علامة «مقروء» على {n} من الكتب"
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Marked {n} books as unread"
-msgstr "وضع علامة كـ غير مقروء"
+msgstr "تم وضع علامة «غير مقروء» على {n} من الكتب"
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Deleted {n} books"
-msgstr "حذف الكتاب"
+msgstr "تم حذف {n} من الكتب"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Delete books?"
-msgstr "حذف الكتاب"
+msgstr "حذف الكتب؟"
 
 #: cps/templates/layout.html
 #, python-brace-format
@@ -17307,14 +17140,13 @@ msgid ""
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Select at least one book first."
-msgstr "إنشاء رف"
+msgstr "حدد كتابًا واحدًا على الأقل أولًا."
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Request failed: {err}"
-msgstr "خطأ في الاتصال"
+msgstr "فشل الطلب: {err}"
 
 #: cps/templates/list.html
 msgid "Filter by initial"
@@ -17325,9 +17157,8 @@ msgid "Grid"
 msgstr "شبكة"
 
 #: cps/templates/login.html
-#, fuzzy
 msgid "Show Password"
-msgstr "كلمة مرور SMTP"
+msgstr "إظهار كلمة المرور"
 
 #: cps/templates/login.html
 msgid "Remember Me"
@@ -17338,16 +17169,14 @@ msgid "Forgot Password?"
 msgstr "هل نسيت كلمة المرور؟"
 
 #: cps/templates/login.html
-#, fuzzy
 msgid ""
 "Log in with Magic\n"
 "      Link"
-msgstr "تسجيل الدخول بالرابط السحري"
+msgstr "تسجيل الدخول بالرابط<br>      السحري"
 
 #: cps/templates/login.html
-#, fuzzy
 msgid "Log in with SSO"
-msgstr "تسجيل الدخول بالرابط السحري"
+msgstr "تسجيل الدخول عبر SSO"
 
 #: cps/templates/login.html
 msgid ""
@@ -17412,9 +17241,8 @@ msgid "Expose this smart shelf in my OPDS feed"
 msgstr "إظهار هذا الرف الذكي في موجز OPDS الخاص بي"
 
 #: cps/templates/magic_shelf_edit.html
-#, fuzzy
 msgid "Share with Everyone (Public)"
-msgstr "مشاركة مع الجميع"
+msgstr "مشاركة مع الجميع (عام)"
 
 #: cps/templates/magic_shelf_edit.html
 msgid ""
@@ -17498,9 +17326,8 @@ msgid "Ok"
 msgstr "موافق"
 
 #: cps/templates/osd.xml
-#, fuzzy
 msgid "Calibre-Web NextGen eBook Catalog"
-msgstr "كتالوج الكتب الإلكترونية Calibre-Web"
+msgstr "فهرس كتب Calibre-Web NextGen الإلكترونية"
 
 #: cps/templates/personal_rating.html
 #, python-format
@@ -17512,9 +17339,8 @@ msgid "epub Reader"
 msgstr "قارئ epub"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Annotations"
-msgstr "الإجراءات"
+msgstr "التعليقات التوضيحية"
 
 #: cps/templates/read.html
 msgid "Open annotations page"
@@ -17525,9 +17351,8 @@ msgid "Font Sizes"
 msgstr "أحجام الخطوط"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Text margin"
-msgstr "الصفحة التالية"
+msgstr "هامش النص"
 
 #: cps/templates/read.html
 msgid "Default"
@@ -17797,9 +17622,8 @@ msgid "Edit Shelf Properties"
 msgstr "تحرير خصائص الرف"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Add Books"
-msgstr "كتاب مخفي"
+msgstr "إضافة كتب"
 
 #: cps/templates/shelf.html
 msgid "Arrange books manually"
@@ -17814,43 +17638,38 @@ msgid "Enable Change order"
 msgstr "تمكين تغيير الترتيب"
 
 #: cps/templates/shelf.html
-#, fuzzy, python-format
+#, python-format
 msgid "%(count)s selected"
-msgstr "دمج الكتب المختارة"
+msgstr "تم تحديد %(count)s"
 
 #: cps/templates/shelf.html
-#, fuzzy, python-format
+#, python-format
 msgid "Add %(count)s"
-msgstr "الحساب"
+msgstr "إضافة %(count)s"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "No books found."
-msgstr "لم يتم العثور على الرمز"
+msgstr "لم يتم العثور على كتب."
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Already on this shelf"
-msgstr "حذف هذا الرف"
+msgstr "موجود بالفعل على هذا الرف"
 
 #: cps/templates/shelf.html
 msgid "Could not add the books. Please try again."
 msgstr ""
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Add books to"
-msgstr "إضافة إلى الرف"
+msgstr "إضافة كتب إلى"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Search your library…"
-msgstr "البحث في المكتبة"
+msgstr "ابحث في مكتبتك…"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Search your library"
-msgstr "البحث في المكتبة"
+msgstr "ابحث في مكتبتك"
 
 #: cps/templates/shelf_edit.html
 msgid "Share with Everyone"
@@ -17886,9 +17705,8 @@ msgid "Moved to position %(num)s of %(total)s"
 msgstr ""
 
 #: cps/templates/shelf_order.html
-#, fuzzy
 msgid "Shelf order"
-msgstr "لم يتم العثور على المستخدم"
+msgstr "ترتيب الرف"
 
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
@@ -17963,9 +17781,8 @@ msgid "Scheduled Time"
 msgstr ""
 
 #: cps/templates/tasks.html
-#, fuzzy
 msgid "State"
-msgstr "تدوير"
+msgstr "الحالة"
 
 #: cps/templates/tasks.html
 msgid ""
@@ -18000,18 +17817,16 @@ msgstr ""
 "إذا كانت هذه مهمة مجدولة، فسيتم إعادة تشغيلها خلال الوقت المجدول التالي."
 
 #: cps/templates/tasks.html
-#, fuzzy
 msgid "Scheduled item cancelled successfully"
-msgstr "تم حذف {} مستخدم(ين) بنجاح"
+msgstr "تم إلغاء العنصر المجدول بنجاح"
 
 #: cps/templates/tasks.html
 msgid "Error cancelling scheduled item"
 msgstr ""
 
 #: cps/templates/update_now_modal.html
-#, fuzzy
 msgid "Update Calibre-Web NextGen"
-msgstr "كتالوج الكتب الإلكترونية Calibre-Web"
+msgstr "تحديث Calibre-Web NextGen"
 
 #: cps/templates/update_now_modal.html
 msgid ""
@@ -18105,14 +17920,12 @@ msgid "Set up automatic updates"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Your Profile"
-msgstr "بريدك الإلكتروني"
+msgstr "ملفك الشخصي"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "User Settings"
-msgstr "الإعدادات"
+msgstr "إعدادات المستخدم"
 
 #: cps/templates/user_edit.html
 msgid "Account Information"
@@ -18128,14 +17941,12 @@ msgid "Reset user Password"
 msgstr "إعادة تعيين كلمة مرور المستخدم"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "eReader Configuration"
-msgstr "تهيئة الخادم"
+msgstr "إعداد القارئ الإلكتروني"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Send to eReader Email Address"
-msgstr "إرسال إلى بريد قارئ الكتب الإلكترونية"
+msgstr "أرسل إلى عنوان البريد الإلكتروني الخاص بجهاز القراءة الإلكترونية"
 
 #: cps/templates/user_edit.html
 msgid "Use comma to separate multiple addresses"
@@ -18179,9 +17990,8 @@ msgid "Language & Theme Preferences"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Interface Language"
-msgstr "أدخل اللغات"
+msgstr "لغة الواجهة"
 
 #: cps/templates/user_edit.html
 msgid "Language of Books"
@@ -18192,9 +18002,8 @@ msgid "Filter the library to only show books in a specific language."
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Book Language Filter"
-msgstr "لم يتم تقديم لغة الكتاب الصالحة"
+msgstr "مرشح لغة الكتب"
 
 #: cps/templates/user_edit.html
 msgid "OAuth & API Integrations"
@@ -18274,14 +18083,12 @@ msgid "OPDS Shelf Exposure"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Expose only books in selected shelves to OPDS"
-msgstr "مزامنة الكتب الموجودة في الرفوف المحددة فقط مع Kobo"
+msgstr "عرض الكتب الموجودة في الرفوف المحددة فقط عبر OPDS"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Sidebar Display Settings"
-msgstr "إعدادات الأمان"
+msgstr "إعدادات عرض الشريط الجانبي"
 
 #: cps/templates/user_edit.html
 msgid "Choose which sections to display in your sidebar navigation."
@@ -18361,9 +18168,8 @@ msgid "Created (oldest first)"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Recently modified"
-msgstr "الكتب المضافة حديثًا"
+msgstr "المعدَّلة مؤخرًا"
 
 #: cps/templates/user_edit.html
 msgid "Least recently modified"
@@ -18388,9 +18194,8 @@ msgid "Default System Shelves:"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Public Shelves:"
-msgstr "تحرير الرفوف العامة"
+msgstr "الرفوف العامة:"
 
 #: cps/templates/user_edit.html
 #, python-format
@@ -18419,9 +18224,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "New app password"
-msgstr "تغيير كلمة المرور"
+msgstr "كلمة مرور تطبيق جديدة"
 
 #: cps/templates/user_edit.html
 #, python-format
@@ -18438,18 +18242,16 @@ msgid "e.g. Kobo Forma, KOReader iPad"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Create app password"
-msgstr "تغيير كلمة المرور"
+msgstr "إنشاء كلمة مرور تطبيق"
 
 #: cps/templates/user_edit.html
 msgid "Label"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Created"
-msgstr "إنشاء/عرض"
+msgstr "تاريخ الإنشاء"
 
 #: cps/templates/user_edit.html
 msgid "Last used"
@@ -18496,14 +18298,12 @@ msgid "eReader Email"
 msgstr "بريد القارئ الإلكتروني"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Enter eReader Email Subject"
-msgstr "أدخل بريد القارئ الإلكتروني"
+msgstr "أدخل موضوع بريد القارئ الإلكتروني"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "eReader Email Subject"
-msgstr "بريد القارئ الإلكتروني"
+msgstr "موضوع بريد القارئ الإلكتروني"
 
 #: cps/templates/user_table.html
 msgid "Locale"
@@ -18558,9 +18358,8 @@ msgid "Sync selected Shelves with Kobo"
 msgstr "مزامنة الرفوف المختارة مع Kobo"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Expose selected Shelves to OPDS"
-msgstr "مزامنة الرفوف المختارة مع Kobo"
+msgstr "عرض الرفوف المحددة عبر OPDS"
 
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"

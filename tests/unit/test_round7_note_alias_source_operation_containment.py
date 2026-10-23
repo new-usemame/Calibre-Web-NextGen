@@ -8,6 +8,7 @@ import pymupdf,pytest
 from cps.services.reflow import vision_pipeline as vp,vision_pixels,vision_reading as vr,build_epub
 from cps.services.reflow.source_display import SourceDisplay
 from cps.services.reflow.ledger import Ledger
+from tests.unit.round7_public_note_contract_support import local_ocr_visible
 s=importlib.util.spec_from_file_location('alias_ink_fixture',Path(vp.__file__).parents[3]/'tests/unit/test_round4_defects.py');h=importlib.util.module_from_spec(s);s.loader.exec_module(h)
 @pytest.mark.parametrize('helper',['_complete_note_alias_body_marker','_complete_note_opening_characters'])
 def test_actual_alias_source_operation_error_completes_owned_page_with_source_return(tmp_path,monkeypatch,helper):
@@ -47,9 +48,23 @@ def test_actual_alias_source_operation_error_completes_owned_page_with_source_re
   docs={name:ET.fromstring(z.read(name))for name in z.namelist()if name.endswith('.xhtml')and not name.endswith(('nav.xhtml','vision-about.xhtml'))}
   images={name for name in z.namelist()if name.startswith('OEBPS/images/')}
  assert h.body_texts(docs).count(before)==h.body_texts(docs).count(after)==1,'Healthy original neighbors survive exactly once'
- cases=report['degraded_units'];assert cases and all(case['page']==1 for case in cases)
- assert any(event.get('stage')=='reading'for event in report['unit_recovery_events']),'Callback failure must reach the existing owned reading ladder'
+ events=report['unit_recovery_events']
+ assert [event.get('transition') for event in events]==[
+  'SOURCE_REPAIR_UNPROVED','QUARANTINE_UNTRUSTED_CACHE',
+  'REREAD_NOT_DISPATCHED','VISIBLE_SOURCE_DEGRADATION'], 'the actual owned rejection ladder must complete in order'
+ assert events[0]['reason']=='synthetic alias original component rendering unavailable'
+ assert events[2]['reason']=='offline_or_financial_hold'
+ assert events[3]['reason']=='unbound printed note marker'
+ receipt=events[1]['receipt'];retained=Path(receipt['path']).read_bytes()
+ assert hashlib.sha256(retained).hexdigest()==receipt['sha256']
+ rejected=json.loads(retained)
+ assert receipt['request_id']=='synthetic-bounded-alias-1' and receipt['cost_usd']==.001
+ assert rejected['answer']==items[1][2]
+ assert rejected['image_sha256']==receipt['image_sha256'] and rejected['config_sha256']==receipt['config_sha256']
  assert any(event.get('transition')=='SOURCE_REPAIR_UNPROVED'and 'synthetic alias original component rendering unavailable'in event.get('reason','')for event in report['unit_recovery_events'])
+ assert h.refs_and_notes(docs)[0]==[]
+ local_ocr_visible(out,report,{1:['The bright ruby','carries a finite attribution.',
+  'A bounded note preserves its original amber attribution.']},non_local_pages={0,2})
  controls=[(name,a)for name,root in docs.items()for a in root.findall('.//x:a',h.NS)if a.get('class')=='source-disclosure-ref'];assert controls
  for name,a in controls:
   target_file,target=h.destination(name,a.get('href'));nodes=[n for n in docs[target_file].iter()if n.get('id')==target];assert len(nodes)==1

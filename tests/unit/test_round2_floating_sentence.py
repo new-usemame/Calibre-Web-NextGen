@@ -29,8 +29,8 @@ def test_source_bound_ordinary_sentence_can_continue_around_separate_owned_artwo
         readings.insert(1,block('A separate printed explanation.',ident='n1',role='footnote',marker='2',bbox=(20,850,480,960) if case=='footer' else (20,420,480,520)))
     body,documents,result=convert(tmp_path,monkeypatch,[answer(*readings)],[pixels],[[]])
     if case in ('ordinary','footer','uncertain_head'):
-        assert left+' '+right in body,'Source-supported ordinary sentence remained split around separate artwork'
-        assert left not in body and right not in body,'Fragment paragraphs survived rather than a single sentence paragraph'
+        assert left+' '+printed_right in body,'Source-supported ordinary sentence remained split around separate artwork'
+        assert left not in body and printed_right not in body,'Fragment paragraphs survived rather than a single sentence paragraph'
     else:
         assert left in body and right in body,'Terminal, indentation, heading, in-flow note and unsupported artwork position are barriers'
     assert body.count(caption)==1,'Caption must remain separate exactly once'
@@ -72,4 +72,5 @@ def test_source_bound_ordinary_sentence_can_continue_around_separate_owned_artwo
                 assert box[0]<=extent[0] and box[1]<=extent[1] and box[2]>=extent[2] and box[3]>=extent[3],'A direct crop must contain the complete authored object'
     if case=='uncertain_head':
         record=next(b for b in result['pages'][0]['blocks'] if b['id']=='b2')
-        assert record['published_tokens'][0]=='patient' and 0 in record['marked'],'Continuation must preserve uncertain published spelling'
+        assert record['published_tokens'][0]=='careful' and 0 in record['marked'], 'Continuation must preserve the independently printed correction and its mark'
+        assert any(d['status']=='RESOLVED' and d['source']==['careful'] and d['model']==['patient'] and d['chosen']==['careful'] for d in record['adjudication']), 'The changed word needs its own pixel-supported correction receipt'

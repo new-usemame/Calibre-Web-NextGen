@@ -13,9 +13,15 @@ def prepared(case):
  # original body/marker image remains actual synthetic ink. Ordinary uncertainty
  # then retains the whole original owning BODY territory; no target is guessed.
  if case!='tight_crop':words=[w for w in words if w['bbox'][1]>300]
+ else:
+  # This case needs a genuinely unsettled ordinary word beside the marker.
+  # A confident exact baseline would already settle the reader's B flag;
+  # a fused recognition of neighbouring ink cannot manufacture a B conflict.
+  for word in words:
+   if word['text']=='B':word['confidence']=40
  return image,words,answer,glyphs
 
-def controls(docs):return [(name,a)for name,root in docs.items()for a in root.findall('.//x:a',m.h.NS)if a.get('class')=='source-disclosure-ref']
+def controls(docs):return [(name,a)for name,root in docs.items()for a in root.findall('.//x:a',m.h.NS)if (a.get('class')=='source-disclosure-ref'and not a.get('href','').startswith('#v4-d-unit-print-'))or(a.get('title')=='Compare this reading with original print'and a.get('id'))]
 def target(docs,name,a):
  dest,ident=m.h.destination(name,a.get('href'));return dest,next(n for n in docs[dest].iter()if n.get('id')==ident)
 def covers(a,b):return all(a[i]<=b[i]+.001 for i in(0,1))and all(a[i]>=b[i]-.001 for i in(2,3))
@@ -51,4 +57,12 @@ def test_shared_marker_context_needs_actual_image_coverage_and_adjacency_and_kee
    wording=' '.join(''.join(p.itertext())for p in node.findall('.//x:p',m.h.NS)).lower()
    assert 'marker'in wording and 'uncertain'in wording,'Shared original-image target visibly discloses the additional marker uncertainty'
  if repeated:assert len({c['source_reference_origin']for c in listed})==2,'Each of these two physically separate marker slots has its own directly adjacent ordinary source control'
- assert len(report['images'])==expected,'No unreferenced duplicate source raster may remain after sharing'
+ inspection={k:v for k,v in report['images'].items()if v['kind']not in('inline_print_preview','flagged_unit_preview')}
+ assert len(inspection)==expected,'No unreferenced duplicate source raster may remain after sharing'
+ emitted={n.get('src')for root in docs.values()for n in root.iter()if n.tag.endswith('}img')}
+ for name,preview in report['images'].items():
+  if preview['kind']=='flagged_unit_preview':
+   assert name in emitted and preview['coverage_eligible']is False
+  if preview['kind']=='inline_print_preview':
+   assert name in emitted and preview['coverage_eligible']is False
+   assert preview['inspection_image']in inspection

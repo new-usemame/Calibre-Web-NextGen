@@ -16,6 +16,7 @@ _TAG = re.compile(r"<[^>]*>", re.S)
 _SPAN_OPEN = re.compile(r"<\s*span\b", re.I)
 _SPAN_CLOSE = re.compile(r"<\s*/\s*span\s*>", re.I)
 _SELF_CLOSING = re.compile(r"/\s*>$")
+_IS_ANNOTATION = re.compile(r'class\s*=\s*"[^"]*\bsource-reading-annotation\b', re.I)
 _IS_UNCERTAIN = re.compile(r'class\s*=\s*"[^"]*\b%s\b' % CLASS, re.I)
 #: One character of readable text: an entity reference, or a character that is
 #: already itself. Matching entities whole is what lets a token containing "&" be
@@ -121,7 +122,7 @@ class _TextNode(object):
         self.starts, self.ends = starts, ends
         self.opens, self.closes = opens, closes
 
-    def find(self, token):
+    def matches(self, token):
         """Where *token* sits in this node, as a slice of the markup to wrap.
 
         The slice always covers whole words. A model quoting a damaged word drops
@@ -138,9 +139,15 @@ class _TextNode(object):
         while at != -1:
             span = self._widen(at, at + width)
             if span is not None and not self._overlaps(*span):
-                self.taken.append(span)
-                return self.starts[span[0]], self.ends[span[1] - 1]
+                yield span, (self.starts[span[0]], self.ends[span[1] - 1])
             at = self.plain.find(token, at + 1)
+
+    def find(self, token):
+        found = next(self.matches(token), None)
+        if found is not None:
+            span, raw = found
+            self.taken.append(span)
+            return raw
         return None
 
     def _widen(self, at, end):
@@ -162,11 +169,11 @@ class _TextNode(object):
         return any(at < taken_end and taken_at < end for taken_at, taken_end in self.taken)
 
 
-def _text_nodes(html):
+def _text_nodes(html, *, include_uncertain=False):
     """The readable runs of *html*, skipping anything already marked uncertain."""
     nodes, spans, cursor = [], [], 0
     for tag in _TAG.finditer(html):
-        if tag.start() > cursor and not any(spans):
+        if tag.start() > cursor and not any(s[1] for s in spans) and (include_uncertain or not any(s[0] for s in spans)):
             nodes.append(_TextNode(html, cursor, tag.start()))
         cursor = tag.end()
         text = tag.group(0)
@@ -174,13 +181,13 @@ def _text_nodes(html):
             if spans:
                 spans.pop()
         elif _SPAN_OPEN.match(text) and not _SELF_CLOSING.search(text):
-            spans.append(bool(_IS_UNCERTAIN.search(text)))
-    if cursor < len(html) and not any(spans):
+            spans.append((bool(_IS_UNCERTAIN.search(text)), bool(_IS_ANNOTATION.search(text))))
+    if cursor < len(html) and not any(s[1] for s in spans) and (include_uncertain or not any(s[0] for s in spans)):
         nodes.append(_TextNode(html, cursor, len(html)))
     return nodes
 
 
-def mark_uncertain(html, spans):
+def mark_uncertain(html, spans, *, source_ranges=None):
     """Wrap each flagged reading where it stands. Returns ``(html, placed)``.
 
     Nothing between the wrapped tags is rewritten — not the escaping, not the
@@ -193,20 +200,38 @@ def mark_uncertain(html, spans):
         return html or "", []
 
     nodes = _text_nodes(html)
+    complete_nodes = _text_nodes(html, include_uncertain=True)
     edits, placed = [], []
-    for span in spans:
+    for index, span in enumerate(spans):
         record = uncertain_record(span)
         if record is None:
             continue
         token, readings = uncertain_readings(record)
-        for node in nodes:
-            found = node.find(token)
-            if found is not None:
-                edits.append((found[0], found[1], _title(readings)))
-                # The caller's own object, so it can tell which of the readings it
-                # handed over a reader will actually find highlighted.
-                placed.append(span)
-                break
+        if 'source_bbox' in record:
+            # Source confidence belongs to an occurrence, not an equal word.
+            # Without a uniquely owned geometric block and one matching token
+            # inside it, retain the record for the caller's unplaced disclosure.
+            bounds = (source_ranges or {}).get(index)
+            if bounds is None:
+                continue
+            occurrences = [raw for node in complete_nodes for _local, raw in node.matches(token)
+                           if bounds[0] <= raw[0] and raw[1] <= bounds[1]]
+            if len(occurrences) != 1:
+                continue
+            matches = [(node, local, raw) for node in nodes
+                       for local, raw in node.matches(token)
+                       if bounds[0] <= raw[0] and raw[1] <= bounds[1]]
+            if len(matches) != 1:
+                continue
+            node, local, found = matches[0]
+            node.taken.append(local)
+        else:
+            found = next((candidate for node in nodes
+                          if (candidate := node.find(token)) is not None), None)
+        if found is not None:
+            edits.append((found[0], found[1], _title(readings)))
+            # Return the caller's actual record, preserving placement identity.
+            placed.append(span)
 
     if not edits:
         return html, []
@@ -229,7 +254,7 @@ def is_recovered_marker(span, recovered):
                for reading in readings for run in _DIGITS.findall(reading))
 
 
-def annotate_page(html, spans, recovered=(), with_placements=False):
+def annotate_page(html, spans, recovered=(), with_placements=False, *, source_ranges=None):
     """The whole of R3 for one page. Returns ``(html, uncertain, marked)``.
 
     ``uncertain`` is what the reader should still be told about: everything that
@@ -241,7 +266,7 @@ def annotate_page(html, spans, recovered=(), with_placements=False):
              if record is not None]
     if not spans:
         return (html, [], 0, []) if with_placements else (html, [], 0)
-    html, placed = mark_uncertain(html, spans)
+    html, placed = mark_uncertain(html, spans, source_ranges=source_ranges)
     marked = [id(record) for record in placed]
     uncertain = [record for record in spans
                  if id(record) in marked or not is_recovered_marker(record, recovered)]

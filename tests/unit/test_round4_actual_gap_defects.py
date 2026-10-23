@@ -121,8 +121,11 @@ def test_literal_printed_row_hyphen_wrap_survives_unrelated_punctuation_disagree
              'operate with a patient companion beside the shelter.',
              'The careful record ends with a warning.)']
     page.text(lines, 'body', model=' '.join(lines).replace('warning.)', 'warning.]'))
-    _, _, docs = h.convert_ink(tmp_path, monkeypatch, [page])
+    _, report, docs = h.convert_ink(tmp_path, monkeypatch, [page])
     texts = h.body_texts(docs)
     assert len(texts) == 1
     assert 'co-operate' in texts[0] and 'co- operate' not in texts[0], 'a remote punctuation difference cannot undo exact adjacent printed wrap-word evidence'
-    assert 'warning.]' in texts[0], 'literal published disagreement remains uncorrected'
+    assert 'warning.)' in texts[0] and 'warning.]' not in texts[0]
+    record=next(b for b in report['pages'][0]['blocks']if b['id']=='body')
+    assert any(d['status']=='RESOLVED' and d['model']==['warning.]'] and d['chosen']==['warning.)'] for d in record['adjudication'])
+    assert record['marked'], 'Every pixel-corrected word remains visibly marked'

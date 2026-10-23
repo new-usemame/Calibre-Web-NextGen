@@ -7,12 +7,13 @@ its character codes are ordinary Latin text.
 import hashlib
 import json
 import re
+from functools import lru_cache
 from dataclasses import replace
 
 from . import unit_recovery
 
 
-def text_layer_overpainted(page, traces):
+def text_layer_overpainted(page, traces, *, word_overlap=False):
     """A later unmasked page image prevents native font codes proving glyphs.
 
     This is conservative paint-order provenance, not an OCR confidence score.
@@ -23,6 +24,14 @@ def text_layer_overpainted(page, traces):
         return False
     log = page.get_bboxlog()
     images = [(i, box) for i,(kind,box) in enumerate(log) if kind == 'fill-image']
+    if word_overlap:
+        # Native word authority requires its own ink to remain unobscured.
+        # A later masked image is also insufficient positive paint proof.
+        # Ignore only sub-millipoint coordinate round trips at touching edges.
+        return any(seq > trace.get('seqno',len(log)) and
+            min(box[2],trace['bbox'][2])-max(box[0],trace['bbox'][0])>1e-3 and
+            min(box[3],trace['bbox'][3])-max(box[1],trace['bbox'][1])>1e-3
+            for seq,box in images for trace in traces)
     info = page.get_image_info()
     if len(info) != len(images):
         return False
@@ -32,6 +41,238 @@ def text_layer_overpainted(page, traces):
         and box[0] <= trace['bbox'][0] and box[1] <= trace['bbox'][1]
         and box[2] >= trace['bbox'][2] and box[3] >= trace['bbox'][3]
         for seq,box in carriers) for trace in traces)
+
+
+@lru_cache(maxsize=64)
+def _has_word_glyph_map(data):
+    """Whole-word glyph labels are optical hypotheses, not letter identity.
+
+    Reconstructed vector text can assign arbitrary strings to one ink shape.
+    A ToUnicode table then helps extraction but cannot independently certify
+    its own transcription. Ordinary typographic ligatures are unaffected.
+    """
+    ligatures={'ff','fi','fl','ffi','ffl','st','ct','Th','ij','IJ'}
+    for section in re.findall(rb'beginbfchar(.*?)endbfchar',data,re.S):
+        for target in re.findall(rb'<[^>]+>\s*<([0-9a-fA-F]+)>',section):
+            try:value=bytes.fromhex(target.decode('ascii')).decode('utf-16-be')
+            except (ValueError,UnicodeError):return True
+            if sum(c.isalpha()for c in value)>1 and value not in ligatures:
+                return True
+    return False
+
+
+def _text_font_authorities(page, *, optical_maps=False):
+    bad=unresolved_fonts(page);faces={}
+    for font in page.get_fonts():
+        name=font[3].split('+',1)[-1]
+        kind,target=page.parent.xref_get_key(font[0],'ToUnicode')
+        mapped=kind!='null'
+        optical=False
+        if mapped and kind=='xref' and not optical_maps and hasattr(page.parent,'xref_stream'):
+            optical=_has_word_glyph_map(page.parent.xref_stream(int(target.split()[0])) or b'')
+        standard=bool(re.fullmatch(r'(?:Times(?:NewRoman)?|Arial|Helvetica|Courier)(?:[-,](?:Roman|Bold|Italic|Oblique|BoldItalic|BoldOblique)|PS(?:MT|-BoldMT|-ItalicMT|-BoldItalicMT)?|MT)?',name,re.I))
+        faces[name]=(mapped or standard) and name not in bad and not optical
+    return faces
+
+
+def _face_authority(faces,name):
+    # Embedded resource names and PostScript trace names may differ only in
+    # separators. Every colliding resource must have the same reliable map.
+    # Type-0 resource BaseFont names may carry their CMap encoding suffix,
+    # while MuPDF's paint trace reports only the embedded face. Strip only
+    # these exact standard encoding suffixes; all aliases must still agree
+    # on character-map authority, including colliding unmapped resources.
+    canonical=lambda value:re.sub(r'[^a-z0-9]','',
+        re.sub(r'-Identity-[HV]$', '', value, flags=re.I).casefold())
+    name=canonical(name)
+    matches=[value for key,value in faces.items()if canonical(key)==name]
+    if matches:return all(matches)
+    # MuPDF may also abbreviate an embedded PostScript face in text traces.
+    matches=[value for key,value in faces.items()if len(name)>=15 and canonical(key).startswith(name)]
+    return bool(matches) and all(matches)
+
+
+def _inside_character(char, boxes):
+    return any(box[0]-.2 <= (char[3][0]+char[3][2])/2 <= box[2]+.2 and
+               box[1]-.2 <= (char[3][1]+char[3][3])/2 <= box[3]+.2 for box in boxes)
+
+
+def fraction_word_view(page, words):
+    """Bind separately drawn fraction atoms only at their measured positions."""
+    from collections import Counter
+    from . import extract
+    words=list(words)
+    if not any('/'in w['text']for w in words) or not any(w['text'].isdigit()for w in words):return words
+    raw=extract.read_page(page.parent,page.number,keep_char_boxes=True)
+    fractions=[part for block in raw.blocks for line in block.lines for span in line.spans
+               for part in getattr(span,'source_fraction_parts',())]
+    proposals=[]
+    for num,den,a,slash,b in fractions:
+        parts=[dict(text=num,bbox=a),dict(text='/',bbox=slash),dict(text=den,bbox=b)]
+        boxes=[a,slash,b];indexes=[]
+        for i,word in enumerate(words):
+            box=word['bbox']
+            if any(box[0]-.2<=(part[0]+part[2])/2<=box[2]+.2 and
+                   box[1]-.2<=(part[1]+part[3])/2<=box[3]+.2 for part in boxes):indexes.append(i)
+        if Counter(''.join(words[i]['text']for i in indexes))!=Counter(num+'/'+den):continue
+        value=dict(text=num+'/'+den,native_parts=parts,
+                   bbox=(min(p[0]for p in boxes),min(p[1]for p in boxes),
+                         max(p[2]for p in boxes),max(p[3]for p in boxes)))
+        if not drawn_word_authority(page,[value]):continue
+        proposals.append((indexes,value))
+    consumed=set();groups={}
+    for indexes,value in proposals:
+        if any(sum(i in ids for ids,_ in proposals)!=1 for i in indexes):continue
+        first=min(indexes);groups[first]=value;consumed.update(indexes)
+    return [groups[i]if i in groups else w for i,w in enumerate(words)if i not in consumed or i in groups]
+
+
+def lexical_word_view(page, words, marker_prefixes=()):
+    """Bind font fragments into printed words without changing their letters.
+
+    Decorative initials can be serialized after their paragraph, and raised
+    ordinal suffixes can be separate words. Their original component boxes
+    remain separate: the bounding rectangle must not borrow a following row.
+    """
+    words=fraction_word_view(page,words);traces=page.get_texttrace();pairs=[]
+    expanded=[]
+    for word in words:
+        match=re.fullmatch(r'(.+[A-Za-z].*?)(\d{1,4})',word['text'])
+        if not match or match[1]not in marker_prefixes:
+            expanded.append(word);continue
+        chars=sorted([c for trace in traces for c in trace.get('chars',())
+                      if c[0]>32 and _inside_character(c,[word['bbox']])],key=lambda c:c[2][0])
+        if (match and match[1]in marker_prefixes and
+                ''.join(chr(c[0])for c in chars)==word['text']):
+            before,after=chars[:-len(match[2])],chars[-len(match[2]):]
+            def bounds(group):
+                return [min(c[3][0]for c in group),min(c[3][1]for c in group),
+                        max(c[3][2]for c in group),max(c[3][3]for c in group)]
+            a,b=bounds(before),bounds(after);height=a[3]-a[1]
+            if b[3]-b[1]<height*.9 and b[3]<a[3]-height*.15:
+                # Reserve independently raised ink for the existing marker
+                # verifier; neither its identity nor note owner is proved here.
+                expanded.extend([dict(word,text=match[1],bbox=a),dict(word,text=match[2],bbox=b,native_reference_ink=True)])
+                continue
+        expanded.append(word)
+    words=expanded
+    def bound(word):
+        import unicodedata
+        chars=[c for trace in traces for c in trace.get('chars',())
+               if c[0]>32 and _inside_character(c,[word['bbox']])]
+        value=''.join(chr(c[0])for c in sorted(chars,key=lambda c:c[2][0]))
+        return unicodedata.normalize('NFKC',value)==unicodedata.normalize('NFKC',word['text'])
+    def separator(a,b):
+        return any(c[0]==32 and a[2] <= (c[3][0]+c[3][2])/2 <= b[0] and
+            min(a[3],b[3],c[3][3])>max(a[1],b[1],c[3][1])
+            for trace in traces for c in trace.get('chars',()))
+    for i,head in enumerate(words):
+        if not re.fullmatch(r'[A-Z]|[([{\"‘“]*[0-9]+',head['text']) or not bound(head):continue
+        a=head['bbox'];height=a[3]-a[1];targets=[]
+        for j,tail in enumerate(words):
+            if i==j:continue
+            b=tail['bbox'];small=b[3]-b[1]
+            cap=(re.fullmatch('[A-Z]',head['text']) and tail['text'][:1].islower()
+                 and height>=small*2 and abs(a[1]-b[1])<=small*.4 and
+                 0<=b[0]-a[2]<=small*.4 and any(
+                     b[1]<w['bbox'][1]<a[3] and abs(w['bbox'][0]-b[0])<small*.4
+                     for k,w in enumerate(words)if k not in(i,j)))
+            ordinal=(bool(re.fullmatch(r'[([{\"‘“]*[0-9]+',head['text'])) and tail['text']in('st','nd','rd','th')
+                     and small<height*.9 and b[3]<a[3]-height*.15 and
+                     min(a[3],b[3])>max(a[1],b[1]) and
+                     0<=b[0]-a[2]<=small*.4)
+            if (cap or ordinal) and not separator(a,b) and bound(tail):targets.append(j)
+        if len(targets)==1:pairs.append((i,targets[0]))
+    used={};groups={}
+    for i,j in pairs:
+        if sum(i in pair or j in pair for pair in pairs)!=1:continue
+        parts=[words[i],words[j]];boxes=[p['bbox']for p in parts]
+        combined=dict(words[j],text=''.join(p['text']for p in parts),
+            bbox=(min(b[0]for b in boxes),min(b[1]for b in boxes),
+                  max(b[2]for b in boxes),max(b[3]for b in boxes)),
+            native_parts=[dict(text=p['text'],bbox=p['bbox'])for p in parts])
+        at=min(i,j);groups[at]=combined;used[i]=used[j]=at
+    return [groups[i]if i in groups else word for i,word in enumerate(words)
+            if i not in used or used[i]==i]
+
+
+def unproved_legacy_word(page,word):
+    """A visible custom code without a character map needs original glyph ink."""
+    faces=_text_font_authorities(page,optical_maps=True);boxes=[p['bbox']for p in word.get('native_parts',[word])]
+    return any(trace.get('type')in(0,1) and trace.get('opacity',1)>=.99 and
+        not _face_authority(faces,trace.get('font','').split('+',1)[-1]) and
+        any(char[0]>32 and _inside_character(char,boxes)for char in trace.get('chars',()))
+        for trace in page.get_texttrace())
+
+
+def word_prefix_ink(page,word,suffix):
+    """Locate original prefix ink without copying a separately proved action.
+
+    Exact character order binds geometry only; it does not certify the custom
+    font's decoded spelling. Ambiguous or transformed character inventories
+    decline this cut rather than duplicate or delete a reference label.
+    """
+    boxes=[p['bbox']for p in word.get('native_parts',[word])]
+    chars=sorted([c for trace in page.get_texttrace()for c in trace.get('chars',())
+        if c[0]>32 and _inside_character(c,boxes)],key=lambda c:c[2][0])
+    text=''.join(chr(c[0])for c in chars)
+    if not suffix or text!=word['text'] or not text.endswith(suffix) or len(text)<=len(suffix):return None
+    def bounds(group):
+        return (min(c[3][0]for c in group),min(c[3][1]for c in group),
+            max(c[3][2]for c in group),max(c[3][3]for c in group))
+    return bounds(chars[:-len(suffix)]),bounds(chars[-len(suffix):])
+
+
+def drawn_word_authority(page, words):
+    """Every occurrence must have reliable, visible native character proof."""
+    return bool(words) and all(drawn_word_authorities(page,words))
+
+
+def drawn_word_authorities(page, words):
+    """Return reliable visible character proof for each native word."""
+    return _drawn_word_authorities(page,words,require_mapping=True)
+
+
+def visible_word_ink(page, words):
+    """Prove original glyph placement, without certifying decoded letters."""
+    return _drawn_word_authorities(page,words,require_mapping=False)
+
+
+def _drawn_word_authorities(page, words, *, require_mapping):
+    """Per-word native paint proof, with optional decoded-letter authority.
+
+    A custom face without ToUnicode can deliberately draw a symbol at a Latin
+    character code even when its descriptor claims nonsymbolic text. Only an
+    explicit Unicode map or a recognized standard text face earns authority.
+    Invisible, overpainted, replacement and private-use characters never do.
+    A failed word does not transfer its uncertainty to reliable neighbors.
+    """
+    import unicodedata
+    traces=page.get_texttrace()
+    faces=_text_font_authorities(page)
+    def safe(text):
+        return all(c!='\ufffd' and unicodedata.category(c) not in ('Co','Cs','Cn')for c in text)
+    result=[]
+    for word in words:
+        boxes=[p['bbox']for p in word.get('native_parts',[word])];chars=[];owners=[];valid=True
+        for trace in traces:
+            own=[char for char in trace.get('chars',())if char[0]>32 and _inside_character(char,boxes)]
+            if not own:continue
+            if (trace.get('type')not in(0,1) or trace.get('opacity',1)<.99 or
+                    (require_mapping and not _face_authority(faces,trace.get('font','').split('+',1)[-1]))):valid=False
+            owners.append(dict(trace,bbox=(min(c[3][0]for c in own),min(c[3][1]for c in own),
+                max(c[3][2]for c in own),max(c[3][3]for c in own))))
+            chars.extend(own)
+        value=''.join(chr(char[0])for char in sorted(chars,key=lambda char:char[2][0]))
+        literal=''.join(c for c in word['text']if not c.isspace())
+        identity=(safe(value+literal) and unicodedata.normalize('NFKC',value)==unicodedata.normalize('NFKC',literal)
+                  if require_mapping else len(chars)==len(literal) and all(c[1]>0 for c in chars))
+        # Missing character mappings may decode as replacement characters even
+        # while the glyph IDs and placements are intact. Only image placement
+        # may use that evidence; it never authorizes the decoded spelling.
+        result.append(bool(valid and owners and not text_layer_overpainted(page,owners,word_overlap=True)
+            and identity))
+    return result
 
 
 def synthetic_spacing_uncertain(spans):
@@ -198,16 +439,16 @@ def image_name(record):
 def _attach_stacked_fractions(blocks):
     """Read a PDF's separately drawn numerator/slash/denominator as one token.
 
-    Both small digits must bracket the slash horizontally and vertically. A
-    lone raised digit remains available to the ordinary note/ordinal handling.
+    Both small atoms must bracket the slash horizontally and vertically. A
+    denominator may be a single variable; a lone raised digit remains available
+    to the ordinary note/ordinal handling.
     Ambiguous matches remain separate source atoms rather than guessed text.
     """
     from .extract import Line, Block
     lines = [line for block in blocks for line in block.lines]
-    parts = [line for line in lines if len(line.spans) == 1
-             and re.fullmatch(r'\d{1,3}', line.stripped)
-             and not (line.spans[0].encoding_unresolved or
-                      line.spans[0].transcription_uncertain)]
+    parts = [Line([span],span.bbox) for line in lines for span in line.spans
+             if re.fullmatch(r'(?:\d{1,3}|[A-Za-z])',span.text.strip())
+             and not (span.encoding_unresolved or span.transcription_uncertain)]
     # Discover every plausible owner before changing any line. Otherwise the
     # first slash hides shared digits from later slashes and extraction order
     # silently decides which prose receives the fraction.
@@ -224,7 +465,8 @@ def _attach_stacked_fractions(blocks):
                 nearby = [part for part in parts if part is not line
                           and .5 <= part.size / line.size <= .8]
                 upper = [part for part in nearby
-                         if abs(part.bbox[2] - x0) <= line.size * .18
+                         if part.stripped.isdigit()
+                         and abs(part.bbox[2] - x0) <= line.size * .18
                          and part.bbox[1] < y0 <= part.bbox[3]
                          and part.bbox[3] <= mid + line.size * .06]
                 lower = [part for part in nearby
@@ -244,7 +486,7 @@ def _attach_stacked_fractions(blocks):
             continue
         edits_by_line.setdefault(id(line), {}).setdefault(span_index, []).append(
             (start, end, num, den, box))
-        consumed.update((id(num), id(den)))
+        consumed.update((id(num.spans[0]), id(den.spans[0])))
     replacements = {}
     for line in lines:
         edits = edits_by_line.get(id(line), {})
@@ -252,6 +494,7 @@ def _attach_stacked_fractions(blocks):
             continue
         changed=[]
         for index, span in enumerate(line.spans):
+            if id(span) in consumed:continue
             if index not in edits:
                 changed.append(span)
                 continue
@@ -266,15 +509,30 @@ def _attach_stacked_fractions(blocks):
                 slash=(slash_box[0],slash_box[1],slash_box[2],slash_box[3])
                 new=[left]*len(num.stripped)+[slash]+[right]*len(den.stripped)
                 boxes.extend((start+j,start+j+1,*box) for j,box in enumerate(new))
-            changed.append(replace(span,text=text,char_boxes=tuple(sorted(boxes))))
+            value=replace(span,text=text,char_boxes=tuple(sorted(boxes)))
+            value.source_fraction_parts=tuple((num.stripped,den.stripped,
+                tuple(num.bbox),tuple(slash_box),tuple(den.bbox))
+                for _,_,num,den,slash_box in edits[index])
+            changed.append(value)
+        # A small denominator can cause MuPDF to flag the remaining baseline
+        # as raised. Only the independently established slash baseline and full
+        # body size can clear that flag; actual small raised spans stay raised.
+        baselines=[line.spans[i]for i in edits]
+        for span in changed:
+            if any(abs(span.size-base.size)<.01 and span.origin_y and
+                   abs(span.origin_y-base.origin_y)<.01 for base in baselines):
+                span.flags &= ~1
         replacements[id(line)]=Line(changed,line.bbox,
                                     spacing_uncertain=line.spacing_uncertain,
                                     transcription_uncertain=line.transcription_uncertain)
     return [Block(block.number,block.bbox,
-                  [replacements.get(id(line),line) for line in block.lines if id(line) not in consumed],
+                  [replacements.get(id(line),Line([s for s in line.spans if id(s)not in consumed],
+                     line.bbox,spacing_uncertain=line.spacing_uncertain,
+                     transcription_uncertain=line.transcription_uncertain))
+                   for line in block.lines if any(id(s)not in consumed for s in line.spans)],
                   block.kind)
             for block in blocks if block.kind != 'text' or
-            any(id(line) not in consumed for line in block.lines)]
+            any(id(s)not in consumed for line in block.lines for s in line.spans)]
 
 
 def normalize_blocks(blocks):

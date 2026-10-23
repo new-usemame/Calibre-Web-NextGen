@@ -5,7 +5,7 @@ from cps.services.reflow import vision_pipeline as vp,vision_reading as vr,build
 from cps.services.reflow.source_display import SourceDisplay
 from cps.services.reflow.ledger import Ledger
 from tests.unit.round7_recovery_test_support import fixture,h,TEXTS
-from tests.unit.round7_public_note_contract_support import source_visible
+from tests.unit.round7_public_note_contract_support import local_ocr_visible
 
 def test_outside_reserved_ceiling_cannot_trigger_reread_or_next_primary_request(tmp_path,monkeypatch):
     doc,_,prepared=fixture(tmp_path,monkeypatch);ledger=Ledger(tmp_path/'ledger.jsonl',cap_usd=2.)
@@ -32,7 +32,6 @@ def test_outside_reserved_ceiling_cannot_trigger_reread_or_next_primary_request(
     assert len(dispatched)==1 and reader.reread_calls==0,'UncertainBilling closes both targeted reread and later new primary dispatch even when reconciled pending balance is zero'
     assert ledger.spent()==.2 and ledger.pending_usd()==0,'the known debit is retained; no fabricated unresolved liability or zero-cost claim'
     assert report['new_cost_usd']==.2 and report['reread_pages']==[]
-    assert {(u['page'],u.get('block')) for u in report['degraded_units']}=={(1,None),(2,None)}
     with zipfile.ZipFile(out) as z:docs={n:ET.fromstring(z.read(n)) for n in z.namelist() if n.startswith('OEBPS/ch') and n.endswith('.xhtml')}
-    assert h.body_texts(docs)==[TEXTS[0]]
-    source_visible(out,report,{0,1,2})
+    local_ocr_visible(out,report,{1:[TEXTS[1]],2:[TEXTS[2]]},non_local_pages={0})
+    assert h.body_texts(docs)==list(TEXTS)

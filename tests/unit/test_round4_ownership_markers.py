@@ -13,7 +13,11 @@ def test_note_section_does_not_capture_next_full_size_body_without_heading(tmp_p
     notes.text('NOTES', 'title', x=120, y=35)
     notes.text('7 A small printed note ends without further material.', 'note', 'footnote', y=90, size=7, marker='7', model='A small printed note ends without further material.')
     prose = 'Ordinary full size prose returns on a new page without any heading.'
-    body.text([prose, 'The next printed line belongs to the same ordinary paragraph.'], 'body', size=11)
+    body.text(['Ordinary full size prose returns on a new',
+               'page without any heading.',
+               'The next printed line belongs to the same',
+               'ordinary paragraph.'], 'body', size=11)
+    assert ' '.join(body.page.get_text().split())==' '.join([prose, 'The next printed line belongs to the same ordinary paragraph.']), 'The fixture must paint its complete expected body text inside the page'
     _, _, docs = h.convert_ink(tmp_path, monkeypatch, [notes, body])
     assert ' '.join([prose, 'The next printed line belongs to the same ordinary paragraph.']) in h.body_texts(docs)
     assert all(prose not in ''.join(n.itertext()) for _, n in h.refs_and_notes(docs)[1])

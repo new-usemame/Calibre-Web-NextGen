@@ -16,7 +16,7 @@ def test_original_optical_abort_is_source_backed_only_on_its_page(tmp_path,monke
         if failure=='corrupt_cache':
             pix=display.pixmap(scale=3,max_pixels=8_000_000);identity=hashlib.sha256(pix.tobytes('png')).hexdigest()
             root=Path(cache);root.mkdir(parents=True,exist_ok=True)
-            (root/('literal-tsv-v2-'+identity+'.json')).write_text('{invalid json')
+            (root/(vision_pixels.CACHE_PREFIX+identity+'.json')).write_text('{invalid json')
         try:return actual(display,cache)
         except (RuntimeError,ValueError,subprocess.TimeoutExpired) as error:
             reached.append((failure,type(error).__name__,str(error)));raise

@@ -42,7 +42,8 @@ def test_native_asset_failure_recovers_only_source_known_objects(tmp_path, monke
              'A later native paragraph keeps its complete valid illustration.']
     for n, text in enumerate(texts):
         page = doc.new_page(width=h.W, height=h.H)
-        page.insert_text((24, 50), text, fontsize=10)
+        page.insert_text((24, 50), text, fontsize=9)
+        assert ' '.join(w[4]for w in page.get_text('words'))==text, 'The entire authored sentence must be inside the printed page'
         page.draw_rect([40, 100, 120, 180], color=(0, 0, 1), fill=(0, 0, 1))
         if n: page.draw_line((40, 100), (120, 180), color=(0, 0, 0), width=2)
         prose = assemble.Element('p', runs=[['t', text]], pno=n, bbox=(24, 35, 290, 55))

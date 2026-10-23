@@ -51,7 +51,7 @@ def test_complete_note_runs_left_column_then_right_column_above_opening(tmp_path
     p.page.draw_line((22,270),(130,270),color=(0,0,0))
     p.page.draw_line((164,287),(280,287),color=(0,0,0))
     _,_,docs=h.convert_ink(tmp_path,monkeypatch,[p]);_,notes=h.refs_and_notes(docs)
-    texts=[' '.join(''.join(n.itertext()).split()) for _,n in notes]
+    texts=[h.plain(n)for _,n in notes]  # Exclude generated controls, preserving every authored word and tail.
     assert h.body_texts(docs)==[body],'column continuation words never become recovered body prose'
     assert sum(note in text for text in texts)==1,'complete left-to-right note order survives a right-column continuation above the opening'
     assert sum(first in text for text in texts)==1 and len(notes)==2

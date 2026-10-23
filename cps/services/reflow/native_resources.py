@@ -173,12 +173,13 @@ class Lease:
     Keep this object alive through parent provider/audit/publication checkpoints.
     Close only after owned children have been reaped. Never unlink its lock file.
     """
-    def __init__(self, root, should_stop=None):
+    def __init__(self, root, should_stop=None, *, _cleanup_only=False):
         self.root = Path(root)
         self.should_stop = should_stop
         self.fd = None
         self.reason = None
         self.next_check = 0
+        self.cleanup_only = _cleanup_only
         self.mode = os.environ.get('REFLOW_NATIVE_CAPACITY_MODE', 'checked')
         if self.mode not in ('checked', 'serialize-only'):
             raise ResourceUnavailable('Unknown native resource capacity mode')
@@ -200,7 +201,7 @@ class Lease:
                 fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise ResourceBusy('Native resource busy; retry after the active work completes') from None
-            for sample in range(3):
+            for sample in range(0 if self.cleanup_only else 3):
                 self._cancel()
                 self._capacity(self.admit, self.disk_admit, ResourceUnavailable)
                 if sample < 2 and self.mode == 'checked':
@@ -319,9 +320,50 @@ class Lease:
 
     def before_launch(self):
         # Source snapshot copying may take time after the initial samples.
+        if self.cleanup_only:
+            raise ResourceUnavailable('Cleanup lease cannot launch a native worker')
         self._cancel()
         self._check_identity()
         self._capacity(self.admit, self.disk_admit, ResourceUnavailable)
+
+    def remove_stale_scratch(self, directory):
+        """Remove prior worker roots while their inherited lease is excluded.
+
+        A worker keeps this same open lock description after its parent exits.
+        Acquiring it is stronger evidence than a PID check: PID reuse and an
+        unreadable process table cannot turn a live worker into a stale one.
+        Writers create their scratch only after acquiring the lease, so a new
+        admission cannot race this removal. No age or PID-file guess is used.
+        """
+        self._check_identity()
+        if self.fd is None or not shutil.rmtree.avoids_symlink_attacks:
+            raise ResourceUnavailable('Native scratch cleanup is not safely supported')
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        try:
+            directory_fd = os.open(directory, flags)
+        except FileNotFoundError:
+            return 0
+        except OSError:
+            raise ResourceUnavailable('Native scratch must be an owned directory') from None
+        removed = 0
+        try:
+            with os.scandir(directory_fd) as entries:
+                names = [entry.name for entry in entries
+                         if re.fullmatch(r'native-[a-z0-9_]{8}', entry.name)
+                         and entry.is_dir(follow_symlinks=False)]
+            for name in names:
+                self._check_identity()
+                try:
+                    # fd-based rmtree rejects replaced top-level symlinks and
+                    # never follows links inside a stopped worker's directory.
+                    shutil.rmtree(name, dir_fd=directory_fd)
+                    removed += 1
+                except (FileNotFoundError, NotADirectoryError):
+                    continue
+            self._check_identity()
+        finally:
+            os.close(directory_fd)
+        return removed
 
     def close(self):
         if self.fd is not None:
@@ -333,3 +375,22 @@ class Lease:
 
     def __exit__(self, *args):
         self.close()
+
+
+def recover_stale_scratch(root, *, on_exclusive=None):
+    """Recover stopped workers under the exact admission lock.
+
+    ``root`` is the deployment Reflow directory, not ``native-scratch``. A busy
+    lease is reported rather than waiting or removing anything. The optional
+    recovery callback runs while all native workers are excluded. Cleanup does
+    not require free admission capacity: this can recover a full scratch disk.
+    """
+    if Path(root).is_symlink():
+        raise ResourceUnavailable('Native recovery root must be an owned directory')
+    with Lease(root, _cleanup_only=True) as lease:
+        removed = lease.remove_stale_scratch(Path(root) / 'native-scratch')
+        if on_exclusive is not None:
+            lease._check_identity()
+            on_exclusive()
+            lease._check_identity()
+        return removed

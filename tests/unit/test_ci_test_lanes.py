@@ -533,3 +533,14 @@ def test_the_workflow_invocation_parser_sees_the_gate_it_is_built_on():
         "only %d pytest invocation(s) parsed from %s — the workflow runs more "
         "than that, so the parse has drifted" % (len(invocations), WORKFLOW.name)
     )
+
+
+def test_converter_ci_verifies_the_same_optical_data_installation_as_the_image():
+    installation = _workflow_step_block('Install converter system dependencies')
+    command = 'scripts/install-reflow-latin-ocr.sh /usr/share/tesseract-ocr/5/tessdata'
+    assert command in installation
+    assert command in (REPO / 'Dockerfile').read_text(encoding='utf-8')
+    verification = _workflow_step_block('Verify converter optical data')
+    assert 'pixel_adjudication._latin_directory' in verification
+    assert 'assert directory is not None' in verification
+    assert '_latin_digest()' in verification

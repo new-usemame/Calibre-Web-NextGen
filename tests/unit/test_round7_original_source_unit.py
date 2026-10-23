@@ -47,7 +47,7 @@ class TrustedPackage:
 def test_original_whole_extent_target_and_zero_live_credit(role):
     display,package,images=Display(),TrustedPackage(),{}
     fragment,asides,report=unit_source.source_unit(display,4,'suspect-unit',role,package,images,'Unread <ambiguous> glyph',bbox=[30,40,55,70])
-    assert display.calls == [((0,0,80,120),{'scale':2,'quality':90})], 'hint cannot truncate original source extent'
+    assert display.calls == [((0,0,80,120),{'scale':2,'quality':30,'optimize':True})], 'hint cannot truncate original source extent'
     assert report['source_image'] in package.images and report['source_image'] in images
     pixels=Image.open(io.BytesIO(package.images[report['source_image']])).convert('RGB')
     for x,y in ((6,6),(151,6),(6,231),(151,231)):

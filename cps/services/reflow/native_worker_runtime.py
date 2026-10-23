@@ -146,7 +146,10 @@ def serve(parent, cache_root, control):
                         if doc is not None or set(args) != {'fingerprint'}: raise ValueError('native open')
                         fingerprint = extract.document_fingerprint(root / 'source.pdf')
                         if fingerprint != args['fingerprint']: raise ValueError('source fingerprint')
-                        doc = pymupdf.open(root / 'source.pdf'); value = len(doc)
+                        from . import native_limits
+                        doc = extract.open_document(root / 'source.pdf')
+                        native_limits.check_document(doc)
+                        value = len(doc)
                     else:
                         if doc is None or extract.document_fingerprint(root / 'source.pdf') != fingerprint:
                             error = unit_recovery.SourceIntegrityError if context is not None else ValueError
@@ -277,7 +280,8 @@ def serve(parent, cache_root, control):
                         stage=exc.stage,cause_type=type(exc.cause).__name__)
                 elif context is not None and isinstance(exc, (unit_recovery.SourceIntegrityError,MemoryError,OSError)):
                     failure = dict(kind='native_fatal_error',source_sha256=fingerprint,
-                        cause_type=('OSError' if isinstance(exc,OSError) else type(exc).__name__),
+                        cause_type=('SourceIntegrityError' if isinstance(exc,unit_recovery.SourceIntegrityError)
+                            else 'OSError' if isinstance(exc,OSError) else type(exc).__name__),
                         errno=getattr(exc,'errno',None))
                 reply = {'seq': sequence, 'ok': False, 'value': failure}
             ipc.write_owned(root, 'response.json', reply)

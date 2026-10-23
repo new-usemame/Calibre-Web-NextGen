@@ -996,3 +996,83 @@ def test_a_preparation_that_cannot_join_the_line_says_why_in_the_readers_languag
     assert error["code"] == code
     english = {"owner_busy": "You already", "queue_full": "Local source"}[reason]
     assert error["message"] and not error["message"].startswith(english), error["message"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", ["false", "true", 0, 1, None, [], {}])
+def test_replacement_consent_requires_a_json_boolean(mod, monkeypatch, pdf_on_disk, value):
+    _wire(mod, monkeypatch, pdf_on_disk, epub=True)
+    resp, added = _start(mod, {"mode": "full", "consent": True,
+                               "replace_existing_epub": value})
+    assert _status(resp) == 400
+    assert _json(resp)["error"]["code"] == "invalid_options"
+    added.assert_not_called()
+    with pytest.raises(ValueError, match="boolean"):
+        mod.tasks_reflow.ReflowOptions({"replace_existing_epub": value})
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value,expected", [(False, 409), (True, 202)])
+def test_literal_replacement_boolean_keeps_the_existing_file_guard(
+        mod, monkeypatch, pdf_on_disk, value, expected):
+    _wire(mod, monkeypatch, pdf_on_disk, epub=True)
+    resp, added = _start(mod, {"mode": "full", "consent": True,
+                               "replace_existing_epub": value})
+    assert _status(resp) == expected
+    if value:
+        assert added.call_args[0][1].options.replace_existing_epub is True
+    else:
+        added.assert_not_called()
+
+
+@pytest.mark.unit
+def test_same_size_timestamp_replacement_invalidates_the_estimate(
+        mod, monkeypatch, pdf_on_disk):
+    wired = _wire(mod, monkeypatch, pdf_on_disk)
+    path = mod._format_path(wired, "PDF")
+    with open(path, "wb") as handle:
+        handle.write(b"AAAA")
+    stamp = os.stat(path)
+    first = mod._survey_cached(path)
+    first_key = mod._cache_key(path)
+    monkeypatch.setattr(mod, "_survey_uncached", lambda _path: _quote(pages=17, verdict="TEXT_SCAN"))
+    with open(path, "wb") as handle:
+        handle.write(b"BBBB")
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    second = mod._survey_cached(path)
+    assert mod._cache_key(path) != first_key
+    assert first["pages"] == 400
+    assert second["pages"] == 17 and second["cached"] is False
+    assert second["source_sha256"] == mod.extract.document_fingerprint(path)
+    assert mod._survey_cached(path)["cached"] is True
+
+
+@pytest.mark.unit
+def test_estimate_is_not_cached_if_the_source_changes_during_survey(
+        mod, monkeypatch, pdf_on_disk):
+    wired = _wire(mod, monkeypatch, pdf_on_disk)
+    path = mod._format_path(wired, "PDF")
+    def changing_survey(_path):
+        with open(path, "ab") as handle:
+            handle.write(b"changed")
+        return _quote()
+    monkeypatch.setattr(mod, "_survey_uncached", changing_survey)
+    with pytest.raises(ValueError, match="changed"):
+        mod._survey_cached(path)
+    directory = os.path.join(mod.REFLOW_DIR, "estimates")
+    assert not os.path.isdir(directory) or os.listdir(directory) == []
+
+
+@pytest.mark.unit
+def test_assessment_never_pairs_old_findings_with_a_new_content_fingerprint(
+        mod, monkeypatch, pdf_on_disk):
+    book = _wire(mod, monkeypatch, pdf_on_disk)
+    source = mod._format_path(book, "PDF")
+    previous = mod.extract.document_fingerprint(source)
+    def stale_survey(_path):
+        with open(source, "ab") as handle:
+            handle.write(b"new source")
+        return dict(_quote(), source_sha256=previous)
+    monkeypatch.setattr(mod, "_survey", stale_survey)
+    with pytest.raises(ValueError, match="changed"):
+        mod._estimate_payload(book, source)

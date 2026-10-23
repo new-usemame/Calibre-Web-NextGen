@@ -303,7 +303,8 @@ COPY --from=dependencies /opt/python /opt/python
 # Install only runtime apt packages (no Python — that came from PBS via the COPY above)
 # tesseract-ocr + eng + osd: Reflow's local source recovery reads picture-only and
 # damaged PDF pages with the Tesseract CLI (cps/services/reflow/ocr.py). English is
-# the bundled recognition language; osd is required for orientation detection.
+# the primary recognition language; a compact Latin optical alphabet is installed
+# below. osd is required for orientation detection.
 # Operator-approved 2026-09-22 (project rule 6); tesseract-ocr-all is NOT approved.
 # Without these packages the app still runs: recovery reports the engine missing
 # and conversions keep a facsimile of those pages.
@@ -361,6 +362,10 @@ RUN \
 # STEP 6 - Copy application files
 # Copy the rest of the application code (changes most frequently)
 COPY --chown=abc:abc . /app/calibre-web-automated/
+
+# The compact optical-only Latin alphabet retains macron vowels that eng cannot
+# emit. Download/checksum/strip once at build time, never during a conversion.
+RUN /app/calibre-web-automated/scripts/install-reflow-latin-ocr.sh /usr/share/tesseract-ocr/5/tessdata
 
 RUN \
   # Install our Python package. The dependencies were installed in STEP 3.1.

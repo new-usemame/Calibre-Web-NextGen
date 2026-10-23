@@ -11,11 +11,14 @@ import uuid
 from pathlib import Path
 
 
+CACHE_PREFIX='literal-tsv-v3-'
+
+
 def words(display,cache):
     pix=display.pixmap(scale=3,max_pixels=8_000_000)
     image=pix.tobytes('png');identity=hashlib.sha256(image).hexdigest()
     root=Path(cache);root.mkdir(parents=True,exist_ok=True)
-    target=root/('literal-tsv-v2-'+('split-landscape-v1-' if pix.width>=pix.height*1.2 else '')+identity+'.json')
+    target=root/(CACHE_PREFIX+('split-landscape-v2-' if pix.width>=pix.height*1.2 else '')+identity+'.json')
     with (root/(identity+'.lock')).open('a') as handle:
         fcntl.flock(handle,fcntl.LOCK_EX)
         if target.exists():return json.loads(target.read_text())
@@ -32,10 +35,17 @@ def _recognize(display,pix,image,target):
     tiles=[(image,0)]
     if pix.width>=pix.height*1.2:
         from PIL import Image
-        picture=Image.open(io.BytesIO(image));mid=pix.width//2;tiles=[]
-        for left,right in ((0,mid),(mid,pix.width)):
-            stream=io.BytesIO();picture.crop((left,0,right,pix.height)).save(stream,format='PNG')
-            tiles.append((stream.getvalue(),left))
+        picture=Image.open(io.BytesIO(image));mid=pix.width//2
+        # A wide raster is not evidence of a blank division. Cutting through
+        # printed words creates a second, damaged inventory which must never
+        # overrule the complete first reading. Keep the bounded full raster
+        # unless the actual shared gutter is positively blank.
+        gutter=picture.convert('L').crop((max(0,mid-2),0,min(pix.width,mid+2),pix.height))
+        if gutter.getextrema()[0]>=235:
+            tiles=[]
+            for left,right in ((0,mid),(mid,pix.width)):
+                stream=io.BytesIO();picture.crop((left,0,right,pix.height)).save(stream,format='PNG')
+                tiles.append((stream.getvalue(),left))
     output=[];sx=display.rect.width/pix.width;sy=display.rect.height/pix.height
     for tile,offset in tiles:
         proc=subprocess.run([engine,'stdin','stdout','-l','eng','--psm','3','tsv'],
@@ -46,7 +56,16 @@ def _recognize(display,pix,image,target):
         for row in csv.DictReader(io.StringIO(proc.stdout.decode('utf-8')),delimiter='\t',quoting=csv.QUOTE_NONE):
             if row['level']!='5' or not row['text'].strip():continue
             x,y,w,h=[int(row[k]) for k in ('left','top','width','height')];x+=offset
-            output.append({'text':row['text'],'bbox':[x*sx,y*sy,(x+w)*sx,(y+h)*sy]})
+            word={'text':row['text'],'bbox':[x*sx,y*sy,(x+w)*sx,(y+h)*sy]}
+            try:
+                confidence=float(row.get('conf',''))
+                if 0<=confidence<=100:word['confidence']=confidence
+            except (ValueError,TypeError):pass
+            try:
+                line=[int(row[name]) for name in ('page_num','block_num','par_num','line_num')]
+                if all(value>0 for value in line):word['optical_line']=[offset,*line]
+            except (KeyError,ValueError,TypeError):pass
+            output.append(word)
     temp=target.with_suffix('.tmp');temp.write_text(json.dumps(output,ensure_ascii=False));os.replace(temp,target)
     return output
 

@@ -50,7 +50,7 @@ def test_footer_note_core_matches_never_become_body_instances(tmp_path,monkeypat
         p.finish=finish_with_fused_opening
     _,_,docs=h.convert_ink(tmp_path,monkeypatch,[p])
     body=stream(docs);_,notes=h.refs_and_notes(docs)
-    texts=[' '.join(''.join(n.itertext()).split()) for _,n in notes]
+    texts=[h.plain(n) for _,n in notes]
     assert 'for archival readers.' not in body,'note-only ending must not enter BODY optical fallback'
     assert body.count(shared)==1,'the actual BODY occurrence stays once; separate footer words never enlarge its optical stream'
     assert '24A' not in body and '24 ' not in body,'a source note opening label never enters BODY through a rounding halo'

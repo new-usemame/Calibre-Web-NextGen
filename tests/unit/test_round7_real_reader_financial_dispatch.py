@@ -6,7 +6,7 @@ from cps.services.reflow import vision_pipeline as vp,vision_reading as vr,build
 from cps.services.reflow.source_display import SourceDisplay
 from cps.services.reflow.ledger import Ledger
 from tests.unit.round7_recovery_test_support import fixture,h,TEXTS
-from tests.unit.round7_public_note_contract_support import source_visible
+from tests.unit.round7_public_note_contract_support import local_ocr_visible
 
 @pytest.mark.parametrize('mode',['unknown_transport','unknown_bill','cap','known_billed_bad_content'])
 def test_actual_reader_dispatch_hold_cap_and_one_known_billed_reread(tmp_path,monkeypatch,mode):
@@ -62,13 +62,11 @@ def test_actual_reader_dispatch_hold_cap_and_one_known_billed_reread(tmp_path,mo
             witness=e['request_witness'];image=(reader.cache/(e['image_sha256']+'-'+e['config_sha256']+'.liability-source.jpg')).read_bytes()
             assert hashlib.sha256(image).hexdigest()==e['image_sha256']
             assert reader._bounded_image_request(image,witness['prompt'],witness['api_schema'],witness['confidence_protocol'])==held[e['attempt']]
-        assert {(u['page'],u.get('block'))for u in report['degraded_units']}=={(1,None),(2,None)}
-        assert h.body_texts(docs)==[TEXTS[0]]
-        source_visible(path,report,{0,1,2})
+        local_ocr_visible(path,report,{1:[TEXTS[1]],2:[TEXTS[2]]},non_local_pages={0})
+        assert h.body_texts(docs)==list(TEXTS)
     else:
         assert len(dispatch)==(0 if mode=='cap' else 1),'no later paid dispatch after cap or unresolved bill'
         assert reader.reread_calls==0 and report['reread_pages']==[],'financially blocked page must not consume or invoke targeted reread'
         assert ledger.spent()==0 and (ledger.pending_usd()==0 if mode=='cap' else ledger.pending_usd()>0)
-        assert {(u['page'],u.get('block')) for u in report['degraded_units']}==({(1,None)} if mode=='cap' else {(1,None),(2,None)})
-        assert h.body_texts(docs)==([TEXTS[0],TEXTS[2]] if mode=='cap' else [TEXTS[0]])
-        source_visible(path,report,{0,1,2})
+        local_ocr_visible(path,report,{1:[TEXTS[1]]},non_local_pages={0,2})
+        assert h.body_texts(docs)==list(TEXTS)

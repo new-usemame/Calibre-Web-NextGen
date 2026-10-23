@@ -9,7 +9,6 @@ Tesseract scores are engine scores, not probabilities of a correct transcription
 """
 
 from dataclasses import asdict, dataclass, field, replace
-from functools import lru_cache
 import csv
 import hashlib
 import json
@@ -99,8 +98,7 @@ def _env():
     return environment
 
 
-@lru_cache(maxsize=32)
-def _file_digest(path, size, modified_ns, identity=None):
+def _file_digest(path):
     digest = hashlib.sha256()
     with open(path, "rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -109,7 +107,8 @@ def _file_digest(path, size, modified_ns, identity=None):
 
 
 # Each supervised native worker owns one job. Cache only successful prerequisite
-# probes; receipt keys still use the same engine version and traineddata digest.
+# probes. Every reuse hashes the current executable and language bytes; file
+# timestamps alone cannot identify rapid equal-length rewrites.
 _ENGINE_IDENTITIES = {}
 
 
@@ -118,18 +117,30 @@ def _identity_stat(path):
     return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
 
 
+def _file_identity(path):
+    """Verify current bytes and symlink target without metadata-only memoization."""
+    candidate = Path(path).absolute()
+    resolved = candidate.resolve(strict=True)
+    stamp = _identity_stat(resolved)
+    digest = _file_digest(resolved)
+    if candidate.resolve(strict=True) != resolved or _identity_stat(resolved) != stamp:
+        raise OSError("OCR prerequisite changed during verification")
+    return str(resolved), stamp, digest
+
+
 def _engine(language):
     if os.name != "posix":
         raise OCRUnavailable("Local OCR requires POSIX process containment (including the Docker image).")
     executable = shutil.which("tesseract")
     if not executable:
         raise OCRUnavailable("Local text recognition requires Tesseract.")
-    executable = str(Path(executable).resolve())
+    executable_path = str(Path(executable).absolute())
     requested = language.split("+") if isinstance(language, str) else []
     if not requested or len(requested) > 4 or any(not LANGUAGE.fullmatch(x) for x in requested):
         raise OCRUnavailable("Choose one to four installed OCR languages.")
     try:
-        executable_identity = _identity_stat(executable)
+        executable_identity = _file_identity(executable_path)
+        executable = executable_identity[0]
     except OSError as exc:
         raise OCRUnavailable("The local text recognition engine is unavailable.") from exc
     key = (executable, executable_identity, language, os.getcwd(),
@@ -138,7 +149,8 @@ def _engine(language):
     if cached is not None:
         result, files = cached
         try:
-            if all(_identity_stat(path) == stamp for path, stamp in files):
+            if (all(_file_identity(path) == identity for path, identity in files)
+                    and _file_identity(executable_path) == executable_identity):
                 return result
         except OSError:
             pass
@@ -163,18 +175,20 @@ def _engine(language):
     try:
         for name in sorted(set(requested + ["osd"])):
             candidate = (data_dir / (name + ".traineddata")).absolute()
-            path = candidate.resolve(strict=True)
-            stamp = _identity_stat(path)
-            identities.append((name, _file_digest(str(path), stamp[2], stamp[3], stamp)))
-            if _identity_stat(path) != stamp:
-                raise OSError("OCR language data changed during verification")
-            files.append((str(candidate), stamp))
+            file_identity = _file_identity(candidate)
+            identities.append((name, file_identity[2]))
+            files.append((str(candidate), file_identity))
+        if any(_file_identity(path) != identity for path, identity in files):
+            raise OSError("OCR language data changed during verification")
     except OSError as exc:
         raise OCRUnavailable("OCR language data could not be verified.") from exc
-    identity = hashlib.sha256(json.dumps(identities).encode()).hexdigest()
+    # The public receipt shape stays stable, but its effective data identity
+    # includes engine bytes even when a replacement reports the same version.
+    identity = hashlib.sha256(json.dumps(dict(
+        engine_sha256=executable_identity[2], languages=identities), sort_keys=True).encode()).hexdigest()
     result = (executable, version, identity)
     try:
-        if _identity_stat(executable) != executable_identity:
+        if _file_identity(executable_path) != executable_identity:
             raise OSError("engine identity changed")
     except OSError as exc:
         raise OCRUnavailable("The local text recognition engine changed during verification.") from exc

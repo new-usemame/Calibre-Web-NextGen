@@ -99,7 +99,7 @@ def test_new_explicit_note_and_terminal_punctuation_preserve_distinct_owners(tmp
         p.page.insert_text((22,y),mark+' '+text,fontsize=4,fontname='unicode')
         p.blocks.append(h.model_block(text,ident,'footnote',[20,y-7,282,y+3],marker=mark))
     _,_,docs=h.convert_ink(tmp_path,monkeypatch,[p]);_,notes=h.refs_and_notes(docs)
-    texts=[' '.join(''.join(n.itertext()).split()) for _,n in notes]
+    texts=[h.plain(n) for _,n in notes]
     assert h.body_texts(docs)==[body] and len(notes)==3
     expected=['The first authored note ends here.','Another independently authored note begins afresh.','A final newly marked note owns its own wording.']
     assert all(sum(s in t for t in texts)==1 for s in expected)

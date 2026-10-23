@@ -127,9 +127,16 @@ def dumps(value):
         dump([index, kind, data]); write(b'\n')
         memo[identity] = index
         return {'ref': index}
-    root = visit(value)
-    write(b'],"root":'); dump(root); write(b'}\n')
-    return output.getvalue()
+    try:
+        root = visit(value)
+        write(b'],"root":'); dump(root); write(b'}\n')
+        return output.getvalue()
+    finally:
+        # Recursive traversal must not retain completed wire buffers until GC.
+        memo.clear()
+        active.clear()
+        output.close()
+        visit = None
 
 
 def _json(raw):

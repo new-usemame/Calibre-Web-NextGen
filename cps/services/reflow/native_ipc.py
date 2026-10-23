@@ -29,6 +29,28 @@ MAX_REPAIR_EVENTS = 4096
 BUILD_DOCUMENT_CLOSE_GRACE_SECONDS = 30
 
 
+def operation_timeout(operation, arguments, page_count):
+    """Absolute operation walls, including progress and parent acknowledgements.
+
+    Preparation can perform bounded OCR for every selected page; it has no paid
+    reader. Give bulk work a page allowance, capped at six hours. Opening and
+    survey have smaller limits; neither performs OCR or model dispatch.
+    """
+    if operation == 'open':
+        return 60
+    if operation == 'survey':
+        return min(3600, 120 + 2 * page_count)
+    if operation in ('prepare', 'build'):
+        selected = arguments.get('page_numbers') if operation == 'prepare' else arguments.get('page_html')
+        pages = page_count if selected is None else len(selected)
+        return min(21600, 1800 + 60 * pages)
+    return 1800
+
+
+class NativeDeadlineExceeded(TimeoutError):
+    pass
+
+
 class ChildExited(RuntimeError):
     pass
 
@@ -176,16 +198,23 @@ class NativeDocument:
         self.shutdown_evidence = None
         self.operation_book = None
         self.resource_lease = None
-        os.makedirs(scratch_root, mode=0o700, exist_ok=True)
-        self.root = tempfile.mkdtemp(prefix='native-', dir=scratch_root)
+        self.operation_deadline = None
+        self.deadline_exceeded = False
+        self.root = None
         self.selector = selectors.DefaultSelector()
         try:
             self.resource_lease = Lease(cache_root or Path(scratch_root).parent, should_stop)
+            self.resource_lease.remove_stale_scratch(scratch_root)
+            os.makedirs(scratch_root, mode=0o700, exist_ok=True)
+            self.root = tempfile.mkdtemp(prefix='native-', dir=scratch_root)
             shutil.copyfile(source, Path(self.root) / 'source.pdf')
             self.fingerprint = extract.document_fingerprint(Path(self.root) / 'source.pdf')
             if extract.document_fingerprint(source) != self.fingerprint:
                 raise ValueError('Source changed while preparing native worker')
             environment = ocr._env()
+            alternate_data = os.environ.get('REFLOW_LATIN_TESSDATA')
+            if alternate_data is not None:
+                environment['REFLOW_LATIN_TESSDATA'] = alternate_data
             environment.update(TMPDIR=self.root, PYTHONNOUSERSITE='1', PYTHONFAULTHANDLER='1')
             environment['REFLOW_NATIVE_LEASE_FD'] = str(self.resource_lease.fd)
             # Fixed installed script and -I exclude cwd, user site and PYTHONPATH.
@@ -232,6 +261,9 @@ class NativeDocument:
             self.stderr_drain_state = 'error'
 
     def _cancel(self):
+        deadline = getattr(self, 'operation_deadline', None)
+        if deadline is not None and time.monotonic() >= deadline:
+            raise NativeDeadlineExceeded("The native PDF operation exceeded its safety deadline.")
         self.check_resources()
         if self.should_stop and self.should_stop():
             from .model import AttemptCancelled
@@ -297,6 +329,8 @@ class NativeDocument:
         if controller is not None and operation in ('prepare','build','operations','layout_prepare','layout_figures'):
             arguments = dict(arguments, _unit_recovery=_unit_context(controller, self.fingerprint))
         write_owned(self.root, 'request.json', {'seq': self.seq, 'operation': operation, 'arguments': arguments})
+        self.operation_deadline = time.monotonic() + operation_timeout(
+            operation, arguments, getattr(self, 'page_count', 0))
         try:
             self.process.stdin.write((str(self.seq) + '\n').encode()); self.process.stdin.flush()
             while True:
@@ -342,7 +376,13 @@ class NativeDocument:
                         if value['cause_type'] == 'MemoryError':raise MemoryError('Native worker memory failure')
                         if value['cause_type'] == 'OSError':raise OSError(value['errno'], 'Native worker storage failure')
                         raise unit_recovery.SourceIntegrityError('Native worker source/configuration failure')
-                    from . import structural_ops, ocr, build_epub, model
+                    from . import structural_ops, ocr, build_epub, model, extract, native_limits
+                    if reply['value'] == 'PasswordProtected':
+                        raise extract.PasswordProtected(
+                            'This PDF is password-protected. Remove its password before converting it.')
+                    if reply['value'] == 'DecodedBudgetExceeded':
+                        raise native_limits.DecodedBudgetExceeded(
+                            'The decoded PDF stream exceeds the 128 MiB safety budget, or the decoded PDF document exceeds the 8 GiB safety budget.')
                     error = {'ContractError': structural_ops.ContractError,
                              'OCRUnavailable': ocr.OCRUnavailable,
                              'OCRCancelled': ocr.OCRCancelled,
@@ -355,8 +395,14 @@ class NativeDocument:
                 self.last_completed_phase = operation
                 self.last_completed_sequence = self.seq
                 return value
+        except NativeDeadlineExceeded:
+            self.deadline_exceeded = True
+            self.close()
+            raise
         except (BrokenPipeError, EOFError) as exc:
             raise ChildExited('Native PDF worker disconnected during ' + operation) from exc
+        finally:
+            self.operation_deadline = None
 
     def prepare_result(self, **arguments):
         arguments.pop('client', None); arguments.pop('ledger', None); arguments.pop('cache', None)
@@ -483,7 +529,7 @@ class NativeDocument:
                 or evidence.get('group_state') != 'absent'
                 or not evidence.get('stderr_drain_complete')
                 or evidence.get('cleanup_error') or evidence.get('record_error')
-                or any(item['reason'] in ('eof_timeout', 'document_close_timeout', 'cancelled', 'resource_stop')
+                or any(item['reason'] in ('eof_timeout', 'document_close_timeout', 'cancelled', 'resource_stop', 'operation_deadline')
                        for item in evidence['signals'])):
             raise ChildExited('Native runtime cleanup failed or could not be verified')
 
@@ -573,8 +619,8 @@ class NativeDocument:
                 deadline = time.monotonic() + SHUTDOWN_EOF_SECONDS
                 grace_granted = False
                 close_finished = False
-                termination_reason = None
-                while process.poll() is None:
+                termination_reason = 'operation_deadline' if getattr(self, 'deadline_exceeded', False) else None
+                while process.poll() is None and termination_reason is None:
                     stop = getattr(self, 'should_stop', None)
                     if stop:
                         try: cancelled = bool(stop())
@@ -642,7 +688,8 @@ class NativeDocument:
             if self.control: self.control.close()
             self.selector.close()
             if process and self.drain and not self.drain.is_alive(): process.stdout.close()
-            shutil.rmtree(self.root)
+            if self.root is not None:
+                shutil.rmtree(self.root)
         except BaseException as exc:
             if evidence is not None: evidence['cleanup_error'] = type(exc).__name__
             raise

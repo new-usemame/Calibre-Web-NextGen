@@ -1188,3 +1188,67 @@ def test_actual_free_task_files_builder_glyph_images_after_internal_validation(r
     with zipfile.ZipFile(target) as archive:
         assert any(b'class="source-glyph"' in archive.read(n) for n in archive.namelist() if n.endswith('.xhtml'))
     assert rig.local_db.session.commits==1
+
+
+@pytest.mark.parametrize("failure", ["grown", "missing", "database", "protected"])
+def test_queued_failure_before_native_work_is_durable_owned_and_visible(
+        rig, monkeypatch, failure):
+    import inspect
+    from unittest.mock import patch
+    from cps.api import reflow as api
+    from cps.services.reflow import native_ipc
+    from tests.unit.test_reflow_api import _ctx, _json, _start, _status, _user, _wire
+
+    monkeypatch.setattr(api, "REFLOW_DIR", rig.root)
+    _wire(api, monkeypatch, {"library": str(rig.folder.parent.parent),
+                             "name": "Book - Author"})
+    monkeypatch.setattr(rig.mod.config, "config_reflow_max_pdf_mb", 1, raising=False)
+    old = ledger_mod.Ledger(os.path.join(rig.root, "jobs", "5", "b" * 16 + ".jsonl"), 0)
+    old.record({"kind": "job", "event": "start", "user_id": 7, "mode": "full"})
+    old.record({"kind": "job", "event": "finish", "status": "done"})
+    os.utime(old.path, (1, 1))
+    response, added = _start(api, {"mode": "full", "consent": True})
+    assert _status(response) == 202
+    task = added.call_args[0][1]
+    source = rig.folder / "Book - Author.pdf"
+    if failure == "grown":
+        with source.open("ab") as handle:
+            handle.write(b"0" * 1048576)
+        reason = "over the limit"
+    elif failure == "missing":
+        source.unlink()
+        reason = "no PDF"
+    elif failure == "database":
+        def unavailable(**_kwargs):
+            raise RuntimeError("Library database unavailable")
+        monkeypatch.setattr(rig.mod.db, "CalibreDB", unavailable)
+        reason = "Library database unavailable"
+    else:
+        def protected(*_args, **_kwargs):
+            raise ValueError("This PDF is password-protected. Remove its password before converting it.")
+        monkeypatch.setattr(native_ipc, "NativeDocument", protected)
+        reason = "password-protected"
+    task.run(None)
+    assert task.stat == STAT_FAIL and reason in str(task.error)
+    assert task.done_event.is_set()
+
+    # Remove all retained task state: the endpoint must read the durable result.
+    monkeypatch.setattr(api.WorkerThread, "get_instance",
+                        staticmethod(lambda: SimpleNamespace(tasks=[])))
+    def listing(user):
+        with _ctx("/api/v1/books/5/reflow/jobs"), patch.object(api, "current_user", user):
+            return _json(inspect.unwrap(api.reflow_jobs)(5))
+    mine = listing(_user())
+    assert mine["active"] == []
+    assert mine["items"][0]["job_id"] == task.job_id
+    assert mine["items"][0]["status"] == "failed"
+    assert reason in mine["items"][0]["error"]
+    assert len(mine["items"]) == 2
+    assert listing(_user(uid=8))["items"] == []
+    assert listing(_user(uid=8, admin=True))["items"][0]["job_id"] == task.job_id
+    task_id = task.job_id
+    del task
+    rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[]))
+    restarted = listing(_user())["items"][0]
+    assert restarted["job_id"] == task_id and restarted["status"] == "failed"
+    assert reason in restarted["error"]

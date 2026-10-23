@@ -262,6 +262,19 @@ function TocList({ items, onPick, untitled, nested = false }: {
 function applyDocumentTheme(doc: Document, theme: ReaderTheme) {
   const bg = THEMES[theme].body.background.replace(' !important', '');
   const fg = THEMES[theme].body.color.replace(' !important', '');
+  // Evidence retains opaque white paper for direct EPUB renderers and their
+  // screen inversion. Blend just these print classes into this reader's page;
+  // dark themes invert their ink first. Ordinary book artwork keeps its colors.
+  let evidenceStyle = doc.getElementById('cwng-print-evidence-theme') as HTMLStyleElement | null;
+  if (!evidenceStyle) {
+    evidenceStyle = doc.createElement('style');
+    evidenceStyle.id = 'cwng-print-evidence-theme';
+    doc.head.appendChild(evidenceStyle);
+  }
+  const darkPrint = theme === 'dark' || theme === 'black';
+  evidenceStyle.textContent = 'a.source-word-image img, .reflow-unit-print img, aside.vision-disclosure img {'
+    + `filter:${darkPrint ? 'invert(1)' : 'none'} !important;`
+    + `mix-blend-mode:${darkPrint ? 'screen' : 'multiply'} !important;}`;
   doc.documentElement.style.setProperty('background', bg, 'important');
   if (doc.body) {
     doc.body.style.setProperty('background', bg, 'important');

@@ -2092,13 +2092,22 @@ def _config_checkbox_int(to_save, x):
 
 
 def _config_float(to_save, x):
-    """A dollar figure from a form. A blank or unparseable field leaves the stored
-    value alone rather than resetting a spending limit to zero."""
+    """Store dollar limits in cents, rounding excess precision downward.
+
+    Blank, invalid and nonfinite fields retain the stored value. Decimal parsing
+    keeps an off-step request from increasing the amount the administrator typed.
+    """
+    from decimal import Decimal, InvalidOperation, ROUND_DOWN
+
     def _parse(value):
         try:
-            number = float(value)
-            return max(0.0, round(number, 4)) if math.isfinite(number) else getattr(config, x, 0.0)
-        except (TypeError, ValueError, OverflowError):
+            number = Decimal(str(value))
+            if not number.is_finite():
+                return getattr(config, x, 0.0)
+            cents = max(Decimal(0), number).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+            result = float(cents)
+            return result if math.isfinite(result) else getattr(config, x, 0.0)
+        except (TypeError, ValueError, OverflowError, InvalidOperation):
             return getattr(config, x, 0.0)
     return config.set_from_dictionary(to_save, x, _parse)
 

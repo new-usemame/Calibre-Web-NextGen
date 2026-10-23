@@ -3003,11 +3003,11 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "The server rejected a batch as too large (maximum {max} books)."
-msgstr ""
+msgstr "رفض الخادم الدفعة لأنها كبيرة جدًا (الحد الأقصى {max} من الكتب)."
 
 #: cps/spa_strings.py
 msgid "The server rejected a batch as too large."
-msgstr ""
+msgstr "رفض الخادم الدفعة لأنها كبيرة جدًا."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3026,7 +3026,7 @@ msgstr "كل كتاب هنا موجود بالفعل في مكتبتك."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Everything on the server, including every new book added to it."
-msgstr ""
+msgstr "كل ما على الخادم، بما في ذلك كل كتاب جديد يُضاف إليه."
 
 #: cps/spa_strings.py
 msgid "Enter a valid book ID."
@@ -3050,7 +3050,7 @@ msgstr "في مكتبتك"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "It also leaves these shelves: {shelves}."
-msgstr ""
+msgstr "سيُزال أيضًا من هذه الرفوف: {shelves}."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3098,7 +3098,7 @@ msgstr "يمكن للمسؤول فقط إعادة إضافته."
 
 #: cps/spa_strings.py
 msgid "Only the books chosen for this account."
-msgstr ""
+msgstr "الكتب المختارة لهذا الحساب فقط."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
@@ -3139,11 +3139,11 @@ msgstr "جارٍ الإزالة…"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Search the global library for \"{query}\" instead"
-msgstr ""
+msgstr "ابحث عن «{query}» في المكتبة الشاملة بدلًا من ذلك"
 
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
-msgstr ""
+msgstr "إعداد «مكتبتي» لجميع المستخدمين"
 
 #: cps/spa_strings.py
 msgid ""
@@ -3224,7 +3224,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "It leaves your library and your OPDS feed."
-msgstr ""
+msgstr "سيُزال من مكتبتك ومن موجز OPDS الخاص بك."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid ""
@@ -3235,7 +3235,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "The whole archive. Add books to your library from here."
-msgstr ""
+msgstr "الأرشيف بأكمله. أضف كتبًا إلى مكتبتك من هنا."
 
 #: cps/spa_strings.py
 msgid "The whole library"
@@ -3325,7 +3325,7 @@ msgstr "الجهاز"
 
 #: cps/spa_strings.py
 msgid "Collects on the device's next sync."
-msgstr ""
+msgstr "يُجمَع عند المزامنة التالية للجهاز."
 
 #: cps/spa_strings.py
 msgid "Choose a device"
@@ -3365,27 +3365,27 @@ msgstr "تطبيق على {n} من الكتب"
 
 #: cps/spa_strings.py
 msgid "Match condition"
-msgstr ""
+msgstr "شرط المطابقة"
 
 #: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule field"
-msgstr ""
+msgstr "حقل القاعدة"
 
 #: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Rule operator"
-msgstr ""
+msgstr "عامل القاعدة"
 
 #: cps/spa_strings.py
 msgid "Could not load smart-shelf rules."
-msgstr ""
+msgstr "تعذر تحميل قواعد الرف الذكي."
 
 #: cps/spa_strings.py
 msgid "Has Cover"
-msgstr ""
+msgstr "لديه غلاف"
 
 #: cps/spa_strings.py
 msgid "Series Index"
-msgstr ""
+msgstr "رقم الكتاب في السلسلة"
 
 #: cps/spa_strings.py cps/templates/search_form.html
 msgid "Read Status"
@@ -3393,55 +3393,55 @@ msgstr "حالة القراءة"
 
 #: cps/spa_strings.py
 msgid "Has Hardcover ID"
-msgstr ""
+msgstr "لديه معرّف Hardcover"
 
 #: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "In the past N days"
-msgstr ""
+msgstr "خلال آخر N يومًا"
 
 #: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Not in the past N days"
-msgstr ""
+msgstr "ليس خلال آخر N يومًا"
 
 #: cps/spa_strings.py
 msgid "is before / less than"
-msgstr ""
+msgstr "قبل / أقل من"
 
 #: cps/spa_strings.py
 msgid "is on or before / at most"
-msgstr ""
+msgstr "في أو قبل / بحد أقصى"
 
 #: cps/spa_strings.py
 msgid "is after / greater than"
-msgstr ""
+msgstr "بعد / أكبر من"
 
 #: cps/spa_strings.py
 msgid "is on or after / at least"
-msgstr ""
+msgstr "في أو بعد / بحد أدنى"
 
 #: cps/spa_strings.py
 msgid "is between"
-msgstr ""
+msgstr "بين"
 
 #: cps/spa_strings.py
 msgid "is not between"
-msgstr ""
+msgstr "ليس بين"
 
 #: cps/spa_strings.py
 msgid "does not begin with"
-msgstr ""
+msgstr "لا يبدأ بـ"
 
 #: cps/spa_strings.py
 msgid "does not end with"
-msgstr ""
+msgstr "لا ينتهي بـ"
 
 #: cps/spa_strings.py
 msgid "is empty"
-msgstr ""
+msgstr "فارغ"
 
 #: cps/spa_strings.py
 msgid "is not empty"
-msgstr ""
+msgstr "غير فارغ"
 
 #: cps/spa_strings.py
 msgid "Appearance"
@@ -3490,7 +3490,7 @@ msgstr "تعذر حفظ المظهر."
 
 #: cps/spa_strings.py
 msgid "Default theme for new accounts"
-msgstr ""
+msgstr "المظهر الافتراضي للحسابات الجديدة"
 
 #: cps/spa_strings.py
 msgid ""
@@ -3500,11 +3500,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default UI body font for new users"
-msgstr ""
+msgstr "خط نص الواجهة الافتراضي للمستخدمين الجدد"
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default UI display font for new users"
-msgstr ""
+msgstr "خط عناوين الواجهة الافتراضي للمستخدمين الجدد"
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid ""
@@ -3557,7 +3557,7 @@ msgstr "أزرق"
 
 #: cps/spa_strings.py
 msgid "Book content"
-msgstr ""
+msgstr "محتوى الكتاب"
 
 #: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
 #: cps/templates/layout.html
@@ -3703,7 +3703,7 @@ msgstr "حذف {n} من الكتب؟ لا يمكن التراجع عن هذا ا
 
 #: cps/spa_strings.py
 msgid "Description contains"
-msgstr ""
+msgstr "الوصف يحتوي على"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3721,7 +3721,7 @@ msgstr "تحرير {title}"
 
 #: cps/spa_strings.py
 msgid "Showing your default library view."
-msgstr ""
+msgstr "يتم عرض طريقة عرض المكتبة الافتراضية الخاصة بك."
 
 #: cps/spa_strings.py
 msgid "Show all books"
@@ -3729,7 +3729,7 @@ msgstr "عرض جميع الكتب"
 
 #: cps/spa_strings.py
 msgid "Edit default view"
-msgstr ""
+msgstr "تحرير العرض الافتراضي"
 
 #: cps/spa_strings.py
 msgid "Failed to load books."
@@ -3769,11 +3769,11 @@ msgstr "اسم المستخدم أو كلمة المرور غير صحيحة."
 
 #: cps/spa_strings.py
 msgid "UI body font"
-msgstr ""
+msgstr "خط نص الواجهة"
 
 #: cps/spa_strings.py
 msgid "UI display font"
-msgstr ""
+msgstr "خط عناوين الواجهة"
 
 #: cps/spa_strings.py
 msgid "Default (Optima / Sans-Serif)"
@@ -3797,7 +3797,7 @@ msgstr "خط أحادي المسافة"
 
 #: cps/spa_strings.py
 msgid "Label (e.g. KOReader on phone)"
-msgstr ""
+msgstr "التسمية (مثل KOReader على الهاتف)"
 
 #: cps/spa_strings.py
 msgid "Languages (comma separated)"
@@ -3849,12 +3849,12 @@ msgstr "لا توجد نتائج لـ «{q}»."
 
 #: cps/spa_strings.py
 msgid "No suggestions"
-msgstr ""
+msgstr "لا توجد اقتراحات"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No {filter} books here."
-msgstr ""
+msgstr "لا توجد كتب {filter} هنا."
 
 #: cps/spa_strings.py
 msgid "Password changed."
@@ -3916,7 +3916,7 @@ msgstr "فشل التسجيل."
 #: cps/templates/search_form.html
 #, python-brace-format
 msgid "Remove {name}"
-msgstr ""
+msgstr "إزالة {name}"
 
 #: cps/spa_strings.py
 msgid "Request failed."
@@ -4018,7 +4018,7 @@ msgstr "الموضع {n} في السلسلة"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{series} #{n}"
-msgstr ""
+msgstr "{series} رقم {n}"
 
 #: cps/spa_strings.py
 msgid "Sign in"
@@ -4085,17 +4085,17 @@ msgstr "أصفر"
 
 #: cps/spa_strings.py
 msgid "e.g. MOBI"
-msgstr ""
+msgstr "مثل MOBI"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{format} reader"
-msgstr ""
+msgstr "قارئ {format}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} API key"
-msgstr ""
+msgstr "مفتاح API لـ {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4161,7 +4161,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No release notes yet — check back after the next update."
-msgstr ""
+msgstr "لا توجد ملاحظات إصدار بعد — تحقق مجددًا بعد التحديث القادم."
 
 #: cps/spa_strings.py
 msgid ""
@@ -4362,7 +4362,7 @@ msgstr "تمت إعادة تعيين الشريط الجانبي إلى الوض
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{label} moved to position {pos} of {total}"
-msgstr ""
+msgstr "تم نقل {label} إلى الموضع {pos} من {total}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4372,22 +4372,22 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {label}"
-msgstr ""
+msgstr "حذف {label}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Restore {label}"
-msgstr ""
+msgstr "استعادة {label}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{label} hidden"
-msgstr ""
+msgstr "تم إخفاء {label}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{label} restored"
-msgstr ""
+msgstr "تمت استعادة {label}"
 
 #: cps/spa_strings.py
 msgid "Could not save sidebar. Please try again."
@@ -4435,15 +4435,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss Ko-fi support message"
-msgstr ""
+msgstr "تجاهل رسالة دعم Ko-fi"
 
 #: cps/spa_strings.py
 msgid "Dismiss help announcement"
-msgstr ""
+msgstr "تجاهل إعلان المساعدة"
 
 #: cps/spa_strings.py
 msgid "Kobo book compatibility repaired"
-msgstr ""
+msgstr "تم إصلاح توافق كتب Kobo"
 
 #: cps/spa_strings.py
 msgid "Library notice"
@@ -4460,16 +4460,16 @@ msgstr "كتاب بلا عنوان"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} notices dismissed permanently."
-msgstr ""
+msgstr "تم تجاهل {count} من الإشعارات نهائيًا."
 
 #: cps/spa_strings.py
 msgid "There is new information about your library."
-msgstr ""
+msgstr "توجد معلومات جديدة عن مكتبتك."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Dismiss all {count} notices permanently"
-msgstr ""
+msgstr "تجاهل جميع الإشعارات ({count}) نهائيًا"
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
@@ -4477,7 +4477,7 @@ msgstr "تجاهل الكل"
 
 #: cps/spa_strings.py
 msgid "There is new information about this book."
-msgstr ""
+msgstr "توجد معلومات جديدة عن هذا الكتاب."
 
 #: cps/spa_strings.py
 msgid "Notice dismissed permanently."
@@ -4525,43 +4525,43 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "begins with"
-msgstr ""
+msgstr "يبدأ بـ"
 
 #: cps/spa_strings.py
 msgid "contains"
-msgstr ""
+msgstr "يحتوي على"
 
 #: cps/spa_strings.py
 msgid "does not contain"
-msgstr ""
+msgstr "لا يحتوي على"
 
 #: cps/spa_strings.py
 msgid "ends with"
-msgstr ""
+msgstr "ينتهي بـ"
 
 #: cps/spa_strings.py
 msgid "in the past N days"
-msgstr ""
+msgstr "خلال آخر N يومًا"
 
 #: cps/spa_strings.py
 msgid "is not"
-msgstr ""
+msgstr "لا يساوي"
 
 #: cps/spa_strings.py
 msgid "is"
-msgstr ""
+msgstr "يساوي"
 
 #: cps/spa_strings.py
 msgid "not in the past N days"
-msgstr ""
+msgstr "ليس خلال آخر N يومًا"
 
 #: cps/spa_strings.py
 msgid "on or after"
-msgstr ""
+msgstr "في أو بعد"
 
 #: cps/spa_strings.py
 msgid "on or before"
-msgstr ""
+msgstr "في أو قبل"
 
 #: cps/spa_strings.py
 msgid "≤"
@@ -5014,7 +5014,7 @@ msgstr "إعدادات الحساب"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Account: {name}"
-msgstr ""
+msgstr "الحساب: {name}"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5027,7 +5027,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add a connection"
-msgstr ""
+msgstr "إضافة اتصال"
 
 #: cps/spa_strings.py
 msgid "Add connection"
@@ -5055,7 +5055,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add to existing"
-msgstr ""
+msgstr "إضافة إلى الموجود"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Add to favorites"
@@ -5067,7 +5067,7 @@ msgstr "إضافة إلى المكتبة"
 
 #: cps/spa_strings.py
 msgid "Added to your activity."
-msgstr ""
+msgstr "تمت الإضافة إلى نشاطك."
 
 #: cps/spa_strings.py
 msgid "Additional local download origins"
@@ -5137,7 +5137,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Allow sharing your own shelves"
-msgstr ""
+msgstr "السماح بمشاركة رفوفك الخاصة"
 
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
@@ -5149,12 +5149,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Also add the book to My Library"
-msgstr ""
+msgstr "أضف الكتاب أيضًا إلى «مكتبتي»"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Also on {names}"
-msgstr ""
+msgstr "موجود أيضًا على {names}"
 
 #: cps/spa_strings.py
 msgid "An administrator has not added a book source, or none is switched on."
@@ -5204,7 +5204,7 @@ msgstr "تطبيق البيانات الوصفية"
 
 #: cps/spa_strings.py
 msgid "Apply selected"
-msgstr ""
+msgstr "تطبيق المحدد"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Applying…"
@@ -5252,7 +5252,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Assign selected to device"
-msgstr ""
+msgstr "تعيين المحدد إلى جهاز"
 
 #: cps/spa_strings.py
 msgid "Assign to device"
@@ -5261,7 +5261,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Assigned to {name}."
-msgstr ""
+msgstr "تم التعيين إلى {name}."
 
 #: cps/spa_strings.py cps/templates/cwa_stats_i18n.html
 msgid "Authentication"

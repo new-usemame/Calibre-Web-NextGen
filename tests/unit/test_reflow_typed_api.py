@@ -1,4 +1,4 @@
-"""Current consent distinguishes source-only conversion from billed two-stage review."""
+"""Current consent distinguishes source-only conversion from billed pixel reading."""
 import inspect,os
 from unittest.mock import patch
 import pytest
@@ -9,7 +9,7 @@ pytestmark=pytest.mark.unit
 
 def consent(mod,pdf_on_disk,**values):
     source=os.path.join(pdf_on_disk['library'],'Author/Book (5)',pdf_on_disk['name']+'.pdf')
-    return dict(consent=True,consent_contract='source-layout-1',source_sha256=mod.extract.document_fingerprint(source),
+    return dict(consent=True,consent_contract='vision-page-1',source_sha256=mod.extract.document_fingerprint(source),
                 review_mode='deterministic',mode='sample',**values)
 
 
@@ -55,18 +55,23 @@ def test_current_source_identity_is_required_even_for_free_conversion(mod,monkey
     added.assert_not_called()
 
 
-def test_optional_review_cannot_bypass_the_quality_gate(mod,monkeypatch,pdf_on_disk):
-    monkeypatch.setattr(mod.structural_pipeline,'QUALITY_RELEASED',False)
+def test_optional_paid_read_cannot_bypass_current_pixel_preparation(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk)
-    body=consent(mod,pdf_on_disk);body.update(review_mode='source_verified',cost_cap_usd=1)
+    attempted=[]
+    def stale(*args):
+        attempted.append(args)
+        raise KeyError('Synthetic missing pixel preparation')
+    monkeypatch.setattr(mod,'_ready_quote',stale)
+    body=consent(mod,pdf_on_disk)
+    body.update(review_mode='source_verified',cost_cap_usd=1,preparation_id='a'*32)
     response,added=_start(mod,body)
-    assert _status(response)==409 and _json(response)['error']['code']=='review_unavailable'
+    assert _status(response)==409 and _json(response)['error']['code']=='estimate_stale'
+    assert len(attempted)==1
     added.assert_not_called()
 
 
 def test_invalid_or_missing_prepared_identity_cannot_start_paid_review(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk)
-    monkeypatch.setattr(mod.structural_pipeline,'QUALITY_RELEASED',True)
     for identity in (None,{},[],123,'not-an-identity'):
         body=consent(mod,pdf_on_disk);body.update(review_mode='source_verified',cost_cap_usd=1,preparation_id=identity)
         response,added=_start(mod,body)
@@ -102,3 +107,23 @@ def test_job_api_never_rounds_away_unresolved_liability(mod,monkeypatch,pdf_on_d
     with _ctx('/api/v1/books/5/reflow/jobs'),patch.object(mod,'current_user',_user()),patch.object(mod.WorkerThread,'get_instance',lambda:SimpleNamespace(tasks=[])):
         row=_json(inspect.unwrap(mod.reflow_jobs)(5))['items'][0]
     assert row['pending_usd']==bound and row['spend_usd']==0
+
+
+def test_job_api_preserves_pixel_scope_and_exact_filed_identity(mod,monkeypatch,pdf_on_disk):
+    from cps.services.reflow.ledger import Ledger
+    from types import SimpleNamespace
+    _wire(mod,monkeypatch,pdf_on_disk)
+    audit=Ledger(os.path.join(mod.REFLOW_DIR,'jobs','5','c'*32+'.jsonl'),cap_usd=.5,job_id='c'*32)
+    audit.record({'kind':'job','event':'start','mode':'full','user_id':7,'cap_usd':.5})
+    summary={'route':'vision','fidelity':{'pages':5,'pages_deterministic':2,'pages_model':1,'pages_disclosed':2},
+             'vision':{'pages':[0,1,2,3,4],'source_pages':5,'source_context_pages':5},
+             'cost':{'spend_usd':0,'pending_usd':0,'cap_usd':.5}}
+    audit.record({'kind':'vision_summary','summary':summary})
+    audit.record({'kind':'artifact','sha256':'d'*64,'bytes':1234})
+    audit.record({'kind':'job','event':'finish','status':'done'})
+    with _ctx('/api/v1/books/5/reflow/jobs'),patch.object(mod,'current_user',_user()),patch.object(mod.WorkerThread,'get_instance',lambda:SimpleNamespace(tasks=[])):
+        row=_json(inspect.unwrap(mod.reflow_jobs)(5))['items'][0]
+    assert row['vision']==summary
+    assert row['structural'] is None
+    assert row['artifact']=={'sha256':'d'*64,'bytes':1234}
+    assert row['spend_usd']==row['pending_usd']==0 and row['cap_usd']==.5

@@ -20443,3 +20443,135 @@ msgstr "Mostra sezione Libri letti e Libri da leggere"
 #~ msgstr ""
 #~ "I libri devono essere prima archiviati e il dispositivo sincronizzato "
 #~ "prima che un libro possa essere eliminato in sicurezza."
+
+msgid "AI page reading is not available in this build. Cached readings and source images remain available."
+msgstr ""
+
+msgid "AI page reading needs a shared 24-hour administrator budget. Cached readings and source images remain available."
+msgstr ""
+
+msgid "Cached readings and source images"
+msgstr ""
+
+msgid "Cached readings reused"
+msgstr ""
+
+msgid "Clean native pages keep their source text. For scans or damaged text, the model reads page images. Quality gates keep unsafe readings out of the EPUB and disclose the original page instead."
+msgstr ""
+
+msgid "Configure an OpenRouter key to read new pages with AI."
+msgstr ""
+
+msgid "Convert using cached readings and disclosed source images, without new model requests or provider charges."
+msgstr ""
+
+msgid "Converted with source-image disclosures"
+msgstr ""
+
+msgid "Create an EPUB from native text and page-image readings, with original-source access for uncertainty. New AI readings have their own estimate and consent."
+msgstr ""
+
+msgid "Expected reading cost"
+msgstr ""
+
+msgid "First-reading ceiling"
+msgstr ""
+
+msgid "Historical formatting-review job"
+msgstr ""
+
+#, python-brace-format
+msgid "I authorize the displayed page-reading model through OpenRouter, up to {amount} for this job, including the quoted reread and note-marker allowances. Unreadable pages retain disclosed source images."
+msgstr ""
+
+msgid "Native pages preserved"
+msgstr ""
+
+msgid "No new model requests or provider charges. Reuse verified cached readings; pages without a safe reading remain accessible as disclosed source images."
+msgstr ""
+
+msgid "Note-marker reading ceiling"
+msgstr ""
+
+msgid "Page reading"
+msgstr ""
+
+msgid "Page reading ended early. Completed readings remain available, and pages without safe readings disclose source images. Compatible cached responses may be reused; unresolved requests are not retried automatically."
+msgstr ""
+
+#, python-brace-format
+msgid "Page reading stopped at the {amount} cap. Completed readings remain in the EPUB; pages without a safe reading disclose their source images."
+msgstr ""
+
+msgid "Page-reading model"
+msgstr ""
+
+msgid "Pages disclosed as source images"
+msgstr ""
+
+msgid "Pages read by a model"
+msgstr ""
+
+msgid "Pages that may need model reading"
+msgstr ""
+
+msgid "Per-book cost target"
+msgstr ""
+
+msgid "Prepare page-reading estimate"
+msgstr ""
+
+msgid "Prepare the page-reading estimate before consenting. This identifies the selected page images and request ceilings locally, without sending a model request or reserving credit."
+msgstr ""
+
+msgid "Read pages with AI"
+msgstr ""
+
+msgid "Reading scanned pages"
+msgstr ""
+
+msgid "Send page images to the displayed model for faithful transcription. Native pages stay local. Unsafe or unavailable readings retain disclosed original-source images."
+msgstr ""
+
+msgid "Targeted reread ceiling"
+msgstr ""
+
+msgid "The $0.50 target is advisory. The administrator limit and your authorized cap are hard limits. If a page cannot be read safely within them, its original image is disclosed."
+msgstr ""
+
+msgid "The ceiling includes first readings, one targeted reread and bounded note-marker readings. Expected cost is an estimate; neither amount is money already held. Your cap limits every new request."
+msgstr ""
+
+msgid "The displayed model reads page images. There is no automatic switch to another model."
+msgstr ""
+
+msgid "The model reads the original page image, including its printed script. Local English OCR supplies alignment evidence; it does not replace the model reading. Unreadable or unsafe passages keep an explicitly disclosed source image."
+msgstr ""
+
+msgid "The sample starts at the first body page found near the beginning of the PDF, or at page 1 if the bounded search finds none. It uses the same page-reading and quality gates as the whole book."
+msgstr ""
+
+msgid "The sampled pages have OCR text behind page images. Recognition errors may remain; unsafe text needs a page-image reading or a disclosed source image."
+msgstr ""
+
+msgid "The shared 24-hour budget is exhausted. Cached readings and source images remain available."
+msgstr ""
+
+msgid "This EPUB uses the page-reading converter. Native text, model readings and disclosed source images are counted separately; disclosures preserve access to the original page."
+msgstr ""
+
+msgid "This PDF has OCR text behind page images. Recognition errors may remain; unsafe text needs a page-image reading or a disclosed source image."
+msgstr ""
+
+msgid "This cap may cover only some page readings. The EPUB will disclose original-source images wherever a safe reading is unavailable."
+msgstr ""
+
+msgid "Total request ceiling"
+msgstr ""
+
+msgid "Without a provider key, conversion uses cached readings and disclosed source images. New page readings need an OpenRouter key."
+msgstr ""
+
+#, python-brace-format
+msgid "{amount} remains in the shared {hours}-hour AI budget. It is checked again before every request."
+msgstr ""

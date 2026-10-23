@@ -9,7 +9,7 @@ test('selected quote prices actual body page IDs, not proportional routed estima
     coverage: [{ page: 6, status: 'unsupported' }, { page: 8, status: 'limited' }, { page: 9, status: 'no_choices' }],
   } as ReviewQuote;
   const sample = selectedReview(quote, 'sample', 5);
-  assert.deepEqual(sample, { start: 5, end: 10, eligible: 2, bound: .24000000000000002,
+  assert.deepEqual(sample, { start: 5, end: 10, eligible: 2, primary: .04, retry: .2, markers: 0, expected: 0, target: .5, bound: .24000000000000002,
     unsupported: 1, limited: 1, noChoices: 1 });
   assert.equal(selectedReview(quote, 'full', 5).eligible, 4);
   assert.equal(selectedReview(undefined, 'sample', 5).bound, 0);
@@ -47,4 +47,36 @@ test('layout consent includes ordering and lexical ceilings for the selected pag
     coverage: [] } as unknown as ReviewQuote;
   assert.equal(selectedReview(quote, 'sample', 5).bound, .25);
   assert.equal(selectedReview(quote, 'full', 5).bound, .7);
+});
+
+test('vision consent sums primary, retry and marker ceilings for only selected PDF pages', () => {
+  const quote = { source_context_pages: 40, first_body_page: 0, target_usd: .5,
+    pages: [{ page_index0: 0, primary_bound_usd: .02, retry_bound_usd: .03,
+      marker_bound_usd: .01, expected_usd: .004, full_bound_usd: .06 },
+      { page_index0: 20, primary_bound_usd: .04, retry_bound_usd: .05,
+        marker_bound_usd: .02, expected_usd: .008, full_bound_usd: .11 }], coverage: [] } as unknown as ReviewQuote;
+  const sample = selectedReview(quote, 'sample', 5);
+  assert.equal(sample.primary, .02);
+  assert.equal(sample.retry, .03);
+  assert.equal(sample.markers, .01);
+  assert.equal(sample.expected, .004);
+  assert.equal(sample.target, .5);
+  assert.equal(sample.bound, .06);
+  const full = selectedReview(quote, 'full', 5);
+  assert.equal(full.primary, .06);
+  assert.equal(full.retry, .08);
+  assert.equal(full.markers, .03);
+  assert.equal(full.expected, .012);
+  assert.equal(full.bound, .06 + .11);
+});
+
+test('a vision sample uses the quote start bound to its selected page count', () => {
+  const quote = { source_context_pages: 80, first_body_page: 20, sample_starts: { '5': 2, '10': 7 },
+    pages: [2, 7, 20].map((page_index0) => ({ page_index0, full_bound_usd: .02 })), coverage: [] } as unknown as ReviewQuote;
+  assert.equal(selectedReview(quote, 'sample', 5).start, 2);
+  assert.equal(selectedReview(quote, 'sample', 5).bound, .02);
+  assert.equal(selectedReview(quote, 'sample', 10).start, 7);
+  assert.equal(selectedReview(quote, 'sample', 10).bound, .02);
+  assert.equal(selectedReview(quote, 'full', 10).start, 0);
+  assert.equal(selectedReview(quote, 'full', 10).bound, .06);
 });

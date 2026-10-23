@@ -1113,11 +1113,11 @@ msgstr "أذونات التنفيذ مفقودة"
 
 #: cps/cover_picker.py cps/spa_strings.py
 msgid "Back to edit metadata"
-msgstr ""
+msgstr "العودة إلى تحرير البيانات الوصفية"
 
 #: cps/cover_picker.py cps/spa_strings.py cps/templates/book_edit.html
 msgid "Back to book"
-msgstr ""
+msgstr "العودة إلى الكتاب"
 
 #: cps/cover_picker.py
 #, python-format
@@ -1158,7 +1158,7 @@ msgstr ""
 
 #: cps/cover_picker.py cps/spa_strings.py
 msgid "Could not design a cover for this book."
-msgstr ""
+msgstr "تعذر تصميم غلاف لهذا الكتاب."
 
 #: cps/cover_picker.py
 msgid "Could not save lock state."
@@ -1178,7 +1178,7 @@ msgstr ""
 
 #: cps/cover_picker.py cps/spa_strings.py
 msgid "Cover save failed."
-msgstr ""
+msgstr "فشل حفظ الغلاف."
 
 #: cps/cwa_functions.py
 msgid "Theme switching is temporarily disabled until v5.0.0"
@@ -1211,7 +1211,7 @@ msgstr ""
 #: cps/cwa_functions.py cps/spa_strings.py cps/templates/tasks.html
 #: cps/templates/user_edit.html
 msgid "Book ID"
-msgstr ""
+msgstr "معرّف الكتاب"
 
 #: cps/cwa_functions.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
@@ -1352,7 +1352,7 @@ msgstr "تحديد الكتاب غير صالح."
 
 #: cps/cwa_functions.py cps/spa_strings.py
 msgid "Book not found."
-msgstr ""
+msgstr "لم يتم العثور على الكتاب."
 
 #: cps/cwa_functions.py
 msgid "Selected book has no EPUB format."
@@ -1765,11 +1765,11 @@ msgstr "لم تتم قراءة الملف المطلوب. ربما الأذون�
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Invalid reading status"
-msgstr ""
+msgstr "حالة القراءة غير صالحة"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Read status could not be set"
-msgstr ""
+msgstr "تعذر تعيين حالة القراءة"
 
 #: cps/helper.py
 #, python-brace-format
@@ -2368,15 +2368,15 @@ msgstr "عرض غير المقروء"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Show Currently Reading Books"
-msgstr ""
+msgstr "عرض الكتب قيد القراءة حاليًا"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Show Books You Did Not Finish"
-msgstr ""
+msgstr "عرض الكتب التي لم تكتمل قراءتها"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Show Books On Hold"
-msgstr ""
+msgstr "عرض الكتب المؤجلة"
 
 #: cps/render_template.py cps/templates/user_table.html
 msgid "Show Tags Section"
@@ -2713,12 +2713,12 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} added to the shelf; {failed} failed."
-msgstr ""
+msgstr "تمت إضافة {succeeded} إلى الرف؛ وفشل {failed}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} book(s) deleted; {failed} failed."
-msgstr ""
+msgstr "تم حذف {succeeded} من الكتب؛ وفشل {failed}."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2730,17 +2730,17 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} book(s) removed from your library; {failed} failed."
-msgstr ""
+msgstr "تمت إزالة {succeeded} من الكتب من مكتبتك؛ وفشل {failed}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} updated; {failed} failed."
-msgstr ""
+msgstr "تم تحديث {succeeded}؛ وفشل {failed}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Metadata applied to {succeeded}; {failed} failed."
-msgstr ""
+msgstr "تم تطبيق البيانات الوصفية على {succeeded}؛ وفشل {failed}."
 
 #: cps/spa_strings.py
 msgid "A book must keep at least one format."
@@ -2885,7 +2885,7 @@ msgstr "يجب تسجيل الدخول"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "You are not allowed to edit metadata"
-msgstr ""
+msgstr "غير مسموح لك بتحرير البيانات الوصفية"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "A tag with that name already exists"
@@ -2893,7 +2893,7 @@ msgstr "توجد علامة بهذا الاسم بالفعل"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name must be text"
-msgstr ""
+msgstr "يجب أن يكون اسم العلامة نصًا"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name cannot contain commas"
@@ -2909,7 +2909,7 @@ msgstr "تعذر تحميل هذه الصفحة"
 
 #: cps/spa_strings.py
 msgid "Page not found"
-msgstr ""
+msgstr "لم يتم العثور على الصفحة"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/email_edit.html cps/templates/shelf.html
@@ -2937,7 +2937,7 @@ msgstr "تمت الإضافة إلى مكتبتك وإلى {shelf}"
 
 #: cps/spa_strings.py
 msgid "Adding this book to a shelf also adds it to your library."
-msgstr ""
+msgstr "تؤدي إضافة هذا الكتاب إلى رف إلى إضافته إلى مكتبتك أيضًا."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Adding…"
@@ -2945,12 +2945,12 @@ msgstr "جارٍ الإضافة…"
 
 #: cps/spa_strings.py
 msgid "Add book to this library"
-msgstr ""
+msgstr "إضافة الكتاب إلى هذه المكتبة"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added book {book} to {name}."
-msgstr ""
+msgstr "تمت إضافة الكتاب {book} إلى {name}."
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
@@ -3019,11 +3019,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete from the global library"
-msgstr ""
+msgstr "الحذف من المكتبة الشاملة"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Every book here is already in your library."
-msgstr ""
+msgstr "كل كتاب هنا موجود بالفعل في مكتبتك."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Everything on the server, including every new book added to it."
@@ -3031,7 +3031,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Enter a valid book ID."
-msgstr ""
+msgstr "أدخل معرّف كتاب صالحًا."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3095,7 +3095,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Only an administrator can add it back."
-msgstr ""
+msgstr "يمكن للمسؤول فقط إعادة إضافته."
 
 #: cps/spa_strings.py
 msgid "Only the books chosen for this account."
@@ -3118,7 +3118,7 @@ msgstr "أُضيف مؤخرًا"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove \"{title}\" from your library?"
-msgstr ""
+msgstr "إزالة «{title}» من مكتبتك؟"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from my library"
@@ -3250,7 +3250,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "You can add it back any time from the global library."
-msgstr ""
+msgstr "يمكنك إضافته مجددًا في أي وقت من المكتبة الشاملة."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3266,7 +3266,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html cps/web.py
 msgid "Your library contents are managed by an administrator."
-msgstr ""
+msgstr "يدير المسؤول محتويات مكتبتك."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Your library is empty"
@@ -3304,7 +3304,7 @@ msgstr "لا"
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "Email Message Body"
-msgstr ""
+msgstr "نص رسالة البريد الإلكتروني"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3362,7 +3362,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Apply to {n} books"
-msgstr ""
+msgstr "تطبيق على {n} من الكتب"
 
 #: cps/spa_strings.py
 msgid "Match condition"
@@ -3475,7 +3475,7 @@ msgstr "تباين عالٍ"
 
 #: cps/spa_strings.py
 msgid "Midnight (AMOLED)"
-msgstr ""
+msgstr "منتصف الليل (AMOLED)"
 
 #: cps/spa_strings.py
 msgid "Match your device’s light or dark setting"
@@ -3519,7 +3519,7 @@ msgstr "إضافة تنسيق"
 
 #: cps/spa_strings.py
 msgid "Add rule"
-msgstr ""
+msgstr "إضافة قاعدة"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 #: cps/templates/search.html
@@ -3532,7 +3532,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "App password label"
-msgstr ""
+msgstr "تسمية كلمة مرور التطبيق"
 
 #: cps/spa_strings.py
 msgid "App passwords"
@@ -3554,7 +3554,7 @@ msgstr "العودة إلى تسجيل الدخول"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Blue"
-msgstr ""
+msgstr "أزرق"
 
 #: cps/spa_strings.py
 msgid "Book content"
@@ -3600,20 +3600,20 @@ msgstr "التحويل إلى"
 
 #: cps/spa_strings.py
 msgid "Convert to format"
-msgstr ""
+msgstr "التحويل إلى التنسيق"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 #: cps/templates/update_now_modal.html cps/templates/user_edit.html
 msgid "Copy"
-msgstr ""
+msgstr "نسخ"
 
 #: cps/spa_strings.py
 msgid "Could not change password."
-msgstr ""
+msgstr "تعذر تغيير كلمة المرور."
 
 #: cps/spa_strings.py
 msgid "Could not create."
-msgstr ""
+msgstr "تعذر الإنشاء."
 
 #: cps/spa_strings.py
 msgid "Could not fetch cover."
@@ -3626,7 +3626,7 @@ msgstr "تعذر تحميل البيانات الوصفية."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Could not load the book file ({status})"
-msgstr ""
+msgstr "تعذر تحميل ملف الكتاب ({status})"
 
 #: cps/spa_strings.py
 msgid "Could not load your account."
@@ -3700,7 +3700,7 @@ msgstr "حذف {fmt}"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {n} book(s)? This cannot be undone."
-msgstr ""
+msgstr "حذف {n} من الكتب؟ لا يمكن التراجع عن هذا الإجراء."
 
 #: cps/spa_strings.py
 msgid "Description contains"
@@ -3734,11 +3734,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Failed to load books."
-msgstr ""
+msgstr "فشل تحميل الكتب."
 
 #: cps/spa_strings.py
 msgid "Failed to open the book."
-msgstr ""
+msgstr "فشل فتح الكتاب."
 
 #: cps/spa_strings.py
 msgid "Generate"
@@ -3746,19 +3746,19 @@ msgstr "إنشاء"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Green"
-msgstr ""
+msgstr "أخضر"
 
 #: cps/spa_strings.py
 msgid "Help"
-msgstr ""
+msgstr "المساعدة"
 
 #: cps/spa_strings.py
 msgid "Highlight color"
-msgstr ""
+msgstr "لون التظليل"
 
 #: cps/spa_strings.py cps/templates/annotations_view.html
 msgid "Import from Kobo"
-msgstr ""
+msgstr "الاستيراد من Kobo"
 
 #: cps/spa_strings.py
 msgid "Interface language"
@@ -3794,7 +3794,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Monospace"
-msgstr ""
+msgstr "خط أحادي المسافة"
 
 #: cps/spa_strings.py
 msgid "Label (e.g. KOReader on phone)"
@@ -3828,7 +3828,7 @@ msgstr "دمج"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Metadata applied to {n} book(s)."
-msgstr ""
+msgstr "تم تطبيق البيانات الوصفية على {n} من الكتب."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3907,7 +3907,7 @@ msgstr "تقدم القراءة"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Red"
-msgstr ""
+msgstr "أحمر"
 
 #: cps/spa_strings.py
 msgid "Registration failed."
@@ -3926,7 +3926,7 @@ msgstr "فشل الطلب."
 #: cps/spa_strings.py cps/templates/cwa_api_stats.html
 #: cps/templates/cwa_library_stats.html cps/templates/cwa_user_activity.html
 msgid "Reset"
-msgstr ""
+msgstr "إعادة تعيين"
 
 #: cps/spa_strings.py
 msgid "Reset your password"
@@ -3935,7 +3935,7 @@ msgstr "أعد تعيين كلمة المرور الخاصة بك"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Revoke {label}"
-msgstr ""
+msgstr "إبطال {label}"
 
 #: cps/spa_strings.py
 msgid "Save changes"
@@ -3971,15 +3971,15 @@ msgstr "مزودو البيانات الوصفية"
 
 #: cps/spa_strings.py
 msgid "Loading providers…"
-msgstr ""
+msgstr "جارٍ تحميل المزودين…"
 
 #: cps/spa_strings.py
 msgid "Could not load providers."
-msgstr ""
+msgstr "تعذر تحميل المزودين."
 
 #: cps/spa_strings.py
 msgid "Could not update provider."
-msgstr ""
+msgstr "تعذر تحديث المزود."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3988,11 +3988,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "On"
-msgstr ""
+msgstr "مفعّل"
 
 #: cps/spa_strings.py
 msgid "Off"
-msgstr ""
+msgstr "معطّل"
 
 #: cps/spa_strings.py cps/templates/shelf.html
 msgid "Search results"
@@ -4009,12 +4009,12 @@ msgstr "تحديد {title}"
 
 #: cps/spa_strings.py
 msgid "Sepia theme"
-msgstr ""
+msgstr "وضع سيبيا"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Series position {n}"
-msgstr ""
+msgstr "الموضع {n} في السلسلة"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4035,7 +4035,7 @@ msgstr "انتقل إلى المحتوى"
 
 #: cps/spa_strings.py
 msgid "Some fields could not be saved."
-msgstr ""
+msgstr "تعذر حفظ بعض الحقول."
 
 #: cps/spa_strings.py
 msgid "Table of contents"
@@ -4066,11 +4066,11 @@ msgstr "تحميل"
 
 #: cps/spa_strings.py
 msgid "Choose books to upload"
-msgstr ""
+msgstr "اختر الكتب المراد تحميلها"
 
 #: cps/spa_strings.py
 msgid "Upload failed."
-msgstr ""
+msgstr "فشل التحميل."
 
 #: cps/spa_strings.py
 msgid "Upload image"
@@ -4078,11 +4078,11 @@ msgstr "تحميل صورة"
 
 #: cps/spa_strings.py
 msgid "Uploading…"
-msgstr ""
+msgstr "جارٍ التحميل…"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Yellow"
-msgstr ""
+msgstr "أصفر"
 
 #: cps/spa_strings.py
 msgid "e.g. MOBI"
@@ -4101,12 +4101,12 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) added to the shelf."
-msgstr ""
+msgstr "تمت إضافة {n} من الكتب إلى الرف."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) deleted."
-msgstr ""
+msgstr "تم حذف {n} من الكتب."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4116,17 +4116,17 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) removed from your library."
-msgstr ""
+msgstr "تمت إزالة {n} من الكتب من مكتبتك."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} marked as read."
-msgstr ""
+msgstr "تم وضع علامة «مقروء» على {n}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} marked as unread."
-msgstr ""
+msgstr "تم وضع علامة «غير مقروء» على {n}."
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #, python-brace-format
@@ -4140,7 +4140,7 @@ msgstr "تمت قراءة {pct}%"
 
 #: cps/spa_strings.py
 msgid "What's new"
-msgstr ""
+msgstr "الجديد"
 
 #: cps/spa_strings.py
 msgid "Help — new updates available"
@@ -4180,7 +4180,7 @@ msgstr "عرض القائمة"
 
 #: cps/spa_strings.py
 msgid "Sync"
-msgstr ""
+msgstr "المزامنة"
 
 #: cps/spa_strings.py cps/templates/layout.html cps/templates/user_edit.html
 msgid "Account"
@@ -4193,7 +4193,7 @@ msgstr "المسؤول"
 
 #: cps/spa_strings.py
 msgid "Under the hood"
-msgstr ""
+msgstr "خلف الكواليس"
 
 #: cps/spa_strings.py
 msgid "Open your library"
@@ -4217,15 +4217,15 @@ msgstr "افتح رفوفك"
 
 #: cps/spa_strings.py
 msgid "Manage sync & app passwords"
-msgstr ""
+msgstr "أدر المزامنة وكلمات مرور التطبيقات"
 
 #: cps/spa_strings.py
 msgid "Check your e-reader address"
-msgstr ""
+msgstr "تحقق من عنوان قارئك الإلكتروني"
 
 #: cps/spa_strings.py
 msgid "Create an app password"
-msgstr ""
+msgstr "أنشئ كلمة مرور للتطبيق"
 
 #: cps/spa_strings.py
 msgid "Browse series"
@@ -4241,7 +4241,7 @@ msgstr "تصفح اللغات"
 
 #: cps/spa_strings.py
 msgid "Open Table view"
-msgstr ""
+msgstr "افتح عرض الجدول"
 
 #: cps/spa_strings.py
 msgid "Open Admin"
@@ -4257,7 +4257,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Explore your library"
-msgstr ""
+msgstr "استكشف مكتبتك"
 
 #: cps/spa_strings.py
 msgid "Go to Upload"
@@ -4277,7 +4277,7 @@ msgstr "تصفح المكتبة الشاملة"
 
 #: cps/spa_strings.py
 msgid "Open device administration"
-msgstr ""
+msgstr "افتح إدارة الأجهزة"
 
 #: cps/spa_strings.py
 msgid "Editions"
@@ -4285,7 +4285,7 @@ msgstr "الإصدارات"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Back to New UI"
-msgstr ""
+msgstr "العودة إلى الواجهة الجديدة"
 
 #: cps/spa_strings.py
 msgid "Back to results"
@@ -4293,7 +4293,7 @@ msgstr "العودة إلى النتائج"
 
 #: cps/spa_strings.py
 msgid "No editions found for this book."
-msgstr ""
+msgstr "لم يتم العثور على إصدارات لهذا الكتاب."
 
 #: cps/spa_strings.py
 msgid "View all details"
@@ -4301,7 +4301,7 @@ msgstr "عرض جميع التفاصيل"
 
 #: cps/spa_strings.py
 msgid "Result details"
-msgstr ""
+msgstr "تفاصيل النتيجة"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Published"
@@ -4317,11 +4317,11 @@ msgstr "المصدر"
 
 #: cps/spa_strings.py
 msgid "Customize"
-msgstr ""
+msgstr "تخصيص"
 
 #: cps/spa_strings.py
 msgid "Customize sidebar"
-msgstr ""
+msgstr "تخصيص الشريط الجانبي"
 
 #: cps/spa_strings.py
 msgid "Customize navigation"
@@ -4329,7 +4329,7 @@ msgstr "تخصيص التنقل"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 msgid "Done"
-msgstr ""
+msgstr "تم"
 
 #: cps/spa_strings.py
 msgid "Reset to default"
@@ -4341,7 +4341,7 @@ msgstr "يظهر دائمًا"
 
 #: cps/spa_strings.py
 msgid "Editing sidebar. Reorder or hide sections, then tap Done."
-msgstr ""
+msgstr "تحرير الشريط الجانبي. أعد ترتيب الأقسام أو أخفِها، ثم اضغط «تم»."
 
 #: cps/spa_strings.py
 msgid "Editing cancelled."
@@ -4448,15 +4448,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Library notice"
-msgstr ""
+msgstr "إشعار المكتبة"
 
 #: cps/spa_strings.py
 msgid "Show affected books"
-msgstr ""
+msgstr "عرض الكتب المتأثرة"
 
 #: cps/spa_strings.py
 msgid "Untitled book"
-msgstr ""
+msgstr "كتاب بلا عنوان"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4474,7 +4474,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
+msgstr "تجاهل الكل"
 
 #: cps/spa_strings.py
 msgid "There is new information about this book."
@@ -4482,19 +4482,19 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Notice dismissed permanently."
-msgstr ""
+msgstr "تم تجاهل الإشعار نهائيًا."
 
 #: cps/spa_strings.py
 msgid "Dismiss permanently"
-msgstr ""
+msgstr "تجاهل نهائيًا"
 
 #: cps/spa_strings.py
 msgid "Could not dismiss the notices. Please try again."
-msgstr ""
+msgstr "تعذر تجاهل الإشعارات. يرجى المحاولة مرة أخرى."
 
 #: cps/spa_strings.py
 msgid "Could not dismiss the notice. Please try again."
-msgstr ""
+msgstr "تعذر تجاهل الإشعار. يرجى المحاولة مرة أخرى."
 
 #: cps/spa_strings.py
 msgid "Open Ko-fi →"
@@ -4506,7 +4506,7 @@ msgstr "تاريخ النشر"
 
 #: cps/spa_strings.py
 msgid "Support us on Ko-fi!"
-msgstr ""
+msgstr "ادعمنا على Ko-fi!"
 
 #: cps/spa_strings.py
 msgid ""
@@ -4998,11 +4998,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "API key"
-msgstr ""
+msgstr "مفتاح API"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
-msgstr ""
+msgstr "مفاتيح API"
 
 #: cps/spa_strings.py cps/templates/layout.html cps/templates/stats.html
 msgid "About"
@@ -5168,7 +5168,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "An unexpected error occurred"
-msgstr ""
+msgstr "حدث خطأ غير متوقع"
 
 #: cps/spa_strings.py
 msgid "Annotation pages"
@@ -5213,11 +5213,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Approve"
-msgstr ""
+msgstr "موافقة"
 
 #: cps/spa_strings.py
 msgid "Approve only if this is your e-reader."
-msgstr ""
+msgstr "وافق فقط إذا كان هذا هو قارئك الإلكتروني."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5532,7 +5532,7 @@ msgstr "إلغاء"
 
 #: cps/spa_strings.py
 msgid "Cancel editing"
-msgstr ""
+msgstr "إلغاء التحرير"
 
 #: cps/spa_strings.py
 msgid "Cancel rename"

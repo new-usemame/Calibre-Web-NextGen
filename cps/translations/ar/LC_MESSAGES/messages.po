@@ -2744,7 +2744,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "A book must keep at least one format."
-msgstr ""
+msgstr "يجب أن يحتفظ الكتاب بتنسيق واحد على الأقل."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2772,11 +2772,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not delete this format."
-msgstr ""
+msgstr "تعذر حذف هذا التنسيق."
 
 #: cps/spa_strings.py
 msgid "Format deleted."
-msgstr ""
+msgstr "تم حذف التنسيق."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
@@ -2826,58 +2826,58 @@ msgstr "SSL"
 
 #: cps/spa_strings.py
 msgid "Series order"
-msgstr ""
+msgstr "ترتيب السلسلة"
 
 #: cps/spa_strings.py
 msgid "Series order (reverse)"
-msgstr ""
+msgstr "ترتيب السلسلة (عكسي)"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Add tag"
-msgstr ""
+msgstr "إضافة علامة"
 
 #: cps/spa_strings.py
 msgid "New tag"
-msgstr ""
+msgstr "علامة جديدة"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove tag"
-msgstr ""
+msgstr "إزالة العلامة"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove tag {name}"
-msgstr ""
+msgstr "إزالة العلامة {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Rename tag {name}"
-msgstr ""
+msgstr "إعادة تسمية العلامة {name}"
 
 #: cps/spa_strings.py
 msgid "Tag name"
-msgstr ""
+msgstr "اسم العلامة"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name cannot be empty"
-msgstr ""
+msgstr "لا يمكن أن يكون اسم العلامة فارغًا"
 
 #: cps/spa_strings.py
 msgid "Save tag name"
-msgstr ""
+msgstr "حفظ اسم العلامة"
 
 #: cps/spa_strings.py
 msgid "Select format"
-msgstr ""
+msgstr "اختر التنسيق"
 
 #: cps/spa_strings.py
 msgid "Could not rename tag"
-msgstr ""
+msgstr "تعذرت إعادة تسمية العلامة"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Tag renamed to {name}"
-msgstr ""
+msgstr "تمت إعادة تسمية العلامة إلى {name}"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "You must be signed in"
@@ -2889,7 +2889,7 @@ msgstr ""
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "A tag with that name already exists"
-msgstr ""
+msgstr "توجد علامة بهذا الاسم بالفعل"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name must be text"
@@ -2897,11 +2897,11 @@ msgstr ""
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name cannot contain commas"
-msgstr ""
+msgstr "لا يمكن أن يحتوي اسم العلامة على فواصل"
 
 #: cps/spa_strings.py
 msgid "Enter a valid tag name"
-msgstr ""
+msgstr "أدخل اسم علامة صالحًا"
 
 #: cps/spa_strings.py
 msgid "Could not load this page"
@@ -2919,21 +2919,21 @@ msgstr "إضافة"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Add to my library"
-msgstr ""
+msgstr "إضافة إلى مكتبتي"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Add {title} to my library"
-msgstr ""
+msgstr "إضافة {title} إلى مكتبتي"
 
 #: cps/spa_strings.py
 msgid "Added to your library"
-msgstr ""
+msgstr "تمت الإضافة إلى مكتبتك"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added to your library and to {shelf}"
-msgstr ""
+msgstr "تمت الإضافة إلى مكتبتك وإلى {shelf}"
 
 #: cps/spa_strings.py
 msgid "Adding this book to a shelf also adds it to your library."
@@ -2941,7 +2941,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Adding…"
-msgstr ""
+msgstr "جارٍ الإضافة…"
 
 #: cps/spa_strings.py
 msgid "Add book to this library"
@@ -2955,27 +2955,27 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Browse global library"
-msgstr ""
+msgstr "تصفح المكتبة الشاملة"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Browse the global library"
-msgstr ""
+msgstr "تصفح المكتبة الشاملة"
 
 #: cps/spa_strings.py
 msgid "Could not add the book."
-msgstr ""
+msgstr "تعذرت إضافة الكتاب."
 
 #: cps/spa_strings.py
 msgid "Could not add this book to the shelf."
-msgstr ""
+msgstr "تعذرت إضافة هذا الكتاب إلى الرف."
 
 #: cps/spa_strings.py
 msgid "Could not add the book. Please try again."
-msgstr ""
+msgstr "تعذرت إضافة الكتاب. يرجى المحاولة مرة أخرى."
 
 #: cps/spa_strings.py
 msgid "Could not remove the book. Please try again."
-msgstr ""
+msgstr "تعذرت إزالة الكتاب. يرجى المحاولة مرة أخرى."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3042,11 +3042,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Global Library"
-msgstr ""
+msgstr "المكتبة الشاملة"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/index.html
 msgid "In your library"
-msgstr ""
+msgstr "في مكتبتك"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3062,23 +3062,23 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Library contents"
-msgstr ""
+msgstr "محتويات المكتبة"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Library scope"
-msgstr ""
+msgstr "نطاق المكتبة"
 
 #: cps/spa_strings.py
 msgid "My selection"
-msgstr ""
+msgstr "اختياري"
 
 #: cps/spa_strings.py
 msgid "New: your own library"
-msgstr ""
+msgstr "جديد: مكتبتك الخاصة"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Not in your library"
-msgstr ""
+msgstr "ليس في مكتبتك"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid ""
@@ -3109,11 +3109,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Own selection"
-msgstr ""
+msgstr "اختيار خاص"
 
 #: cps/spa_strings.py
 msgid "Recently added"
-msgstr ""
+msgstr "أُضيف مؤخرًا"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3122,20 +3122,20 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from my library"
-msgstr ""
+msgstr "إزالة من مكتبتي"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {title} from my library"
-msgstr ""
+msgstr "إزالة {title} من مكتبتي"
 
 #: cps/spa_strings.py
 msgid "Removed from your library"
-msgstr ""
+msgstr "تمت الإزالة من مكتبتك"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removing…"
-msgstr ""
+msgstr "جارٍ الإزالة…"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3240,7 +3240,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The whole library"
-msgstr ""
+msgstr "المكتبة بأكملها"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
@@ -3270,7 +3270,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Your library is empty"
-msgstr ""
+msgstr "مكتبتك فارغة"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3322,7 +3322,7 @@ msgstr "إرسال إلى الجهاز"
 
 #: cps/spa_strings.py
 msgid "Device"
-msgstr ""
+msgstr "الجهاز"
 
 #: cps/spa_strings.py
 msgid "Collects on the device's next sync."
@@ -3330,27 +3330,27 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose a device"
-msgstr ""
+msgstr "اختر جهازًا"
 
 #: cps/spa_strings.py
 msgid "Queueing…"
-msgstr ""
+msgstr "جارٍ الإدراج في قائمة الانتظار…"
 
 #: cps/spa_strings.py
 msgid "Book queued for this device"
-msgstr ""
+msgstr "أُدرج الكتاب في قائمة الانتظار لهذا الجهاز"
 
 #: cps/spa_strings.py
 msgid "This book is already queued for this device"
-msgstr ""
+msgstr "هذا الكتاب في قائمة الانتظار لهذا الجهاز بالفعل"
 
 #: cps/spa_strings.py
 msgid "This book is already on that device"
-msgstr ""
+msgstr "هذا الكتاب موجود بالفعل على ذلك الجهاز"
 
 #: cps/spa_strings.py
 msgid "Could not queue this book for the device."
-msgstr ""
+msgstr "تعذر إدراج هذا الكتاب في قائمة الانتظار للجهاز."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3515,7 +3515,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add a format"
-msgstr ""
+msgstr "إضافة تنسيق"
 
 #: cps/spa_strings.py
 msgid "Add rule"
@@ -3546,7 +3546,7 @@ msgstr "المؤلف"
 
 #: cps/spa_strings.py
 msgid "Authors (separate with &)"
-msgstr ""
+msgstr "المؤلفون (افصل بينهم بـ &)"
 
 #: cps/spa_strings.py
 msgid "Back to sign in"
@@ -3587,16 +3587,16 @@ msgstr "المحتويات"
 
 #: cps/spa_strings.py
 msgid "Convert failed."
-msgstr ""
+msgstr "فشل التحويل."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{format} is ready."
-msgstr ""
+msgstr "{format} جاهز."
 
 #: cps/spa_strings.py
 msgid "Convert to"
-msgstr ""
+msgstr "التحويل إلى"
 
 #: cps/spa_strings.py
 msgid "Convert to format"
@@ -3617,11 +3617,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not fetch cover."
-msgstr ""
+msgstr "تعذر جلب الغلاف."
 
 #: cps/spa_strings.py
 msgid "Could not load metadata."
-msgstr ""
+msgstr "تعذر تحميل البيانات الوصفية."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3638,15 +3638,15 @@ msgstr "تعذر الحفظ."
 
 #: cps/spa_strings.py
 msgid "Cover image URL"
-msgstr ""
+msgstr "رابط صورة الغلاف"
 
 #: cps/spa_strings.py
 msgid "Cover update failed."
-msgstr ""
+msgstr "فشل تحديث الغلاف."
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Cover updated."
-msgstr ""
+msgstr "تم تحديث الغلاف."
 
 #: cps/spa_strings.py cps/templates/layout.html cps/web.py
 msgid "Create smart shelf"
@@ -3681,11 +3681,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Deleting…"
-msgstr ""
+msgstr "جارٍ الحذف…"
 
 #: cps/spa_strings.py
 msgid "Could not delete this book."
-msgstr ""
+msgstr "تعذر حذف هذا الكتاب."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3695,7 +3695,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {fmt}"
-msgstr ""
+msgstr "حذف {fmt}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3709,7 +3709,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Deselect {title}"
-msgstr ""
+msgstr "إلغاء تحديد {title}"
 
 #: cps/spa_strings.py
 msgid "Edit metadata"
@@ -3742,7 +3742,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Generate"
-msgstr ""
+msgstr "إنشاء"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Green"
@@ -3802,7 +3802,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Languages (comma separated)"
-msgstr ""
+msgstr "اللغات (مفصولة بفواصل)"
 
 #: cps/spa_strings.py
 msgid "Light theme"
@@ -3863,11 +3863,11 @@ msgstr "تم تغيير كلمة المرور."
 
 #: cps/spa_strings.py
 msgid "Paste URL"
-msgstr ""
+msgstr "الصق الرابط"
 
 #: cps/spa_strings.py
 msgid "Private shelf"
-msgstr ""
+msgstr "رف خاص"
 
 #: cps/spa_strings.py
 msgid "Profile"
@@ -3879,7 +3879,7 @@ msgstr "تم حفظ الملف الشخصي."
 
 #: cps/spa_strings.py
 msgid "Public shelf"
-msgstr ""
+msgstr "رف عام"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/detail.html
@@ -3890,7 +3890,7 @@ msgstr "الناشر"
 
 #: cps/spa_strings.py
 msgid "Publishers (comma separated)"
-msgstr ""
+msgstr "الناشرون (مفصولون بفواصل)"
 
 #: cps/spa_strings.py cps/templates/image.html cps/templates/listenmp3.html
 msgid "Read"
@@ -3963,11 +3963,11 @@ msgstr "فشل البحث."
 
 #: cps/spa_strings.py
 msgid "Search for metadata"
-msgstr ""
+msgstr "البحث عن البيانات الوصفية"
 
 #: cps/spa_strings.py
 msgid "Metadata providers"
-msgstr ""
+msgstr "مزودو البيانات الوصفية"
 
 #: cps/spa_strings.py
 msgid "Loading providers…"
@@ -4005,7 +4005,7 @@ msgstr "ابحث في المكتبة"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Select {title}"
-msgstr ""
+msgstr "تحديد {title}"
 
 #: cps/spa_strings.py
 msgid "Sepia theme"
@@ -4043,7 +4043,7 @@ msgstr "جدول المحتويات"
 
 #: cps/spa_strings.py
 msgid "Tags (comma separated)"
-msgstr ""
+msgstr "العلامات (مفصولة بفواصل)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
@@ -4074,7 +4074,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Upload image"
-msgstr ""
+msgstr "تحميل صورة"
 
 #: cps/spa_strings.py
 msgid "Uploading…"
@@ -4131,7 +4131,7 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #, python-brace-format
 msgid "{n} selected"
-msgstr ""
+msgstr "تم تحديد {n}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4273,7 +4273,7 @@ msgstr "افتح البحث"
 
 #: cps/spa_strings.py
 msgid "Browse the Global Library"
-msgstr ""
+msgstr "تصفح المكتبة الشاملة"
 
 #: cps/spa_strings.py
 msgid "Open device administration"
@@ -4325,7 +4325,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Customize navigation"
-msgstr ""
+msgstr "تخصيص التنقل"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 msgid "Done"
@@ -4333,11 +4333,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reset to default"
-msgstr ""
+msgstr "إعادة التعيين إلى الافتراضي"
 
 #: cps/spa_strings.py
 msgid "Always shown"
-msgstr ""
+msgstr "يظهر دائمًا"
 
 #: cps/spa_strings.py
 msgid "Editing sidebar. Reorder or hide sections, then tap Done."
@@ -4345,7 +4345,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Editing cancelled."
-msgstr ""
+msgstr "تم إلغاء التحرير."
 
 #: cps/spa_strings.py
 msgid ""
@@ -4354,11 +4354,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Sidebar saved."
-msgstr ""
+msgstr "تم حفظ الشريط الجانبي."
 
 #: cps/spa_strings.py
 msgid "Sidebar reset to default."
-msgstr ""
+msgstr "تمت إعادة تعيين الشريط الجانبي إلى الوضع الافتراضي."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4392,11 +4392,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save sidebar. Please try again."
-msgstr ""
+msgstr "تعذر حفظ الشريط الجانبي. يرجى المحاولة مرة أخرى."
 
 #: cps/spa_strings.py
 msgid "Refresh library"
-msgstr ""
+msgstr "تحديث المكتبة"
 
 #: cps/spa_strings.py
 msgid "<"
@@ -4418,11 +4418,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Date Added"
-msgstr ""
+msgstr "تاريخ الإضافة"
 
 #: cps/spa_strings.py
 msgid "Last Modified"
-msgstr ""
+msgstr "آخر تعديل"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4502,7 +4502,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 msgid "Publication Date"
-msgstr ""
+msgstr "تاريخ النشر"
 
 #: cps/spa_strings.py
 msgid "Support us on Ko-fi!"
@@ -4842,7 +4842,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Public"
-msgstr ""
+msgstr "عام"
 
 #: cps/spa_strings.py
 msgid "Custom display name"
@@ -4879,7 +4879,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Books on this device"
-msgstr ""
+msgstr "الكتب على هذا الجهاز"
 
 #: cps/spa_strings.py
 msgid "Same as my account setting"
@@ -4887,11 +4887,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Everything in my library"
-msgstr ""
+msgstr "كل ما في مكتبتي"
 
 #: cps/spa_strings.py
 msgid "Only these shelves"
-msgstr ""
+msgstr "هذه الرفوف فقط"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5126,7 +5126,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "All shelves"
-msgstr ""
+msgstr "جميع الرفوف"
 
 #: cps/spa_strings.py
 msgid "Allow remote (magic-link) login"
@@ -5201,7 +5201,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Apply metadata"
-msgstr ""
+msgstr "تطبيق البيانات الوصفية"
 
 #: cps/spa_strings.py
 msgid "Apply selected"
@@ -5274,11 +5274,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Author A–Z"
-msgstr ""
+msgstr "المؤلف من أ إلى ي"
 
 #: cps/spa_strings.py
 msgid "Author Z–A"
-msgstr ""
+msgstr "المؤلف من ي إلى أ"
 
 #: cps/spa_strings.py
 msgid "Author text"
@@ -5380,7 +5380,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Book order"
-msgstr ""
+msgstr "ترتيب الكتب"
 
 #: cps/spa_strings.py
 msgid "Book sources"
@@ -5425,7 +5425,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Books per page"
-msgstr ""
+msgstr "عدد الكتب في الصفحة"
 
 #: cps/spa_strings.py
 msgid "Books placement"

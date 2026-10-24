@@ -194,3 +194,25 @@ def test_a_clean_revert_still_opens_the_pr(tmp_path):
     assert f"auto-revert/{bad[:7]}" in _remote_branches(origin), out
     assert any(c.startswith("pr create") for c in gh_calls), gh_calls
     assert (work / "f.txt").read_text() == "one\n"
+
+
+def test_a_merge_commit_that_cannot_be_reverted_is_a_failure(tmp_path):
+    """`git revert` refuses a merge commit without `-m` and leaves a clean
+    tree, the same picture as an already-reverted commit. Only the content
+    check tells them apart; a step that reads "clean tree" as "nothing to do"
+    reports success with main still red."""
+
+    def merge_in(w, _):
+        _git(w, "checkout", "-q", "-b", "side", "HEAD~1")
+        _commit(w, "side work", **{"h.txt": "side\n"})
+        _git(w, "checkout", "-q", "main")
+        _git(w, "merge", "-q", "--no-ff", "--no-edit", "side")
+
+    work, origin, _ = _main_with_bad_commit(tmp_path, merge_in)
+    merge = _git(work, "rev-parse", "HEAD")
+
+    rc, out, gh_calls = _run_step(work, merge, tmp_path)
+
+    assert rc != 0, f"an unrevertable merge was reported as a clean no-op:\n{out}"
+    assert not gh_calls
+    assert _remote_branches(origin) == ["main"]

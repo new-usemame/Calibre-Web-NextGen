@@ -24,6 +24,7 @@ import requests
 
 from cps import constants, logger
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
+from cps.services.isbn import is_valid as isbn_is_valid
 
 
 log = logger.create()
@@ -72,7 +73,7 @@ class AppleBooks(Metadata):
 
     def _looks_like_isbn(self, query: str) -> bool:
         digits = self._ISBN_DIGITS_RE.sub("", query)
-        return len(digits) in (10, 13)
+        return len(digits) in (10, 13) and isbn_is_valid(digits)
 
     def _lookup_isbn(self, query: str) -> List[Dict]:
         isbn = self._ISBN_DIGITS_RE.sub("", query)

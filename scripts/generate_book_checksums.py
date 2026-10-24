@@ -356,8 +356,8 @@ def main():
 
     parser.add_argument(
         '--library-path',
-        default='/calibre-library',
-        help='Path to Calibre library directory (default: /calibre-library)'
+        default=None,
+        help='Path to Calibre library directory (default: the configured library dir, /calibre-library in the container)'
     )
 
     parser.add_argument(
@@ -380,6 +380,8 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.library_path is None:
+        args.library_path = app_paths.calibre_library_dir()
 
     # Validate library path
     if not os.path.isdir(args.library_path):

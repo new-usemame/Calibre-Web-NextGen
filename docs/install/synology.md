@@ -33,9 +33,19 @@ own user's, shown under Control Panel → User → your account → details.)*
 
 5. **Container Manager → Projekt / Project → Erstellen / Create.**
    - **Projektname / Project name:** `calibre-web-nextgen`
+   - **Pfad / Path:** the folder where Container Manager keeps this project's
+     `docker-compose.yml`. It is not your library. Click **Pfad festlegen / Set path**,
+     select `docker`, click **Ordner erstellen / Create folder**, name it
+     `calibre-web-nextgen`, and select it. (Re-creating a project you removed? Pick its old
+     folder instead; if a `docker-compose.yml` is still in it, Container Manager offers to
+     reuse it.)
    - **Quelle / Source:** choose *"docker-compose.yml erstellen / create docker-compose.yml"*
      and paste the block below. Replace the three `/volume1/...` paths and the
-     `PUID`/`PGID`/`TZ` with the values you noted:
+     `PUID`/`PGID`/`TZ` with the values you noted. The paths below are examples: each one
+     must be a folder that exists on your NAS (check in File Station). The `/config` folder
+     is the one holding `app.db`, and the `/calibre-library` folder holds `metadata.db`. If a
+     path is wrong, NextGen starts with an empty library and a fresh admin login. Your data
+     is untouched in that case: stop the project, fix the paths, and build again.
 
    ```yaml
    services:

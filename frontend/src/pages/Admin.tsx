@@ -14,6 +14,7 @@ import { EmptyState } from '../components/EmptyState';
 import { IngestFolderLabels } from '../components/IngestFolderLabels';
 import { MyLibraryIntro } from '../components/MyLibraryIntro';
 import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
+import { CoverFlagRepairAdmin } from '../components/CoverFlagRepairAdmin';
 import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -369,6 +370,7 @@ export function Admin() {
       <IngestFolderLabels />
       <AdminConfigForm />
       <ReaderFontsAdmin />
+      <CoverFlagRepairAdmin />
       <MailConfigForm />
       <SecurityConfigForm />
     </div>

@@ -204,6 +204,7 @@
         </div>
       <a class="btn btn-default scheduledtasks" id="admin_edit_scheduled_tasks" href="{{url_for('admin.edit_scheduledtasks')}}">{{_('Edit Scheduled Tasks Settings')}}</a>
       <a class="btn btn-default" id="admin_refresh_cover_cache">{{_('Refresh Thumbnail Cache')}}</a>
+      <a class="btn btn-default" id="admin_restore_missing_covers" href="{{url_for('admin.cover_flag_repair_scan')}}">{{_('Restore missing covers')}}</a>
     </div>
   </div>
 {%  endif %}

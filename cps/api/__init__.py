@@ -216,6 +216,7 @@ from . import search   # noqa: E402,F401
 from . import account  # noqa: E402,F401
 from . import reader   # noqa: E402,F401
 from . import reader_fonts  # noqa: E402,F401
+from . import cover_flags  # noqa: E402,F401
 from . import book_reviews  # noqa: E402,F401
 from . import book_ratings  # noqa: E402,F401
 from . import ingest_folder_labels  # noqa: E402,F401

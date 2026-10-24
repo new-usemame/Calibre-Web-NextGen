@@ -20460,3 +20460,87 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
+#: cps/spa_strings.py
+msgid "Restore missing covers"
+msgstr "Ontbrekende omslagen herstellen"
+
+#: cps/spa_strings.py
+msgid "Find books that have a cover.jpg in their folder but are marked as having no cover, so the cover is never shown."
+msgstr "Zoekt boeken met een cover.jpg in hun map die als zonder omslag zijn gemarkeerd, waardoor het omslag nooit wordt getoond."
+
+#: cps/spa_strings.py
+msgid "A cover that was removed on purpose in the book editor also looks like this. Select only the books whose cover you want back."
+msgstr "Een omslag die bewust in de boekeditor is verwijderd ziet er ook zo uit. Selecteer alleen de boeken waarvan het omslag terug moet komen."
+
+#: cps/spa_strings.py
+msgid "Scan library"
+msgstr "Bibliotheek scannen"
+
+#: cps/spa_strings.py
+msgid "Scanning…"
+msgstr "Scannen…"
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
+msgstr "De bibliotheek kon niet worden gescand."
+
+#: cps/spa_strings.py
+msgid "{count} book(s) have a cover file but are marked as having no cover."
+msgstr "{count} boek(en) hebben een omslagbestand maar zijn gemarkeerd als zonder omslag."
+
+#: cps/spa_strings.py
+msgid "No books need their cover restored."
+msgstr "Geen enkel boek heeft omslagherstel nodig."
+
+#: cps/spa_strings.py
+msgid "{count} cover(s) restored."
+msgstr "{count} omslag(en) hersteld."
+
+#: cps/spa_strings.py
+msgid "{count} book(s) were skipped because they changed since the scan."
+msgstr "{count} boek(en) zijn overgeslagen omdat ze sinds de scan zijn gewijzigd."
+
+#: cps/spa_strings.py
+msgid "Could not restore covers."
+msgstr "De omslagen konden niet worden hersteld."
+
+#: cps/spa_strings.py
+msgid "This is not available for Google Drive libraries."
+msgstr "Dit is niet beschikbaar voor Google Drive-bibliotheken."
+
+#: cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr "Dit voorbeeld is ongeldig of verlopen. Scan de bibliotheek opnieuw."
+
+#: cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr "Selecteer minstens één boek om te herstellen."
+
+#: cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr "De geselecteerde boeken komen niet overeen met dit voorbeeld. Scan de bibliotheek opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr "De bibliotheekdatabase kon niet worden bijgewerkt. Er zijn geen omslagen gewijzigd."
+
+#: cps/spa_strings.py
+msgid "{selected} of {count} selected"
+msgstr "{selected} van {count} geselecteerd"
+
+#: cps/spa_strings.py
+msgid "Books with a cover file but no cover"
+msgstr "Boeken met een omslagbestand maar zonder omslag"
+
+#: cps/spa_strings.py
+msgid "Restore the cover of {title}"
+msgstr "Omslag van {title} herstellen"
+
+#: cps/spa_strings.py
+msgid "Restore selected covers"
+msgstr "Geselecteerde omslagen herstellen"
+
+#: cps/spa_strings.py
+msgid "Select all books"
+msgstr "Alle boeken selecteren"

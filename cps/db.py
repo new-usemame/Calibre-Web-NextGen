@@ -1658,21 +1658,16 @@ class CalibreDB:
                           allow_show_hidden=False, allow_show_global=False,
                           user=None, allow_public_shelf_books=False):
         self.ensure_session()
-        # Eagerly load all relationships to prevent detached instance errors during editing
+        # Every relationship still loads eagerly, through the model's
+        # lazy='selectin' (one indexed `WHERE book IN (?)` query each), so a
+        # detached book stays readable. No joinedload here (#2699): SQLite
+        # materializes each `LEFT JOIN (link JOIN table)` by scanning the whole
+        # table first, which cost ~4s per cover on a 272k-book library.
         # allow_show_hidden=True: covers/read/edit/download flows for a user's
         # OWN hidden book must reach it (hidden is a listing exclusion, not an
         # access revocation — otherwise the detail page's action buttons all
         # error 'unavailable' and the listing shows no covers). See #319.
         return (self.session.query(Books)
-                .options(joinedload(Books.authors),
-                         joinedload(Books.tags),
-                         joinedload(Books.comments),
-                         joinedload(Books.data),
-                         joinedload(Books.series),
-                         joinedload(Books.ratings),
-                         joinedload(Books.languages),
-                         joinedload(Books.publishers),
-                         joinedload(Books.identifiers))
                 .filter(Books.id == book_id)
                 .filter(self.common_filters(
                     allow_show_archived,

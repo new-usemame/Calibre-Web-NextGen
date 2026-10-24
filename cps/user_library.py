@@ -190,18 +190,61 @@ def prepare_user_library_seed(user, *, chunk_size=SEED_CHUNK_SIZE,
     return inserted
 
 
+def _validate_start_empty(user, desired, *, app_session):
+    """Reject an empty start that would strand or strip the account.
+
+    An empty start is an administrator's explicit choice at the moment My
+    Library is first enabled, so it is checked against everything the default
+    seed exists to protect.
+    """
+    if not desired:
+        raise UserLibraryError(
+            "An empty start only applies when switching to My Library."
+        )
+    if bool(getattr(user, "user_library_seeded", False)):
+        raise UserLibraryError(
+            "An empty start only applies the first time My Library is "
+            "enabled; this account already has its own selection."
+        )
+    if not user.role_browse_global():
+        # Without the browse role the account cannot add anything itself, so
+        # an empty set would leave it with no books at all.
+        raise UserLibraryError(
+            "Starting My Library empty needs the global-browse role, "
+            "otherwise this user would see no books and could not add any."
+        )
+    already_synced = (_session(app_session).query(ub.KoboSyncedBooks.id)
+                      .filter(ub.KoboSyncedBooks.user_id == int(user.id))
+                      .first()) is not None
+    if already_synced:
+        # The same reason the default seed is mandatory: an empty set reads
+        # to a Kobo as every book removed at the next sync.
+        raise UserLibraryError(
+            "This account already syncs books to a Kobo; starting empty "
+            "would remove them from the device at the next sync."
+        )
+
+
 def set_library_mode(user, mode, *, app_session=None, cdb=None,
                      chunk_size=SEED_CHUNK_SIZE, seed_rows_prepared=False,
-                     commit=True):
-    """Switch modes; commit the seed fence and personal mode atomically."""
+                     commit=True, start_empty=False):
+    """Switch modes; commit the seed fence and personal mode atomically.
+
+    ``start_empty`` skips the first-time seed so the account begins with no
+    books and adds its own from the global library. It is an administrator
+    choice made before the seed fence exists, never a way to clear an
+    existing selection.
+    """
     app_session = _session(app_session)
     if mode not in constants.LIBRARY_MODES:
         raise UserLibraryError(
             "Library mode must be 'monolibrary' or 'personal_library'."
         )
     desired = mode == constants.LIBRARY_MODE_PERSONAL
+    if start_empty:
+        _validate_start_empty(user, desired, app_session=app_session)
     if desired and not bool(getattr(user, "user_library_seeded", False)):
-        if not seed_rows_prepared:
+        if not seed_rows_prepared and not start_empty:
             prepare_user_library_seed(
                 user,
                 chunk_size=chunk_size,

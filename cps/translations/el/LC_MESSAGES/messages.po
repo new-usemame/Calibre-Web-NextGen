@@ -2720,7 +2720,7 @@ msgstr "Ένα ιδιωτικό ράφι με το όνομα '%(title)s' υπά
 #: cps/shelf.py
 #, python-format
 msgid "Shelf: '%(name)s'"
-msgstr "Ράφι: '%(name)s"
+msgstr "Ράφι: '%(name)s'"
 
 #: cps/shelf.py
 msgid "Error opening shelf. Shelf does not exist or is not accessible"

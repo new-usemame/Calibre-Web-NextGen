@@ -43,9 +43,9 @@ def _format_fn_source() -> str:
         ("Change order of Shelf: 'Dad's picks'", "Change order of Shelf — Dad's picks"),
         # Apostrophe in a translated label must survive too.
         ("Modifier l'ordre de l'étagère : 'Mes livres'", "Modifier l'ordre de l'étagère  — Mes livres"),
-        # el's msgstr has no closing quote: "Ράφι: '%(name)s".
-        ("Ράφι: 'Plain", "Ράφι — Plain"),
-        ("Ράφι: 'Kid's", "Ράφι — Kid's"),
+        # fi reorder puts text after the name: the translator's quotes stay and
+        # the name is untouched, rather than one quote being stripped.
+        ("Muuta hyllyn: 'Kid's' järjestystä", "Muuta hyllyn — 'Kid's' järjestystä"),
         # A name that itself ends in an apostrophe keeps it.
         ("Shelf: 'Dads''", "Shelf — Dads'"),
         # No wrapping quotes: only the colon is rewritten.

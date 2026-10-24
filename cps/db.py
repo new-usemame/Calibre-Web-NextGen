@@ -2129,16 +2129,9 @@ class CalibreDB:
                     discover_filter,
                     extra_filter if extra_filter is not None else true(),
                 )
-            # Eagerly load template relationships to prevent detached lazy-load
-            # failures if another request tears down the shared scoped session.
-            if database == Books:
-                random_query = random_query.options(
-                    joinedload(Books.authors),
-                    joinedload(Books.tags),
-                    joinedload(Books.data),
-                    joinedload(Books.series),
-                    joinedload(Books.ratings),
-                )
+            # Template relationships load eagerly through the model's
+            # lazy='selectin', so a torn-down scoped session cannot leave them
+            # unloaded. No joinedload: see get_filtered_book (#2699).
             randm = (random_query.filter(self.common_filters(allow_show_archived,
                                                              viewing_tag_id=viewing_tag_id,
                                                              allow_show_hidden=allow_show_hidden,
@@ -2154,16 +2147,12 @@ class CalibreDB:
         else:
             query = self.session.query(database)
         
-        # Eagerly load template relationships to prevent DetachedInstanceError
-        # during rendering under concurrent status/notification requests.
-        if database == Books and not ids_only:
-            query = query.options(
-                joinedload(Books.authors),
-                joinedload(Books.tags),
-                joinedload(Books.data),
-                joinedload(Books.series),
-                joinedload(Books.ratings),
-            )
+        # Template relationships load eagerly through the model's
+        # lazy='selectin' (one indexed `WHERE book IN (<page ids>)` query
+        # each), which prevents DetachedInstanceError during rendering under
+        # concurrent status/notification requests. A joinedload here made
+        # SQLite read the whole authors/tags/series tables for every page,
+        # about 3s per page on a 270k-book library (#2699).
         
         off = int(int(pagesize) * (page - 1))
 

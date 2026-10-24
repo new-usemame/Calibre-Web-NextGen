@@ -11974,6 +11974,10 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
 
+#: cps/spa_strings.py
+msgid "Your account has no password yet. Set one to sign in from e-reader apps and OPDS clients."
+msgstr "Je account heeft nog geen wachtwoord. Stel er een in om in te loggen vanuit e-reader-apps en OPDS-clients."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Naamloos label"

@@ -511,3 +511,46 @@ def test_me_payload_kobo_flag_survives_missing_attribute_866():
     bare = _user(check_visibility=lambda _bit: True, role_anonymous=lambda: False)
     del bare.kobo_only_shelves_sync
     assert serialize_user(bare)["kobo_only_shelves_sync"] is False
+
+
+@pytest.mark.unit
+def test_an_account_without_a_password_can_set_its_first_one(monkeypatch, tmp_path):
+    """#2572: reverse-proxy auto-created accounts are stored with an empty
+    password. The New UI must let them set one (classic profile parity), and the
+    new password must then work for Basic Auth clients. An account that HAS a
+    password still has to prove it."""
+    from cps import constants
+    from tests.unit.koreader_library_world import LibraryWorld
+    world = LibraryWorld(monkeypatch, tmp_path)
+    world.enable_web()
+    import cps.helper
+    monkeypatch.setattr(cps.helper.config, "config_password_policy", False, raising=False)
+    try:
+        proxy_user = world.add_user("proxy")
+        proxy_user.password = ""
+        alice_user = world.add_user("alice")
+        for user in (proxy_user, alice_user):
+            user.role |= constants.ROLE_PASSWD
+        world.session.commit()
+
+        proxy = world.browser("proxy")
+        assert proxy.get("/api/v1/account").get_json()["has_password"] is False
+        resp = proxy.post("/api/v1/account/password",
+                          json={"current_password": "", "new_password": "Newpass123!"})
+        assert resp.status_code == 204, resp.get_data(as_text=True)
+        assert proxy.get("/api/v1/account").get_json()["has_password"] is True
+        assert world.client.get("/kosync/users/auth",
+                                headers=world.basic("proxy", "Newpass123!")).status_code == 200
+        # Once set, the next change needs it like any other account.
+        again = proxy.post("/api/v1/account/password",
+                           json={"current_password": "", "new_password": "Other123!"})
+        assert again.status_code == 400
+
+        alice = world.browser("alice")
+        assert alice.get("/api/v1/account").get_json()["has_password"] is True
+        blind = alice.post("/api/v1/account/password", json={"new_password": "Other123!"})
+        assert blind.status_code == 400
+        assert world.client.get("/kosync/users/auth",
+                                headers=world.basic("alice")).status_code == 200
+    finally:
+        world.close()

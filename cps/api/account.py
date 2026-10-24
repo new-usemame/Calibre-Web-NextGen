@@ -96,6 +96,9 @@ def _serialize_account():
             "passwd": current_user.role_passwd(),
         },
         "can_change_password": bool(current_user.role_passwd() or current_user.role_admin()),
+        # Accounts auto-created by reverse-proxy header login have no password
+        # yet (#2572); the form then asks only for the new one.
+        "has_password": bool(current_user.password),
         # Picker options for the settings form.
         "locales": locales,
         "languages": lang_options,
@@ -249,7 +252,10 @@ def change_password():
     new_password = data.get("new_password") or ""
 
     # Verify the current password — never let a session change the password blind.
-    if not current_user.password or not check_password_hash(current_user.password, current_password):
+    # An account with no password at all (reverse-proxy auto-create, #2572) has
+    # nothing to verify, so its signed-in session may set the first one, as the
+    # classic profile page already allows.
+    if current_user.password and not check_password_hash(current_user.password, current_password):
         return _err("invalid_credentials", "Current password is incorrect", 400)
 
     try:

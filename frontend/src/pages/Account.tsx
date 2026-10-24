@@ -192,6 +192,7 @@ export function Account() {
   };
 
   const activeRoles = Object.entries(account.role).filter(([, v]) => v);
+  const hasPassword = account.has_password !== false;
   const selectedTheme = THEMES.find((o) => o.slug === theme);
   const showOriginalFilename = me?.preferences?.show_original_filename !== false;
 
@@ -622,11 +623,17 @@ export function Account() {
         <form className={styles.card} onSubmit={onChangePassword}>
           <h2 className={styles.cardTitle}><KeyRound size={16} aria-hidden="true" focusable={false} /> {t('Change password')}</h2>
 
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="acc-cur">{t('Current password')}</label>
-            <input id="acc-cur" type="password" autoComplete="current-password" className={styles.input}
-              value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
-          </div>
+          {/* An account created by reverse-proxy login has no password to
+            * confirm yet (#2572); it sets its first one here. */}
+          {hasPassword ? (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="acc-cur">{t('Current password')}</label>
+              <input id="acc-cur" type="password" autoComplete="current-password" className={styles.input}
+                value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
+            </div>
+          ) : (
+            <p className={styles.hint}>{t('Your account has no password yet. Set one to sign in from e-reader apps and OPDS clients.')}</p>
+          )}
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="acc-new">{t('New password')}</label>
@@ -646,7 +653,7 @@ export function Account() {
 
           <div className={styles.actions}>
             <Button type="submit" variant="ghost"
-              disabled={changePassword.isPending || !currentPw || !newPw}>
+              disabled={changePassword.isPending || (hasPassword && !currentPw) || !newPw}>
               <KeyRound size={15} aria-hidden="true" focusable={false} /> {t('Update password')}
             </Button>
             <span

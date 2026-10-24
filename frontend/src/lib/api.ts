@@ -484,6 +484,8 @@ export interface Account {
   ui_font_display: string;
   role: Record<string, boolean>;
   can_change_password: boolean;
+  /** False for an account with no password yet (reverse-proxy auto-create, #2572). */
+  has_password: boolean;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
   app_passwords: AppPassword[];

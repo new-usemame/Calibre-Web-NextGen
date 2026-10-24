@@ -37,10 +37,21 @@ Deliberately dependency-free, like :mod:`app_paths`: these run before the Flask
 stack is usable.
 """
 
-import grp
 import os
-import pwd
 import subprocess
+
+# pwd/grp are POSIX-only: on Windows they do not exist, and the bare imports
+# made every script that imports this module die with ModuleNotFoundError at
+# startup (auto_library, cover_enforcer, ingest_processor, convert_library)
+# before any of the "no service account -> skip chown" logic could run.
+# Windows is definitionally "not the container": service_ids() returning None
+# is the same normal source-install outcome the KeyError path already models.
+try:
+    import grp
+    import pwd
+except ImportError:  # pragma: no cover — Windows
+    grp = None
+    pwd = None
 
 __all__ = [
     "DEFAULT_SERVICE_USER",
@@ -61,6 +72,9 @@ def service_ids():
     ``None`` means "this is not the container" — a source install, a CI runner,
     a dev checkout. Callers skip the chown; they do not report a failure.
     """
+    if pwd is None or grp is None:
+        # POSIX account lookups do not exist on this platform (Windows).
+        return None
     user = os.environ.get("CWA_SERVICE_USER", DEFAULT_SERVICE_USER).strip()
     group = os.environ.get("CWA_SERVICE_GROUP", DEFAULT_SERVICE_GROUP).strip()
     if not user or not group:

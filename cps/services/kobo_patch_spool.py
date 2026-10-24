@@ -120,7 +120,12 @@ def _reset_request_io_slots_after_fork():
     _REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
 
 
-os.register_at_fork(after_in_child=_reset_request_io_slots_after_fork)
+# POSIX-only (Windows has no fork, and the attribute does not exist there --
+# its absence used to crash the whole app at startup on Windows the moment
+# Kobo was enabled). Workers there are spawn/subprocess based, so the child
+# reset is never needed either.
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_request_io_slots_after_fork)
 
 
 def _spool_root() -> Path:

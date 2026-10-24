@@ -29,6 +29,7 @@ import queue
 # the module inside those functions, so Empty has to be imported by name to be reachable.
 from queue import Empty
 import os
+import sys
 import tempfile
 from datetime import datetime, timedelta
 import re
@@ -369,7 +370,7 @@ def get_ingest_queue_size():
 def refresh_library(app):
     with app.app_context():  # Create app context for session
         ingest_dir = get_ingest_dir()
-        result = subprocess.run(['python3', os.path.join(constants.SCRIPTS_DIR, 'ingest_processor.py'), ingest_dir])
+        result = subprocess.run([sys.executable, os.path.join(constants.SCRIPTS_DIR, 'ingest_processor.py'), ingest_dir])
         return_code = result.returncode
 
         # Add empty list for messages in app context if a list doesn't already exist
@@ -2154,7 +2155,7 @@ def convert_library_start(queue):
     library_hold = None
     try:
         library_hold = content_server.hold_library()
-        cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+        cl_process = subprocess.Popen([sys.executable, os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
     except Exception as error:
         try:
             with open(_service_log_path("convert-library.log"), "a") as failed_log:
@@ -2344,9 +2345,9 @@ def get_status():
 
 def epub_fixer_start(queue, input_file: str | None = None):
     if input_file:
-        ef_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py'), '--input_file', input_file])
+        ef_process = subprocess.Popen([sys.executable, os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py'), '--input_file', input_file])
     else:
-        ef_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py'), '--all'])
+        ef_process = subprocess.Popen([sys.executable, os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py'), '--all'])
     queue.put(ef_process)
 
 def is_epub_fixer_finished() -> bool:
@@ -2589,7 +2590,7 @@ def cover_enforcer_start(queue):
         # Popen dups the fd into the child, so closing the parent copy here is safe and
         # avoids leaking one descriptor per run.
         log_file = open(_service_log_path("cover-enforcer.log"), 'a')
-        ce_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'cover_enforcer.py'), '-all'], stdout=log_file, stderr=subprocess.STDOUT)
+        ce_process = subprocess.Popen([sys.executable, os.path.join(constants.SCRIPTS_DIR, 'cover_enforcer.py'), '-all'], stdout=log_file, stderr=subprocess.STDOUT)
     except Exception as e:
         # Nothing was ever put on the queue, so the watcher blocked forever at queue.get()
         # on cancel and the page polled a run that had never started. Write the end marker

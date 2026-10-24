@@ -1,4 +1,4 @@
-# Calibre-Web Automated – fork of Calibre-Web
+# Calibre-Web Automated - fork of Calibre-Web
 # Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -43,6 +43,11 @@ def _format_fn_source() -> str:
         ("Change order of Shelf: 'Dad's picks'", "Change order of Shelf — Dad's picks"),
         # Apostrophe in a translated label must survive too.
         ("Modifier l'ordre de l'étagère : 'Mes livres'", "Modifier l'ordre de l'étagère  — Mes livres"),
+        # el's msgstr has no closing quote: "Ράφι: '%(name)s".
+        ("Ράφι: 'Plain", "Ράφι — Plain"),
+        ("Ράφι: 'Kid's", "Ράφι — Kid's"),
+        # A name that itself ends in an apostrophe keeps it.
+        ("Shelf: 'Dads''", "Shelf — Dads'"),
         # No wrapping quotes: only the colon is rewritten.
         ("Shelf: Plain", "Shelf — Plain"),
     ],

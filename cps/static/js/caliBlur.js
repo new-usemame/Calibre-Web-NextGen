@@ -747,10 +747,11 @@ $("#nav_new a:contains('Recently')").contents().filter(function () {
 // The server renders the heading as "Shelf: 'Name'". Turn that into
 // "Shelf — Name" by dropping only the quotes that wrap the name, so an
 // apostrophe inside the name ("Children's Fiction") or in a translated
-// label survives (#1704).
+// label survives (#1704). The closing quote is optional because some
+// translations (el) leave it out.
 function formatShelfHeading(text) {
     return text
-        .replace(/:(\s*)'([\s\S]*)'(\s*)$/, ":$1$2$3")
+        .replace(/:(\s*)'([\s\S]*?)'?(\s*)$/, ":$1$2$3")
         .replace(":", " —");
 }
 

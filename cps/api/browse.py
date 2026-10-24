@@ -78,44 +78,31 @@ def _require_metadata_editor():
     return None
 
 
-@api_v1.route("/tags/<int:tag_id>", methods=["POST"])
-@login_required_if_no_ano
-def rename_tag(tag_id):
-    """Rename one existing Calibre tag for every linked book.
+def _rename_or_merge(model, link_attr, obj_id, name, merge, messages):
+    """Rename one calibre list value (a tag) for every linked book.
 
-    A name collision is the de-duplication case (#973), not merely an error:
-    renaming a tag onto its near-duplicate is how you consolidate the two. So
-    the 409 carries the conflicting tag (id, name, how many books it holds) and
-    the caller can repeat the request with ``merge: true`` to fold this tag into
-    it. The merge stays opt-in and must be boolean ``true`` — folding two tags
-    together destroys the distinction between them and there is no undo, so a
-    typo that happens to match an existing tag must not silently consume it.
+    ``model`` is the calibre table, ``link_attr`` the ``Books`` relationship
+    that holds it, ``messages`` the translated texts for this kind of value
+    (``not_found``, ``exists``). A name collision is the de-duplication case
+    (#973), not merely an error: renaming a value onto its near-duplicate is
+    how you consolidate the two. So the 409 carries the conflicting value (id,
+    name, how many books it holds) and the caller can repeat the request with
+    ``merge: true`` to fold this value into it. The merge stays opt-in and must
+    be boolean ``true``: folding two values together destroys the distinction
+    between them and there is no undo, so a typo that happens to match an
+    existing value must not silently consume it.
     """
-    guard = _require_metadata_editor()
-    if guard is not None:
-        return guard
-
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict) or not isinstance(payload.get("name"), str):
-        return jsonify({"error": {"code": "invalid_request", "message": _("Tag name must be text")}}), 400
-    name = payload["name"].strip()
-    if not name:
-        return jsonify({"error": {"code": "invalid_request", "message": _("Tag name cannot be empty")}}), 400
-    if "," in name:
-        return jsonify({"error": {"code": "invalid_request", "message": _("Tag name cannot contain commas")}}), 400
-    merge = payload.get("merge") is True
-
     with metadata_db_write_lock():
-        tag = calibre_db.session.get(db.Tags, tag_id)
-        if tag is None:
-            return jsonify({"error": {"code": "not_found", "message": _("Tag not found")}}), 404
-        if tag.name == name:
-            return jsonify({"id": tag.id, "name": tag.name})
+        obj = calibre_db.session.get(model, obj_id)
+        if obj is None:
+            return jsonify({"error": {"code": "not_found", "message": messages["not_found"]}}), 404
+        if obj.name == name:
+            return jsonify({"id": obj.id, "name": obj.name})
 
         # Recheck under the process-shared writer lock so two Flask workers
         # cannot both pass the uniqueness check before either commits.
-        duplicate = (calibre_db.session.query(db.Tags)
-                     .filter(func.lower(db.Tags.name) == name.lower(), db.Tags.id != tag_id)
+        duplicate = (calibre_db.session.query(model)
+                     .filter(func.lower(model.name) == name.lower(), model.id != obj_id)
                      .first())
         if duplicate is not None and not merge:
             # The count is the raw link count, i.e. the true blast radius of the
@@ -123,45 +110,82 @@ def rename_tag(tag_id):
             # common_filters(), which would under-report what actually moves.
             return jsonify({"error": {
                 "code": "conflict",
-                "message": _("A tag with that name already exists"),
+                "message": messages["exists"],
                 "conflict": {"id": duplicate.id, "name": duplicate.name, "count": len(duplicate.books)},
             }}), 409
 
         # Materialize the exact linked-book set while association writers are
         # excluded, then mutate and dirty that same set in one transaction.
-        affected_books = list(tag.books)
+        affected_books = list(obj.books)
         try:
             if duplicate is not None:
-                # Merge: move every book off this tag onto the survivor, whose
-                # own spelling wins, then drop the now-empty tag. A book already
+                # Merge: move every book off this value onto the survivor, whose
+                # own spelling wins, then drop the now-empty value. A book already
                 # carrying both must end up with one link, not two.
                 for book in affected_books:
-                    if duplicate not in book.tags:
-                        book.tags.append(duplicate)
-                    book.tags.remove(tag)
+                    linked = getattr(book, link_attr)
+                    if duplicate not in linked:
+                        linked.append(duplicate)
+                    linked.remove(obj)
                     helper.mark_book_modified(book, set_dirty=True)
-                calibre_db.session.delete(tag)
+                calibre_db.session.delete(obj)
                 result = {"id": duplicate.id, "name": duplicate.name,
                           "merged": True, "books": len(affected_books)}
             else:
-                tag.name = name
+                obj.name = name
+                if hasattr(obj, "sort"):
+                    obj.sort = name
                 for book in affected_books:
                     helper.mark_book_modified(book, set_dirty=True)
-                result = {"id": tag.id, "name": tag.name}
+                result = {"id": obj.id, "name": obj.name}
             calibre_db.session.commit()
         except IntegrityError:
             calibre_db.session.rollback()
-            return jsonify({"error": {"code": "conflict", "message": _("A tag with that name already exists")}}), 409
+            return jsonify({"error": {"code": "conflict", "message": messages["exists"]}}), 409
         except Exception:
             calibre_db.session.rollback()
             raise
 
     # File-level enforcement is best-effort and must only be queued after the
     # database transaction succeeds. Every linked book now carries the surviving
-    # tag name (or, after a merge, no longer carries the one that was folded in).
+    # name (or, after a merge, no longer carries the one that was folded in).
     for book in affected_books:
-        helper.log_metadata_change(book, {"tags": ", ".join(item.name for item in book.tags)})
+        helper.log_metadata_change(
+            book, {link_attr: ", ".join(item.name for item in getattr(book, link_attr))})
     return jsonify(result)
+
+
+def _read_new_name(empty_message, type_message, comma_message=None):
+    """``(name, merge, None)`` from the request body, or ``(None, None, error)``."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("name"), str):
+        return None, None, (jsonify({"error": {"code": "invalid_request", "message": type_message}}), 400)
+    name = payload["name"].strip()
+    if not name:
+        return None, None, (jsonify({"error": {"code": "invalid_request", "message": empty_message}}), 400)
+    if comma_message and "," in name:
+        return None, None, (jsonify({"error": {"code": "invalid_request", "message": comma_message}}), 400)
+    return name, payload.get("merge") is True, None
+
+
+@api_v1.route("/tags/<int:tag_id>", methods=["POST"])
+@login_required_if_no_ano
+def rename_tag(tag_id):
+    """Rename one existing Calibre tag for every linked book (#973).
+
+    See ``_rename_or_merge`` for the merge semantics.
+    """
+    guard = _require_metadata_editor()
+    if guard is not None:
+        return guard
+    name, merge, error = _read_new_name(
+        _("Tag name cannot be empty"), _("Tag name must be text"), _("Tag name cannot contain commas"))
+    if error is not None:
+        return error
+    return _rename_or_merge(db.Tags, "tags", tag_id, name, merge, {
+        "not_found": _("Tag not found"),
+        "exists": _("A tag with that name already exists"),
+    })
 
 
 @api_v1.route("/tags/<int:tag_id>", methods=["DELETE"])

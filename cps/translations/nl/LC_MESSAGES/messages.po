@@ -20460,3 +20460,175 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
+#: cps/spa_strings.py
+msgid "Becomes"
+msgstr "Wordt"
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr "Wordt (scheid met komma’s om te splitsen)"
+
+#: cps/spa_strings.py
+msgid "By name"
+msgstr "Op naam"
+
+#: cps/spa_strings.py
+msgid "Change {n} books now?"
+msgstr "Nu {n} boeken wijzigen?"
+
+#: cps/spa_strings.py
+msgid "Changed {n} books."
+msgstr "{n} boeken gewijzigd."
+
+#: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr "Kan de regels niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not read that file: {error}"
+msgstr "Kan dat bestand niet lezen: {error}"
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr "Valt onder een regel"
+
+#: cps/spa_strings.py
+msgid "Discard"
+msgstr "Verwerpen"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr "Deze waarde verwijderen"
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr "Verwijderd"
+
+#: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr "Vul de waarde in die moet overeenkomen."
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr "Vul in wat het wordt, of kies Verwijderen."
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr "Elke waarde valt onder een regel."
+
+#: cps/spa_strings.py
+msgid "Field"
+msgstr "Veld"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr "Waarden filteren"
+
+#: cps/spa_strings.py
+msgid "History"
+msgstr "Geschiedenis"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr "Binnenkomende waarde"
+
+#: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr "Metadata opschonen"
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr "Het toepassen van metadata staat uit, dus de boekbestanden houden hun oude metadata."
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr "Meeste boeken eerst"
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr "Geen enkel boek verandert met de opgeslagen regels."
+
+#: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr "Nog geen regels. Voeg er hierboven een toe, of importeer een JSON-bestand met regels."
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr "Geen waarden gevonden."
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr "Nog niets toegepast."
+
+#: cps/spa_strings.py
+msgid "One map per field. A rule turns a value into another (rename), several (split) or none (drop), matching regardless of case and accents. Values no rule covers stay as they are. Nothing changes in the library until you apply the preview."
+msgstr "Eén set regels per veld. Een regel maakt van een waarde een andere (hernoemen), meerdere (splitsen) of geen (verwijderen), ongeacht hoofdletters en accenten. Waarden waarvoor geen regel geldt, blijven zoals ze zijn. Er verandert niets in de bibliotheek totdat je het voorbeeld toepast."
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr "Alleen waarden zonder regel"
+
+#: cps/spa_strings.py
+msgid "Remove the rule for {value}"
+msgstr "De regel voor {value} verwijderen"
+
+#: cps/spa_strings.py
+msgid "Removed {n} values no book uses now."
+msgstr "{n} waarden die geen boek meer gebruikt zijn verwijderd."
+
+#: cps/spa_strings.py
+msgid "Restored {n} books."
+msgstr "{n} boeken hersteld."
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr "Regels"
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr "Regels opgeslagen. Het voorbeeld hieronder is bijgewerkt."
+
+#: cps/spa_strings.py
+msgid "Save rules"
+msgstr "Regels opslaan"
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr "Sla de regels op om het voorbeeld bij te werken."
+
+#: cps/spa_strings.py
+msgid "Sort values"
+msgstr "Waarden sorteren"
+
+#: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr "De boekbestanden worden ook bijgewerkt."
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr "Er is al een regel voor deze waarde."
+
+#: cps/spa_strings.py
+msgid "Undone"
+msgstr "Ongedaan gemaakt"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr "Niet-opgeslagen wijzigingen in de regels."
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr "Waarden in je bibliotheek"
+
+#: cps/spa_strings.py
+msgid "{n} books"
+msgstr "{n} boeken"
+
+#: cps/spa_strings.py
+msgid "{n} books could not be changed: {list}"
+msgstr "{n} boeken konden niet worden gewijzigd: {list}"
+
+#: cps/spa_strings.py
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr "{n} overgeslagen, omdat ze sinds het voorbeeld zijn gewijzigd of zijn uitgesloten."

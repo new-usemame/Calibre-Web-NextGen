@@ -206,15 +206,17 @@ from cps.api.acquisition import worker_available as actual_worker_available
 
 @pytest.mark.parametrize('service',['up','down','unknown','error'])
 def test_runtime_liveness_does_not_treat_unknown_ingest_as_working(api,monkeypatch,service):
-    from cps import schedule,web,cwa_functions
+    from cps import constants,schedule
+    from cps.services import s6_status
+    from cps.services.acquisition import availability
     client,repo,actor,module,connection,offer,database=api
     monkeypatch.setattr(schedule,'acquisition_scheduler_available',lambda:True)
-    monkeypatch.setattr(cwa_functions,'get_ingest_dir',lambda:str(database.parent))
-    monkeypatch.setattr(module,'config',SimpleNamespace(config_calibre_dir=str(database.parent)))
+    monkeypatch.setattr(constants,'ingest_folder',lambda:str(database.parent))
+    monkeypatch.setattr(availability,'config',SimpleNamespace(config_calibre_dir=str(database.parent)))
     def check():
         if service=='error':raise OSError('service probe unavailable')
         return {'cwa-ingest-service':service}
-    monkeypatch.setattr(web,'_check_s6_service_status',check)
+    monkeypatch.setattr(s6_status,'check_s6_service_status',check)
     status=actual_worker_available()
     assert status['available'] is (service=='up')
     if service!='up':assert 'ingest_service_unavailable' in status['reasons']
@@ -379,12 +381,14 @@ def test_other_accounts_catalog_cursor_is_rejected_before_any_remote_fetch(api,m
 
 @pytest.mark.parametrize('key_state',['missing','corrupt'])
 def test_runtime_refuses_queue_when_its_existing_key_is_unavailable(api,monkeypatch,key_state):
-    from cps import schedule,web,cwa_functions
+    from cps import constants,schedule
+    from cps.services import s6_status
+    from cps.services.acquisition import availability
     client,repo,actor,module,connection,offer,database=api
     monkeypatch.setattr(schedule,'acquisition_scheduler_available',lambda:True)
-    monkeypatch.setattr(cwa_functions,'get_ingest_dir',lambda:str(database.parent))
-    monkeypatch.setattr(module,'config',SimpleNamespace(config_calibre_dir=str(database.parent)))
-    monkeypatch.setattr(web,'_check_s6_service_status',lambda:{'cwa-ingest-service':'up'})
+    monkeypatch.setattr(constants,'ingest_folder',lambda:str(database.parent))
+    monkeypatch.setattr(availability,'config',SimpleNamespace(config_calibre_dir=str(database.parent)))
+    monkeypatch.setattr(s6_status,'check_s6_service_status',lambda:{'cwa-ingest-service':'up'})
     key=database.with_name('acquisition.key')
     if key_state=='missing':key.unlink()
     else:key.write_bytes(b'corrupt-existing-key')

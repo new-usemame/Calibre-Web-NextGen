@@ -70,6 +70,7 @@ from .kobo_sync_status import change_archived_books
 from . import limiter, rate_limits
 from .services.worker import WorkerThread
 from .services.parallel import run_blocking as _run_blocking
+from .services.s6_status import CRITICAL_LONGRUNS as _CRITICAL_LONGRUNS, check_s6_service_status as _check_s6_service_status
 from .tasks_status import render_task_status
 from .usermanagement import user_login_required
 from .string_helper import strip_whitespaces
@@ -82,9 +83,7 @@ from .user_preferences import set_checkbox_preference_from_form
 from .services import reader_fonts
 
 # CWA Imports
-import shutil
 import sqlite3
-import subprocess
 import threading
 import time
 
@@ -1608,16 +1607,6 @@ def render_magic_shelf(shelf_id, sort_param, page):
 
 # ################################### Health Check ##################################################################
 
-# The longruns whose liveness directly determines whether the container is
-# functionally useful. ``cwa-ingest-service`` watches /cwa-book-ingest and
-# moves new files into the library; ``metadata-change-detector`` propagates
-# metadata edits back to the underlying book files. If either has died and
-# isn't being restarted, the container can still serve /health and read
-# metadata.db but the user-visible features dependent on those services are
-# broken — exactly the failure mode reported in fork #193 (droM4X) and the
-# ~200k-book production trace from @FRaccie.
-_CRITICAL_LONGRUNS = ("cwa-ingest-service", "metadata-change-detector")
-
 # A metadata writer is normal during ingest, checksum backfill, or a direct
 # calibredb operation.  Waiting on SQLite's busy timeout here is unsafe:
 # gevent is deliberately unpatched, so a blocking request greenlet freezes
@@ -1701,49 +1690,6 @@ def _probe_metadata_db():
     finally:
         if conn is not None:
             conn.close()
-
-
-def _check_s6_service_status():
-    """Probe live state of each :data:`_CRITICAL_LONGRUNS` longrun via
-    ``s6-rc -a list``.
-
-    ``s6-rc -a list`` enumerates the services currently active under
-    s6-rc and returns their names on stdout. Stopping a service via
-    ``s6-rc -d change <name>`` removes it from this output, so membership
-    is a reliable "is the service currently up" signal. We use this
-    primitive rather than ``s6-svstat`` because the latter requires read
-    access to ``/run/service/<svc>/supervise/`` (root-only in the lsio
-    base image) while the Flask app runs as ``abc``. ``s6-rc -a list``
-    reads world-readable state under ``/run/s6/db`` and works fine for
-    unprivileged callers — that's the same primitive the existing
-    ``scripts/check-cwa-services.sh`` (consumed by the admin UI's "Check
-    NextGen Status" action) already relies on.
-
-    Returns a dict ``{service_name: "up" | "down" | "unknown"}``. The
-    ``unknown`` value covers any environment where ``s6-rc`` isn't on
-    PATH (the unit-test harness, dev compose without s6, k8s sidecars) —
-    not a known-bad state, so the caller treats ``unknown`` as a no-op
-    for the 503 decision.
-    """
-    s6_rc = shutil.which("s6-rc")
-    if not s6_rc:
-        return {service: "unknown" for service in _CRITICAL_LONGRUNS}
-
-    try:
-        completed = subprocess.run(
-            [s6_rc, "-a", "list"],
-            capture_output=True,
-            text=True,
-            timeout=1,
-        )
-    except (subprocess.TimeoutExpired, OSError):
-        return {service: "unknown" for service in _CRITICAL_LONGRUNS}
-
-    if completed.returncode != 0:
-        return {service: "unknown" for service in _CRITICAL_LONGRUNS}
-
-    active = {line.strip() for line in completed.stdout.splitlines() if line.strip()}
-    return {service: ("up" if service in active else "down") for service in _CRITICAL_LONGRUNS}
 
 
 def _run_single_flight_health_probe(gate, probe, already_running_result, label):

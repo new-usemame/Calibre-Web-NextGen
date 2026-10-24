@@ -13,6 +13,7 @@ from . import api_v1, log
 from .. import config, constants, limiter, ub
 from ..cw_login import current_user
 from ..services.acquisition import admission, runtime
+from ..services.acquisition.availability import run_private_blocking as _run_private_blocking, worker_available
 from ..services.acquisition.catalog import CatalogService, CatalogError, connection_config
 from ..services.acquisition.contracts import DIRECT_FORMATS, MOBI_MEDIA_TYPE
 from ..services.acquisition.http import TransportError, origin
@@ -124,67 +125,6 @@ def _endpoint(*, admin=False, available=False, read=READ_RATE, write=WRITE_RATE)
             return wrapped
         return limiter.limit(_rate(read,write),key_func=_key,per_method=True)(wrapped)
     return decorate
-
-
-
-def _run_private_blocking(operation):
-    # gevent's threadpool reports uncaught worker exceptions to stderr before
-    # a waiting request can sanitize them. Keep errors as private return values
-    # inside the worker; route error handling remains on the request thread.
-    from ..services.parallel import run_blocking
-    def invoke():
-        try:
-            return True,operation()
-        except Exception as error:
-            return False,error
-    successful,value=run_blocking(invoke)
-    if not successful:
-        raise value from None
-    return value
-
-
-def worker_available():
-    """Runtime preconditions only: a catalog probe does not prove import success.
-
-    First slice requires the existing s6 ingest service. Unknown/non-s6 runtimes
-    are unavailable rather than accepting jobs into an unverified queue.
-    """
-    from ..schedule import acquisition_scheduler_available
-    from ..cwa_functions import get_ingest_dir
-    from ..web import _check_s6_service_status
-    reasons=[]
-    if not acquisition_scheduler_available(): reasons.append('scheduler_unavailable')
-    if admission.instance_state(ub.app_DB_path)['migration_status'] != 'ready': reasons.append('migration_unavailable')
-    if not admission.configured_media_types(ub.app_DB_path): reasons.append('formats_disabled')
-    try:
-        key=Path(ub.app_DB_path).parent/'acquisition.key'
-        key_present=key.is_file() and not key.is_symlink()
-    except (TypeError,OSError):
-        key_present=False
-    if not key_present:
-        reasons.append('key_unavailable')
-    else:
-        database=ub.app_DB_path
-        def repository_ready():
-            try:
-                with runtime.open_repository(database):
-                    return True
-            except Exception:
-                return False
-        if not _run_private_blocking(repository_ready): reasons.append('repository_unavailable')
-    try:
-        ingest=Path(get_ingest_dir())
-        if not ingest.is_dir() or not os.access(ingest,os.W_OK|os.X_OK): reasons.append('ingest_unwritable')
-    except (OSError,TypeError): reasons.append('ingest_unavailable')
-    try:
-        if not config.config_calibre_dir or not Path(config.config_calibre_dir).is_dir(): reasons.append('library_unavailable')
-    except (OSError,TypeError): reasons.append('library_unavailable')
-    try:
-        running=_run_private_blocking(_check_s6_service_status).get('cwa-ingest-service') == 'up'
-    except Exception:
-        running=False
-    if not running: reasons.append('ingest_service_unavailable')
-    return {'available':not reasons,'reasons':reasons}
 
 
 

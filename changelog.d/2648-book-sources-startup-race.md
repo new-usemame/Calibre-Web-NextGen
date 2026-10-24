@@ -1,0 +1,2 @@
+### Fixed
+- **Book sources settings no longer disappear after a restart.** With book sources turned on, the background import job could start loading the web pages' code at the same moment the server was setting them up. When the two overlapped, the book sources admin page and search answered "Not Found" until the next restart, and the log repeated "The setup method 'route' can no longer be called" every five seconds. The background job no longer loads any web page code. #2648.

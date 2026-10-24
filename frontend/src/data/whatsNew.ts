@@ -56,6 +56,32 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.54',
+    date: '2026-10-24',
+    items: [
+      {
+        title: 'Covers, the reader and library pages are fast on very large libraries',
+        body: 'Looking up a book used one query that made the database read whole tables of authors, tags and series first. On a library of about 270,000 books a cover took around 4 seconds and opening the reader 20 seconds or more. Each part of a book is now loaded with its own indexed query: one book went from about 2.7 seconds to under 10 milliseconds, and a page of 60 books from about 3.5 seconds to about 90 milliseconds.',
+        category: 'Library',
+      },
+      {
+        title: 'The Save button in the PDF reader works in Firefox',
+        body: 'Firefox blocked the download, so pressing Save in the PDF reader did nothing. It downloads the book again, from both Read now and Open without saving progress.',
+        category: 'Reading',
+      },
+      {
+        title: 'Shelf names keep their apostrophes on the classic shelf page',
+        body: 'A shelf called "Children\'s Fiction" was shown as "Childrens Fiction" on the classic theme\'s shelf page. The name was always stored correctly, and now shows correctly too.',
+        category: 'Library',
+      },
+      {
+        title: 'Scheduled maintenance handles clock-change nights',
+        body: 'A restart inside the scheduled-task window starts the tasks straight away. On the nights the clocks change, a window in the skipped hour never opened and the repeated hour counted twice. The window now opens once a day at the chosen hour in the server\'s time zone.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.53',
     date: '2026-10-23',
     items: [

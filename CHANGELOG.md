@@ -16,6 +16,20 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.54] - 2026-10-24
+
+### Fixed
+
+- **Shelf names keep their apostrophes on the classic shelf page.** A shelf called "Children's Fiction" was shown as "Childrens Fiction" on the shelf page in the classic theme; the name was always stored correctly. Reported in #1704, fixed by @sgreadly (#2685).
+
+- **Covers, the reader and library pages load quickly on very large libraries.** Looking up books joined their authors, tags, series, publishers and languages into one query that SQLite answered by reading those whole tables first. On a library of about 270,000 books every cover took around 4 seconds, opening the reader could take 20 seconds or more, and each page of the library list took seconds too. Each relationship is now loaded with its own indexed query. On a generated 270,000-book library one book's lookup went from about 2.7 seconds to under 10 milliseconds, and a 60-book page from about 3.5 seconds to about 90 milliseconds. Reported by @victor910 in #2699.
+
+- **The Save button in the PDF reader downloads the book again.** In Firefox the download was blocked by the page's security policy ("blocked the loading of a resource (frame-src) at blob:"), so nothing happened when you pressed it, from both "Read now" and "Open without saving progress". Reported by @darkmatterpelican in #2710.
+
+- **The automatic revert job no longer reports success when it reverted nothing.** When reverting a commit that broke `main` conflicted with later work, the job printed "Revert failed" and still finished green, so nobody learned that `main` was still red. It now fails with an error. A commit that `main` has already reverted is still a quiet no-op, with a log line saying so. (#2553)
+
+- **Scheduled maintenance starts on a restart inside its window on clock-change days too.** When the server starts while the scheduled-task window is open, the tasks start straight away. On the nights the clocks change that check used wall-clock arithmetic: a window set for the skipped hour was never treated as open, and after the clocks went back the repeated hour counted as a second window. The window now opens at the chosen hour in the server's time zone (`TZ`) and lasts its set number of real minutes, so it is open exactly once a day, including a restart at the very minute it opens (#2551).
+
 ## [v4.1.53] - 2026-10-23
 
 ### Fixed

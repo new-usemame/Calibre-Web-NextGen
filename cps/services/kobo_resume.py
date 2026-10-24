@@ -21,6 +21,7 @@ from .kobo_position import (
     MAX_RESUME_ARCHIVE_BYTES,
     MAX_RESUME_DIRECTORY_ENTRIES,
     MAX_RESUME_HREF_CHARS,
+    _note_archive_over_cap,
     _resume_directory_start,
 )
 
@@ -106,7 +107,10 @@ def _chapter_snapshot(epub_path, source, chapter_percent):
     path = Path(epub_path)
     with path.open('rb') as stream:
         before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+        if not stat.S_ISREG(before.st_mode):
+            return None
+        if before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+            _note_archive_over_cap(str(path), before.st_size, MAX_RESUME_ARCHIVE_BYTES)
             return None
         raw = stream.read(MAX_RESUME_ARCHIVE_BYTES + 1)
         after = os.fstat(stream.fileno())

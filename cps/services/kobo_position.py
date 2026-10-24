@@ -41,6 +41,7 @@ not part of the import-contract.
 from __future__ import annotations
 
 import logging
+import os
 import posixpath
 import re
 import zipfile
@@ -206,7 +207,44 @@ def compute_cfi_range(epub_path: Path, position: KoboPosition) -> Optional[str]:
 # character offset. Resolve its span START, and never use the context fallback.
 # These limits bound optional work, including compressed XML bombs. The caller
 # must run filesystem access off the request thread with a deadline.
-MAX_RESUME_ARCHIVE_BYTES = 16 * 1024 * 1024
+_RESUME_ARCHIVE_ENV = "CWA_KOBO_RESUME_MAX_ARCHIVE_MIB"
+_RESUME_ARCHIVE_DEFAULT_MIB = 16
+# Matches the KEPUB alignment ceiling (koreader_xpointer.MAX_ARCHIVE_BYTES).
+_RESUME_ARCHIVE_MAX_MIB = 256
+
+
+def _resume_archive_limit():
+    """Compressed EPUB size admitted for exact resume, in bytes.
+
+    The whole archive is read into memory (and hashed) per resolution, and up
+    to two resolutions run at once, so operators with large illustrated books
+    can raise this deliberately. Whole MiB from 1 to 256; anything else is
+    ignored with a warning and the 16 MiB default is used.
+    """
+    raw = os.environ.get(_RESUME_ARCHIVE_ENV)
+    if raw is None or not raw.strip():
+        return _RESUME_ARCHIVE_DEFAULT_MIB * 1024 * 1024
+    try:
+        mib = int(raw)
+        if 1 <= mib <= _RESUME_ARCHIVE_MAX_MIB:
+            return mib * 1024 * 1024
+    except ValueError:
+        pass
+    log.warning("Invalid %s=%r; using %d MiB", _RESUME_ARCHIVE_ENV, raw,
+                _RESUME_ARCHIVE_DEFAULT_MIB)
+    return _RESUME_ARCHIVE_DEFAULT_MIB * 1024 * 1024
+
+
+MAX_RESUME_ARCHIVE_BYTES = _resume_archive_limit()
+
+
+@lru_cache(maxsize=256)
+def _note_archive_over_cap(path, size, cap):
+    """Say once per file why exact resume is unavailable (not on every request)."""
+    log.info(
+        "Exact Kobo resume skipped for %s: EPUB is %.1f MiB, over the %.0f MiB limit; "
+        "the web reader will offer percentage resume. Raise %s to allow it.",
+        path, size / 1048576, cap / 1048576, _RESUME_ARCHIVE_ENV)
 MAX_RESUME_XML_BYTES = 2 * 1024 * 1024
 MAX_RESUME_DIRECTORY_BYTES = 256 * 1024
 MAX_RESUME_DIRECTORY_ENTRIES = 2048
@@ -364,7 +402,10 @@ def _resume_snapshot(epub_path, source, location_type, value, *, bridge=None):
         path = Path(epub_path)
         with path.open("rb") as stream:
             before = os.fstat(stream.fileno())
-            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+            if not stat.S_ISREG(before.st_mode):
+                return None
+            if before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+                _note_archive_over_cap(str(path), before.st_size, MAX_RESUME_ARCHIVE_BYTES)
                 return None
             raw = stream.read(MAX_RESUME_ARCHIVE_BYTES + 1)
             after = os.fstat(stream.fileno())

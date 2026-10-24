@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="discover hardcover-missing-page">
+  <h2>{{_('Books without a Hardcover ID')}}</h2>
+
+  <p class="lead" style="color: #bbb;">
+    {{_('Reading progress, read status and annotations only reach Hardcover for books that carry a Hardcover identifier. These %(total)s book(s) have none.', total=total)}}
+  </p>
+
+  <div style="margin: 20px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+    {% set labels = {
+      'all': _('All'),
+      'pending': _('Waiting for review'),
+      'rejected': _('Rejected'),
+      'skipped': _('Skipped'),
+      'unmatched': _('Not matched yet'),
+    } %}
+    {% for key in ['all', 'pending', 'rejected', 'skipped', 'unmatched'] %}
+    <a href="{{ url_for('admin.hardcover_missing_ids', status=key) }}"
+       class="btn {% if status_filter == key %}btn-primary{% else %}btn-default{% endif %}">
+      {{ labels[key] }} ({{ total if key == 'all' else counts[key] }})
+    </a>
+    {% endfor %}
+  </div>
+
+  <div style="margin: 0 0 20px 0; display: flex; flex-wrap: wrap; gap: 8px;">
+    <form method="post" action="{{ url_for('admin.hardcover_rematch') }}" style="display: inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="{{ status_filter }}">
+      <button type="submit" class="btn btn-primary" {% if not (sync_enabled and token_available) %}disabled{% endif %}
+              title="{{_('Searches Hardcover again for every book listed here, including those waiting for review. Rejected books are skipped.')}}">
+        🔖 {{_('Match again now')}}
+      </button>
+    </form>
+    <a href="{{ url_for('admin.hardcover_review_matches') }}" class="btn btn-info">📋 {{_('Review Hardcover Matches')}} ({{ counts['pending'] }})</a>
+  </div>
+
+  {% if not sync_enabled %}
+  <div class="alert alert-warning">{{_('Hardcover sync is disabled. Enable it in Basic Configuration or with HARDCOVER_SYNC_ENABLED.')}}</div>
+  {% elif not token_available %}
+  <div class="alert alert-warning">{{_('No Hardcover token available. Set HARDCOVER_TOKEN environment variable or configure in Basic Configuration.')}}</div>
+  {% endif %}
+
+  {% if rows %}
+  {% if rows|length < shown_of %}
+  <p style="color: #bbb;">{{_('Showing the first %(shown)s of %(count)s.', shown=rows|length, count=shown_of)}}</p>
+  {% endif %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>{{_('Title')}}</th>
+        <th>{{_('Authors')}}</th>
+        <th>{{_('Status')}}</th>
+        <th>{{_('Actions')}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><a href="{{ url_for('web.show_book', book_id=row.id) }}">{{ row.title }}</a></td>
+        <td>{{ row.authors }}</td>
+        <td>{{ labels[row.status] }}</td>
+        <td style="white-space: nowrap;">
+          <a class="btn btn-default btn-sm" href="{{ url_for('edit-book.show_edit_book', book_id=row.id) }}"
+             title="{{_('Fetch metadata from Hardcover on the edit page to add the identifier by hand.')}}">{{_('Edit metadata')}}</a>
+          {% if row.status == 'rejected' %}
+          <form method="post" action="{{ url_for('admin.hardcover_allow_retry', book_id=row.id) }}" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <button type="submit" class="btn btn-default btn-sm">{{_('Allow retry')}}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="status-hero success" style="text-align: center;">
+    <h3 class="status-hero-title">{{_('Nothing to show')}}</h3>
+    <p class="status-hero-message">{{_('No book without a Hardcover ID matches this filter.')}}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

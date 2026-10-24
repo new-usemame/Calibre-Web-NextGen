@@ -165,3 +165,46 @@ def test_single_book_lookup_still_returns_its_relationships_loaded(cdb):
     assert [d.format for d in book.data] == ["EPUB"]
     assert [i.val for i in book.identifiers] == ["isbn3"]
     assert book.ratings == []
+
+
+def test_list_page_reads_through_indexes_only(cdb, monkeypatch):
+    """The library list had the same joined load: about 3s per page of 60 on
+    a generated 270k-book library, against about 90ms without it."""
+    import cps.db as dbmod
+    from cps.db import Books
+
+    db, engine = cdb
+    db.config = type("Cfg", (), {"config_books_per_page": 3})()
+    monkeypatch.setattr(dbmod, "current_user", type("U", (), {
+        "show_detail_random": lambda self: False,
+    })())
+    captured = []
+
+    def _capture(conn, cursor, statement, params, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            captured.append((statement, params))
+
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        entries, _randm, _pagination = db.fill_indexpage_with_archived_books(
+            page=1, database=Books, pagesize=3, db_filter=true(),
+            order=[Books.id.desc()], allow_show_archived=True,
+            join_archive_read=False, config_read_column=0,
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+
+    assert [b.id for b in entries] == [5, 4, 3]
+    assert all(b.tags and b.authors for b in entries)
+
+    offenders = []
+    for sql, rows in _plans(engine, captured):
+        bad = [r for r in _whole_table_steps(rows)
+               # The page and count queries walk books (or their own
+               # derived id list) in order; that is what a list page reads.
+               if not r.startswith(("SCAN books", "SCAN anon_"))]
+        if bad:
+            offenders.append((bad, sql.split(" FROM ")[0][:80]))
+    assert not offenders, (
+        "a list page scanned or materialized whole relationship tables: %r"
+        % offenders)

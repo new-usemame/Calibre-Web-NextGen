@@ -48,6 +48,22 @@ def _app_passwords():
             for r in rows]
 
 
+def _password_policy():
+    """Snapshot of the settings valid_password() enforces (see helper.py)."""
+    def _get(name, default):
+        return getattr(config, "config_password_" + name, default)
+
+    return {
+        "enabled": bool(_get("policy", False)),
+        "min_length": int(_get("min_length", 0) or 0),
+        "number": bool(_get("number", False)),
+        "lower": bool(_get("lower", False)),
+        "upper": bool(_get("upper", False)),
+        "letter": bool(_get("character", False)),
+        "special": bool(_get("special", False)),
+    }
+
+
 def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
 
@@ -96,6 +112,9 @@ def _serialize_account():
             "passwd": current_user.role_passwd(),
         },
         "can_change_password": bool(current_user.role_passwd() or current_user.role_admin()),
+        # Same settings valid_password() enforces, so the SPA can show the rules
+        # up front instead of only after a rejected save (#2632).
+        "password_policy": _password_policy(),
         # Picker options for the settings form.
         "locales": locales,
         "languages": lang_options,

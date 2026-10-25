@@ -11028,10 +11028,10 @@
    "PR #2535"
   ],
   "outcome": "not_fixed",
-  "basis": "reply: partial",
-  "quote": "The native library view is quite pleasant, feels easier than OPDS.\n\n The main downside I'm noticing is how \"slow\" the sync is at session start",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6118474428",
-  "judged_by": "review",
+  "basis": "reply: not_fixed",
+  "quote": "Effectively made the app unusable.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6387618590",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2329@2026-10-09T20:42:53Z"
  },
  {
@@ -11319,7 +11319,7 @@
   ],
   "outcome": "happy",
   "basis": "reply: fixed",
-  "quote": "Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
+  "quote": "Hi! Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2606#issuecomment-6250731100",
   "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2606@2026-10-17T08:33:10Z"
@@ -11604,11 +11604,11 @@
   "delivered_via": [
    "PR #2683"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: content",
+  "quote": "I'm confident it would.  I'm on vacation and can't test presently, but I see no reason to keep the issue open in the meantime.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2153#issuecomment-6384347029",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2153@2026-10-21T01:40:35Z"
  },
  {
@@ -11663,13 +11663,14 @@
   "title": "[bug] New UI cuts off series name and number compared to classic view",
   "person": "mrfearless",
   "delivered_via": [
-   "PR #2700"
+   "PR #2700",
+   "closed"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "@new-usemame looks fine to me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2147#issuecomment-6380474241",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2147@2026-10-22T13:31:42Z"
  },
  {
@@ -11761,5 +11762,68 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2702@2026-10-22T17:28:51Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1704",
+  "title": "[bug] Shelves do not display apostrophes in their titles",
+  "person": "TangentFoxy",
+  "delivered_via": [
+   "PR #2711",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#1704@2026-10-24T04:46:45Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2699",
+  "title": "[bug] Cover requests take ~4 seconds per image with 270k-book library — expensive SQLAlchemy joinedload query",
+  "person": "victor910",
+  "delivered_via": [
+   "PR #2713",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "both previous issues are completely resolved",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2699#issuecomment-6383492490",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2699@2026-10-24T08:18:15Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2710",
+  "title": "[bug] Cannot download PDF",
+  "person": "darkmatterpelican",
+  "delivered_via": [
+   "PR #2712",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2710@2026-10-24T04:17:35Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2685",
+  "title": "Keep apostrophes in shelf names on the classic shelf page (#1704)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2685@2026-10-24T04:46:57Z"
  }
 ]

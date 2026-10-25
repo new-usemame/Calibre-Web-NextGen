@@ -1,3 +1,0 @@
-### Fixed
-
-- **Scheduled maintenance starts on a restart inside its window on clock-change days too.** When the server starts while the scheduled-task window is open, the tasks start straight away. On the nights the clocks change that check used wall-clock arithmetic: a window set for the skipped hour was never treated as open, and after the clocks went back the repeated hour counted as a second window. The window now opens at the chosen hour in the server's time zone (`TZ`) and lasts its set number of real minutes, so it is open exactly once a day, including a restart at the very minute it opens (#2551).

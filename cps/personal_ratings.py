@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Per-account scores and opt-in aggregate projections at the SQL seam."""
 import json
+from datetime import datetime, timezone
 
 from sqlalchemy import Text, case, cast, func, literal, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.sql.functions import coalesce
 
 from . import constants, db, ub
@@ -20,6 +22,21 @@ def personal_score(user_id):
         ub.BookRating.user_id == int(user_id),
         ub.BookRating.book_id == db.Books.id,
     ).correlate(db.Books).scalar_subquery(), 0)
+
+
+def save_personal_rating(session, user_id, book_id, score):
+    """Upsert one account's score for a book and commit; 0 records a clear.
+
+    Raises SQLAlchemyError on failure; the caller rolls back and answers.
+    """
+    now = datetime.now(timezone.utc)
+    session.execute(sqlite_insert(ub.BookRating).values(
+        user_id=user_id, book_id=book_id, rating=score, updated_at=now,
+    ).on_conflict_do_update(
+        index_elements=[ub.BookRating.user_id, ub.BookRating.book_id],
+        set_={'rating': score, 'updated_at': now},
+    ))
+    session.commit()
 
 
 def personal_rating_order(user_id, descending=True):

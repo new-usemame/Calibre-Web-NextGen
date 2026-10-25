@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Account-owned scores; writes never touch metadata.db."""
-from datetime import datetime, timezone
-
 from flask import jsonify, request
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
 from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
-from ..personal_ratings import ratings_for_books
+from ..personal_ratings import ratings_for_books, save_personal_rating
 from ..sort_orders import viewer_id
 from ..usermanagement import login_required_if_no_ano
 
@@ -56,16 +53,8 @@ def book_rating(book_id):
         score = body.get('rating') if isinstance(body, dict) else None
         if type(score) is not int or not 0 <= score <= 10:
             return _error('invalid_rating', 'Rating must be an integer from 0 to 10', 400)
-    now = datetime.now(timezone.utc)
-    statement = sqlite_insert(ub.BookRating).values(
-        user_id=uid, book_id=book_id, rating=score, updated_at=now,
-    ).on_conflict_do_update(
-        index_elements=[ub.BookRating.user_id, ub.BookRating.book_id],
-        set_={'rating': score, 'updated_at': now},
-    )
     try:
-        ub.session.execute(statement)
-        ub.session.commit()
+        save_personal_rating(ub.session, uid, book_id, score)
     except SQLAlchemyError:
         ub.session.rollback()
         log.exception('Failed to save personal rating for user %s, book %s', uid, book_id)

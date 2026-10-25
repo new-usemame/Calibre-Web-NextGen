@@ -156,7 +156,10 @@ end
 -- `f(book_id, temp)`.
 -- With `blocking`, the list request answers before it returns, as it does on a
 -- device without Turbo, and counts as a blocking request.
-local function sync(answer, real_apply, fetch, root, broken, blocking)
+-- With `automatic`, the sync runs as a wake or network-up sync does, with
+-- `real_apply` still applying the list; the limits each request was given are
+-- in outcome.list_timeouts and outcome.download_timeouts.
+local function sync(answer, real_apply, fetch, root, broken, blocking, automatic)
     local queue, requests = {}, {}
     local outcome = { applied = nil }
     local client = {
@@ -165,6 +168,7 @@ local function sync(answer, real_apply, fetch, root, broken, blocking)
             local callback = select(count, ...)
             -- if_revision, then the page size when the runtime asks for one.
             if count >= 3 then outcome.limit = select(2, ...) end
+            if count >= 4 then outcome.list_timeouts = select(3, ...) end
             requests[#requests + 1] = cursor or "first"
             if blocking then
                 blockingRequest()
@@ -200,8 +204,9 @@ local function sync(answer, real_apply, fetch, root, broken, blocking)
                 digest = function() return nil end, placeholderId = function() return nil end }
         end
         if type(fetch) == "table" then
-            function client:download_file(_, _, _, _, url_path, temp)
+            function client:download_file(_, _, _, _, url_path, temp, timeouts)
                 blockingRequest()
+                outcome.download_timeouts = timeouts
                 outcome.fetched = outcome.fetched + 1
                 return fetch.download(tonumber(url_path:match("/books/(%d+)/")), temp)
             end
@@ -223,7 +228,7 @@ local function sync(answer, real_apply, fetch, root, broken, blocking)
     end
     runtime:syncLibrary({
         force = true,
-        interactive = real_apply,
+        interactive = (not automatic) and real_apply or nil,
         on_done = function(ok, summary) outcome.ok, outcome.summary = ok, summary end,
     })
     while #queue > 0 or #ticks > 0 do
@@ -886,6 +891,94 @@ local function testBooksComeBackWithTheirAccount()
     assertEqual(read(mine .. "/.cwng-account"), "http://old.example:8083|ann", "in a folder still marked hers")
 end
 
+-- #2329, 2026-10-24: on a weak network each page of the list held KOReader's
+-- screen for up to the 30 seconds a request was allowed, and an automatic
+-- sync pushed on through every page: Android showed "not responding" at
+-- "200 of 1350 books". Nobody is waiting on an automatic sync, so it may give
+-- up sooner; Sync now is asked for and keeps the long limits.
+local function testAnAutomaticSyncHoldsTheScreenForLessThanSyncNow()
+    local automatic = sync(pagesOf(2, 1), nil, nil, nil, nil, nil, true)
+    assertEqual(automatic.ok, true, "an automatic sync on a good network finishes")
+    local runtime = setmetatable({ settings = { username = "reader", password = "secret" },
+        device_id = "device" }, { __index = Runtime })
+    local seen
+    function runtime:libraryEnabled() return true end
+    function runtime:getLibraryRoot() return "/mnt/us/cwng-library" end
+    function runtime:getLibraryState() return { books = {} } end
+    function runtime:accountOwner() return "reader@server" end
+    function runtime:libraryProbe() return {} end
+    function runtime:applyLibraryManifest(_, _, _, _, done) done(true) end
+    function runtime:newSyncClient()
+        return { get_library = function(_, _, _, _, _, _, ...)
+            local count = select("#", ...)
+            if count >= 4 then seen = select(3, ...) end
+            select(count, ...)(true, { books = {}, revision = "r1" })
+        end }
+    end
+    runtime:syncLibrary({ force = true, interactive = true })
+    while #ticks > 0 do table.remove(ticks, 1)() end
+    assert(seen == nil or (seen[2] or 0) >= 30, "Sync now keeps its long limit")
+    -- The first fill after connecting is watched as closely as Sync now.
+    seen = "not asked"
+    runtime:syncLibrary({ force = true, after_setup = true })
+    while #ticks > 0 do table.remove(ticks, 1)() end
+    assert(seen == nil or (type(seen) == "table" and (seen[2] or 0) >= 30), "the first fill keeps the long limit")
+    assert(type(automatic.list_timeouts) == "table", "an automatic sync must say how long a page may take")
+    local total = automatic.list_timeouts[2]
+    assert(total and total <= 8, "an automatic page may hold the screen at most a few seconds, not "
+        .. tostring(total))
+    assert(seen == nil or (seen[2] or 0) >= 30, "Sync now keeps its long limit")
+end
+
+local function testAFailedAutomaticSyncWaitsBeforeTryingAgain()
+    -- The file browser opening, a wake and the network coming up each start
+    -- an automatic sync. After one failed, the next must not freeze the
+    -- screen again a moment later: it waits the usual interval.
+    package.loaded["cwng_library_runtime"] = nil
+    local fresh = require("cwng_library_runtime")
+    local requests = 0
+    local runtime = setmetatable({ settings = { username = "reader", password = "secret" },
+        device_id = "device" }, { __index = fresh })
+    function runtime:libraryEnabled() return true end
+    function runtime:getLibraryRoot() return "/mnt/us/cwng-library" end
+    function runtime:getLibraryState() return { books = {} } end
+    function runtime:accountOwner() return "reader@server" end
+    function runtime:libraryProbe() return {} end
+    function runtime:applyLibraryManifest(_, _, _, _, done) done(true) end
+    function runtime:newSyncClient()
+        return { get_library = function(_, _, _, _, _, _, ...)
+            requests = requests + 1
+            select(select("#", ...), ...)(false, nil, "the server took too long to answer")
+        end }
+    end
+    local outcomes = {}
+    local function run(opts)
+        opts.on_done = function(ok) outcomes[#outcomes + 1] = ok end
+        runtime:syncLibrary(opts)
+        while #ticks > 0 do table.remove(ticks, 1)() end
+    end
+    run({})
+    assertEqual(requests, 1, "the automatic sync asks for the list")
+    assertEqual(outcomes[1], false, "and fails")
+    run({})
+    assertEqual(requests, 1, "the next automatic sync waits rather than freezing the screen again")
+    run({ force = true, interactive = true })
+    assertEqual(requests, 2, "Sync now still runs at once")
+    package.loaded["cwng_library_runtime"] = Runtime
+end
+
+local function testAnAutomaticSyncStopsAtTheFirstCoverThatDoesNotArrive()
+    local outcome = sync(manyNewBooks(2000), true, { download = function() return false, nil, nil, "timeout" end },
+        nil, nil, nil, true)
+    assertEqual(outcome.ok, false, "the automatic sync does not finish")
+    assertEqual(outcome.fetched, 1, "it stops at the first cover the server does not send")
+    assert(type(outcome.download_timeouts) == "table" and (outcome.download_timeouts[2] or 99) <= 8,
+        "and waits only a few seconds for it")
+    -- Sync now keeps trying a little longer, as before.
+    outcome = sync(manyNewBooks(2000), true, { download = function() return false, nil, nil, "timeout" end })
+    assertEqual(outcome.fetched, 3, "Sync now gives three covers a chance")
+end
+
 testEveryPageOfABigLibraryReachesTheDevice()
 testAnotherAccountsBooksLeaveTheLibraryFolder()
 testBooksComeBackWithTheirAccount()
@@ -909,6 +1002,9 @@ testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
 testALibraryWhoseListWasNotSavedIsNotEmptied()
 testAnErrorInASyncDoesNotStopLaterSyncs()
+testAnAutomaticSyncHoldsTheScreenForLessThanSyncNow()
+testAFailedAutomaticSyncWaitsBeforeTryingAgain()
+testAnAutomaticSyncStopsAtTheFirstCoverThatDoesNotArrive()
 os.execute("rm -rf '" .. folder .. "'")
 
 print("cwng_library_runtime tests passed")

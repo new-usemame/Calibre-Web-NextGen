@@ -543,8 +543,9 @@ end
 
 -- The library manifest: which books this device should show, one page at a
 -- time. `if_revision` lets an unchanged library answer in one small response.
--- timeouts: { connect, total } for this page; an automatic sync passes short
--- ones (#2329), and without them the page gets INVENTORY_TIMEOUTS.
+-- timeouts: socketutil's { block, total } for this page (the longest wait for
+-- the server, and for the whole answer once it starts arriving). An automatic
+-- sync passes short ones (#2329); without them the page gets INVENTORY_TIMEOUTS.
 function CWNGSyncClient:get_library(
         username, password, device, device_id, cursor, if_revision, limit, timeouts, callback)
     timeouts = timeouts or INVENTORY_TIMEOUTS

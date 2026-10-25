@@ -917,6 +917,12 @@ local function testAnAutomaticSyncHoldsTheScreenForLessThanSyncNow()
     end
     runtime:syncLibrary({ force = true, interactive = true })
     while #ticks > 0 do table.remove(ticks, 1)() end
+    assert(seen == nil or (seen[2] or 0) >= 30, "Sync now keeps its long limit")
+    -- The first fill after connecting is watched as closely as Sync now.
+    seen = "not asked"
+    runtime:syncLibrary({ force = true, after_setup = true })
+    while #ticks > 0 do table.remove(ticks, 1)() end
+    assert(seen == nil or (type(seen) == "table" and (seen[2] or 0) >= 30), "the first fill keeps the long limit")
     assert(type(automatic.list_timeouts) == "table", "an automatic sync must say how long a page may take")
     local total = automatic.list_timeouts[2]
     assert(total and total <= 8, "an automatic page may hold the screen at most a few seconds, not "

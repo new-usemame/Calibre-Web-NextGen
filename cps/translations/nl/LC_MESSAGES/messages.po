@@ -21732,3 +21732,135 @@ msgstr "Deze ruime bovengrens dekt voorstellen en goedkeuringen voor onzekere op
 #. Reflow conversion and reading interface.
 msgid "Warning: this highlight can’t be shown in the book"
 msgstr "Waarschuwing: deze markering kan niet in het boek worden weergegeven"
+
+msgid "AI page reading is not available in this build. Cached readings and source images remain available."
+msgstr "AI-paginalezing is niet beschikbaar in deze versie. Lezingen uit de cache en bronafbeeldingen blijven beschikbaar."
+
+msgid "AI page reading needs a shared 24-hour administrator budget. Cached readings and source images remain available."
+msgstr "Voor AI-paginalezing moet de beheerder een gedeeld budget voor 24 uur instellen. Lezingen uit de cache en bronafbeeldingen blijven beschikbaar."
+
+msgid "Cached readings and source images"
+msgstr "Lezingen uit de cache en bronafbeeldingen"
+
+msgid "Cached readings reused"
+msgstr "Hergebruikte lezingen uit de cache"
+
+msgid "Clean native pages keep their source text. For scans or damaged text, the model reads page images. Quality gates keep unsafe readings out of the EPUB and disclose the original page instead."
+msgstr "Goede pagina’s met oorspronkelijke tekst behouden hun brontekst. Bij scans of beschadigde tekst leest het model de pagina-afbeeldingen. Kwaliteitscontroles weren onbetrouwbare lezingen uit de EPUB en tonen in plaats daarvan de oorspronkelijke pagina met een duidelijke vermelding."
+
+msgid "Configure an OpenRouter key to read new pages with AI."
+msgstr "Stel een OpenRouter-sleutel in om nieuwe pagina’s met AI te lezen."
+
+msgid "Convert using cached readings and disclosed source images, without new model requests or provider charges."
+msgstr "Converteer met lezingen uit de cache en duidelijk vermelde bronafbeeldingen, zonder nieuwe modelaanvragen of providerkosten."
+
+msgid "Converted with source-image disclosures"
+msgstr "Geconverteerd met vermelde bronafbeeldingen"
+
+msgid "Create an EPUB from native text and page-image readings, with original-source access for uncertainty. New AI readings have their own estimate and consent."
+msgstr "Maak een EPUB van oorspronkelijke tekst en lezingen van pagina-afbeeldingen, met toegang tot de bron bij onzekerheid. Voor nieuwe AI-lezingen gelden een eigen raming en toestemming."
+
+msgid "Expected reading cost"
+msgstr "Verwachte leeskosten"
+
+msgid "First-reading ceiling"
+msgstr "Bovengrens voor eerste lezingen"
+
+msgid "Historical formatting-review job"
+msgstr "Eerdere taak voor opmaakcontrole"
+
+#, python-brace-format
+msgid "I authorize the displayed page-reading model through OpenRouter, up to {amount} for this job, including the quoted reread and note-marker allowances. Unreadable pages retain disclosed source images."
+msgstr "Ik geef het getoonde model toestemming om via OpenRouter pagina’s te lezen tot maximaal {amount} voor deze taak, inclusief de vermelde bedragen voor herlezingen en nootverwijzingen. Onleesbare pagina’s behouden hun duidelijk vermelde bronafbeeldingen."
+
+msgid "Native pages preserved"
+msgstr "Behouden pagina’s met oorspronkelijke tekst"
+
+msgid "No new model requests or provider charges. Reuse verified cached readings; pages without a safe reading remain accessible as disclosed source images."
+msgstr "Geen nieuwe modelaanvragen of providerkosten. Geverifieerde lezingen uit de cache worden hergebruikt; pagina’s zonder betrouwbare lezing blijven toegankelijk als duidelijk vermelde bronafbeeldingen."
+
+msgid "Note-marker reading ceiling"
+msgstr "Bovengrens voor het lezen van nootverwijzingen"
+
+msgid "Page reading"
+msgstr "Pagina’s lezen"
+
+msgid "Page reading ended early. Completed readings remain available, and pages without safe readings disclose source images. Compatible cached responses may be reused; unresolved requests are not retried automatically."
+msgstr "Het lezen van pagina’s is voortijdig gestopt. Voltooide lezingen blijven beschikbaar en pagina’s zonder betrouwbare lezing tonen vermelde bronafbeeldingen. Geschikte antwoorden uit de cache kunnen opnieuw worden gebruikt; onopgeloste aanvragen worden niet automatisch herhaald."
+
+#, python-brace-format
+msgid "Page reading stopped at the {amount} cap. Completed readings remain in the EPUB; pages without a safe reading disclose their source images."
+msgstr "Het lezen van pagina’s is gestopt bij de limiet van {amount}. Voltooide lezingen blijven in de EPUB; pagina’s zonder betrouwbare lezing tonen hun duidelijk vermelde bronafbeeldingen."
+
+msgid "Page-reading model"
+msgstr "Model voor paginalezing"
+
+msgid "Pages disclosed as source images"
+msgstr "Pagina’s met vermelde bronafbeeldingen"
+
+msgid "Pages read by a model"
+msgstr "Door een model gelezen pagina’s"
+
+msgid "Pages that may need model reading"
+msgstr "Pagina’s die mogelijk een modellezing vereisen"
+
+msgid "Per-book cost target"
+msgstr "Streefbedrag per boek"
+
+msgid "Prepare page-reading estimate"
+msgstr "Raming voor paginalezing voorbereiden"
+
+msgid "Prepare the page-reading estimate before consenting. This identifies the selected page images and request ceilings locally, without sending a model request or reserving credit."
+msgstr "Bereid de raming voor paginalezing voor voordat u toestemming geeft. De geselecteerde pagina-afbeeldingen en bovengrenzen voor aanvragen worden lokaal bepaald, zonder een modelaanvraag te versturen of tegoed te reserveren."
+
+msgid "Read pages with AI"
+msgstr "Pagina’s lezen met AI"
+
+msgid "Reading scanned pages"
+msgstr "Gescande pagina’s lezen"
+
+msgid "Send page images to the displayed model for faithful transcription. Native pages stay local. Unsafe or unavailable readings retain disclosed original-source images."
+msgstr "Stuur pagina-afbeeldingen naar het getoonde model voor een getrouwe transcriptie. Pagina’s met oorspronkelijke tekst blijven lokaal. Bij onbetrouwbare of ontbrekende lezingen blijven de oorspronkelijke bronafbeeldingen behouden, met een duidelijke vermelding."
+
+msgid "Targeted reread ceiling"
+msgstr "Bovengrens voor gerichte herlezingen"
+
+msgid "The $0.50 target is advisory. The administrator limit and your authorized cap are hard limits. If a page cannot be read safely within them, its original image is disclosed."
+msgstr "Het streefbedrag van $0,50 is een richtlijn. De beheerderslimiet en de limiet waarvoor u toestemming geeft zijn harde grenzen. Als een pagina daarbinnen niet betrouwbaar kan worden gelezen, wordt de oorspronkelijke afbeelding duidelijk vermeld."
+
+msgid "The ceiling includes first readings, one targeted reread and bounded note-marker readings. Expected cost is an estimate; neither amount is money already held. Your cap limits every new request."
+msgstr "De bovengrens omvat eerste lezingen, één gerichte herlezing en begrensde lezingen van nootverwijzingen. De verwachte kosten zijn een raming; geen van beide bedragen is al gereserveerd. Uw limiet begrenst iedere nieuwe aanvraag."
+
+msgid "The displayed model reads page images. There is no automatic switch to another model."
+msgstr "Het getoonde model leest pagina-afbeeldingen. Er wordt niet automatisch naar een ander model overgeschakeld."
+
+msgid "The model reads the original page image, including its printed script. Local English OCR supplies alignment evidence; it does not replace the model reading. Unreadable or unsafe passages keep an explicitly disclosed source image."
+msgstr "Het model leest de oorspronkelijke pagina-afbeelding, inclusief het gedrukte schrift. Lokale Engelse OCR levert uitlijningsbewijs en vervangt de modellezing niet. Onleesbare of onbetrouwbare passages behouden een expliciet vermelde bronafbeelding."
+
+msgid "The sample starts at the first body page found near the beginning of the PDF, or at page 1 if the bounded search finds none. It uses the same page-reading and quality gates as the whole book."
+msgstr "Het voorbeeld begint bij de eerste tekstpagina die aan het begin van de PDF wordt gevonden, of bij pagina 1 als de begrensde zoekactie niets vindt. Het gebruikt dezelfde paginalezing en kwaliteitscontroles als het hele boek."
+
+msgid "The sampled pages have OCR text behind page images. Recognition errors may remain; unsafe text needs a page-image reading or a disclosed source image."
+msgstr "De onderzochte pagina’s hebben OCR-tekst achter pagina-afbeeldingen. Herkenningsfouten kunnen blijven bestaan; onbetrouwbare tekst vereist een lezing van de pagina-afbeelding of een vermelde bronafbeelding."
+
+msgid "The shared 24-hour budget is exhausted. Cached readings and source images remain available."
+msgstr "Het gedeelde budget voor 24 uur is uitgeput. Lezingen uit de cache en bronafbeeldingen blijven beschikbaar."
+
+msgid "This EPUB uses the page-reading converter. Native text, model readings and disclosed source images are counted separately; disclosures preserve access to the original page."
+msgstr "Deze EPUB gebruikt de converter voor paginalezing. Oorspronkelijke tekst, modellezingen en vermelde bronafbeeldingen worden afzonderlijk geteld; de vermeldingen behouden toegang tot de oorspronkelijke pagina."
+
+msgid "This PDF has OCR text behind page images. Recognition errors may remain; unsafe text needs a page-image reading or a disclosed source image."
+msgstr "Deze PDF heeft OCR-tekst achter pagina-afbeeldingen. Herkenningsfouten kunnen blijven bestaan; onbetrouwbare tekst vereist een lezing van de pagina-afbeelding of een vermelde bronafbeelding."
+
+msgid "This cap may cover only some page readings. The EPUB will disclose original-source images wherever a safe reading is unavailable."
+msgstr "Deze limiet dekt mogelijk slechts een deel van de paginalezingen. De EPUB toont duidelijk vermelde bronafbeeldingen waar geen betrouwbare lezing beschikbaar is."
+
+msgid "Total request ceiling"
+msgstr "Totale bovengrens voor aanvragen"
+
+msgid "Without a provider key, conversion uses cached readings and disclosed source images. New page readings need an OpenRouter key."
+msgstr "Zonder providersleutel gebruikt de conversie lezingen uit de cache en vermelde bronafbeeldingen. Voor nieuwe paginalezingen is een OpenRouter-sleutel nodig."
+
+#, python-brace-format
+msgid "{amount} remains in the shared {hours}-hour AI budget. It is checked again before every request."
+msgstr "Er resteert {amount} in het gedeelde AI-budget voor {hours} uur. Dit wordt voor iedere aanvraag opnieuw gecontroleerd."

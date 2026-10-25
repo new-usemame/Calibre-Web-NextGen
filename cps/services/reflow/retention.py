@@ -72,6 +72,7 @@ POLICIES = {
     "estimates": Policy(30, 64),
     # Bound to versions and prices that move; preparing one again costs CPU.
     "typed-quotes": Policy(30, 512),
+    "vision-quotes": Policy(30, 512),
     # Recognising a page again costs seconds of CPU, not money.
     "ocr-cache": Policy(60, 2048),
     # Model answers cost money: kept longest.
@@ -122,6 +123,11 @@ def sweep(root, active_jobs=(), now=None):
         return os.path.basename(path)[:-len(".epub")] in active
 
     def answer_needed(path):
+        if os.path.basename(os.path.dirname(path)) == 'vision':
+            name = os.path.basename(path)
+            if name.endswith(('.pending', '.rejected')):
+                return True
+            return name.removesuffix('.json') in named_answers or bool(active)
         if os.path.basename(os.path.dirname(os.path.dirname(path))) != "source-operations-v1":
             return False                         # a legacy page answer: reuse only
         key = os.path.basename(path)[:-len(".json")]
@@ -138,6 +144,7 @@ def sweep(root, active_jobs=(), now=None):
         ("samples", ".epub", sample_needed),
         ("estimates", ".json", None),
         ("typed-quotes", ".json", None),
+        ("vision-quotes", ".json", None),
         ("ocr-cache", ".json", None),
         ("cache", ".json", answer_needed),
         ("jobs", ".jsonl", lambda path: path in needed_records),

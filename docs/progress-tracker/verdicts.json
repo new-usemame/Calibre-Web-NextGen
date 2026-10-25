@@ -888,6 +888,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1954#issuecomment-5903257997",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2051@2026-10-01T01:02:14Z": {
+  "hash": "5ba78d1870d29f66",
+  "verdict": "fixed",
+  "quote": "Yes, this is looking good -- long series, such as \"Anita Blake, Vampire Hunter\" or \"Everybody Loves Large Chests\" is now partially-obscured by ellipsis, which is fine since the prefix is more than sufficient to identify it without creating visual clutter, and the series number itself remains showing",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2051#issuecomment-6350728352",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#205@2026-05-20T13:48:44Z": {
   "hash": "dfe9ba120a71df07",
   "verdict": "content",
@@ -907,6 +914,20 @@
   "verdict": "annoyed",
   "quote": "Pinging this, as it was marked completed due to one PR, but per your last comment it should remain open",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2103#issuecomment-5608143659",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2147@2026-10-22T13:31:42Z": {
+  "hash": "266892f056d28622",
+  "verdict": "fixed",
+  "quote": "@new-usemame looks fine to me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2147#issuecomment-6380474241",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2153@2026-10-21T01:40:35Z": {
+  "hash": "c45fd593e92d32fb",
+  "verdict": "content",
+  "quote": "I'm confident it would.  I'm on vacation and can't test presently, but I see no reason to keep the issue open in the meantime.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2153#issuecomment-6384347029",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2169@2026-09-05T20:46:06Z": {
@@ -984,6 +1005,13 @@
   "verdict": "partial",
   "quote": "The theme switcher icon has disappeared from the top, but on the container’s first startup a notification still appears at the bottom saying that it is disabled until version 5. This notification is no longer needed.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/222#issuecomment-4496768176",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2232@2026-10-04T23:46:35Z": {
+  "hash": "0aface4bb5f036da",
+  "verdict": "fixed",
+  "quote": "i think we can mark this as fixed, as it is no longer coming.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2232#issuecomment-6336478369",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2235@2026-09-23T13:05:57Z": {
@@ -1092,11 +1120,11 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2329@2026-10-09T20:42:53Z": {
-  "hash": "9ee0287b35081c13",
-  "verdict": "partial",
-  "quote": "App startup (on pixel9pro) has a blank white screen",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6126610643",
-  "by": "review"
+  "hash": "dc6200729d5fadbe",
+  "verdict": "not_fixed",
+  "quote": "Effectively made the app unusable.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6387618590",
+  "by": "deepseek-v4.1-flash"
  },
  "issue#2334@2026-09-27T08:53:23Z": {
   "hash": "9a9cfc87320961c0",
@@ -1224,6 +1252,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2537#issuecomment-6250789739",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2559@2026-10-11T09:09:44Z": {
+  "hash": "3f2649eef8a191d8",
+  "verdict": "fixed",
+  "quote": "I tested it on v4.1.52 and it works on my setup.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2559#issuecomment-6340232347",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#256@2026-05-19T23:19:02Z": {
   "hash": "3755aabc005c989d",
   "verdict": "partial",
@@ -1246,7 +1281,7 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2606@2026-10-17T08:33:10Z": {
-  "hash": "9b89269b3a1a830a",
+  "hash": "0a15cc9c0f6ed9b7",
   "verdict": "fixed",
   "quote": "Hi! Yes it's working fine on .48. Tried a sync right after booting the container on both of my kobos and a bit later like I did yesterday and it's now syncing. Thanks!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2606#issuecomment-6250731100",
@@ -1257,6 +1292,27 @@
   "verdict": "partial",
   "quote": "Just tried the web reader again, and sure enough, it opened to the cover. The checkbox is set for that.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2647#issuecomment-6267096452",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2673@2026-10-20T16:18:06Z": {
+  "hash": "c8e6583e3471fa99",
+  "verdict": "fixed",
+  "quote": "Yep looks good. Logs only display in DEBUG",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2673#issuecomment-6313775324",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2688@2026-10-21T16:29:24Z": {
+  "hash": "5b75ff1ac695c941",
+  "verdict": "fixed",
+  "quote": "yep works as mentioned.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2688#issuecomment-6337861806",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2699@2026-10-24T08:18:15Z": {
+  "hash": "da69ddeeb245be1a",
+  "verdict": "fixed",
+  "quote": "both previous issues are completely resolved",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2699#issuecomment-6383492490",
   "by": "deepseek-v4.1-flash"
  },
  "issue#276@2026-05-21T20:53:22Z": {
@@ -1404,6 +1460,13 @@
   "verdict": "not_fixed",
   "quote": "it isn't really synchronizing the positions",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-5184010179",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#324@2026-09-24T04:46:25Z": {
+  "hash": "6d95bc739398a454",
+  "verdict": "not_fixed",
+  "quote": "Hmm, nothing seems to work for me in 4.1.51 (between native Kobo and Web Reader).",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-6352552291",
   "by": "deepseek-v4.1-flash"
  },
  "issue#331@2026-05-27T05:31:40Z": {

@@ -2,45 +2,23 @@
 # Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Regression guard for fork issue #725 — the Tags column on the new-UI table
+"""Regression guard for fork issue #725: the Tags column on the new-UI table
 view (#725 / PR #756).
 
 The table view serializes ``book.tags`` for every book on a page via the shared
 ``/api/v1/books`` list path (``cps.api.serializers.serialize_book_list_item``),
-which reads from ``calibre_db.fill_indexpage_with_archived_books``. That list
-path must **eager-load** ``Books.tags`` in the same query it loads the books in,
-so the page does not pay a follow-up ``SELECT … FROM tags`` per poll.
+which reads from ``calibre_db.fill_indexpage_with_archived_books``. Every book
+on the page must arrive with its tags loaded, and loading them must cost a
+fixed number of statements per page, never one per book.
 
-Why this matters here specifically: ``Books.tags`` is configured
-``lazy='selectin'`` (``cps/db.py``), so the list query's eager-load options block
-must include ``joinedload(Books.tags)``. The detail path
-(``get_filtered_book``) already eager-loads tags; PR #756 originally claimed the
-list path did too — it did not, so the list page issued an extra ``selectin``
-query every page.
-
-These two tests pin the fix from two angles:
-
-* ``test_fill_indexpage_options_block_eager_loads_books_tags`` — a source pin on
-  the real ``fill_indexpage_with_archived_books``: it MUST apply
-  ``joinedload(Books.tags)`` in BOTH eager-load options blocks (the main list
-  query block AND the random-books block). Removing either line turns this red.
-  (``inspect.getsource`` source-pin for a refactor-fragile invariant, per the
-  project's no-slop bar — the eager-load directive is exactly the property under
-  test, not a field-name triviality.)
-* ``test_list_query_eager_loads_tags_no_follow_up_selectin`` — behavioural:
-  drives the REAL ``fill_indexpage_with_archived_books`` against an in-memory
-  calibre metadata DB (real ``Books``/``Tags``/``Authors`` models) and counts SQL
-  statements. With the eager load the page resolves in the eager-join baseline
-  (6 statements: total_count + the main eager join + the model's other selectin
-  relationship loads). Removing ``joinedload(Books.tags)`` makes the ``selectin``
-  strategy fire a follow-up ``SELECT`` for tags → the count rises to 7 → this
-  assertion fails. The baseline is stable across page sizes (the statements are
-  per-relationship, not per-book).
+Since #2699 the list query relies on the model's ``lazy='selectin'`` rather
+than ``joinedload``: one indexed ``WHERE book IN (<page ids>)`` statement per
+relationship. ``joinedload`` made SQLite read whole tables for every page
+(see ``test_2699_single_book_lookup_plan.py``).
 """
 
 from __future__ import annotations
 
-import inspect
 import sqlite3
 from datetime import datetime, timezone
 
@@ -53,28 +31,6 @@ from sqlalchemy.sql.expression import true
 # CI selects tests with ``pytest -m "smoke or unit"``; without this marker the
 # whole module is collected but deselected, so the regression would never guard.
 pytestmark = pytest.mark.unit
-
-
-def test_fill_indexpage_options_block_eager_loads_books_tags():
-    """Source pin (the deterministic removal guard): the list-path function
-    ``CalibreDB.fill_indexpage_with_archived_books`` must apply
-    ``joinedload(Books.tags)`` in BOTH of its eager-load options blocks — the
-    main list query and the random-books query. Fails the instant either line is
-    dropped."""
-    from cps.db import CalibreDB
-
-    src = inspect.getsource(CalibreDB.fill_indexpage_with_archived_books)
-    # The function must reference the Books.tags joined eager load.
-    assert "joinedload(Books.tags)" in src, (
-        "fill_indexpage_with_archived_books must eager-load Books.tags so the "
-        "/api/v1/books list path (table view Tags column) does not pay a "
-        "follow-up SELECT for tags on every page."
-    )
-    # …and it must do so in BOTH options blocks (main query + random query).
-    assert src.count("joinedload(Books.tags)") >= 2, (
-        "fill_indexpage_with_archived_books must eager-load Books.tags in both "
-        "the main list-query options block and the random-books options block."
-    )
 
 
 def _build_calibre_engine():
@@ -151,46 +107,45 @@ def calibre_db(monkeypatch):
         cdb.session.close()
 
 
-def test_list_query_eager_loads_tags_no_follow_up_selectin(calibre_db):
-    """Behavioural guard: a list page must load books AND their tags in the
-    eager-join baseline — no follow-up ``SELECT`` for tags.
-
-    With ``joinedload(Books.tags)`` the page resolves in 6 statements (verified
-    stable across page sizes 3/5/10). Drop the eager load and the ``selectin``
-    strategy issues a 7th statement for tags, failing this budget. This drives
-    the real ``fill_indexpage_with_archived_books`` (not a mock), so it catches
-    the regression in the production code path."""
+def _count_page_statements(engine, cdb, pagesize):
     from cps.db import Books
-    cdb, engine = calibre_db
 
     total = {"n": 0}
 
     def _on_execute(conn, cursor, statement, params, context, executemany):
         total["n"] += 1
 
+    cdb.session.expunge_all()
     event.listen(engine, "before_cursor_execute", _on_execute)
     try:
         entries, _randm, _pagination = cdb.fill_indexpage_with_archived_books(
-            page=1, database=Books, pagesize=10, db_filter=true(),
+            page=1, database=Books, pagesize=pagesize, db_filter=true(),
             order=[Books.id.asc()], allow_show_archived=True,
             join_archive_read=False, config_read_column=0,
         )
     finally:
         event.remove(engine, "before_cursor_execute", _on_execute)
+    return entries, total["n"]
 
-    # Sanity: the page actually returned books with their tags populated.
-    assert len(entries) >= 1
-    assert all(len(b.tags) >= 1 for b in entries), \
-        "tags must be populated on every book returned by the list path"
 
-    # Budget: the eager join folds tags into the main query. Without the eager
-    # load, the selectin strategy adds a 7th statement for tags -> this fails.
-    assert total["n"] <= 6, (
-        f"list path emitted {total['n']} SQL statements for one page; expected "
-        "the eager-join baseline (6). A 7th statement means Books.tags was NOT "
-        "eager-loaded (the lazy selectin fired) — re-add joinedload(Books.tags) "
-        "to fill_indexpage_with_archived_books (cps/db.py)."
-    )
+def test_list_page_loads_tags_with_a_fixed_number_of_statements(calibre_db):
+    """Every book on the page has its tags, readable after the session is
+    gone, and a bigger page costs no extra statements (no per-book query)."""
+    cdb, engine = calibre_db
+
+    small, small_count = _count_page_statements(engine, cdb, 2)
+    entries, count = _count_page_statements(engine, cdb, 5)
+
+    assert len(small) == 2 and len(entries) == 5
+    assert count == small_count, (
+        f"a 5-book page took {count} statements and a 2-book page "
+        f"{small_count}; the difference is a per-book relationship load")
+
+    cdb.session.expunge_all()
+    cdb.session.close()
+    assert [sorted(t.name for t in b.tags) for b in entries] == [
+        sorted([f"tag-{i}", "shared"]) for i in range(5)]
+    assert all(len(b.authors) == 1 for b in entries)
 
 
 def test_select_all_query_returns_only_ordered_ids_without_loading_book_models(calibre_db):

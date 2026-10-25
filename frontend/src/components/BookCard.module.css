@@ -144,7 +144,8 @@
 }
 
 /* Series name + position under the cover (fork #657). Slightly quieter than the
- * author line so the title stays the visual anchor; one line, ellipsised. */
+ * author line so the title stays the visual anchor. The name may wrap to two
+ * lines (#2147); the position stays pinned beside it and is never clipped. */
 .series {
   font-size: var(--fs-sm);
   /* No opacity here. --text-muted IS the muted colour (#54606b in light,
@@ -157,15 +158,24 @@
   /* A flex row, not a one-line clamp of the whole string (#2051): the clamp
      cut the position off together with a long name. Only .seriesName shrinks. */
   display: flex;
+  /* `flex-start`: the position sits on the name's first line, so a one-line
+     name in a reserved two-line box still reads "Name #4" with no gap. */
+  align-items: flex-start;
   min-width: 0;
   overflow: hidden;
+  /* Two lines at --lh-snug, reserved even when the name needs one, so the
+     metadata block keeps the same row baseline across neighbouring cards. The
+     title above does the same for the same reason (#863). */
+  line-height: var(--lh-snug);
+  min-height: 2.6em;
 }
 
 .seriesLink {
   /* 25px leaves a little room for fractional grid/layout rounding at 375px; a
-     nominal 24px measured just under the WCAG target on desktop Chromium. */
-  min-height: 25px;
-  align-items: center;
+     nominal 24px measured just under the WCAG target on desktop Chromium.
+     max(): this rule comes after .series, so a bare 25px would replace the
+     reserved two lines on every linked series line (#2147). */
+  min-height: max(25px, 2.6em);
   border-radius: var(--r-sm);
   text-decoration: none;
 }
@@ -181,9 +191,14 @@
 
 .seriesName {
   min-width: 0;
+  /* Wrap to at most two lines, then ellipsise (#2147). Only the name is
+     clamped: .seriesIndex is a separate flex item, so the position survives
+     however long the name is (#2051). */
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }
 
 /* pre, not nowrap: the translated text around the name starts or ends with the

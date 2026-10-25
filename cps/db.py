@@ -1658,21 +1658,16 @@ class CalibreDB:
                           allow_show_hidden=False, allow_show_global=False,
                           user=None, allow_public_shelf_books=False):
         self.ensure_session()
-        # Eagerly load all relationships to prevent detached instance errors during editing
+        # Every relationship still loads eagerly, through the model's
+        # lazy='selectin' (one indexed `WHERE book IN (?)` query each), so a
+        # detached book stays readable. No joinedload here (#2699): SQLite
+        # materializes each `LEFT JOIN (link JOIN table)` by scanning the whole
+        # table first, which cost ~4s per cover on a 272k-book library.
         # allow_show_hidden=True: covers/read/edit/download flows for a user's
         # OWN hidden book must reach it (hidden is a listing exclusion, not an
         # access revocation — otherwise the detail page's action buttons all
         # error 'unavailable' and the listing shows no covers). See #319.
         return (self.session.query(Books)
-                .options(joinedload(Books.authors),
-                         joinedload(Books.tags),
-                         joinedload(Books.comments),
-                         joinedload(Books.data),
-                         joinedload(Books.series),
-                         joinedload(Books.ratings),
-                         joinedload(Books.languages),
-                         joinedload(Books.publishers),
-                         joinedload(Books.identifiers))
                 .filter(Books.id == book_id)
                 .filter(self.common_filters(
                     allow_show_archived,
@@ -2134,16 +2129,9 @@ class CalibreDB:
                     discover_filter,
                     extra_filter if extra_filter is not None else true(),
                 )
-            # Eagerly load template relationships to prevent detached lazy-load
-            # failures if another request tears down the shared scoped session.
-            if database == Books:
-                random_query = random_query.options(
-                    joinedload(Books.authors),
-                    joinedload(Books.tags),
-                    joinedload(Books.data),
-                    joinedload(Books.series),
-                    joinedload(Books.ratings),
-                )
+            # Template relationships load eagerly through the model's
+            # lazy='selectin', so a torn-down scoped session cannot leave them
+            # unloaded. No joinedload: see get_filtered_book (#2699).
             randm = (random_query.filter(self.common_filters(allow_show_archived,
                                                              viewing_tag_id=viewing_tag_id,
                                                              allow_show_hidden=allow_show_hidden,
@@ -2159,16 +2147,12 @@ class CalibreDB:
         else:
             query = self.session.query(database)
         
-        # Eagerly load template relationships to prevent DetachedInstanceError
-        # during rendering under concurrent status/notification requests.
-        if database == Books and not ids_only:
-            query = query.options(
-                joinedload(Books.authors),
-                joinedload(Books.tags),
-                joinedload(Books.data),
-                joinedload(Books.series),
-                joinedload(Books.ratings),
-            )
+        # Template relationships load eagerly through the model's
+        # lazy='selectin' (one indexed `WHERE book IN (<page ids>)` query
+        # each), which prevents DetachedInstanceError during rendering under
+        # concurrent status/notification requests. A joinedload here made
+        # SQLite read the whole authors/tags/series tables for every page,
+        # about 3s per page on a 270k-book library (#2699).
         
         off = int(int(pagesize) * (page - 1))
 

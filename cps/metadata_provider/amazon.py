@@ -27,6 +27,7 @@ log = logger.create()
 class Amazon(Metadata):
     __name__ = "Amazon"
     __id__ = "amazon"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
     # CW #3648: a Firefox User-Agent alone isn't enough — Amazon's
     # bot detection 503s when the request lacks the full browser-shape
     # headers (Accept-Language, DNT, Sec-Fetch-*, Upgrade-Insecure-
@@ -47,6 +48,17 @@ class Amazon(Metadata):
     }
     session = requests.Session()
     session.headers=headers
+
+    @staticmethod
+    def _series_from_bullet(text):
+        """(series, position) from "Book X of Y: Series Title" or "Book X: Series
+        Title", or (None, None). X may be a fractional position such as 24.5."""
+        found = re.search(r'Book\s+(\d+(?:\.\d+)?)(?:\s+of\s+\d+)?:\s*(.+)',
+                          str(text or "").strip(), re.IGNORECASE)
+        if not found:
+            return None, None
+        position = float(found.group(1))
+        return found.group(2).strip(), int(position) if position.is_integer() else position
 
     def search(
         self, query: str, generic_cover: str = "", locale: str = "en"
@@ -131,24 +143,9 @@ class Amazon(Metadata):
                     match.identifiers = {}
                 try:
                     series_link = soup2.find(attrs={"data-feature-name": "seriesBulletWidget"})
-                    if series_link:
-                        series_text = series_link.find("a")
-                        if series_text:
-                            series_str = str(series_text.text).strip()
-                            # Match patterns like "Book X of Y: Series Title" or "Book X: Series Title"
-                            series_match = re.search(r'Book\s+(\d+)(?:\s+of\s+\d+)?:\s*(.+)', series_str, re.IGNORECASE)
-                            if series_match:
-                                match.series_index = int(series_match.group(1))
-                                match.series = series_match.group(2).strip()
-                            else:
-                                match.series = None
-                                match.series_index = None
-                        else:
-                            match.series = None
-                            match.series_index = None
-                    else:
-                        match.series = None
-                        match.series_index = None
+                    series_text = series_link.find("a") if series_link else None
+                    match.series, match.series_index = Amazon._series_from_bullet(
+                        series_text.text if series_text else "")
                 except (AttributeError, ValueError, TypeError):
                     match.series = None
                     match.series_index = None

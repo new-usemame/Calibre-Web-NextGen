@@ -420,6 +420,78 @@ test.describe('reader notes (#325)', () => {
     await restoreAnnotations(page, bookId!, preExisting);
   });
 
+  // #2550 (test from @jay23606, #2554): a failed create used to be swallowed and
+  // the selection cleared, so the reader lost the note with nothing to retry.
+  test('a failed highlight and note create keeps the selection and retries the same payload', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
+    const before = await paintCounts(page);
+    expect(await selectSomeText(page), 'text selected in the book frame').not.toBe('');
+    await page.getByRole('button', { name: 'Add note' }).click();
+    const note = `Retry this note. ${Date.now()}`;
+    await setNote(page, note);
+
+    const payloads: unknown[] = [];
+    let releaseRetry!: () => void;
+    const retryHeld = new Promise<void>((resolve) => { releaseRetry = resolve; });
+    await page.route(`**/annotations/${bookId}`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      payloads.push(route.request().postDataJSON());
+      if (payloads.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      await retryHeld;
+      return route.fulfill({ status: 201, json: { ...payloads[1] as object, annotation_id: 'retried-note' } });
+    });
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Add note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(note);
+    const frame = page.frames().find((candidate) => candidate !== page.mainFrame())!;
+    await expect.poll(() => frame.evaluate(() => window.getSelection()?.toString())).not.toBe('');
+
+    // The composer now stays open while the retry is in flight, so a second
+    // press must not send a second create (one highlight, not two).
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect.poll(() => payloads.length).toBe(2);
+    // The catch keeps this passing if the busy button ever becomes truly disabled;
+    // the payload count below is what catches a duplicate create.
+    await page.getByRole('button', { name: 'Save note' }).click({ timeout: 2_000 }).catch(() => {});
+    releaseRetry();
+    await expect(page.getByRole('dialog', { name: 'Add note' })).toBeHidden();
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    await expect.poll(async () => (await paintCounts(page)).noted).toBe(before.noted + 1);
+    // Every create here is answered by the route, so the server holds nothing to clean up.
+  });
+
+  test('a failed one-tap highlight keeps the colour choice open and retries the same payload', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
+    const before = await paintCounts(page);
+    expect(await selectSomeText(page), 'text selected in the book frame').not.toBe('');
+
+    const payloads: unknown[] = [];
+    await page.route(`**/annotations/${bookId}`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      payloads.push(route.request().postDataJSON());
+      if (payloads.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.fulfill({ status: 201, json: { ...payloads[1] as object, annotation_id: 'retried-highlight' } });
+    });
+
+    await page.getByRole('button', { name: 'Yellow' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that highlight.');
+    expect((await paintCounts(page)).plain, 'nothing painted for a create the server refused').toBe(before.plain);
+
+    await page.getByRole('button', { name: 'Yellow' }).click();
+    await expect.poll(() => payloads.length).toBe(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    await expect.poll(async () => (await paintCounts(page)).plain).toBeGreaterThan(before.plain);
+  });
+
   test('the one-tap colour highlight still creates without a note', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);

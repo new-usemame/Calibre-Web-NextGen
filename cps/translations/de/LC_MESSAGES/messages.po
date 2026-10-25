@@ -6166,6 +6166,10 @@ msgid "Could not save reader settings."
 msgstr "Konnte Reader-Einstellungen nicht speichern."
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr ""
 
@@ -15369,16 +15373,11 @@ msgstr "Intelligente Metadaten-Zuweisung aktivieren"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Wenn aktiviert, werden vorhandene Daten nur durch abgerufene Metadaten "
-"ersetzt, wenn diese eine bessere Qualität aufweisen (z. B. längere "
-"Beschreibungen, höher auflösende Cover). Wenn deaktiviert, ersetzen die "
-"abgerufenen Metadaten des bevorzugten Anbieters die vorhandenen Daten so, "
-"wie sie sind."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -18964,6 +18963,18 @@ msgstr "Ausgewählte Regale für OPDS freigeben"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
+
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "Wenn aktiviert, werden vorhandene Daten nur durch abgerufene Metadaten "
+#~ "ersetzt, wenn diese eine bessere Qualität aufweisen (z. B. längere "
+#~ "Beschreibungen, höher auflösende Cover). Wenn deaktiviert, ersetzen die "
+#~ "abgerufenen Metadaten des bevorzugten Anbieters die vorhandenen Daten so, "
+#~ "wie sie sind."
 
 #~ msgid "Rating updated"
 #~ msgstr "Bewertung aktualisiert"

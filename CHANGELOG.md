@@ -16,6 +16,44 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.54] - 2026-10-24
+
+### Fixed
+
+- **Shelf names keep their apostrophes on the classic shelf page.** A shelf called "Children's Fiction" was shown as "Childrens Fiction" on the shelf page in the classic theme; the name was always stored correctly. Reported in #1704, fixed by @sgreadly (#2685).
+
+- **Covers, the reader and library pages load quickly on very large libraries.** Looking up books joined their authors, tags, series, publishers and languages into one query that SQLite answered by reading those whole tables first. On a library of about 270,000 books every cover took around 4 seconds, opening the reader could take 20 seconds or more, and each page of the library list took seconds too. Each relationship is now loaded with its own indexed query. On a generated 270,000-book library one book's lookup went from about 2.7 seconds to under 10 milliseconds, and a 60-book page from about 3.5 seconds to about 90 milliseconds. Reported by @victor910 in #2699.
+
+- **The Save button in the PDF reader downloads the book again.** In Firefox the download was blocked by the page's security policy ("blocked the loading of a resource (frame-src) at blob:"), so nothing happened when you pressed it, from both "Read now" and "Open without saving progress". Reported by @darkmatterpelican in #2710.
+
+- **The automatic revert job no longer reports success when it reverted nothing.** When reverting a commit that broke `main` conflicted with later work, the job printed "Revert failed" and still finished green, so nobody learned that `main` was still red. It now fails with an error. A commit that `main` has already reverted is still a quiet no-op, with a log line saying so. (#2553)
+
+- **Scheduled maintenance starts on a restart inside its window on clock-change days too.** When the server starts while the scheduled-task window is open, the tasks start straight away. On the nights the clocks change that check used wall-clock arithmetic: a window set for the skipped hour was never treated as open, and after the clocks went back the repeated hour counted as a second window. The window now opens at the chosen hour in the server's time zone (`TZ`) and lasts its set number of real minutes, so it is open exactly once a day, including a restart at the very minute it opens (#2551).
+
+## [v4.1.53] - 2026-10-23
+
+### Fixed
+
+- **A long series name under a book in the new UI now wraps to a second line instead of being cut off.** Before, the series line on a book card was limited to one line, so a name that didn't fit ended in an ellipsis where the classic view showed it in full. The name now takes up to two lines before it is shortened, and the series number stays visible beside it. The series line keeps the same height whether the name needs one line or two, so cards with a series stay aligned in a row. The full name is still shown on hover (#2147).
+
+- **Automatic metadata fetch fills in a missing series from another source.** When the source that matched a book gives no series (Google Books, Open Library and IBDb never do), up to three of the series sources in your provider order are asked next, then Hardcover and Kobo if your order leaves them out, and only the series and position are taken from a result that is the same book. Amazon, Goodreads and the other page scrapers are asked only when you put them in the order.
+
+- **A source's other spelling of a series you already have no longer creates a second series.** "Dune Chronicles" or "Red Rising Saga" join the library's "Dune" and "Red Rising". Names with two different notes, such as "Star Wars (Legends)" and "Star Wars (Canon)", stay separate.
+
+- **Series positions such as 24.5 are no longer rounded down** from Kobo and Amazon, and Goodreads books whose page only names the series in the title, as in "Cross Kill (Alex Cross, #23.5)", now get that series. The "(Series, #N)" suffix is no longer kept in the Goodreads title.
+
+- **Uploading a book whose filename is all non-ASCII no longer loses it.** A file such as `龙蛋.epub` was staged for import without its extension, so the import step deleted it even though the upload had been reported as queued. The staged copy now keeps the extension, so CJK, Cyrillic and other non-ASCII filenames import normally. The original filename is still recorded as before (#2701, thanks @HernandoR).
+
+## [v4.1.52] - 2026-10-22
+
+### Fixed
+
+- **A Kobo that downloads a book now opens at the place you were reading in the web reader.** Before, a book downloaded (or re-downloaded) to a Kobo opened at the cover showing 1%, and stayed there until the web reader saved a new position, even though the Kobo had already synced that place. After a Kobo finishes downloading the book as a KEPUB, the next sync sends the shared place once, if Share my place is on for that Kobo and the Kobo has no newer place of its own. Reported by @sgreadly (#2688).
+
+- **A failed highlight or note save in the web reader can be retried.** Before, when saving a new highlight or note failed, the reader said nothing and cleared the selection, so a typed note was lost. Now it says the save failed and keeps the selection and the note, and saving again sends the same highlight. Thanks @jay23606 (#2550, #2554).
+
+- **Smart metadata mode no longer replaces an existing title or description with a longer one.** It only fills a title or description that is missing (empty, or Calibre's "Unknown" for the title), the way it already treated series, publisher, date, rating and cover. A summary or study guide's title and blurb are nearly always longer than the real book's, so "longer wins" put another product's metadata on the book. The setting's description on the settings page now says what smart mode does. Thanks to @splitsec2 (#2669).
+
 ## [v4.1.51] - 2026-10-21
 
 ### Changed

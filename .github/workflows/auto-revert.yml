@@ -242,8 +242,26 @@ jobs:
           BAD_TITLE=$(git log -1 --format='%s' "$BAD_SHA")
           BRANCH="auto-revert/${BAD_SHA:0:7}"
           git checkout -b "$BRANCH" main
-          # Allow empty in case the commit was already reverted
-          git revert --no-edit "$BAD_SHA" || { echo "Revert failed; aborting"; exit 0; }
+          # A failed revert must fail the job: main is still red and no PR is
+          # coming, so a green run here hides it (#2553). The one exit-0 case is
+          # a commit main has already reverted. git refuses that empty commit
+          # with a clean tree, but so do an unknown SHA and a merge commit, so the no-op is
+          # established from content: every path the commit touched already
+          # matches its parent.
+          if ! git revert --no-edit "$BAD_SHA"; then
+            git revert --abort 2>/dev/null || true
+            if git cat-file -e "${BAD_SHA}^{commit}" 2>/dev/null \
+               && git cat-file -e "${BAD_SHA}^1^{commit}" 2>/dev/null; then
+              mapfile -d '' -t touched < <(git diff-tree -z --no-commit-id --name-only -r "$BAD_SHA")
+              if [ "${#touched[@]}" -gt 0 ] \
+                 && git diff --quiet "${BAD_SHA}^1" HEAD -- "${touched[@]}"; then
+                echo "${BAD_SHA:0:7} is already reverted on main; nothing to do."
+                exit 0
+              fi
+            fi
+            echo "::error::git revert of ${BAD_SHA:0:7} failed (conflict or unreadable commit). Nothing was reverted and main is still red; revert it by hand."
+            exit 1
+          fi
           # Append [autopilot] to the commit message
           git commit --amend -m "$(git log -1 --format='%B') [autopilot]"
           git push origin "$BRANCH"

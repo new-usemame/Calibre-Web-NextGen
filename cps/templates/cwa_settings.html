@@ -326,13 +326,13 @@
       </p>
 
       {% if cwa_settings['auto_metadata_smart_application'] %}
-      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Apply intelligent criteria when replacing existing metadata">
+      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Only fill metadata the book is missing">
       {% else %}
-      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Apply intelligent criteria when replacing existing metadata">
+      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Only fill metadata the book is missing">
       {% endif %}
       <label for="auto_metadata_smart_application" style="padding-left: 10px;">{{_('Enable Smart Metadata Application')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When enabled, fetched metadata will only replace existing data if it appears to be better quality (e.g., longer descriptions, higher resolution covers). When disabled, fetched metadata will replace existing data as-is from the preferred provider.')}}
+        {{_('When enabled, fetched metadata only fills in what a book is missing (for example an empty description, a missing series or cover) and adds new tags, but never replaces data the book already has. When disabled, fetched metadata will replace existing data as-is from the preferred provider.')}}
       </p>
 
       <!-- Metadata Field Selection -->

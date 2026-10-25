@@ -9862,11 +9862,11 @@
   "delivered_via": [
    "PR #2280"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "not_fixed",
+  "basis": "reply: not_fixed",
+  "quote": "Hmm, nothing seems to work for me in 4.1.51 (between native Kobo and Web Reader).",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-6352552291",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#324@2026-09-24T04:46:25Z"
  },
  {
@@ -10372,11 +10372,11 @@
   "delivered_via": [
    "PR #2385"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "Yes, this is looking good -- long series, such as \"Anita Blake, Vampire Hunter\" or \"Everybody Loves Large Chests\" is now partially-obscured by ellipsis, which is fine since the prefix is more than sufficient to identify it without creating visual clutter, and the series number itself remains showing",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2051#issuecomment-6350728352",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2051@2026-10-01T01:02:14Z"
  },
  {
@@ -10687,13 +10687,14 @@
   "title": "[bug]  check_architecture(): always produces \"Unsupported architecture detected\" when used on windows platform",
   "person": "Rol3333",
   "delivered_via": [
-   "PR #2453"
+   "PR #2453",
+   "closed"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "i think we can mark this as fixed, as it is no longer coming.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2232#issuecomment-6336478369",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2232@2026-10-04T23:46:35Z"
  },
  {
@@ -10747,7 +10748,8 @@
   "title": "Auto metadata fetch on ingest: UNIQUE constraint failed: ratings.rating poisons the session, every later provider fails",
   "person": "Godferdom",
   "delivered_via": [
-   "PR #2489"
+   "PR #2489",
+   "closed"
   ],
   "outcome": "no_reply",
   "basis": "nothing heard",
@@ -10762,7 +10764,8 @@
   "title": "Editing a user's name to a different letter case fails (\"This username is already taken\"), then the error page crashes with `visible_public_shelves is undefined`",
   "person": "Godferdom",
   "delivered_via": [
-   "PR #2491"
+   "PR #2491",
+   "closed"
   ],
   "outcome": "no_reply",
   "basis": "nothing heard",
@@ -11025,10 +11028,10 @@
    "PR #2535"
   ],
   "outcome": "not_fixed",
-  "basis": "reply: partial",
-  "quote": "App startup (on pixel9pro) has a blank white screen",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6126610643",
-  "judged_by": "review",
+  "basis": "reply: not_fixed",
+  "quote": "Effectively made the app unusable.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6387618590",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2329@2026-10-09T20:42:53Z"
  },
  {
@@ -11235,13 +11238,14 @@
   "title": "[bug] Case-only title change deletes the book file on a case-insensitive filesystem",
   "person": "jg120a",
   "delivered_via": [
-   "PR #2560"
+   "PR #2560",
+   "closed"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "I tested it on v4.1.52 and it works on my setup.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2559#issuecomment-6340232347",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2559@2026-10-11T09:09:44Z"
  },
  {
@@ -11570,11 +11574,11 @@
   "delivered_via": [
    "PR #2675"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "Yep looks good. Logs only display in DEBUG",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2673#issuecomment-6313775324",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2673@2026-10-20T16:18:06Z"
  },
  {
@@ -11600,12 +11604,28 @@
   "delivered_via": [
    "PR #2683"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: content",
+  "quote": "I'm confident it would.  I'm on vacation and can't test presently, but I see no reason to keep the issue open in the meantime.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2153#issuecomment-6384347029",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2153@2026-10-21T01:40:35Z"
+ },
+ {
+  "date": "2026-10-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2688",
+  "title": "[bug] Kobo opens at the cover after a (re)download until the web reader saves a new position",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2690",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "yep works as mentioned.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2688#issuecomment-6337861806",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2688@2026-10-21T16:29:24Z"
  },
  {
   "date": "2026-10-21",
@@ -11621,5 +11641,189 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2672@2026-10-21T01:41:14Z"
+ },
+ {
+  "date": "2026-10-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2689",
+  "title": "Re-send the shared place to a Kobo once its download is proven (#2688)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2689@2026-10-21T16:29:52Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2147",
+  "title": "[bug] New UI cuts off series name and number compared to classic view",
+  "person": "mrfearless",
+  "delivered_via": [
+   "PR #2700",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "@new-usemame looks fine to me.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2147#issuecomment-6380474241",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2147@2026-10-22T13:31:42Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2701",
+  "title": "Uploads with non-ASCII filenames lose their extension and are silently discarded",
+  "person": "HernandoR",
+  "delivered_via": [
+   "PR #2704"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2701@2026-10-22T17:28:29Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2554",
+  "title": "fix(reader): keep failed annotation creates retryable",
+  "person": "jay23606",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2554@2026-10-22T00:36:18Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2669",
+  "title": "Smart metadata mode only fills a missing title or description, never a longer one over an existing one",
+  "person": "splitsec2",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2669@2026-10-22T04:38:07Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2684",
+  "title": "feat(metadata): fill a missing series from the providers that carry one",
+  "person": "splitsec2",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2684@2026-10-22T20:57:04Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2697",
+  "title": "Let the New UI series line wrap to two lines instead of ellipsising (#2147)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2697@2026-10-22T13:31:55Z"
+ },
+ {
+  "date": "2026-10-22",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2702",
+  "title": "fix(upload): keep extension for non-ASCII filenames",
+  "person": "HernandoR",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2702@2026-10-22T17:28:51Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1704",
+  "title": "[bug] Shelves do not display apostrophes in their titles",
+  "person": "TangentFoxy",
+  "delivered_via": [
+   "PR #2711",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#1704@2026-10-24T04:46:45Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2699",
+  "title": "[bug] Cover requests take ~4 seconds per image with 270k-book library — expensive SQLAlchemy joinedload query",
+  "person": "victor910",
+  "delivered_via": [
+   "PR #2713",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "both previous issues are completely resolved",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2699#issuecomment-6383492490",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2699@2026-10-24T08:18:15Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2710",
+  "title": "[bug] Cannot download PDF",
+  "person": "darkmatterpelican",
+  "delivered_via": [
+   "PR #2712",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2710@2026-10-24T04:17:35Z"
+ },
+ {
+  "date": "2026-10-24",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2685",
+  "title": "Keep apostrophes in shelf names on the classic shelf page (#1704)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2685@2026-10-24T04:46:57Z"
  }
 ]

@@ -468,6 +468,29 @@ def _get_ingest_owner_id(variable):
         return 1000
 
 
+def _safe_upload_basename(filename):
+    """Sanitize an upload's name for the ingest staging file, keeping its extension.
+
+    ``secure_filename()`` transliterates to ASCII and then strips leading and
+    trailing dots, so a name whose stem has no ASCII characters (``龙蛋.epub``,
+    ``файл.epub``) collapses to ``epub`` with no dot.  The ingest service reads
+    the format from the staged name's last suffix, so it rejected and deleted
+    such files after the upload had already been reported as queued (#2701).
+
+    The stem and the last suffix are sanitized separately: the suffix is the
+    same one ``_validate_uploaded_file`` checked, and a stem that sanitizes to
+    nothing becomes ``book``.  The browser-supplied name still reaches ingest
+    unchanged through the sidecar's ``original_filename``.
+    """
+    name = os.path.basename(filename or "")
+    stem, dot, extension = name.rpartition(".")
+    if not dot:
+        return secure_filename(name) or "book"
+    safe_stem = secure_filename(stem) or "book"
+    safe_extension = secure_filename(extension)
+    return f"{safe_stem}.{safe_extension}" if safe_extension else safe_stem
+
+
 def _get_ingest_path(uploaded_file, prefix_parts=None):
     ingest_dir = get_ingest_dir()
     try:
@@ -493,7 +516,7 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
 
     _ensure_ingest_dir_writable(ingest_dir)
 
-    base_name = secure_filename(uploaded_file.filename)
+    base_name = _safe_upload_basename(uploaded_file.filename)
     # CWA change: use timestamp for more predictable sorting vs uuid
     unique = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     prefix = "_".join([str(p) for p in (prefix_parts or []) if p])

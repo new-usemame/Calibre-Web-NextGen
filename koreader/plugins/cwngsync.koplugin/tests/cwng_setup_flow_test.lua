@@ -267,6 +267,22 @@ local function testSigningInFindsAnHttpsOnlyServerToo()
     assertEqual(plugin.settings.server, "https://192.0.2.36:8083", "and the address that worked is kept")
 end
 
+local function testTheFirstLibraryFillWaitsLikeSyncNow()
+    -- #2329: automatic syncs give up after a few seconds a request. The fill
+    -- that starts right after connecting is the one the reader is watching,
+    -- so it must not be taken for one.
+    reset({ "https://192.0.2.36:8083" })
+    local plugin = newPlugin()
+    local opts
+    function plugin:syncLibrary(o) opts = o end
+    typed = "192.0.2.36:8083"
+    plugin:showConnectChoices()
+    press(dialogs[#dialogs], "Sign in with username and password")
+    press(dialogs[#dialogs], "Continue")
+    assert(opts, "connecting starts the library sync")
+    assertEqual(opts.after_setup, true, "as the first fill, with the long limits")
+end
+
 local function testAPasswordRefusedOverHttpIsNotSentAgain()
     reset({})
     refusing["http://192.168.1.20:8083"] = true
@@ -316,6 +332,7 @@ local function testTurningTheLibraryOffGivesTheReaderTheirHomeBack()
 end
 
 testTurningTheLibraryOffGivesTheReaderTheirHomeBack()
+testTheFirstLibraryFillWaitsLikeSyncNow()
 testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
 testAPlainHttpServerIsAskedOnce()
 testAPlainHttpServerThatFailsSaysWhy()

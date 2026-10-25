@@ -543,14 +543,18 @@ end
 
 -- The library manifest: which books this device should show, one page at a
 -- time. `if_revision` lets an unchanged library answer in one small response.
+-- timeouts: socketutil's { block, total } for this page (the longest wait for
+-- the server, and for the whole answer once it starts arriving). An automatic
+-- sync passes short ones (#2329); without them the page gets INVENTORY_TIMEOUTS.
 function CWNGSyncClient:get_library(
-        username, password, device, device_id, cursor, if_revision, limit, callback)
+        username, password, device, device_id, cursor, if_revision, limit, timeouts, callback)
+    timeouts = timeouts or INVENTORY_TIMEOUTS
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
     self.client:enable("GinClient")
     self.client:enable("CWNGSyncAuth", { username = username, password = password })
     self.client:enable("CWNGDeviceHeaders", { device = device, device_id = device_id })
-    socketutil:set_timeout(INVENTORY_TIMEOUTS[1], INVENTORY_TIMEOUTS[2])
+    socketutil:set_timeout(timeouts[1], timeouts[2])
     local co = coroutine.create(function()
         local ok, res = pcall(function()
             return self.client:get_library({

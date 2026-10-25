@@ -101,11 +101,14 @@ def test_merged_model_BODY_restores_three_indented_original_paragraphs(tmp_path,
     if mode == 'note':
         refs, notes = h.assert_exact_returns(docs, 1)
         assert refs[0][1].get('href').endswith('#v4-note-0-n1')
-        assert len(notes) == 1 and NOTE in ''.join(notes[0][1].itertext())
+        assert len(notes) == 1 and NOTE in h.plain(notes[0][1])
         assert len(source_returns(docs)) == 1
         assert len(report.get('note_marker_disclosures', [])) == 1
     if mode == 'uncertain':
-        assert len(source_returns(docs)) == 1, 'One confidence occurrence must produce one owned original-reading control'
+        block=next(b for b in report['pages'][0]['blocks'] if b['id']=='body0-p2')
+        assert block['published_tokens'][8]=='careful'
+        assert source_returns(docs)==[], 'A positively pixel-settled unchanged word needs no unresolved note'
+        assert block['verified_unchanged']==[8] and block['marked']==[]
     assert lexical(docs) == expected, 'One model block cannot erase three independently printed paragraph starts'
 
 

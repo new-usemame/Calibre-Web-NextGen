@@ -272,6 +272,31 @@ def _signal_group(pgid: int, sig: signal.Signals) -> None:
     # All other permission and inspection errors remain containment errors.
 
 
+def _pre_phase_identities() -> dict[int, tuple[int, int]]:
+    """Record processes that cannot inherit a token created after this snapshot.
+
+    This is restricted to the diagnostic inherited-token contract. A later PID
+    or a reused birth identity is never excluded, and phase group membership
+    remains authoritative even for a preexisting process.
+    """
+    result = subprocess.run(["ps", "-U", str(os.getuid()), "-o", "pid="],
+                            capture_output=True, text=True, timeout=5)
+    if result.returncode:
+        return {}  # No exclusion is safer than an incomplete ownership claim.
+    identities = {}
+    for value in result.stdout.split():
+        if not value.isdigit():
+            return {}
+        pid = int(value)
+        try:
+            identity = _process_identity(pid)
+        except IsolationError:
+            continue  # An unknown birth cannot establish pre-launch exclusion.
+        if identity is not None:
+            identities[pid] = identity
+    return identities
+
+
 def _terminate_phase_processes(
     proc, token: str,
 ) -> tuple[tuple[int, ...], str | None, tuple[UninspectableProcess, ...]]:
@@ -289,7 +314,19 @@ def _terminate_phase_processes(
         proc.poll()  # reap the leader before checking the process group
         try:
             members, uninspectable = _phase_members(proc.pid, token)
-            gaps.update((gap.pid, gap) for gap in uninspectable)
+            preexisting = getattr(proc, "preexisting_identities", {})
+            for gap in uninspectable:
+                prior = preexisting.get(gap.pid)
+                if prior is not None and gap.pid != proc.pid and gap.pid not in members:
+                    try:
+                        current = _process_identity(gap.pid)
+                    except IsolationError:
+                        current = None
+                    if current == prior:
+                        # This exact process existed before the token. It
+                        # cannot be an inherited-token child of this phase.
+                        continue
+                gaps[gap.pid] = gap
             # A missing entry in ps is not evidence of disappearance. Reinspect
             # pending PIDs through sysctl before accepting the cleanup boundary.
             for pid in list(gaps):
@@ -376,6 +413,7 @@ def run_phase_process(
     if timeout <= 0 or not argv:
         raise ValueError("a phase needs an argv and a positive timeout")
     artifacts.mkdir(parents=True, exist_ok=True)
+    preexisting = _pre_phase_identities()
     token = uuid.uuid4().hex
     env = {**environment, "CWNG_MUTATION_PHASE_TOKEN": token}
     stdout_path = artifacts / f"{token}.stdout"
@@ -387,6 +425,7 @@ def run_phase_process(
         proc = subprocess.Popen(
             argv, cwd=cwd, env=env, stdout=out, stderr=err, start_new_session=True,
         )
+        proc.preexisting_identities = preexisting
         try:
             proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:

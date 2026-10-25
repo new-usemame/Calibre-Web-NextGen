@@ -54,6 +54,20 @@ def test_native_whole_paragraph_source_correspondence(tmp_path,case):
         assert build_epub.validate(str(out))==[]
         with zipfile.ZipFile(out) as z:
             docs={n:ET.fromstring(z.read(n)) for n in z.namelist() if n.startswith('OEBPS/ch') and n.endswith('.xhtml')}
+            if case=='changed_word':
+                import json
+                metadata=json.loads(z.read('META-INF/reflow.json'))
+                units=metadata['pages']['1']['degraded_units']
+                assert len(units)==1 and units[0]['page']==1
+                assert z.read('OEBPS/'+units[0]['source_image']), 'Unbound cached wording must retain accessible original pixels'
+                target=units[0]['source_reference']
+                destinations=[n for root in docs.values()for n in root.iter()if n.get('id')==target]
+                assert len(destinations)==1 and any(n.tag.endswith('}img')and n.get('src')==units[0]['source_image']for n in destinations[0].iter())
+                assert any(n.tag.endswith('}a')and(n.get('href')or'').split('#')[-1]==target for root in docs.values()for n in root.iter())
+        if case=='changed_word':
+            assert 'departing' in doc[1].get_text() and 'approaching' not in doc[1].get_text()
+            assert h.body_texts(docs)==[left], 'A stale header rectangle cannot authorize a cached word contradicted by print; only that unbound unit is disclosed'
+            return
         expected=[left+' '+complete] if case in ('stale_header','leading_spaces') else [left,complete]
         assert h.body_texts(docs)==expected, 'complete unique native source rows distinguish layout spaces, stale header boxes, true indent and unproved text'
         assert sum(t.count(right) for t in h.body_texts(docs))==1

@@ -14,6 +14,10 @@ import os
 from pathlib import Path
 import threading
 import re
+import pickle
+import shutil
+import stat
+import tempfile
 from xml.etree import ElementTree as ET
 
 
@@ -22,6 +26,151 @@ _active = ContextVar('reflow_unit_recovery', default=None)
 
 class SourceIntegrityError(ValueError):
     """Authoritative source/configuration cannot safely be used."""
+
+
+def _pdf_references(value):
+    """Read indirect references while ignoring PDF strings, names and comments."""
+    tokens=[];index=0
+    while index<len(value):
+        char=value[index]
+        if char=='(':
+            depth=1;index+=1
+            while index<len(value) and depth:
+                if value[index]=='\\':index+=2;continue
+                if value[index]=='(':depth+=1
+                elif value[index]==')':depth-=1
+                index+=1
+            if depth:raise SourceIntegrityError('Cannot verify source object string')
+            tokens=[]
+        elif value[index:index+2] in ('<<','>>'):
+            index+=2
+        elif char=='<':
+            end=value.find('>',index+1)
+            if end<0:raise SourceIntegrityError('Cannot verify source object string')
+            index=end+1;tokens=[]
+        elif char=='%':
+            end=value.find('\n',index+1);index=len(value) if end<0 else end+1
+        elif char=='/':
+            index+=1
+            while index<len(value) and not value[index].isspace() and value[index] not in '[]<>()/%':index+=1
+            tokens=[]
+        elif char.isspace() or char in '[]<>':index+=1
+        else:
+            end=index+1
+            while end<len(value) and not value[end].isspace() and value[end] not in '[]<>()/%':end+=1
+            token=value[index:end];index=end
+            if token=='R' and len(tokens)>=2 and all(v.isdigit() for v in tokens[-2:]):
+                yield int(tokens[-2]);tokens=[]
+            else:tokens=(tokens+[token])[-2:]
+
+
+def page_fingerprint(doc, page):
+    """Hash current page objects, encoded streams and inherited render resources.
+
+    File identities and text alone miss in-memory edits and image-only changes.
+    Reading raw streams avoids decoding them, and walking the page's resources
+    avoids serializing or rendering the entire document on every retry.
+    """
+    try:
+        source=doc[page];root=source.xref
+        digest=hashlib.sha256(b'reflow-page-source-v1\x00')
+        digest.update(repr((page,tuple(source.rect),source.rotation)).encode())
+        pending=[root]
+        # Page-tree parents carry inherited resource and geometry values. Their
+        # Kids arrays name unrelated pages and are deliberately not traversed.
+        ancestor=root;seen_parents=set()
+        for key in ('Resources','MediaBox','CropBox','Rotate','UserUnit'):
+            ancestor=root;seen_parents.clear()
+            while ancestor and ancestor not in seen_parents:
+                seen_parents.add(ancestor)
+                kind,value=doc.xref_get_key(ancestor,key)
+                if kind!='null':
+                    digest.update((key+'\x00'+value+'\x00').encode())
+                    pending.extend(_pdf_references(value));break
+                kind,value=doc.xref_get_key(ancestor,'Parent')
+                ancestor=int(value.split()[0]) if kind=='xref' else 0
+        # Optional-content visibility, output profiles and form appearances can
+        # affect a page without changing its own contents or resource dictionary.
+        catalog=doc.pdf_catalog()
+        for key in ('OCProperties','OutputIntents','AcroForm'):
+            kind,value=doc.xref_get_key(catalog,key)
+            digest.update((key+'\x00'+value+'\x00').encode())
+            pending.extend(_pdf_references(value))
+            if key=='OCProperties' and kind!='null':
+                digest.update(json.dumps(doc.layer_ui_configs(),sort_keys=True).encode())
+        visited=set()
+        while pending:
+            xref=pending.pop()
+            if xref in visited:continue
+            if not 0<xref<doc.xref_length():
+                raise SourceIntegrityError('Cannot verify source object reference')
+            visited.add(xref)
+            value=doc.xref_object(xref,compressed=False)
+            digest.update((str(xref)+'\x00'+value+'\x00').encode())
+            references=set(_pdf_references(value))
+            if doc.xref_get_key(xref,'Type')==('name','/Page'):
+                kind,parent=doc.xref_get_key(xref,'Parent')
+                if kind=='xref':references.discard(int(parent.split()[0]))
+            pending.extend(sorted(references))
+            if doc.xref_is_stream(xref):
+                data=doc.xref_stream_raw(xref)
+                if not isinstance(data,bytes):
+                    raise SourceIntegrityError('Cannot verify source stream bytes')
+                digest.update(data)
+            digest.update(b'\x00')
+        return digest.hexdigest()
+    except SourceIntegrityError:raise
+    except Exception as error:
+        raise SourceIntegrityError('Cannot verify current source page') from error
+
+
+def _job_component(job_id):
+    value=str(job_id)
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,127}',value):
+        raise SourceIntegrityError('Invalid conversion scratch job identity')
+    return value
+
+
+def owned_job_scratch(root, job_id):
+    """A real, direct job directory under its configured scratch root, or None."""
+    root=Path(root).absolute();job_id=_job_component(job_id)
+    # Do not follow a substituted root or job directory during cleanup.
+    if any(part.is_symlink() for part in (root,*root.parents)):return None
+    path=root/job_id
+    try:info=path.lstat()
+    except FileNotFoundError:return None
+    return path if stat.S_ISDIR(info.st_mode) else None
+
+
+def remove_job_scratch(root, job_id):
+    path=owned_job_scratch(root,job_id)
+    if path is None:return False
+    shutil.rmtree(path)
+    return not path.exists()
+
+
+@contextmanager
+def preparation_scratch(*, scratch_dir=None, job_id=None):
+    """Ephemeral preparation under a removable job owner, never beside an EPUB."""
+    if scratch_dir is None:
+        if job_id is not None:raise SourceIntegrityError('Job scratch root is required')
+        with tempfile.TemporaryDirectory(prefix='reflow-preparation-') as staging:
+            yield Path(staging)
+        return
+    if job_id is None:raise SourceIntegrityError('Conversion scratch job identity is required')
+    root=Path(scratch_dir).absolute();root.mkdir(parents=True,exist_ok=True)
+    if any(part.is_symlink() for part in (root,*root.parents)):
+        raise SourceIntegrityError('Conversion scratch root must not contain symlinks')
+    owner=root/_job_component(job_id)
+    owner.mkdir(mode=0o700,exist_ok=True)
+    if owned_job_scratch(root,job_id)!=owner:
+        raise SourceIntegrityError('Conversion scratch owner is not a real directory')
+    try:
+        with tempfile.TemporaryDirectory(prefix='prepare-',dir=owner) as staging:
+            yield Path(staging)
+    finally:
+        try:owner.rmdir()
+        except OSError:pass             # another preparation or a retained crash file
 
 
 class UnitFailure(Exception):
@@ -82,6 +231,8 @@ class Controller:
         self.staging.mkdir(parents=True, exist_ok=True)
         self.readings, self.images, self.answers, self.regions = {}, {}, {}, {}
         self.source_repairs = {}
+        self.admitted_answers = {}
+        self.omission_coverage = {}
         self.source_image_provider = None
         self.retried, self.degraded, self.events = set(), {}, []
         self.source_render_repaired = set()
@@ -90,6 +241,9 @@ class Controller:
         self._active_page = None
         self.recovery_closed = set()
         self.records = {}
+        self.prepared_pages = {}
+        self.source_fingerprints = {}
+        self.native_classification = {}
         self.fragment_units, self.id_units = {}, {}
         self.ledger = getattr(reader, 'ledger', None)
         self.start_spend = self.ledger.spent() if self.ledger else None
@@ -116,7 +270,7 @@ class Controller:
         if any(u.get('block') for u in units) or len(units) != 1:
             return units
         n = units[0]['page']
-        answer = self.answers.get(n)
+        answer = self.admitted_answers.get(n, self.answers.get(n))
         blocks = answer.get('blocks', []) if isinstance(answer, dict) else []
         if not isinstance(blocks, list):
             blocks = []
@@ -165,7 +319,51 @@ class Controller:
         self._page_by_image[identity] = page
         return identity
 
-    def read(self, page, image, source_repair=None):
+    def verify_source(self, doc, page):
+        """Fail before any cached reading or preparation can cross a source edit."""
+        value=page_fingerprint(doc,page)
+        previous=self.source_fingerprints.setdefault(page,value)
+        if previous!=value:
+            raise SourceIntegrityError('Current source page changed during conversion')
+        return value
+
+    def _preparation_key(self, page):
+        record = self.readings.get(page)
+        if record is None:
+            return None
+        # Scoped to this controller's admitted source and reading image. Block
+        # removal changes geometry, so it invalidates preparation as a reread does.
+        value = [record, sorted(self.blocked(page)), self.images.get(page, {}).get('sha256'),
+                 self.source_fingerprints.get(page)]
+        return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+    def load_prepared(self, page):
+        saved = self.prepared_pages.get(page)
+        if saved is None or saved[0] != self._preparation_key(page):
+            return None
+        # Only our own ephemeral checkpoint is read. No external pickle/cache
+        # input is accepted. Every attempt receives independent mutable objects.
+        with saved[1].open('rb') as handle:
+            return pickle.load(handle)
+
+    def store_prepared(self, page, prepared):
+        key = self._preparation_key(page)
+        if key is None:
+            return
+        path = self.staging / ('prepared-' + str(page) + '.pickle')
+        with path.open('wb') as handle:
+            pickle.dump(prepared, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        self.prepared_pages[page] = (key, path)
+
+    def _replace_reading(self, page, record):
+        self.readings[page] = copy.deepcopy(record)
+        self.answers[page] = copy.deepcopy(record['answer'])
+        self.admitted_answers.pop(page, None)
+        self.regions.pop(page, None)
+        self.omission_coverage.pop(page, None)
+        self.prepared_pages.pop(page, None)
+
+    def read(self, page, image, source_repair=None, local_read=None):
         identity = self.register_image(page, image)
         if source_repair is not None:self.source_repairs[page]=source_repair
         if page in self.readings:
@@ -178,9 +376,12 @@ class Controller:
         if record.get('degraded_source'):
             self.events.extend(record.get('recovery_events', []))
             self.recovery_closed.add(page)
-            raise UnitFailure([dict(page=page)], 'reading', ValueError(record['failure']))
-        self.readings[page] = copy.deepcopy(record)
-        self.answers[page] = copy.deepcopy(record['answer'])
+            if local_read is None:
+                raise UnitFailure([dict(page=page)], 'reading', ValueError(record['failure']))
+            # Local recognition cannot settle or release any paid attempt. Its
+            # separate source receipt replaces only the unavailable transcript.
+            record = local_read(record['failure'])
+        self._replace_reading(page, record)
         self.events.extend(record.get('recovery_events', []))
         return copy.deepcopy(record)
 
@@ -215,7 +416,7 @@ class Controller:
                 try:
                     record=self.reader.cached_reread(Path(image_record['path']).read_bytes(),self.source_repairs.get(page))
                     if record and record.get('config_sha256')!=self.readings.get(page,{}).get('config_sha256'):
-                        self.readings[page]=copy.deepcopy(record);self.answers[page]=copy.deepcopy(record['answer'])
+                        self._replace_reading(page, record)
                         self.retried.add(page);reread=True
                         event.setdefault('cached_reread_receipts',[]).append(dict(page=page,**{k:v for k,v in record.items() if k!='answer'}))
                         continue
@@ -235,8 +436,7 @@ class Controller:
                     self.claim_reread(page, image_record['sha256'])):
                 try:
                     record = self.reader.reread(Path(image_record['path']).read_bytes())
-                    self.readings[page] = copy.deepcopy(record)
-                    self.answers[page] = copy.deepcopy(record['answer'])
+                    self._replace_reading(page, record)
                     event.setdefault('reread_receipts', []).append(
                         dict(page=page, **{k: v for k, v in record.items() if k != 'answer'}))
                     reread = True
@@ -252,16 +452,46 @@ class Controller:
             event['transition'] = 'TARGETED_REREAD_REASSEMBLE'
             self.events.append(event)
             return
+        # A publication batch can implicate an existing source presentation
+        # alongside newly rejected readings. Remove the new readings first and
+        # check a fresh assembly before concluding the original presentation is
+        # unusable. This makes bounded same-page progress; a repeated failure
+        # without a new unit still escalates through the original fallback path.
+        progress_pages = {unit['page'] for unit in failure.units
+                          if unit.get('block') is not None
+                          and (unit['page'], unit['block']) not in self.degraded
+                          and (unit['page'], None) not in self.degraded}
+        # This failed assembly can only reject fallbacks it actually used.
+        # Overlapping block/page owners may schedule one original page twice;
+        # a fallback first created in this handler has not been rendered yet.
+        previous_source_pages = self.source_pages()
         for unit in failure.units:
             key = (unit['page'], unit.get('block'))
+            if (key in self.degraded and unit.get('block') is not None
+                    and unit['page'] in progress_pages
+                    and failure.stage in {'publication_text_quality', 'compiled_publication_text_quality'}):
+                event.setdefault('deferred_source_unit_rechecks', []).append(copy.deepcopy(unit))
+                continue
             if key in self.degraded:
                 if unit.get('block') is None:
+                    if unit['page'] not in previous_source_pages:
+                        continue
                     raise SourceIntegrityError('Original source fallback itself is unusable') from failure.cause
                 previous=[copy.deepcopy(v) for k,v in self.degraded.items() if k[0]==unit['page']]
                 self.degraded={k:v for k,v in self.degraded.items() if k[0]!=unit['page']}
                 unit=dict(page=unit['page'],block=None)
                 event.setdefault('source_page_escalations',[]).append(dict(page=unit['page'],previous_units=previous))
                 key=(unit['page'],None)
+            if unit.get('block') is None:
+                previous=[copy.deepcopy(v) for k,v in self.degraded.items()
+                          if k[0]==unit['page'] and k[1] is not None]
+                self.degraded={k:v for k,v in self.degraded.items()
+                               if k[0]!=unit['page'] or k[1] is None}
+                if previous:
+                    event.setdefault('source_page_escalations',[]).append(
+                        dict(page=unit['page'],previous_units=previous))
+            elif (unit['page'],None) in self.degraded:
+                continue
             unit_reason=unit.get('source_failure_reason')
             if not isinstance(unit_reason,str) or not unit_reason.strip():
                 unit_reason=reason
@@ -275,8 +505,48 @@ class Controller:
     def blocked(self, page):
         return {bid: case for (n, bid), case in self.degraded.items() if n == page and bid is not None}
 
-    def register_regions(self, page, regions):
-        self.regions.setdefault(page, {}).update(copy.deepcopy(regions))
+    def admit_answer(self, page, answer):
+        """Retain identities only after source geometry admitted their units.
+
+        Omitted-line recovery creates units absent from the model response. Their
+        IDs must survive transactional retries just like the original response's
+        IDs. Previously blocked units remain in this registry for source targets,
+        without reintroducing their rejected text into compilation.
+        """
+        previous = self.admitted_answers.get(page, self.answers.get(page, {'blocks': []}))
+        blocks = copy.deepcopy(answer['blocks'])
+        blocked = self.blocked(page)
+        retained = {b['id']: b for b in previous['blocks'] if b['id'] in blocked}
+        # Neutral validation stubs cannot replace the admitted source unit.
+        blocks = [copy.deepcopy(retained.get(b['id'], b)) for b in blocks]
+        ids = {b['id'] for b in blocks}
+        old = previous['blocks']
+        for index, block in enumerate(old):
+            if block['id'] in ids:
+                continue
+            following = {b['id'] for b in old[index+1:]}
+            at = next((i for i, b in enumerate(blocks) if b['id'] in following), len(blocks))
+            blocks.insert(at, copy.deepcopy(block)); ids.add(block['id'])
+        self.admitted_answers[page] = dict(answer, blocks=blocks)
+
+    def source_answer(self, page):
+        return copy.deepcopy(self.admitted_answers.get(page, self.answers.get(page, {'blocks': []})))
+
+    def register_regions(self, page, regions, omission_coverage=None):
+        previous = self.regions.setdefault(page, {})
+        blocked = self.blocked(page)
+        # Disclosing a unit does not release its already admitted physical ink.
+        protected = {instance: owner for instance, owner in previous.get('_instances', {}).items()
+                     if owner in blocked}
+        previous.update(copy.deepcopy(regions))
+        previous.setdefault('_instances', {}).update(protected)
+        # The boxes previously used to suppress omitted-line recovery need not
+        # be independently proved clipping geometry. Keep that narrower purpose
+        # separate, and never let a retry release a disclosed row's footprint.
+        coverage = self.omission_coverage.setdefault(page, {})
+        for bid, boxes in (omission_coverage or {}).items():
+            if bid not in blocked or bid not in coverage:
+                coverage[bid] = copy.deepcopy(boxes)
 
     def coverage_regions(self, page, regions):
         """Source territory retained by a visible fallback cannot be recovered twice.
@@ -285,9 +555,14 @@ class Controller:
         reserves ink only; it does not validate or publish the rejected wording.
         """
         regions = copy.deepcopy(regions)
-        for bid in self.blocked(page):
-            if bid in self.regions.get(page, {}):
-                regions.setdefault('_degraded_territories', []).extend(copy.deepcopy(self.regions[page][bid]))
+        blocked = self.blocked(page)
+        protected = {instance: owner for instance, owner in self.regions.get(page, {}).get('_instances', {}).items()
+                     if owner in blocked}
+        regions.setdefault('_instances', {}).update(copy.deepcopy(protected))
+        for bid in blocked:
+            boxes = self.omission_coverage.get(page, {}).get(bid,
+                self.regions.get(page, {}).get(bid, []))
+            regions.setdefault('_degraded_territories', []).extend(copy.deepcopy(boxes))
         return regions
 
     def source_pages(self):
@@ -309,17 +584,38 @@ class Controller:
             return answer
         removed_notes = {b['id'] for b in answer['blocks']
                          if b['id'] in blocked and b['role'] == 'footnote'}
-        # A response reference to an unproved note owner is a dependent unit,
-        # never permission to attach it to another note or erase its glyph.
-        import re
-        for b in answer['blocks']:
-            if any(ref in removed_notes for ref in re.findall(r'<n:([^>]+)>', b['text'])):
-                key = (page, b['id'])
-                self.degraded.setdefault(key, dict(page=page, block=b['id'],
-                    stage='note_dependency', reason='Note owner requires original source inspection',
-                    status='DEGRADED_SOURCE_CONTEXT'))
-        blocked = self.blocked(page)
-        answer['blocks'] = [b for b in answer['blocks'] if b['id'] not in blocked or b['role'] in ('figure','table')]
+        # Keep a schema-valid, nonpublishing note identity for references in
+        # otherwise supported prose. Compilation discloses their association;
+        # rejecting a note owner does not reject its neighbouring body words.
+        referenced = {ref for b in answer['blocks'] if b['id'] not in blocked
+                      for ref in re.findall(r'<n:([^>]+)>', b['text'])}
+        stubs = removed_notes & referenced
+        answer['blocks'] = [b for b in answer['blocks'] if b['id'] not in blocked
+                            or b['role'] in ('figure','table') or b['id'] in stubs]
+        admitted = {b['id']: b for b in self.admitted_answers.get(page, {}).get('blocks', [])}
+        for block in answer['blocks']:
+            if block['id'] in stubs:
+                if block['id'] in admitted:
+                    block['bbox'] = copy.deepcopy(admitted[block['id']]['bbox'])
+                box = block['bbox']
+                if not (all(0 <= v <= 1000 for v in box)
+                        and box[0] < box[2] and box[1] < box[3]):
+                    # This is a schema-only identity, never a located note.
+                    # Its source disclosure retains the complete original page.
+                    block['bbox'] = [0, 0, 1000, 1000]
+                block.update(text='', marker='', low_confidence=[],
+                             continues_previous=False, continues_next=False)
+            if block['id'] in blocked and block['role'] in ('figure','table'):
+                # Geometry was already bound before this unit was rejected.
+                # Its neutral label cannot establish a new pixel match.
+                owned = admitted.get(block['id'])
+                if owned is not None and owned['role'] == block['role']:
+                    block['bbox'] = copy.deepcopy(owned['bbox'])
+                # The retained source image owns this rejected graphic. Its
+                # discarded wording cannot demand note owners during geometry
+                # or leak into live table cells or accessibility descriptions.
+                block.update(text='Original source image',marker='',low_confidence=[],
+                             continues_previous=False,continues_next=False)
         return answer
 
     def register_page(self,page,record):
@@ -334,10 +630,18 @@ class Controller:
                 self.id_units.setdefault(ident,[]).append(unit)
         for fragment in page['asides']:
             ident=re.search(r'<aside\b[^>]*\bid="v4-note-\d+-([^" ]+)"',fragment)
-            unit=dict(page=page['pno'],block=ident[1] if ident else None)
-            self.fragment_units[hashlib.sha256(fragment.encode()).hexdigest()]=[unit]
+            units=[dict(page=page['pno'],block=ident[1])] if ident else []
+            if not units:
+                target=re.search(r'<aside\b[^>]*\bid="([^"]+)"',fragment)
+                if target:
+                    for origin in page['body']:
+                        if re.search(r'href="#'+re.escape(target[1])+r'"',origin):
+                            units.extend(self.fragment_units.get(hashlib.sha256(origin.encode()).hexdigest(),[]))
+            if not units:units=[dict(page=page['pno'],block=None)]
+            units=list({(unit['page'],unit.get('block')):unit for unit in units}.values())
+            self.fragment_units[hashlib.sha256(fragment.encode()).hexdigest()]=units
             for name in re.findall(r'\bid="([^"]+)"',fragment):
-                self.id_units.setdefault(name,[]).append(unit)
+                self.id_units.setdefault(name,[]).extend(units)
 
     def fragment_owners(self,fragment,anchor=None):
         found=(self.id_units.get(anchor,[]) if anchor else
@@ -415,9 +719,71 @@ def chapters(pages):
         return result
 
 
-def bind_links(chapters):
+def _disclose_unbound_notes(chapters, source_context):
+    """Retain printed marker text; disclose only its unproved association.
+
+    Endnotes can share one outer section. Ownership comes from the closest
+    registered action or enclosing note, never all IDs in that outer section.
+    The caller provides original-page pixels; this pass cannot invent a target.
+    """
+    from . import build_epub
+    controller = current()
+    home = {ident for c in chapters for b in c.blocks for ident in build_epub._ID.findall(b)}
+    retained = []
+    for chapter in chapters:
+        for index, fragment in enumerate(chapter.blocks):
+            if not any(target not in home for target in build_epub._HREF.findall(fragment)):
+                continue
+            root = ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">' + fragment + '</root>')
+            parents = {child: parent for parent in root.iter() for child in parent}
+            changed = False
+            for node in root.iter():
+                target = node.get('href', '')
+                classes = node.get('class', '').split()
+                if (node.tag.rsplit('}', 1)[-1] != 'a' or not target.startswith('#') or
+                        target[1:] in home):
+                    continue
+                ancestor = node
+                within_note = False
+                while ancestor is not root:
+                    within_note = within_note or 'footnote' in ancestor.get('class', '').split()
+                    ancestor = parents[ancestor]
+                if not within_note and not set(classes).intersection({'noteref', 'note-return'}):
+                    continue
+                units = []
+                owner = node
+                while owner is not root:
+                    units = controller.id_units.get(owner.get('id'), []) if controller else []
+                    if units:break
+                    owner = parents[owner]
+                if not units or source_context is None:
+                    if controller:
+                        controller.check_units(units)
+                        raise UnitFailure(units, 'link_reference', ValueError('No admitted destination for ' + target[1:]))
+                    raise ValueError('No admitted destination for ' + target[1:])
+                if len({u['page'] for u in units}) != 1:
+                    raise SourceIntegrityError('Unproved note action has ambiguous source ownership')
+                identity = hashlib.sha256(ET.tostring(node) + str(len(retained)).encode()).hexdigest()[:20]
+                destination, fragments = source_context(units, target[1:], 'note-link-' + identity)
+                node.set('href', '#' + destination)
+                node.set('class', 'source-disclosure-ref')
+                node.set('{http://www.idpf.org/2007/ops}type', 'noteref')
+                node.set('aria-label', 'Note association unresolved; view original source page')
+                retained.extend(fragments)
+                controller.events.append(dict(stage='note_link_disclosure',
+                    transition='LOCAL_NOTE_SOURCE_DISCLOSURE', units=copy.deepcopy(units),
+                    missing_target=target[1:], source_reference=destination))
+                changed = True
+            if changed:
+                chapter.blocks[index] = ''.join(ET.tostring(child, encoding='unicode') for child in root)
+    if retained:
+        chapters[-1].blocks.extend(retained)
+
+
+def bind_links(chapters, source_context=None):
     """Relocate only references to a uniquely admitted destination ID."""
     from . import build_epub
+    if source_context is not None:_disclose_unbound_notes(chapters, source_context)
     controller=current();home={};orig=copy.deepcopy(chapters)
     for chapter in orig:
         for fragment in chapter.blocks:
@@ -671,20 +1037,21 @@ def verify_degradation(parts,assets):
                         raise ValueError('Referenced degraded SOURCE note has no working Return')
 
 
-def package(out_path):
+def package(out_path, *, source_bytes=0):
     """Keep strict asset admission, plus an independent original-source writer."""
     from . import build_epub
     import posixpath
     import zipfile
     class RecoverablePackage(build_epub._Package):
         def __init__(self,path):
-            try:super().__init__(path)
+            try:super().__init__(path, source_bytes=source_bytes)
             except Exception as error:
                 if fatal(error) or current() is None:raise
                 if getattr(self,'_zf',None) is not None:self._zf.close()
                 self.path=str(path);self.tmp=self.path+'.tmp'
                 Path(self.tmp).parent.mkdir(parents=True,exist_ok=True)
                 self.images={};self.aliases={};self.media_types={}
+                self.source_bytes=source_bytes;self._image_digests={};self._resource_hashes={}
                 self._zf=zipfile.ZipFile(self.tmp,'w',zipfile.ZIP_DEFLATED)
                 info=zipfile.ZipInfo('mimetype');info.compress_type=zipfile.ZIP_STORED
                 self._zf.writestr(info,b'application/epub+zip')
@@ -700,22 +1067,34 @@ def package(out_path):
                     transition='DETERMINISTIC_SOURCE_REPAIR',image=actual,
                     evidence='Repeated asset bytes have identical SHA256',sha256=digest))
                 return
+            # Distinct ordinary disclosure regions retain their own ownership
+            # records, even when their pixels happen to be identical. Repeated
+            # original-page resources share bytes through source_image().
             super().image(href,data,store=store)
             self._hashes[self.aliases.get(href,href)]=digest
 
         def source_image(self,href,data):
             # Semantic crop/image helpers cannot prevent the trusted original
             # unit from being retained. Actual archive I/O failures still fail.
+            requested=href
+            href=build_epub._encoded_image_href(href,data)
             digest=hashlib.sha256(data).hexdigest()
-            if href in self.images:
-                if self._hashes.get(href)==digest:return
+            actual=self.aliases.get(requested,href)
+            if actual in self.images:
+                if self._hashes.get(actual)==digest:return
                 raise SourceIntegrityError('Original source asset changed during an assembly attempt')
             if not (data.startswith(b'\xff\xd8') or data.startswith(b'\x89PNG\r\n\x1a\n')):
                 raise SourceIntegrityError('Original source renderer did not produce an image')
+            existing=self._image_digests.get(digest)
+            if existing is not None:
+                self.aliases[requested]=existing
+                return
             self._zf.writestr(posixpath.join(build_epub.OEBPS,href),data)
+            self._image_digests[digest]=href
             self.images[href]=len(data)
             self.media_types[href]='image/png' if data.startswith(b'\x89PNG') else 'image/jpeg'
             self._hashes[href]=digest
+            if requested!=href:self.aliases[requested]=href
 
         def finish(self,parts):
             # Prove the exact inputs before trying a fallible packaging helper.
@@ -743,12 +1122,17 @@ def package(out_path):
                     for href in self.images:
                         if hashlib.sha256(published.read('OEBPS/'+href)).hexdigest()!=self._hashes[href]:
                             raise ValueError('Package changed admitted image '+href)
-                    if json.loads(published.read(build_epub.SIDECAR_PATH))!=parts['sidecar']:
+                    if json.loads(published.read(build_epub.SIDECAR_PATH))!=json.loads(json.dumps(parts['sidecar'],ensure_ascii=False)):
                         raise ValueError('Package changed admitted disclosure report')
                 os.unlink(backup)
                 return result
             except Exception as error:
-                if fatal(error):raise
+                if fatal(error):
+                    self.abandon()
+                    for candidate in (backup,self.tmp+'.repaired'):
+                        try:os.unlink(candidate)
+                        except FileNotFoundError:pass
+                    raise
                 controller=current()
                 if controller is None:raise
                 controller.events.append(dict(stage='packaging',transition='DETERMINISTIC_SOURCE_REPAIR',
@@ -772,6 +1156,14 @@ def package(out_path):
                         fresh.writestr('OEBPS/'+name,parts[key])
                     fresh.writestr('OEBPS/style.css',_proved_styles(parts['sidecar']))
                     for href,text in parts['documents'].items():fresh.writestr('OEBPS/'+href,text)
+                from .image_budget import check
+                try:check(self.source_bytes,os.path.getsize(replacement))
+                except BaseException:
+                    self.abandon()
+                    for candidate in (backup,replacement):
+                        try:os.unlink(candidate)
+                        except FileNotFoundError:pass
+                    raise
                 os.replace(replacement,self.path)
                 if os.path.exists(self.tmp):os.unlink(self.tmp)
                 os.unlink(backup)

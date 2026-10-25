@@ -254,6 +254,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libldap2-dev libsasl2-dev libssl-dev gettext \
             tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd
+          sudo scripts/install-reflow-latin-ocr.sh /usr/share/tesseract-ocr/5/tessdata
           tesseract --version
           tesseract --list-langs
 
@@ -261,6 +262,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e '.[dev]'
+
+      - name: Verify converter optical data
+        run: |
+          python - <<'PYDATA'
+          import hashlib
+          import shutil
+          from cps.services.reflow import pixel_adjudication
+          directory = pixel_adjudication._latin_directory(shutil.which('tesseract'))
+          assert directory is not None, 'Pinned Latin optical data is not discoverable'
+          data = (directory / 'LatinRaw.traineddata').read_bytes()
+          assert hashlib.sha256(data).digest() == pixel_adjudication._latin_digest()
+          print('Verified Latin optical data:', directory, len(data), hashlib.sha256(data).hexdigest())
+          PYDATA
 
       - name: Run converter tests
         # Two xdist workers fit the runner's two cores. Keep full failure output:

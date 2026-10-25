@@ -116,3 +116,136 @@ def test_public_original_punctuation_disagreement_is_visible_source_not_guessed_
     assert all(case['page'] == 0 for case in report['degraded_units'])
     assert any(case.get('stage') == 'source_word_coverage' and 'punctuation disagrees' in case.get('reason', '') for case in report['degraded_units'])
     assert c.source_returns(docs)
+
+
+def test_new_recovered_paragraph_failure_retains_its_geometry_and_healthy_text(tmp_path, monkeypatch):
+    page, paragraphs = c.fixture()
+    page.blocks.clear()
+    healthy = 'The final clear sample remains readable beside the window.'
+    page.text(healthy, 'healthy', y=240, size=8)
+    cover = vp.cover_missing_lines
+    recovered_ids = set()
+
+    def unproved_recovered_response(*args, **kwargs):
+        answer, recovered = cover(*args, **kwargs)
+        for block in answer['blocks']:
+            if block['id'] not in recovered:
+                continue
+            recovered_ids.add(block['id'])
+            block['role'] = 'body'
+            tokens = block['text'].split()
+            cut = len(paragraphs[0].split())
+            block['text'] += ' ' + ' '.join(tokens[cut-3:cut+3])
+        return answer, recovered
+
+    monkeypatch.setattr(vp, 'cover_missing_lines', unproved_recovered_response)
+    _, report, docs = h.convert_ink(tmp_path, monkeypatch, [page])
+    record = report['pages'][0]
+    assert record['source'] == 'vision'
+    assert recovered_ids and {u['block'] for u in record['degraded_units']} == recovered_ids
+    assert all('ambiguous response ownership' in u['reason'] for u in record['degraded_units'])
+    assert ' '.join(h.body_texts(docs)).count(healthy) == 1
+    assert c.source_returns(docs)
+    assert not any(e.get('class') == 'source-original' for root in docs.values() for e in root.iter())
+
+
+@pytest.mark.parametrize('side', ['before', 'after'])
+def test_one_optical_character_error_does_not_discard_proved_paragraphs(side):
+    doc, display, words, answer, regions, owners, expected = source_case()
+    try:
+        target = 'bank.' if side == 'before' else 'young'
+        changed = 'bnk.' if side == 'before' else 'oung'
+        occurrence = next(word for word in words if word['text'] == target)
+        occurrence['text'] = changed
+        original = copy.deepcopy(answer)
+        result, repairs = vp._source_paragraph_boundaries(answer, words, display, regions, owners)
+        assert answer == original, 'Boundary inference cannot rewrite the cached reading'
+        assert [b['text'] for b in result['blocks'] if b['role'] == 'body'] == expected
+        assert len(repairs) == 1
+        assert ' '.join(b['text'] for b in result['blocks']).split() == original['blocks'][0]['text'].split()
+    finally:
+        doc.close()
+
+
+@pytest.mark.parametrize('side', ['before', 'after'])
+def test_public_single_optical_letter_error_keeps_printed_prose_live(tmp_path, monkeypatch, side):
+    from cps.services.reflow import pixel_adjudication
+    page, expected = c.fixture()
+    finish = page.finish
+    printed = []
+    target = 'bank.' if side == 'before' else 'young'
+    changed = 'bnk.' if side == 'before' else 'oung'
+
+    def optical_error():
+        image, words, answer = finish()
+        printed.extend(copy.deepcopy(words))
+        next(word for word in words if word['text'] == target)['text'] = changed
+        return image, words, answer
+
+    page.finish = optical_error
+    # The second synthetic observer reads the independently printed inventory,
+    # including the letter omitted only from the first observer's word record.
+    def second_read(display, boxes, cache, **options):
+        return copy.deepcopy([w for w in printed if any(
+            box[0] <= (w['bbox'][0] + w['bbox'][2]) / 2 <= box[2] and
+            box[1] <= (w['bbox'][1] + w['bbox'][3]) / 2 <= box[3]
+            for box in boxes)])
+
+    monkeypatch.setattr(pixel_adjudication, '_read_crop', second_read)
+    _, report, docs = h.convert_ink(tmp_path, monkeypatch, [page])
+    c.invariant(report, docs, expected)
+    assert c.lexical(docs) == expected
+
+
+@pytest.mark.parametrize('case', ['two_alternatives', 'two_word_errors'])
+def test_near_paragraph_window_needs_unique_single_character_correspondence(case):
+    doc, display, words, answer, regions, owners, expected = source_case()
+    try:
+        next(w for w in words if w['text'] == 'bank.')['text'] = 'bnk.'
+        block = answer['blocks'][0]
+        tokens = block['text'].split()
+        first = len(expected[0].split())
+        if case == 'two_alternatives':
+            tokens[-6:] = tokens[first-3:first+3]
+        else:
+            next(w for w in words if w['text'] == 'young')['text'] = 'oung'
+        block['text'] = ' '.join(tokens)
+        original = copy.deepcopy(answer)
+        original_regions = copy.deepcopy(regions)
+        with pytest.raises(ValueError, match='ambiguous response ownership'):
+            vp._source_paragraph_boundaries(answer, words, display, regions, owners)
+        assert answer == original and regions == original_regions
+    finally:
+        doc.close()
+
+
+@pytest.mark.parametrize('public', [False, True])
+def test_paragraph_cut_uses_its_local_window_when_unrelated_optical_words_are_fused(tmp_path,monkeypatch,public):
+    from cps.services.reflow import pixel_adjudication
+    page, expected = c.fixture()
+    finish = page.finish
+    printed=[]
+    def optical_error():
+        image, words, answer = finish()
+        printed.extend(copy.deepcopy(words))
+        first,second=words[:2]
+        words[:2]=[dict(first,text=first['text']+second['text'],
+            bbox=[first['bbox'][0],first['bbox'][1],second['bbox'][2],second['bbox'][3]])]
+        next(word for word in words if word['text']=='bank.')['text']='bnk.'
+        return image,words,answer
+    if public:
+        page.finish=optical_error
+        monkeypatch.setattr(pixel_adjudication,'_read_crop',lambda *a,**k:copy.deepcopy(printed))
+        _,report,docs=h.convert_ink(tmp_path,monkeypatch,[page])
+        c.invariant(report,docs,expected)
+        assert c.lexical(docs)==expected
+    else:
+        image,words,answer=optical_error()
+        doc=pymupdf.open();p=doc.new_page(width=h.W,height=h.H);p.insert_image(p.rect,stream=image)
+        display=SourceDisplay(doc,0);box=[23,38,282,151]
+        original=copy.deepcopy(answer)
+        try:
+            result,repairs=vp._source_paragraph_boundaries(answer,words,display,{'body0':[box]},{'body0':box})
+            assert answer==original
+            assert [b['text']for b in result['blocks']]==expected and len(repairs)==1
+        finally:doc.close()

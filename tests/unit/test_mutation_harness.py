@@ -1945,6 +1945,9 @@ def preflight_gap_case(tmp_path, monkeypatch):
         with monkeypatch.context() as patch:
             patch.setattr(mutate, 'sys', SimpleNamespace(**{**vars(sys), 'platform': 'darwin'}))
             patch.setattr(mutate.subprocess, 'Popen', Process)
+            # PID123 models an unknown new phase child, not a pre-launch
+            # service. The synthetic Popen stub does not implement ps capture.
+            patch.setattr(mutate, '_pre_phase_identities', lambda: {})
             snapshots = iter([({}, (gap,)), ({}, ()), ({}, ()), ({}, ())])
             patch.setattr(mutate, '_phase_members', lambda *a: next(snapshots))
             patch.setattr(mutate, '_has_phase_token', lambda *a: gap)
@@ -2167,3 +2170,41 @@ def test_container_capability_probe_has_short_timeout(container_module, monkeypa
     monkeypatch.setattr(container_module, '_docker', wedged)
     with pytest.raises(pytest.skip.Exception, match='wedged daemon'):
         request.getfixturevalue('container_backend')
+
+
+@DARWIN_ONLY
+@pytest.mark.parametrize('preexisting',[True,False])
+def test_unrelated_prelaunch_identity_cannot_invalidate_a_new_token_phase(tmp_path,monkeypatch,preexisting):
+    """An authored inspection gap models an unrelated service, never a child."""
+    real=mutate._has_phase_token
+    def unreadable_parent(pid,token):
+        if pid==os.getpid():return mutate.UninspectableProcess(pid,5)
+        return real(pid,token)
+    monkeypatch.setattr(mutate,'_has_phase_token',unreadable_parent)
+    if not preexisting:
+        monkeypatch.setattr(mutate,'_pre_phase_identities',lambda:{},raising=False)
+    result=mutate.run_phase_process([sys.executable,'-c','print("synthetic completed phase")'],
+        cwd=tmp_path,environment=os.environ.copy(),timeout=30,artifacts=tmp_path/'artifacts',
+        ownership_contract='inherited-token')
+    assert result.returncode==0
+    if preexisting:
+        assert result.containment_error is None
+        assert result.inspection_gaps==()
+    else:
+        assert result.inspection_gaps,'An unbound identity remains fail-closed'
+        assert result.status=='UNVERIFIED'
+
+
+@DARWIN_ONLY
+def test_a_reused_pid_cannot_borrow_a_prelaunch_identity(tmp_path,monkeypatch):
+    real=mutate._has_phase_token
+    def unreadable_parent(pid,token):
+        return mutate.UninspectableProcess(pid,5)if pid==os.getpid()else real(pid,token)
+    monkeypatch.setattr(mutate,'_has_phase_token',unreadable_parent)
+    monkeypatch.setattr(mutate,'_pre_phase_identities',lambda:{os.getpid():(0,0)})
+    result=mutate.run_phase_process([sys.executable,'-c','print("synthetic completed phase")'],
+        cwd=tmp_path,environment=os.environ.copy(),timeout=30,artifacts=tmp_path/'artifacts',
+        ownership_contract='inherited-token')
+    assert result.returncode==0
+    assert any(gap.pid==os.getpid()for gap in result.inspection_gaps)
+    assert result.status=='UNVERIFIED'

@@ -5,6 +5,7 @@ from cps.services.reflow import vision_reading as vr,vision_pipeline as vp,visio
 from cps.services.reflow.ledger import Ledger
 from cps.services.reflow.source_display import SourceDisplay
 from tests.unit.round7_recovery_test_support import fixture,publish,h,TEXTS
+from tests.unit.round7_public_note_contract_support import local_ocr_visible
 
 @pytest.mark.parametrize('identity',['image_sha256','config_sha256'])
 def test_wrong_unit_cache_identity_preserves_exact_rejected_bytes_and_healthy_cached_pages(tmp_path,monkeypatch,identity):
@@ -18,13 +19,13 @@ def test_wrong_unit_cache_identity_preserves_exact_rejected_bytes_and_healthy_ca
     network=[]
     def forbidden(*args,**kwargs):network.append('unexpected network');raise AssertionError('offline cache rejection cannot dispatch')
     monkeypatch.setattr(requests,'post',forbidden)
-    _,report,docs=publish(doc,reader,tmp_path)
+    path,report,docs=publish(doc,reader,tmp_path)
     assert not network and report['reread_pages']==[]
     assert reader.ledger.spent()==reader.ledger.pending_usd()==0
-    assert {(u['page'],u.get('block')) for u in report['degraded_units']}=={(1,None)}
     assert all('Untrusted foreign cache' not in ''.join(root.itertext()) for root in docs.values())
     assert saved[0][0].read_bytes()==saved[0][1] and saved[2][0].read_bytes()==saved[2][1]
     assert any(p.read_bytes()==saved[1][1] for p in reader.cache.rglob('*') if p.is_file()),'rejected cache evidence remains exact'
+    local_ocr_visible(path,report,{1:[TEXTS[1]]},non_local_pages={0,2})
 
 @pytest.mark.parametrize('fatal',['cancel','destination_full'])
 def test_global_cancellation_and_destination_storage_failure_do_not_silently_source_replace(tmp_path,monkeypatch,fatal):

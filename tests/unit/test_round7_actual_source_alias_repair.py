@@ -7,6 +7,7 @@ import pytest
 from cps.services.reflow import vision_pipeline as vp,vision_pixels,vision_reading as vr,build_epub
 from cps.services.reflow.source_display import SourceDisplay
 from cps.services.reflow.ledger import Ledger
+from tests.unit.round7_public_note_contract_support import local_ocr_visible
 _spec=importlib.util.spec_from_file_location('r7_actual_alias_ink',Path(vp.__file__).parents[3]/'tests/unit/test_round4_defects.py')
 h=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(h)
 BODY='The bright ruby carries a finite attribution. Every later source word remains intact.'
@@ -50,8 +51,7 @@ def test_actual_source_alias_callback_requires_printed_reference_and_opening(def
             repaired=json.loads(cache.read_text());assert repaired['answer']['blocks'][0]['text']==answer['blocks'][0]['text'].replace('<n:fn1>','<n:n1>')
             retained=repaired['rejected_receipt'];assert Path(retained['path']).read_bytes()==rejected
         else:
-            assert report['degraded_units'], 'unproved source marker correspondence must take visible SOURCE fallback, never blind fn/n repair'
             assert h.refs_and_notes(docs)[0]==[]
-            for unit in report['degraded_units']:
-                src=unit['source_image'];assert 'OEBPS/'+src in archive.namelist()
-                assert any(image.get('src')==src for root in docs.values() for image in root.findall('.//x:img',h.NS))
+            assert any(p.read_bytes()==rejected for p in reader.cache.rglob('*') if p.is_file()), 'rejected source-marker evidence remains exact'
+            local_ocr_visible(path,report,{0:['The bright ruby','carries a finite attribution.',
+                'Every later source word remains intact.',NOTE]})

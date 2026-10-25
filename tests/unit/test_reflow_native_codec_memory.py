@@ -102,3 +102,51 @@ def test_native_flat_key_width_is_bounded_on_both_sides():
                           b',[1,"dict",[[{"ref":0},1]]]\n],"root":{"ref":1}}')
     with pytest.raises(ValueError, match='native key/member'):
         codec.loads(mapping)
+
+
+def test_dumps_releases_discarded_wire_buffers_without_cyclic_collection(tmp_path):
+    """Six bounded synthetic replies must not own six obsolete wire buffers."""
+    import subprocess
+    import sys
+    from cps.services.reflow import native_codec as codec
+    from pathlib import Path
+    script = tmp_path / 'codec_lifetime.py'
+    script.write_text(r'''import gc,hashlib,json,sys,tracemalloc
+import socket
+def no_network(*args,**kwargs):
+ raise RuntimeError("Synthetic lifetime probe forbids network access")
+socket.getaddrinfo=no_network
+socket.create_connection=no_network
+sys.path.insert(0,sys.argv[1])
+from cps.services.reflow import native_codec
+shared=[1,2,(3,4)]
+payload={'text':'x'*(512*1024),'values':[shared,shared],0:('integer key',True,-0.0)}
+expected=native_codec.dumps(payload)
+restored=native_codec.loads(expected)
+assert restored == payload and restored['values'][0] is restored['values'][1]
+assert type(restored[0]) is tuple and type(restored[0][1]) is bool
+expected_hash=hashlib.sha256(expected).hexdigest()
+expected_length=len(expected)
+del expected,restored
+gc.collect()
+gc.disable()
+tracemalloc.start()
+baseline=tracemalloc.get_traced_memory()[0]
+for _ in range(6):
+ wire=native_codec.dumps(payload)
+ assert len(wire)==expected_length and hashlib.sha256(wire).hexdigest()==expected_hash
+ assert len(wire)<native_codec.MAX_BYTES
+ del wire
+current,peak=tracemalloc.get_traced_memory()
+retained=current-baseline
+peak_delta=peak-baseline
+limit=max(256*1024,int(peak_delta*.20))
+print(json.dumps(dict(gc_enabled=gc.isenabled(),calls=6,wire_bytes=expected_length,wire_sha256=expected_hash,
+ retained_bytes=retained,peak_delta_bytes=peak_delta,retained_bound_bytes=limit)),flush=True)
+assert not gc.isenabled()
+assert retained<limit,'Discarded native wire buffers retain a per-call allocation without cyclic collection'
+''')
+    completed = subprocess.run([sys.executable, '-I', str(script),
+        str(Path(__file__).resolve().parents[2])], text=True, capture_output=True, timeout=30)
+    (tmp_path / 'subprocess-observation.txt').write_text(completed.stdout + completed.stderr)
+    assert completed.returncode == 0, completed.stdout + completed.stderr

@@ -195,6 +195,31 @@ def scanned_doc(count=1):
     return doc
 
 
+def scanned_note_doc(prefix, suffix, note, following=None, diagram=False, marker="1"):
+    """Rasterize the literal synthetic ink required by positive note tests."""
+    doc=pymupdf.open();doc._synthetic_optical=[]
+    with pymupdf.open() as ink:
+        p=ink.new_page(width=300,height=400)
+        p.insert_text((24,80),prefix,fontsize=10)
+        x=24+pymupdf.get_text_length(prefix,fontsize=10)
+        p.insert_text((x+1,75),marker,fontsize=6)
+        if suffix:p.insert_text((x+7,80),suffix,fontsize=10)
+        p.insert_text((24,300),marker+' '+note,fontsize=9)
+        if diagram:
+            p.draw_rect(pymupdf.Rect(18,330,55,350),color=(0,0,0))
+            p.draw_line((18,330),(55,350),color=(0,0,0))
+        doc._synthetic_optical.append([dict(text=w[4],bbox=list(w[:4]),confidence=99)for w in p.get_text('words',sort=True)])
+        target=doc.new_page(width=300,height=400)
+        target.insert_image(target.rect,stream=p.get_pixmap(matrix=pymupdf.Matrix(3,3)).tobytes('png'))
+        if following:
+            p=ink.new_page(width=300,height=400)
+            p.insert_text((24,80),following,fontsize=10)
+            doc._synthetic_optical.append([dict(text=w[4],bbox=list(w[:4]),confidence=99)for w in p.get_text('words',sort=True)])
+            target=doc.new_page(width=300,height=400)
+            target.insert_image(target.rect,stream=p.get_pixmap(matrix=pymupdf.Matrix(3,3)).tobytes('png'))
+    return doc
+
+
 class SyntheticReader:
     def __init__(self, *readings):
         from pathlib import Path
@@ -233,15 +258,58 @@ def assert_links_resolve(docs):
             assert any(n.get('id') == target_id for n in docs[target].iter()), href
 
 
+
+def assert_live_assistance_images(node, *, require_flags=False):
+    """Flagged words reach their own print, inline or through the unit's link."""
+    flags=[e for e in node.iter()if e.get('class')=='reflow-flagged-reading']
+    if require_flags:assert flags
+    parents={c:p for p in node.iter()for c in p}
+    for flag in flags:
+        links=[e for e in flag.iter()if e.get('class')=='source-word-image']
+        if links:
+            assert len(links)==1 and len(links[0])==1 and links[0][0].tag.rsplit('}',1)[-1]=='img'
+            assert links[0].get('href') and links[0][0].get('alt')==''
+        else:
+            plausible=next(e for e in flag if e.get('class')=='reflow-plausible')
+            links=[e for e in plausible.iter()if e.tag.rsplit('}',1)[-1]=='a']
+            assert len(links)==1 and links[0].get('href','').startswith('#v4-d-')
+            assert links[0].get('title')=='Compare this reading with original print'
+            assert ''.join(links[0].itertext()).strip()
+    for image in (e for e in node.iter()if e.tag.rsplit('}',1)[-1]=='img'):
+        link=parents[image];owner=parents[link]
+        while owner is not node and owner.get('class')not in ('reflow-flagged-reading','reflow-unit-print'):
+            owner=parents[owner]
+        if owner.get('class')=='reflow-unit-print':
+            assert link.get('class')=='source-disclosure-ref' and link.get('href','').startswith('#v4-d-unit-print-')
+        else:
+            assert link.get('class')=='source-word-image' and link.get('href')
+            assert owner.get('class')=='reflow-flagged-reading'
+            reading=next(e for e in owner if e.get('class')=='reflow-plausible')
+            assert ''.join(reading.itertext()).strip()
+        assert image.get('alt')==''
+
+
+def assistance_live_text(node):
+    """Reading text across preview runs, excluding only generated controls."""
+    def visit(el):
+        if 'source-disclosure-ref' in el.get('class','').split():return ''
+        text=(el.text or '')+''.join(visit(child)+(child.tail or '') for child in el)
+        return ' '+text+' ' if el.tag.rsplit('}',1)[-1] in ('p','div','h1','h2') else text
+    return ' '.join(visit(node).split())
+
 @real_ocr
-def test_final_epub_note_and_disclosure_links_resolve_without_body_crops(tmp_path):
-    doc = scanned_doc()
+def test_final_epub_note_and_disclosure_links_resolve_with_live_assistance(tmp_path,monkeypatch):
+    doc = scanned_note_doc('The narrow',' path crosses a bridge.','A short printed note.',diagram=True,marker='*')
+    from cps.services.reflow import vision_pixels
+    import copy
+    monkeypatch.setattr(vision_pixels,'words',lambda display,cache:copy.deepcopy(doc._synthetic_optical[display.pno]))
     reader = SyntheticReader(answer(
-        block('The narrow<n:n1> path reaches a bridge.', low=[1]),
-        block('A short printed note.', ident='n1', role='footnote', marker='1', bbox=(50, 650, 950, 800)),
+        block('The narrow<n:n1> path reaches a bridge.', low=[4]),
+        block('A short printed note.', ident='n1', role='footnote', marker='*', bbox=(50, 650, 950, 800)),
         block('SYNTHETIC RUNNING HEAD', ident='rh', role='running_head', bbox=(50, 10, 950, 40)),
         block('7', ident='folio', role='folio', bbox=(450, 900, 550, 950)),
         block('A genuine diagram', ident='fig', role='figure', bbox=(50, 820, 200, 880))))
+    reader.read_marker=lambda image:dict(label='*',uncertain=False,cached=True,new_cost_usd=0)
     out = tmp_path / 'notes.epub'
     result = vision_pipeline.convert(doc, str(out), reader)
     doc.close()
@@ -258,8 +326,9 @@ def test_final_epub_note_and_disclosure_links_resolve_without_body_crops(tmp_pat
     assert result['disclosure_count'] == 1
     for root in docs.values():
         for p in root.findall('.//x:p', NS):
-            assert p.findall('.//x:img', NS) == [], 'body sentences must remain live text'
-    assert set(i['kind'] for i in result['images'].values()) == {'figure', 'vision_disclosure'}
+            assert_live_assistance_images(p)
+    assert {'figure','vision_disclosure'} <= set(i['kind'] for i in result['images'].values())
+    assert set(i['kind'] for i in result['images'].values()) <= {'figure','vision_disclosure','inline_print_preview'}
 
 
 @real_ocr
@@ -410,7 +479,17 @@ def test_contiguous_disagreement_has_one_resolving_disclosure_for_all_words(tmp_
         note = next(n for n in root.iter() if n.get('id') == target)
         assert 'narrow path' in ''.join(note.itertext())
         assert any(a.get('href') == '#' + refs[0].get('id') for a in note.iter('a'))
-        assert list(root.iter('p'))[0].findall('.//img') == []
+        first=list(root.iter('p'))[0]
+        assert_live_assistance_images(first)
+        flags=[e for e in first.iter()if e.get('class')=='reflow-flagged-reading']
+        assert flags and ' '.join(''.join(f.find('span').itertext())for f in flags)=='narrow path'
+        reading_links=[a for f in flags for a in f.iter('a')]
+        targets={a.get('href') for a in reading_links}
+        assert targets=={'#v4-d-0-b1-2'}
+        assert any(a.get('href')in targets for a in note.iter('a')), 'Shared evidence retains the original detailed word receipt'
+        detail=next(n for n in root.iter()if '#'+str(n.get('id'))in targets)
+        assert any(a.get('href')=='#r-v4-d-0-b1-2'for a in detail.iter('a'))
+        assert assistance_live_text(first)==reading
     finally:
         pkg.abandon()
         doc.close()
@@ -580,7 +659,11 @@ def test_missing_optical_paragraph_recovery_is_disclosed_and_figure_text_is_excl
     try:
         published, report = vision_pipeline.compile_page(recovered, missing, display, 0, pkg, {}, missing + figure, identities)
         body = ''.join(published['body'])
-        assert missing_text in ET.fromstring('<html xmlns:epub="http://www.idpf.org/2007/ops">' + body + '</html>').itertext()
+        root=ET.fromstring('<html xmlns:epub="http://www.idpf.org/2007/ops">' + body + '</html>')
+        own=next(n for n in root.iter()if n.get('data-source-block')==added['id'])
+        assert assistance_live_text(own)==missing_text
+        assert 'diagram label' not in assistance_live_text(root)
+        assert_live_assistance_images(own,require_flags=True)
         assert any(b['fallback'] and b['marked'] for b in report['blocks'] if b['id'] in identities)
         assert 'class="source-disclosure-ref"' in body
     finally:
@@ -672,7 +755,7 @@ def test_optical_words_inside_claimed_body_recover_omission_despite_layer_agreem
             assert observed['marked'], 'optical fallback must retain uncertainty disclosure'
         markup = ET.fromstring('<html xmlns:epub="http://www.idpf.org/2007/ops">' + ''.join(published['body']) + '</html>')
         assert missing in ''.join(markup.itertext())
-        assert list(markup.iter('img')) == [], 'recovered prose must stay live text'
+        assert_live_assistance_images(markup)
     finally:
         pkg.abandon()
         doc.close()
@@ -709,8 +792,10 @@ def test_disclosure_crop_tracks_actual_optical_ink_without_changing_layer_certai
         assert after['blocks'][0]['marked'] == before['blocks'][0]['marked'] == [1]
         assert after['blocks'][0]['fallback'] is before['blocks'][0]['fallback'] is False
         assert after['marks'] == before['marks'] == 1
-        assert len(current_records) == 1
-        name, evidence = next(iter(current_records.items()))
+        inspections={name:e for name,e in current_records.items()if e['kind']=='vision_disclosure'}
+        assert len(inspections)==1
+        name,evidence=next(iter(inspections.items()))
+        assert all(e.get('coverage_eligible')is False for e in current_records.values()if e['kind']=='inline_print_preview')
         crop = pymupdf.Rect(evidence['bbox'])
         original_word = pymupdf.Rect(optical[1]['bbox'])
         assert crop.contains(original_word), 'crop must contain the actual printed corrected word'
@@ -754,7 +839,8 @@ def test_concurrent_independent_pixel_readings_recognize_once_and_share_valid_ca
             except Exception as exc:
                 results.append(exc)
     assert len(calls) == 1, 'independent readers must not recognize/write the same image twice'
-    assert results == [[{'text': 'River', 'bbox': [50, 100, 80, 110]}]] * 2
+    assert results == [[{'text': 'River', 'bbox': [50, 100, 80, 110],
+                         'confidence': 95.0, 'optical_line': [0, 1, 1, 1, 1]}]] * 2
     assert vision_pixels.words(display, tmp_path / 'optical') == results[0]
     assert len(calls) == 1
 
@@ -909,7 +995,7 @@ def test_disjoint_pixel_regions_publish_cross_column_paragraph_once_and_recover_
         ps = markup.findall('p')
         assert len(ps) == 3, 'cross-column source regions must remain one published paragraph'
         assert len([p for p in ps if 'Amber boats' in ''.join(p.itertext())]) == 1
-        assert all(not p.findall('.//img') for p in ps)
+        for p in ps:assert_live_assistance_images(p)
     finally:
         pkg.abandon()
         doc.close()
@@ -1006,7 +1092,7 @@ def test_converter_passes_disjoint_source_regions_through_final_epub(tmp_path, m
     assert len(body) == 3
     assert sum('Amber boats' in ''.join(p.itertext()) for p in body) == 1
     assert sum('Several unrelated' in ''.join(p.itertext()) for p in body) == 2
-    assert all(p.findall('.//x:img', NS) == [] for p in body)
+    for p in body:assert_live_assistance_images(p)
 
 
 @pytest.mark.parametrize('flags,recovers', [
@@ -1172,9 +1258,11 @@ def test_model_continued_hyphen_keeps_literal_hyphen_without_space_or_broken_dis
     assert len(body) == 1
     assert reading_flow.projection(body[0], {}).strip() == 'The quiet bridge-side leads into the meadow.', 'literal hyphen must survive without introducing a word-seam space'
     assert all('source-reading-annotation' not in ET.tostring(root, encoding='unicode') and 'reading-return-reading-' not in ET.tostring(root, encoding='unicode') for root in docs.values()), 'temporary source-control carriers must not leak into publication'
-    refs = body[0].findall('.//x:a[@class="source-disclosure-ref"]', NS)
+    units=chapter.findall('.//x:div[@class="reflow-unit-print"]',NS)
+    refs = body[0].findall('.//x:a[@class="source-disclosure-ref"]', NS)+[a for unit in units for a in unit.findall('.//x:a[@class="source-disclosure-ref"]',NS)]
     assert len(refs) == int(disclosure_affix)
-    assert body[0].findall('.//x:img', NS) == []
+    assert_live_assistance_images(body[0])
+    assert bool(body[0].findall('.//x:img',NS) or units) is disclosure_affix
     if disclosure_affix:
         assert refs[0].get('href') and any('Return' == ''.join(a.itertext()) for root in docs.values() for a in root.findall('.//x:a', NS))
 
@@ -1219,11 +1307,13 @@ def test_descriptive_image_confidence_still_requires_a_string_array(tmp_path, ro
 @real_ocr
 def test_printed_note_reference_is_transparent_to_literal_hyphen_continuation(tmp_path):
     from cps.services.reflow import reading_flow
-    doc = scanned_doc(2)
+    doc = scanned_note_doc('The quiet bridge-','','A short original note.',
+                           following='side leads into the meadow.')
     reader = SyntheticReader(answer(
         block('The quiet bridge-<n:n1>', next=True),
         block('A short original note.', ident='n1', role='footnote', marker='1', bbox=(50, 700, 950, 850))),
         answer(block('side leads into the meadow.', previous=True)))
+    reader.read_marker=lambda image:dict(label='1',uncertain=False,cached=True,new_cost_usd=0)
     out = tmp_path / 'printed-note-hyphen.epub'
     try:
         result = vision_pipeline.convert(doc, str(out), reader)
@@ -1242,3 +1332,18 @@ def test_printed_note_reference_is_transparent_to_literal_hyphen_continuation(tm
     assert any(a.get('href', '').endswith('#' + refs[0].get('id')) for root in docs.values() for a in root.findall('.//x:a', NS))
     assert all('source-reading-annotation' not in ET.tostring(root, encoding='unicode') and 'reading-return-reading-' not in ET.tostring(root, encoding='unicode') for root in docs.values())
     assert body[0].findall('.//x:img', NS) == []
+
+
+@real_ocr
+def test_blank_original_cannot_manufacture_a_printed_note(tmp_path):
+    doc=scanned_doc()
+    reader=SyntheticReader(answer(
+        block('The quiet sample<n:n1> remains readable.'),
+        block('A short invented note.',ident='n1',role='footnote',marker='1',bbox=(50,700,950,850))))
+    out=tmp_path/'unprinted-note.epub'
+    try:result=vision_pipeline.convert(doc,str(out),reader)
+    finally:doc.close()
+    docs=documents(out);assert_links_resolve(docs)
+    assert not [a for root in docs.values()for a in root.findall('.//x:a',NS)if a.get('class')=='noteref']
+    assert all('A short invented note.'not in ''.join(root.itertext())for root in docs.values())
+    assert any(u.get('block')=='n1'for u in result['degraded_units'])

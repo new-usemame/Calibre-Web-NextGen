@@ -42,7 +42,7 @@ def test_exact_local_caption_suffix_survives_bad_prefix_without_body_duplication
  assert h.body_texts(docs)==expected,'the unique printed caption suffix cannot reappear as BODY; actual omitted/reserved BODY survives'
  assert any(r[3]>225 and r[3]<240 for r in source_regions(docs)),'SOURCE ownership reaches the exact adjacent third caption row'
  assert all(r[3]<240 for r in source_regions(docs)),'caption may not borrow later body instances'
- assert any(a.get('class')=='source-disclosure-ref' for n in caption_nodes(docs) for a in n.findall('.//x:a',h.NS)),'damaged unproved prefix retains its SOURCE uncertainty disclosure'
+ assert any((a.get('class')=='source-disclosure-ref' or a.get('title')=='Compare this reading with original print') for n in caption_nodes(docs) for a in n.findall('.//x:a',h.NS)),'damaged unproved prefix retains its SOURCE uncertainty disclosure'
 
 
 @pytest.mark.parametrize('kind',['ambiguous','altered','remote'])

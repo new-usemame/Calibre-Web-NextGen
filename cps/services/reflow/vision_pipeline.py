@@ -14,7 +14,13 @@ from html import escape, unescape
 from pathlib import Path
 from . import assemble, build_epub, extract, pipeline, reading_flow, vision_reading
 from .source_display import SourceDisplay
-from . import unit_recovery
+from . import unit_recovery, text_quality, visible_scripts, local_reading
+
+
+_MARKER_GROUP_AMBIGUOUS = 'multiple_original_glyphs_for_one_placeholder'
+_MARKER_GROUP_INCOMPLETE = 'complete_original_marker_group_not_proved'
+_MARKER_SLOT_UNBOUND = 'original_marker_slot_not_uniquely_bound'
+_MARKER_ROLE_UNPROVED = 'numeric_original_marker_role_unproved'
 
 
 def clean_native(page, raw=None):
@@ -30,6 +36,8 @@ def clean_native(page, raw=None):
         return False
     text=page.get_text('text')
     if '\ufffd' in text or any(ord(c)<32 and c not in '\n\r\t' for c in text):
+        return False
+    if text_quality.inspect(text)['needs_read']:
         return False
     raw=raw or extract.read_page(page.parent,page.number)
     return not any(getattr(s,k,False) for b in raw.text_blocks for l in b.lines for s in l.spans
@@ -96,6 +104,42 @@ def _pixel_lines(words):
     """
     import statistics
     if not words:return []
+    # The recognizer sees curved printed baselines that horizontal center
+    # sorting cannot represent. Retain its line instances only when their
+    # original word boxes form coherent, moderately sloped physical rows.
+    labelled={};valid=True
+    for word in words:
+        key=word.get('optical_line')
+        if (not isinstance(key,(list,tuple)) or len(key)!=5
+                or any(type(v)is not int for v in key) or key[0]<0 or min(key[1:])<=0):
+            valid=False;break
+        labelled.setdefault(tuple(key),[]).append(word)
+    if valid:
+        rows=[]
+        for key,row in sorted(labelled.items()):
+            row=sorted(row,key=lambda w:w['bbox'][0])
+            height=statistics.median(w['bbox'][3]-w['bbox'][1]for w in row)
+            centers=[((w['bbox'][0]+w['bbox'][2])/2,(w['bbox'][1]+w['bbox'][3])/2)for w in row]
+            width=centers[-1][0]-centers[0][0]
+            slope=(centers[-1][1]-centers[0][1])/width if width>0 else 0
+            intercept=statistics.median(y-slope*x for x,y in centers)
+            if abs(slope)>.15 or any(abs(y-slope*x-intercept)>max(2,height*.8)for x,y in centers):
+                valid=False;break
+            rows.append(row)
+        if valid:
+            # OCR may put a narrow number column in a separate block. Two
+            # labelled groups sharing one adjacent physical baseline are one
+            # row, not a later continuation after the paragraph's last word.
+            for i,left in enumerate(rows):
+                for right in rows[i+1:]:
+                    height=statistics.median(w['bbox'][3]-w['bbox'][1]for w in left+right)
+                    a=vision_reading.union([w['bbox']for w in left])
+                    b=vision_reading.union([w['bbox']for w in right])
+                    if (abs((a[1]+a[3]-b[1]-b[3])/2)<=max(2,height*.55)
+                            and max(a[0],b[0])-min(a[2],b[2])<=2*height):
+                        valid=False;break
+                if not valid:break
+        if valid:return rows
     tolerance=max(2,statistics.median(w['bbox'][3]-w['bbox'][1] for w in words)*.55)
     lines=[]
     center=lambda w:(w['bbox'][1]+w['bbox'][3])/2
@@ -218,7 +262,7 @@ def _source_note_boundaries(answer,optical,display,regions,body_owners,reader,re
     return answer,repairs
 
 
-def _note_pixel_anchors(optical,available,candidate,hint):
+def _note_pixel_anchors(optical,available,candidate,hint,*,exact_complete=False):
     """Corroborate a complete note in physical row or column reading order.
 
     A coarse hint can omit an internal row edge or the top of the next column.
@@ -274,6 +318,7 @@ def _note_pixel_anchors(optical,available,candidate,hint):
             for sequence in (sides,list(reversed(sides))):
                 yield [lookup[id(w)] for side in sequence for w in _pixel_line_order(side)]
     orders.extend(gutter_orders(pool))
+    exact_orders=list(orders)
     matches=[_geometry_anchors(optical,order,candidate) for order in orders]
     score=lambda pairs:(len({j for _,j in pairs}),sum(i in local for i,j in pairs))
     best=max(matches,key=score,default=[])
@@ -286,7 +331,25 @@ def _note_pixel_anchors(optical,available,candidate,hint):
         top=min(w['bbox'][1] for w in anchored)-height*.5
         bottom=max(hint[3],max(w['bbox'][3] for w in anchored)+height*.5)
         band=[i for i in pool if top<=(optical[i]['bbox'][1]+optical[i]['bbox'][3])/2<=bottom]
-        matches.extend(_geometry_anchors(optical,order,candidate) for order in gutter_orders(band))
+        band_orders=list(gutter_orders(band))
+        exact_orders.extend(band_orders)
+        matches.extend(_geometry_anchors(optical,order,candidate) for order in band_orders)
+    if exact_complete:
+        # A complete literal occurrence inside the supplied territory may span
+        # a proved persistent gutter. Enumerate identities rather than letting
+        # one partial row window win merely because it is compact.
+        key=lambda text:re.sub(r'[^\w]','',vision_reading.normalized(text).casefold())
+        proofs={}
+        if len(candidate)<5:return []
+        for order in exact_orders:
+            sequence=[i for i in order if key(optical[i]['text'])]
+            keys=[key(optical[i]['text'])for i in sequence]
+            for at in range(len(keys)-len(candidate)+1):
+                if keys[at:at+len(candidate)]==candidate:
+                    indices=tuple(sequence[at:at+len(candidate)])
+                    if len(set(indices)&set(local))>=min(3,len(candidate)):
+                        proofs[indices]=list(zip(indices,range(len(candidate))))
+        return next(iter(proofs.values())) if len(proofs)==1 else []
     return max(matches,key=score,default=[])
 
 
@@ -347,6 +410,910 @@ def _reserve_object_instances(answer,optical,display,regions):
             for i,j in matches:instances.setdefault(_source_instance(optical[i]),block['id'])
 
 
+def _reserve_layer_instances(answer,words,display,regions):
+    """Rebind unique lexical occurrences to this inventory's physical identities.
+
+    A dotted leader and its distant page number do not form prose anchors.
+    Locate the lexical reading first, then bind the original punctuation and
+    numeric tail only on those same printed rows. This grants ownership only.
+    """
+    from .source_geometry import unique_anchors
+    key=lambda text:re.sub(r'[^\w]','',vision_reading.normalized(text).casefold())
+    instances=regions.setdefault('_instances',{})
+    # Recognition inventories can divide the same printed word differently.
+    # Transfer only an already proved physical owner, never its transcription.
+    # Competing owners or a word spanning two owners cannot establish a claim.
+    prior=list(instances.items())
+    for word in words:
+        occurrence=_source_instance(word)
+        if occurrence in instances:continue
+        x=word['bbox'];cx=(x[0]+x[2])/2;cy=(x[1]+x[3])/2
+        owners=set()
+        for (_,box),owner in prior:
+            height=min(x[3]-x[1],box[3]-box[1])
+            if height<=0:continue
+            overlap_x=max(0,min(x[2],box[2])-max(x[0],box[0]))
+            overlap_y=max(0,min(x[3],box[3])-max(x[1],box[1]))
+            if (overlap_x>=.5*min(x[2]-x[0],box[2]-box[0])
+                    and overlap_y>=.6*height
+                    and abs(cy-(box[1]+box[3])/2)<=.5*max(x[3]-x[1],box[3]-box[1])
+                    and (box[0]-.5<=cx<=box[2]+.5 or x[0]<= (box[0]+box[2])/2 <=x[2])):
+                owners.add(owner)
+        if len(owners)==1:instances[occurrence]=next(iter(owners))
+        elif len(owners)>1:
+            # A merged OCR column can cover several separately owned labels.
+            # It cannot be printed inline as another word in any of those rows;
+            # publication conservation retains its complete original context.
+            regions.setdefault('_ambiguous_instances',set()).add(occurrence)
+    # Short numbered rows can have a vertically clipped reader hint. Before a
+    # crop reread can replace it with the preceding row, locate the complete
+    # lexical row in a bounded neighbourhood. This moves geometry only when
+    # exactly one physical row proves every lexical anchor; repeated rows and
+    # already owned neighbouring occurrences cannot establish a new placement.
+    for block in answer['blocks']:
+        tokens=block['text'].split()
+        lexical=[key(t)for t in tokens if any(c.isalpha()for c in key(t))]
+        boxes=regions.get(block['id'],[block_rect(block,display)])
+        if (block['role']!='body' or not re.match(r'^\d{1,3}[.)]\s',block['text'])
+                or not 2<=len(lexical)<=4 or len(tokens)>6 or len(boxes)!=1):continue
+        box=boxes[0];pad=2*max(1,box[3]-box[1])
+        search=[box[0],max(display.rect.y0,box[1]-pad),box[2],min(display.rect.y1,box[3]+pad)]
+        candidates=[]
+        for row in _pixel_lines([w for w in words if owned_words([w],search)]):
+            matches=unique_anchors(row,range(len(row)),lexical,minimum=2)
+            if {j for i,j in matches}!=set(range(len(lexical))):continue
+            own=[row[i]for i,j in matches]
+            if any(instances.get(_source_instance(w),block['id'])!=block['id']for w in own):continue
+            candidates.append(own)
+        if len(candidates)!=1:continue
+        bounds=vision_reading.union([w['bbox']for w in candidates[0]])
+        # Preserve space for this row's adjacent printed number. Its spelling
+        # still has to pass the ordinary native/pixel identity checks.
+        regions[block['id']]=[[min(box[0],bounds[0]),bounds[1]-.01,
+                              max(box[2],bounds[2]),bounds[3]+.01]]
+        for word in candidates[0]:instances[_source_instance(word)]=block['id']
+    proposals={};proved_rows={};proved_row_words={}
+    # A compact index entry may have only one ordinary lexical word plus an
+    # ordinal and page number. Its complete printed row still proves ownership
+    # against a larger neighbor that borrowed that same row as a tail.
+    for block in answer['blocks']:
+        if block['role'] not in ('body','other','caption','heading'):continue
+        candidate=[key(token)for token in block['text'].split()]
+        if (not 3<=len(candidate)<=6 or not all(candidate) or
+                not any(token.isdigit()for token in candidate)):continue
+        boxes=regions.get(block['id'],[block_rect(block,display)])
+        nearby=[w for w in words if any(owned_words([w],box)for box in boxes)]
+        if not nearby:continue
+        import statistics
+        pad=3*statistics.median(w['bbox'][3]-w['bbox'][1]for w in nearby)
+        search=[[box[0],box[1],min(display.rect.x1,box[2]+pad),box[3]]for box in boxes]
+        local=[w for w in words if any(owned_words([w],box)for box in search)]
+        rows=[]
+        for row in _pixel_lines(local):
+            # An index's numeric tail cannot borrow the next lexical column.
+            numeric=False;bounded=[]
+            for word in row:
+                token=key(word['text'])
+                reference=any(c.isdigit()for c in token)or bool(re.fullmatch(r'[ivxlcdm]+',token,re.I))
+                if numeric and any(c.isalpha()for c in token)and not reference:break
+                bounded.append(word)
+                numeric|=reference
+            row=bounded
+            if not row or key(row[0]['text'])!=candidate[0]:continue
+            # This is one measured index row inside the unit's original
+            # territory. Its tab gap is intentional; the generic prose anchor
+            # finder would incorrectly split label and numeric columns here.
+            from difflib import SequenceMatcher
+            matcher=SequenceMatcher(None,[key(w['text'])for w in row],candidate,autojunk=False)
+            anchors=[(i,j)for a,b,count in matcher.get_matching_blocks()
+                     for i,j in zip(range(a,a+count),range(b,b+count))]
+            covered={j for _,j in anchors}
+            # One damaged reference must not transfer its row's label/tail
+            # into a preceding entry. Three literal own-row anchors and the
+            # first label establish placement, never the uncertain spelling.
+            if 0 in covered and len(covered)>=3 and len(covered)/len(candidate)>=.75:
+                rows.append(row[min(i for i,_ in anchors):max(i for i,_ in anchors)+1])
+        if len(rows)!=1:continue
+        for word in rows[0]:
+            occurrence=_source_instance(word)
+            proved_rows.setdefault(occurrence,set()).add(block['id'])
+            proved_row_words[occurrence]=word
+    for block in answer['blocks']:
+        if block['role'] not in ('body','other','caption','heading','footnote'):continue
+        candidate=[key(token)for token in re.sub(r'<n:[^>]+>',' ',block['text']).split()]
+        lexical=[token for token in candidate if any(c.isalpha()for c in token)]
+        short_list=(block['role']=='body' and
+                    bool(re.match(r'^\d{1,3}[.)]\s',block['text'])) and
+                    2<=len(lexical)<=4 and len(candidate)<=6)
+        if len(lexical)<3 and not short_list:continue
+        boxes=regions.get(block['id'],[block_rect(block,display)])
+        if block['role']=='footnote' and block.get('marker'):
+            heights=[w['bbox'][3]-w['bbox'][1]for w in words
+                     if any(owned_words([w],box)for box in boxes)]
+            if heights:
+                import statistics
+                hint=block_rect(block,display);pad=3*statistics.median(heights)
+                boxes=boxes+[[max(display.rect.x0,hint[0]-pad),hint[1],
+                              min(display.rect.x1,hint[2]+pad),hint[3]]]
+        all_local=_pixel_line_order([word for word in words if any(owned_words([word],box)for box in boxes)])
+        local=[word for word in all_local if any(c.isalpha()for c in key(word['text']))]
+        anchors=unique_anchors(local,range(len(local)),lexical,minimum=2 if short_list else 3)
+        covered={j for i,j in anchors}
+        complete=covered==set(range(len(lexical)))
+        if short_list and len(_pixel_lines([local[i]for i,j in anchors]))!=1:continue
+        if not complete and not(block['role']=='footnote'and len(covered)>=6
+                                 and len(covered)/len(lexical)>=.8):continue
+        selected={id(local[i])for i,j in anchors}
+        # Ancillary dot leaders cannot become a second row's lexical bridge.
+        # Numbers bind only when their literal is unique on this anchored row.
+        for row in _pixel_lines(all_local):
+            row_anchors=[w for w in row if id(w)in selected]
+            if not row_anchors:continue
+            for number in {t for t in candidate if t.isdigit()}:
+                hits=[w for w in row if key(w['text'])==number]
+                if len(hits)==1:selected.add(id(hits[0]));row_anchors+=hits
+            left=min(w['bbox'][0]for w in row_anchors);right=max(w['bbox'][2]for w in row_anchors)
+            selected.update(id(w)for w in row if not key(w['text'])
+                            and left<=w['bbox'][0]and w['bbox'][2]<=right)
+        for word in all_local:
+            if id(word)not in selected:continue
+            proposals.setdefault(_source_instance(word),set()).add(block['id'])
+            if block['role']=='footnote':
+                bound=regions.setdefault(block['id'],[block_rect(block,display)])
+                if not any(owned_words([word],box)for box in bound):
+                    bound.append(list(word['bbox']))
+                    additions=regions.setdefault('_row_additions',{}).setdefault(block['id'],[])
+                    if not isinstance(additions,list):
+                        additions=list(additions);regions['_row_additions'][block['id']]=additions
+                    additions.append(_source_instance(word))
+    instances=regions.setdefault('_instances',{})
+    for occurrence,owners in proposals.items():
+        if len(owners)==1:instances.setdefault(occurrence,next(iter(owners)))
+    # OCR can omit a list's narrow number column entirely. Its independently
+    # owned lexical row locates the adjacent original label without certifying
+    # the label's spelling. A preceding row's label cannot join this row.
+    for block in answer['blocks']:
+        if block['role']!='body' or not re.match(r'^\d{1,3}[.)]\s',block['text']):continue
+        own=[w for w in words if instances.get(_source_instance(w))==block['id']]
+        for row in _pixel_lines(own):
+            if len(row)<2:continue
+            import statistics
+            left=min(w['bbox'][0]for w in row)
+            middle=statistics.median((w['bbox'][1]+w['bbox'][3])/2 for w in row)
+            height=statistics.median(w['bbox'][3]-w['bbox'][1]for w in row)
+            labels=[w for w in words if _source_instance(w)not in instances and
+                    re.fullmatch(r'\d{1,3}',key(w['text'])) and
+                    0<=left-w['bbox'][2]<=2*height and
+                    abs((w['bbox'][1]+w['bbox'][3])/2-middle)<=.5*height]
+            if len(labels)==1:instances[_source_instance(labels[0])]=block['id']
+    for occurrence,owners in proved_rows.items():
+        if len(owners)!=1:continue
+        owner=next(iter(owners));instances[occurrence]=owner
+        word=proved_row_words[occurrence]
+        bound=regions.setdefault(owner,[block_rect(next(b for b in answer['blocks']if b['id']==owner),display)])
+        if not any(owned_words([word],box)for box in bound):
+            bound.append(list(word['bbox']))
+            additions=regions.setdefault('_row_additions',{}).setdefault(owner,[])
+            if not isinstance(additions,list):
+                additions=list(additions);regions['_row_additions'][owner]=additions
+            additions.append(occurrence)
+
+
+def _native_lexical_view(display,words,marker_prefixes=()):
+    from .native_text import lexical_word_view
+    if not display.page.get_texttrace():return words
+    def physical(word):
+        return dict(word,bbox=list(display.source_rect(word['bbox'])*display.page.derotation_matrix))
+    grouped=lexical_word_view(display.page,[physical(word)for word in words],marker_prefixes)
+    result=[]
+    for word in grouped:
+        value=dict(word,bbox=list(display.reading_rect(word['bbox'])))
+        if 'native_parts'in word:
+            value['native_parts']=[dict(p,bbox=list(display.reading_rect(p['bbox'])))for p in word['native_parts']]
+        result.append(value)
+    return result
+
+
+def _native_wrap_view(words,tokens):
+    """Conserve native letters across a geometrically proved line-end wrap."""
+    from difflib import SequenceMatcher
+    proposed=[t for t in tokens if not t.startswith('<n:')]
+    key=vision_reading.normalized
+    changes={}
+    for kind,a,z,b,y in SequenceMatcher(None,[key(w['text'])for w in words],
+                                      [key(t)for t in proposed],autojunk=False).get_opcodes():
+        if kind!='replace' or z-a!=2 or y-b!=1:continue
+        left,right=words[a:z];x,q=left['bbox'],right['bbox']
+        height=min(x[3]-x[1],q[3]-q[1])
+        joined=left['text'][:-1]+right['text']
+        if (left['text'].endswith('-') and key(proposed[b])in(key(joined),key(left['text']+right['text']))
+                and (q[1]+q[3]-x[1]-x[3])/2>height*.5 and q[0]<=x[0]+height*.5):
+            changes[a]=dict(left,text=proposed[b],bbox=vision_reading.union([x,q]),
+                native_parts=[dict(text=w['text'],bbox=w['bbox'])for w in (left,right)])
+    return [changes[i]if i in changes else word for i,word in enumerate(words)if i-1 not in changes]
+
+
+def _native_ink_regions(territories,words):
+    """Cover only already-owned, positively proved native word components."""
+    boxes=[list(box)for box in territories]
+    for word in words:
+        for part in word.get('native_parts',[word]):
+            ink=part['bbox']
+            if any(b[0]<=ink[0] and b[1]<=ink[1] and b[2]>=ink[2] and b[3]>=ink[3]for b in boxes):continue
+            enlarged=[vision_reading.union([box,ink])for box in boxes]
+            index=min(range(len(boxes)),key=lambda i:(enlarged[i][2]-enlarged[i][0])*(enlarged[i][3]-enlarged[i][1])-
+                      (boxes[i][2]-boxes[i][0])*(boxes[i][3]-boxes[i][1]))
+            boxes[index]=enlarged[index]
+    return boxes
+
+
+def _complete_note_head_territory(block,answer,words,display,regions,local):
+    """Locate an exact reader opening on adjacent, otherwise unclaimed source ink.
+
+    This widens a crop, not transcription authority. The original source and
+    independent recognition still adjudicate every added word normally.
+    """
+    if block.get('role')!='footnote' or len(local)<6 or '<n:'in block['text']:return None
+    import statistics
+    from difflib import SequenceMatcher
+    key=lambda text:''.join(c for c in vision_reading.normalized(text).casefold()if c.isalnum())
+    model=block['text'].split();suffix=key(''.join(w['text']for w in local))
+    if len(model)<=len(local) or not suffix:return None
+    splits=[i for i in range(1,len(model)-5)
+            if abs(len(key(''.join(model[i:])))-len(suffix))<=2
+            and SequenceMatcher(None,suffix,key(''.join(model[i:]))).ratio()>=.95]
+    if not splits:return None
+    rank=lambda i:(abs(len(key(''.join(model[i:])))-len(suffix)),
+                   -SequenceMatcher(None,suffix,key(''.join(model[i:]))).ratio())
+    splits.sort(key=rank)
+    if len(splits)>1 and rank(splits[0])==rank(splits[1]):return None
+    head=key(''.join(model[:splits[0]]))
+    if not head or splits[0]>20:return None
+    height=statistics.median(w['bbox'][3]-w['bbox'][1]for w in local)
+    first=min((w['bbox'][1]+w['bbox'][3])/2 for w in local)
+    left=min(w['bbox'][0]for w in local)-3*height
+    right=max(w['bbox'][2]for w in local)+3*height
+    existing={_source_instance(w)for w in local}
+    preceding=_pixel_line_order([w for w in words if _source_instance(w)not in existing
+        and left<=(w['bbox'][0]+w['bbox'][2])/2<=right
+        and first-2.5*height<=(w['bbox'][1]+w['bbox'][3])/2<first-.5*height])
+    selected=[];literal=''
+    for word in reversed(preceding):
+        selected.insert(0,word);literal=key(word['text'])+literal
+        if not head.endswith(literal):return None
+        if literal==head:break
+    if literal!=head:return None
+    for word in selected:
+        claim=(regions or {}).get('_instances',{}).get(_source_instance(word))
+        if claim is not None and claim!=block['id']:return None
+        x=(word['bbox'][0]+word['bbox'][2])/2;y=(word['bbox'][1]+word['bbox'][3])/2
+        for other in answer['blocks']:
+            if other['id']==block['id']:continue
+            if any(b[0]<=x<=b[2]and b[1]<=y<=b[3]
+                   for b in (regions or {}).get(other['id'],[block_rect(other,display)])):return None
+    return selected+list(local)
+
+
+
+def _complete_note_tail_territory(block,answer,words,display,regions,local):
+    """Locate an exact reader tail on adjacent, otherwise unclaimed source ink.
+
+    This widens a crop, not transcription authority. The original source and
+    independent recognition still adjudicate every added word normally.
+    """
+    if block.get('role')!='footnote' or len(local)<6 or '<n:'in block['text']:return None
+    import statistics
+    from difflib import SequenceMatcher
+    key=lambda text:''.join(c for c in vision_reading.normalized(text).casefold()if c.isalnum())
+    model=block['text'].split();prefix=key(''.join(w['text']for w in local))
+    if not prefix or len(key(''.join(model)))<=len(prefix):return None
+    splits=[i for i in range(1,len(model))
+            if abs(len(key(''.join(model[:i])))-len(prefix))<=2
+            and SequenceMatcher(None,prefix,key(''.join(model[:i]))).ratio()>=.95]
+    if not splits:return None
+    rank=lambda i:(abs(len(key(''.join(model[:i])))-len(prefix)),
+                   -SequenceMatcher(None,prefix,key(''.join(model[:i]))).ratio())
+    splits.sort(key=rank)
+    if len(splits)>1 and rank(splits[0])==rank(splits[1]):return None
+    tail=key(''.join(model[splits[0]:]))
+    if not tail or len(model)-splits[0]>20:return None
+    height=statistics.median(w['bbox'][3]-w['bbox'][1]for w in local)
+    last=max((w['bbox'][1]+w['bbox'][3])/2 for w in local)
+    left=min(w['bbox'][0]for w in local)-3*height
+    right=max(w['bbox'][2]for w in local)+3*height
+    existing={_source_instance(w)for w in local}
+    terminal=_pixel_line_order(local)[-1]
+    terminal_right=terminal['bbox'][2]
+    following=_pixel_line_order([w for w in words if _source_instance(w)not in existing
+        and left<=(w['bbox'][0]+w['bbox'][2])/2<=right
+        and ((last+.5*height<(w['bbox'][1]+w['bbox'][3])/2<=last+2.5*height)
+             or (abs((w['bbox'][1]+w['bbox'][3])/2-last)<=.5*height
+                 and w['bbox'][0]>=terminal_right-.1*height))])
+    selected=[];literal=''
+    for word in following:
+        selected.append(word);literal+=key(word['text'])
+        if not tail.startswith(literal):return None
+        if literal==tail:break
+    if literal!=tail:return None
+    for word in selected:
+        claim=(regions or {}).get('_instances',{}).get(_source_instance(word))
+        if claim is not None and claim!=block['id']:return None
+        x=(word['bbox'][0]+word['bbox'][2])/2;y=(word['bbox'][1]+word['bbox'][3])/2
+        for other in answer['blocks']:
+            if other['id']==block['id']:continue
+            if any(b[0]<=x<=b[2]and b[1]<=y<=b[3]
+                   for b in (regions or {}).get(other['id'],[block_rect(other,display)])):return None
+    return list(local)+selected
+
+
+def _complete_optical_row_openings(block,answer,pixels,display,regions,local):
+    """Locate unclaimed row openings from unique following source anchors.
+
+    A first-line indent cannot cut later lines at the same horizontal edge.
+    Only already recognized, exact, adjacent source instances may enlarge the
+    region. Their geometry supplies no new spelling authority.
+    """
+    from difflib import SequenceMatcher
+    key=lambda text:''.join(c for c in vision_reading.normalized(text).casefold()if c.isalnum())
+    model=[key(t)for t in re.sub(r'<n:[^>]+>',' ',block['text']).split()]
+    source=[key(w['text'])for w in local]
+    known={_source_instance(w)for w in local};added=[]
+    for kind,a,z,b,y in SequenceMatcher(None,source,model,autojunk=False).get_opcodes():
+        if kind!='insert' or a>=len(local) or not 1<=y-b<=20:continue
+        anchor=model[y:y+3]
+        if (len(anchor)!=3 or source[z:z+3]!=anchor
+                or sum(model[i:i+3]==anchor for i in range(len(model)-2))!=1
+                or sum(source[i:i+3]==anchor for i in range(len(source)-2))!=1):continue
+        right=local[a]['bbox'];height=right[3]-right[1]
+        if height<=0:continue
+        center=(right[1]+right[3])/2
+        if (a and abs(sum(local[a-1]['bbox'][1::2])/2-center)<=.5*height
+                or any(abs(sum(w['bbox'][1::2])/2-center)>.5*height for w in local[a:a+3])):continue
+        candidates=[]
+        for word in pixels:
+            box=word['bbox'];x=(box[0]+box[2])/2;cy=(box[1]+box[3])/2
+            if (_source_instance(word)in known or box[2]>right[0]+.1*height
+                    or abs(cy-center)>.5*height or not .5*height<=box[3]-box[1]<=1.8*height):continue
+            claim=(regions or {}).get('_instances',{}).get(_source_instance(word))
+            if claim is not None and claim!=block['id']:continue
+            if any(other['id']!=block['id']and any(r[0]<=x<=r[2]and r[1]<=cy<=r[3]
+                   for r in (regions or {}).get(other['id'],[block_rect(other,display)]))
+                   for other in answer['blocks']):continue
+            candidates.append(word)
+        candidates.sort(key=lambda word:word['bbox'][0]);selected=candidates[-(y-b):]
+        if (len(selected)!=y-b
+                or [key(word['text'])for word in selected]!=model[b:y]):continue
+        following=right
+        for word in reversed(selected):
+            box=word['bbox'];gap=following[0]-box[2]
+            if not -.1*height<=gap<=2*height:break
+            following=box
+        else:
+            added.extend(selected);known.update(_source_instance(word)for word in selected)
+    return added
+
+
+def _complete_optical_row_territory(block,answer,pixels,display,regions,body_owners,source_words=()):
+    """Recover exact unclaimed words at any clipped physical row edge.
+
+    Page recognition locates the missing instances before crop adjudication.
+    Model rectangles are hints: an adjacent proved row may extend beyond one.
+    Other owners, distant ink and ambiguous model anchors remain excluded.
+    Widening a territory confers no spelling authority.
+    """
+    if block['role'] not in ('body','other','caption','footnote') or not pixels:return []
+    local=_pixel_line_order(_owned_block_words(block,answer,pixels,display,regions,body_owners,ordered=True))
+    if len(local)<6:return []
+    import statistics
+    from difflib import SequenceMatcher
+    key=lambda t:''.join(c for c in vision_reading.normalized(t).casefold()if c.isalnum())
+    model=[key(t)for t in re.sub(r'<n:[^>]+>',' ',block['text']).split()]
+    source=[key(w['text'])for w in local]
+    alignment=SequenceMatcher(None,source,model,autojunk=False)
+    if sum(n for _,_,n in alignment.get_matching_blocks())<6:return []
+    known={_source_instance(w)for w in local};result=[]
+    for kind,a,z,b,y in alignment.get_opcodes():
+        divided=(kind=='replace' and z-a==y-b==1 and source[a]
+            and len(model[b])>len(source[a]) and model[b].endswith(source[a]))
+        if (kind!='insert' and not divided) or a==0 or not 1<=y-b<=20:continue
+        anchor=model[max(0,b-3):b]
+        if len(anchor)<3 or sum(model[i:i+3]==anchor for i in range(len(model)-2))!=1:continue
+        left=local[a-1]['bbox'];height=left[3]-left[1]
+        if height<=0:continue
+        middle=(left[1]+left[3])/2
+        next_box=local[a]['bbox']if a<len(local)else None
+        same_next=next_box is not None and abs((next_box[1]+next_box[3])/2-middle)<=.5*height
+        following=[]
+        for word in pixels:
+            box=word['bbox'];x=(box[0]+box[2])/2;y0=(box[1]+box[3])/2
+            if (_source_instance(word)in known or box[0]<left[2]-.1*height
+                    or abs(y0-middle)>.5*height or not .5*height<=box[3]-box[1]<=1.8*height
+                    or same_next and box[2]>next_box[0]+.1*height):continue
+            claim=(regions or {}).get('_instances',{}).get(_source_instance(word))
+            if claim is not None and claim!=block['id']:continue
+            if any(other['id']!=block['id']and any(r[0]<=x<=r[2]and r[1]<=y0<=r[3]
+                   for r in (regions or {}).get(other['id'],[block_rect(other,display)]))
+                   for other in answer['blocks']):continue
+            following.append(word)
+        following.sort(key=lambda w:w['bbox'][0]);selected=following[:y-b]
+        if divided:
+            # A clipped row-ending prefix and the owned next-row tail are one
+            # source occurrence only when their printed division and unique
+            # anchors prove it. This extends geometry, never spelling proof.
+            if (source[max(0,a-3):a]!=anchor or next_box is None
+                    or not .5*height<(next_box[1]+next_box[3])/2-middle<=2.5*height
+                    or next_box[0]>=left[0] or len(selected)!=1):continue
+            prefix=selected[0];box=prefix['bbox']
+            # Page OCR may misread a stroke in the divided prefix. A unique
+            # co-located source occurrence can still locate that same ink; the
+            # enlarged upright crop must subsequently prove its letters.
+            from .pixel_adjudication import _complete_word_occurrence
+            mapped_prefix=[w for w in source_words
+                if w['text'].rstrip().endswith(('-', '­', '‐'))
+                and key(w['text'])+source[a]==model[b]
+                and _complete_word_occurrence(w,prefix)]
+            if (not prefix['text'].rstrip().endswith(('-', '­', '‐'))
+                    or key(prefix['text'])+source[a]!=model[b] and len(mapped_prefix)!=1
+                    or box[0]-left[2]>2*height):continue
+            tail_middle=(next_box[1]+next_box[3])/2
+            if any(next_box[0]-.5*height<=(w['bbox'][0]+w['bbox'][2])/2<=box[2]+.5*height
+                   and middle+.5*height<(w['bbox'][1]+w['bbox'][3])/2<tail_middle-.3*height
+                   for w in pixels):continue
+            result.append(prefix);known.add(_source_instance(prefix))
+            continue
+        # A bad rectangle may end before the final printed row altogether.
+        # Three unique preceding source/model anchors and an exact next-row
+        # prefix locate that same ending; neither a distant word nor a foreign
+        # owner can enlarge the territory. It still earns no spelling proof.
+        if (len(selected)!=y-b and a==len(local) and y==len(model)
+                and source[max(0,a-3):a]==anchor
+                and sum(source[i:i+3]==anchor for i in range(len(source)-2))==1):
+            prefix=list(selected)if all(key(w['text'])==expected for w,expected in zip(selected,model[b:y]))else[]
+            if prefix and (prefix[0]['bbox'][0]-left[2]>2*height
+                    or any(right['bbox'][0]-left_word['bbox'][2]>2*height for left_word,right in zip(prefix,prefix[1:]))):prefix=[]
+            territory=[r for r in (regions or {}).get(block['id'],[])
+                if r[0]<=sum(left[::2])/2<=r[2] and r[1]<=middle<=r[3]]
+            if territory and (not selected or prefix):
+                lo=min(r[0]for r in territory);hi=max(r[2]for r in territory)
+                below=[w for w in pixels if lo-.5*height<=(w['bbox'][0]+w['bbox'][2])/2<=hi+.5*height
+                    and middle+.5*height<(w['bbox'][1]+w['bbox'][3])/2<=middle+2.5*height
+                    and .5*height<=w['bbox'][3]-w['bbox'][1]<=1.8*height]
+                rows=_pixel_lines(below)
+                if rows:
+                    first=sorted(rows[0],key=lambda w:w['bbox'][0]);candidate=first[:y-b-len(prefix)]
+                    def available(word):
+                        r=word['bbox'];x=(r[0]+r[2])/2;cy=(r[1]+r[3])/2
+                        return (_source_instance(word)not in known
+                            and (regions or {}).get('_instances',{}).get(_source_instance(word),block['id'])==block['id']
+                            and not any(other['id']!=block['id']and any(v[0]<=x<=v[2]and v[1]<=cy<=v[3]
+                                for v in (regions or {}).get(other['id'],[block_rect(other,display)]))for other in answer['blocks']))
+                    if len(candidate)+len(prefix)==y-b and all(available(w)for w in prefix+candidate):
+                        selected=prefix+candidate
+                        previous_box=None
+                        for word in selected:
+                            if previous_box and abs(sum(word['bbox'][1::2])-sum(previous_box[1::2]))<=height and word['bbox'][0]-previous_box[2]>2*height:break
+                            previous_box=word['bbox']
+                        else:
+                            if all(key(w['text'])==expected for w,expected in zip(selected,model[b:y])):
+                                result.extend(selected);known.update(_source_instance(w)for w in selected)
+                                continue
+                        selected=[]
+        if len(selected)!=y-b:continue
+        def located(word,expected):
+            if key(word['text'])==expected:return True
+            # An original text occurrence can locate the same printed word
+            # when page OCR spells it differently. It supplies geometry only;
+            # the widened original crop still adjudicates both readings.
+            from .pixel_adjudication import _complete_word_occurrence
+            matches=[w for w in source_words if key(w['text'])==expected
+                and _complete_word_occurrence(w,word)]
+            return len(matches)==1
+        if not all(located(w,expected)for w,expected in zip(selected,model[b:y])):continue
+        previous=left
+        for word in selected:
+            if word['bbox'][0]-previous[2]>2*height:break
+            previous=word['bbox']
+        else:
+            result.extend(selected);known.update(_source_instance(w)for w in selected)
+    for word in _complete_optical_row_openings(block,answer,pixels,display,regions,local):
+        if _source_instance(word)not in known:
+            result.append(word);known.add(_source_instance(word))
+    return result
+
+
+def _complete_closing_mark_territory(block,answer,words,pixel_words,display,regions,local):
+    """Include one adjacent, independently recognized closing mark in its word."""
+    if not local or not pixel_words:return None
+    from . import pixel_adjudication
+    model=[t for t in block['text'].split()if not t.startswith('<n:')]
+    if not model or model[-1][-1:]not in ('"','”','’'):return None
+    last=_pixel_line_order(local)[-1]
+    existing={_source_instance(w)for w in local};found=[]
+    for word in words:
+        if (_source_instance(word)in existing or not word['text']
+                or not all(c in '"”’'for c in word['text'])):continue
+        joined=pixel_adjudication._terminal_word_view([model[-1]],[last,word])
+        if len(joined)!=1 or pixel_adjudication._key(joined[0]['text'])!=pixel_adjudication._key(model[-1]):continue
+        box=word['bbox']
+        visible=[w for w in pixel_words
+            if pixel_adjudication._key(w['text'])==pixel_adjudication._key(word['text'])
+            and w.get('confidence',0)>=50
+            and box[0]-1<=(w['bbox'][0]+w['bbox'][2])/2<=box[2]+1
+            and box[1]-1<=(w['bbox'][1]+w['bbox'][3])/2<=box[3]+1]
+        if len(visible)!=1:continue
+        claim=(regions or {}).get('_instances',{}).get(_source_instance(word))
+        if claim is not None and claim!=block['id']:continue
+        x=(box[0]+box[2])/2;y=(box[1]+box[3])/2
+        if any(other['id']!=block['id']and any(b[0]<=x<=b[2]and b[1]<=y<=b[3]
+            for b in (regions or {}).get(other['id'],[block_rect(other,display)]))for other in answer['blocks']):continue
+        found.append(word)
+    return list(local)+found if len(found)==1 else None
+
+
+def _complete_native_reading_territory(block,answer,words,display,regions,body_owners,local):
+    """Restore a clipped optical territory only from complete original print."""
+    if (not local or len(local)>=len(block['text'].split()) or '<n:'in block['text']
+            or block.get('role')not in ('body','heading','caption')):return None
+    from .native_text import drawn_word_authorities,unproved_legacy_word,visible_word_ink
+    def original(items):
+        return [dict(w,bbox=list(display.source_rect(w['bbox'])*display.page.derotation_matrix),
+            **({'native_parts':[dict(p,bbox=list(display.source_rect(p['bbox'])*display.page.derotation_matrix))for p in w['native_parts']]}if 'native_parts'in w else{}))for w in items]
+    if sum(drawn_word_authorities(display.page,original(local)))<2:return None
+    proposed=dict(regions or {});proposed[block['id']]=[block_rect(block,display)]
+    candidate=_native_lexical_view(display,_owned_block_words(block,answer,words,display,
+        proposed,body_owners,ordered=True))
+    tokens=block['text'].split()
+    if not len(local)<len(candidate)==len(tokens):return None
+    keys=[_source_instance(w)for w in candidate]
+    if len(set(keys))!=len(keys):return None
+    positions={key:i for i,key in enumerate(keys)}
+    prior=[positions.get(_source_instance(w),-1)for w in local]
+    if -1 in prior or prior!=sorted(set(prior)):return None
+    raw=original(candidate);known=drawn_word_authorities(display.page,raw);matched=0;changed=0
+    for word,token,proved,physical in zip(candidate,tokens,known,raw):
+        if proved:
+            if vision_reading.normalized(word['text'])==vision_reading.normalized(token):matched+=1
+            else:changed+=1
+        elif not(unproved_legacy_word(display.page,physical)and visible_word_ink(display.page,[physical])[0]):
+            return None
+    # One reader error can be adjudicated from mapped print only in a complete
+    # occurrence with six unchanged words; a reworded passage earns no binding.
+    if changed>1 or changed and matched<6:return None
+    return candidate
+
+
+def _remove_foreign_word_runs(result,bid,answer,optical,regions):
+    """Remove a borrowed run only at a proved own-to-foreign source boundary.
+
+    Recovery can reserve the rest of a printed row as a new unit. A model's
+    unbound continuation must not publish those same occurrences again. Equal
+    words elsewhere, absent geometry and isolated unplaced words prove no copy.
+    """
+    if not regions or not optical:return
+    from .pixel_adjudication import _complete_word_occurrence, _key
+    tokens=result['tokens'];boxes=result['boxes'];removed=set();runs=[]
+    start=0
+    while start<len(tokens):
+        if start in boxes or tokens[start].startswith('<n:'):
+            start+=1;continue
+        end=start+1
+        while end<len(tokens)and end not in boxes and not tokens[end].startswith('<n:'):end+=1
+        if end-start>=2 and start>0 and start-1 in boxes:
+            literal=[_key(t)for t in tokens[start:end]];matches=[]
+            for offset in range(1,len(optical)-len(literal)+1):
+                prior=optical[offset-1]
+                if (_key(prior['text'])!=_key(tokens[start-1])
+                        or not _complete_word_occurrence(prior,dict(bbox=boxes[start-1]))):continue
+                words=optical[offset:offset+len(literal)]
+                if [_key(w['text'])for w in words]!=literal:continue
+                owners=[]
+                for word in words:
+                    own=regions.get('_instances',{}).get(_source_instance(word))
+                    if own is None:
+                        candidates=[b['id']for b in answer['blocks']if b['id']!=bid
+                            and any(owned_words([word],r)for r in regions.get(b['id'],[]))]
+                        own=candidates[0]if len(candidates)==1 else None
+                    owners.append(own)
+                if owners and len(set(owners))==1 and owners[0] not in (None,bid):
+                    matches.append((words,owners[0]))
+            if len(matches)==1:
+                words,owner=matches[0];removed.update(range(start,end))
+                runs.append(dict(indices=list(range(start,end)),words=tokens[start:end],owner=owner,
+                    source_boxes=[w['bbox']for w in words]))
+        start=end
+    if not removed:return
+    mapping={old:new for new,old in enumerate(i for i in range(len(tokens))if i not in removed)}
+    result['tokens']=[t for i,t in enumerate(tokens)if i not in removed]
+    for key in ('boxes','word_notes'):
+        result[key]={mapping[i]:v for i,v in result.get(key,{}).items()if i in mapping}
+    result['marked']={mapping[i]for i in result['marked']if i in mapping}
+    result['verified_unchanged']=[mapping[i]for i in result.get('verified_unchanged',[])if i in mapping]
+    result.setdefault('guard',[]).append(dict(kind='foreign_owned_run_published_once',runs=runs))
+
+
+def _present_print_only_images(text,display,pno,bid,territories,package,images,extras):
+    """Declined word previews keep their own print at block scale.
+
+    Move existing images and their reciprocal controls only. Combining their
+    rectangles would blur independent occurrence ownership, add a duplicate
+    disclosure, and could reintroduce unrelated ink between the source parts.
+    """
+    flags=[m.span()for m in re.finditer(r'<span class="reflow-flagged-reading">.*?</a></span>',text,re.S)]
+    pattern=re.compile(r'<a class="source-word-image"[^>]*href="#([^"]+)"[^>]*><img src="([^"]+)"[^>]*/></a>'
+        r'(?P<retained>(?:<a\b[^>]*class="noteref"[^>]*>.*?</a>)?)'
+        r'(?P<closing>(?:\s*</(?:sup|sub|em|strong|i|b|span)>\s*)*)'
+        r'(?P<actions>(?:\s*<a id="[^"]+" class="source-disclosure-ref" epub:type="noteref" href="#[^"]+"><sup>†</sup></a>)+)')
+    candidates=[m for m in pattern.finditer(text)if not any(a<=m.start()<b for a,b in flags)]
+    selected=[m for m in candidates if images.get(m[2],{}).get('kind')!='inline_print_preview']
+    offsets={m.start()for m in selected};compact={m.start()for m in candidates}-offsets
+    def replace(match):
+        if match.start()in offsets:return match['retained']+match['closing']
+        if match.start()in compact:
+            core=match[0][:match.start('retained')-match.start()]
+            return ('<span class="reflow-print-control">'+core+match['retained']+match['actions']
+                +'</span>'+match['closing'])
+        return match[0]
+    text=pattern.sub(replace,text)
+    if not selected:return text,''
+    prints=[]
+    for match in selected:
+        # A multirow inspection has no credible one-line em metrics. Its
+        # original resource and masked source parts stay untouched.
+        core=match[0][:match.start('retained')-match.start()]
+        original=re.sub(r' style="[^"]*"','',core)+match['actions']
+        prints.append('<span class="reflow-print-control">'+original+'</span>')
+    return text,'<div class="reflow-unit-print">'+'<br/>'.join(prints)+'</div>'
+
+
+def _present_flagged_prints(text,display,pno,bid,territories,package,images,extras,*,evidence_words=None,heading=False,protected_inspections=()):
+    """Declined word previews and dense assistance use one legible unit print.
+
+    An inspection asset may be a complete page or several physical rows. It
+    never supplies inline word metrics. The live hypotheses remain underlined;
+    their shared print follows the paragraph, without duplicating every phrase.
+    """
+    text,print_only_html=_present_print_only_images(text,display,pno,bid,territories,package,images,extras)
+    pattern=re.compile(r'<span class="reflow-flagged-reading"><span class="reflow-plausible">(.*?)</span>'
+        r'<a class="source-word-image"(?: title="Inspect original print")? href="#([^"]+)"><img src="([^"]+)"[^>]*?/></a></span>',re.S)
+    matches=list(pattern.finditer(text))
+    if not matches:return text,print_only_html
+    from . import inline_print
+    from html import unescape
+    plain=lambda value:unescape(re.sub(r'<[^>]+>',' ',value))
+    lex=lambda value:re.findall(r"[^\W_]+(?:['’\-][^\W_]+)*",plain(value),re.UNICODE)
+    def record_presentation(src,record):
+        # Encoded whole-page evidence is shared by its physical owner. A new
+        # presentation of those bytes must not replace the admitted source
+        # receipt's kind or coverage with optional-preview metadata.
+        canonical=getattr(package,'aliases',{}).get(src,src)
+        if canonical!=src and canonical in images:
+            images[canonical].setdefault('presentation_uses',[]).append(record)
+        else:images[src]=record
+    def context_image(src,bounds,record):
+        for existing,admitted in images.items():
+            box=admitted.get('bbox',[])
+            if (admitted.get('page')==pno and len(box)==4 and
+                    all(abs(a-b)<.01 for a,b in zip(box,bounds)) and
+                    admitted.get('kind')in ('vision_disclosure','unit_source_reference',
+                        'located_inspection_context','flagged_unit_preview') and
+                    not admitted.get('source_parts')):
+                admitted.setdefault('presentation_uses',[]).append(record)
+                return existing
+        _word_disclosure_image(package,src,display,bounds)
+        record_presentation(src,record)
+        return src
+    placed=inline_print.locate_context(plain(text),evidence_words or [],display.rect)
+    replacements=[]
+    inspections={};scopes={}
+    for match in matches:
+        start=len(lex(text[:match.start()]));count=len(lex(match[1]))
+        own=[placed['word_boxes'].get(i)for i in range(start,start+count)]
+        scopes.setdefault(match[2],[]).append(vision_reading.union(own)if own and all(own)else None)
+    initial_flagged=sum(len(lex(m[1]))for m in matches)
+    initial_dense=len(matches)>=2 and initial_flagged>=max(8,.25*len(lex(text)))
+    for match in matches:
+        start=len(lex(text[:match.start()]));count=len(lex(match[1]))
+        boxes=[placed['word_boxes'].get(i)for i in range(start,start+count)]
+        own=bool(boxes)and all(boxes)
+        bounds=vision_reading.union(boxes)if own else None
+        asset=images.get(match[3],{})
+        # Tapping the evidence must not lead back to the stale crop which
+        # prompted this re-placement. Unplaced words retain complete context,
+        # explicitly identified as context rather than a word identification.
+        target_scopes=scopes[match[2]]
+        inspection_placed=all(target_scopes)
+        inspection_bounds=vision_reading.union(target_scopes)if inspection_placed else placed['bbox']
+        if match[2]not in inspections:
+            original_src=asset.get('inspection_image',match[3])
+            original=images.get(original_src,{})
+            previous=original.get('bbox',[])
+            # Existing correct padded inspections remain immutable and avoid
+            # duplicate encoded assets. Only a changed occurrence is re-cut.
+            same=(len(previous)==4 and inspection_placed and
+                all(abs(a-b)<=3 for a,b in zip(previous,inspection_bounds)))
+            inspection=original_src if same else f'images/{match[2]}-located-context.jpg'
+            if not same:
+                inspection=context_image(inspection,inspection_bounds,dict(page=pno,block=bid,bbox=inspection_bounds,
+                    kind='located_inspection_context'if inspection_placed else'flagged_unit_preview',
+                    presentation_role='located_inspection_context',coverage_eligible=False,
+                    placement_method=placed['method'],unplaced_context=not inspection_placed))
+            inspections[match[2]]=inspection
+            for index,aside in enumerate(extras):
+                # A factory fragment can contain several sibling notes. Scope
+                # the replacement to this exact aside; changing every image in
+                # the fragment would detach another note's source receipt.
+                scoped=re.compile(r'(<aside\b[^>]*\bid="'+re.escape(match[2])+r'"[^>]*>)(.*?)(</aside>)',re.S)
+                def replace_inspection(found):
+                    if match[2]in protected_inspections:
+                        # A neighboring typed reference may share the complete
+                        # original span. Keep its admitted image and add the
+                        # separately located word context; neither proof is
+                        # allowed to erase the other's printed occurrence.
+                        inner=found[2]
+                        if not same:
+                            context='<p>Located reading context:</p><img src="'+inspection+'" alt="Located original reading"/>'
+                            if inspection_placed:
+                                at=inner.find('<img')
+                                inner=inner[:at]+context+'<p>Original context for the adjoining reference:</p>'+inner[at:]
+                            else:
+                                # Unplaced whole-page context is supplemental;
+                                # keep the admitted reference receipt first.
+                                at=inner.rfind('<a ')
+                                if at<0:at=len(inner)
+                                inner=inner[:at]+context+inner[at:]
+                    else:
+                        inner=re.sub(r'(<img\b[^>]*\bsrc=")[^"]+("[^>]*>)',
+                            lambda m:m[1]+inspection+m[2],found[2])
+                    if not inspection_placed:
+                        inner=inner.replace('<p>','<p>Word placement is not proved; compare the complete source context. ',1)
+                    return found[1]+inner+found[3]
+                extras[index]=scoped.sub(replace_inspection,aside)
+        # A clean-looking crop is still unsafe when the occurrence was bound
+        # from stale rectangles. Rebuild from the source sequence's own slot.
+        if initial_dense:continue
+        preview=(inline_print.preview(display,bounds)
+                 if own and not heading and count<=6 else None)
+        preview=inline_print.readable_preview(preview,plain(match[1]))
+        if preview is None:
+            if asset.get('kind')=='inline_print_preview':
+                images[match[3]]=dict(asset,kind='unplaced_word_preview')
+            continue
+        data,metrics=preview;src=match[3].rsplit('.',1)[0]+'-placed.png'
+        # Optional previews are never source-coverage proofs. The original
+        # inspection receipt remains separate and reciprocal.
+        if hasattr(package,'image'):
+            if src not in images:package.image(src,data)
+            images[src]=dict(asset,kind='inline_print_preview',coverage_eligible=False,**metrics,
+                placement_method=placed['method'])
+            replacement=re.sub(r' style="[^"]*"',' style="'+metrics['style']+'"',match[0].replace(match[3],src))
+            replacements.append((match.start(),match.end(),replacement))
+    for a,z,value in reversed(replacements):text=text[:a]+value+text[z:]
+    matches=list(pattern.finditer(text))
+    refused=any(images.get(m[3],{}).get('kind')!='inline_print_preview'for m in matches)
+    flagged=sum(len(re.sub(r'<[^>]+>',' ',m[1]).split())for m in matches)
+    total=len(re.sub(r'<[^>]+>',' ',text).split())
+    dense=len(matches)>=2 and flagged>=max(8,.25*total)
+    # Only the compact evidence control is atomic, not the live reading.
+    control=re.compile(r'(<a class="source-word-image"(?: title="Inspect original print")? href="#[^"]+"><img [^>]+/></a>)(</span>)(<a id="[^"]+" class="source-disclosure-ref" epub:type="noteref" href="#[^"]+"><sup>†</sup></a>)')
+    if not(refused or dense):
+        return control.sub(r'<span class="reflow-print-control">\1\3</span>\2',text),print_only_html
+    refused_targets={m[2]for m in matches if images.get(m[3],{}).get('kind')!='inline_print_preview'}
+    selected=[m for m in matches if dense or m[2]in refused_targets]
+    targets={m[2]for m in selected}
+    last_for_target={m[2]:m.start()for m in selected}
+    def reading_link(match):
+        if match[2]not in targets:return match[0]
+        identity=' id="r-'+match[2]+'"'if match.start()==last_for_target[match[2]]else''
+        return ('<span class="reflow-flagged-reading"><span class="reflow-plausible"><a'+identity
+            +' title="Compare this reading with original print" href="#'+match[2]+'">'
+            +match[1]+'</a></span></span>')
+    text=pattern.sub(reading_link,text)
+    action=re.compile(r'<a id="([^"]+)" class="source-disclosure-ref" epub:type="noteref" href="#([^"]+)"><sup>†</sup></a>')
+    text=action.sub(lambda m:''if m[2]in targets else m[0],text)
+    ident=f'v4-d-unit-print-{pno}-{bid}';origin='r-'+ident
+    bounds=placed['bbox']
+    src=f'images/{ident}.jpg'
+    src=context_image(src,bounds,dict(page=pno,block=bid,bbox=bounds,kind='flagged_unit_preview',coverage_eligible=False,
+        reason='dense_flagged_reading'if dense else'refused_word_preview',flagged_runs=len(selected),
+        placement_method=placed['method'],unplaced_context=not bool(placed['word_boxes'])))
+    details=[]
+    for target in sorted(targets):
+        # Show the highlighted words, not a second copy of each detailed
+        # explanation. Their individual source receipts remain one click away.
+        label=' '.join(re.sub(r'<[^>]+>',' ',m[1]).strip()for m in selected if m[2]==target)
+        details.append('<li><a href="#'+target+'">'+label+'</a></li>')
+    detail_links='<ul>'+''.join(details)+'</ul>'
+    extras.append(f'<aside id="{ident}" class="footnote vision-disclosure" data-reflow-owner-page="{pno}" data-reflow-owner-block="{escape(bid,quote=True)}" epub:type="footnote"><p>Underlined readings are plausible, not independently proved. This original print is shared by the unit.</p><img src="{src}" alt="Original printed reading"/>{detail_links}<a href="#{origin}">Return</a></aside>')
+    supplement=(f'<div class="reflow-unit-print"><a id="{origin}" class="source-disclosure-ref" epub:type="noteref" href="#{ident}">'
+        f'<img src="{src}" alt=""/><sup>†</sup></a></div>')
+    text=control.sub(r'<span class="reflow-print-control">\1\3</span>\2',text)
+    return text,print_only_html+('' if heading else supplement)
+
+
+def _coalesce_inline_source_images(pieces,display,pno,bid,package,images):
+    """Publish overlapping adjacent ink once, with all inspection links intact.
+
+    Padding is useful for inspection, but two neighboring digit/glyph crops can
+    repeat the same printed strokes when inserted side by side. One original
+    span preserves that ink and its actual spacing without clipping either word.
+    Separate rows, columns and intervening live words never form a group.
+    """
+    pattern=re.compile(r'<a\b[^>]*class="source-word-image"[^>]*>\s*<img\b[^>]*src="([^"]+)"[^>]*/>\s*</a>')
+    groups=[]
+    for index,piece in enumerate(pieces):
+        # Appended print accompanies live words and may share a broad receipt
+        # with another run. It is not a repeated print-only word to coalesce.
+        if 'class="reflow-flagged-reading"' in piece:
+            groups.append([]);continue
+        match=pattern.search(piece)
+        image=images.get(match[1])if match else None
+        if not image or not image.get('bbox')or image.get('source_parts'):
+            groups.append([]);continue
+        original=images.get(image.get('inspection_image'),image)
+        if original.get('source_parts'):
+            groups.append([]);continue
+        box=original['bbox'];entry=(index,match,box)
+        previous=groups[-1][-1]if groups and groups[-1]else None
+        if previous:
+            other=previous[2]
+            same_row=min(other[3],box[3])-max(other[1],box[1])>=.5*min(other[3]-other[1],box[3]-box[1])
+            overlap=min(other[2],box[2])-max(other[0],box[0])
+            if same_row and overlap>.1*min(other[2]-other[0],box[2]-box[0]):
+                # Intersecting inspection padding is not duplicated print.
+                # Require actual strokes in the shared strip; two separate
+                # letters with blank space between them keep separate images.
+                shared=extract.pymupdf.Rect(max(other[0],box[0]),max(other[1],box[1]),
+                    min(other[2],box[2]),min(other[3],box[3]))
+                pix=display.pixmap(shared,scale=3,gray=True,max_pixels=100_000)
+                samples=pix.samples
+                if samples and max(samples)-min(samples)>40:
+                    groups[-1].append(entry);continue
+        groups.append([entry])
+    for group in groups:
+        if len(group)<2:continue
+        box=vision_reading.union([entry[2]for entry in group])
+        src=f'images/v4-word-span-{pno}-{bid}-{group[0][0]}-{group[-1][0]}.jpg'
+        _word_disclosure_image(package,src,display,extract.pymupdf.Rect(box))
+        images[src]=dict(page=pno,bbox=list(box),kind='vision_disclosure',
+            source_word_indices=[index for index,_,_ in group],method='overlapping_inline_ink_once')
+        from . import inline_print
+        preview=inline_print.preview(display,box)if hasattr(package,'image')else None
+        inline_src=src;style='height:1.4em;vertical-align:-0.25em;width:auto'
+        if preview is not None:
+            data,metrics=preview;inline_src=src[:-4]+'-inline.png'
+            package.image(inline_src,data)
+            images[inline_src]=dict(page=pno,kind='inline_print_preview',coverage_eligible=False,
+                inspection_image=src,**metrics)
+            style=metrics['style']
+        for offset,(index,match,_)in enumerate(group):
+            replacement=match[0].replace(match[1],inline_src)if offset==0 else ''
+            if replacement:
+                replacement=re.sub(r' style="[^"]*"',' style="'+style+'"',replacement)
+            pieces[index]=pieces[index][:match.start()]+replacement+pieces[index][match.end():]
+
+
+def _word_disclosure_image(package,name,display,clip,parts=None):
+    if not parts:
+        if hasattr(package,'disclosure_image'):package.disclosure_image(name,display,clip)
+        else:package.image(name,display.jpeg(clip,scale=3,quality=90))
+        return
+    # A decorative initial spans several rows. Preserve only its own glyphs
+    # and word suffix, not unrelated ink inside their enclosing rectangle.
+    import io,math
+    from PIL import Image
+    original=Image.open(io.BytesIO(display.jpeg(clip,scale=3,quality=90))).convert('RGB')
+    kept=Image.new('RGB',original.size,'white')
+    for part in parts:
+        box=part['bbox']if isinstance(part,dict)else part
+        sx=original.width/clip.width;sy=original.height/clip.height
+        region=(max(0,math.floor((box[0]-clip.x0)*sx)),max(0,math.floor((box[1]-clip.y0)*sy)),
+                min(original.width,math.ceil((box[2]-clip.x0)*sx)),min(original.height,math.ceil((box[3]-clip.y0)*sy)))
+        kept.paste(original.crop(region),region)
+    encoded=io.BytesIO();kept.save(encoded,format='JPEG',quality=90)
+    if len(encoded.getvalue())>2*1024*1024:raise extract.RasterTooLarge('compound word exceeds encoded-byte bound')
+    package.image(name,encoded.getvalue())
+
+
 def _owned_block_words(block,answer,items,display,regions=None,body_owners=None,ordered=False):
     """Use one source-ownership rule for publication and boundary inference."""
     territories=(regions or {}).get(block['id'],[block_rect(block,display)])
@@ -357,17 +1324,39 @@ def _owned_block_words(block,answer,items,display,regions=None,body_owners=None,
         x=(word['bbox'][0]+word['bbox'][2])/2
         y=(word['bbox'][1]+word['bbox'][3])/2
         return box[0]<=x<=box[2] and box[1]<=y<=box[3]
-    seen=set();result=[]
+    seen=set();result=[];ordered_groups=[];pending_additions=[]
+    def adjacent_groups(local,height):
+        return [group for _,group in ordered_groups if any(
+            abs((w['bbox'][1]+w['bbox'][3]-v['bbox'][1]-v['bbox'][3])/2)<=.5*height
+            and (-.1*height<=w['bbox'][0]-v['bbox'][2]<=2*height
+                 or -.1*height<=v['bbox'][0]-w['bbox'][2]<=2*height)
+            for w in local for v in group)]
     for territory in territories:
         local=[]
         for word in owned_words(items,territory):
+            if _source_instance(word)in(regions or {}).get('_ambiguous_instances',()):continue
+            # Rounding admission must not pull a following row into an earlier
+            # partial-row territory owned by this same block.
+            if not strictly_inside(word,territory) and any(
+                    strictly_inside(word,box) for box in territories if box is not territory):continue
             claim=(regions or {}).get('_instances',{}).get(_source_instance(word))
             if claim is not None and claim!=block['id']:continue
+            # A paragraph may wrap beside an original illustration. Its broad
+            # row envelope does not turn unclaimed diagram lettering into prose.
+            # Independently proved BODY occurrences still outrank a coarse hint.
+            if block['role']=='body' and claim!=block['id'] and any(
+                    strictly_inside(word,box) for other in answer['blocks']
+                    if other['id']!=block['id'] and other['role'] in ('figure','table')
+                    for box in (regions or {}).get(other['id'],[block_rect(other,display)])):continue
             strict=any(strictly_inside(word,box) for box in territories)
             # A final printed territory outranks its neighbour's rounding halo.
             # Strict/strict overlap retains the existing coherent-owner rule.
             if block['role']=='body' and not strict and any(
                     strictly_inside(word,box) for box in other_body_regions):continue
+            if block['role']=='footnote' and not strict and any(
+                    strictly_inside(word,box)for other in answer['blocks']
+                    if other['id']!=block['id']and other['role']=='footnote'
+                    for box in (regions or {}).get(other['id'],[block_rect(other,display)])):continue
             # Reservations locate coherent paragraphs; only their final source
             # territories can exclude ink from another published block.
             if block['role'] in ('body','caption') and any(owned_words([word],box)
@@ -379,7 +1368,55 @@ def _owned_block_words(block,answer,items,display,regions=None,body_owners=None,
                     if other['id']!=block['id'] and other['role'] in ('footnote','running_head','folio')
                     for box in (regions or {}).get(other['id'],[block_rect(other,display)])):continue
             if id(word) not in seen:local.append(word);seen.add(id(word))
-        result.extend(_pixel_line_order(local) if ordered else local)
+        if not ordered:result.extend(local)
+        elif local:
+            import statistics
+            prior=ordered_groups[-1][0] if ordered_groups else None
+            height=statistics.median(w['bbox'][3]-w['bbox'][1]for w in local)
+            additions=(regions or {}).get('_row_additions',{}).get(block['id'],())
+            if additions and any(tuple(territory)==item[1]for item in additions):
+                # Exact added row words keep the position of their neighbouring
+                # original ink. Appending their crop after later rows must not
+                # duplicate them as a second reading at the end of the unit.
+                targets=adjacent_groups(local,height)
+                if len(targets)==1:
+                    targets[0].extend(local);continue
+                # The outermost opening word may be too far away until its
+                # intervening original words have joined the same row.
+                pending_additions.append((territory,local,height));continue
+            overlap=(min(prior[2],territory[2])-max(prior[0],territory[0]) if prior else 0)
+            same_column=(prior is not None and overlap>=.5*min(prior[2]-prior[0],territory[2]-territory[0])
+                         and prior[1]<=territory[1]<=prior[3]+2*height)
+            # A raised terminal symbol can form a tiny territory before its
+            # baseline text. Join only a single physically adjacent row, so
+            # vertical sorting cannot move that glyph to the paragraph head.
+            same_row=(bool(ordered_groups) and
+                      len(_pixel_lines(ordered_groups[-1][1]+local))==1 and
+                      any(-.1*height<=w['bbox'][0]-v['bbox'][2]<=2*height or
+                          -.1*height<=v['bbox'][0]-w['bbox'][2]<=2*height
+                          for w in local for v in ordered_groups[-1][1]))
+            # Rounding can admit the last word of a split row through the first
+            # territory. Order the connected column as one occurrence inventory;
+            # a following column keeps its supplied reading-flow position.
+            if same_column or same_row:
+                ordered_groups[-1][0]=territory;ordered_groups[-1][1].extend(local)
+            else:ordered_groups.append([territory,list(local)])
+    while pending_additions:
+        remaining=[];progress=False
+        for territory,local,height in pending_additions:
+            targets=adjacent_groups(local,height)
+            if len(targets)==1:
+                targets[0].extend(local);progress=True
+            else:remaining.append((territory,local,height))
+        if not progress:
+            ordered_groups.extend([territory,list(local)]for territory,local,_ in remaining)
+            break
+        pending_additions=remaining
+    if ordered:
+        result=[]
+        for _,group in ordered_groups:
+            columns,proved=(_proved_recovery_columns(group)if block.get('role')in ('body','other')else([group],False))
+            for column in columns if proved else [_pixel_line_order(group)]:result.extend(column)
     if block['role']=='heading' and result and body_owners:
         # A run-in heading can share a physical row with the following
         # paragraph. Its broad rectangle must not let a damaged recognition
@@ -401,6 +1438,47 @@ def _owned_block_words(block,answer,items,display,regions=None,body_owners=None,
                 reserved.update(id(source[i]) for i,_ in matches)
         result=[word for word in result if id(word) not in reserved or id(word) in protected]
     return result
+
+
+
+
+def _unpartitioned_note_openings(answer,optical,display,regions,body_owners):
+    """Find still-interior symbolic openings before accepting note geometry."""
+    import statistics
+    unproved=[]
+    for block in answer['blocks']:
+        if block['role']!='footnote' or block['marker'] not in ('*','†','‡'):continue
+        owned=_owned_block_words(block,answer,optical,display,regions,body_owners,ordered=True)
+        opening=regions.get('_note_openings',{}).get(block['id'])
+        owned=_note_lexical_evidence(owned,opening)
+        if not owned:continue
+        height=max(1,statistics.median(w['bbox'][3]-w['bbox'][1]for w in owned))
+        for position,word in enumerate(owned):
+            if not position or word['text'] not in {block['marker'],'+'}:continue
+            if not any(re.search(r'\w',w['text'])for w in owned[:position]):continue
+            box=word['bbox'];middle=sum(box[1::2])/2
+            row=[w for w in owned if w is not word and abs(sum(w['bbox'][1::2])/2-middle)<=height*.55]
+            following=[w for w in row if 0<=w['bbox'][0]-box[2]<=4*height]
+            preceding=[w for w in row if 0<=box[0]-w['bbox'][2]<=4*height]
+            if following and not preceding:
+                unproved.append(dict(block=block['id'],source_bbox=list(box)))
+    return unproved
+
+
+def _note_lexical_evidence(items, opening):
+    """Exclude one bound label occurrence, without asserting its identity."""
+    if not opening:return items
+    expected=(opening['observed_text'],tuple(opening['source_bbox']))
+    if any(_source_instance(word)==expected for word in items):
+        return [word for word in items if _source_instance(word)!=expected]
+    box=opening['source_bbox']
+    def same_glyph(word):
+        slot=word['bbox'];width=min(box[2]-box[0],slot[2]-slot[0]);height=min(box[3]-box[1],slot[3]-slot[1])
+        return (min(box[2],slot[2])-max(box[0],slot[0])>=width*.7
+            and min(box[3],slot[3])-max(box[1],slot[1])>=height*.5
+            and max(box[2]-box[0],slot[2]-slot[0])<=3*max(.01,width))
+    matches=[word for word in items if same_glyph(word)]
+    return [word for word in items if word is not matches[0]]if len(matches)==1 else items
 
 
 def _printed_wraps(tokens,optical):
@@ -824,7 +1902,8 @@ def _figure_source_context(display,pno,bid,package,image_records,source=None):
     src=source or f'images/{ident}.jpg'
     if source is None:
         writer=getattr(package,'source_image',package.image)
-        writer(src,display.roi_jpeg(display.rect,scale=2,quality=90))
+        writer(src,package.evidence_jpeg(display,display.rect) if hasattr(package,'evidence_jpeg')
+            else display.roi_jpeg(display.rect,scale=2,quality=90))
     image_records[src]=dict(page=pno,bbox=list(display.rect),kind='figure_source_reference')
     figure=(f'<figure><a id="{escape(ref,quote=True)}" class="source-disclosure-ref" '
         f'epub:type="noteref" href="#{escape(ident,quote=True)}">View figure in original page</a></figure>')
@@ -892,7 +1971,8 @@ def _recover_native_figures(unavailable,html_native,book,doc,package,images,evid
                 if len(matches)==1:
                     box=list(display.reading_rect(objects[index]['bbox']))
                     retained=f'images/v4-native-source-atom-{pno}-{index}.jpg'
-                    package.image(retained,display.roi_jpeg(box,scale=2,quality=90))
+                    package.image(retained,package.evidence_jpeg(display,box) if hasattr(package,'evidence_jpeg')
+                        else display.roi_jpeg(box,scale=2,quality=90))
                     images[retained]=dict(page=pno,bbox=box,kind='native_source_raster_reference')
                     updated,count=re.subn(carrier,lambda m:m.group(0).replace(src,retained)+figure,
                         html_native[pno])
@@ -965,6 +2045,47 @@ def _source_header_ownership(scans):
                 source_rule_bbox=candidate['rule'],support_pages=support))
 
 
+def _corroborate_note_prefix(display,prefixes,label,cache):
+    """Read the complete original label before treating an OCR fragment as a veto."""
+    if not re.fullmatch(r'\d{1,4}',label):return None
+    from . import pixel_adjudication as pa
+    bounds=vision_reading.union([w['bbox']for w in prefixes])
+    if not (0<bounds[2]-bounds[0]<=80 and 0<bounds[3]-bounds[1]<=40):return None
+    occurrence=dict(bbox=bounds)
+    normalize=lambda text:re.sub(r'^[\s([.]+|[\s).\]]+$','',text)
+    from . import native_text
+    native=[dict(text=w[4],bbox=list(w[:4]))for w in display.page.get_text('words')]
+    candidates=[]
+    for word,proved in zip(native,native_text.drawn_word_authorities(display.page,native)):
+        box=list(display.reading_rect(word['bbox']))
+        # A smaller native fragment is not proof of the complete printed label.
+        overlap=max(0,min(box[2],bounds[2])-max(box[0],bounds[0]))
+        if (proved and overlap>=(bounds[2]-bounds[0])*.8
+                and pa._complete_word_occurrence(occurrence,dict(bbox=box))):
+            candidates.append(dict(text=word['text'],bbox=box))
+    if candidates:
+        if len(candidates)!=1 or normalize(candidates[0]['text'])!=label:return None
+        return dict(label=label,original_readings=[w['text']for w in prefixes],
+            source_bbox=list(bounds),method='visible_native_note_prefix')
+    if cache is None:return None
+    witness=pa.read_crop(display,[bounds],cache)
+    def owned(view,confidence):
+        words=[w for w in view if pa._complete_word_occurrence(occurrence,w)]
+        return (words[0]if len(words)==1 and words[0].get('confidence',0)>=confidence
+                and normalize(words[0]['text'])==label else None)
+    primary=owned(witness,85)
+    alternatives=getattr(witness,'alternates',None)
+    if primary is None or alternatives is None:return None
+    views=alternatives()[:2]
+    if len(views)!=2:return None
+    secondary=[owned(view,90)for view in views]
+    if not all(secondary):return None
+    return dict(label=label,original_readings=[w['text']for w in prefixes],
+        source_bbox=list(bounds),method='complete_original_note_prefix_pixel_agreement',
+        english_confidence=primary['confidence'],
+        latin_confidences=[w['confidence']for w in secondary])
+
+
 def _note_ownership(scans):
     """Establish note continuations and marginal furniture across selected pages.
 
@@ -975,20 +2096,25 @@ def _note_ownership(scans):
     import statistics
     _source_header_ownership(scans)
     repeated={};owners={};last=None;last_note=None;previous_pno=None;section=False;note_size=None;previous_body_size=None
+    controller=unit_recovery.current()
+    def selected_blocks(n,s):
+        blocked=controller.blocked(n) if controller else {}
+        return [b for b in s['answer']['blocks']
+                if not (b['role']=='footnote' and b['id'] in blocked)]
     def ink_size(s,roles):
-        heights=[w['bbox'][3]-w['bbox'][1] for b in s['answer']['blocks'] if b['role'] in roles
+        heights=[w['bbox'][3]-w['bbox'][1] for b in selected_blocks(n,s) if b['role'] in roles
                  for w in _owned_block_words(b,s['answer'],s['optical'],s['display'],s['regions'],ordered=True)
                  if re.search(r'[A-Za-z]',w['text'])]
         return statistics.median(heights) if heights else None
     for n,s in scans.items():
         with unit_recovery.guard(n,'note_ownership'):
-            for b in s['answer']['blocks']:
+            for b in selected_blocks(n,s):
                 box=block_rect(b,s['display']);text=re.sub(r'\W+',' ',b['text']).strip().casefold()
                 if text and len(text.split())<=12 and (box[1]<s['display'].rect.height*.13 or box[1]>s['display'].rect.height*.88):
                     repeated.setdefault(text,set()).add(n)
     for n,s in scans.items():
         with unit_recovery.guard(n,'note_ownership'):
-            blocks=s['answer']['blocks'];r=s['display'].rect
+            blocks=selected_blocks(n,s);r=s['display'].rect
             if previous_pno is None or n!=previous_pno+1:
                 last=None;last_note=None;section=False;note_size=None;previous_body_size=None
             footer=last_note if last_note and last_note[0]==n-1 else None
@@ -1090,7 +2216,7 @@ def _note_ownership(scans):
     catalogue={};labels={}
     for n,s in scans.items():
         with unit_recovery.guard(n,'note_ownership'):
-            for b in s['answer']['blocks']:
+            for b in selected_blocks(n,s):
                 if b['role']!='footnote':continue
                 key=(n,b['id']);owner=owners.get(key,key)
                 label=re.sub(r'^[\s(.]+|[\s).]+$','',b['marker'])
@@ -1108,7 +2234,10 @@ def _note_ownership(scans):
                                 and abs((w['bbox'][1]+w['bbox'][3]-box[1]-box[3])/2)<height*.55
                                 and (w is first or 0<=box[0]-w['bbox'][2]<3*height)]
                             if any(re.sub(r'^[\s([.]+|[\s).\]]+$','',w['text'])!=label for w in prefixes):
-                                raise ValueError('Selected note marker disagrees with its printed source prefix')
+                                proof=_corroborate_note_prefix(s['display'],prefixes,label,s.get('pixel_cache'))
+                                if proof is None:
+                                    raise ValueError('Selected note marker disagrees with its printed source prefix')
+                                s.setdefault('source_note_marker_verifications',{})[b['id']]=dict(proof,block=b['id'])
                     catalogue[owner]={'label':label or '*','target':f'v4-note-{n}-{b["id"]}'}
                     if label:labels.setdefault(label,[]).append(owner)
     return owners,catalogue,labels
@@ -1605,6 +2734,152 @@ def _original_marker_slot_components(display, lexical_box, following_box, candid
     return dict(bbox=ink,horizontal_components=len(groups))
 
 
+def _lexical_marker_view(tokens,source,proofs):
+    """Reserve proved reference occurrences without editing source inventories.
+
+    A placeholder's bounded raised slot is not an ordinary word. Identity may
+    remain uncertain: only marker-only recognizer tokens in an independently
+    anchored original slot can be reserved opaquely. Final reference rendering
+    still uses the complete original inventory and its normal verification.
+    """
+    lexical=list(tokens)
+    slots=[]
+    opaque_reasons={_MARKER_GROUP_AMBIGUOUS,
+        'original_character_optical_marker_conflict',
+        'original_character_without_independent_optical_corroboration',
+        _MARKER_GROUP_INCOMPLETE,'original_marker_verification_unusable'}
+    for index,proof in proofs.items():
+        if not (0<=index<len(tokens) and re.fullmatch(r'<n:[^>]+>',tokens[index])):continue
+        box=proof.get('source_bbox')
+        if not box or len(box)!=4 or not (box[0]<box[2] and box[1]<box[3]):continue
+        proved=(proof.get('status')=='PROVED' and
+            re.fullmatch(r'\d{1,4}|[*†‡§¶]',proof.get('label') or ''))
+        opaque=(proof.get('status')=='UNPROVED' and proof.get('reason') in opaque_reasons
+            and proof.get('anchor_before_bbox') and (proof.get('anchor_after_bbox') or
+                box[2]-box[0]<=2*max(1,proof['anchor_before_bbox'][3]-proof['anchor_before_bbox'][1])))
+        # An attached symbolic alternative and two exact lexical endpoints
+        # reserve a bounded unknown glyph for the dedicated marker verifier.
+        # English OCR must not turn that provisional reference into a word.
+        before=proof.get('anchor_before_bbox');after=proof.get('anchor_after_bbox')
+        symbol=re.search(r'([*†‡])$',tokens[index-1]) if index else None
+        symbol_value=symbol[1] if symbol else proof.get('lexical_literal_suffix')
+        if not proved and symbol_value:
+            # An unplaced literal is protected from lexical replacement too.
+            # This metadata makes no claim about its original glyph or owner.
+            proof['unplaced_literal_suffix']=symbol_value
+            proof['unplaced_literal_placeholder']=tokens[index]
+        # Keep an unplaced literal in all lexical views. Removing it only from
+        # the model makes independent OCR reintroduce the same ink as a word
+        # correction, after which restoration would print the symbol twice.
+        # Only a bounded original slot can reserve and later restore it.
+        provisional=bool(not proved and symbol_value and before and after and
+            before[2]-.5<=box[0] and box[2]<=after[0]+.5 and
+            0<box[2]-box[0]<=max(1,before[3]-before[1])*3 and
+            min(box[3],before[3],after[3])>max(box[1],before[1],after[1]))
+        if provisional:
+            proof['lexical_literal_suffix']=symbol_value
+            proof['lexical_placeholder']=tokens[index]
+            if tokens[index-1].endswith(symbol_value):lexical[index-1]=tokens[index-1][:-1]
+            opaque=True
+        if not (proved or opaque):continue
+        if index:proof['lexical_preceding_token']=lexical[index-1]
+        slots.append((proof,bool(proved)))
+        # This field is supplied only by the existing sole-instance proof.
+        # Never infer model suffix removal from a shared label alone.
+        prior=proof.get('deduplicated_literal_token')
+        if proved and prior is not None and prior==index-1 and prior>=0:
+            lexical[prior]=proof['literal_display_text']
+    # A missing occurrence binding cannot turn independently raised, marker-only
+    # ink into prose. Reserve the physical atom without assigning its identity
+    # to any placeholder. Ordinary full-height baseline numbers stay lexical.
+    raised=[]
+    if proofs:
+        for word in source:
+            if not re.fullmatch(r'[0-9*†‡§¶]+',word['text']):continue
+            if word.get('native_reference_ink'):
+                raised.append(word);continue
+            box=word['bbox'];height=max(.1,box[3]-box[1])
+            key=lambda text:re.sub(r'[^a-z]','',vision_reading.normalized(text).casefold())
+            before={key(tokens[i-1])for i in proofs if i>0}
+            symbolic=(re.fullmatch(r'[*†‡§¶]',word['text']) and any(
+                key(w['text']) in before and key(w['text']) and
+                0<=box[0]-w['bbox'][2]<=3*max(height,w['bbox'][3]-w['bbox'][1]) and
+                min(box[3],w['bbox'][3])>max(box[1],w['bbox'][1])for w in source))
+            if symbolic:
+                raised.append(word);continue
+            neighbours=[w for w in source if re.search(r'[A-Za-z]',w['text'])
+                and 0<=min(abs(w['bbox'][0]-box[2]),abs(box[0]-w['bbox'][2]))<=3*max(height,w['bbox'][3]-w['bbox'][1])
+                and w['bbox'][1]-height<=box[1]<=w['bbox'][3]]
+            if any(height<.8*(w['bbox'][3]-w['bbox'][1]) and
+                   box[3]<w['bbox'][3]-.15*(w['bbox'][3]-w['bbox'][1]) for w in neighbours):
+                raised.append(word)
+    result=[]
+    for word in source:
+        if any(word is w for w in raised):continue
+        text=word['text'];bounds=word['bbox'];replacement=text
+        for proof,proved in slots:
+            box=proof['source_bbox']
+            overlap=max(0,min(bounds[2],box[2])-max(bounds[0],box[0]))*max(0,min(bounds[3],box[3])-max(bounds[1],box[1]))
+            small=min((bounds[2]-bounds[0])*(bounds[3]-bounds[1]),(box[2]-box[0])*(box[3]-box[1]))
+            if small<=0 or overlap<small*.5:continue
+            if proved and text==proof['label']:
+                replacement='';break
+            preceding=proof.get('lexical_preceding_token')
+            if (preceding and text.startswith(preceding) and text!=preceding and
+                    re.fullmatch(r'''[0-9*†‡§¶'’`]+''',text[len(preceding):]) and
+                    box[0]>=bounds[2]-max(1,bounds[3]-bounds[1])*1.5):
+                # An independently bounded reference may be fused to the word
+                # as an apostrophe by OCR. Remove only that extra nonlexical
+                # suffix; preserve all punctuation already in the reading.
+                replacement=preceding;break
+            if not proved:
+                # An unknown identity cannot remove lexical letters or a
+                # broad cardinal token. Keep it opaque only inside its actual
+                # bounded raised original slot; numeric-role failures stay live.
+                height=max(1,proof['anchor_before_bbox'][3]-proof['anchor_before_bbox'][1])
+                marker_atom=(re.fullmatch(r'[0-9*†‡§¶]+',text) or
+                    proof.get('lexical_literal_suffix') and re.fullmatch(r'[A-Za-z+]',text))
+                if (marker_atom and
+                        box[0]-height*.5<=bounds[0] and bounds[2]<=box[2]+height*.5 and
+                        box[1]-height*.5<=bounds[1] and bounds[3]<=box[3]+height*.5):
+                    replacement='';break
+                # A symbolic suffix at this bounded slot is nonlexical even
+                # when its identity is not proved. Preserve adjacent punctuation
+                # and letters; the final marker path still discloses the glyph.
+                suffix=re.search(r'''([*†‡§¶+])([.,;:)\]”’"']*)$''',text)
+                if (suffix and re.search(r'[A-Za-z]',text[:suffix.start()]) and
+                        box[0]>=bounds[2]-max(1,bounds[3]-bounds[1])*1.5):
+                    replacement=text[:suffix.start()]+suffix[2];break
+                continue
+            suffix=re.search(re.escape(proof['label'])+r'''([.,;:)\]”’"']*)$''',text)
+            if (suffix and re.search(r'[A-Za-z]',text[:suffix.start()]) and
+                    box[0]>=bounds[2]-max(1,bounds[3]-bounds[1])*1.5):
+                replacement=text[:suffix.start()]+suffix[1];break
+        if replacement:result.append(word if replacement==text else dict(word,text=replacement))
+    from .pixel_adjudication import CropWitness
+    if isinstance(source,CropWitness):
+        result=CropWitness(result)
+        # Reserving reference ink changes the lexical view, not the independent
+        # recognizer or its failure receipt. Project lazy secondary views through
+        # the same reservations so they cannot reintroduce the reference as prose.
+        def project(views):
+            return [_lexical_marker_view(tokens,view,proofs)[1]for view in views]
+        for name in ('alternates','resampled'):
+            reader=getattr(source,name,None)
+            if reader is not None:
+                setattr(result,name,lambda reader=reader:project(reader()))
+        for name in ('word_readings','word_context_readings'):
+            reader=getattr(source,name,None)
+            if reader is not None:
+                setattr(result,name,lambda word,reader=reader:project(reader(word)))
+        # Reserving a reference changes the lexical inventory, not the
+        # original ink used to prove complete words and printed spaces.
+        for name in ('mark_absence','failure','word_scope','word_separation','model_reading',
+                     'word_gap','dash_shape','fragment_boundary','word_end_dash'):
+            if hasattr(source,name):setattr(result,name,getattr(source,name))
+    return lexical,result
+
+
 def _placeholder_display_evidence(tokens,optical,display,box,context,pno,literal=None):
     """Bind display glyphs to original slots, independently of note owners.
 
@@ -1652,7 +2927,7 @@ def _placeholder_display_evidence(tokens,optical,display,box,context,pno,literal
                 if ((same_row and b[0]>=a[0] and 0<=b[0]-a[2]<=height*4)
                         or (0<=b[1]-a[3]<=height*2 and b[0]<a[0])):
                     pairs.append((first,second))
-        proof={'status':'UNPROVED','source_bbox':list(box),'reason':'original_marker_slot_not_uniquely_bound'}
+        proof={'status':'UNPROVED','source_bbox':list(box),'reason':_MARKER_SLOT_UNBOUND}
         # An absent lexical slot provides no evidence for the printed label.
         # Keep the known note owner, but disclose its unproved body display in
         # exactly the same way as multiple candidate original slots below.
@@ -1697,13 +2972,13 @@ def _placeholder_display_evidence(tokens,optical,display,box,context,pno,literal
                 and str(unique[0].get('label') or '').isdigit()
                 and not _numeric_original_marker_role(display,a,unique[0]['bbox']))
             if numeric_role_unproved:
-                proof.update(source_bbox=list(unique[0]['bbox']),reason='numeric_original_marker_role_unproved')
+                proof.update(source_bbox=list(unique[0]['bbox']),reason=_MARKER_ROLE_UNPROVED)
             elif len(unique)==1 and complete_identity and optical_labels=={unique[0].get('label')} and re.fullmatch(r'\d{1,4}|[*†‡§¶]',unique[0].get('label') or ''):
                 c=unique[0];proof.update(status='PROVED',label=c['label'],source_bbox=list(c['bbox']),
                     method='unique_raised_original_glyph_at_exact_lexical_slot',reason=None)
             elif len(unique)>1:
                 proof.update(source_bbox=vision_reading.union([c['bbox'] for c in unique]),
-                    reason='multiple_original_glyphs_for_one_placeholder')
+                    reason=_MARKER_GROUP_AMBIGUOUS)
             else:
                 # Independent OCR can miss the glyph entirely. Original ink
                 # between two exact words supplies only a bounded verification
@@ -1722,7 +2997,7 @@ def _placeholder_display_evidence(tokens,optical,display,box,context,pno,literal
                         slot[0]=max(box[0],a[0]-.4)
                         ink=vision_pixels.ink_bounds(display,slot)
                     else:ink=list(unique[0]['bbox']) if conflict or uncorroborated else vision_pixels.ink_bounds(display,slot)
-                    if incomplete_group:proof['reason']='complete_original_marker_group_not_proved'
+                    if incomplete_group:proof['reason']=_MARKER_GROUP_INCOMPLETE
                     if conflict:proof['reason']='original_character_optical_marker_conflict';proof['optical_labels']=sorted(optical_labels)
                     elif uncorroborated:proof['reason']='original_character_without_independent_optical_corroboration'
                     proof['source_bbox']=list(ink or slot)
@@ -1766,300 +3041,1110 @@ def _placeholder_display_evidence(tokens,optical,display,box,context,pno,literal
     return answers
 
 
-def compile_page(answer,words,display,pno,package,image_records,pixel_words=None,forced_uncertain=(),regions=None,body_owners=None,note_context=None,figure_cases=None):
+class _DisclosureQualityRejection(ValueError):
+    """A known unsafe disclosure reading; other compilation errors stay strict."""
+
+
+class _CompilationQualityFailure(unit_recovery.UnitFailure):
+    """Independent rejected units from a disposable compilation attempt."""
+    def __init__(self, units):
+        units=[rejection for unit in copy.deepcopy(units)
+               for rejection in unit.get('source_failure_units',[unit])]
+        whole_pages={unit['page'] for unit in units if unit.get('block') is None}
+        owned=[];combined=set()
+        for unit in units:
+            page=unit['page']
+            if page not in whole_pages:
+                owned.append(unit);continue
+            if page in combined:continue
+            combined.add(page)
+            rejected=[item for item in units if item['page']==page]
+            reason='; '.join(dict.fromkeys(item['source_failure_reason'] for item in rejected))
+            record=dict(page=page,block=None,source_failure_reason=reason)
+            if len(rejected)>1:
+                # A required whole-page fallback also owns its failed blocks.
+                # Preserve every rejection without creating unrendered units.
+                record['source_failure_units']=rejected
+            owned.append(record)
+        reason='; '.join(dict.fromkeys(unit['source_failure_reason'] for unit in owned))
+        super().__init__(owned,'page_compilation',ValueError(reason))
+
+
+def _unproved_optical_letter_clusters(text,optical,display):
+    """Decline an optical substitution supported by repeated solid dot-like ink.
+
+    A dictionary can contain OCR noise as legitimate abbreviations. Require two
+    nearby same-baseline lettering anchors and multiple thin, wide clusters of
+    compact solid components. Real miniature letters with open interiors remain
+    eligible. This conservative pattern check does not identify characters; the
+    caller retains the affected original unit as an image instead.
+    """
+    from . import vision_pixels
+    import statistics
+    vocabulary={word.casefold() for word in re.findall(r'[^\W\d_]+',text)}
+    lexical=[word for word in optical if re.fullmatch(r'[^\W\d_]{3,}',word['text'])]
+    anchors=[word for word in lexical if word['text'].casefold() in vocabulary]
+    if len(anchors)<2:return False
+    suspect=0;measured=0
+    for word in lexical:
+        if word['text'].casefold() in vocabulary:continue
+        box=word['bbox'];height=box[3]-box[1]
+        nearby=[anchor for anchor in anchors
+            if abs(anchor['bbox'][3]-box[3])<=.45*(anchor['bbox'][3]-anchor['bbox'][1])]
+        if len(nearby)<2:continue
+        normal=statistics.median(anchor['bbox'][3]-anchor['bbox'][1] for anchor in nearby)
+        if height<=0 or height>=normal*.35 or box[2]-box[0]<=height*6:continue
+        measured+=1
+        if measured>32:return True
+        pix=display.pixmap(box,scale=6,max_pixels=200_000)
+        picture,components=vision_pixels._word_ink_components(pix)
+        if len(components)<3:continue
+        sx=(box[2]-box[0])/picture.width;sy=height/picture.height
+        pixels=picture.load()
+        def solid_component(component):
+            left,top,right,bottom=component
+            area=(right-left)*(bottom-top)
+            background={(x,y) for x in range(left,right) for y in range(top,bottom)
+                        if pixels[x,y]>=180}
+            if len(background)>area*.2:return False
+            # A real small rounded letter can have the same outside dimensions
+            # as a dot. Its enclosed white interior is independent pixel evidence
+            # against this pattern, even when most of the component is dark.
+            edge={point for point in background if point[0] in (left,right-1)
+                  or point[1] in (top,bottom-1)}
+            reached=set(edge);pending=list(edge)
+            while pending:
+                x,y=pending.pop()
+                for neighbour in ((x-1,y),(x+1,y),(x,y-1),(x,y+1)):
+                    if neighbour in background and neighbour not in reached:
+                        reached.add(neighbour);pending.append(neighbour)
+            return len(reached)==len(background)
+        if all((component[3]-component[1])*sy<normal*.35 and
+               .4<=(component[2]-component[0])*sx/max(.01,(component[3]-component[1])*sy)<=2.5
+               and solid_component(component) for component in components):
+            suspect+=1
+            if suspect>=2:return True
+    return False
+
+
+def compile_page(answer,words,display,pno,package,image_records,pixel_words=None,forced_uncertain=(),regions=None,body_owners=None,note_context=None,figure_cases=None,local_ocr=False,local_ocr_units=None):
     vision_reading.validate(answer)
-    body=[];asides=[];alignment=[];marked=0;tokens_count=0
+    if local_ocr:words=[]
+    if words:
+        regions=dict(regions or {})
+        regions['_instances']=dict(regions.get('_instances',{}))
+        regions['_ambiguous_instances']=set(regions.get('_ambiguous_instances',()))
+        _reserve_layer_instances(answer,words,display,regions)
+        if pixel_words:_reserve_layer_instances(answer,pixel_words,display,regions)
+    body=[];asides=[];alignment=[];marked=0;tokens_count=0;source_quote_suppressions={}
     footnotes={b['id']:b for b in answer['blocks'] if b['role']=='footnote'}
+    controller=unit_recovery.current()
+    unresolved_notes=set(footnotes)&set(controller.blocked(pno) if controller else {})
     refs={};extras=[];live_table_cells=[];marker_disclosures=[];marker_repairs=[];pixel_rows=_pixel_row_ids(pixel_words or [])
+    quality_failures=[];pixel_claims={};optical_fallbacks=set()
+    final_local_units=[]
+    if local_ocr:
+        source=f'images/v4-local-ocr-source-{pno}.jpg'
+        if hasattr(package,'disclosure_image'):
+            package.disclosure_image(source,display,display.rect)
+        else:
+            package.image(source,display.jpeg(display.rect,scale=2,quality=88))
+        image_records[source]=dict(page=pno,bbox=list(display.rect),kind='vision_disclosure')
+        extras.append(f'<aside id="v4-local-ocr-source-{pno}" class="footnote vision-disclosure" epub:type="footnote">'
+            '<p>Complete original page for the unverified local OCR transcription.</p>'
+            f'<img src="{source}" alt="Complete original source page"/></aside>')
     for block in answer['blocks']:
-        bid=block['id'];role=block['role'];box=block_rect(block,display)
-        territories=(regions or {}).get(bid,[box])
-        def owned(items):
-            return _owned_block_words(block,answer,items,display,regions,body_owners)
-        if role in ('running_head','folio'):
-            alignment.append(dict(id=bid,role=role,text=block['text'],bbox=box));continue
-        if role in ('figure','table'):
-            from . import vision_pixels
-            case=(figure_cases or {}).get(bid)
-            if case:
-                figure,context,src,target=_figure_source_context(display,pno,bid,package,image_records)
-                body.append(figure);extras.append(context)
-                case.update(page=pno,source_reference=target,source_image=src)
-                frame=display.provenance.get('original_frame')
-                if frame:case['original_page_index0']=frame['original_page_index0']
+        try:
+            original_model_tokens=block['text'].split()
+            # Reader emphasis is metadata, never a printed angle-bracket word.
+            # Accept only the closed formatting vocabulary, retaining all inner
+            # words and the original response in the audit record.
+            cleaned_tokens=[re.sub(r'</?(?:i|b|em|strong)>','',token) for token in original_model_tokens]
+            positions={old:new for new,old in enumerate(i for i,token in enumerate(cleaned_tokens) if token)}
+            block=dict(block,text=re.sub(r'</?(?:i|b|em|strong)>','',block['text']),
+                low_confidence=[positions[i] for i in block['low_confidence'] if i in positions])
+            bid=block['id'];role=block['role'];box=block_rect(block,display)
+            # A rejected note's validation stub owns no live words or note link.
+            # Its admitted original unit is inserted as source context below.
+            if role=='footnote' and bid in unresolved_notes:continue
+            territories=(regions or {}).get(bid,[box])
+            def owned(items):
+                return _owned_block_words(block,answer,items,display,regions,body_owners)
+            if role in ('running_head','folio'):
+                alignment.append(dict(id=bid,role=role,text=block['text'],bbox=box));continue
+            if role in ('figure','table'):
+                from . import vision_pixels
+                case=(figure_cases or {}).get(bid)
+                if case:
+                    figure,context,src,target=_figure_source_context(display,pno,bid,package,image_records)
+                    body.append(figure);extras.append(context)
+                    case.update(page=pno,source_reference=target,source_image=src)
+                    frame=display.provenance.get('original_frame')
+                    if frame:case['original_page_index0']=frame['original_page_index0']
+                    alignment.append(dict(id=bid,role=role,bbox=box,
+                        source_bound_art=role=='figure' or vision_pixels.table_rules(display,box),
+                        degraded_source_context=True,continues_previous=False,continues_next=False))
+                    continue
+                if text_quality.inspect_disclosure(block['text'])['needs_read']:
+                    raise _DisclosureQualityRejection('Unreliable image description requires original source disclosure')
+                src=f'images/vision_p{pno:04d}_{bid}.jpg'
+                package.image(src,display.jpeg(box,scale=2,quality=88))
+                image_records[src]=dict(page=pno,bbox=box,kind='figure' if role=='figure' else 'table')
+                # A generated description is not a transcription merely
+                # because it consists of dictionary words. Publish literal
+                # reading text only when this original crop proves it; otherwise
+                # the actual figure carries a neutral source label.
+                description_verified=False
+                if note_context and note_context.get('cache'):
+                    from . import pixel_adjudication
+                    description_pixels=pixel_adjudication.read_crop(display,territories,
+                        Path(note_context['cache'])/'adjudication')
+                    description_verified=bool(description_pixels) and (
+                        [pixel_adjudication._key(w['text']) for w in description_pixels]
+                        ==[pixel_adjudication._key(t) for t in block['text'].split()]
+                        and all(w.get('confidence',0)>=90 for w in description_pixels))
+                description=(block['text'] if description_verified else
+                             f'Original {role} from PDF page {pno+1}')
+                body.append(f'<figure><img src="{src}" alt="{escape(description,quote=True)}"/></figure>')
+                if role=='table':
+                    proved=_source_grid_live_text(block['text'],owned(pixel_words or words),display,box,pno,bid)
+                    if proved:
+                        html,case=proved;body[-1]+=html;live_table_cells.append(case)
+                        tokens_count+=case['source_words']
                 alignment.append(dict(id=bid,role=role,bbox=box,
-                    source_bound_art=role=='figure' or vision_pixels.table_rules(display,box),
-                    degraded_source_context=True,continues_previous=False,continues_next=False))
-                continue
-            src=f'images/vision_p{pno:04d}_{bid}.jpg'
-            package.image(src,display.jpeg(box,scale=2,quality=88))
-            image_records[src]=dict(page=pno,bbox=box,kind='figure' if role=='figure' else 'table')
-            body.append(f'<figure><img src="{src}" alt="{escape(block["text"],quote=True)}"/></figure>')
-            if role=='table':
-                proved=_source_grid_live_text(block['text'],owned(pixel_words or words),display,box,pno,bid)
-                if proved:
-                    html,case=proved;body[-1]+=html;live_table_cells.append(case)
-                    tokens_count+=case['source_words']
-            alignment.append(dict(id=bid,role=role,bbox=box,
-                source_bound_art=bool((regions or {}).get(bid)) and
-                    (role=='figure' or vision_pixels.table_rules(display,box)),
-                continues_previous=False,continues_next=False));continue
-        local=owned(words)
-        # A footnote label is preserved as a label, outside its lexical reading.
-        if role=='footnote' and local and vision_reading.normalized(local[0]['text']).strip('.')==vision_reading.normalized(block['marker']).strip('.'):
-            local=local[1:]
-        optical_evidence=owned(pixel_words) if pixel_words is not None else None
-        punctuation_proof=(_caption_punctuation_anchors(optical_evidence,
-            list(range(len(optical_evidence))),block['text'])
-            if role=='caption' and optical_evidence and (regions or {}).get(bid) else [])
-        # A complete exact optical caption proves that a long whitespace-token
-        # disagreement is punctuation segmentation, not an unrelated line.
-        # Ordinary layer disagreement marks and confidence positions remain.
-        run_limit=(max(len(local),len(block['text'].split()))+1
-                   if punctuation_proof else vision_reading.UNALIGNED_RUN)
-        result=vision_reading.align(block['text'],local,block['low_confidence'],
-            has_layer=bool(words),pixel_words=optical_evidence,run_limit=run_limit)
-        evidence_boxes=result['boxes'];wraps=set();optical_local=[]
-        if pixel_words is not None:
-            optical_local=_owned_block_words(block,answer,pixel_words,display,regions,body_owners,ordered=True)
-            if role=='footnote' and optical_local and vision_reading.normalized(optical_local[0]['text']).strip('.')==vision_reading.normalized(block['marker']).strip('.'):
-                optical_local=optical_local[1:]
-            # Check optical-only dropped lines even when a sparse original layer
-            # agrees perfectly with the model's incomplete paragraph.
-            suffix_proof=(_caption_punctuation_suffix_anchors(optical_local,
-                list(range(len(optical_local))),block['text'],box)
-                if role=='caption' and not punctuation_proof and (regions or {}).get(bid) else [])
-            guard_evidence=(_caption_segmentation_evidence(optical_local,suffix_proof,block['text'])
-                if suffix_proof else optical_local)
-            guarded=vision_reading.align(block['text'],guard_evidence,(),has_layer=True,
-                run_limit=(max(len(optical_local),len(block['text'].split()))+1
-                           if punctuation_proof else vision_reading.UNALIGNED_RUN))
-            if guarded['fallback']:
-                result=guarded
-                result['guard'].append({'kind':'independent_pixel_line_fallback'})
-            elif result['fallback'] and optical_local:
-                # The full pixel region independently corroborates this reading.
-                # An unrelated damaged layer cannot replace it with garbage.
-                result=vision_reading.align(block['text'],local,block['low_confidence'],
-                    has_layer=bool(words),run_limit=max(len(local),len(block['text'].split()))+1)
-                result['guard']=[{'kind':'damaged_layer_pixel_corroboration'}]
-            if suffix_proof and not guarded['fallback']:
-                # The proved suffix cannot certify its unproved prefix. Keep
-                # every prefix disagreement visible even on image-only pages.
-                result['marked'].update(guarded['marked'])
-            # Optical coordinates bind the disclosure to the printed reading;
-            # they do not change certainty or the chosen published words. A
-            # damaged layer can have unrelated word rectangles even when its
-            # few anchors permit a correct full-page model transcription.
-            evidence_boxes=(guarded['boxes'] if result['tokens']==guarded['tokens']
-                            else result['boxes'])
-            wraps=_printed_wraps(result['tokens'],optical_local)
-        # A block with no word overlap in a layered page needs explicit uncertainty,
-        # but cannot fall back to an empty string and delete printed content.
-        if words and not local and block['text'].strip():
-            result['marked']=set(range(len(result['tokens'])))
-            result['unmapped_block']=True
-        # One discreet reference covers each contiguous disagreement span.
-        # Every covered word remains recorded in the machine-readable alignment.
-        if bid in forced_uncertain:
-            result['marked']=set(range(len(result['tokens'])))
-            result['fallback']=True
-            result['guard'].append({'kind':'omitted_pixel_line_recovery'})
-        groups=[]
-        for index in sorted(i for i in result['marked'] if not result['tokens'][i].startswith('<n:')):
-            if groups and index==groups[-1][-1]+1:groups[-1].append(index)
-            else:groups.append([index])
-        endings={g[-1]:g for g in groups}
-        literal={};placeholder_display={}
-        if note_context and role in ('body','other','caption'):
-            note_optical=_adjacent_source_note_glyphs(optical_local,pixel_words or [])
-            source_context=dict(note_context,source_words=pixel_words)
-            args=(result['tokens'],note_optical,display,box,note_context['cache'],note_context['labels'],pno,source_context)
-            literal=(_literal_note_refs(*args,allow_omitted=True) if role=='caption'
-                     else _literal_note_refs(*args))
-            placeholder_display=_placeholder_display_evidence(result['tokens'],optical_local,display,box,note_context,pno,literal)
-        display_tokens=list(result['tokens'])
-        for proof in placeholder_display.values():
-            if 'deduplicated_literal_token' in proof and not literal.get(proof['deduplicated_literal_token']):
-                display_tokens[proof['deduplicated_literal_token']]=proof['literal_display_text']
-        pieces=[];tokens_count+=len(result['tokens'])
-        for index,token in enumerate(display_tokens):
-            marker=re.fullmatch(r'<n:([^>]+)>',token)
-            if marker:
-                nid=marker[1];ref=f'v4-ref-{pno}-{bid}-{index}'
-                owner=note_context['owners'].get((pno,nid),(pno,nid)) if note_context else (pno,nid)
-                # A literal and an adjacent placeholder can describe the same
-                # original reference. Reconcile only one proven source glyph;
-                # two distinct original glyphs keep their separate actions.
-                evidence=getattr(literal,'source_instances',{})
-                sole=getattr(literal,'sole_source_instances',set())
-                repeated=any(bound_owner==owner and
-                    re.fullmatch(r'''[.,;:)\]”’"']*''',result['tokens'][index-1][b:]) and
-                    len(evidence.get((index-1,a,b,bound_owner,label),[]))==1 and
-                    (index-1,a,b,bound_owner,label) in sole
-                    for a,b,bound_owner,label in literal.get(index-1,[]))
-                display_proof=placeholder_display.get(index,{})
-                repeated=repeated or bool(display_proof.get('deduplicated_literal_token')==index-1
-                    and any(bound_owner==owner for a,b,bound_owner,label in literal.get(index-1,[])))
-                if repeated:
-                    pieces.append('');continue
-                refs.setdefault(nid,[]).append(ref)
-                target=note_context['catalogue'][owner] if note_context else {'target':f'v4-note-{pno}-{nid}','label':footnotes[nid]['marker'] or '*'}
-                if note_context:note_context['refs'].setdefault(owner,[]).append(ref)
-                proof=placeholder_display.get(index)
-                label=proof['label'] if proof and proof['status']=='PROVED' else target['label']
-                piece=f'<a id="{ref}" class="noteref" epub:type="noteref" href="#{target["target"]}"><sup>{escape(label)}</sup></a>'
-                if proof:
-                    marker_record=dict(page=pno,block=bid,token=index,note_owner=list(owner),
-                        catalogue_label=target['label'],display_label=label,**proof)
-                    if proof['status']=='PROVED':marker_repairs.append(marker_record)
-                    else:
+                    description_pixel_verified=description_verified,
+                    source_bound_art=bool((regions or {}).get(bid)) and
+                        (role=='figure' or vision_pixels.table_rules(display,box)),
+                    continues_previous=False,continues_next=False));continue
+            # PDF emission order can place short glyph runs or italic words
+            # after later lines. Conservation compares physical occurrences in
+            # each owned territory, never that arbitrary serialization order.
+            local=_owned_block_words(block,answer,words,display,regions,body_owners,ordered=True)
+            local=_native_lexical_view(display,local,
+                re.findall(r'(?:^|\s)([^\s<>]+)\s*<n:[^>]+>',block['text']))
+            opening_proof=copy.deepcopy((regions or {}).get('_note_openings',{}).get(bid)) if role=='footnote' else None
+            local=_note_lexical_evidence(local,opening_proof)
+            # A footnote label is preserved as a label, outside its lexical reading.
+            if role=='footnote' and local and vision_reading.normalized(local[0]['text']).strip('.,:;()[]{}')==vision_reading.normalized(block['marker']).strip('.,:;()[]{}'):
+                local=local[1:]
+            optical_tail=_complete_optical_row_territory(block,answer,pixel_words,display,regions,body_owners,words)
+            if optical_tail:
+                regions=dict(regions or {})
+                territories=list(territories)+[list(w['bbox'])for w in optical_tail]
+                regions[bid]=territories
+                regions['_instances']=dict(regions.get('_instances',{}))
+                regions['_instances'].update({_source_instance(w):bid for w in optical_tail})
+                regions['_row_additions']=dict(regions.get('_row_additions',{}))
+                regions['_row_additions'][bid]=tuple(_source_instance(w)for w in optical_tail)
+                local=_owned_block_words(block,answer,words,display,regions,body_owners,ordered=True)
+                local=_native_lexical_view(display,local,
+                    re.findall(r'(?:^|\s)([^\s<>]+)\s*<n:[^>]+>',block['text']))
+                local=_note_lexical_evidence(local,opening_proof)
+                if role=='footnote' and local and vision_reading.normalized(local[0]['text']).strip('.,:;()[]{}')==vision_reading.normalized(block['marker']).strip('.,:;()[]{}'):
+                    local=local[1:]
+            original=' '.join(w['text'] for w in local)
+            original_quality=text_quality.inspect_disclosure('\n'.join(
+                ' '.join(w['text'] for w in row) for row in _pixel_lines(local)))
+            optical_evidence=owned(pixel_words) if pixel_words is not None else None
+            punctuation_proof=(_caption_punctuation_anchors(optical_evidence,
+                list(range(len(optical_evidence))),block['text'])
+                if role=='caption' and optical_evidence and (regions or {}).get(bid) else [])
+            # A complete exact optical caption proves that a long whitespace-token
+            # disagreement is punctuation segmentation, not an unrelated line.
+            # Ordinary layer disagreement marks and confidence positions remain.
+            run_limit=(max(len(local),len(block['text'].split()))+1
+                       if punctuation_proof else vision_reading.UNALIGNED_RUN)
+            result=vision_reading.align(block['text'],local,block['low_confidence'],
+                has_layer=bool(words),pixel_words=optical_evidence,run_limit=run_limit)
+            if optical_tail:result['guard'].append(dict(kind='complete_optical_row_territory',restored_words=len(optical_tail)))
+            evidence_boxes=result['boxes'];wraps=set();optical_local=[];independent_optical_fallback=False
+            if pixel_words is not None:
+                optical_local=_note_lexical_evidence(_owned_block_words(block,answer,pixel_words,display,regions,body_owners,ordered=True),opening_proof)
+                if role=='footnote' and optical_local and vision_reading.normalized(optical_local[0]['text']).strip('.,:;()[]{}')==vision_reading.normalized(block['marker']).strip('.,:;()[]{}'):
+                    optical_local=optical_local[1:]
+                # Check optical-only dropped lines even when a sparse original layer
+                # agrees perfectly with the model's incomplete paragraph.
+                suffix_proof=(_caption_punctuation_suffix_anchors(optical_local,
+                    list(range(len(optical_local))),block['text'],box)
+                    if role=='caption' and not punctuation_proof and (regions or {}).get(bid) else [])
+                guard_evidence=(_caption_segmentation_evidence(optical_local,suffix_proof,block['text'])
+                    if suffix_proof else optical_local)
+                guarded=vision_reading.align(block['text'],guard_evidence,(),has_layer=True,
+                    run_limit=(max(len(optical_local),len(block['text'].split()))+1
+                               if punctuation_proof else vision_reading.UNALIGNED_RUN))
+                if guarded['fallback']:
+                    if _unproved_optical_letter_clusters(block['text'],optical_local,display):
+                        raise _DisclosureQualityRejection('Optical letter claims have unproved punctuation-sized source ink')
+                    if role=='heading':
+                        # An unproved heading hint cannot turn an adjacent
+                        # optical line into replacement heading words.
+                        raise _DisclosureQualityRejection('Unproved optical heading requires original source disclosure')
+                    independent_optical_fallback=True
+                    result=guarded
+                    result['guard'].append({'kind':'independent_pixel_line_fallback'})
+                elif result['fallback'] and optical_local:
+                    # The full pixel region independently corroborates this reading.
+                    # An unrelated damaged layer cannot replace it with garbage.
+                    result=vision_reading.align(block['text'],local,block['low_confidence'],
+                        has_layer=bool(words),run_limit=max(len(local),len(block['text'].split()))+1)
+                    result['guard']=[{'kind':'damaged_layer_pixel_corroboration'}]
+                if suffix_proof and not guarded['fallback']:
+                    # The proved suffix cannot certify its unproved prefix. Keep
+                    # every prefix disagreement visible even on image-only pages.
+                    result['marked'].update(guarded['marked'])
+                # Optical coordinates bind the disclosure to the printed reading;
+                # they do not change certainty or the chosen published words. A
+                # damaged layer can have unrelated word rectangles even when its
+                # few anchors permit a correct full-page model transcription.
+                evidence_boxes=(guarded['boxes'] if result['tokens']==guarded['tokens']
+                                else result['boxes'])
+                wraps=_printed_wraps(result['tokens'],optical_local)
+            # A block with no word overlap in a layered page needs explicit uncertainty,
+            # but cannot fall back to an empty string and delete printed content.
+            if words and not local and block['text'].strip():
+                result['marked']=set(range(len(result['tokens'])))
+                result['unmapped_block']=True
+            if local_ocr:
+                # OCR and a PDF OCR layer are not independent witnesses. Their
+                # agreement never certifies a local-only transcription.
+                result['marked']=set(range(len(result['tokens'])))
+            if local_ocr and local_ocr_units is not None:
+                owned_units=[unit for unit in local_ocr_units if unit['id']==bid]
+                if len(owned_units)>1:
+                    raise _DisclosureQualityRejection('Local OCR has ambiguous source owners')
+                raw=owned_units[0] if owned_units else None
+                if raw and [word['text'] for word in raw['words']]==result['tokens']:
+                    source_unit=copy.deepcopy(raw)
+                    source_unit['source_method']='local_recognition_occurrences'
+                elif ((independent_optical_fallback or bid in forced_uncertain)
+                        and optical_local
+                        and [word['text'] for word in optical_local]==result['tokens']):
+                    # A recovery reading owns the actual independent occurrences
+                    # selected above, rather than the superseded OCR transcript.
+                    indices={id(word):index for index,word in enumerate(pixel_words or [])}
+                    selected=[indices.get(id(word)) for word in optical_local]
+                    if (len(indices)!=len(pixel_words or []) or None in selected
+                            or len(set(selected))!=len(selected)):
+                        raise _DisclosureQualityRejection('Local OCR recovery has nonunique source occurrences')
+                    source_unit=dict(id=bid,words=copy.deepcopy(optical_local),
+                        source_method='independent_pixel_occurrences',
+                        source_word_indices=selected,mean_confidence=None,
+                        low_confidence_tokens=list(range(len(optical_local))))
+                else:
+                    raise _DisclosureQualityRejection('Local OCR reading has no exact source occurrence inventory')
+                # Crop the words actually published. Independent recognition may
+                # miss a final row; interpolated alignment boxes cannot replace
+                # the original local occurrences that still supply that text.
+                evidence_boxes={index:word['bbox'] for index,word in enumerate(source_unit['words'])}
+                final_local_units.append(source_unit)
+            # One discreet reference covers each contiguous disagreement span.
+            # Every covered word remains recorded in the machine-readable alignment.
+            if bid in forced_uncertain:
+                result['marked']=set(range(len(result['tokens'])))
+                result['fallback']=True
+                result['guard'].append({'kind':'omitted_pixel_line_recovery'})
+            proposed=re.findall(r'<n:[^>]+>|\S+',re.sub(r'(<n:[^>]+>)',r' \1 ',block['text']))
+            lexical=lambda tokens:[t for t in tokens if not t.startswith('<n:')]
+            admitted=[lexical(proposed),[w['text'] for w in local],[w['text'] for w in optical_local]]
+            if lexical(result['tokens']) not in admitted:
+                raise _DisclosureQualityRejection('Aligned reading has no admitted source or reader inventory')
+            # Decide lexical disagreements against an independently recognized
+            # upright crop before rendering any live text or disclosure note.
+            adjudication=None;witness=None;legacy_native_words=[];native_geometry=None
+            if note_context and note_context.get('cache') and not local_ocr:
+                from . import pixel_adjudication
+                with unit_recovery.guard(pno,'pixel_adjudication',block=bid):
+                    from .native_text import drawn_word_authority,drawn_word_authorities,unproved_legacy_word
+                    note_head=_complete_note_head_territory(block,answer,words,display,regions,local)
+                    if note_head is not None:
+                        result['guard'].append(dict(kind='complete_note_head_territory',
+                            restored_words=len(note_head)-len(local)))
+                        local=note_head;territories=_native_ink_regions(territories,local)
+                        refreshed=vision_reading.align(block['text'],local,block['low_confidence'],
+                            has_layer=True,pixel_words=optical_local)
+                        if not refreshed['fallback']:
+                            independent_optical_fallback=False
+                            for key in ('tokens','marked','boxes','fallback','dropped_layer_words'):
+                                result[key]=refreshed[key]
+                    note_tail=_complete_note_tail_territory(block,answer,words,display,regions,local)
+                    if note_tail is not None:
+                        result['guard'].append(dict(kind='complete_note_tail_territory',
+                            restored_words=len(note_tail)-len(local)))
+                        local=note_tail;territories=_native_ink_regions(territories,local)
+                        # Re-evaluate the conservation guard with the complete
+                        # owned inventory; its earlier missing-row fallback is
+                        # not word-level reader doubt. Pixel adjudication below
+                        # still checks the widened original crop normally.
+                        refreshed=vision_reading.align(block['text'],local,block['low_confidence'],
+                            has_layer=True,pixel_words=optical_local)
+                        if not refreshed['fallback']:
+                            independent_optical_fallback=False
+                            for key in ('tokens','marked','boxes','fallback','dropped_layer_words'):
+                                result[key]=refreshed[key]
+
+                    closing=_complete_closing_mark_territory(block,answer,words,pixel_words,display,regions,local)
+                    if closing is not None:
+                        result['guard'].append(dict(kind='complete_closing_mark_territory',restored_marks=1))
+                        local=closing;territories=_native_ink_regions(territories,local)
+                        refreshed=vision_reading.align(block['text'],local,block['low_confidence'],
+                            has_layer=True,pixel_words=optical_local)
+                        if not refreshed['fallback']:
+                            independent_optical_fallback=False
+                            for key in ('tokens','marked','boxes','fallback','dropped_layer_words'):
+                                result[key]=refreshed[key]
+
+                    complete=_complete_native_reading_territory(block,answer,words,display,
+                        regions,body_owners,local)
+                    if complete is not None:
+                        result['guard'].append(dict(kind='complete_native_reading_territory',
+                            restored_words=len(complete)-len(local)))
+                        local=complete;territories=_native_ink_regions(territories,local)
+                    native_occurrences=[dict(w,bbox=list(display.source_rect(w['bbox'])*display.page.derotation_matrix),
+                        **({'native_parts':[dict(p,bbox=list(display.source_rect(p['bbox'])*display.page.derotation_matrix))for p in w['native_parts']]}if 'native_parts'in w else{}))for w in local]
+                    native_proof=drawn_word_authorities(display.page,native_occurrences)
+                    legacy_native_words=[w for w,physical_word in zip(local,native_occurrences)if unproved_legacy_word(display.page,physical_word)]
+                    native_print_words=[w for w,proved in zip(local,native_proof)if proved]
+                    source_print=bool(local) and all(native_proof)
+                    if source_print:territories=_native_ink_regions(territories,local)
+                    witness=(pixel_adjudication.CropWitness([dict(w,confidence=100)for w in local]) if source_print else
+                        pixel_adjudication.read_crop(display,territories,Path(note_context['cache'])/'adjudication'))
+                    from difflib import SequenceMatcher
+                    baseline=(optical_local if independent_optical_fallback else local or optical_local)
+                    if native_print_words:baseline=local
+                    if not native_print_words and local and optical_local and not independent_optical_fallback:
+                        overlap=sum(n for _,_,n in SequenceMatcher(None,
+                            [vision_reading.normalized(w['text']) for w in local],
+                            [vision_reading.normalized(w['text']) for w in optical_local],autojunk=False).get_matching_blocks())
+                        if overlap/max(1,len(optical_local))<.6:baseline=optical_local
+                    if baseline and (witness is not None or native_print_words or legacy_native_words):
+                        # Only the admitted alignment inventories reach this
+                        # stage. Retain the first reader as an alternative, but
+                        # require positive pixels to revive rejected words.
+                        first_tokens=list(proposed)
+                        # Existing local physical proof reserves reference ink
+                        # before lexical conservation can turn it into body words.
+                        # This early pass cannot dispatch a marker request. Final
+                        # rendering keeps the complete original inventories and
+                        # performs its usual verified/disclosed reference binding.
+                        marker_corroboration=optical_local;physical={}
+                        if role in ('body','other','caption') and any(
+                                re.fullmatch(r'<n:[^>]+>',t) for t in first_tokens):
+                            local_context=dict(note_context,marker_reader=None)
+                            with unit_recovery.guard(pno,'page_compilation',block=bid):
+                                physical=_placeholder_display_evidence(first_tokens,
+                                    optical_local,display,box,local_context,pno)
+                            first_tokens,baseline=_lexical_marker_view(first_tokens,baseline,physical)
+                            _,witness=_lexical_marker_view(first_tokens,witness,physical)
+                            _,marker_corroboration=_lexical_marker_view(first_tokens,optical_local,physical)
+                        if source_print:
+                            native_geometry=list(baseline)
+                            normalized_baseline=_native_wrap_view(baseline,first_tokens)
+                            if normalized_baseline!=baseline:
+                                baseline=normalized_baseline;native_print_words=list(baseline)
+                                witness=pixel_adjudication.CropWitness([dict(w,confidence=100)for w in baseline])
+                                result['guard'].append(dict(kind='native_line_wrap_normalization'))
+                        # Conservation failure and interpolated alignment are
+                        # block-level routing evidence, not reader uncertainty in
+                        # every neighboring word. Actual lexical alternatives
+                        # are adjudicated below at their own occurrences.
+                        pending=vision_reading.align(block['text'],[],block['low_confidence'],
+                            has_layer=False)['marked']
+                        if not hasattr(witness,'__dict__'):
+                            witness=pixel_adjudication.CropWitness(witness)
+                        witness.neighbor_occurrences=pixel_words or ()
+                        witness.model_reading=not bool(getattr(witness,'failure',None))
+                        if not source_print:
+                            baseline=pixel_adjudication.canonical_source_occurrences(
+                                first_tokens,baseline,witness,native_print_words)
+                        adjudication=pixel_adjudication.adjudicate(first_tokens,
+                            baseline,witness,uncertain=pending,corroboration=marker_corroboration,
+                            # Inconclusive OCR cannot revive a model passage already
+                            # rejected by the source-conservation alignment guard.
+                            unresolved_source=bool(result['fallback']),source_print=source_print,native_print_words=native_print_words,
+                            absence_proof=lambda left,right:(pixel_adjudication.blank_between(display,left,right,territories)
+                                or pixel_adjudication.blank_wrap_margins(display,left,right)))
+                        def printed_space(left,right):
+                            a,b=left['bbox'],right['bbox'];h=min(a[3]-a[1],b[3]-b[1])
+                            return (b[0]-a[2]>=h*.15 and
+                                pixel_adjudication.blank_between(display,left,right,territories))
+                        conflicts=pixel_adjudication.audit_agreement(adjudication['tokens'],baseline,witness,
+                            boundary_proof=printed_space,word_boxes=adjudication['boxes'],
+                            conserved_boundaries=adjudication.get('conserved_boundaries'))
+                        for i,decision in conflicts.items():
+                            if pixel_adjudication.proved_native_occurrence(adjudication['tokens'][i],adjudication['boxes'].get(i),native_print_words):continue
+                            adjudication['marked'].add(i)
+                            adjudication['word_notes'].setdefault(i,decision)
+                        if (result['fallback'] or bid in forced_uncertain) and not native_print_words:
+                            refined=pixel_adjudication.refine_fallback(adjudication['tokens'],witness,
+                                text_quality.english_lexicon(),source=baseline)
+                            if refined is not None:
+                                from difflib import SequenceMatcher
+                                for kind,a,z,b,y in SequenceMatcher(None,adjudication['tokens'],refined['tokens'],autojunk=False).get_opcodes():
+                                    if kind=='equal':
+                                        for old_index,new_index in zip(range(a,z),range(b,y)):
+                                            if old_index in adjudication['boxes']:
+                                                refined['boxes'].setdefault(new_index,adjudication['boxes'][old_index])
+                                    affected=([j for i,j in zip(range(a,z),range(b,y)) if i in adjudication['marked']]
+                                        if kind=='equal' else list(range(b,y)) if any(i in adjudication['marked'] for i in range(a,z)) else [])
+                                    for i in affected:
+                                        refined['marked'].add(i)
+                                        prior=adjudication['word_notes'].get(a+i-b) if kind=='equal' else None
+                                        if prior and prior.get('source_image_only'):
+                                            # This pass has not changed the word. Its own
+                                            # inconclusive note cannot certify a spelling
+                                            # already withheld from live publication.
+                                            refined['word_notes'][i]=prior
+                                        else:
+                                            refined['word_notes'].setdefault(i,prior or dict(source=[refined['tokens'][i]],
+                                                chosen=[refined['tokens'][i]],status='UNRESOLVED',method='reader_uncertainty'))
+                                refined['decisions']=adjudication['decisions']+refined['decisions']
+                                refined['verified_unchanged']=adjudication.get('verified_unchanged',[])
+                                adjudication=refined
+                        # Restore the original symbolic alternative at its
+                        # stable typed reference boundary. The normal original-
+                        # glyph verifier still decides whether it is one action.
+                        for proof in physical.values():
+                            suffix=proof.get('lexical_literal_suffix') or proof.get('unplaced_literal_suffix')
+                            marker=proof.get('lexical_placeholder') or proof.get('unplaced_literal_placeholder')
+                            positions=[i for i,t in enumerate(adjudication['tokens']) if t==marker]
+                            if suffix and len(positions)==1 and positions[0]>0:
+                                index=positions[0]-1
+                                if not adjudication['tokens'][index].endswith(suffix):
+                                    adjudication['tokens'][index]+=suffix
+                                decision=adjudication['word_notes'].get(index)
+                                if decision and decision['method'] in ('independent_upright_crop',
+                                        'two_own_pixel_readings','agreeing_readings_pixel_conflict'):
+                                    values=[decision[k] for k in ('source','model','chosen','alternative') if k in decision]
+                                    lexical=lambda value:value[:-len(suffix)] if value.endswith(suffix) else value
+                                    if (all(len(value)==1 for value in values)
+                                            and len({lexical(value[0])for value in values})==1):
+                                        # Glyph identity has its own disclosure.
+                                        # It is not a correction of this unchanged
+                                        # lexical word, nor authority to delete it.
+                                        adjudication['marked'].discard(index)
+                                        adjudication['word_notes'].pop(index)
+                                        adjudication['decisions']=[d for d in adjudication['decisions'] if d is not decision]
+                        result.update(tokens=adjudication['tokens'],
+                            marked=adjudication['marked'],boxes=adjudication['boxes'])
+                        evidence_boxes=adjudication['boxes']
+                        result['adjudication']=adjudication['decisions']
+                        result['word_notes']=adjudication['word_notes']
+                        wraps=_printed_wraps(result['tokens'],optical_local)
+            if local_ocr and note_context and note_context.get('cache'):
+                from . import pixel_adjudication
+                with unit_recovery.guard(pno,'local_pixel_adjudication',block=bid):
+                    witness=pixel_adjudication.read_crop(display,territories,
+                        Path(note_context['cache'])/'adjudication')
+                    if hasattr(witness,'__dict__'):witness.neighbor_occurrences=pixel_words or ()
+                    source_occurrences=(source_unit['words'] if local_ocr_units is not None else optical_local)
+                    refined=pixel_adjudication.refine_fallback(result['tokens'],witness,
+                        text_quality.english_lexicon(),source=source_occurrences,corroboration=optical_local)
+                    # Original occurrence inventories are immutable. Only a
+                    # positively corroborated one-for-one repair can replace a
+                    # local token without changing those source owners.
+                    repairs=(refined if refined and len(refined['tokens'])==len(result['tokens'])
+                        and all(len(d['source'])==len(d['chosen']) for d in refined['decisions']
+                                if d['status']=='RESOLVED') else None)
+                    if repairs:
+                        result['tokens']=repairs['tokens']
+                        result['word_notes']=repairs['word_notes']
+                        result['adjudication']=repairs['decisions']
+                        for i,decision in repairs['word_notes'].items():
+                            if decision['status']=='RESOLVED' and i in repairs['boxes']:
+                                evidence_boxes[i]=repairs['boxes'][i]
+                        if local_ocr_units is not None:
+                            source_unit['published_words']=list(result['tokens'])
+                    conflicts=pixel_adjudication.audit_agreement(result['tokens'],source_occurrences,witness)
+                    result.setdefault('adjudication',[]).extend(conflicts.values())
+                    # Two settings of one local recognizer do not establish
+                    # independent certainty. Preserve all local OCR uncertainty
+                    # and its exact recognized source occurrence inventory.
+                    for i,decision in conflicts.items():result.setdefault('word_notes',{}).setdefault(i,decision)
+            if witness is not None and hasattr(witness,'alternates'):
+                witness.source_occurrences=source_occurrences if local_ocr else baseline
+                pixel_adjudication.disclose_alternate_conflicts(result,evidence_boxes,witness,allow_clear=not local_ocr)
+            if getattr(witness,'failure',None):
+                # Keep the already admitted reading and its own source owners.
+                # Unavailable secondary recognition must not widen a primary
+                # optical/marker failure into healthy sibling units.
+                result['word_notes']={i:dict(source=[t],model=[t],chosen=[t],status='UNRESOLVED',
+                    method='independent_crop_unavailable') for i,t in enumerate(result['tokens'])
+                    if i in result['marked'] and not t.startswith('<n:')}
+                result['adjudication']=list(result['word_notes'].values())
+                result['guard'].append(dict(kind='independent_crop_unavailable',reason=witness.failure))
+            if witness is not None and (local_ocr or (bid in forced_uncertain and not native_print_words)):
+                # Recovered optical clauses have no independent model reading.
+                # Their numeral identity needs the same print retention as a
+                # local-only first pass, without downgrading drawn native text.
+                pixel_adjudication.audit_local_numeric_suffixes(result,evidence_boxes,witness)
+            if local_ocr and witness is not None:
+                pixel_adjudication.audit_reverse_local_ink(result,evidence_boxes,witness,display,
+                    territories,text_quality.english_lexicon())
+                if local_ocr_units is not None:source_unit['published_words']=list(result['tokens'])
+            if legacy_native_words:
+                unplaced=any(len([i for i,slot in result['boxes'].items()
+                    if pixel_adjudication._complete_word_occurrence(w,dict(bbox=slot))])!=1
+                    for w in legacy_native_words)
+                legacy_ids={id(w)for w in legacy_native_words}
+                script_loss=text_quality.reading_script_mismatches(block['text'],' '.join(result['tokens']))
+                if ((unplaced or script_loss) and native_print_words and role in ('body','other','caption')
+                        and not any(t.startswith('<n:')for t in proposed+result['tokens'])
+                        and all(proved or id(w)in legacy_ids for w,proved in zip(local,native_proof))):
+                    from .native_text import visible_word_ink
+                    if all(visible_word_ink(display.page,native_occurrences)):
+                        # A reader can expand opaque codes into several tokens,
+                        # or replace each with a script the font cannot map. The
+                        # complete visible native inventory proves the prose;
+                        # only opaque occurrences require original ink. This
+                        # containment applies whether their token binding was
+                        # already unique or must be restored from native print.
+                        result.update(tokens=[w['text']for w in local],fallback=False,native_ink_stencil=True,
+                            boxes={i:w['bbox']for i,w in enumerate(local)},marked=set(),
+                            word_notes={},adjudication=[],
+                            verified_unchanged=[i for i,proved in enumerate(native_proof)if proved])
+                        result.setdefault('guard',[]).append(dict(kind='visible_native_ink_stencil'))
+                        evidence_boxes=result['boxes']
+                        adjudication=dict(verified_unchanged=result['verified_unchanged'])
+                        wraps=_printed_wraps(result['tokens'],optical_local)
+            for legacy_word in legacy_native_words:
+                occurrences=[i for i,box in result['boxes'].items()
+                    if pixel_adjudication._complete_word_occurrence(legacy_word,dict(bbox=box))]
+                if len(occurrences)!=1:
+                    raise _DisclosureQualityRejection('Unmapped glyph has no unique published occurrence')
+                index=occurrences[0]
+                decision=dict(source=[legacy_word['text']],model=[result['tokens'][index]],
+                    chosen=[result['tokens'][index]],status='UNRESOLVED',
+                    method='unproved_native_character_map',source_image_only=True,
+                    source_bbox=legacy_word['bbox'])
+                if 'native_parts'in legacy_word:decision['source_parts']=legacy_word['native_parts']
+                result['marked'].add(index)
+                result.setdefault('word_notes',{})[index]=decision
+                result.setdefault('adjudication',[]).append(decision)
+            if adjudication:
+                result['verified_unchanged']=sorted(set(result.get('verified_unchanged',[]))|
+                    set(adjudication.get('verified_unchanged',[])))
+            from . import reading_tiers
+            # Keep the independent optical bindings when reindexing words.
+            # The original layer's rectangles may describe unrelated blank paper.
+            result['boxes']=evidence_boxes
+            reading_tiers.conserve_punctuation_boundaries(result,baseline if adjudication else local,first_tokens if adjudication else proposed)
+            _remove_foreign_word_runs(result,bid,answer,pixel_words or [],regions)
+            reading_tiers.join_letter_spaced_readings(result,witness or [])
+            reading_tiers.join_fragmented_readings(result,witness if witness is not None else [])
+            reading_tiers.discard_dot_leaders(result,display,pixel_words or local)
+            if any(g.get('kind')in('foreign_owned_run_published_once','letter_spaced_printed_words')
+                   for g in result['guard']):
+                wraps=_printed_wraps(result['tokens'],optical_local)
+            evidence_boxes=result['boxes']
+            compiled_reading=' '.join(result['tokens'])
+            lost_scripts=(text_quality.reading_script_mismatches(block['text'],compiled_reading)
+                          if result['fallback'] else text_quality.script_mismatches(block['text'],compiled_reading))
+            if lost_scripts and not result.get('native_ink_stencil'):
+                # An English optical fallback cannot replace a reader's non-Latin
+                # passage with Latin lookalikes. Retain original pixels when this
+                # compiler cannot safely bind the reading in its printed script.
+                raise ValueError('Source-script reading lost during alignment: '+', '.join(lost_scripts))
+            # A whole chosen reading reduced to a few optical fragments is not a
+            # usable transcript, even when those fragments are dictionary words or
+            # punctuation. Measure the complete block: a local replacement may
+            # correctly remove a long borrowed model tail from healthy source prose.
+            # Short chosen fragments still receive the separate lexical check below.
+            model_count=len(re.sub(r'<n:[^>]+>', ' ', block['text']).split())
+            chosen_count=sum(not token.startswith('<n:') for token in result['tokens'])
+            contracted=(model_count>=vision_reading.UNALIGNED_RUN
+                        and chosen_count<.25*model_count
+                        and ''.join(block['text'].split())!=''.join(result['tokens']))
+            if result['fallback'] and contracted:
+                raise _DisclosureQualityRejection('Unreliable contracted fallback requires original source disclosure')
+            # A punctuation-only model variant does not turn an unchanged
+            # source citation into a new short purported reading. Keep its
+            # ordinary page-quality check and each actual chosen span's short
+            # check; lexical substitutions and fallbacks retain the stronger
+            # complete-reading check.
+            source_reading=' '.join(w['text'] for w in (local or optical_local))
+            lexical_change=(re.findall(r'\w+',compiled_reading)!=re.findall(r'\w+',source_reading))
+            complete_check=(text_quality.inspect_disclosure if result['fallback'] or lexical_change
+                            else text_quality.inspect)
+            if ((result['fallback'] or result['marked'])
+                    and complete_check(compiled_reading)['needs_read']):
+                raise _DisclosureQualityRejection('Unreliable chosen reading requires original source disclosure')
+            reading_tiers.settle_typographic_equivalents(result)
+            reading_tiers.settle_repeated_word_shapes(result,display)
+            flagged_readings=reading_tiers.prepare(result)
+            literal={};placeholder_display={}
+            if note_context and role in ('body','other','caption'):
+                note_optical=_adjacent_source_note_glyphs(optical_local,pixel_words or [])
+                source_context=dict(note_context,source_words=pixel_words)
+                args=(result['tokens'],note_optical,display,box,note_context['cache'],note_context['labels'],pno,source_context)
+                literal=(_literal_note_refs(*args,allow_omitted=True) if role=='caption'
+                         else _literal_note_refs(*args))
+                placeholder_display=_placeholder_display_evidence(result['tokens'],optical_local,display,box,note_context,pno,literal)
+            individual_receipts={i for i,d in result.get('word_notes',{}).items()
+                if d.get('source') and (d.get('source')!=d.get('chosen') or
+                    d.get('model') and d.get('model')!=d.get('chosen'))}
+            groups=[]
+            for index in sorted(i for i in result['marked'] if not result['tokens'][i].startswith('<n:')):
+                resolved_local={i for i,d in (result.get('word_notes') or {}).items() if d['status']=='RESOLVED'} if local_ocr else set()
+                image_words={i for i,d in (result.get('word_notes') or {}).items() if d.get('source_image_only')}
+                if ((local_ocr or not result.get('adjudication')) and groups and index==groups[-1][-1]+1
+                        and (index in flagged_readings)==(groups[-1][-1] in flagged_readings)
+                        and index not in literal and groups[-1][-1] not in literal
+                        and index not in individual_receipts and groups[-1][-1] not in individual_receipts
+                        and index not in resolved_local and groups[-1][-1] not in resolved_local
+                        and index not in image_words and groups[-1][-1] not in image_words):groups[-1].append(index)
+                else:groups.append([index])
+            # Adjacent plausible words on one printed row share one reading
+            # underline and one adjacent print preview. A typed reference,
+            # resolved correction or another physical row ends the run.
+            merged=[]
+            for group in groups:
+                previous=merged[-1]if merged else []
+                if (previous and group[0]==previous[-1]+1
+                        and len(previous)+len(group)<=8
+                        and not any(i in literal or i in individual_receipts for i in previous+group)
+                        and all(i in flagged_readings and i in evidence_boxes for i in previous+group)):
+                    a=evidence_boxes[previous[-1]];b=evidence_boxes[group[0]]
+                    same_row=min(a[3],b[3])-max(a[1],b[1])>=.5*min(a[3]-a[1],b[3]-b[1])
+                    if same_row and -.5<=b[0]-a[2]<=1.5*max(a[3]-a[1],b[3]-b[1]):
+                        previous.extend(group);continue
+                merged.append(list(group))
+            groups=merged
+            endings={g[-1]:g for g in groups}
+            print_groups=reading_tiers.bound_print_runs(groups,flagged_readings,evidence_boxes)
+            print_endings={g[-1]:g for g in print_groups if all(i in flagged_readings for i in g)}
+            print_owners={i:g[-1] for g in groups for i in g}
+            emission_groups={**endings,**print_endings}
+
+            def flagged_piece(indices, ident, inspection_src, reading_html=None):
+                # Presentation runs may be shorter than the original warning.
+                # Every run links to that same complete, source-owned receipt;
+                # only the final run needs its dagger and return origin.
+                # Placement and ink validation happen once after the complete
+                # published sequence exists. Rendering a guessed preview here
+                # would leave an unused raster when that placement is refused.
+                inline_src=inspection_src
+                style='height:1.1em;vertical-align:-0.15em;width:auto'
+                reading=''.join(('' if j==0 or i in wraps else ' ')+result['tokens'][i]
+                    for j,i in enumerate(indices))
+                return reading_tiers.flagged_html(reading,inline_src,ident,style,reading_html=reading_html)
+            # Reject each chosen span before emitting markers or source images.
+            # Keep the rendering-time check as a defensive publication boundary.
+            for group in groups:
+                chosen_reading=' '.join(result['tokens'][i] for i in group)
+                if text_quality.inspect_disclosure(chosen_reading)['needs_read']:
+                    raise _DisclosureQualityRejection('Unreliable chosen reading requires original source disclosure')
+            display_tokens=list(result['tokens'])
+            for proof in placeholder_display.values():
+                if 'deduplicated_literal_token' in proof and not literal.get(proof['deduplicated_literal_token']):
+                    display_tokens[proof['deduplicated_literal_token']]=proof['literal_display_text']
+            pieces=[];tokens_count+=len(result['tokens'])
+            for index,token in enumerate(display_tokens):
+                marker=re.fullmatch(r'<n:([^>]+)>',token)
+                if marker:
+                    nid=marker[1];ref=f'v4-ref-{pno}-{bid}-{index}'
+                    owner=note_context['owners'].get((pno,nid),(pno,nid)) if note_context else (pno,nid)
+                    if nid in unresolved_notes:
                         from .unit_source import source_unit
-                        ident=f'marker-{bid}-{index}'
-                        reason='Printed body note marker is uncertain: '+proof['reason']
-                        shared=None
-                        # Only an already emitted, immediately adjacent action
-                        # can share its SOURCE target. Actual image territory,
-                        # not a requested crop or an enclosing block hint, must
-                        # contain the complete unresolved marker evidence.
-                        if index-1 in endings:
-                            dest=f'v4-d-{pno}-{bid}-{index-1}';origin='r-'+dest
-                            src='images/'+dest+'.jpg';image=image_records.get(src,{})
-                            crop=image.get('bbox');needed=proof['source_bbox']
-                            matches=[j for j,aside in enumerate(extras) if f'id="{dest}"' in aside]
-                            if (image.get('page')==pno and image.get('kind')=='vision_disclosure'
-                                    and crop and len(matches)==1
-                                    and crop[0]<=needed[0] and crop[1]<=needed[1]
-                                    and crop[2]>=needed[2] and crop[3]>=needed[3]):
-                                j=matches[0]
-                                extras[j]=extras[j].replace('<p>','<p>'+escape(reason)+'. ',1)
-                                shared=dict(page=pno,block=ident,source_bbox=list(crop),unit_bbox=list(needed),
-                                    source_image=src,image=src,source_reference=dest,source_reference_origin=origin,
-                                    reason=reason,shared_existing_source_disclosure=True)
-                        if shared is not None:
-                            unit=shared
-                        else:
-                            _,contexts,unit=source_unit(display,pno,ident,'other',package,image_records,
-                                reason,bbox=proof['source_bbox'])
-                            extras.extend(contexts);origin=unit['source_reference_origin'];dest=unit['source_reference']
-                            piece+=f'<a id="{origin}" class="source-disclosure-ref" epub:type="noteref" href="#{dest}"><sup>†</sup></a>'
-                            marked+=1
-                        marker_record.update(unit,unit_kind='note_marker',status='DEGRADED_SOURCE_CONTEXT')
+                        proof=placeholder_display.get(index,dict(status='UNPROVED',
+                            source_bbox=list(box),reason=_MARKER_SLOT_UNBOUND))
+                        reason='Printed note association requires original source inspection'
+                        _,contexts,unit=source_unit(display,pno,f'marker-{bid}-{index}','other',
+                            package,image_records,reason,bbox=proof['source_bbox'])
+                        extras.extend(contexts)
+                        label=proof['label'] if proof['status']=='PROVED' else '†'
+                        pieces.append(f'<a id="{unit["source_reference_origin"]}" class="source-disclosure-ref" epub:type="noteref" href="#{unit["source_reference"]}"><sup>{escape(label)}</sup></a>')
+                        marker_record=dict(proof,**unit)
+                        marker_record.update(page=pno,block=bid,token=index,note_owner=list(owner),
+                            display_label=label,association_status='UNPROVED',
+                            unit_kind='note_marker',status='DEGRADED_SOURCE_CONTEXT')
                         marker_disclosures.append(marker_record)
-                pieces.append(piece);continue
-            piece=escape(token)
-            if index in literal:
-                start=0;parts=[]
-                for a,b,owner,label in sorted(literal[index]):
-                    ref=f'v4-ref-{pno}-{bid}-{index}-{a}'
-                    parts.append(escape(token[start:a])+f'<a id="{ref}" class="noteref" epub:type="noteref" href="#{note_context["catalogue"][owner]["target"]}"><sup>{escape(label)}</sup></a>')
-                    note_context['refs'].setdefault(owner,[]).append(ref);start=b
-                piece=''.join(parts)+escape(token[start:])
-            if index in endings:
-                marked+=1;ident=f'v4-d-{pno}-{bid}-{index}';ref='r-'+ident
-                src=f'images/{ident}.jpg'
-                boxes=[evidence_boxes[i] for i in endings[index] if i in evidence_boxes]
-                crop=(list(display.rect) if len(territories)>1 else
-                      vision_reading.union(boxes) if len(boxes)==len(endings[index]) else box)
-                # Tight evidence remains in final notes, never an inline word crop.
-                clip=extract.pymupdf.Rect(crop);clip.x0-=2;clip.y0-=2;clip.x1+=2;clip.y1+=2;clip &= display.rect
-                package.image(src,display.jpeg(clip,scale=3,quality=90))
-                image_records[src]=dict(page=pno,bbox=list(clip),kind='vision_disclosure')
-                label='Uncertain source reading fallback' if result['fallback'] else 'Model reading differs from source layer' if words else 'Low-confidence model reading'
-                original=' '.join(w['text'] for w in local)
-                extras.append(f'<aside id="{ident}" class="footnote vision-disclosure" epub:type="footnote"><p>{label}: {escape(' '.join(result['tokens'][i] for i in endings[index]))}. Source layer: {escape(original)}.</p><img src="{src}" alt="Original printed reading"/><a href="#{ref}">Return</a></aside>')
-                piece+=f'<a id="{ref}" class="source-disclosure-ref" epub:type="noteref" href="#{ident}"><sup>†</sup></a>'
-            pieces.append(piece)
-        text=''.join(('' if i==0 or i in wraps else ' ')+piece for i,piece in enumerate(pieces) if piece)
-        # The marker is typographic punctuation, not a standalone sentence block.
-        text=re.sub(r'\s+(<a[^>]*class="noteref".*?</a>)',r'\1',text)
-        text=(f'<span data-source-page="{pno}" data-source-block="{escape(bid,quote=True)}" '
-              f'data-source-regions="{escape(json.dumps(territories),quote=True)}">{text}</span>')
-        tag='h2' if role=='heading' else 'p'
-        html=f'<{tag}>{text}</{tag}>'
-        if role=='footnote':
-            asides.append((bid,f'<aside id="v4-note-{pno}-{bid}" class="footnote" epub:type="footnote"><p>{escape(block["marker"])} {text}</p>'))
-        elif role=='caption':body.append(f'<p class="caption">{text}</p>')
-        else:body.append(html)
-        printed=owned_words(optical_local,territories[0])
-        rows=_pixel_lines(printed)
-        # Column skew far below the opening is not a paragraph indent. Compare
-        # the opening with nearby subsequent line starts in its own territory.
-        import statistics
-        opening_left=(statistics.median(min(w['bbox'][0] for w in row) for row in rows[1:4])
-                      if len(rows)>1 else None)
-        printed_head,printed_tail=_published_pixel_edges(result['tokens'],optical_local)
-        head_variant=None
-        visible=[t for t in result['tokens'] if not t.startswith('<n:')]
-        if printed_head is None and visible and optical_local:
-            published=re.fullmatch(r'[-­‐‑]+([a-z]{2,})[.,;:]?',visible[0])
-            source=re.fullmatch(r"['’‘\"\-­‐‑]*([a-z]{2,})[.,;:]?",optical_local[0]['text'])
-            if published and source and published[1]==source[1]:
-                head_variant={'published':visible[0],'source':optical_local[0]['text'],
-                              'letters':source[1],'bbox':optical_local[0]['bbox']}
-        art_gap=None
-        if role=='caption' and printed_head is None and printed_tail is None:
-            at=answer['blocks'].index(block)
-            adjacent=[next((x for x in sequence if x['role'] not in ('caption','running_head','folio')),None)
-                      for sequence in (reversed(answer['blocks'][:at]),answer['blocks'][at+1:])]
-            candidates=[]
-            for art in adjacent:
-                if art is None or art['role'] not in ('figure','table'):continue
-                source=(regions or {}).get(art['id'])
-                degraded=(figure_cases or {}).get(art['id'])
-                if not source and not degraded:continue
-                if art['role']=='table':
-                    from . import vision_pixels
-                    if not vision_pixels.table_rules(display,block_rect(art,display)):continue
-                bound=vision_reading.union(source) if source else block_rect(art,display)
-                gap=max(0,bound[1]-box[3],box[1]-bound[3])
-                horizontal=max(0,bound[0]-box[2],box[0]-bound[2])
-                candidates.append((gap+horizontal,art,bound))
-            if candidates:
-                _,art,bound=min(candidates,key=lambda value:value[0])
-                # Structural attachment moves the caption with its independently
-                # source-bound object. Exact caption territories still identify
-                # its own words; an unmatched hint receives no invented anchors.
-                art_gap={'object':art['id'],'bbox':bound}
-        alignment.append(dict(id=bid,role=role,bbox=box,source_regions=territories,
-            source_rows=[vision_reading.union([w['bbox'] for w in row])
-                         for territory in territories for row in _pixel_lines(owned_words(optical_local,territory))],
-            first_line_x=min((w['bbox'][0] for w in rows[0]),default=None) if rows else None,
-            opening_column_left=opening_left,
-            printed_tail=printed_tail['text'] if printed_tail is not None else None,
-            printed_head=printed_head['text'] if printed_head is not None else None,
-            printed_tail_box=printed_tail['bbox'] if printed_tail is not None else None,
-            printed_head_box=printed_head['bbox'] if printed_head is not None else None,
-            printed_tail_row=pixel_rows.get(id(printed_tail.get('_source_word',printed_tail))) if printed_tail is not None else None,
-            printed_head_row=pixel_rows.get(id(printed_head.get('_source_word',printed_head))) if printed_head is not None else None,
-            physical_head=(dict(text=optical_local[0]['text'],bbox=optical_local[0]['bbox']) if optical_local else None),
-            physical_tail=(dict(text=optical_local[-1]['text'],bbox=optical_local[-1]['bbox']) if optical_local else None),
-            disputed_head_prefix=head_variant,source_art_gap=art_gap,
-            punctuation_source_anchors=[dict(source_word_index=i,
-                lexical_whitespace_token_index=j,source_bbox=optical_evidence[i]['bbox'])
-                for i,j in punctuation_proof],
-            published_tokens=result['tokens'],
-            marked=sorted(result['marked']),fallback=result['fallback'],guard=result['guard'],
-            layer_words=[w['text'] for w in local],dropped_layer_words=result['dropped_layer_words'],
-            continues_previous=block['continues_previous'],continues_next=block['continues_next']))
-        if role=='caption' and punctuation_proof and printed_head is not None and printed_tail is not None:
-            # Uniqueness must cover the original page, not just locally owned
-            # words: a displaced hint could otherwise hide a second caption.
-            complete=_caption_punctuation_anchors(pixel_words,
-                list(range(len(pixel_words))),block['text']) if pixel_words else []
-            local_box=vision_reading.union([optical_evidence[i]['bbox'] for i,j in punctuation_proof])
-            complete_box=vision_reading.union([pixel_words[i]['bbox'] for i,j in complete]) if complete else None
-            if complete_box==local_box:
-                # Structural location only; original context stays whole.
-                alignment[-1]['source_complete_caption_bbox']=local_box
+                        marked+=1
+                        continue
+                    # A literal and an adjacent placeholder can describe the same
+                    # original reference. Reconcile only one proven source glyph;
+                    # two distinct original glyphs keep their separate actions.
+                    evidence=getattr(literal,'source_instances',{})
+                    sole=getattr(literal,'sole_source_instances',set())
+                    repeated=any(bound_owner==owner and
+                        re.fullmatch(r'''[.,;:)\]”’"']*''',result['tokens'][index-1][b:]) and
+                        len(evidence.get((index-1,a,b,bound_owner,label),[]))==1 and
+                        (index-1,a,b,bound_owner,label) in sole
+                        for a,b,bound_owner,label in literal.get(index-1,[]))
+                    display_proof=placeholder_display.get(index,{})
+                    repeated=repeated or bool(display_proof.get('deduplicated_literal_token')==index-1
+                        and any(bound_owner==owner for a,b,bound_owner,label in literal.get(index-1,[])))
+                    if repeated:
+                        pieces.append('');continue
+                    refs.setdefault(nid,[]).append(ref)
+                    target=note_context['catalogue'][owner] if note_context else {'target':f'v4-note-{pno}-{nid}','label':footnotes[nid]['marker'] or '*'}
+                    if note_context:note_context['refs'].setdefault(owner,[]).append(ref)
+                    proof=placeholder_display.get(index)
+                    label=proof['label'] if proof and proof['status']=='PROVED' else target['label']
+                    piece=f'<a id="{ref}" class="noteref" epub:type="noteref" href="#{target["target"]}"><sup>{escape(label)}</sup></a>'
+                    if proof:
+                        marker_record=dict(page=pno,block=bid,token=index,note_owner=list(owner),
+                            catalogue_label=target['label'],display_label=label,**proof)
+                        if proof['status']=='PROVED':marker_repairs.append(marker_record)
+                        else:
+                            from .unit_source import source_unit
+                            ident=f'marker-{bid}-{index}'
+                            reason='Printed body note marker is uncertain: '+proof['reason']
+                            shared=None
+                            # Only an already emitted, immediately adjacent action
+                            # can share its SOURCE target. Actual image territory,
+                            # not a requested crop or an enclosing block hint, must
+                            # contain the complete unresolved marker evidence.
+                            if index-1 in endings:
+                                dest=f'v4-d-{pno}-{bid}-{index-1}';origin='r-'+dest
+                                src='images/'+dest+'.jpg';image=image_records.get(src,{})
+                                crop=image.get('bbox');needed=proof['source_bbox']
+                                matches=[j for j,aside in enumerate(extras) if f'id="{dest}"' in aside]
+                                if (image.get('page')==pno and image.get('kind')=='vision_disclosure'
+                                        and crop and len(matches)==1
+                                        and crop[0]<=needed[0] and crop[1]<=needed[1]
+                                        and crop[2]>=needed[2] and crop[3]>=needed[3]):
+                                    j=matches[0]
+                                    extras[j]=extras[j].replace('<p>','<p>'+escape(reason)+'. ',1)
+                                    shared=dict(page=pno,block=ident,source_bbox=list(crop),unit_bbox=list(needed),
+                                        source_image=src,image=src,source_reference=dest,source_reference_origin=origin,
+                                        reason=reason,shared_existing_source_disclosure=True)
+                            if shared is not None:
+                                unit=shared
+                            else:
+                                _,contexts,unit=source_unit(display,pno,ident,'other',package,image_records,
+                                    reason,bbox=proof['source_bbox'])
+                                extras.extend(contexts);origin=unit['source_reference_origin'];dest=unit['source_reference']
+                                piece+=f'<a id="{origin}" class="source-disclosure-ref" epub:type="noteref" href="#{dest}"><sup>†</sup></a>'
+                                marked+=1
+                            marker_record.update(unit,unit_kind='note_marker',status='DEGRADED_SOURCE_CONTEXT')
+                            marker_disclosures.append(marker_record)
+                    pieces.append(piece);continue
+                if index in flagged_readings and index not in print_endings:
+                    pieces.append('');continue
+                piece=escape(token)
+                if index in literal:
+                    start=0;parts=[]
+                    for a,b,owner,label in sorted(literal[index]):
+                        ref=f'v4-ref-{pno}-{bid}-{index}-{a}'
+                        parts.append(escape(token[start:a])+f'<a id="{ref}" class="noteref" epub:type="noteref" href="#{note_context["catalogue"][owner]["target"]}"><sup>{escape(label)}</sup></a>')
+                        note_context['refs'].setdefault(owner,[]).append(ref);start=b
+                    piece=''.join(parts)+escape(token[start:])
+                if index in print_endings and index not in endings:
+                    ident=f'v4-d-{pno}-{bid}-{print_owners[index]}'
+                    piece=flagged_piece(print_endings[index],ident,f'images/{ident}.jpg',
+                        reading_html=piece if index in literal else None)
+                if index in endings:
+                    chosen_reading=''.join((''if j==0 or i in wraps else' ')+result['tokens'][i]
+                        for j,i in enumerate(endings[index]))
+                    if text_quality.inspect_disclosure(chosen_reading)['needs_read']:
+                        raise _DisclosureQualityRejection('Unreliable chosen reading requires original source disclosure')
+                    marked+=1;ident=f'v4-d-{pno}-{bid}-{index}';ref='r-'+ident
+                    src=f'images/{ident}.jpg'
+                    word_decision=(result.get('word_notes')or{}).get(index,{})
+                    boxes=([word_decision['source_bbox']] if len(endings[index])==1 and word_decision.get('source_bbox') and (word_decision.get('source_image_only') or word_decision.get('source_image_only_before_publication')) else
+                           [evidence_boxes[i] for i in endings[index] if i in evidence_boxes])
+                    crop=(word_decision['source_bbox'] if len(endings[index])==1 and word_decision.get('source_bbox') and (word_decision.get('source_image_only') or word_decision.get('source_image_only_before_publication')) else
+                          vision_reading.union(boxes) if len(boxes)==len(endings[index]) else box)
+                    if word_decision.get('source_parts'):
+                        # A divided word owns both physical pieces, which can
+                        # span rows. Its tail box alone cannot enclose its print.
+                        crop=vision_reading.union([part['bbox']if isinstance(part,dict)else part
+                            for part in word_decision['source_parts']])
+                    # Tight evidence remains in final notes, never an inline word crop.
+                    clip=extract.pymupdf.Rect(crop);clip.x0-=2;clip.y0-=2;clip.x1+=2;clip.y1+=2;clip &= display.rect
+                    _word_disclosure_image(package,src,display,clip,word_decision.get('source_parts'))
+                    image_records[src]=dict(page=pno,bbox=list(clip),kind='vision_disclosure',
+                        **({'source_parts':copy.deepcopy(word_decision['source_parts'])}
+                           if word_decision.get('source_parts')else {}))
+                    label=('Unverified local OCR reading' if local_ocr else
+                        'Uncertain source reading fallback' if result['fallback'] else
+                        'Model reading differs from source layer' if words else 'Low-confidence model reading')
+                    if local_ocr:
+                        source_quote=('This local OCR transcription has not been independently verified. '
+                            'Consult the original printed reading in the image. '
+                            f'<a href="#v4-local-ocr-source-{pno}">View complete original page</a>.')
+                    elif original_quality['needs_read']:
+                        source_quote='The text layer is unreliable; consult the original printed reading in the image.'
+                        suppression=source_quote_suppressions.setdefault(bid,dict(block=bid,quality=original_quality,disclosure_count=0))
+                        suppression['disclosure_count']+=1
+                    else:
+                        source_quote='Source reading: '+escape(' '.join(owned_word['text'] for owned_word in local if any(owned_word['bbox']==evidence_boxes.get(i) for i in endings[index])))+'.'
+                    decision=(result.get('word_notes') or {}).get(index)
+                    if len(endings[index])>1 and all(i in flagged_readings for i in endings[index]):
+                        members=[result.get('word_notes',{}).get(i,{})for i in endings[index]]
+                        decision=dict(source=[s for d in members for s in d.get('source',[])],
+                            model=[s for d in members for s in d.get('model',[])],
+                            chosen=[result['tokens'][i]for i in endings[index]],status='UNRESOLVED',
+                            method='contiguous_unproved_reading')
+                    if decision:
+                        label=(('Unverified local OCR reading; pixel-supported correction' if decision['status']=='RESOLVED'
+                                else 'Unverified local OCR reading') if local_ocr else
+                               'Pixel-verified correction' if decision['status']=='RESOLVED' else 'Unresolved source reading')
+                        before=(decision.get('model',[]) if decision['source']==decision['chosen']
+                                and decision.get('model',[])!=decision['chosen'] else decision['source'])
+                        source_quote=(escape(' '.join(before)) or '[no word]')+' → '+(escape(' '.join(decision['chosen'])) or '[no word]')+'.'
+                    if local_ocr:
+                        explanation=((source_quote+' ') if decision and (decision['status']=='RESOLVED' or decision.get('source')!=decision.get('chosen')) else '')+'This local OCR transcription has not been independently verified. Consult the original printed reading in the image. '+f'<a href="#v4-local-ocr-source-{pno}">View complete original page</a>.'
+                    elif decision:
+                        if decision.get('method')=='complete_vision_reading_without_optical_counterevidence':
+                            explanation=source_quote+' The complete vision reading is retained. The optical alternative has no complete competing word. Compare the original printed word in the image.'
+                        elif decision.get('mapping')=='unplaced_within_span':
+                            explanation=escape(' '.join(decision['chosen']))+'. Its source-word correspondence is unresolved. Compare the original printed span in the image.'
+                        elif decision['source']==decision['chosen'] and decision.get('model',decision['source'])==decision['chosen']:
+                            explanation=escape(' '.join(decision['chosen']))+'. Consult the original printed word in the image.'
+                        else:explanation=source_quote+(' An independent upright crop supports this correction.' if decision['status']=='RESOLVED' else ' An independent upright crop could not settle this difference.')+' Compare the original printed word in the image.'
+                    else:explanation=escape(' '.join(result['tokens'][i] for i in endings[index]))+'. '+source_quote
+                    if decision and decision.get('source_image_only'):
+                        explanation=((source_quote+' ')if decision['source']!=decision['chosen']else '')+'The independent pixel readings do not settle this printed word. Read the original image.'
+                    if original_quality['needs_read'] and not local_ocr:
+                        explanation='The text layer is unreliable; consult the original printed reading in the image. '+explanation
+                    if index in flagged_readings:
+                        label='Unverified local OCR reading'if local_ocr else'Unresolved source reading'
+                        explanation='Plausible reading; it has not been independently proved. Compare the adjacent original print. '+explanation
+                    extras.append(f'<aside id="{ident}" class="footnote vision-disclosure" data-reflow-owner-page="{pno}" data-reflow-owner-block="{escape(bid,quote=True)}" epub:type="footnote"><p>{label}: {explanation}</p><img src="{src}" alt="Original printed reading"/><a href="#{ref}">Return</a></aside>')
+                    if index in flagged_readings:
+                        piece=flagged_piece(print_endings[index],ident,src,reading_html=piece if index in literal else None)
+                    elif decision and decision.get('source_image_only'):
+                        from . import inline_print
+                        inline_src=src;inline_style='height:1.4em;vertical-align:-0.25em;width:auto'
+                        preview=(inline_print.preview(display,crop)
+                                 if not word_decision.get('source_parts') and len(boxes)==len(endings[index]) else None)
+                        if preview is not None and hasattr(package,'image'):
+                            data,metrics=preview
+                            inline_src=f'images/{ident}-inline.png'
+                            package.image(inline_src,data)
+                            image_records[inline_src]=dict(page=pno,kind='inline_print_preview',coverage_eligible=False,
+                                inspection_image=src,**metrics)
+                            inline_style=metrics['style']
+                        piece=(f'<a class="source-word-image" href="#{ident}"><img src="{inline_src}" '
+                            f'alt="Unresolved printed word; inspect original" style="{inline_style}"/></a>')
+                    piece+=f'<a id="{ref}" class="source-disclosure-ref" epub:type="noteref" href="#{ident}"><sup>†</sup></a>'
+                if local_ocr and index in result['marked']:
+                    piece='<span class="uncertain" title="Unverified local OCR reading">'+piece+'</span>'
+                pieces.append(piece)
+            _coalesce_inline_source_images(pieces,display,pno,bid,package,image_records)
+            from . import occurrence_coverage
+            inventory=(raw['words']if local_ocr and local_ocr_units is not None and raw else optical_local or local)
+            coverage=occurrence_coverage.classify(inventory,result['tokens'],evidence_boxes,
+                result.get('word_notes',{}),image_records,pno)
+            for row in coverage:
+                if any(occurrence_coverage._contains(region,row['source_bbox'])for region in result.get('decorative_source_regions',[])):
+                    row.update(disposition='excluded',rule='measured_contents_dot_leader',published_indices=[])
+            typed_occurrences=[dict(source_bbox=proof['source_bbox'],label=proof['label'],
+                target=f'v4-ref-{pno}-{bid}-{index}')for index,proof in placeholder_display.items()
+                if proof.get('status')=='PROVED'and proof.get('source_bbox')]
+            if opening_proof and opening_proof['identity_status']=='PROVED':
+                typed_occurrences.append(dict(source_bbox=opening_proof['source_bbox'],
+                    label=block['marker'],target=f'v4-note-{pno}-{bid}'))
+            for row in coverage:
+                matches=[proof for proof in typed_occurrences
+                    if occurrence_coverage._key(proof['label'])==occurrence_coverage._key(row['source_text'])
+                    and occurrence_coverage._contains(proof['source_bbox'],row['source_bbox'])]
+                if len(matches)==1:row.update(disposition='live',typed_reference=matches[0]['target'])
+            # A proved printed note label sits outside the lexical note span.
+            # Account for its own source occurrence and actual target explicitly.
+            for proof in typed_occurrences:
+                if not any(occurrence_coverage._key(row['source_text'])==occurrence_coverage._key(proof['label'])
+                        and occurrence_coverage._contains(proof['source_bbox'],row['source_bbox'])for row in coverage):
+                    coverage.append(dict(source_text=proof['label'],source_bbox=proof['source_bbox'],
+                        disposition='live',typed_reference=proof['target'],published_indices=[]))
+            missing=[row for row in coverage if row['disposition']=='missing']
+            if missing:
+                # A replacement optical inventory cannot silently erase source
+                # occurrences. Keep healthy live words; retain only this gap's
+                # unresolved ownership in an explicit original-print context.
+                from .unit_source import source_unit
+                _,contexts,unit=source_unit(display,pno,'coverage-'+bid,'other',package,image_records,
+                    'Source occurrences without a unique live-word binding are retained as original print',
+                    bbox=vision_reading.union([row['source_bbox']for row in missing]))
+                extras.extend(contexts)
+                origin=unit['source_reference_origin'];target=unit['source_reference']
+                pieces.append(f'<a id="{origin}" class="source-disclosure-ref" epub:type="noteref" href="#{target}"><sup>†</sup></a>')
+                marked+=1
+                for row in missing:row.update(disposition='print',image=unit['image'],
+                    source_reference=target,method='unplaced_occurrence_original_print')
+            text=''.join(('' if (emission_groups.get(i,[i])[0]==0 or emission_groups.get(i,[i])[0] in wraps) else ' ')+piece
+                         for i,piece in enumerate(pieces) if piece)
+            text,unit_print_html=_present_flagged_prints(text,display,pno,bid,territories,
+                package,image_records,extras,evidence_words=pixel_words or local,heading=role=='heading',
+                protected_inspections={item['source_reference']for item in marker_disclosures})
+            # The marker is typographic punctuation, not a standalone sentence block.
+            text=re.sub(r'\s+(<a[^>]*class="noteref".*?</a>)',r'\1',text)
+            text=(f'<span data-source-page="{pno}" data-source-block="{escape(bid,quote=True)}" '
+                  f'data-source-regions="{escape(json.dumps(territories),quote=True)}">{text}</span>')
+            tag='h2' if role=='heading' else 'p'
+            html=f'<{tag}>{text}</{tag}>'+unit_print_html
+            if role=='footnote':
+                label_html=escape(block['marker'])
+                if opening_proof and opening_proof['identity_status']=='UNPROVED':
+                    bounds=opening_proof['source_bbox'];receipts=(note_context or {}).get('marker_receipts',{})
+                    # Reuse a verified partition/opening receipt at this exact
+                    # glyph. A geometry reservation alone never proves identity.
+                    def same_slot(receipt):
+                        box=receipt.get('source_bbox') or []
+                        return len(box)==4 and all(box[i]-1<=bounds[i] for i in (0,1)) and all(bounds[i]<=box[i]+1 for i in (2,3))
+                    verified=any(same_slot(r) and r.get('label')==block['marker'] and not r.get('uncertain',True)
+                        for r in receipts.get(pno,[]))
+                    reader=(note_context or {}).get('marker_reader')
+                    if not verified and reader:
+                        try:
+                            verified=_verify_note_glyph(display,bounds,reader,receipts,pno,'footnote_opening')==block['marker']
+                        except (vision_reading.model.ModelError,vision_reading.model.CapExceeded) as error:
+                            # This optional label read may be unavailable before
+                            # dispatch. Its existing local source control owns
+                            # that uncertainty; do not discard readable note text.
+                            # Cancellation, ambiguous billing and unexpected
+                            # failures retain their ordinary recovery behavior.
+                            if not (isinstance(error,vision_reading.model.CapExceeded) or
+                                    type(error) is vision_reading.model.ModelError and
+                                    str(error)=='Printed marker absent from offline cache'):raise
+                            receipts.setdefault(pno,[]).append(dict(label='',uncertain=True,
+                                deferred=True,request_dispatched=False,new_cost_usd=0.,cached=False,
+                                source_bbox=list(bounds),kind='footnote_opening',
+                                reason='opening_glyph_not_verified_without_dispatch'))
+                    if not verified:
+                        from .unit_source import source_unit
+                        _,contexts,unit=source_unit(display,pno,'opening-'+bid,'other',package,image_records,
+                            'Printed note opening label requires original source inspection',bbox=bounds)
+                        extras.extend(contexts)
+                        label_html=(f'<a id="{unit["source_reference_origin"]}" class="source-disclosure-ref" epub:type="noteref" '
+                            f'href="#{unit["source_reference"]}">{label_html}</a>')
+                        marker_disclosures.append(dict(unit,page=pno,block=bid,unit_kind='note_marker',
+                            status='DEGRADED_SOURCE_CONTEXT',opening_identity='UNPROVED'))
+                        marked+=1
+                asides.append((bid,f'<aside id="v4-note-{pno}-{bid}" class="footnote" epub:type="footnote"><p>{label_html} {text}</p>'+unit_print_html))
+            elif role=='caption':body.append(f'<p class="caption">{text}</p>'+unit_print_html)
+            else:body.append(html)
+            geometry_words=native_geometry if native_geometry is not None else optical_local
+            geometry_rows=_pixel_row_ids(geometry_words) if native_geometry is not None else pixel_rows
+            printed=owned_words(geometry_words,territories[0])
+            rows=_pixel_lines(printed)
+            # Column skew far below the opening is not a paragraph indent. Compare
+            # the opening with nearby subsequent line starts in its own territory.
+            import statistics
+            opening_left=(statistics.median(min(w['bbox'][0] for w in row) for row in rows[1:4])
+                          if len(rows)>1 else None)
+            # Original-ink word images carry no live spelling. Rejected OCR
+            # labels must not become structural anchors for that publication.
+            live_tokens=[t for i,t in enumerate(result['tokens'])
+                if not (result.get('word_notes',{}).get(i,{}).get('source_image_only') or
+                        result.get('word_notes',{}).get(i,{}).get('source_image_only_before_publication'))]
+            printed_head,printed_tail=_published_pixel_edges(live_tokens,geometry_words)
+            head_variant=None
+            visible=[t for t in result['tokens'] if not t.startswith('<n:')]
+            if printed_head is None and visible and optical_local:
+                published=re.fullmatch(r'[-­‐‑]+([a-z]{2,})[.,;:]?',visible[0])
+                source=re.fullmatch(r"['’‘\"\-­‐‑]*([a-z]{2,})[.,;:]?",optical_local[0]['text'])
+                if published and source and published[1]==source[1]:
+                    head_variant={'published':visible[0],'source':optical_local[0]['text'],
+                                  'letters':source[1],'bbox':optical_local[0]['bbox']}
+            art_gap=None
+            if role=='caption' and printed_head is None and printed_tail is None:
+                at=answer['blocks'].index(block)
+                adjacent=[next((x for x in sequence if x['role'] not in ('caption','running_head','folio')),None)
+                          for sequence in (reversed(answer['blocks'][:at]),answer['blocks'][at+1:])]
+                candidates=[]
+                for art in adjacent:
+                    if art is None or art['role'] not in ('figure','table'):continue
+                    source=(regions or {}).get(art['id'])
+                    degraded=(figure_cases or {}).get(art['id'])
+                    if not source and not degraded:continue
+                    if art['role']=='table':
+                        from . import vision_pixels
+                        if not vision_pixels.table_rules(display,block_rect(art,display)):continue
+                    bound=vision_reading.union(source) if source else block_rect(art,display)
+                    gap=max(0,bound[1]-box[3],box[1]-bound[3])
+                    horizontal=max(0,bound[0]-box[2],box[0]-bound[2])
+                    candidates.append((gap+horizontal,art,bound))
+                if candidates:
+                    _,art,bound=min(candidates,key=lambda value:value[0])
+                    # Structural attachment moves the caption with its independently
+                    # source-bound object. Exact caption territories still identify
+                    # its own words; an unmatched hint receives no invented anchors.
+                    art_gap={'object':art['id'],'bbox':bound}
+            alignment.append(dict(id=bid,role=role,bbox=box,source_regions=territories,
+                source_rows=[vision_reading.union([w['bbox'] for w in row])
+                             for territory in territories for row in _pixel_lines(owned_words(geometry_words,territory))],
+                first_line_x=min((w['bbox'][0] for w in rows[0]),default=None) if rows else None,
+                opening_column_left=opening_left,
+                printed_tail=printed_tail['text'] if printed_tail is not None else None,
+                printed_head=printed_head['text'] if printed_head is not None else None,
+                printed_tail_box=printed_tail['bbox'] if printed_tail is not None else None,
+                printed_head_box=printed_head['bbox'] if printed_head is not None else None,
+                printed_tail_row=geometry_rows.get(id(printed_tail.get('_source_word',printed_tail))) if printed_tail is not None else None,
+                printed_head_row=geometry_rows.get(id(printed_head.get('_source_word',printed_head))) if printed_head is not None else None,
+                physical_head=(dict(text=geometry_words[0]['text'],bbox=geometry_words[0]['bbox']) if geometry_words else None),
+                physical_tail=(dict(text=geometry_words[-1]['text'],bbox=geometry_words[-1]['bbox']) if geometry_words else None),
+                disputed_head_prefix=head_variant,source_art_gap=art_gap,
+                punctuation_source_anchors=[dict(source_word_index=i,
+                    lexical_whitespace_token_index=j,source_bbox=optical_evidence[i]['bbox'])
+                    for i,j in punctuation_proof],
+                occurrence_coverage=coverage,
+                decorative_source_regions=result.get('decorative_source_regions',[]),
+                published_word_boxes={str(i):list(box)for i,box in evidence_boxes.items()},
+                published_tokens=result['tokens'],
+                marked=sorted(result['marked']),fallback=result['fallback'],guard=result['guard'],
+                flagged_readings={str(i):choice for i,choice in flagged_readings.items()},
+                adjudication=result.get('adjudication',[]),source_image_words=sorted(i for i,d in (result.get('word_notes')or{}).items()if d.get('source_image_only')),verified_unchanged=sorted(set(result.get('verified_unchanged',[]))),original_model_tokens=original_model_tokens,
+                layer_words=[w['text'] for w in local],dropped_layer_words=result['dropped_layer_words'],
+                continues_previous=block['continues_previous'],continues_next=block['continues_next']))
+            if role=='caption' and punctuation_proof and printed_head is not None and printed_tail is not None:
+                # Uniqueness must cover the original page, not just locally owned
+                # words: a displaced hint could otherwise hide a second caption.
+                complete=_caption_punctuation_anchors(pixel_words,
+                    list(range(len(pixel_words))),block['text']) if pixel_words else []
+                local_box=vision_reading.union([optical_evidence[i]['bbox'] for i,j in punctuation_proof])
+                complete_box=vision_reading.union([pixel_words[i]['bbox'] for i,j in complete]) if complete else None
+                if complete_box==local_box:
+                    # Structural location only; original context stays whole.
+                    alignment[-1]['source_complete_caption_bbox']=local_box
+            if optical_local:
+                # Whole original optical tokens can belong to only one live
+                # reading unit. Equal spelling at another rectangle is distinct;
+                # fused/partial tokens and interpolated alignment boxes prove no
+                # ownership. Only successfully compiled blocks make claims.
+                from difflib import SequenceMatcher
+                lexical=lambda text:re.sub(r'[^\w]', '', vision_reading.normalized(text).casefold())
+                source=[(word,lexical(word['text'])) for word in optical_local
+                        if lexical(word['text'])]
+                chosen=[lexical(token) for token in result['tokens']
+                        if not token.startswith('<n:') and lexical(token)]
+                matched=SequenceMatcher(None,[key for word,key in source],chosen,autojunk=False)
+                for first,_,count in matched.get_matching_blocks():
+                    for word,key in source[first:first+count]:
+                        pixel_claims.setdefault(_source_instance(word),set()).add(bid)
+                if independent_optical_fallback:optical_fallbacks.add(bid)
+        except _DisclosureQualityRejection as error:
+            controller=unit_recovery.current()
+            if controller is None:raise
+            # Refine only against source-bound admitted unit identities,
+            # including omitted-line recovery registered before compilation.
+            admitted={b['id'] for b in controller.source_answer(pno)['blocks']}
+            owned=block['id'] if block['id'] in admitted else None
+            units=controller.refine_units([dict(page=pno,block=owned)],error)
+            quality_failures.extend(dict(unit,source_failure_reason=str(error)) for unit in units)
+    borrowed={bid for claimants in pixel_claims.values() if len(claimants)>1
+              for bid in claimants if bid in optical_fallbacks}
+    if borrowed:
+        error=_DisclosureQualityRejection('Optical fallback has nonunique source ownership; original source disclosure required')
+        controller=unit_recovery.current()
+        if controller is None:raise error
+        units=controller.refine_units([dict(page=pno,block=bid) for bid in sorted(borrowed)],error)
+        quality_failures.extend(dict(unit,source_failure_reason=str(error)) for unit in units)
+    if quality_failures:
+        raise _CompilationQualityFailure(quality_failures)
     note_html=[]
     for nid,html in asides:
         backlinks='' if note_context else ' '.join(f'<a href="#{ref}">Return</a>' for ref in refs.get(nid,[]))
         note_html.append(html+backlinks+'</aside>')
+    from .occurrence_coverage import summary as coverage_summary
     return {'pno':pno,'anchor':f'<span id="pg_{pno:04d}"></span>',
             'body':body,'asides':note_html+extras},dict(blocks=alignment,marks=marked,words=tokens_count,
+            occurrence_coverage=coverage_summary([row for block in alignment for row in block.get('occurrence_coverage',[])]),
             unlinked_notes=sorted(set(footnotes)-set(refs)),source_figure_contexts=list((figure_cases or {}).values()),
-            live_table_cells=live_table_cells,note_marker_disclosures=marker_disclosures,note_marker_repairs=marker_repairs)
+            live_table_cells=live_table_cells,note_marker_disclosures=marker_disclosures,note_marker_repairs=marker_repairs,
+            source_quote_suppressions=list(source_quote_suppressions.values()),
+            **({'local_ocr_units':final_local_units} if local_ocr and local_ocr_units is not None else {}))
 
 
 def bind_geometry(answer,optical,display,regions=None,body_owners=None):
@@ -2071,6 +4156,13 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
     from difflib import SequenceMatcher
     import statistics
     answer=copy.deepcopy(answer);repairs=[]
+    def reject(message):
+        # The current response unit owns this error. A previous loop's note
+        # object must not turn an unplaced block into a page-wide rejection.
+        if unit_recovery.current() is None:
+            raise ValueError(message)
+        with unit_recovery.guard(display.pno,'geometry',block=block['id']):
+            raise ValueError(message)
     def lex(word):return re.sub(r'[^\w]', '', vision_reading.normalized(word).casefold())
     source=[lex(w['text']) for w in optical]
     referenced={n for b in answer['blocks'] for n in re.findall(r'<n:([^>]+)>',b['text'])}
@@ -2109,20 +4201,51 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
     # matching that paragraph. Tight, independently coherent BODY instances
     # remain protected from displaced note hints.
     note_openings={}
+    # A model can duplicate a separately owned BODY prefix in a note. Its
+    # complete source-backed body owner and the remaining note's own printed
+    # opening prove the partition; no text is transferred to another note.
+    for note in answer['blocks']:
+        if note['role']!='footnote':continue
+        proposed=note['text'].split()
+        for body in answer['blocks']:
+            prefix=body['text'].split()
+            if (body['role']!='body' or body['id'] not in owners or len(prefix)<5 or
+                    len(proposed)-len(prefix)<5 or
+                    [lex(t)for t in proposed[:len(prefix)]]!=[lex(t)for t in prefix]):continue
+            from .source_geometry import labelled_note_anchors,local_note_openings
+            available=[i for i in range(len(optical))if i not in reserved]
+            candidate=[lex(t)for t in proposed[len(prefix):]]
+            hint=block_rect(note,display)
+            opening=local_note_openings(optical,available,note['marker'],hint)
+            proof=labelled_note_anchors(optical,available,candidate,note['marker'],openings=opening)
+            if not proof or {j for i,j in proof['anchors']}!=set(range(len(candidate))):continue
+            note['text']=' '.join(proposed[len(prefix):])
+            note['low_confidence']=[i-len(prefix)for i in note['low_confidence']if i>=len(prefix)]
+            repairs.append(dict(block=note['id'],method='separate_owned_body_prefix_excluded',
+                body_owner=body['id'],excluded_token_count=len(prefix)))
+            break
     for note in answer['blocks']:
         x=note['bbox']
         if note['role']!='footnote' or not (all(0<=v<=1000 for v in x) and x[0]<x[2] and x[1]<x[3]):continue
         hint=block_rect(note,display)
         candidate=[lex(w) for w in re.sub(r'<n:[^>]+>',' ',note['text']).split()]
         available=[i for i in range(len(optical)) if i not in reserved]
-        anchors=_note_pixel_anchors(optical,available,candidate,hint)
+        from .source_geometry import labelled_note_anchors,local_note_openings
+        openings=local_note_openings(optical,available,note['marker'],hint)
+        labelled=labelled_note_anchors(optical,available,candidate,note['marker'],openings=openings or None)
+        complete=_note_pixel_anchors(optical,available,candidate,hint,exact_complete=True)
+        if labelled and complete and any(dict((j,i)for i,j in complete).get(j)!=i for i,j in labelled['anchors']):complete=[]
+        anchors=complete or (labelled['anchors'] if labelled else _note_pixel_anchors(optical,available,candidate,hint))
+        if labelled:note_openings[note['id']]=labelled['marker_bbox']
         local=[(i,j) for i,j in anchors if owned_words([optical[i]],hint)]
-        if (len({j for i,j in anchors})<min(5,len(candidate)) or
+        if (len({j for i,j in anchors})+bool(labelled)<min(5,len(candidate)) or
                 len({j for i,j in anchors})/max(1,len(candidate))<.6 or
-                len({j for i,j in local})<min(5,len(candidate))):continue
+                not labelled and len({j for i,j in local})<min(5,len(candidate))):continue
         indices={i for i,j in anchors}
         opening=min(anchors,key=lambda a:a[1])
-        if note['marker'] and opening[1]<=1:
+        if labelled:
+            indices.update(i for i in available if optical[i]['bbox']==labelled['marker_bbox'])
+        if not labelled and note['marker'] and opening[1]<=1:
             first=optical[opening[0]]['bbox']
             height=max(1,first[3]-first[1]);marker=lex(note['marker'])
             labels=[i for i in available if i not in indices and
@@ -2131,7 +4254,15 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                 0<=first[0]-optical[i]['bbox'][2]<=3*height and
                 (lex(optical[i]['text'])==marker or
                  lex(optical[i]['text']).startswith(marker) and
-                 len(lex(optical[i]['text']))==len(marker)+1)]
+                 len(lex(optical[i]['text']))==len(marker)+1 or
+                 # A uniquely adjacent raised glyph can own this opening
+                 # without its OCR spelling proving the numeric identity.
+                 # Reserve its ink for the note's existing UNPROVED control;
+                 # omission recovery must not append it to preceding prose.
+                 marker.isdigit() and len(optical[i]['text'])==1
+                 and not optical[i]['text'].isalnum()
+                 and optical[i]['bbox'][3]-optical[i]['bbox'][1]<height*.85
+                 and optical[i]['bbox'][3]<first[3]-height*.25)]
             if len(labels)==1:
                 indices.add(labels[0]);note_openings[note['id']]=optical[labels[0]]['bbox']
         for i in indices:
@@ -2139,11 +4270,19 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
             if regions is not None:regions.setdefault('_instances',{})[_source_instance(optical[i])]=note['id']
     # Bind BODY first so restored edge instances are reserved before a caption
     # or note can globally borrow its inline reference or continuation.
+    controller=unit_recovery.current()
+    blocked=controller.blocked(display.pno) if controller else {}
     for block in sorted(answer['blocks'],key=lambda b:b['role']!='body'):
+        if (block['role']=='footnote' and block['id'] in blocked
+                and block['text']==block['marker']==''):
+            # A rejected note's identity carrier cannot establish pixel
+            # ownership, including when its original rectangle was invalid.
+            if regions is not None:regions[block['id']]=[]
+            continue
         x=block['bbox'];valid=all(0<=v<=1000 for v in x) and x[0]<x[2] and x[1]<x[3]
         if block['role'] in ('figure','table') and valid:continue
         candidate=[lex(w) for w in re.sub(r'<n:[^>]+>',' ',block['text']).split()]
-        available=[i for i in range(len(optical)) if block['role'] not in ('body','caption','footnote') or reserved.get(i,block['id'])==block['id']]
+        available=[i for i in range(len(optical)) if block['role'] not in ('body','caption','footnote','heading') or reserved.get(i,block['id'])==block['id']]
         if valid and block['role']=='other' and re.fullmatch(r'[A-Za-z0-9°○]{1,3}',block['text'].strip()):
             hint=block_rect(block,display);r=display.rect
             # A shifted short margin hint can find its real glyph in the same
@@ -2154,6 +4293,20 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                 available=[i for i in available if optical[i]['bbox'][3]<r.height*.13]
         local_indices=[i for i in available if owned_words([optical[i]],block_rect(block,display))] if valid else []
         matched=_geometry_anchors(optical,local_indices,candidate,body=valid and block['role']=='body',wrap_pool=available)
+        if valid and block['role']=='heading' and 2<=len(candidate)<=4 and matched:
+            # A short run-in title may have one damaged OCR word. Its exact
+            # neighbours locate one continuous physical row after BODY claims
+            # have been excluded. Reserve that ink without certifying spelling.
+            anchor_boxes=[optical[i]['bbox'] for i,j in matched]
+            middle=statistics.median((box[1]+box[3])/2 for box in anchor_boxes)
+            height=statistics.median(max(1,box[3]-box[1]) for box in anchor_boxes)
+            row=sorted((i for i in local_indices if
+                abs(sum(optical[i]['bbox'][1::2])/2-middle)<=height*.55),
+                key=lambda i:optical[i]['bbox'][0])
+            if (len(row)==len(candidate) and sum(source[i]==key for i,key in zip(row,candidate))>=len(candidate)-1
+                    and all(optical[b]['bbox'][0]-optical[a]['bbox'][2]<=2*height for a,b in zip(row,row[1:]))):
+                matched=list(zip(row,range(len(candidate))))
+        seed_caption_complete=False
         if block['role']=='caption' and valid and len({j for i,j in matched})<len(candidate):
             # Caption hints can be displaced by a few printed rows. Recover
             # exact nearby instances, with BODY reservations already removed;
@@ -2167,6 +4320,14 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
             if len({j for i,j in extended})>len({j for i,j in matched}):matched=extended
             punctuated=_caption_punctuation_anchors(optical,nearby,block['text'])
             if len({j for i,j in punctuated})>len({j for i,j in matched}):matched=punctuated
+            # A complete nearby physical occurrence must survive a shorter
+            # local match. Uniqueness and complete coverage are required; this
+            # cannot promote a partial caption or borrow reserved BODY words.
+            from .source_geometry import unique_anchors
+            nearby_proof=unique_anchors(optical,nearby,candidate)
+            if {j for i,j in nearby_proof}=={j for j,key in enumerate(candidate) if key}:
+                matched=nearby_proof
+                seed_caption_complete=True
             # A displaced caption hint can still be proved inside the seed of
             # its adjacent source object. Admit only a complete unique original
             # text instance, with all independently owned BODY ink excluded.
@@ -2183,6 +4344,7 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
             seed_proof=_caption_punctuation_anchors(optical,seed_indices,block['text'])
             if seed_proof and {j for i,j in seed_proof}=={j for j,key in enumerate(candidate) if key}:
                 matched=seed_proof
+                seed_caption_complete=True
                 repairs.append(dict(block=block['id'],method='unique_complete_caption_in_adjacent_source_seed',
                     source_word_indices=list(dict.fromkeys(i for i,j in seed_proof))))
             if not punctuated and not seed_proof:
@@ -2193,14 +4355,120 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                     first=min(j for i,j in suffix)
                     matched=sorted(set([(i,j) for i,j in matched if j<first]+suffix),
                         key=lambda pair:(pair[1],optical[pair[0]]['bbox'][0]))
+        labelled=None;local_openings=[];complete_note=[]
         if block['role']=='footnote' and valid:
-            matched=_note_pixel_anchors(optical,available,candidate,block_rect(block,display))
+            from .source_geometry import labelled_note_anchors,local_note_openings
+            hint=block_rect(block,display)
+            local_openings=local_note_openings(optical,available,block['marker'],hint)
+            labelled=labelled_note_anchors(optical,available,candidate,block['marker'],openings=local_openings or None)
+            complete_note=_note_pixel_anchors(optical,available,candidate,hint,exact_complete=True)
+            if labelled and complete_note and any(dict((j,i)for i,j in complete_note).get(j)!=i for i,j in labelled['anchors']):complete_note=[]
+            matched=complete_note or (labelled['anchors'] if labelled else _note_pixel_anchors(optical,local_indices if local_openings else available,candidate,hint))
+            if labelled:note_openings[block['id']]=labelled['marker_bbox']
+        from .source_geometry import unique_anchors
+        proof_pool=(local_indices if valid and block['role'] in ('running_head','folio','heading','caption') else available)
+        # A printed note opening owns its local footer even when its reading is
+        # damaged. A pagewide prose match cannot move that note onto BODY ink.
+        if local_openings:proof_pool=local_indices
+        corroborated=unique_anchors(optical,proof_pool,candidate) if not labelled and not seed_caption_complete and not complete_note else []
+        if (corroborated and valid and block['role']=='body' and candidate and
+                {j for i,j in matched if source[i]==candidate[j]}==set(range(len(candidate)))):
+            # Exact common words elsewhere in a wide hint do not establish
+            # paragraph continuity. Retain disjoint rows only when an actual
+            # source object separates them within the proved text column.
+            compact=vision_reading.union([optical[i]['bbox']for i,j in corroborated])
+            extent=vision_reading.union([optical[i]['bbox']for i,j in matched])
+            rows=[vision_reading.union([word['bbox']for word in row])
+                  for row in _pixel_lines([optical[i]for i,j in matched])]
+            # A broad row can extend beside a narrower wrapped row. Column
+            # continuity is a row-span property, not an every-word overlap.
+            same_column=all(min(box[2],compact[2])>max(box[0],compact[0])for box in rows)
+            ordered_rows=sorted(rows,key=lambda box:box[1])
+            art_between=any(any(left[3]<box[3] and box[1]<right[1]
+                                for left,right in zip(ordered_rows,ordered_rows[1:]))
+                and min(box[2],extent[2])>max(box[0],extent[0])
+                for other in answer['blocks']if other['role']in ('figure','table')
+                for box in [block_rect(other,display)])
+            if same_column and art_between:corroborated=matched
+        if corroborated:
+            # Compact exact proof must retain an independently located divided
+            # edge atom. The existing matcher proves that partial word beside
+            # its exact same-row neighbour; it is not a distant text match.
+            partial=[]
+            if block['role']=='body' and valid:
+                # A compact continuation cannot erase an exact hinted prefix
+                # when original ink proves the divided word across artwork.
+                # This joins source territories, never the intervening pixels.
+                exact = sorted((i,j) for i,j in matched if source[i] == candidate[j])
+                prefix = sorted(exact, key=lambda pair: pair[1])
+                n = 0
+                while n < len(prefix) and prefix[n][1] == n:
+                    n += 1
+                prefix = prefix[:n]
+                tail_positions = {j for i,j in corroborated}
+                if (n >= 3 and n < len(candidate) and
+                        any(len(candidate[j]) >= 6 for i,j in prefix) and
+                        set(range(n+1,len(candidate))) <= tail_positions):
+                    ends = [i for i in local_indices if
+                        optical[i]['text'].endswith(tuple(assemble.HYPHENS)) and
+                        candidate[n].startswith(source[i]) and source[i] != candidate[n]]
+                    pairs = []
+                    for a in ends:
+                        left = optical[a]['bbox'];h = max(1,left[3]-left[1])
+                        previous = optical[prefix[-1][0]]['bbox']
+                        if not (abs(sum(left[1::2])-sum(previous[1::2]))<=h and
+                                0 <= left[0]-previous[2] <= 3*h):continue
+                        if any(w['bbox'][0]>=left[2] and
+                            abs(sum(w['bbox'][1::2])-sum(left[1::2]))<=h for w in optical):continue
+                        for b in available:
+                            right = optical[b]['bbox']
+                            if source[a]+source[b] != candidate[n] or right[1] <= left[3]:continue
+                            if any(w['bbox'][2]<=right[0] and
+                                abs(sum(w['bbox'][1::2])-sum(right[1::2]))<=h for w in optical):continue
+                            following = [optical[i]['bbox']for i,j in corroborated if j==n+1]
+                            if len(following)!=1:continue
+                            near=following[0]
+                            if not (abs(sum(right[1::2])-sum(near[1::2]))<=2*h and
+                                    0 <= near[0]-right[2] <= 3*h and
+                                    abs(right[0]-optical[prefix[0][0]]['bbox'][0])<=3*h):continue
+                            if not any(other['role'] in ('figure','table') and
+                                left[3]<block_rect(other,display)[1] and
+                                block_rect(other,display)[3]<right[1]for other in answer['blocks']):continue
+                            pairs.append((a,b))
+                    if len(pairs)==1:
+                        a,b=pairs[0]
+                        partial.extend(prefix+[(a,n),(b,n)])
+            if block['role']=='body':
+                for index,position in matched:
+                    if position not in (0,len(candidate)-1):continue
+                    raw=optical[index]['text'];atom=lex(raw);whole=candidate[position]
+                    if len(atom)<2 or atom==whole or not whole.isalpha():continue
+                    leading=position==0
+                    if not (whole.endswith(atom) if leading else
+                            raw.endswith(tuple(assemble.HYPHENS)) and whole.startswith(atom)):continue
+                    neighbors=[i for i,j in corroborated if j==position+(1 if leading else -1)]
+                    if len(neighbors)!=1:continue
+                    box=optical[index]['bbox'];near=optical[neighbors[0]]['bbox']
+                    height=max(1,box[3]-box[1],near[3]-near[1])
+                    gap=near[0]-box[2] if leading else box[0]-near[2]
+                    if abs((box[1]+box[3]-near[1]-near[3])/2)<=height*.55 and 0<=gap<=2*height:
+                        partial.append((index,position))
+            matched=sorted(set(corroborated+partial),key=lambda pair:pair[1])
+        if not corroborated and block['role']=='body' and hasattr(display,'doc'):
+            from .source_geometry import native_pixel_anchors
+            if not hasattr(display,'_placement_words'):
+                display._placement_words=layer_words(display.doc,display.pno,display)
+            joint=native_pixel_anchors(display._placement_words,optical,available,candidate)
+            if joint:
+                matched=joint
+                repairs.append(dict(block=block['id'],method='native_sequence_on_independent_pixel_ink'))
         borrowed=(block['role']=='body' and block['id'] not in owners and any(
             max(n for a,b,n in SequenceMatcher(None,[source[i] for i in range(len(optical))
                 if reserved.get(i)==owner],candidate,autojunk=False).get_matching_blocks())>=vision_reading.UNALIGNED_RUN
             for owner in owners if owner!=block['id']))
         count=len({j for _,j in matched})
         local_owned=borrowed and count>=5 and count/max(1,len(local_indices))>=.6
+        globally_relocated=False
         if count/max(1,len(candidate))<.6 and not local_owned:
             # A damaged marginal heading can repeat verbatim inside the prose.
             # Its valid source rectangle still owns that margin: a global text
@@ -2212,10 +4480,40 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
             else:
                 local_indices=available
                 if block['role']!='footnote':matched=_geometry_anchors(optical,local_indices,candidate)
+                globally_relocated=block['role']=='body'
         anchors=matched
-        if len(anchors)<min(5,len(candidate)) or (len(anchors)/max(1,len(candidate))<.6 and not (valid and borrowed)):
-            if valid:continue
-            raise ValueError('Model block rectangle cannot be bound to printed pixels: '+block['id'])
+        if block['role']=='body':
+            # A repeated list number elsewhere on the page cannot bridge a
+            # displaced hint to its real paragraph. A numeric boundary needs
+            # adjacent printed ink; otherwise keep its reading uncertain and
+            # leave that remote physical occurrence with its original unit.
+            for position in (0,len(candidate)-1):
+                if not candidate or not re.fullmatch(r'[0-9]{1,4}',candidate[position]):continue
+                edges=[(i,j) for i,j in anchors if j==position]
+                rest=[(i,j) for i,j in anchors if j!=position]
+                if not rest:continue
+                if len(edges)==1:
+                    index,_=edges[0]
+                    neighbor=min(rest,key=lambda pair:abs(pair[1]-position))[0]
+                    box=optical[index]['bbox'];near=optical[neighbor]['bbox']
+                    height=max(1,box[3]-box[1],near[3]-near[1])
+                    gap=max(0,max(box[1],near[1])-min(box[3],near[3]))
+                    if gap<=2.5*height:continue
+                # A compact proof can exclude the remote numeral before this
+                # stage. Its absence is uncertainty, regardless of which binder
+                # established the remaining paragraph's physical ownership.
+                anchors=[pair for pair in anchors if pair not in edges]
+                positions=[i for i,word in enumerate(block['text'].split())
+                    for token in re.sub(r'<n:[^>]+>',' ',word).split()]
+                block['low_confidence']=sorted(set(block['low_confidence']+[positions[position]]))
+                repairs.append(dict(block=block['id'],method='unplaced_numeric_boundary',
+                    candidate_position=position))
+        if len(anchors)+bool(labelled)<min(5,len(candidate)) or (len(anchors)/max(1,len(candidate))<.6 and not (valid and borrowed)):
+            # A syntactically valid note hint cannot identify a repeated or
+            # unobserved occurrence. Keep it explicitly unplaced; source-unit
+            # recovery retains its original page without publishing stale text.
+            if valid and block['role']!='footnote':continue
+            reject('Model block rectangle cannot be bound to printed pixels: '+block['id'])
         if block['role']=='body':
             # A tight hint can stop at the last letter. Its exact published
             # suffix still owns adjacent punctuation before artwork barriers
@@ -2231,6 +4529,28 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                     additions.extend((lookup[id(w)],position) for w in candidates[0][1:])
             anchors=list(dict.fromkeys(anchors+additions))
             anchors.sort(key=lambda a:(a[1],optical[a[0]]['bbox'][0]))
+        if block['role']=='body' and anchors:
+            # A compact proof can locate the continuation but omit the entire
+            # opening at the foot of the preceding printed column. Only a
+            # complete unique prefix at the two column edges can extend it;
+            # source instances reserved by another owner remain unavailable.
+            edge=min(j for i,j in anchors)
+            if 6<=edge<=32:
+                opening=unique_anchors(optical,available,candidate[:edge])
+                if {j for i,j in opening}==set(range(edge)):
+                    first=optical[min(anchors,key=lambda pair:pair[1])[0]]['bbox']
+                    head=[optical[i]['bbox']for i,j in opening]
+                    envelope=vision_reading.union(head)
+                    height=statistics.median(b[3]-b[1]for b in head)
+                    column_return=(envelope[2]+3<first[0]
+                        and envelope[1]>=display.rect.y0+.8*display.rect.height
+                        and first[1]<=display.rect.y0+.25*display.rect.height
+                        and .6*height<=statistics.median(optical[i]['bbox'][3]-optical[i]['bbox'][1]
+                            for i,j in anchors)<=1.5*height)
+                    if column_return:
+                        anchors=sorted(set(opening+anchors),key=lambda pair:pair[1])
+                        repairs.append(dict(block=block['id'],
+                            method='complete_previous_column_opening',source_word_count=edge))
         core_anchors=set(anchors)
         if block['role']=='body' and anchors and regions is not None:
             # A valid model rectangle can begin/end inside a printed paragraph.
@@ -2259,7 +4579,7 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
         # their bounding union must never own the intervening paragraphs.
         import statistics
         height=statistics.median(max(1,w['bbox'][3]-w['bbox'][1]) for w in optical)
-        components=[]
+        components=[];bridged_instances=set()
         for anchor in anchors:
             if components:
                 previous=optical[components[-1][-1][0]]['bbox'];current=optical[anchor[0]]['bbox']
@@ -2268,6 +4588,18 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                 if block['role']=='footnote':
                     transition=(abs((previous[1]+previous[3]-current[1]-current[3])/2)>height*.55
                                 or current[0]<previous[0]-3 or current[0]-previous[2]>4*height)
+                    if (transition and current[0]>previous[2]
+                            and min(previous[3],current[3])-max(previous[1],current[1])>height*.5):
+                        # A misspelled model word between two anchors is still
+                        # original ink. Fill only a continuous, unclaimed row;
+                        # a blank column gutter cannot bridge separate notes.
+                        inside=sorted([i for i in available if optical[i]['bbox'][0]>=previous[2]
+                            and optical[i]['bbox'][2]<=current[0]
+                            and min(optical[i]['bbox'][3],previous[3])-max(optical[i]['bbox'][1],previous[1])>height*.5],
+                            key=lambda i:optical[i]['bbox'][0])
+                        chain=[previous]+[optical[i]['bbox'] for i in inside]+[current]
+                        if inside and all(b[0]-a[2]<=height*1.5 for a,b in zip(chain,chain[1:])):
+                            transition=False;bridged_instances.update(inside)
                 else:
                     art_gap=(block['role']=='body' and current[1]-previous[3]>3*height and any(
                         box[0]<max(envelope[2],current[2]) and box[2]>min(envelope[0],current[0])
@@ -2278,6 +4610,54 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
             else:transition=True
             if transition:components.append([])
             components[-1].append(anchor)
+        if block['role']=='body' and len(components)>1:
+            # A long unplaced continuation can match a few common words deep
+            # inside another column. Those sparse suffix anchors do not prove
+            # that the paragraph crossed the intervening, unprinted words.
+            dominant=max(components,key=lambda component:len({j for i,j in component}))
+            positions={j for i,j in dominant}
+            if len(positions)>=8 and len(positions)/max(1,len(candidate))>=.5:
+                own=vision_reading.union([optical[i]['bbox']for i,j in dominant])
+                kept=[]
+                for component in components:
+                    slots={j for i,j in component}
+                    rect=vision_reading.union([optical[i]['bbox']for i,j in component])
+                    remote=rect[0]>own[2]+3 or rect[2]<own[0]-3
+                    span=max(slots)-max(positions) if min(slots)>max(positions) else 0
+                    sparse=(len(slots)<5 and span>=vision_reading.UNALIGNED_RUN
+                            and len(slots)/span<.5)
+                    if remote and sparse:
+                        repairs.append(dict(block=block['id'],method='unproved_remote_continuation_excluded',
+                            source_word_indices=[i for i,j in component]))
+                        continue
+                    kept.append(component)
+                components=kept
+                admitted={pair for component in components for pair in component}
+                anchors=[pair for pair in anchors if pair in admitted]
+                core_anchors.intersection_update(admitted)
+        interior_rows=[]
+        if block['role']=='footnote' and len(components)>1:
+            # A damaged transcription may omit every matching word on a middle
+            # row. Its ink still belongs between this note's proved rows; do
+            # not emit it a second time as an unrelated recovered paragraph.
+            # Fill only short, same-column gaps with no intervening unit or
+            # independently printed opening label. Keep each row's own crop.
+            for before,after in zip(components,components[1:]):
+                a=vision_reading.union([optical[i]['bbox'] for i,j in before])
+                b=vision_reading.union([optical[i]['bbox'] for i,j in after])
+                gap=b[1]-a[3]
+                if not (height*.5<gap<=height*2.5 and min(a[2],b[2])>max(a[0],b[0])):continue
+                left=min(a[0],b[0]);right=max(a[2],b[2])
+                between=[i for i,w in enumerate(optical) if a[3]<sum(w['bbox'][1::2])/2<b[1]
+                         and w['bbox'][0]>=left-height and w['bbox'][2]<=right+height]
+                if not between or any(i not in available for i in between):continue
+                opening=note_openings.get(block['id'])
+                if opening and any(re.fullmatch(r'[0-9]{1,4}|[*†‡]',lex(optical[i]['text']))
+                    and abs(optical[i]['bbox'][0]-opening[0])<=height for i in between):continue
+                rows=_pixel_lines([optical[i] for i in between])
+                if any(any(y['bbox'][0]-x['bbox'][2]>4*height for x,y in zip(row,row[1:])) for row in rows):continue
+                bridged_instances.update(between)
+                interior_rows.extend(vision_reading.union([w['bbox'] for w in row]) for row in rows)
         territories=[]
         for component in components:
             rect=vision_reading.union([optical[i]['bbox'] for i,j in component])
@@ -2285,7 +4665,7 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
             segment=candidate[component[0][1]:component[-1][1]+1]
             sm=SequenceMatcher(None,[lex(w['text']) for w in local],segment,autojunk=False)
             if not valid and any(max(a2-a1,b2-b1)>=vision_reading.UNALIGNED_RUN for tag,a1,a2,b1,b2 in sm.get_opcodes() if tag!='equal'):
-                raise ValueError('Ambiguous printed region for model block: '+block['id'])
+                reject('Ambiguous printed region for model block: '+block['id'])
             if block['role']=='footnote' and block['marker'] and component is components[0]:
                 # Include the independently printed opening label, if adjacent.
                 labels=[w['bbox'] for w in optical if lex(w['text'])==lex(block['marker'])
@@ -2299,10 +4679,21 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                 # union with later full rows must not swallow an omitted prefix
                 # or a neighboring paragraph on that same physical baseline.
                 first=min(j for i,j in core);last=max(j for i,j in core)
+                restored=[]
                 for leading in (True,False):
-                    if not leading:territories.append(vision_reading.union([optical[i]['bbox'] for i,j in core]))
+                    if not leading:restored.append(vision_reading.union([optical[i]['bbox'] for i,j in core]))
                     rows=_pixel_lines([optical[i] for i,j in edge if (j<first if leading else j>last)])
-                    territories.extend(vision_reading.union([w['bbox'] for w in row]) for row in rows)
+                    restored.extend(vision_reading.union([w['bbox'] for w in row]) for row in rows)
+                # Model token positions can place the continuation of a
+                # divided word before its upper-line stem. This component's
+                # physical rows, rather than that lexical alignment, order its
+                # crops. Remove contained regions so the same continuation
+                # cannot be recognized twice. Separate columns remain separate
+                # components in the transition proof above.
+                restored=[r for i,r in enumerate(restored) if not any(
+                    j!=i and q[0]<=r[0] and q[1]<=r[1] and q[2]>=r[2] and q[3]>=r[3]
+                    and (q!=r or j<i) for j,q in enumerate(restored))]
+                territories.extend(sorted(restored,key=lambda r:(r[1],r[0])))
             elif block['role']=='caption':
                 # A caption's partial first row may sit beside unrelated prose.
                 # Completing its later rows must not turn their bounding union
@@ -2310,17 +4701,48 @@ def bind_geometry(answer,optical,display,regions=None,body_owners=None):
                 territories.extend(vision_reading.union([w['bbox'] for w in row])
                     for row in _pixel_lines([optical[i] for i,j in component]))
             else:territories.append(rect)
+        if interior_rows:
+            territories=sorted(territories+interior_rows,key=lambda rect:(rect[1],rect[0]))
+        # Absence of persistent column evidence is not single-column proof.
+        # Reorder only the observed interleaving of redundant physical crops;
+        # short, separately admitted columns retain their supplied flow.
+        contained_regions=any(i!=j and q[0]<=r[0] and q[1]<=r[1]
+            and q[2]>=r[2] and q[3]>=r[3]
+            for i,r in enumerate(territories)for j,q in enumerate(territories))
+        if (block['role']=='body' and contained_regions
+                and any(b[1]<a[1]-height for a,b in zip(territories,territories[1:]))):
+            owned=[optical[i]for i in available if any(owned_words([optical[i]],r)for r in territories)]
+            _,columns_proved=_proved_recovery_columns(owned)
+            if not columns_proved:
+                # A lexical anchor for a divided word can put its lower-line
+                # continuation before the stem, even across separate restored
+                # components. A real column transition keeps its flow order;
+                # a single-column return uses physical row order once only.
+                territories=[r for i,r in enumerate(territories) if not any(
+                    j!=i and q[0]<=r[0] and q[1]<=r[1] and q[2]>=r[2] and q[3]>=r[3]
+                    and(q!=r or j<i)for j,q in enumerate(territories))]
+                territories.sort(key=lambda r:(r[1],r[0]))
         if len(territories)>1 and regions is None:
-            raise ValueError('Disjoint printed reading requires source region ownership')
+            reject('Disjoint printed reading requires source region ownership')
         if regions is not None:regions[block['id']]=territories
-        if block['role'] in ('body','footnote') and regions is not None:
-            for i,j in anchors:
+        if block['role'] in ('body','footnote','heading') and regions is not None:
+            for i in {i for i,j in anchors}|bridged_instances:
                 reserved[i]=block['id']
                 regions.setdefault('_instances',{})[_source_instance(optical[i])]=block['id']
         rect=vision_reading.union(territories);r=display.rect
         block['bbox']=[max(0,rect[0]/r.width*1000-2),max(0,rect[1]/r.height*1000-2),
                        min(1000,rect[2]/r.width*1000+2),min(1000,rect[3]/r.height*1000+2)]
         repairs.append(block['id'])
+    if regions is not None:
+        for ident,bounds in note_openings.items():
+            originals=[w for w in optical if w['bbox']==bounds]
+            block=next(b for b in answer['blocks'] if b['id']==ident)
+            if len(originals)!=1:continue
+            observed=originals[0]['text']
+            label=lambda text:vision_reading.normalized(text).strip('.,:;()[]{}')
+            regions.setdefault('_note_openings',{})[ident]=dict(source_bbox=list(bounds),
+                observed_text=observed,expected_label=block['marker'],
+                identity_status='PROVED' if label(observed)==label(block['marker']) else 'UNPROVED')
     if regions is not None:_reserve_object_instances(answer,optical,display,regions)
     vision_reading.validate(answer)
     return answer,repairs
@@ -2439,7 +4861,8 @@ def _continuation_decision(left,right,blocks,tail,head):
     if divided:
         a,b=divided['source_tail'],divided['source_head']
         proof_left=dict(left,printed_tail=a['text'],printed_tail_box=a['bbox'])
-        proof_right=dict(right,printed_head=b['text'],printed_head_box=b['bbox'])
+        proof_right=dict(right,printed_head=b['text'],printed_head_box=b['bbox'],
+                         completed_division_source_proved=True)
         return _continuation_decision(proof_left,proof_right,blocks,
             ' '.join(tail_text.split()[:-1]+[a['text']]),
             ' '.join([b['text']]+head_text.split()[1:]))
@@ -2472,6 +4895,25 @@ def _continuation_decision(left,right,blocks,tail,head):
             and lexical_reference(tail_text.split()[-1])==lexical_reference(left.get('printed_tail') or '')
             and lexical_reference(head_text.split()[0])==lexical_reference(right.get('printed_head') or '')):
         return decision('split','distinct_reference_entry_after_range')
+    if tail_text.endswith(tuple(assemble.HYPHENS)) and not right.get('completed_division_source_proved'):
+        letters=lambda words:''.join(c for word in words for c in word.casefold()if c.isalpha())
+        head_corrections=[d for d in right.get('adjudication',[]) if d.get('status')=='RESOLVED'
+            and d.get('model_range',[None])[0]==0 and d.get('source')!=d.get('model')
+            and letters(d.get('source',[]))!=letters(d.get('model',[]))]
+        a,b=left.get('physical_tail') or {},right.get('physical_head') or {}
+        prefix=re.fullmatch(r"([A-Za-z'’]+)["+assemble.HYPHENS+r']',a.get('text',''))
+        lexical=lambda word:vision_reading.normalized(word).casefold()
+        def restored_printed_division(change):
+            # The reader may complete the next atom with this exact printed
+            # prefix. Restoring its source suffix does not destroy that proof.
+            return bool(prefix and a.get('bbox') and b.get('bbox')
+                and change.get('source')==change.get('chosen')==[b.get('text')]
+                and len(change.get('model',[]))==1
+                and lexical(prefix[1]+b['text'])==lexical(change['model'][0]))
+        if any(not restored_printed_division(change) for change in head_corrections):
+            # Correcting letters at the next opening proves that word, not a
+            # compound with an unrelated hyphenated tail on the previous page.
+            return decision('split','corrected_head_without_compound_proof')
     variant=right.get('disputed_head_prefix')
     word_edge=bool(variant and head_text.split()[0]==variant['published']
         and re.search(r'[A-Za-z]{2,}[-­‐‑]$',tail_text)
@@ -2691,6 +5133,113 @@ def _native_source_paragraph_gap(previous,current,model):
         cadence=statistics.median(local)
         if abs(gap-cadence)<=height*.25:normal=cadence
     return gap>normal+height*.5
+
+
+def _native_fraction_ownership(doc,book,pno,physical):
+    """Restore original fraction placement without adopting optical spellings."""
+    from .native_text import drawn_word_authority
+    if book.has_source_navigation(pno):return []
+    elements=book.pages.get(pno,[])
+    candidates=[e for e in elements if e.kind=='p' and e.bbox and
+        all(r[0]in('t','raised')for r in e.runs) and any(r[0]=='raised'for r in e.runs)
+        and '/'in e.text]
+    if not candidates:return []
+    raw=extract.read_page(doc,pno,keep_char_boxes=True)
+    lines=[word['_line']for row in _pixel_lines([dict(text=line.text,bbox=line.bbox,_line=line)
+        for b in raw.blocks for line in b.lines])for word in row]
+    flat=lambda value:''.join(vision_reading.normalized(value).split())
+    repairs=[]
+    for element in candidates:
+        original=''.join(r[1]for r in element.runs);proposals=[]
+        for first,line in enumerate(lines):
+            if not owned_words([dict(bbox=line.bbox)],element.bbox):continue
+            for last in range(first,len(lines)):
+                selected=lines[first:last+1]
+                if len(flat(' '.join(ln.text for ln in selected)))>len(flat(original)):break
+                parts=[part for ln in selected for span in ln.spans
+                    for part in getattr(span,'source_fraction_parts',())]
+                if len(parts)!=1:continue
+                num,den,*_=parts[0]
+                for pair in re.finditer(re.escape(den)+r'\s*/',original):
+                    for digit in re.finditer(r'(?<!\w)'+re.escape(num)+r'(?!\w)',original):
+                        if digit.start()<pair.end():continue
+                        proposed=original[:pair.start()]+num+'/'+den+original[pair.end():digit.start()]+original[digit.end():]
+                        source=' '.join(ln.text for ln in selected)
+                        if flat(proposed)!=flat(source):continue
+                        own=[w for w in physical if any(owned_words([w],ln.bbox)for ln in selected)]
+                        # The decoded stream can reverse a fraction's atoms;
+                        # the lexical view binds those exact original glyphs.
+                        from .native_text import lexical_word_view
+                        lexical=lexical_word_view(doc[pno],own)
+                        if not drawn_word_authority(doc[pno],lexical):continue
+                        if any(other is not element and other.kind in('p','h','caption')and
+                               other.bbox and owned_words(own,other.bbox)for other in elements):continue
+                        proposals.append((selected,source,own))
+        if len(proposals)!=1:continue
+        selected,source,own=proposals[0];runs=[]
+        for ln in selected:
+            if runs:runs.append(['t',' '])
+            runs.extend(assemble._line_runs(ln,pno,set(),set(),[],[],preserve_style=True))
+        if flat(assemble.plain_text(runs))!=flat(source):continue
+        element.runs=runs;element.bbox=tuple(vision_reading.union([w['bbox']for w in own]))
+        element.line_boxes=[ln.bbox for ln in selected]
+        repairs.append(dict(page=pno,kind='original_stacked_fraction_placement',
+            source_fraction_parts=1,complete_visible_native_words=True,
+            original_source_typography=True))
+    return repairs
+
+
+def _native_prefix_label_ownership(doc,book,pno,physical):
+    """Restore a detached original prefix without changing prose or styles."""
+    from .native_text import lexical_word_view,drawn_word_authority
+    if book.has_source_navigation(pno):return []
+    words=_pixel_line_order(lexical_word_view(doc[pno],physical))
+    norm=vision_reading.normalized
+    elements=book.pages.get(pno,[]);repairs=[]
+    for index,element in enumerate(elements):
+        if (element.kind!='p' or not element.bbox or not element.runs or
+                any(run[0]!='t' or len(run)>3 for run in element.runs)):continue
+        raw=''.join(run[1]for run in element.runs)
+        tokens=list(re.finditer(r'\S+',raw))
+        if len(tokens)<8 or tokens[0].group().isdigit():continue
+        proposed=[norm(t.group())for t in tokens];proofs=[]
+        for position,token in enumerate(tokens):
+            label=token.group()
+            if not re.fullmatch(r'\d{1,3}',label)or proposed.count(label)!=1:continue
+            body=proposed[:position]+proposed[position+1:]
+            for start,head in enumerate(words):
+                source=words[start:start+len(tokens)]
+                if len(source)!=len(tokens)or head['text']!=label:continue
+                if [norm(w['text'])for w in source[1:]]!=body:continue
+                a,b=head['bbox'],source[1]['bbox'];height=b[3]-b[1]
+                if not (0<a[3]-a[1]<height*.9 and 0<=b[0]-a[2]<=height*.5
+                        and min(a[3],b[3])>max(a[1],b[1])
+                        and a[3]<b[3]-height*.15):continue
+                if not drawn_word_authority(doc[pno],source):continue
+                proofs.append((position,source))
+        if len(proofs)!=1:continue
+        position,source=proofs[0]
+        if not owned_words([source[1]],element.bbox):continue
+        if any(other is not element and other.kind in('p','h','caption')and other.bbox
+                and owned_words(source,other.bbox)for other in elements):continue
+        token=tokens[position];cursor=0;run_position=None
+        for ri,run in enumerate(element.runs):
+            if cursor<=token.start()<token.end()<=cursor+len(run[1]):
+                if len(run)>2 and run[2]:break
+                run_position=(ri,token.start()-cursor,token.end()-cursor);break
+            cursor+=len(run[1])
+        if run_position is None:continue
+        ri,a,z=run_position;run=element.runs[ri]
+        run[1]=run[1][:a]+run[1][z:]
+        element.runs.insert(0,['t',tokens[position].group()+' '])
+        rows=_pixel_lines(source);element.bbox=tuple(vision_reading.union([w['bbox']for w in source]))
+        element.line_boxes=[tuple(vision_reading.union([w['bbox']for w in row]))for row in rows]
+        repairs.append(dict(page=pno,block='native-element-'+str(index),
+            kind='original_detached_native_prefix',source_label=source[0]['text'],
+            source_label_bbox=source[0]['bbox'],source_words=len(source),
+            previous_token_index=position,complete_visible_native_words=True,
+            original_styles_preserved=True))
+    return repairs
 
 
 def _native_inline_paragraph_ownership(doc,book,pno,physical):
@@ -3056,6 +5605,8 @@ def _native_publication_ownership(doc,book,numbers,raw_pages=None):
                     if len(matches)!=1:raise ValueError('Native figure source inventory is not one-to-one')
                     ordered.append(matches[0])
                 book.figures=[f for f in book.figures if f['pno']!=pno]+ordered
+            repairs.extend(_native_fraction_ownership(doc,book,pno,physical))
+            repairs.extend(_native_prefix_label_ownership(doc,book,pno,physical))
             repairs.extend(_native_inline_paragraph_ownership(doc,book,pno,physical))
             elements=book.pages[pno]
             # Reconstruct only a complete, exact plain-text same-column run. The
@@ -3215,27 +5766,70 @@ def _native_seam_blocks(doc,book,pno,page):
     """Bind published native paragraphs to their own physical source rows."""
     import statistics
     elements=book.pages.get(pno,[])
-    physical=[{'text':w[4],'bbox':list(w[:4])} for w in doc[pno].get_text('words')]
+    # Paint-object order can serialize a raised note label after its line.
+    # Complete occurrence identity follows the printed spatial word order.
+    stream=[{'text':w[4],'bbox':list(w[:4])}for w in doc[pno].get_text('words')]
+    physical=_pixel_line_order(stream)
     # Cached native elements can retain a removed running title's box, or an
     # emitted glyph/span can make element-text equality unavailable. Bind the
     # complete emitted reading to unique source words before trusting that box.
     compact=lambda text:re.sub(r'\s+','',vision_reading.normalized(text))
-    source='';starts={};ends={}
-    for index,word in enumerate(physical):
-        value=compact(word['text'])
-        if not value:continue
-        starts[len(source)]=index;source+=value;ends[len(source)]=index+1
-    def complete_words(text):
+    # Occurrence identity and cached element boxes use original PDF space.
+    # Group there directly: rotating and derotating introduces float aliases
+    # that can make one physical occurrence appear to be two distinct ones.
+    from .native_text import lexical_word_view
+    lexical=lexical_word_view(doc[pno],physical)if doc[pno].get_texttrace()else physical
+    def complete_occurrences(text,element=None):
         target=compact(text)
         if not target:return []
-        found=[];offset=source.find(target)
-        while offset>=0:
-            end=offset+len(target)
-            if offset in starts and end in ends:
-                words=physical[starts[offset]:ends[end]]
-                if len(words)>1:found.append(words)
-            offset=source.find(target,offset+1)
-        return found[0] if len(found)==1 else []
+        # The emitted native paragraph can join an original line-end division
+        # and a drawn raised suffix. Match those exact physical components
+        # before allowing a stale first-line rectangle to truncate its owner.
+        views=[(physical,False),(_native_wrap_view(lexical,text.split()),False)]
+        positions={i for i,item in enumerate(elements)if item is element}
+        own_navigation=any((link['pno']==pno and link.get('source_element')in positions)or
+                           (link['dest_page']==pno and link.get('dest_element')in positions)
+                           for link in navigation)
+        # A link on another element (including an incoming page link) cannot
+        # hide these complete original cells. Keep the semantic-action guard
+        # for every source/destination item belonging to this actual element.
+        if (element is not None and not own_navigation
+                and all(run[0]in('t','raised')for run in element.runs)):
+            views.append((stream,True))
+        found={}
+        for words,components_only in views:
+            source='';starts={};ends={}
+            for index,word in enumerate(words):
+                value=compact(word['text'])
+                if not value:continue
+                starts[len(source)]=index;source+=value;ends[len(source)]=index+1
+            offset=source.find(target)
+            while offset>=0:
+                end=offset+len(target)
+                if offset in starts and end in ends:
+                    owned=words[starts[offset]:ends[end]]
+                    if owned:
+                        allowed=True
+                        if components_only:
+                            # Independent cells can serialize by column. The
+                            # original stream still cannot move a raised atom
+                            # behind words on its own row or borrow another
+                            # paragraph's source component.
+                            positions={id(word):i for i,word in enumerate(owned)}
+                            allowed=not any(positions[id(left)]>positions[id(right)]
+                                for row in _pixel_lines(owned)for left,right in zip(row,row[1:]))
+                            allowed=allowed and bool(owned_words([owned[0]],element.bbox))
+                            allowed=allowed and not any(other is not element and
+                                other.kind in('p','h','caption')and other.bbox and
+                                owned_words(owned,other.bbox)for other in elements)
+                        if allowed:
+                            components=tuple(sorted(tuple(part['bbox'])for word in owned
+                                for part in word.get('native_parts',[word])))
+                            bound=([dict(word,_native_component_bound=True)for word in owned]
+                                   if components_only else owned)
+                            found.setdefault(components,bound)
+                offset=source.find(target,offset+1)
+        return list(found.values())
     # A typed native note atom has a literal rendered symbol, whereas its
     # inventory uses a bracketed semantic token. Compare the actual factory
     # rendering, never strip brackets from source text or guess an owner.
@@ -3260,7 +5854,12 @@ def _native_seam_blocks(doc,book,pno,page):
             for item_index,r in enumerate(element.list_items)))
     rows=_pixel_row_ids(physical);result=[]
     for index,fragment in enumerate(page['body']):
-        role=('heading' if re.match(r'<h[1-6](?:>|\s)',fragment) else
+        # Factory notices describe source evidence; they are not authored
+        # paragraphs and cannot have a printed lexical occurrence. Keep their
+        # body position, but never make their missing source box reject healthy
+        # neighboring prose during the independent native pixel audit.
+        role=('other' if build_epub._LEADING_NOTICE.match(fragment) or not _seam_text(fragment) else
+              'heading' if re.match(r'<h[1-6](?:>|\s)',fragment) else
               'caption' if fragment.startswith('<p class="caption"') else
               'body' if build_epub._is_paragraph(fragment) or fragment.startswith('<ol class="source-list"') else 'other')
         text=_seam_text(fragment)
@@ -3272,9 +5871,31 @@ def _native_seam_blocks(doc,book,pno,page):
                     fragment_sha256=hashlib.sha256(fragment.encode()).hexdigest(),continues_previous=False,continues_next=False,
                     source_regions=[],first_line_x=None,printed_head=None,printed_tail=None)
         element=candidates[0] if len(candidates)==1 else None
-        owned=complete_words(text)
-        binding='unique_complete_source_text' if owned else 'native_element_box'
-        if not owned and element is not None:owned=owned_words(physical,element.bbox)
+        repeated_source=None
+        if len(candidates)>1:
+            # Factory order disambiguates repeated labels only with equal
+            # fragment/element counts and complete text inside the own box.
+            # Global row-major text can interleave columns or even fabricate a
+            # matching sequence from the tail of one cell and another's head.
+            positions=[i for i,part in enumerate(page['body']) if _seam_text(part)==text]
+            if len(positions)==len(candidates):
+                proposed=candidates[positions.index(index)]
+                local=_pixel_line_order(owned_words(physical,proposed.bbox))
+                if compact(' '.join(w['text']for w in local))==compact(text):
+                    element=proposed;repeated_source=local
+        occurrences=complete_occurrences(text,element if len(candidates)==1 else None)
+        owned=(repeated_source if repeated_source is not None else
+               occurrences[0] if len(occurrences)==1 and len(candidates)<=1 else [])
+        record['native_occurrence_count']=len(occurrences)
+        binding=('factory_order_complete_local_source' if repeated_source is not None else
+                 'unique_complete_source_text' if owned else 'native_element_box')
+        if not owned and element is not None:
+            owned=owned_words(physical,element.bbox)
+            if len(occurrences)>1 and compact(' '.join(w['text']for w in owned))!=compact(text):
+                # The literal exists, but a stale rectangle does not choose
+                # between its repeated original occurrences. Keep its existing
+                # unplaced-reading disclosure instead of borrowing header ink.
+                owned=[]
         if owned:
             owned=_pixel_line_order(owned)
             box=(vision_reading.union([w['bbox'] for w in owned])
@@ -3286,7 +5907,9 @@ def _native_seam_blocks(doc,book,pno,page):
                 next((_native_source_structural_row(vision_reading.union([w['bbox']for w in row]),model)
                     for row in line_groups if _native_source_structural_row(
                         vision_reading.union([w['bbox']for w in row]),model)),None))
-            record.update(bbox=box,source_regions=[box],native_geometry_binding=binding,
+            territories=([list(part['bbox'])for word in owned for part in word.get('native_parts',[word])]
+                if any(word.get('_native_component_bound')for word in owned)else[box])
+            record.update(bbox=box,source_regions=territories,native_geometry_binding=binding,
                 native_source_structure=structure,
                 cached_element_bbox=list(element.bbox) if element is not None else None,
                 native_source_list=bool(element is not None and element.kind=='list'),
@@ -3308,6 +5931,382 @@ def _native_seam_blocks(doc,book,pno,page):
                 printed_tail_row=rows.get(id(tail.get('_source_word',tail))) if tail is not None else None)
         result.append(record)
     return result
+
+
+def _audit_native_pixels(doc,page,records,cache,package,images):
+    """Inspect native live words against their own independent pixel crop."""
+    from . import pixel_adjudication,vision_pixels
+    display=SourceDisplay(doc,page['pno'])
+    optical=None
+    controller=unit_recovery.current()
+    physical=[dict(text=w[4],bbox=list(display.reading_rect(w[:4])))
+              for w in doc[page['pno']].get_text('words')]
+    for position,record in enumerate(records):
+        if record.get('role') not in ('body','heading','caption'):continue
+        # The caller replaces blocked native units after auditing their healthy
+        # siblings. Rechecking the same failed unit would escalate its page
+        # before that bounded source replacement can be published.
+        if controller and record['id'] in controller.blocked(page['pno']):continue
+        territories=record.get('source_regions')
+        unit=dict(page=page['pno'],block=record['id'],
+                  fragment_sha256=hashlib.sha256(page['body'][position].encode()).hexdigest())
+        with unit_recovery.guard(page['pno'],'native_pixel_adjudication',units=[unit]):
+            if not territories:
+                if 'native_occurrence_count' not in record or unit_recovery.current() is None:
+                    raise ValueError('Native live text has no uniquely bound source occurrence')
+                from .unit_source import source_unit
+                reason=('Native reading cannot be audited at a unique printed occurrence; inspect the original source'
+                    if record['native_occurrence_count'] else
+                    'Native text has no printed occurrence; only its original source is published')
+                fragment,asides,unit=source_unit(display,page['pno'],record['id'],record['role'],package,images,reason)
+                if record['native_occurrence_count']:
+                    # The complete literal inventory exists in the original,
+                    # but it cannot earn a guessed block/crop identity. Keep
+                    # that inventory with an explicitly unplaced page context.
+                    original=page['body'][position]
+                    tokens=_seam_text(original).split()
+                    page['body'][position]=re.sub(r'(<(?:p|h[1-6])\b[^>]*>)(.*)(</(?:p|h[1-6])>)',
+                        lambda m:m[1]+'<span class="uncertain" title="Unplaced native reading; inspect original source">'+m[2]+'</span>'+m[3],
+                        original,flags=re.S)+fragment
+                    record.update(published_tokens=tokens,marked=list(range(len(tokens))),
+                        adjudication=[dict(source=[],model=[],chosen=[],status='UNRESOLVED',
+                            method='unplaced_native_reading',mapping='unplaced_within_span')])
+                else:
+                    page['body'][position]=fragment
+                    record['published_tokens']=[]
+                page['asides'].extend(asides)
+                record.update(degraded_source_context=True,unplaced_source_context=unit,
+                    pixel_adjudication_status='UNPLACED_SOURCE_CONTEXT')
+                continue
+            # Proved original note rows need exact word ownership. The model-box
+            # rounding allowance can otherwise borrow a nearby raised label.
+            tolerance=.2 if record.get('native_exact_territories')else 3
+            source=_pixel_line_order([w for w in physical if any(
+                box[0]-tolerance <= (w['bbox'][0]+w['bbox'][2])/2 <= box[2]+tolerance and
+                box[1]-tolerance <= (w['bbox'][1]+w['bbox'][3])/2 <= box[3]+tolerance
+                for box in territories)])
+            source=_native_lexical_view(display,source)
+            record['native_source_occurrences']=copy.deepcopy(source)
+            tokens=_seam_text(page['body'][position]).split()
+            record['published_tokens']=tokens
+            # A scan-to-vector producer authors its Unicode map by recognition.
+            # Repeating a suspicious OCR spelling is not independent letter
+            # identity, even though those visible vectors are original paint.
+            metadata=doc.metadata or {}
+            optical_map=bool(re.search(r'ClearScan|Paper Capture|ABBYY|OCRmyPDF',
+                str(metadata.get('producer',''))+' '+str(metadata.get('creator','')),re.I))
+            lexical_doubts=pixel_adjudication.optical_map_doubts(tokens)if optical_map else{}
+            from .native_text import drawn_word_authority,drawn_word_authorities
+            original=[dict(w,bbox=list(display.source_rect(w['bbox'])*display.page.derotation_matrix),
+                **({'native_parts':[dict(p,bbox=list(display.source_rect(p['bbox'])*display.page.derotation_matrix))for p in w['native_parts']]}if 'native_parts'in w else{}))for w in source]
+            if drawn_word_authority(doc[page['pno']],original) and not lexical_doubts:
+                literal=lambda values:''.join(vision_reading.normalized(t)for t in values)
+                native_view=_native_wrap_view(source,tokens)
+                from collections import Counter
+                covered=Counter(vision_reading.normalized(w['text'])for w in native_view)
+                atoms=lambda values:re.findall(r'\w+|[^\w\s]',
+                    ' '.join(vision_reading.normalized(t)for t in values))
+                if (covered==Counter(vision_reading.normalized(t)for t in tokens)
+                        or atoms(w['text']for w in native_view)==atoms(tokens)
+                        or re.search(r'<(?:a|sup)\b[^>]*class="noteref(?:-unresolved)?"',page['body'][position])
+                        and literal(w['text']for w in native_view)==literal(tokens)):
+                    record['pixel_adjudication_status']='VISIBLE_NATIVE_PRINT'
+                    continue
+                # Authority belongs to the covered characters, never to extra
+                # factory runs outside that territory. A detached legacy run
+                # may retain its ink only at a unique visible original glyph;
+                # its placement in this factory paragraph remains unproved.
+                from difflib import SequenceMatcher
+                from .native_text import unproved_legacy_word,visible_word_ink
+                mapped={};unbound=[]
+                for kind,a,z,b,y in SequenceMatcher(None,
+                        [w['text']for w in source],tokens,autojunk=False).get_opcodes():
+                    if kind=='equal':mapped.update({b+i:source[a+i]for i in range(z-a)})
+                    elif kind=='insert':unbound.extend(range(b,y))
+                    else:raise ValueError('Native factory output has no complete printed binding')
+                used={tuple(w['bbox'])for w in source};proof=[]
+                for index in unbound:
+                    candidates=[]
+                    for word in physical:
+                        if word['text']!=tokens[index]:continue
+                        raw=dict(word,bbox=list(display.source_rect(word['bbox'])*display.page.derotation_matrix))
+                        if unproved_legacy_word(display.page,raw)and visible_word_ink(display.page,[raw])[0]:
+                            candidates.append(word)
+                    if len(candidates)!=1 or tuple(candidates[0]['bbox'])in used:
+                        raise ValueError('Native factory output has no complete printed binding')
+                    word=candidates[0];mapped[index]=word;used.add(tuple(word['bbox']))
+                    proof.append(dict(index=index,source_bbox=list(word['bbox']),
+                        method='unique_visible_legacy_glyph',mapping='unplaced_native_factory_run'))
+                if not unbound or len(mapped)!=len(tokens):
+                    raise ValueError('Native factory output has no complete printed binding')
+                source=[mapped[i]for i in range(len(tokens))]
+                original=[dict(w,bbox=list(display.source_rect(w['bbox'])*display.page.derotation_matrix))for w in source]
+                territories=list(territories)+[item['source_bbox']for item in proof]
+                record.update(source_regions=territories,unplaced_native_factory_glyphs=proof,
+                    pixel_adjudication_status='UNPLACED_NATIVE_FACTORY_GLYPHS')
+            witness=pixel_adjudication.read_crop(display,territories,Path(cache)/'adjudication')
+            from .native_text import unproved_legacy_word
+            legacy={i for i,w in enumerate(original)if unproved_legacy_word(doc[page['pno']],w)}
+            reliable=drawn_word_authorities(doc[page['pno']],original)
+            output_sources={i:w for i,w in enumerate(source)}
+            if [w['text'] for w in source]!=tokens:
+                # The factory may join line wraps or preserve inline actions.
+                # Bind unchanged occurrences through that transform instead of
+                # treating one unreliable glyph as a failure of all its peers.
+                from difflib import SequenceMatcher
+                mapping={};joined_sources={}
+                for kind,a,z,b,y in SequenceMatcher(None,
+                        [w['text']for w in source],tokens,autojunk=False).get_opcodes():
+                    if kind=='equal':
+                        mapping.update({a+i:b+i for i in range(z-a)})
+                    elif (kind=='replace' and y-b==1 and z>a and
+                            ''.join(w['text']for w in source[a:z])==tokens[b]):
+                        # Native inline markup can join an expression across a
+                        # wrap. Exact unchanged letters bind its original parts
+                        # to one output word; no neighboring prose is rejected.
+                        parts=[part for w in source[a:z]for part in w.get('native_parts',[w])]
+                        joined_sources[b]=dict(text=tokens[b],
+                            bbox=vision_reading.union([part['bbox']for part in parts]),
+                            native_parts=parts)
+                        mapping.update({i:b for i in range(a,z)})
+                conflicts=pixel_adjudication.audit_agreement([w['text']for w in source],source,witness)
+                for i in legacy:
+                    conflicts[i]=dict(source=[source[i]['text']],model=[source[i]['text']],
+                        chosen=[source[i]['text']],status='UNRESOLVED',method='unproved_native_character_map')
+                conflicts={i:d for i,d in conflicts.items()if not reliable[i]}
+                if any(i not in mapping for i in conflicts):
+                    raise ValueError('Unreliable native occurrence has no unique published word binding')
+                output_sources={mapping[i]:source[i]for i in mapping}
+                output_sources.update(joined_sources)
+                conflicts={mapping[i]:d for i,d in conflicts.items()}
+                for i in conflicts.keys() & joined_sources.keys():
+                    conflicts[i]=dict(source=[tokens[i]],model=[tokens[i]],chosen=[tokens[i]],
+                        status='UNRESOLVED',method='unproved_native_character_map')
+                legacy={mapping[i]for i in legacy if i in mapping}
+                record['pixel_adjudication_status']='SOURCE_OCCURRENCES_CHECKED_BEFORE_NATIVE_TRANSFORM'
+            else:
+                conflicts=None
+            if conflicts is None:
+                refined=pixel_adjudication.refine_fallback(tokens,witness,text_quality.english_lexicon(),source=source)
+                if (refined and any(d['status']=='UNRESOLVED' and
+                        len(d['source'])==len(d['chosen'])==1 for d in refined['decisions'])
+                        and any(w.get('confidence',0)>=90 for w in witness)):
+                    # Unknown spellings need a second pixel view at this same
+                    # occurrence. Cache the independent page segmentation once;
+                    # a dictionary preference cannot stand in for visible ink.
+                    if optical is None:optical=vision_pixels.words(display,cache)
+                    corroboration=[w for w in optical if any(owned_words([w],box) for box in territories)]
+                    refined=pixel_adjudication.refine_fallback(tokens,witness,
+                        text_quality.english_lexicon(),source=source,corroboration=corroboration)
+                # Native fragments retain their structure and word inventory. Only
+                # one-for-one, independently corroborated spelling edits fit here.
+                repairs={i:d for i,d in (refined or {}).get('word_notes',{}).items()
+                         if d['status']=='RESOLVED' and len(d['source'])==len(d['chosen'])==1}
+                if refined is None or len(refined['tokens'])!=len(tokens) or any(
+                        len(d['source'])!=len(d['chosen']) for d in refined['decisions']):repairs={}
+                conflicts=pixel_adjudication.audit_agreement(tokens,source,witness)
+                conflicts.update(repairs)
+                reliable=drawn_word_authorities(doc[page['pno']],original)
+                conflicts={i:d for i,d in conflicts.items()if not reliable[i]}
+                for i in legacy:
+                    conflicts[i]=dict(source=[source[i]['text']],model=[source[i]['text']],
+                        chosen=[source[i]['text']],status='UNRESOLVED',method='unproved_native_character_map')
+            # An independent complete repair can resolve the spelling. Equal
+            # suspect readings merely repeat the optically authored map.
+            for i,decision in lexical_doubts.items():
+                if not(conflicts.get(i,{}).get('status')=='RESOLVED' and
+                       conflicts[i].get('chosen')!=decision['chosen']):
+                    conflicts[i]=decision
+            record['adjudication']=list(conflicts.values())
+            if not conflicts:continue
+            fragment=page['body'][position]
+            ranges=pixel_adjudication.fragment_word_ranges(fragment,tokens)
+            if ranges is None:
+                raise ValueError('Native pixel conflict has no unique published occurrence')
+            # A verified typed reference is not a lexical suffix. OCR may
+            # recognize its raised number as punctuation, but cannot rewrite
+            # that separately owned action through a prose-word correction.
+            for index,decision in list(conflicts.items()):
+                a,z=ranges[index];raw=fragment[a:z]
+                action=re.search(r'<a\b[^>]*class="noteref"[^>]*>.*?</a>',raw,re.S)
+                alternative=decision.get('alternative') or decision.get('chosen') or []
+                if action and len(alternative)==1 and index not in legacy:
+                    prefix=_seam_text(raw[:action.start()])
+                    suffix=_seam_text(raw[action.end():])
+                    value=alternative[0]
+                    tail=value[len(prefix):] if prefix and value.startswith(prefix) else None
+                    if (tail is not None and not any(c.isalpha()for c in tail) and
+                            not any(c.isalnum()for c in suffix)):
+                        del conflicts[index]
+            record['adjudication']=list(conflicts.values())
+            if not conflicts:continue
+            edits=[]
+            for index,decision in conflicts.items():
+                a,z=ranges[index]
+                from . import reading_tiers
+                reading_tiers.qualify_resolution(decision)
+                formatted=None
+                if decision['status']=='RESOLVED' and '<' in fragment[a:z]:
+                    formatted=pixel_adjudication.replace_formatted_word(fragment[a:z],decision['chosen'][0])
+                if decision['status']=='RESOLVED' and '<' in fragment[a:z] and formatted is None:
+                    # Keep ordinal formatting and typed reference actions. A
+                    # lexical replacement cannot delete their inline markup;
+                    # retain the authored word with an owned unresolved note.
+                    decision.update(alternative=decision['chosen'],chosen=[tokens[index]],
+                        status='UNRESOLVED',method='formatted_native_word_requires_typed_edit')
+                ident=f"v4-native-d-{page['pno']}-{record['id']}-{index}";origin='r-'+ident
+                src='images/'+ident+'.jpg';box=output_sources[index]['bbox']
+                retained_action='';label_box=None
+                if index in legacy:
+                    action=re.search(r'<a\b[^>]*class="noteref"[^>]*>.*?</a>',fragment[a:z],re.S)
+                    if action:
+                        from .native_text import word_prefix_ink
+                        physical_word=dict(output_sources[index],bbox=list(display.source_rect(box)*display.page.derotation_matrix))
+                        cut=word_prefix_ink(doc[page['pno']],physical_word,_seam_text(action[0]))
+                        if cut is None:
+                            raise ValueError('Unmapped glyph cannot be separated from its proved note action')
+                        box=list(display.reading_rect(cut[0]));label_box=display.reading_rect(cut[1])
+                        retained_action=action[0]
+                clip=extract.pymupdf.Rect(box);clip.x0-=2;clip.y0-=2;clip.x1+=2;clip.y1+=2;clip &= display.rect
+                if label_box is not None:
+                    if box[2]<=label_box.x0+1e-3:clip.x1=min(clip.x1,label_box.x0)
+                    elif box[0]>=label_box.x1-1e-3:clip.x0=max(clip.x0,label_box.x1)
+                    elif box[3]<=label_box.y0+1e-3:clip.y1=min(clip.y1,label_box.y0)
+                    elif box[1]>=label_box.y1-1e-3:clip.y0=max(clip.y0,label_box.y1)
+                    else:raise ValueError('Unmapped glyph overlaps its proved note action')
+                _word_disclosure_image(package,src,display,clip,output_sources[index].get('native_parts'))
+                images[src]=dict(page=page['pno'],bbox=list(clip),kind='vision_disclosure',
+                    **({'source_parts':copy.deepcopy(output_sources[index]['native_parts'])}
+                       if output_sources[index].get('native_parts')else {}))
+                label='Pixel-verified correction' if decision['status']=='RESOLVED' else 'Unresolved source reading'
+                chosen=decision['chosen'][0] if decision['status']=='RESOLVED' else tokens[index]
+                explanation=(escape(tokens[index])+' → '+escape(chosen)+'.' if chosen!=tokens[index]
+                             else escape(chosen)+'. Consult the original printed word in the image.')
+                explanation+=' An independent upright crop supports this correction.' if decision['status']=='RESOLVED' else ' An independent upright crop could not settle this difference.'
+                page['asides'].append(f'<aside id="{ident}" class="footnote vision-disclosure" data-reflow-owner-page="{page["pno"]}" data-reflow-owner-block="{escape(record["id"],quote=True)}" epub:type="footnote"><p>{label}: {explanation}</p><img src="{src}" alt="Original printed reading"/><a href="#{origin}">Return</a></aside>')
+                from .native_text import unproved_legacy_word
+                legacy_ink=(decision['status']=='UNRESOLVED' and
+                            index in legacy)
+                if legacy_ink:
+                    edits.append((a,z,f'<a class="source-word-image" href="#{ident}"><img src="{src}" alt="Unmapped printed glyph; inspect original"/></a>'+retained_action))
+                    decision['source_image_only']=True
+                elif decision['status']=='UNRESOLVED':
+                    from . import reading_tiers,inline_print
+                    choice=reading_tiers.choose(tokens[index],decision,rank_lexical=False)
+                    decision['publication']=choice
+                    if choice['tier']=='flagged':
+                        chosen=choice['reading'];inline_src=src
+                        style='height:1.4em;vertical-align:-0.25em;width:auto'
+                        preview=(inline_print.preview(display,box)
+                            if not output_sources[index].get('native_parts')else None)
+                        if preview is not None and hasattr(package,'image'):
+                            data,metrics=preview;inline_src=f'images/{ident}-inline.png'
+                            package.image(inline_src,data)
+                            images[inline_src]=dict(page=page['pno'],kind='inline_print_preview',coverage_eligible=False,
+                                inspection_image=src,**metrics)
+                            style=metrics['style']
+                        replacement=reading_tiers.flagged_html(chosen,inline_src,ident,style)
+                        edits.append((a,z,replacement))
+                        record.setdefault('flagged_readings',{})[str(index)]=choice
+                    elif choice['tier']=='print':
+                        edits.append((a,z,f'<a class="source-word-image" href="#{ident}"><img src="{src}" alt="Unresolved printed word; inspect original"/></a>'))
+                        decision['source_image_only']=True
+                elif chosen!=tokens[index]:edits.append((a,z,formatted if formatted is not None else escape(chosen)))
+                # Add the control after any enclosing inline action closes;
+                # never nest a new link inside a typed source reference.
+                closing=re.match(r'(?:</(?:sup|sub|em|strong|i|b|a|span)\s*>)+',fragment[z:],re.I)
+                at=z+(closing.end() if closing else 0)
+                edits.append((at,at,f'<a id="{origin}" class="source-disclosure-ref" epub:type="noteref" href="#{ident}"><sup>†</sup></a>'))
+                tokens[index]=chosen
+            for a,z,value in sorted(edits,reverse=True):fragment=fragment[:a]+value+fragment[z:]
+            fragment,unit_print_html=_present_flagged_prints(fragment,display,page['pno'],record['id'],
+                record.get('source_regions') or [record['bbox']],package,images,page['asides'],
+                evidence_words=optical or physical,heading=record.get('role')=='heading')
+            page['body'][position]=fragment+unit_print_html
+            record['marked']=sorted(set(record.get('marked',[]))|set(conflicts))
+            record['source_image_words']=sorted(set(record.get('source_image_words',[]))|
+                {i for i,d in conflicts.items()if d.get('source_image_only')})
+
+
+def _audit_native_note_pixels(doc,book,page,cache,package,images):
+    """Audit native note text separately from its label and generated controls."""
+    from . import pixel_adjudication
+    records=[];display=SourceDisplay(doc,page['pno']);additions=[]
+    physical=[dict(text=w[4],bbox=list(w[:4]))
+              for w in doc[page['pno']].get_text('words')]
+    controller=unit_recovery.current()
+    for ordinal,note in enumerate(n for n in book.notes if n.pno==page['pno']):
+        ident='native-note-'+str(ordinal)
+        if controller and ident in controller.blocked(page['pno']):continue
+        if note.uses_source_image and not any(run[0]=='t' and run[1].strip() for run in note.glyph_runs):continue
+        with unit_recovery.guard(page['pno'],'native_note_pixel_adjudication',block=ident):
+            if note.uses_source_image:
+                raise ValueError('Mixed native glyph and live-text note requires original source disclosure')
+            literal=escape(note.text,quote=False)
+            if not literal.strip():continue
+            target='fn_p%04d_%s'%(page['pno'],note.num) if note.num is not None else None
+            candidates=[]
+            for index,fragment in enumerate(page['asides']):
+                if target is not None and 'id="'+target+'"' not in fragment:continue
+                tokens=_seam_text(fragment).split()
+                ranges=pixel_adjudication.fragment_word_ranges(fragment,tokens)
+                if ranges is None:continue
+                for start in pixel_adjudication._matches(tokens,note.text.split()):
+                    if note.num is not None and start==0:continue
+                    a,z=ranges[start][0],ranges[start+len(note.text.split())-1][1]
+                    if fragment[a:z]==literal:candidates.append((index,a,z))
+            if len(candidates)!=1:
+                raise ValueError('Native note has no unique emitted lexical fragment')
+            source_box=extract.pymupdf.Rect(note.bbox)
+            words=(_pixel_line_order(owned_words(physical,source_box))
+                   if not source_box.is_empty else [])
+            # Label order belongs to original source coordinates, before a PDF
+            # display rotation can reverse its position beside the lexical copy.
+            # A box already containing precisely the body must not lose its own
+            # first word merely because that word equals the note number.
+            local=vision_reading.normalized(' '.join(w['text']for w in words)).split()
+            printed_label=None
+            if (note.num is not None and words and local!=vision_reading.normalized(note.text).split()
+                    and vision_reading.normalized(words[0]['text']).strip('.,:;()[]{}')==str(note.num)):
+                printed_label=dict(text=words[0]['text'],bbox=list(display.reading_rect(words[0]['bbox'])),target=target)
+                words=words[1:]
+            territories=[list(display.reading_rect(vision_reading.union([w['bbox']for w in row])))
+                         for row in _pixel_lines(words)]
+            # A cached rectangle can retain only the first line of a continued
+            # note. Complete unique original text proves its full footprint even
+            # when that stale rectangle is nonempty. Ambiguous text still needs
+            # the note's own bounded territory (including label separation).
+            bound=_native_seam_blocks(doc,book,page['pno'],dict(body=['<p>'+literal+'</p>']))[0]
+            if bound.get('native_geometry_binding')=='unique_complete_source_text' or not territories:
+                territories=[list(display.reading_rect(box))for box in
+                             (bound.get('source_rows')or bound.get('source_regions',[]))]
+            if not territories:raise ValueError('Native note has no original word territory')
+            fragment='<p><span data-source-page="%d">%s</span></p>'%(page['pno'],literal)
+            proxy=dict(pno=page['pno'],body=[fragment],asides=[])
+            record=dict(id=ident,role='body',native_source=True,source_regions=territories,
+                        native_exact_territories=True)
+            _native_published_provenance(proxy,[record])
+            _audit_native_pixels(doc,proxy,[record],cache,package,images)
+            # Presentation can append this note's generated print after its
+            # lexical paragraph. Keep that evidence inside the footnote while
+            # still rejecting any other change to the paragraph container.
+            supplements=_defer_unit_prints([proxy])
+            if any(owner!=(str(page['pno']),ident)for owner,_ in supplements):
+                raise ValueError('Native note print changed its source owner')
+            inner=re.fullmatch(r'<p>(.*)</p>',proxy['body'][0],re.S)
+            if inner is None:raise ValueError('Native note audit changed its lexical container')
+            index,a,z=candidates[0]
+            original=page['asides'][index]
+            replacement=original[:a]+inner[1]+original[z:]
+            if supplements:
+                if not replacement.endswith('</aside>'):
+                    raise ValueError('Native note print lost its footnote container')
+                replacement=replacement[:-len('</aside>')]+''.join(html for _,html in supplements)+'</aside>'
+            page['asides'][index]=replacement
+            record.update(role='footnote',lane='asides',source_aside_index=index,printed_label_occurrence=printed_label)
+            records.append(record);additions.extend(proxy['asides'])
+    page['asides'].extend(additions)
+    return records
 
 
 def _native_published_provenance(page,records):
@@ -3409,6 +6408,9 @@ def _leading_art_continuation(previous,current,before,after,tail,blocks):
     opening=next((i for i,b in enumerate(after) if b['role']=='body'),None)
     if not opening or opening>=len(current['body']):return None
     leading=after[:opening];right=after[opening];left=before[-1]
+    # A disclosed or unbound body is a structural barrier, including when
+    # another readable body follows it. Never reorder across that barrier.
+    if any(b.get('degraded_source_context') or not b.get('source_regions') for b in (left,right)):return None
     if not _floating_art(leading):return None
     source_position=next(i for i,b in enumerate(blocks) if b['id']==right['id'])
     territory=right['source_regions'][0]
@@ -3450,6 +6452,7 @@ def _leading_art_continuation(previous,current,before,after,tail,blocks):
 
 def _join_scanned_regions(page,blocks,words=(),compounds=()):
     """Join adjacent body fragments only across an observed column/leaf edge."""
+    unit_prints=_defer_unit_prints([page])
     emitted=[b for b in blocks if b['role'] not in ('running_head','folio','footnote')]
     # In-flow notes are structural barriers; footer geometry distinguishes notes
     # that are outside a paragraph continuing onto the next scanned leaf.
@@ -3551,6 +6554,7 @@ def _join_scanned_regions(page,blocks,words=(),compounds=()):
             if not join and not floating:last_body_index=len(result)-1
         previous=block
     page['body']=result
+    _restore_unit_prints([page],unit_prints)
 
 
 def _proved_recovery_columns(words):
@@ -3571,21 +6575,26 @@ def _proved_recovery_columns(words):
     gaps=[b[0]-a[1] for a,b in zip(intervals,intervals[1:])]
     # A gutter must exceed ordinary persistent inter-word spacing as well as
     # the type height. Repeated word slots alone do not prove text columns.
-    minimum=max(6,1.5*height,2*statistics.median(gaps)) if gaps else 6
-    cuts=[(a[1]+b[0])/2 for a,b in zip(intervals,intervals[1:])
-          if b[0]-a[1]>=minimum]
-    if not cuts:return [words],False
-    groups=[[] for _ in range(len(cuts)+1)]
-    for word in words:
-        center=(word['bbox'][0]+word['bbox'][2])/2
-        groups[sum(center>cut for cut in cuts)].append(word)
-    rows=[_pixel_lines(group) for group in groups]
-    if any(len(column)<3 or statistics.median(len(row) for row in column)<2
-           for column in rows):return [words],False
-    boxes=[vision_reading.union([w['bbox'] for w in group]) for group in groups]
-    if any(min(a[3],b[3])-max(a[1],b[1])<2*height
-           for a,b in zip(boxes,boxes[1:])):return [words],False
-    return [_pixel_line_order(group) for group in groups],True
+    # The sole persistent gap can itself be the gutter. Including it in the
+    # estimate of ordinary word spacing makes a two-column proof impossible.
+    ordinary=[gap for gap in gaps if gap<1.5*height]
+    minimum=max(6,1.5*height,2*statistics.median(ordinary)) if ordinary else max(6,1.5*height)
+    widths=sorted(set(gap for gap in gaps if gap>=minimum))
+    for width in widths:
+        cuts=[(a[1]+b[0])/2 for a,b in zip(intervals,intervals[1:])
+              if b[0]-a[1]>=width]
+        groups=[[] for _ in range(len(cuts)+1)]
+        for word in words:
+            center=(word['bbox'][0]+word['bbox'][2])/2
+            groups[sum(center>cut for cut in cuts)].append(word)
+        rows=[_pixel_lines(group) for group in groups]
+        if any(len(column)<3 or statistics.median(len(row) for row in column)<2
+               for column in rows):continue
+        boxes=[vision_reading.union([w['bbox'] for w in group]) for group in groups]
+        if any(min(a[3],b[3])-max(a[1],b[1])<2*height
+               for a,b in zip(boxes,boxes[1:])):continue
+        return [_pixel_line_order(group) for group in groups],True
+    return [words],False
 
 
 def _source_paragraph_boundaries(answer,optical,display,regions,body_owners):
@@ -3598,9 +6607,28 @@ def _source_paragraph_boundaries(answer,optical,display,regions,body_owners):
     """
     import statistics
     answer=copy.deepcopy(answer);published=[];repairs=[]
+    def reject(message):
+        if unit_recovery.current() is None:
+            raise ValueError(message)
+        with unit_recovery.guard(display.pno,'source_word_coverage',block=block['id']):
+            raise ValueError(message)
     identities={b['id'] for b in answer['blocks']}
     norm=lambda value:vision_reading.normalized(value).casefold()
     word_key=lambda value:re.sub(r'[^\w]','',norm(value))
+    def one_character_edit(left,right):
+        if abs(len(left)-len(right))>1:return False
+        at=next((i for i,(a,b) in enumerate(zip(left,right)) if a!=b),min(len(left),len(right)))
+        if at==min(len(left),len(right)):return abs(len(left)-len(right))==1
+        if len(left)==len(right):return left[at+1:]==right[at+1:]
+        if len(left)>len(right):return left[at+1:]==right[at:]
+        return left[at:]==right[at+1:]
+    def near_windows(words,window):
+        positions=[]
+        for i in range(3,len(words)-2):
+            other=words[i-3:i+3]
+            different=[(a,b)for a,b in zip(other,window)if a!=b]
+            if not different or len(different)==1 and one_character_edit(*different[0]):positions.append(i)
+        return positions
     for block in answer['blocks']:
         bid=block['id'];territories=regions.get(bid,[])
         if block['role']!='body' or len(territories)!=1:
@@ -3672,8 +6700,16 @@ def _source_paragraph_boundaries(answer,optical,display,regions,body_owners):
             sequence=keys[position-3:position+3]
             candidates=[i for i in range(3,len(values)-2) if values[i-3:i+3]==sequence]
             source_candidates=[i for i in range(3,len(keys)-2) if keys[i-3:i+3]==sequence]
+            if not candidates:
+                # A one-character optical defect cannot erase otherwise proved
+                # prose. Five exact surrounding words and a
+                # reciprocal unique window locate only the structural cut.
+                # The differing word stays untouched for pixel adjudication.
+                near=near_windows(values,sequence)
+                if len(near)==1 and near_windows(keys,values[near[0]-3:near[0]+3])==[position]:
+                    candidates=near
             if len(candidates)!=1 or source_candidates!=[position]:
-                raise ValueError('Original paragraph start has ambiguous response ownership')
+                reject('Original paragraph start has ambiguous response ownership')
             boundary=visible[candidates[0]][0]
             left=next((re.sub(r'<n:[^>]+>','',token)for token in reversed(tokens[:boundary])
                        if re.sub(r'<n:[^>]+>','',token)), '')
@@ -3681,12 +6717,12 @@ def _source_paragraph_boundaries(answer,optical,display,regions,body_owners):
             model_marker=norm(re.sub(r'<n:[^>]+>','',tokens[boundary]))
             if (ordinal and model_marker!=norm(lexical_current[0]['text']) or
                     not ordinal and not re.search(r'[.!?…]$',model_terminal)):
-                raise ValueError('Original paragraph punctuation disagrees with response')
+                reject('Original paragraph punctuation disagrees with response')
             cuts.append((boundary,row_index))
         if not cuts:
             published.append(block);continue
         if len({a for a,b in cuts})!=len(cuts) or cuts!=sorted(cuts):
-            raise ValueError('Original paragraph starts have no ordered response partition')
+            reject('Original paragraph starts have no ordered response partition')
         spans=[(0,0)]+cuts+[(len(tokens),len(rows))]
         parts=[]
         for index,((begin,first),(end,last))in enumerate(zip(spans,spans[1:])):
@@ -3718,6 +6754,85 @@ def _source_paragraph_boundaries(answer,optical,display,regions,body_owners):
     return answer,repairs
 
 
+def _omission_coverage(answer,display,regions,optical=None):
+    """Record exactly the footprints used to consider each live unit covered."""
+    coverage={b['id']:regions.get(b['id'],[block_rect(b,display)]) for b in answer['blocks']}
+    controller=unit_recovery.current()
+    blocked=controller.blocked(display.pno) if controller else {}
+    for block in answer['blocks']:
+        if (block['role']=='footnote' and block['id'] in blocked
+                and not coverage[block['id']]):
+            # An unplaced note retains the complete original page as context.
+            # That context covers unclaimed ink without assigning it a note
+            # location or reclassifying its text as an omitted body paragraph.
+            # Independently owned body remains live. A previously admitted
+            # narrower note footprint is preserved by register_regions.
+            coverage[block['id']]=[list(display.rect)]
+    if controller and optical:
+        from .source_geometry import local_note_openings
+        # Unreferenced rejected notes have no validation stub in `answer`.
+        # Their retained source image must not also become a recovered BODY
+        # row. Reserve only an actual unique opening and its continuous row,
+        # never an unproved rectangle or a distant matching prose occurrence.
+        for block in controller.source_answer(display.pno)['blocks']:
+            bid=block['id'];bounds=block['bbox']
+            if (bid not in blocked or bid in coverage or block['role']!='footnote'
+                    or not all(0<=v<=1000 for v in bounds)
+                    or not(bounds[0]<bounds[2] and bounds[1]<bounds[3])):continue
+            hint=block_rect(block,display)
+            available=[i for i,w in enumerate(optical)
+                if (regions.get('_instances',{}).get(_source_instance(w),bid)==bid)]
+            openings=local_note_openings(optical,available,block['marker'],hint)
+            if len(openings)!=1:continue
+            opening=optical[openings[0]];box=opening['bbox'];height=max(1,box[3]-box[1])
+            row=sorted((optical[i]for i in available if i!=openings[0]
+                and hint[0]-3<=optical[i]['bbox'][0] and optical[i]['bbox'][2]<=hint[2]+3
+                and optical[i]['bbox'][0]>=box[2]
+                and abs(sum(optical[i]['bbox'][1::2])-sum(box[1::2]))<=height*1.5),
+                key=lambda w:w['bbox'][0])
+            chain=[opening]
+            for word in row:
+                if word['bbox'][0]-chain[-1]['bbox'][2]>height*4:break
+                chain.append(word)
+            if len(chain)>=3:coverage[bid]=[vision_reading.union([w['bbox']for w in chain])]
+    return coverage
+
+
+def _recovery_visual_tail(words):
+    """Keep a compact trailing diagram out of an omitted prose transcription.
+
+    Several centered, sparse glyph rows below a colon are original visual
+    evidence, not reliable prose merely because a recognizer assigned digits.
+    Ordinary word rows, wide tables and ambiguous geometry retain their route.
+    """
+    import statistics
+    rows=_pixel_lines(words)
+    if len(rows)<6:return None
+    tail=[]
+    for row in reversed(rows):
+        if not(1<=len(row)<=3)or any(len(w['text'])>3 for w in row):break
+        tail.insert(0,row)
+        if len(tail)>8:return None
+    if len(tail)<3 or len(rows)-len(tail)<3:return None
+    head=rows[:-len(tail)]
+    if not head[-1][-1]['text'].endswith(':'):return None
+    prose=[row for row in head if len(row)>=4]
+    if len(prose)<3:return None
+    from .text_quality import english_lexicon
+    vocabulary=english_lexicon()
+    if sum(''.join(c for c in w['text'].casefold()if c.isalpha())in vocabulary
+           for row in tail for w in row if any(c.isalpha()for c in w['text']))>1:return None
+    width=statistics.median(max(w['bbox'][2]for w in row)-min(w['bbox'][0]for w in row)for row in prose)
+    height=statistics.median(w['bbox'][3]-w['bbox'][1]for row in prose for w in row)
+    if width<=15*height:return None
+    boxes=[vision_reading.union([w['bbox']for w in row])for row in tail]
+    if any(b[2]-b[0]>.4*width for b in boxes):return None
+    centers=[(b[0]+b[2])/2 for b in boxes]
+    if max(centers)-min(centers)>1.5*height:return None
+    if not 0<=boxes[0][1]-max(w['bbox'][3]for w in head[-1])<=3*height:return None
+    return ([w for row in head for w in row],[w for row in tail for w in row])
+
+
 def cover_missing_lines(answer,optical,source_words,display,regions=None,body_owners=None):
     """Recover line-sized printed text omitted entirely by the page reader.
 
@@ -3725,6 +6840,7 @@ def cover_missing_lines(answer,optical,source_words,display,regions=None,body_ow
     certain. Figure/table territories are already represented as source images.
     Short unmatched marks remain diagnostics instead of invented paragraph roles.
     """
+    if regions is not None:_reserve_layer_instances(answer,optical,display,regions)
     answer=copy.deepcopy(answer);blocks=answer['blocks'];boxes=[box for b in blocks for box in (regions or {}).get(b['id'],[block_rect(b,display)])]
     # Reserved SOURCE territories survive removal of rejected authored blocks.
     # They are rendered by unit_source, so recovering their ink again would
@@ -3743,14 +6859,34 @@ def cover_missing_lines(answer,optical,source_words,display,regions=None,body_ow
     partitioned=[]
     for run in runs:
         columns,proved=_proved_recovery_columns(run)
-        partitioned.extend((column,proved) for column in columns)
+        for column in columns:
+            visual_tail=_recovery_visual_tail(column)
+            if visual_tail:
+                prose,artwork=visual_tail
+                partitioned.extend(((prose,proved,False),(artwork,proved,True)))
+            else:partitioned.append((column,proved,False))
     recovered=[];pixel_rows=_pixel_row_ids(optical)
     # A covered foreign word still occupies its place on the source row.
     # Exact consecutive physical instances prohibit jumping across that ink.
     row_pairs={(_source_instance(left),_source_instance(right))
                for row in _pixel_lines(optical) for left,right in zip(row,row[1:])}
-    for index,(run,proved_column) in enumerate(partitioned):
+    for index,(run,proved_column,is_visual) in enumerate(partitioned):
         bbox=vision_reading.union([w['bbox'] for w in run])
+        if is_visual:
+            ident='recovered-visual-'+hashlib.sha256(repr(tuple(round(v,3)for v in bbox)).encode()).hexdigest()[:16]
+            while any(b['id']==ident for b in blocks):ident+='x'
+            r=display.rect
+            normalized=[bbox[0]/r.width*1000,bbox[1]/r.height*1000,bbox[2]/r.width*1000,bbox[3]/r.height*1000]
+            block=dict(id=ident,role='figure',text='Original printed diagram',marker='',bbox=normalized,
+                low_confidence=[],continues_previous=False,continues_next=False)
+            neighbours=[(i,b)for i,b in enumerate(blocks)
+                if b['bbox'][0]<normalized[2]and normalized[0]<b['bbox'][2]and b['bbox'][3]<=normalized[1]+5]
+            at=max(neighbours,key=lambda p:p[1]['bbox'][3])[0]+1 if neighbours else 0
+            blocks.insert(at,block);recovered.append(ident)
+            if regions is not None:
+                regions[ident]=[bbox]
+                regions.setdefault('_instances',{}).update((_source_instance(w),ident)for w in run)
+            continue
         local=[w for w in owned_words(source_words,bbox) if not covered(w)]
         if proved_column:local=_pixel_line_order(local)
         # A legible original layer is preferred; a sparse/garbage layer cannot
@@ -3761,7 +6897,34 @@ def cover_missing_lines(answer,optical,source_words,display,regions=None,body_ow
         sm=SequenceMatcher(None,optical_text,source_text,autojunk=False)
         score=sum(size for _,_,size in sm.get_matching_blocks())/max(1,len(run))
         chosen=local if score>=.75 else run
-        ident='recovered-'+str(index)
+        # A clipped ownership strip can omit a tail which the reader already
+        # placed in the right paragraph. Exact consecutive source occurrences
+        # settle its owner before a new recovery unit can steal that tail.
+        # This grants geometry, never a new transcription or a lexical guess.
+        ordered_run=_pixel_line_order(run)
+        run_tokens=[vision_reading.normalized(w['text'])for w in ordered_run]
+        tail_owners=[]
+        if regions is not None and len(run_tokens)>=2 and run_tokens==[
+                vision_reading.normalized(w['text'])for w in chosen]:
+            for candidate in blocks:
+                tokens=[vision_reading.normalized(t)for t in candidate['text'].split()]
+                if (candidate['role']!='body' or len(tokens)<len(run_tokens)+2
+                        or tokens[-len(run_tokens):]!=run_tokens):continue
+                ink=_owned_block_words(candidate,answer,optical,display,regions,body_owners,ordered=True)
+                if (len(ink)<2 or tokens[-len(run_tokens)-2:-len(run_tokens)]!=[
+                        vision_reading.normalized(w['text'])for w in ink[-2:]]):continue
+                if (_source_instance(ink[-1]),_source_instance(ordered_run[0]))not in row_pairs:continue
+                if any(regions['_instances'].get(_source_instance(w),candidate['id'])!=candidate['id']
+                       for w in run+chosen):continue
+                tail_owners.append(candidate)
+        if len(tail_owners)==1:
+            owner=tail_owners[0]['id']
+            regions.setdefault(owner,[]).append(bbox)
+            regions['_instances'].update((_source_instance(w),owner)for w in run+chosen)
+            continue
+        # Geometry, rather than the current omission list's index, owns a
+        # recovered ID. Removing a failed neighbour cannot rename another unit.
+        ident='recovered-'+hashlib.sha256(repr(tuple(round(v, 3) for v in bbox)).encode()).hexdigest()[:16]
         while any(b['id']==ident for b in blocks):ident+='x'
         r=display.rect;normalized=[bbox[0]/r.width*1000,bbox[1]/r.height*1000,bbox[2]/r.width*1000,bbox[3]/r.height*1000]
         block=dict(id=ident,role='other',text=' '.join(w['text'] for w in chosen),marker='',bbox=normalized,
@@ -3877,7 +7040,11 @@ def cover_missing_lines(answer,optical,source_words,display,regions=None,body_ow
                          pixel_rows.get(id(printed[-1])),pixel_rows.get(id(_pixel_line_order(run)[0])))))
             and previous_text.split() and vision_reading.normalized(previous_text.split()[-1])==vision_reading.normalized(printed[-1]['text'])
             and assemble.continues(previous_text,block['text']))
-        if len(run)<vision_reading.UNALIGNED_RUN and not (forward or float_edge or backward):continue
+        corroborated_short=(len(run)>=2 and score==1. and len(local)==len(run)
+            and all(vision_reading.normalized(a['text'])==vision_reading.normalized(b['text'])
+                    for a,b in zip(run,local))
+            and any(sum(c.isalpha() for c in word['text'])>=3 for word in run))
+        if len(run)<vision_reading.UNALIGNED_RUN and not (forward or float_edge or backward or corroborated_short):continue
         recovered_head=(previous and previous['role']=='body' and not labelled
             and bbox[0]>prev_box[2]+3 and bbox[1]<prev_box[1]
             and first_x<=column_x+3 and assemble.continues(previous_text,block['text']))
@@ -3923,6 +7090,36 @@ def cover_missing_lines(answer,optical,source_words,display,regions=None,body_ow
     return answer,set(recovered)
 
 
+def _defer_unit_prints(pages):
+    """Keep generated block prints outside lexical paragraph merging.
+
+    A print following a source fragment is not a sentence boundary. Remove
+    only the exact generated supplement while page/column seams are decided;
+    after merging, its source attributes locate the completed paragraph.
+    """
+    saved=[]
+    pattern=re.compile(r'(?:<div class="reflow-unit-print">(?:(?!</?div\b).)*</div>)+$',re.S)
+    for page in pages:
+        for i,fragment in enumerate(page['body']):
+            match=pattern.search(fragment)
+            if match is None:continue
+            owners=re.findall(r'data-source-page="(\d+)" data-source-block="([^"]+)"',fragment[:match.start()])
+            if not owners:continue
+            saved.append((owners[-1],match[0]))
+            page['body'][i]=fragment[:match.start()]
+    return saved
+
+
+def _restore_unit_prints(pages,saved):
+    """A unit's shared print follows the paragraph containing its final words."""
+    for (number,block),html in saved:
+        owner=f'data-source-page="{number}" data-source-block="{block}"'
+        locations=[(page,i)for page in pages for i,fragment in enumerate(page['body'])if owner in fragment]
+        if not locations:raise ValueError('Published unit print lost its source paragraph')
+        page,index=locations[-1]
+        page['body'][index]+=html
+
+
 def _join_control_carriers(pages):
     """Use the native joiner's generated-copy offset carrier for our controls.
 
@@ -3932,14 +7129,24 @@ def _join_control_carriers(pages):
     """
     pattern=re.compile(r'<a id="(?:r-v4-d-|r-v4-unit-source-|v4-ref-)[^"]+" class="(?:source-disclosure-ref|noteref)" epub:type="noteref" href="[^"]+"><sup>[^<]*</sup></a>')
     carriers={}
-    def wrap(match):
-        anchor=match.group(0);identity=hashlib.sha256(anchor.encode()).hexdigest()
-        carrier='<span class="source-reading-annotation" id="reading-return-reading-'+identity+'">'+anchor+'</span>'
+    def carrier_for(anchor):
+        identity=hashlib.sha256(anchor.encode()).hexdigest()
+        carrier='<span class="source-reading-annotation" id="reading-return-reading-'+identity+'"></span>'
         carriers[carrier]=anchor
         return carrier
+    def wrap(match):
+        return carrier_for(match.group(0))
+    # Adjacent print assists the flagged reading; it is not another source word.
+    # Hide only this factory-generated attachment from the lexical seam copy,
+    # preserving its exact bytes and location when the join restores controls.
+    flagged=re.compile(r'(<span class="reflow-flagged-reading"><span class="reflow-plausible">.*?</span>)(<a class="source-word-image"(?: title="Inspect original print")? href="[^"]+"><img [^>]+/></a>)(</span>)')
+    def assist(match):
+        return match.group(1)+carrier_for(match.group(2))+match.group(3)
+    compact=re.compile(r'<span class="reflow-print-control">.*?</span>',re.S)
+    origins=re.compile(r'<a id="r-v4-d-[^"]+" class="reflow-reading-origin"></a>')
     for page in pages:
         with unit_recovery.guard(page['pno'],'seam_control_carriers'):
-            page['body']=[pattern.sub(wrap,fragment) for fragment in page['body']]
+            page['body']=[pattern.sub(wrap,flagged.sub(assist,origins.sub(wrap,compact.sub(wrap,fragment)))) for fragment in page['body']]
     return carriers
 
 
@@ -4435,6 +7642,163 @@ def _source_note_id_repair(answer,display,optical,cache):
     return vision_reading.repair_note_ids(answer,evidence)
 
 
+def _compiled_text_quality(pages,records,numbers,stage='compiled_publication_text_quality'):
+    """Sweep all reader-facing channels and retain only implicated owners."""
+    sweep=text_quality.sweep_publication_pages(pages,records,numbers)
+    controller=unit_recovery.current()
+    failures=[]
+    for page in pages:
+        n=page['pno'];quality=sweep['pages'][n]
+        records[n]['compiled_text_quality']=quality
+        if quality['passed']:continue
+        fragments=page['body']+page['asides']
+        parts=[];owners={}
+        for fragment in fragments:
+            for part in text_quality.publication_parts(dict(body=[fragment],asides=[])):
+                # Preserve every whitespace word, including one joined across
+                # source spans. Distinct neighbouring words keep their own
+                # contributing owners rather than inheriting the paragraph's
+                # union and sacrificing a clean source page beside bad text.
+                groups=[]
+                for token in re.finditer(r'\S+',part['text']):
+                    explicit=[unit for span in part.get('spans',[])
+                              if span['start']<token.end() and token.start()<span['end']
+                              for unit in span['owners']]
+                    owned=list({(u['page'],u.get('block')):u for u in explicit}.values())
+                    if not owned:
+                        owned=(controller.fragment_owners(fragment) if controller else [dict(page=n,block=None)])
+                    if controller:
+                        controller.check_units(owned)
+                        for unit in owned:
+                            if unit.get('block') is not None and unit['block'] not in {
+                                    b['id'] for b in (records[unit['page']].get('blocks',[])+
+                                                     records[unit['page']].get('native_note_adjudication',[]))}:
+                                raise unit_recovery.SourceIntegrityError('Publication text has an unregistered source unit')
+                    key=tuple(sorted((u['page'],u.get('block') or '') for u in owned))
+                    if groups and groups[-1][0]==key:
+                        groups[-1][2]=token.end()
+                    else:
+                        groups.append([key,token.start(),token.end(),owned])
+                for _,start,end,owned in groups:
+                    index=len(parts)
+                    parts.append((index,part['text'][start:end],part['kind']))
+                    owners[index]=owned
+        local=text_quality.inspect_partitioned(parts)
+        for index in local['rejected_units']:
+            failures.extend(owners[index])
+        if not local['rejected_units']:
+            failures.append(dict(page=n,block=None))
+    if failures:
+        unique=list({(unit['page'],unit.get('block')):unit for unit in failures}.values())
+        # A failed joined fragment may own the complete reading of its source
+        # pages. Only those pages with no independently safe unit left need a
+        # whole-page fallback; partial pages keep their unaffected fragments.
+        if stage=='compiled_publication_text_quality':
+            whole=set()
+            for n in {unit['page'] for unit in unique}:
+                ids={b['id'] for b in (records[n].get('blocks',[])+records[n].get('native_note_adjudication',[]))
+                     if b['role'] not in ('running_head','folio') and not b.get('degraded_source_context')}
+                bad={unit.get('block') for unit in unique if unit['page']==n}
+                if None in bad or ids and ids<=bad:whole.add(n)
+            unique=[unit for unit in unique if unit['page'] not in whole]+[dict(page=n,block=None) for n in sorted(whole)]
+        if controller:
+            controller.check_units(unique)
+            raise unit_recovery.UnitFailure(unique,stage,ValueError('Joined reading has unresolved text quality'))
+        raise ValueError('Joined reading has unresolved text quality')
+    return sweep
+
+
+def _prepare_scanned_page(doc,n,reader,controller,provenance,original_frames):
+    """Checkpoint source geometry before any mutable book-level assembly."""
+    boundary_receipts={}
+    if controller:controller.verify_source(doc,n)
+    saved=controller.load_prepared(n) if controller else None
+    if saved is not None:
+        prov=(provenance or {}).get(n,{})
+        display=SourceDisplay(doc,n,dict(prov,layer='ocr' if prov.get('space')=='reading' else 'native',
+            original_frame=(original_frames or {}).get(n)))
+        display=local_reading.reading_display(display,saved['reading'])
+        optical=saved['optical']
+        controller.source_repairs[n]=lambda value:_source_note_id_repair(value,display,optical,reader.cache.parent/'pixel-guard-cache')
+        controller.register_regions(n,saved['regions'],
+            _omission_coverage(saved['answer'],display,saved['regions'],saved['optical']))
+        receipts=saved.pop('boundary_receipts')
+        return dict(display=display,**saved),receipts
+    with unit_recovery.guard(n,'primary_source_render'):
+        prov=(provenance or {}).get(n,{})
+        display=SourceDisplay(doc,n,dict(prov,layer='ocr' if prov.get('space')=='reading' else 'native',
+            original_frame=(original_frames or {}).get(n)))
+        if controller and n in controller.images:
+            image=Path(controller.images[n]['path']).read_bytes()
+        else:
+            pix=display.pixmap(scale=2,max_pixels=2_500_000)
+            image=pix.tobytes('jpg',jpg_quality=90)
+        if controller:controller.register_image(n,image)
+    from . import vision_pixels
+    with unit_recovery.guard(n,'optical_evidence'):
+        optical=vision_pixels.words(display,reader.cache.parent/'pixel-guard-cache')
+    with unit_recovery.guard(n,'reading'):
+        reading=(controller.read(n,image,lambda value:_source_note_id_repair(value,display,optical,reader.cache.parent/'pixel-guard-cache'),
+                    local_read=lambda reason:local_reading.read_oriented(display,controller.staging/'local-ocr-cache',reason))
+                 if controller else reader.read(image))
+        upright=local_reading.reading_display(display,reading)
+        if upright is not display:
+            display=upright
+            optical=vision_pixels.words(display,reader.cache.parent/'pixel-guard-cache')
+            controller.source_repairs[n]=lambda value:_source_note_id_repair(value,display,optical,reader.cache.parent/'pixel-guard-cache')
+    regions={};body_owners={}
+    selected=controller.filter_answer(n,reading['answer']) if controller else reading['answer']
+    with unit_recovery.guard(n,'geometry'):
+        answer,repairs=bind_geometry(selected,optical,display,regions,body_owners)
+    with unit_recovery.guard(n,'note_boundaries'):
+        answer,boundary_repairs=_source_note_boundaries(answer,optical,display,regions,body_owners,
+            getattr(reader,'read_marker',None),boundary_receipts,n)
+        repairs.extend(boundary_repairs)
+        for opening in _unpartitioned_note_openings(answer,optical,display,regions,body_owners):
+            with unit_recovery.guard(n,'note_boundaries',block=opening['block']):
+                raise ValueError('Interior printed note opening requires a verified source partition')
+    if controller:
+        controller.register_regions(n,regions,_omission_coverage(answer,display,regions,optical))
+        controller.admit_answer(n,answer)
+    with unit_recovery.guard(n,'reading_text_quality'):
+        units=[(b['id'],b['text']) for b in answer['blocks'] if b['role'] not in ('figure','table')]
+        quality=text_quality.inspect_partitioned(units)
+        failed=list(quality['rejected_units']);missing_scripts=set();weak_local=[]
+        for unit in reading.get('local_ocr_units',[]):
+            # Very weak recognition is retained as source context for just its
+            # paragraph. A high engine score never removes uncertainty marks.
+            if (unit['id'] in {b['id'] for b in answer['blocks']}
+                    and unit['mean_confidence'] < 75 and unit['id'] not in failed):
+                failed.append(unit['id'])
+                weak_local.append(unit['id'])
+        for block in answer['blocks']:
+            if block['role'] in ('figure','table') or not visible_scripts.source_text(display):continue
+            boxes=regions.get(block['id'])
+            if boxes is None:boxes=[block_rect(block,display)]
+            missing=text_quality.script_mismatches(visible_scripts.source_text(display,boxes),block['text'])
+            missing_scripts.update(missing)
+            if missing and block['id'] not in failed:failed.append(block['id'])
+        if failed:
+            reason='Pixel reading has unresolved text quality: '+', '.join(quality['reasons']+
+                ['local_ocr_mean_confidence_below_75' for _ in weak_local[:1]]+
+                ['missing_source_script_'+v for v in sorted(missing_scripts)])
+            if controller:
+                owned=([dict(page=n,block=None)] if set(failed)=={b['id'] for b in answer['blocks']}
+                       else [dict(page=n,block=bid) for bid in failed])
+                raise unit_recovery.UnitFailure(owned,
+                    'reading_text_quality',ValueError(reason))
+            raise ValueError(reason)
+    prepared=dict(reading=reading,optical=optical,regions=regions,
+        body_owners=body_owners,answer=answer,geometry_repairs=repairs,
+        source_words=[])
+    with unit_recovery.guard(n,'source_words'):
+        prepared['source_words']=layer_words(doc,n,display)
+    prepared['boundary_receipts']=boundary_receipts
+    if controller:controller.store_prepared(n,prepared)
+    prepared.pop('boundary_receipts')
+    return dict(display=display,**prepared),boundary_receipts
+
+
 def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None):
     """Build an EPUB with explicit source-word disclosures and source-linked notes."""
     numbers=sorted(page_numbers if page_numbers is not None else range(len(doc)))
@@ -4443,15 +7807,29 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
     # extracting image metadata, which also invalidates the reading cache.
     # clean_native reads native spans only after ruling out scanned pages.
     controller=unit_recovery.current()
+    if controller:
+        for n in numbers:controller.verify_source(doc,n)
     source_pages=controller.source_pages() if controller else set()
     native=[]
     for n in numbers:
         if n in source_pages:continue
         with unit_recovery.guard(n,'page_classification'):
-            if clean_native(doc[n]):native.append(n)
+            if controller and n in controller.native_classification:
+                is_native=controller.native_classification[n]
+            else:
+                is_native=clean_native(doc[n])
+                if controller:controller.native_classification[n]=is_native
+            if is_native:native.append(n)
     scanned=[n for n in numbers if n not in native and n not in source_pages]
-    prepared=(copy.deepcopy(native_prepared) if native_prepared is not None else
-              pipeline.run(doc,page_numbers=native,recovery_opts={'mode':'off'}) if native else None)
+    prepared=None
+    if native:
+        source_prepared=native_prepared
+        if source_prepared is None:
+            source_prepared=getattr(controller,'native_prepared',None)
+            if source_prepared is None:
+                source_prepared=pipeline.run(doc,page_numbers=native,recovery_opts={'mode':'off'})
+                if controller:controller.native_prepared=source_prepared
+        prepared=copy.deepcopy(source_prepared)
     book=prepared.book if prepared else assemble.Book()
     # Filter cached native preparation to the actual selected native pages.
     book.pages={n:els for n,els in book.pages.items() if n in native}
@@ -4462,7 +7840,8 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         doc,book,native,raw_pages=getattr(prepared,'raw_pages',None))
     native_margin_repairs=_native_margin_runs(doc,book,native)
     native_caption_repairs=_native_caption_ownership(doc,book,native)
-    package=unit_recovery.package(out_path);pages=[];records={};images={};html_native={};native_unit_reports={}
+    from . import image_budget
+    package=unit_recovery.package(out_path,source_bytes=image_budget.source_size(doc));pages=[];records={};images={};html_native={};native_unit_reports={}
     try:
         for n in native:
             with unit_recovery.guard(n,'native_page_markup'):
@@ -4527,33 +7906,9 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                 case.update(unit,unit_kind='figure');native_cases.append(case)
         scans={};boundary_receipts={}
         for n in scanned:
-            with unit_recovery.guard(n,'primary_source_render'):
-                prov=(provenance or {}).get(n,{})
-                display=SourceDisplay(doc,n,dict(prov,layer='ocr' if prov.get('space')=='reading' else 'native',
-                    original_frame=(original_frames or {}).get(n)))
-                pix=display.pixmap(scale=2,max_pixels=2_500_000)
-                image=pix.tobytes('jpg',jpg_quality=90)
-                if controller:controller.register_image(n,image)
-            from . import vision_pixels
-            with unit_recovery.guard(n,'optical_evidence'):
-                optical=vision_pixels.words(display,reader.cache.parent/'pixel-guard-cache')
-            with unit_recovery.guard(n,'reading'):
-                reading=(controller.read(n,image,lambda value:_source_note_id_repair(value,display,optical,reader.cache.parent/'pixel-guard-cache'))
-                         if controller else reader.read(image))
-            regions={};body_owners={}
-            selected=controller.filter_answer(n,reading['answer']) if controller else reading['answer']
-            with unit_recovery.guard(n,'geometry'):
-                answer,repairs=bind_geometry(selected,optical,display,regions,body_owners)
-            with unit_recovery.guard(n,'note_boundaries'):
-                answer,boundary_repairs=_source_note_boundaries(answer,optical,display,regions,body_owners,
-                    getattr(reader,'read_marker',None),boundary_receipts,n)
-                repairs.extend(boundary_repairs)
-            if controller:controller.register_regions(n,regions)
-            scans[n]=dict(display=display,reading=reading,optical=optical,regions=regions,
-                body_owners=body_owners,answer=answer,geometry_repairs=repairs,
-                source_words=[])
-            with unit_recovery.guard(n,'source_words'):
-                scans[n]['source_words']=layer_words(doc,n,display)
+            scans[n],receipts=_prepare_scanned_page(doc,n,reader,controller,provenance,original_frames)
+            scans[n]['pixel_cache']=reader.cache.parent/'pixel-guard-cache'
+            boundary_receipts.update(receipts)
         # Resolve book-level roles before omitted-line recovery so an oversized
         # model illustration cannot swallow either live prose or a note tail.
         _note_ownership(scans)
@@ -4585,10 +7940,20 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                 if controller:s['regions']=controller.coverage_regions(n,s['regions'])
                 s['answer'],s['recovered']=cover_missing_lines(s['answer'],s['optical'],s['source_words'],
                     s['display'],s['regions'],s['body_owners'])
+                if controller:
+                    # Newly recovered units already have source footprints.
+                    # Keep those identities before the stricter paragraph
+                    # partition can reject one, without publishing its text.
+                    controller.register_regions(n,s['regions'],
+                        _omission_coverage(s['answer'],s['display'],s['regions'],s['optical']))
+                    controller.admit_answer(n,s['answer'])
+                    s['answer']=controller.filter_answer(n,s['answer'])
                 s['answer'],s['paragraph_repairs']=_source_paragraph_boundaries(
                     s['answer'],s['optical'],s['display'],s['regions'],s['body_owners'])
                 if controller:
-                    controller.register_regions(n,s['regions'])
+                    controller.register_regions(n,s['regions'],
+                        _omission_coverage(s['answer'],s['display'],s['regions'],s['optical']))
+                    controller.admit_answer(n,s['answer'])
                     s['answer']=controller.filter_answer(n,s['answer'])
         if unproved_art_cases:
             raise unit_recovery.UnitFailure(unproved_art_cases,'figure_separation',
@@ -4597,6 +7962,7 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         note_context={'owners':owners,'catalogue':catalogue,'labels':labels,'refs':{},
                       'cache':reader.cache.parent/'pixel-guard-cache',
                       'marker_reader':getattr(reader,'read_marker',None),'marker_receipts':boundary_receipts}
+        compilation_failures=[]
         for n in numbers:
             if n in source_pages:
                 from .unit_source import source_unit
@@ -4623,37 +7989,66 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                 with unit_recovery.guard(n,'native_seam_binding'):
                     native_report['blocks']=_native_seam_blocks(doc,book,n,native_pages[n])
                     _native_published_provenance(native_pages[n],native_report['blocks'])
+                    _audit_native_pixels(doc,native_pages[n],native_report['blocks'],
+                        reader.cache.parent/'pixel-guard-cache',package,images)
+                    native_report['native_note_adjudication']=_audit_native_note_pixels(doc,book,native_pages[n],
+                        reader.cache.parent/'pixel-guard-cache',package,images)
+                    native_report['degraded_units'].extend(b['unplaced_source_context']
+                        for b in native_report['blocks'] if b.get('unplaced_source_context'))
+                    audited=native_report['blocks']+native_report['native_note_adjudication']
+                    native_report['marks']=sum(len(b.get('marked',[])) for b in audited)
+                    native_report['words']=sum(len(b.get('published_tokens',[])) for b in audited)
                     if controller:
                         native_pages[n],native_report=build_epub.degrade_native_units(native_pages[n],native_report,
                             controller.blocked(n),SourceDisplay(doc,n),package,images)
                 pages.append(native_pages[n]);records[n]=native_report;continue
             s=scans[n];reading=s['reading'];recovered=s['recovered']
-            with unit_recovery.guard(n,'page_compilation'):
-                page,report=compile_page(s['answer'],s['source_words'],s['display'],n,package,images,
-                    s['optical'],recovered,s['regions'],s['body_owners'],note_context,
-                    {case['block']:case for case in s['figure_repairs'] if case.get('degraded')})
+            try:
+                with unit_recovery.guard(n,'page_compilation'):
+                    local_units=(local_reading.partition_units(reading['local_ocr_units'],
+                        s.get('paragraph_repairs',[])) if reading.get('local_ocr') else None)
+                    page,report=compile_page(s['answer'],s['source_words'],s['display'],n,package,images,
+                        s['optical'],recovered,s['regions'],s['body_owners'],note_context,
+                        {case['block']:case for case in s['figure_repairs'] if case.get('degraded')},
+                        local_ocr=reading.get('local_ocr',False),
+                        **({'local_ocr_units':local_units} if local_units is not None else {}))
+            except _CompilationQualityFailure as failure:
+                compilation_failures.extend(failure.units)
+                continue
             if controller and controller.blocked(n):
-                _insert_source_units(page,report,reading['answer'],controller.blocked(n),s['display'],package,images)
+                _insert_source_units(page,report,controller.source_answer(n),controller.blocked(n),s['display'],package,images)
             report['recovered_omitted_blocks']=list(recovered)
             report['source_paragraph_repairs']=s.get('paragraph_repairs',[])
+            report['source_note_marker_verifications']=list(s.get('source_note_marker_verifications',{}).values())
             report['pixel_bound_geometry_repairs']=s['geometry_repairs']
             report['source_bound_figure_repairs']=s['figure_repairs']
             report['degraded_figures']=[case for case in s['figure_repairs'] if case.get('degraded')]
             report['degraded_figure_count']=len(report['degraded_figures'])
             pages.append(page);records[n]=dict(source='vision',**report,
-                **{k:v for k,v in reading.items() if k!='answer'})
+                **{k:v for k,v in reading.items() if k not in ('answer','local_ocr_units')})
+            if local_units is not None:
+                records[n]['local_ocr_original_units']=copy.deepcopy(reading['local_ocr_units'])
+                records[n]['local_ocr_units']=report['local_ocr_units']
             records[n]['marker_readings']=note_context['marker_receipts'].get(n,[])
             records[n]['new_cost_usd']+=sum(r['new_cost_usd'] for r in records[n]['marker_readings'])
             records[n]['cached']=records[n]['cached'] and all(
                 r['cached'] for r in records[n]['marker_readings']
                 if r.get('request_dispatched') is not False)
             if progress:progress(n,records[n])
-        # Shared publication handles scoped native IDs, chapter splits and page turns.
-        # Vision IDs already include physical page identity, so do not scope twice.
+        if compilation_failures:
+            # No page sweep, note finishing or publication may consume this
+            # failed attempt's partial fragments or reference dictionaries.
+            raise _CompilationQualityFailure(compilation_failures)
+        # All physical pages, including short notes and headings, are checked.
+        # Failure uses the same source-owned reread/disclosure recovery as any
+        # other rejected reading; this sweep itself never changes lexical text.
         if controller:
             controller.records=records
             for page in pages:controller.register_page(page,records[page['pno']])
+        quality_sweep=_compiled_text_quality(pages,records,numbers,'publication_text_quality')
+        for n,quality in quality_sweep['pages'].items():records[n]['text_quality']=quality
         _finish_notes(pages,owners,catalogue,note_context['refs'])
+        unit_prints=_defer_unit_prints(pages)
         carriers=_join_control_carriers(pages)
         scan_words,scan_compounds=_scan_wrap_vocabulary(scans)
         for page in pages:
@@ -4726,9 +8121,25 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         for page in pages:
             for carrier,anchor in carriers.items():
                 page['body']=[fragment.replace(carrier,anchor) for fragment in page['body']]
+        _restore_unit_prints(pages,unit_prints)
+        # Removing a printed line-end hyphen can form a newly damaged word.
+        # Validate the actual joined text, not only its earlier page fragments.
+        quality_sweep=_compiled_text_quality(pages,records,numbers)
         chapters=unit_recovery.chapters(pages)
         reading_flow.finish(chapters,book)
-        unit_recovery.bind_links(chapters)
+        note_link_disclosures=[]
+        def disclose_note_link(units, missing_target, bid):
+            # Association failure is local metadata uncertainty. Keep both live
+            # text and already admitted page fallbacks; expose original pixels
+            # without spending a new read or retrying unrelated transcription.
+            pno=units[0]['page']
+            from .unit_source import source_unit
+            fragment,asides,case=source_unit(SourceDisplay(doc,pno),pno,bid,'other',
+                package,images,'The printed note association could not be proved.')
+            case.update(stage='note_link_disclosure',missing_target=missing_target)
+            note_link_disclosures.append(case)
+            return case['source_reference'],[fragment]+asides
+        unit_recovery.bind_links(chapters,source_context=disclose_note_link)
         for chapter in chapters:
             chapter.blocks=[build_epub._image_aliases(block,package.aliases) for block in chapter.blocks]
         native_evidence=build_epub._resource_aliases(native_evidence,package.aliases)
@@ -4739,7 +8150,7 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         homes=unit_recovery.page_homes(chapters)
         documents={c.href:unit_recovery.document(c.title,'\n'.join(c.blocks),'en') for c in chapters}
         about='vision-about.xhtml'
-        documents[about]=unit_recovery.document('About this conversion','<h1>About this conversion</h1><p>Clean native pages retain deterministic text. Other pages were transcribed from their printed pixels. A dagger links a differing or uncertain reading to its original source crop. Running heads and folios are excluded from reading flow. Printed notes and transcription disclosures appear in the notes section with Return links.</p>','en')
+        documents[about]=unit_recovery.document('About this conversion','<h1>About this conversion</h1><p>Clean native pages retain deterministic text. Other pages were transcribed from their printed pixels. Proved words remain ordinary text. A plausible but unproved reading is underlined and accompanied by its original print; compare that print when the reading matters. When no complete reading is available, only the original print is shown. A dagger opens the full source crop. Independently supported corrections keep their correction notice. Running heads and folios are excluded from reading flow. Printed notes and transcription disclosures appear in the notes section with Return links.</p>','en')
         entries=[(about,'About this conversion')]+[(c.href,c.title) for c in chapters]
         identifier='urn:uuid:'+str(uuid.uuid4());meta={'title':'PDF vision conversion','language':'en'}
         manifest=[{'id':'nav','href':'nav.xhtml','type':'application/xhtml+xml','properties':'nav'},
@@ -4755,17 +8166,26 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
                 ident='native-support-'+str(index);documents[href]=html
                 manifest.append({'id':ident,'href':href,'type':'application/xhtml+xml'});spine.append(ident)
             entries.extend([(build_epub.SOURCE_CHECKS_HREF,'Source checks'),(build_epub.SOURCE_INDEX_HREF,'Source PDF pages')])
+        from .occurrence_coverage import final_publication
+        source_displays={n:scans[n]['display']if n in scans else SourceDisplay(doc,n)for n in numbers}
+        source_frames={n:scans[n]['optical']if n in scans else
+            [dict(text=w[4],bbox=list(source_displays[n].reading_rect(w[:4])))
+             for w in doc[n].get_text('words')]for n in numbers}
+        publication_coverage=final_publication(documents,records,source_frames,images,package,source_displays,homes,
+            source_inventory=getattr(book,'source_inventory',{}))
         for index,src in enumerate(package.images):
             manifest.append({'id':f'im{index}','href':src,'type':package.media_types[src]})
         result={'converter':'vision-page-pilot','version':vision_reading.VERSION,'model':vision_reading.MODEL,
-                'pages':records,'page_homes':homes,'page_joins':joins,'native_pages':native,'vision_pages':scanned,
+                'pages':records,'text_quality':quality_sweep,'page_homes':homes,'page_joins':joins,'native_pages':native,'vision_pages':scanned,
                 'page_seam_decisions':seam_decisions,'page_seam_role_repairs':seam_role_repairs,
                 'source_document_sha256':extract.document_fingerprint(doc),'images':images,
+                'publication_coverage':publication_coverage,
                 'native_margin_repairs':native_margin_repairs,
                 'native_caption_repairs':native_caption_repairs,
                 'native_publication_repairs':native_publication_repairs,
                 'live_table_cells':[case for record in records.values() for case in record.get('live_table_cells',[])],
                 'note_marker_disclosures':[case for record in records.values() for case in record.get('note_marker_disclosures',[])],
+                'note_link_disclosures':note_link_disclosures,
                 'note_marker_repairs':[case for record in records.values() for case in record.get('note_marker_repairs',[])],
                 'degraded_figures':[case for record in records.values() for case in record['degraded_figures']],
                 'degraded_figure_count':sum(record['degraded_figure_count'] for record in records.values()),
@@ -4777,6 +8197,9 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         if controller:
             result['degraded_units']=[unit for record in records.values() for unit in record.get('degraded_units',[])]
             controller.decorate_report(result)
+        # Shared image resources retain each disclosure's own identity.
+        result=build_epub._resource_aliases(result,package.aliases)
+        text_quality.validate_sweep(quality_sweep,numbers)
         package.finish({'sidecar':result,'documents':documents,
             'opf':unit_recovery.generated_xml('opf',build_epub._opf,dict(meta,**(metadata or {})),manifest,spine,identifier,datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 nonlinear={item for item in spine if item=='about' or item.startswith('native-support-')}),
@@ -4787,7 +8210,7 @@ def _convert_attempt(doc,out_path,reader,*,page_numbers=None,provenance=None,pro
         package.abandon();raise
 
 
-def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None):
+def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None,scratch_dir=None,job_id=None):
     """Complete source-owned units despite rejected readings or assembly units.
 
     Each failed publication attempt is abandoned. Its source-bound unit either
@@ -4817,13 +8240,15 @@ def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=No
                     status='source_integrity_failure',cause_type=type(error).__name__,reason=str(error))
                 raise
     parent=Path(out_path).parent;parent.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='.unit-recovery-',dir=parent) as staging:
+    with unit_recovery.preparation_scratch(scratch_dir=scratch_dir,job_id=job_id) as staging:
         controller=unit_recovery.Controller(reader,numbers,staging)
+        from .image_budget import EvidenceRaster
+        source_raster=EvidenceRaster()
         def original_image(n):
             prov=(provenance or {}).get(n,{})
             display=SourceDisplay(doc,n,dict(prov,layer='ocr' if prov.get('space')=='reading' else 'native',
                 original_frame=(original_frames or {}).get(n)))
-            return display.roi_jpeg(display.rect,scale=2,quality=90)
+            return source_raster.jpeg(display,display.rect)
         controller.source_image_provider=original_image
         with unit_recovery.activated(controller):
             while True:
@@ -4835,7 +8260,7 @@ def _convert_with_recovery(doc,out_path,reader,*,page_numbers=None,provenance=No
                     controller.recover(failure)
 
 
-def convert(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None):
+def convert(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=None,native_prepared=None,original_frames=None,metadata=None,scratch_dir=None,job_id=None):
     """Publish source-owned units; persist bounded SOURCE-fatal diagnostics.
 
     Optional source-record metadata supplies OPF title, authors and language.
@@ -4844,7 +8269,7 @@ def convert(doc,out_path,reader,*,page_numbers=None,provenance=None,progress=Non
     try:
         return _convert_with_recovery(doc,out_path,reader,page_numbers=page_numbers,
             provenance=provenance,progress=progress,native_prepared=native_prepared,
-            original_frames=original_frames,metadata=metadata)
+            original_frames=original_frames,metadata=metadata,scratch_dir=scratch_dir,job_id=job_id)
     except unit_recovery.SourceIntegrityError as error:
         import os,tempfile
         event=getattr(error,'source_recovery_event',{})

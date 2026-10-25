@@ -83,6 +83,11 @@ def note_text(note):
 @pytest.mark.parametrize('plus',[False,True])
 def test_source_interior_marker_keeps_unlabelled_prefix_with_previous_note(tmp_path,monkeypatch,mirror,plus):
     p,body,left,prefix,citation=fixture(mirror=mirror,plus=plus)
+    from cps.services.reflow import pixel_adjudication as pa
+    def unavailable(*args):
+        value=pa.CropWitness();value.failure='Synthetic secondary recognition unavailable'
+        return value
+    monkeypatch.setattr(pa,'read_crop',unavailable)
     calls=verified_marker_reader(monkeypatch)
     _,_,docs=h.convert_ink(tmp_path,monkeypatch,[p])
     refs,notes=h.assert_exact_returns(docs,2)
@@ -132,12 +137,23 @@ def test_coherent_body_prefix_cannot_be_moved_into_an_unfinished_note(tmp_path,m
 def test_real_plus_does_not_authorize_dagger_partition(tmp_path,monkeypatch):
     p,body,left,prefix,citation=fixture(actual_plus=True)
     verified_marker_reader(monkeypatch,label='+')
-    try:
-        _,_,docs=h.convert_ink(tmp_path,monkeypatch,[p])
-    except ValueError as error:
-        assert 'marker' in str(error).lower() or 'label' in str(error).lower(),'only an explicit selected-symbol conflict is an allowed strict failure'
-        return
-    refs,notes=h.assert_exact_returns(docs,2);bytarget={(name,n.get('id')):n for name,n in notes}
-    star=next(bytarget[h.destination(name,ref.get('href'))] for name,ref in refs if ''.join(ref.itertext())=='*')
-    assert prefix not in note_text(star),'ordinary plus ink is not a globally substituted source dagger boundary'
+    _,report,docs=h.convert_ink(tmp_path,monkeypatch,[p])
+    refs,notes=h.assert_exact_returns(docs,1)
+    assert ''.join(refs[0][1].itertext())=='*'
+    star=next(n for name,n in notes if (name,n.get('id'))==h.destination(refs[0][0],refs[0][1].get('href')))
+    assert left in note_text(star) and prefix not in note_text(star)
     assert h.body_texts(docs)==[body]
+    units=[u for u in report['degraded_units']if u.get('block')=='second']
+    assert len(units)==1 and units[0]['unit_kind']=='footnote'
+    contexts=[n for root in docs.values()for n in root.findall('.//x:aside',h.NS)if n.get('id')=='v4-note-0-second']
+    assert len(contexts)==1 and contexts[0].findall('.//x:img',h.NS)
+    assert prefix not in note_text(contexts[0]) and citation not in note_text(contexts[0])
+    markers=[u for u in report['note_marker_disclosures']if u.get('association_status')=='UNPROVED']
+    assert len(markers)==1 and markers[0]['note_owner']==[0,'second']
+    origin=markers[0]['source_reference_origin']
+    controls=[(name,a)for name,root in docs.items()for a in root.findall('.//x:a',h.NS)if a.get('id')==origin]
+    assert len(controls)==1
+    name,control=controls[0];target=h.destination(name,control.get('href'))
+    context=next(n for n in docs[target[0]].iter()if n.get('id')==target[1])
+    assert context.findall('.//x:img',h.NS)
+    assert any(h.destination(target[0],a.get('href'))==(name,origin)for a in context.findall('.//x:a',h.NS)if '#'in(a.get('href')or''))

@@ -336,7 +336,9 @@ def test_verifier_proposal_binding_rechecks_overlap_and_final_staleness(source):
 def enriched(source):
     from cps.services.reflow.enriched_source import prepare_source_page
     book, doc, _ = source
-    records = [{'token':'source','score':22,'source_bbox':[1,2,3,4]},
+    boxes = [list(word[:4]) for word in doc[0].get_text('words') if word[4] == 'source']
+    assert len(boxes) == 1
+    records = [{'token':'source','score':22,'source_bbox':boxes[0]},
                {'token':'source','score':31,'source_bbox':[5,6,7,8]},
                {'token':'.s','score':7,'source_bbox':[9,10,11,12]}]
     layer = {'layer':'ocr','uncertain_words':3,'orientation':0}

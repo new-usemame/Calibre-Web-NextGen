@@ -40,6 +40,11 @@ def projection(node, images):
     """Source-only endpoint witness, including opaque source text atoms."""
     tag = node.tag.rsplit('}', 1)[-1]
     classes = node.get('class', '').split()
+    if 'reflow-flagged-reading' in classes:
+        # The attached print repeats the plausible reading; its spacing is
+        # presentation, not a new source-word boundary.
+        live=next((c for c in node if 'reflow-plausible' in c.get('class','').split()),None)
+        return ((live.text or '')+''.join(projection(c,images)for c in live) if live is not None else '')+(node.tail or '')
     if 'source-glyph-presentation' in classes:
         # The visible ink expansion has a different resource identity. Its
         # sealed canonical sibling supplies the same source word witness.

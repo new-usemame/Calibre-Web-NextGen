@@ -341,3 +341,91 @@ def test_raised_suffix_can_occupy_the_source_whitespace_before_punctuation():
     assert len(result[0].lines)==1
     assert ''.join(s.text for s in result[0].lines[0].spans)=='10th . Next'
     assert [s.text for s in result[0].lines[0].spans if s.superscript]==['th']
+
+
+@pytest.mark.parametrize("encoding", ["Identity-H", "Identity-V"])
+def test_mapped_cid_resource_encoding_suffix_preserves_drawn_words(encoding):
+    """Synthetic mapped font names differ from their paint-trace names."""
+    from cps.services.reflow import native_text
+    class Doc:
+        def xref_get_key(self, xref, key):
+            return ('xref', '9 0 R') if key == 'ToUnicode' else ('null', 'null')
+    class Page:
+        parent = Doc()
+        def get_fonts(self):
+            return [(1, 'cid', 'Type0', 'ABCDEF+TextFace-' + encoding, 'F1', encoding)]
+        def get_texttrace(self):
+            return [dict(font='TextFace', type=0, opacity=1, seqno=0,
+                         bbox=(10, 10, 50, 20), chars=[
+                (ord(c), i + 1, (10 + i * 8, 20), (10 + i * 8, 10, 18 + i * 8, 20))
+                for i, c in enumerate('clear')])]
+        def get_bboxlog(self):
+            return [('fill-text', (10, 10, 50, 20))]
+    page = Page()
+    word = dict(text='clear', bbox=(10, 10, 50, 20))
+    assert native_text.drawn_word_authorities(page, [word]) == [True]
+    assert not native_text.unproved_legacy_word(page, word)
+
+
+def test_cid_trace_alias_cannot_hide_a_conflicting_unmapped_resource():
+    from cps.services.reflow import native_text
+    assert not native_text._face_authority(
+        {'TextFace-Identity-H': True, 'TextFace': False}, 'TextFace')
+    assert not native_text._face_authority({'TextFace-Unrelated': True}, 'TextFace')
+
+
+def test_word_glyph_unicode_map_is_optical_evidence_not_native_letter_proof():
+    """Synthetic reconstructed-font cmap assigns a whole word to one glyph."""
+    from cps.services.reflow import native_text
+    class Doc:
+        def xref_get_key(self, xref, key):
+            return ('xref', '9 0 R') if key == 'ToUnicode' else ('null', 'null')
+        def xref_stream(self, xref):
+            return b'1 beginbfchar\n<0001> <00670061007200640065006E>\nendbfchar'
+    class Page:
+        parent = Doc()
+        def get_fonts(self):
+            return [(1, 'cid', 'Type0', 'TextFace-Identity-H', 'F1', 'Identity-H')]
+        def get_texttrace(self):
+            return [dict(font='TextFace', type=0, opacity=1, seqno=0,
+                         bbox=(10, 10, 50, 20), chars=[
+                (ord(c), i + 1, (10 + i * 8, 20), (10 + i * 8, 10, 18 + i * 8, 20))
+                for i, c in enumerate('clear')])]
+        def get_bboxlog(self):
+            return [('fill-text', (10, 10, 50, 20))]
+    page = Page()
+    word = dict(text='clear', bbox=(10, 10, 50, 20))
+    assert not native_text.drawn_word_authorities(page, [word])[0]
+    # A mapped optical hypothesis can be read independently. It is distinct
+    # from an opaque symbol code that must always retain the original glyph.
+    assert not native_text.unproved_legacy_word(page, word)
+
+
+def test_reconstructed_font_hypothesis_cannot_override_a_complete_pixel_reading(tmp_path, monkeypatch):
+    import pymupdf
+    from cps.services.reflow import vision_pipeline as vp, pixel_adjudication as pa, vision_pixels
+    from cps.services.reflow.source_display import SourceDisplay
+    from tests.unit.test_reflow_vision_pilot import block
+    class Package:
+        def image(self, *args): pass
+        def disclosure_image(self, *args): pass
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=300, height=200)
+        page.insert_font(fontname='embedded', fontbuffer=pymupdf.Font('helv').buffer)
+        page.insert_text((30, 70), 'clear garden', fontname='embedded', fontsize=12)
+        xref = int(doc.xref_get_key(page.get_fonts()[0][0], 'ToUnicode')[1].split()[0])
+        cmap = doc.xref_stream(xref)
+        cmap = cmap.replace(b'endcmap', b'2 beginbfchar\n<004d> <0031>\n<ffff> <00670061007200640065006e>\nendbfchar\nendcmap')
+        doc.update_stream(xref, cmap)
+        page = doc.reload_page(page)
+        source = [dict(text=w[4], bbox=list(w[:4]), confidence=99) for w in page.get_text('words')]
+        assert source[0]['text'] == 'c1ear'
+        pixels = [dict(w, text=w['text'].replace('c1ear', 'clear')) for w in source]
+        monkeypatch.setattr(pa, 'read_crop', lambda *args: pixels)
+        monkeypatch.setattr(vision_pixels, 'words', lambda *args: pixels)
+        _, record = vp.compile_page({'blocks': [block('clear garden', bbox=(0, 0, 1000, 1000))]},
+            source, SourceDisplay(doc, 0), 0, Package(), {}, pixel_words=pixels,
+            note_context={'cache': tmp_path/'cache', 'labels': {}, 'catalogue': {}, 'refs': {}})
+    result = record['blocks'][0]
+    assert result['published_tokens'] == ['clear', 'garden']
+    assert not result.get('source_image_words')

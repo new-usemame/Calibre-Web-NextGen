@@ -36,3 +36,29 @@ Audit writing occurs after provider processing. Failure keeps normal paid-respon
 cache and financial-ledger evidence: a subsequent authorized job reuses answers
 rather than treating them as unsent. No audit record changes request serialization,
 source preparation, quote cache identities, billing, or the provider route.
+
+## Reading assistance and source evidence
+
+The EPUB distinguishes three publication states. Proved words remain ordinary
+text. Plausible but unproved words remain live, visibly underlined, with original
+print appended to the word or its contiguous reading run. Undecodable glyph codes
+and incomplete surviving words retain print alone. A flag is an unresolved
+reading, including when the candidate happens to be correct; it never upgrades
+an adjudication to a proved correction. Supported corrections retain their
+existing linked notices.
+
+Inspection links retain the complete original crop. The optional gray inline
+preview follows the source line's baseline and x-height and is excluded from
+source-occurrence coverage evidence. Its empty alternative text avoids speaking
+the live candidate twice. A source word retained only as print has an explicit
+inspection label. Theme or reading-system image transformations need visual
+verification; browser rendering does not prove Kindle conversion behavior.
+
+Representation equivalence covers presentation ligatures, quote forms and soft
+hyphens, preserving accents and macrons. Repeated-word proof is currently bounded
+to complete matching ink on the same page, earned from independent readings. It
+does not infer an authoritative font map or extend spelling proof across a book.
+A dictionary may rank already observed reading candidates for flagged assistance;
+it cannot certify the print, change a proved word, or decide between two valid
+words. Native candidate assistance keeps its source reading unless the existing
+pixel adjudication independently proves a correction.

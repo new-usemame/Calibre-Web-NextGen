@@ -8,6 +8,7 @@ import json
 import weakref
 from dataclasses import dataclass, replace, asdict
 from xml.dom import Node, minidom
+from xml.parsers.expat import ExpatError
 
 from . import annotate
 
@@ -123,6 +124,85 @@ def _image_owned_records(book,pno,provenance,records):
     return art,qualified
 
 
+def _uncertainty_owners(book, pno, provenance, records):
+    """Require one source element to own each original-coordinate record."""
+    from . import extract
+    from .heading_evidence import _valid, _inside
+    angle = provenance.get('orientation', 0)
+    frame = provenance.get('page_rect')
+    if angle not in (0, 90, 180, 270) or (angle and not _valid(frame)):
+        return {}
+    matrix = extract.pymupdf.Matrix(1, 1).prerotate(angle)
+    origin = extract.pymupdf.Rect(frame) * matrix if _valid(frame) else extract.pymupdf.Rect()
+    result = {}
+    for index, record in enumerate(records):
+        box = record.get('source_bbox')
+        if not _valid(box):
+            continue
+        mapped = extract.pymupdf.Rect(box) * matrix
+        mapped = (mapped.x0 - origin.x0, mapped.y0 - origin.y0,
+                  mapped.x1 - origin.x0, mapped.y1 - origin.y0)
+        owners = [i for i, element in enumerate(book.pages[pno])
+                  if element.kind in ('p', 'h', 'caption') and _valid(element.bbox)
+                  and _inside(mapped, element.bbox)
+                  and (not element.line_boxes or any(_valid(line) and _inside(mapped, line)
+                                                    for line in element.line_boxes))]
+        if len(owners) == 1:
+            result[index] = owners[0]
+    return result
+
+
+def _block_offsets(html):
+    from . import build_epub
+    offsets, cursor = {}, 0
+    for index, block in enumerate(build_epub.split_blocks(html)):
+        start = html.find(block, cursor)
+        if start < 0:
+            return {}
+        offsets[index] = (start, start + len(block))
+        cursor = start + len(block)
+    return offsets
+
+
+def _uncertainty_ranges(book, pno, provenance, records, html, mapping):
+    """Bind confidence to a uniquely owned surviving source block."""
+    offsets = _block_offsets(html)
+    return {index: offsets[mapping[owner]]
+            for index, owner in _uncertainty_owners(book, pno, provenance, records).items()
+            if owner in mapping and mapping[owner] in offsets}
+
+
+def model_uncertainty_ranges(book, pno, provenance, records, html):
+    """Map owned source transcripts to unique output blocks, never by order.
+
+    A changed or repeated transcript has no safe block correspondence. Its
+    record remains disclosed but unplaced; equal words elsewhere cannot own it.
+    """
+    from . import build_epub
+    def text(fragment):
+        root = minidom.parseString('<root xmlns:epub="http://www.idpf.org/2007/ops">'
+                                   + fragment + '</root>')
+        def walk(node):
+            return node.data if node.nodeType == Node.TEXT_NODE else ''.join(
+                walk(child) for child in node.childNodes)
+        return ' '.join(walk(root.documentElement).split())
+    try:
+        blocks = build_epub.split_blocks(html)
+        transcripts = [text(block) for block in blocks]
+        mapping = {}
+        for owner in set(_uncertainty_owners(book, pno, provenance, records).values()):
+            transcript = ' '.join(book.pages[pno][owner].text.split())
+            matches = [i for i, value in enumerate(transcripts) if value == transcript]
+            source_matches = sum(' '.join(element.text.split()) == transcript
+                                 for element in book.pages[pno]
+                                 if element.kind in ('p', 'h', 'caption'))
+            if len(matches) == 1 and source_matches == 1:
+                mapping[owner] = matches[0]
+        return _uncertainty_ranges(book, pno, provenance, records, html, mapping)
+    except (ValueError, TypeError, ExpatError):
+        return {}
+
+
 def prepare_source_page(book, pno, provenance, records=()):
     """Capture actual Recovery provenance/records; callers regenerate on replay.
 
@@ -146,7 +226,10 @@ def prepare_source_page(book, pno, provenance, records=()):
     artwork,qualified=_image_owned_records(book,pno,provenance,normalized)
     excluded=set(artwork+qualified)
     active=[i for i in range(len(normalized)) if i not in excluded]
-    html, _, marked, placements = annotate.annotate_page(html,[normalized[i] for i in active],with_placements=True)
+    active_records = [normalized[i] for i in active]
+    source_ranges = _uncertainty_ranges(book, pno, provenance, active_records, html, mapping)
+    html, _, marked, placements = annotate.annotate_page(
+        html, active_records, with_placements=True, source_ranges=source_ranges)
     placed=[active[i] for i in placements]
     report = {'version': VERSION, 'records_sha256': _digest(raw), 'raw_records': len(raw),
               'normalized_raw_indices': [i for i, r in enumerate(raw) if annotate.uncertain_record(r) is not None],

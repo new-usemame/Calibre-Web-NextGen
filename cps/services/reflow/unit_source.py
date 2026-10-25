@@ -66,40 +66,55 @@ def source_unit(display, pno, bid, role, package, image_records, reason, bbox=No
     ref = "r-" + target
     src = f"images/{target}.jpg"
     from . import unit_recovery
+    from .image_budget import EVIDENCE_PREVIEW_QUALITY
     with unit_recovery.guard(pno, "source_unit_render", block=None if role == "page" else bid):
-        try:
-            data = display.roi_jpeg(display.rect, scale=2, quality=90)
-        except Exception as error:
-            controller = unit_recovery.current()
-            if controller is None or unit_recovery.fatal(error):
-                raise
-            event = dict(page=pno, stage="source_unit_render", block=bid,
-                         cause_type=type(error).__name__, reason=str(error),
-                         transition="DETERMINISTIC_SOURCE_RENDER_REPAIR")
-            if controller.claim_source_render_repair(pno):
-                try:
-                    # Repeat the same proved original page and bounded encoder,
-                    # never a prepared-image substitution or a model request.
-                    data = display.roi_jpeg(display.rect, scale=2, quality=90)
-                except Exception as repeated:
-                    if unit_recovery.fatal(repeated):
-                        raise
-                    event.update(status="original_source_unrenderable",
-                                 repeated_cause_type=type(repeated).__name__,
-                                 repeated_reason=str(repeated))
+        raster = getattr(package, '_evidence_raster', None)
+        data = raster.cached_preview(display) if raster is not None else None
+        if data is None:
+            try:
+                data = display.roi_jpeg(display.rect, scale=2, quality=EVIDENCE_PREVIEW_QUALITY, optimize=True)
+            except Exception as error:
+                controller = unit_recovery.current()
+                if controller is None or unit_recovery.fatal(error):
+                    raise
+                event = dict(page=pno, stage="source_unit_render", block=bid,
+                             cause_type=type(error).__name__, reason=str(error),
+                             transition="DETERMINISTIC_SOURCE_RENDER_REPAIR")
+                if controller.claim_source_render_repair(pno):
+                    try:
+                        # Repeat the same proved original page and bounded encoder,
+                        # never a prepared-image substitution or a model request.
+                        data = display.roi_jpeg(display.rect, scale=2, quality=EVIDENCE_PREVIEW_QUALITY, optimize=True)
+                    except Exception as repeated:
+                        if unit_recovery.fatal(repeated):
+                            raise
+                        event.update(status="original_source_unrenderable",
+                                     repeated_cause_type=type(repeated).__name__,
+                                     repeated_reason=str(repeated))
+                        controller.events.append(event)
+                        failure = unit_recovery.SourceIntegrityError("Original SOURCE page is unrenderable after one local encode repair")
+                        failure.source_recovery_event = event
+                        raise failure from repeated
+                    event["status"] = "SOURCE_RENDER_REPAIRED"
                     controller.events.append(event)
-                    failure = unit_recovery.SourceIntegrityError("Original SOURCE page is unrenderable after one local encode repair")
+                else:
+                    event["status"] = "original_source_unrenderable"
+                    event["repair_allowance_used"] = True
+                    controller.events.append(event)
+                    failure = unit_recovery.SourceIntegrityError("Original SOURCE page is unrenderable; local encode repair allowance was used")
                     failure.source_recovery_event = event
-                    raise failure from repeated
-                event["status"] = "SOURCE_RENDER_REPAIRED"
-                controller.events.append(event)
-            else:
-                event["status"] = "original_source_unrenderable"
-                event["repair_allowance_used"] = True
-                controller.events.append(event)
-                failure = unit_recovery.SourceIntegrityError("Original SOURCE page is unrenderable; local encode repair allowance was used")
-                failure.source_recovery_event = event
-                raise failure from error
+                    raise failure from error
+        # An already proved complete preview is the same original page. Reuse
+        # its encoded bytes while preserving each unit's own semantic controls.
+        # Without one, retain the renderer and its one-repair ownership above.
+        # A proved complete native bitmap can then replace its lossy encoding
+        # without changing the original page, crop, or recognition inputs.
+        from .image_budget import EvidenceRaster, native_evidence
+        if not hasattr(package, '_evidence_raster'):
+            package._evidence_raster = EvidenceRaster()
+        lossless = native_evidence(display, display.rect, owner=package._evidence_raster)
+        if lossless is not None:
+            data = lossless
         writer = getattr(package, "source_image", None)
         if writer is None:
             # Compatibility for direct primitive users predating trusted assets.

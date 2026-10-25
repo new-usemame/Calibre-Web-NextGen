@@ -82,5 +82,6 @@ def test_closing_punctuation_plus_or_missing_local_owner_cannot_invent_caption_n
     (_,_,docs),calls=convert_case(tmp_path,monkeypatch,p,label=label)
     assert h.refs_and_notes(docs)[0]==[],'local note count or arbitrary terminal ink is not proof of a caption dagger'
     captions=[n for root in docs.values() for n in root.findall('.//x:p[@class="caption"]',h.NS)]
-    assert [h.plain(n) for n in captions]==[text]
+    printed=text[:-1]+'+)' if glyph=='+' else text
+    assert [h.plain(n) for n in captions]==[printed]
     assert h.body_texts(docs)==['Careful observers compare independently measured specimens.']

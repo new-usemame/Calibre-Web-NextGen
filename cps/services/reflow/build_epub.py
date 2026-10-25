@@ -112,6 +112,7 @@ p.source-evidence-compact { text-indent: 0; margin: 0.35em 0; border-left: 0.12e
 figure { margin: 1em 0; text-align: center; page-break-inside: avoid; }
 figcaption { font-size: 0.85em; text-align: center; }
 img { max-width: 100%; }
+a.source-word-image img { height:1em; width:auto; vertical-align:baseline; }
 .source-list { list-style: none; padding-left: 1.5em; }
 .source-list li { margin: 0.25em 0; }
 .source-pages { list-style: none; padding: 0; text-align: left; }
@@ -123,6 +124,8 @@ from .source_reading_display import glyph_stylesheet
 STYLESHEET += glyph_stylesheet()+"\n"
 from .glyph_presentation import stylesheet as glyph_presentation_stylesheet
 STYLESHEET += glyph_presentation_stylesheet()
+from .reading_tiers import stylesheet as reading_tiers_stylesheet
+STYLESHEET += reading_tiers_stylesheet()
 STYLESHEET += ".source-reading-annotation { font-size:1em; font-style:normal; border-bottom:1px dotted currentColor; }\n"
 STYLESHEET += """\
 .source-control, .source-reading-annotation a { display:inline-block; min-height:1.75em; padding:0.5em 0.7em; line-height:1.5; text-indent:0; text-align:left; border:1px solid currentColor; margin:0.25em 0; }
@@ -522,6 +525,24 @@ def degrade_native_units(page, report, blocked, display, package, image_records)
         fragment, asides, unit = source_unit(display, page['pno'], record['id'], role,
                                             package, image_records, case['reason'])
         unit['stage'] = case['stage'];case.update(unit)
+        # Transcription rejection does not revoke a separately admitted printed
+        # note action. Keep its exact number, origin and uniquely present note
+        # target beside the retained paragraph's inspection control. Never infer
+        # a note association from a number or manufacture a missing destination.
+        actions = []
+        current = page['body'][index]
+        publication = '\n'.join(page['body'] + page['asides'])
+        for action in re.findall(r'<a\b[^>]*>.*?</a>', current, re.S):
+            node = ElementTree.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">' + action + '</root>')[0]
+            origin, target = node.get('id'), node.get('href', '')
+            if ('noteref' in node.get('class', '').split() and
+                    node.get('{http://www.idpf.org/2007/ops}type') == 'noteref' and
+                    origin and target.startswith('#') and len(target) > 1 and
+                    _ID.findall(publication).count(origin) == 1 and
+                    _ID.findall(publication).count(target[1:]) == 1):
+                actions.append(action)
+        if actions:
+            fragment = fragment.replace('</p>', ' ' + ' '.join(actions) + '</p>', 1)
         page['body'][index] = fragment
         page['asides'].extend(asides)
         alignment[index] = dict(unit['blocks'][0], native_source=True)
@@ -1752,7 +1773,7 @@ def _figure_crop_margin(data, audit=None):
     Crops already surrounded by white paper retain their original encoding.
     """
     import io
-    from PIL import Image, ImageOps
+    from PIL import Image, ImageOps, ImageChops
     with Image.open(io.BytesIO(data)) as image:
         if audit is not None:
             audit['reading_image_geometry'] = dict(source_pixel_size=list(image.size),
@@ -1766,6 +1787,11 @@ def _figure_crop_margin(data, audit=None):
         if audit is not None:
             audit['reading_image_geometry'].update(packaged_pixel_size=list(padded.size),
                 padding=[margin]*4)
+        # Grayscale storage is lossless when all three channels are equal.
+        # Framing a gray source as RGB needlessly triples the filtered samples.
+        r,g,b=padded.split()
+        if ImageChops.difference(r,g).getbbox() is None and ImageChops.difference(r,b).getbbox() is None:
+            padded=r
         output = io.BytesIO()
         padded.save(output, format='PNG', optimize=True)
         return output.getvalue()
@@ -2400,7 +2426,8 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
                         figure.get('reading_bbox', bbox), trims))
                 # Outside the crop's failure handling: a crop the archive cannot take
                 # is a failed build, never a figure reported lost from the source.
-                package.image(src, _figure_crop_margin(data, figure))
+                writer = getattr(package, 'figure_image', package.image)
+                writer(src, _figure_crop_margin(data, figure))
     return missing, blanks
 
 
@@ -2621,10 +2648,25 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
             display = SourceDisplay(doc, pno, provenance)
             def package_source_image(src, data):
-                if pno in native_figures:
-                    package.image(src, data, store=True)
-                else:
-                    package.image(src, data)
+                # Inspection identities remain distinct; identical evidence bytes
+                # can share one archive member and retain every inspection link.
+                package._deduplicate_evidence = True
+                try:
+                    if pno in native_figures:
+                        package.image(src, data, store=True)
+                    else:
+                        package.image(src, data)
+                finally:
+                    package._deduplicate_evidence = False
+            def display_evidence(rect):
+                # Lossless native pixels and their source predicates are an
+                # existing evidence contract. Preserve them exactly; only lossy
+                # display copies use the bounded shared inspection encoder.
+                data=display.source_image(rect,scale=2 if pno in native_figures else 3,
+                    lossless_candidate=pno not in native_figures)
+                if pno in native_figures or data.startswith(b'\x89PNG\r\n\x1a\n') or not hasattr(package,'evidence_jpeg'):
+                    return data
+                return package.evidence_jpeg(display,rect,detail=True)
             source_edges = None
             def reading_crop(rect, data):
                 # Primary artwork and its enlarged inspection must agree. The full
@@ -2689,9 +2731,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                     reading_rect, edge_proof = display.complete_detail_rect(reading_rect)
                     rect = display.source_rect(reading_rect) * doc[pno].derotation_matrix
                 original_reading_rect = reading_rect
-                reading_rect, data, trims = reading_crop(reading_rect, display.source_image(reading_rect,
-                    scale=2 if pno in native_figures else 3,
-                    lossless_candidate=pno not in native_figures))
+                reading_rect, data, trims = reading_crop(reading_rect, display_evidence(reading_rect))
                 if any(t.get('action') == 'drop_scan_carrier' for t in trims):
                     continue
                 package_source_image(src, data)
@@ -2714,7 +2754,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 key = "layout_%d" % element_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)
                 rect, data, trims = reading_crop(extract.pymupdf.Rect(proof['reading_bbox']),
-                    display.source_image(proof['reading_bbox'], lossless_candidate=True))
+                    display_evidence(proof['reading_bbox']))
                 if any(t.get('action') == 'drop_scan_carrier' for t in trims):
                     continue
                 package.image(src, data)
@@ -2734,8 +2774,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                     _check_cancelled(should_stop)
                     key = "inspection_%d" % tile_index
                     src = "images/original_p%04d_%s.jpg" % (pno, key)
-                    trimmed_tile, data, trims = reading_crop(tile, display.source_image(tile,
-                        lossless_candidate=pno not in native_figures))
+                    trimmed_tile, data, trims = reading_crop(tile, display_evidence(tile))
                     if any(t.get('action') == 'drop_scan_carrier' for t in trims):
                         continue
                     package_source_image(src, data)
@@ -3008,7 +3047,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     # From here the book is written while it is built: each image goes into the
     # archive when it is rendered (_Package), and a build that stops for any reason
     # -- a cancel, a bad page, a full disk -- removes its half-written archive.
-    package = _Package(out_path)
+    from . import image_budget
+    package = _Package(out_path, source_bytes=image_budget.source_size(doc))
     try:
         from .native_text import package_glyphs
         if runtime_progress is not None:
@@ -3317,6 +3357,13 @@ def _resource_aliases(value,aliases):
     return value
 
 
+def _encoded_image_href(href, data):
+    """Name image resources for their encoded bytes, preserving caller aliases."""
+    extension = ('.png' if data.startswith(b'\x89PNG\r\n\x1a\n') else
+                 '.jpg' if data.startswith(b'\xff\xd8') else None)
+    return posixpath.splitext(href)[0] + extension if extension else href
+
+
 class _Package(object):
     """The EPUB archive, written while the book is built rather than after it.
 
@@ -3333,7 +3380,12 @@ class _Package(object):
     nothing else.
     """
 
-    def __init__(self, out_path):
+    def __init__(self, out_path, *, source_bytes=0):
+        from .image_budget import limit
+        limit(source_bytes)
+        self.source_bytes = source_bytes
+        self._image_digests = {}
+        self._resource_hashes = {}
         self.path = str(out_path)
         self.tmp = "%s.tmp" % self.path
         directory = os.path.dirname(self.path)
@@ -3355,15 +3407,40 @@ class _Package(object):
             self.abandon()
             raise
 
-    def image(self, href, data, *, store=False):
+    def evidence_jpeg(self, display, rect, *, detail=False):
+        from .image_budget import EvidenceRaster
+        if not hasattr(self, '_evidence_raster'):
+            self._evidence_raster = EvidenceRaster()
+        return self._evidence_raster.jpeg(display, rect, detail=detail)
+
+    def figure_image(self, href, data):
+        # The PNG/JPEG encoder already compressed these pixels. Avoid a second
+        # compressor and its in-flight workspace while streaming each plate.
+        self.image(href, data, store=True)
+
+    def disclosure_image(self, href, display, rect):
+        # Whole-page context has one physical owner. Separate cropped regions
+        # keep their identities even when their encoded samples are identical.
+        self._deduplicate_evidence = tuple(rect) == tuple(display.rect)
+        try:
+            self.image(href, self.evidence_jpeg(display, rect))
+        finally:
+            self._deduplicate_evidence = False
+
+    def image(self, href, data, *, store=False, deduplicate=False):
         requested=href
         png=data.startswith(b'\x89PNG\r\n\x1a\n')
-        if png and href.endswith('.jpg'):
-            href=href[:-4]+'.png'
+        href=_encoded_image_href(href,data)
         if requested in self.aliases or href in self.images:
             # A dictionary kept the last of two renders under one name; an archive
             # would keep both, and a reader could open either.
             raise ValueError("the image %s was rendered twice" % href)
+        import hashlib
+        digest = hashlib.sha256(data).hexdigest()
+        existing = self._image_digests.get(digest) if (deduplicate or getattr(self, '_deduplicate_evidence', False)) else None
+        if existing is not None:
+            self.aliases[requested] = existing
+            return
         if store:
             # These native-figure source assets are already JPEG/PNG encoded.
             # DEFLATE reserves a multi-megabyte workspace for each tile even
@@ -3374,6 +3451,8 @@ class _Package(object):
             self._zf.writestr(info, data)
         else:
             self._zf.writestr(posixpath.join(OEBPS, href), data)
+        self._image_digests[digest] = href
+        self._resource_hashes[href] = digest
         self.images[href] = len(data)
         self.media_types[href] = 'image/png' if png else 'image/jpeg'
         if requested!=href:self.aliases[requested]=href
@@ -3401,6 +3480,12 @@ class _Package(object):
         for href, text in parts["documents"].items():
             zf.writestr(posixpath.join(OEBPS, href), text)
         zf.close()
+        from .image_budget import check
+        try:
+            check(self.source_bytes, os.path.getsize(self.tmp))
+        except BaseException:
+            self.abandon()
+            raise
         os.replace(self.tmp, self.path)
         return self.path
 
@@ -3485,6 +3570,23 @@ def _written_glyph_style(element, parent):
     return bool(page and re.fullmatch(r'images/glyph_p'+page.group(1)+r'_[a-f0-9]{20}\.(?:jpg|png)', element.get('src','')))
 
 
+def _written_word_preview_style(element, parent):
+    """Bounded factory metrics apply only to a local source-word image link."""
+    if (element.tag != _XHTML_NS+'img' or parent is None
+            or parent.tag != _XHTML_NS+'a' or parent.get('class') != 'source-word-image'
+            or len(parent) != 1 or parent.text or len(element)
+            or set(element.attrib) != {'src','alt','style'}
+            or set(parent.attrib) not in ({'class','href'}, {'class','href','title'})
+            or ('title' in parent.attrib and parent.get('title') != 'Inspect original print')):
+        return False
+    if not re.fullmatch(r'(?:[^/#]+\.xhtml)?#v4-(?:d|native)-[A-Za-z0-9_-]+',parent.get('href','')):
+        return False
+    if not re.fullmatch(r'images/v4-[A-Za-z0-9_-]+\.(?:png|jpg)',element.get('src','')):
+        return False
+    metric=re.fullmatch(r'height:([0-9]+(?:\.[0-9]+)?)em;vertical-align:(-[0-9]+(?:\.[0-9]+)?)em;width:auto',element.get('style',''))
+    return bool(metric and 0<float(metric[1])<=8 and -4<=float(metric[2])<0)
+
+
 def _active_markup(name, root, names):
     """The written bytes of one document, held to what the builder writes.
 
@@ -3508,7 +3610,7 @@ def _active_markup(name, root, names):
             value = value or ""
             if key.startswith("on") or key in _NEVER_WRITTEN_URLS:
                 found.append('%s gives <%s> the attribute "%s"' % (name, local, key))
-            elif key == "style" and not (_WRITTEN_STYLE.match(value) or _written_glyph_style(element, parents.get(element))):
+            elif key == "style" and not (_WRITTEN_STYLE.match(value) or _written_glyph_style(element, parents.get(element)) or _written_word_preview_style(element, parents.get(element))):
                 found.append('%s styles <%s> with "%s"' % (name, local, value[:80]))
             elif key in ("href", "src") and _LEAVES_THE_BOOK.match(value):
                 found.append('%s points <%s> outside the book: "%s"'

@@ -51,7 +51,10 @@ def test_published_endpoint_survives_unpublished_next_row_ink(tmp_path, matched_
             'Same-row joining must follow exact published endpoints, with no '
             'new paragraph break or unsupported physical endpoint')
         if matched_tail:
-            assert build_epub.block_text(page['body'][0]) == prefix + ' ' + suffix
+            from xml.etree import ElementTree as ET
+            from tests.unit.test_round4_defects import plain
+            fragment=ET.fromstring('<div xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">'+page['body'][0]+'</div>')
+            assert plain(fragment.find('{*}p')) == prefix + ' ' + suffix
     finally:
         package.abandon()
         document.close()

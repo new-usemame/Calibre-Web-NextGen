@@ -140,6 +140,7 @@ def test_real_child_and_direct_pipeline_emit_same_semantic_epub(tmp_path):
 def test_child_environment_excludes_secrets_and_uses_installed_script(rig, monkeypatch):
     monkeypatch.setenv('OPENROUTER_API_KEY', 'must-never-inherit')
     monkeypatch.setenv('PYTHONPATH', '/untrusted-config')
+    monkeypatch.setenv('REFLOW_LATIN_TESSDATA', str(rig.folder / 'optical-data'))
     real = ipc.subprocess.Popen; launches = []
     def launch(*args, **kwargs):
         launches.append((args, kwargs)); return real(*args, **kwargs)
@@ -151,6 +152,7 @@ def test_child_environment_excludes_secrets_and_uses_installed_script(rig, monke
     for args, kw in native:
         assert '-I' in args[0] and kw['start_new_session']
         assert 'OPENROUTER_API_KEY' not in kw['env'] and 'PYTHONPATH' not in kw['env']
+        assert kw['env'].get('REFLOW_LATIN_TESSDATA') == str(rig.folder / 'optical-data')
 
 
 @pytest.mark.parametrize('stop_kind', ['death', 'cancel', 'capacity'])

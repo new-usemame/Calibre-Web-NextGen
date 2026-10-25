@@ -522,10 +522,11 @@ _SERIES_KIND_WORDS = frozenset({
 _SERIES_FILL_LIMIT = 3
 
 # Series-capable providers the fill asks even when the configured order leaves
-# them out: both carry series data of their own. Any other provider (Amazon,
-# Goodreads and the rest scrape pages that throttle bots) is asked only when
-# the administrator put it in the order.
-_SERIES_FILL_EXTRAS = ("hardcover", "kobo")
+# them out: each carries series data of their own. Wikidata comes last because
+# it finds fewer series than Hardcover. Any other provider (Amazon, Goodreads
+# and the rest scrape pages that throttle bots) is asked only when the
+# administrator put it in the order.
+_SERIES_FILL_EXTRAS = ("hardcover", "kobo", "wikidata")
 
 # The fill has not run yet for this book (None means it ran and found nothing).
 _NOT_ASKED = object()

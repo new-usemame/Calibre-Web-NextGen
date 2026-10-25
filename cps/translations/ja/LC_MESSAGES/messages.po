@@ -6062,6 +6062,10 @@ msgid "Could not save reader settings."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr ""
 
@@ -15193,14 +15197,11 @@ msgstr "スマートメタデータ適用を有効化"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"有効にすると、取得したメタデータがより高品質な場合（例：説明が長い、表紙が高"
-"解像度）のみ既存データを置き換えます。無効にすると、優先プロバイダーから取得"
-"したメタデータをそのまま既存データに上書きします。"
 
 #: cps/templates/cwa_settings.html
 #, fuzzy
@@ -18812,6 +18813,16 @@ msgstr "選択した本棚をKoboと同期"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "既読/未読セクションを表示"
+
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "有効にすると、取得したメタデータがより高品質な場合（例：説明が長い、表紙が"
+#~ "高解像度）のみ既存データを置き換えます。無効にすると、優先プロバイダーから"
+#~ "取得したメタデータをそのまま既存データに上書きします。"
 
 #, fuzzy
 #~ msgid "Rating updated"

@@ -480,6 +480,55 @@ def refresh_share_place_nudges(device, *, session):
     return len(armed)
 
 
+def arm_download_place_nudge(device_id, book_id, *, session):
+    """Re-send a book's shared place once to a Kobo that proved it downloaded it.
+
+    Nickel treats every (re-)download as "forget the position I had", so it
+    opens the book at the cover. A shared place sent before the download is
+    gone from the device, but the device's reading-state cursor is already
+    past it, so nothing would send it again until the account's place changed
+    (#2688). Called once the download is proven complete: the same proof that
+    makes the delivered span exact.
+
+    Armed only where the turn-on nudge would be: the box is on and the shared
+    place beats this Kobo's own report. For a Kobo with an older report of
+    its own, the own-place restore armed at download time sends the same
+    place, and the sync drops the nudge's copy as a duplicate; the nudge is
+    what covers a Kobo with no report, or one past that restore's window.
+    Returns whether a nudge was armed.
+    """
+    device = session.execute(
+        select(ub.Device.user_id, ub.Device.kind, ub.Device.share_place)
+        .where(ub.Device.id == int(device_id))
+    ).first()
+    if (device is None or device.kind != "kobo" or not device.share_place
+            or not gates_enforced(device.user_id)):
+        return False
+    state, mark = ub.KoboReadingState, ub.KoboBookmark
+    shared = session.execute(
+        select(mark.progress_percent, mark.location_value, mark.last_modified,
+               mark.server_modified_at)
+        .join(state, mark.kobo_reading_state_id == state.id)
+        .where(state.user_id == device.user_id, state.book_id == int(book_id))
+    ).first()
+    shared_report = None if shared is None else shared_bookmark_report(
+        shared.progress_percent, shared.location_value, shared.last_modified,
+        shared.server_modified_at)
+    if shared_report is None:
+        return False
+    journal = ub.DeviceReadingPosition.__table__
+    own = session.execute(select(journal).where(
+        journal.c.device_id == int(device_id),
+        journal.c.book_id == int(book_id),
+    )).first()
+    if not report_wins(shared_report, _journal_place_report(own)):
+        return False
+    session.execute(sqlite_insert(ub.KoboSharePlaceNudge.__table__).values(
+        device_id=int(device_id), book_id=int(book_id), armed_at=_now(),
+    ).on_conflict_do_nothing(index_elements=["device_id", "book_id"]))
+    return True
+
+
 def clear_share_place_nudges(device_id, *, session):
     nudge = ub.KoboSharePlaceNudge.__table__
     return session.execute(nudge.delete().where(

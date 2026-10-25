@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an idea, even a half-formed one. Anything goes.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: A one-liner is fine. Screenshots, links and examples are all welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What would it help you do? (optional)
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else (optional)

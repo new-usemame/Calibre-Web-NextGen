@@ -6362,6 +6362,10 @@ msgid "Could not save reader settings."
 msgstr "No s'ha pogut desar la configuració del lector."
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr "No s'ha pogut desar aquesta nota."
 
@@ -16156,15 +16160,11 @@ msgstr "Activa l'aplicació de metadades intel·ligents"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Si s'activa, les metadades obtingudes només substituiran les actuals quan "
-"semblin de més qualitat (p. ex., descripcions més llargues o cobertes de més "
-"resolució). Si es desactiva, les metadades del proveïdor preferit "
-"substituiran directament les actuals."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -19889,3 +19889,14 @@ msgstr "Mostra els prestatges seleccionats a OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra la secció de llibres llegits i no llegits"
+
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "Si s'activa, les metadades obtingudes només substituiran les actuals quan "
+#~ "semblin de més qualitat (p. ex., descripcions més llargues o cobertes de "
+#~ "més resolució). Si es desactiva, les metadades del proveïdor preferit "
+#~ "substituiran directament les actuals."

@@ -56,6 +56,131 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.54',
+    date: '2026-10-24',
+    items: [
+      {
+        title: 'Covers, the reader and library pages are fast on very large libraries',
+        body: 'Looking up a book used one query that made the database read whole tables of authors, tags and series first. On a library of about 270,000 books a cover took around 4 seconds and opening the reader 20 seconds or more. Each part of a book is now loaded with its own indexed query: one book went from about 2.7 seconds to under 10 milliseconds, and a page of 60 books from about 3.5 seconds to about 90 milliseconds.',
+        category: 'Library',
+      },
+      {
+        title: 'The Save button in the PDF reader works in Firefox',
+        body: 'Firefox blocked the download, so pressing Save in the PDF reader did nothing. It downloads the book again, from both Read now and Open without saving progress.',
+        category: 'Reading',
+      },
+      {
+        title: 'Shelf names keep their apostrophes on the classic shelf page',
+        body: 'A shelf called "Children\'s Fiction" was shown as "Childrens Fiction" on the classic theme\'s shelf page. The name was always stored correctly, and now shows correctly too.',
+        category: 'Library',
+      },
+      {
+        title: 'Scheduled maintenance handles clock-change nights',
+        body: 'A restart inside the scheduled-task window starts the tasks straight away. On the nights the clocks change, a window in the skipped hour never opened and the repeated hour counted twice. The window now opens once a day at the chosen hour in the server\'s time zone.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.53',
+    date: '2026-10-23',
+    items: [
+      {
+        title: 'Automatic metadata fetch fills in a missing series',
+        body: 'When the source that matched a book has no series, a few of the series sources in your provider order are asked next, and only the series and its number are taken from a result that is the same book. Another source\'s spelling of a series you already have, such as "Dune Chronicles", now joins your existing "Dune" instead of starting a second series, and numbers such as 24.5 are no longer rounded down.',
+        category: 'Library',
+      },
+      {
+        title: 'Books with non-ASCII filenames upload again',
+        body: 'A file named only in Chinese, Cyrillic or another non-Latin script, such as 龙蛋.epub, was reported as queued and then dropped before import. It now imports normally.',
+        category: 'Library',
+      },
+      {
+        title: 'Long series names wrap on book cards',
+        body: 'A series name too long for one line under a book now takes up to two lines before it is shortened, with the series number still visible. Cards in a row stay aligned.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.52',
+    date: '2026-10-22',
+    items: [
+      {
+        title: 'A book downloaded to your Kobo opens where you left off',
+        body: 'A book downloaded or re-downloaded to a Kobo used to open at the cover, showing 1%, even when you had read further in the web reader. Once the Kobo finishes downloading it, the next sync now sends your place, as long as Share my place is on for that Kobo and it has no newer place of its own.',
+        category: 'Sync',
+      },
+      {
+        title: 'A highlight or note that fails to save can be saved again',
+        body: 'When saving a new highlight or note failed, the web reader said nothing and cleared your selection, so a typed note was lost. It now tells you the save failed and keeps the selection and the note, so you can try again.',
+        category: 'Reading',
+      },
+      {
+        title: 'Smart metadata mode keeps your title and description',
+        body: 'Smart mode used to replace a title or description with a longer one from a metadata source, which often put a summary or study guide\'s details on the real book. It now only fills a title or description that is missing, the same way it already treats series, publisher, date, rating and cover.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.51',
+    date: '2026-10-21',
+    items: [
+      {
+        title: 'More than one account can skip the email address',
+        body: 'The first user created without an email worked, but the second was refused as if the address were already taken. A blank email is now stored as no email, and existing installs are corrected at startup.',
+        category: 'Admin',
+      },
+      {
+        title: 'A quieter log with book sources on',
+        body: 'With book sources enabled, the import queue job wrote two lines to the log every 5 seconds. Successful scheduled runs are now quiet at the default log level; failed or missed runs are still logged, and the DEBUG level shows every run.',
+        category: 'Admin',
+      },
+      {
+        title: 'Reporting a bug asks the right questions',
+        body: 'A new bug report on GitHub walks you through a short form for your version, setup, device and logs. The report link in the Help menu still fills in your version, page and browser for you.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The docs site is current again',
+        body: 'wiki.calibrewebnextgen.com now updates alongside the GitHub wiki whenever the guides change, and is linked from the README.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.50',
+    date: '2026-10-20',
+    items: [
+      {
+        title: 'Publication dates show the day you saved',
+        body: 'In time zones west of UTC the book page showed the day before, and a year-only date showed as 31 December of the year before. The page now shows the date as you entered it.',
+        category: 'Library',
+      },
+      {
+        title: 'Fetched metadata reaches the book file',
+        body: 'When fetch on ingest filled in only text, such as a description or publisher, the change stayed in the library and never reached the file or a Kobo that had already synced the book. It now does, like a fetched cover already did.',
+        category: 'Library',
+      },
+      {
+        title: 'Settings survive a version switch',
+        body: 'Moving to an older version, or trying a newer one and coming back, used to erase settings that version did not know about. They are now kept and come back when you return.',
+        category: 'Admin',
+      },
+      {
+        title: 'Simplified Chinese is complete',
+        body: 'Nearly 3,000 missing or unconfirmed Simplified Chinese entries are now translated, including reading states, account settings and book-source messages.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'A square app icon for dashboards',
+        body: 'Homepage, Heimdall and similar dashboards can use /static/CalibreWebNextgen-square.svg, which loads without signing in.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.49',
     date: '2026-10-19',
     items: [

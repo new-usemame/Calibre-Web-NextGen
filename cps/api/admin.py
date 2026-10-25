@@ -60,6 +60,16 @@ def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
 
 
+def _conflict_message(exc):
+    """Name the field that actually collided (SQLite reports it as ``user.<column>``)."""
+    detail = str(getattr(exc, "orig", exc)).lower()
+    if "user.email" in detail:
+        return "An account already exists for this email address"
+    if "user.name" in detail:
+        return "That username is already taken"
+    return "An account already exists for this email or username"
+
+
 def _require_admin():
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
@@ -489,9 +499,9 @@ def admin_create_user():
     try:
         ub.session.add(new_user)
         ub.session.commit()
-    except IntegrityError:
+    except IntegrityError as ex:
         ub.session.rollback()
-        return _err("conflict", "An account already exists for this email or name", 409)
+        return _err("conflict", _conflict_message(ex), 409)
     except Exception as ex:
         ub.session.rollback()
         return _err("db_error", "Could not create user: %s" % ex, 500)

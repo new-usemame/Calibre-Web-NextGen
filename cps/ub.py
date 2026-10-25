@@ -291,7 +291,9 @@ class User(UserBase, Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(64), unique=True)
-    email = Column(String(120), unique=True, default="")
+    # A blank address is stored as NULL, never '': SQLite's UNIQUE allows any
+    # number of NULLs but only one '' (#2153). See _blank_email_is_null().
+    email = Column(String(120), unique=True, nullable=True)
     role = Column(SmallInteger, default=constants.ROLE_USER)
     # Publishing one's own shelves is independent from editing other users'
     # public shelves (ROLE_EDIT_SHELFS). Existing installs are backfilled on.
@@ -371,6 +373,13 @@ class User(UserBase, Base):
     # only in the SPA (frontend/src/lib/fonts.ts). "" = use the theme default.
     ui_font_body = Column(String, default="")
     ui_font_display = Column(String, default="")
+
+    @validates("email")
+    def _blank_email_is_null(self, _key, value):
+        """Keep "no email" as NULL so any number of accounts can omit it (#2153)."""
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 if oauth_support:
@@ -2984,6 +2993,17 @@ def migrate_user_table(engine, _session):
     except exc.OperationalError:
         _safe_session_rollback(_session, "user.kindle_mail_subject")
         _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'kindle_mail_subject' String DEFAULT ''")
+
+    # Blank emails are stored as NULL, not '' (#2153): the UNIQUE constraint
+    # would otherwise allow only one account without an address. Because of
+    # that same constraint at most one row can hold '', and this is a no-op
+    # once it has run.
+    try:
+        _session.execute(text("UPDATE user SET email = NULL WHERE email = ''"))
+        _session.commit()
+    except exc.OperationalError as e:
+        _safe_session_rollback(_session, "user.email blank-to-NULL")
+        log.error("Failed to convert blank user emails to NULL in app.db: %s", e)
 
     # Migration for cover-preview per-user preference columns (Phase 2 of
     # cover-normalization — see notes/COVER-NORMALIZATION-DESIGN.md).

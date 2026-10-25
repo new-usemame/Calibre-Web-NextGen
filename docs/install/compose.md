@@ -1,7 +1,7 @@
 # Install / switch with `docker compose` (command line)
 
 The baseline path, on any machine with Docker installed. **Your books, users, settings and
-Read checkmarks live in the volumes you mount — not in the image — so switching keeps
+Read checkmarks live in the volumes you mount, not in the image, so switching keeps
 everything and is reversible.**
 
 ## Fresh install

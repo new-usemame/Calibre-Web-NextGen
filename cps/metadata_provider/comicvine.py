@@ -41,6 +41,7 @@ def _scrub(text, api_key: str = "") -> str:
 class ComicVine(Metadata):
     __name__ = "ComicVine"
     __id__ = "comicvine"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
     DESCRIPTION = "ComicVine Books"
     META_URL = "https://comicvine.gamespot.com/"
     # The key every install sends when the admin has not supplied one. It has

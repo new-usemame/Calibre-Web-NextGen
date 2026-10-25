@@ -6272,6 +6272,10 @@ msgid "Could not save reader settings."
 msgstr "Impossibile salvare le impostazioni del lettore."
 
 #: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save that note."
 msgstr "Impossibile salvare la nota."
 
@@ -15758,16 +15762,11 @@ msgstr "Abilita l'applicazione intelligente dei metadati"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Quando è abilitato, i metadati recuperati sostituiranno i dati esistenti "
-"solo se sembrano di qualità migliore (ad es. descrizioni più lunghe, "
-"copertine a risoluzione più elevata). Quando è disabilitato, i metadati "
-"recuperati sostituiranno i dati esistenti così come sono dal provider "
-"preferito."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -19501,6 +19500,18 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "Quando è abilitato, i metadati recuperati sostituiranno i dati esistenti "
+#~ "solo se sembrano di qualità migliore (ad es. descrizioni più lunghe, "
+#~ "copertine a risoluzione più elevata). Quando è disabilitato, i metadati "
+#~ "recuperati sostituiranno i dati esistenti così come sono dal provider "
+#~ "preferito."
 
 #~ msgid "Rating updated"
 #~ msgstr "Valutazione aggiornata"

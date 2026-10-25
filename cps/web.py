@@ -175,6 +175,12 @@ def add_security_headers(resp):
         csp += " *"
     if reader_like:
         csp += " blob: ; style-src-elem 'self' blob: 'unsafe-inline'"
+        # #2710: pdf.js saves a PDF by clicking a link to a blob: URL, and
+        # Firefox checks that download against frame-src, which otherwise
+        # falls back to default-src (no blob:). Keep default-src's hosts so
+        # the SPA can still frame /read/<id>/pdf.
+        csp += "; frame-src " + ' '.join(
+            [src for src in default_src if not src.startswith("'unsafe-")] + ["blob:"])
     # #60: the switched-back-to-Classic feedback popup (layout.html) POSTs to our
     # first-party feedback endpoint (a Cloudflare Worker on a different origin).
     # Without an explicit connect-src, fetch()/XHR fall back to default-src 'self'

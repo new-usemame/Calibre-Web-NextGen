@@ -96,6 +96,7 @@ def _probe_dnb_cover(cover_url: str, mode: str) -> Optional[str]:
 class DNB(Metadata):
     __name__ = "Deutsche Nationalbibliothek"
     __id__ = "dnb"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
 
     # Configuration defaults from original plugin
     cfg_guess_series = True

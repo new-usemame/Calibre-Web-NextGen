@@ -10,6 +10,7 @@
 
 import re
 from typing import Optional
+from urllib.parse import quote
 
 try:
     import unidecode  # type: ignore
@@ -55,3 +56,29 @@ def get_valid_filename_shared(value: str,
     if not value:
         raise ValueError("Filename cannot be empty")
     return value
+
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def build_content_disposition(disposition: str, filename: str) -> str:
+    """Return an RFC 6266 Content-Disposition value naming ``filename``.
+
+    ``filename*`` carries the real (UTF-8, percent-encoded) name; ``filename``
+    is a plain-ASCII fallback for clients that ignore ``filename*``. Control
+    characters are dropped so a title can never inject a header line, and the
+    fallback never contains a quote or backslash.
+    """
+    filename = _CONTROL_CHARS_RE.sub("", filename or "")
+    stem, dot, ext = filename.rpartition(".")
+    if not dot:
+        stem, ext = filename, ""
+    fallback = filename
+    if unidecode is not None:
+        fallback = unidecode.unidecode(filename)
+    fallback = fallback.encode("ascii", "ignore").decode("ascii")
+    fallback = fallback.replace("\\", "_").replace('"', "'").strip()
+    if not fallback or fallback == "." + ext:
+        fallback = "book" + ("." + ext if ext else "")
+    return "%s; filename=\"%s\"; filename*=UTF-8''%s" % (
+        disposition, fallback, quote(filename, safe=""))

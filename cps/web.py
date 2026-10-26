@@ -47,7 +47,7 @@ from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
     get_book_cover, get_series_cover_thumbnail, get_download_link, send_mail, generate_random_password, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
-    edit_book_read_status, valid_password, get_kosync_progress_display, get_sendable_book
+    edit_book_read_status, valid_password, get_kosync_progress_display, get_sendable_book, set_inline_filename
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS, DEFAULT_SORT, book_sort_order, viewer_id
 from .unicode_collation import locale_sort_key, locale_initial, unicode_sort_key
@@ -3119,6 +3119,8 @@ def serve_book(book_id, book_format, anyname):
             if not range_header:
                 log.info('Serving book: %s', data.name)
                 headers['Accept-Ranges'] = 'bytes'
+            if book_format.upper() == 'PDF':
+                set_inline_filename(headers, book, book_format)  # #2729
             df = getFileFromEbooksFolder(book.path, data.name + "." + book_format)
             return do_gdrive_download(df, headers, (book_format.upper() == 'TXT'))
         except AttributeError as ex:
@@ -3156,6 +3158,8 @@ def serve_book(book_id, book_format, anyname):
         response = make_response(
             send_from_directory(os.path.join(config.get_book_path(), book.path), data.name + "." + book_format))
         response.headers['Content-Disposition'] = 'inline'
+        if book_format.upper() == 'PDF':
+            set_inline_filename(response.headers, book, book_format)  # #2729
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Content-Security-Policy'] = "script-src 'none'; object-src 'none'"
         if not range_header:

@@ -386,3 +386,68 @@ test.describe('reader: a jump is not a reading position', () => {
     expect(afterReadingOn).toBeTruthy();
   });
 });
+
+test.describe('reader: opening a book is not reading it (#324)', () => {
+  let bookUnderTest: number | null = null;
+  test.afterEach(async ({ page }) => {
+    if (bookUnderTest === null) return;
+    await page.request.post(`/api/v1/books/${bookUnderTest}/bookmark`, {
+      data: { format: 'epub', bookmark: '' },
+      headers: { 'X-CSRFToken': await csrfToken(page) },
+    }).catch(() => undefined);
+    bookUnderTest = null;
+  });
+
+  test('reopening a book at its saved place sends no save until the reader turns a page', async ({ page }, testInfo) => {
+    /*
+     * Every save stamps the browser's place with the current time, and the
+     * newest place is the one the user's Kobo and the reader are offered. So a
+     * save on open makes "I opened the book" outrank "I read three chapters on
+     * the Kobo": the reporter on #324 saw the place drop back to 1% and the
+     * Kobo's offer disappear, with one bookmark write a second after each open.
+     *
+     * Counted as requests rather than read back from the server, because the
+     * write the defect makes stores the same page it opened on; only its
+     * timestamp changes, and the bookmark API does not return one.
+     *
+     * Desktop only and lane 5 for the same reasons as the spec above: it
+     * arranges per-(user, book) server state, and lanes 0-4 are taken.
+     */
+    test.skip(
+      testInfo.project.name !== 'desktop',
+      'arranges per-(user,book) server state; concurrent projects would clobber it',
+    );
+    const bookId = await pickEpub(page, 5);
+    bookUnderTest = bookId;
+    test.skip(!bookId, 'no EPUB with enough prose in this library');
+
+    await page.request.post(`/api/v1/books/${bookId}/bookmark`, {
+      data: { format: 'epub', bookmark: '' },
+      headers: { 'X-CSRFToken': await csrfToken(page) },
+    });
+    await page.goto(`/app/read/${bookId}`);
+    await page.locator('iframe').waitFor({ state: 'visible', timeout: 40_000 });
+    await turnPage(page, 3);
+    const saved = await waitForSavedChange(page, bookId!, null);
+    expect(saved, 'reading should save a position before reopening means anything').toBeTruthy();
+
+    const saves: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && req.url().includes(`/api/v1/books/${bookId}/bookmark`)) {
+        saves.push(req.url());
+      }
+    });
+    await page.reload();
+    await page.locator('iframe').waitFor({ state: 'visible', timeout: 40_000 });
+    // Well past the 800ms debounce, the location index and late layout
+    // relocations that used to produce the write.
+    await page.waitForTimeout(6_000);
+    expect(saves, 'opening the book at its saved place must not save it again').toHaveLength(0);
+    expect(spineSection(await savedPosition(page, bookId!))).toBe(spineSection(saved));
+
+    // The other half: a fix that stopped saving altogether would pass the
+    // assertion above. Turning a page is reading, so it must save.
+    await turnPage(page, 2);
+    await expect.poll(() => saves.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  });
+});

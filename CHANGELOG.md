@@ -16,6 +16,14 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.55] - 2026-10-25
+
+### Fixed
+
+- **KOReader no longer freezes for long stretches when the CWNG Sync plugin syncs the library over a weak network.** Without Turbo mode each request holds KOReader's screen until it finishes, and each page of the book list was allowed up to 30 seconds, so on a slow connection an automatic sync could leave KOReader unresponsive long enough for Android to show "not responding". Automatic syncs (on wake, when the network comes up, when the file browser opens) now give each request a few seconds, stop at the first one that runs out, and try again at the next automatic sync about five minutes later instead of on the very next trigger. Sync now and the first sync after connecting keep the long limits. The plugin is now version 4.1.55. Reported by @magdalar (#2329).
+
+- **Arabic is translated across the new interface.** 379 strings that showed in English are now translated, and 221 fuzzy entries, which the app skips because they had been matched to the wrong English text, are replaced with correct translations. Contributed by @sgreadly in #2707.
+
 ## [v4.1.54] - 2026-10-24
 
 ### Fixed

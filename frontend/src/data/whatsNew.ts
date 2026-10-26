@@ -56,6 +56,22 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.55',
+    date: '2026-10-25',
+    items: [
+      {
+        title: 'KOReader stays responsive when the library syncs on a weak network',
+        body: 'An automatic library sync could hold KOReader\'s screen for up to 30 seconds per page on a slow connection, long enough for Android to say the app was not responding. Automatic syncs now give each request a few seconds, stop at the first slow one and try again about five minutes later. Sync now keeps the long limits. Needs the CWNG Sync plugin 4.1.55.',
+        category: 'Sync',
+      },
+      {
+        title: 'Arabic is translated across the new interface',
+        body: 'About 600 Arabic strings were added or corrected, so far fewer screens fall back to English. Thanks to @sgreadly.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.54',
     date: '2026-10-24',
     items: [

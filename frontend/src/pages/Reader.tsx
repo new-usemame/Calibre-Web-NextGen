@@ -1798,10 +1798,13 @@ export function Reader({ id }: { id: string }) {
           return epubBook.getRange(cfi);
         });
         if (cancelled) return;
-        // epub.js may emit delayed layout relocations after display resolves.
-        // Treat opening with a synced hint as a preview until a real page turn,
-        // or those layout events would stamp the local CFI newer than the hint.
-        previewingRef.current = !!resume;
+        // Opening a book is not reading it. epub.js reports the first display
+        // and its delayed layout settles as relocations, and saving those
+        // stamps the browser's place with the current time, which then
+        // outranks a Kobo or KOReader that really read further (#324). So
+        // every open is a preview until the reader moves themselves (a page
+        // turn, a link, a chapter); from then on relocations save again.
+        previewingRef.current = true;
         let initialTarget = savedCfiRef.current || undefined;
         if (initialTarget && resume?.mode === 'automatic' && resume.cfi) {
           initialTarget = resume.cfi;

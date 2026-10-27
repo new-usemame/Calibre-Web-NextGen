@@ -255,8 +255,9 @@ local function historyPaths(root)
     return paths
 end
 
--- KOReader's own status for a book here, or nil when it has none.
+-- KOReader's own status for a book here, or nil when it has no progress here.
 local function localStatus(path)
+    if BookList.getBookInfo then return Catalog.deviceStatus(BookList.getBookInfo(path)) end
     local status = BookList.getBookStatus(path)
     if status == "new" then return nil end
     return status

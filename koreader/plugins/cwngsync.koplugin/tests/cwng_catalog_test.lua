@@ -105,8 +105,12 @@ end
 
 local function testResetOrDeletedHereMeansNoProgressHere()
     assertEqual(Catalog.deviceStatus({ been_opened = false }), nil, "deleted: no sidecar")
-    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading" }), nil,
-        "Reset keeps the sidecar but clears percent_finished, and KOReader then says reading")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", has_summary = false, reset = true }),
+        nil, "Reset keeps the sidecar without its summary, and KOReader then says reading")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", has_summary = false }), nil,
+        "no summary and no position saved")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", has_summary = true }), "reading",
+        "read here with the status bar off: a summary but no percent_finished")
     assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", percent_finished = 0.02 }),
         "reading", "a page turned here is progress")
     assertEqual(Catalog.deviceStatus({ been_opened = true, status = "complete" }), "complete",

@@ -194,16 +194,19 @@ function Catalog.recentlyAdded(entries, limit)
     return list
 end
 
--- KOReader's status for a book on this device from its BookList info
--- ({ been_opened, status, percent_finished }), or nil when the book has no
--- progress here. Delete removes the sidecar ("new"), but Reset keeps it with
--- the status gone, which KOReader then reports as "reading"; what Reset does
--- clear is percent_finished, so a "reading" book without it has no progress.
+-- KOReader's status for a book on this device, or nil when the book has no
+-- progress here. info is BookList's { been_opened, status, percent_finished }
+-- plus, from the sidecar, has_summary and reset. Delete removes the sidecar
+-- (been_opened false). Reset keeps the sidecar but deletes its summary and
+-- marks it docsettings_reset_done, and BookList then reports "reading". Every
+-- open saves summary.status, so a book read here always has a summary, even
+-- with the status bar off (which leaves percent_finished unset).
 function Catalog.deviceStatus(info)
     if type(info) ~= "table" or not info.been_opened then return nil end
     local status = info.status
     if status == nil or status == "new" then return nil end
-    if status == "reading" and not ((tonumber(info.percent_finished) or 0) > 0) then return nil end
+    if info.reset then return nil end
+    if info.has_summary == false and not ((tonumber(info.percent_finished) or 0) > 0) then return nil end
     return status
 end
 

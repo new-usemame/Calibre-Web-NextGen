@@ -17,6 +17,7 @@ local Button = require("ui/widget/button")
 local ButtonDialog = require("ui/widget/buttondialog")
 local Catalog = require("cwng_catalog")
 local Device = require("device")
+local DocSettings = require("docsettings")
 local DocumentRegistry = require("document/documentregistry")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -257,7 +258,24 @@ end
 
 -- KOReader's own status for a book here, or nil when it has no progress here.
 local function localStatus(path)
-    if BookList.getBookInfo then return Catalog.deviceStatus(BookList.getBookInfo(path)) end
+    if BookList.getBookInfo then
+        local cached = BookList.getBookInfo(path)
+        local info = {
+            been_opened = cached.been_opened,
+            status = cached.status,
+            percent_finished = cached.percent_finished,
+        }
+        -- BookList says "reading" both for a book read here and for one that
+        -- was Reset; only the sidecar tells them apart (#2732).
+        if info.been_opened and info.status == "reading" then
+            local ok, settings = pcall(DocSettings.open, DocSettings, path)
+            if ok and settings then
+                info.has_summary = settings:readSetting("summary") ~= nil
+                info.reset = settings:isTrue("docsettings_reset_done")
+            end
+        end
+        return Catalog.deviceStatus(info)
+    end
     local status = BookList.getBookStatus(path)
     if status == "new" then return nil end
     return status

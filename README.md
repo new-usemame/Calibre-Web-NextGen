@@ -546,6 +546,15 @@ A key typed into the admin UI wins, then `HARDCOVER_TOKEN`, then `HARDCOVER_TOKE
 
 There are two Hardcover tokens, and both take the same personal API token from https://hardcover.app/account/api. The one above belongs to the server and is used to look up books (metadata search and Hardcover ID fetching), so it only reads from Hardcover. Each user also has their own **Hardcover API Token** on their profile page in the classic UI. Sync uses only that one: it writes to that person's Hardcover library (reading progress and status from Kobo and KOReader, books marked as read, and books added to a Kobo-synced shelf). So each reader's token has to come from the Hardcover account whose library should be updated, and replacing the server token does not fix sync when a reader's own token has expired.
 
+If you create a token with limited scopes, these are the ones CWNG uses ([Hardcover's scope list](https://docs.hardcover.app/api/graphql/actions/)):
+
+| Token | Scopes |
+|---|---|
+| Server token (Basic Configuration or `HARDCOVER_TOKEN`) | `read:catalog`, `read:me` |
+| Each reader's own token | `read:catalog`, `read:me`, `read:library`, `write:library` |
+
+A reader's token needs `read:catalog` too, because metadata search tries it before the server token and sync looks up the current Hardcover book for an edition before writing.
+
 Turn on **Enable Hardcover Sync** once under Admin → Edit Basic Configuration. That one switch controls both scheduled Hardcover ID fetching and Kobo/KOReader reading-progress sync. A declarative deployment can set it instead:
 
 ```yaml

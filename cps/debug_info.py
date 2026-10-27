@@ -19,7 +19,7 @@ from io import BytesIO
 from flask import send_file
 from flask_babel.speaklater import LazyString
 
-from . import logger, config
+from . import logger, config, support_pack_state
 from .about import collect_stats
 
 log = logger.create()
@@ -288,6 +288,52 @@ def assemble_logfiles(file_name):
                          download_name=os.path.basename(file_name))
 
 
+def _resolve_state_paths() -> dict:
+    """Real paths for the state collectors (see ``support_pack_state``).
+
+    Each lookup is independent and best-effort: a role that cannot be
+    resolved is ``None`` and its section reports ``configured: false``
+    rather than failing the whole pack.
+    """
+    from . import constants, ub
+
+    paths = {"config": None, "library": None, "ingest": None,
+             "app_db": None, "cwa_db": None, "metadata_db": None}
+    try:
+        app_db = getattr(ub, "app_DB_path", None)
+        if app_db:
+            paths["app_db"] = app_db
+            paths["config"] = os.path.dirname(app_db)
+    except Exception:  # pylint: disable=broad-except
+        pass
+    try:
+        from .cwa_db_loader import load_cwa_db
+        db_dir = load_cwa_db().default_db_dir()
+        paths["cwa_db"] = os.path.join(db_dir, "cwa.db")
+        paths["config"] = paths["config"] or db_dir
+    except Exception:  # pylint: disable=broad-except
+        pass
+    try:
+        # metadata.db lives in config_calibre_dir. With a split library the
+        # book files live elsewhere (get_book_path() returns that directory),
+        # which is often the network mount, so report it as its own role.
+        calibre_dir = getattr(config, "config_calibre_dir", None)
+        if calibre_dir:
+            paths["library"] = calibre_dir
+            paths["metadata_db"] = os.path.join(calibre_dir, "metadata.db")
+        if getattr(config, "config_calibre_split", False):
+            split_dir = getattr(config, "config_calibre_split_dir", None)
+            if split_dir:
+                paths["library_books"] = split_dir
+    except Exception:  # pylint: disable=broad-except
+        pass
+    try:
+        paths["ingest"] = constants.ingest_folder()
+    except Exception:  # pylint: disable=broad-except
+        pass
+    return paths
+
+
 def _build_debug_zip(sanitize: bool):
     """Build the in-memory debug pack. When ``sanitize`` is True the
     settings file is redacted and every log line is scrubbed for IPs,
@@ -300,6 +346,7 @@ def _build_debug_zip(sanitize: bool):
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
+    state_files = support_pack_state.collect_all(_resolve_state_paths(), sanitized=sanitize)
     if sanitize:
         settings_dict = _redact_for_export(settings_dict)
 
@@ -307,6 +354,8 @@ def _build_debug_zip(sanitize: bool):
     with zipfile.ZipFile(memory_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('settings.txt', json.dumps(settings_dict, sort_keys=True, indent=2))
         zf.writestr('libs.txt', json.dumps(libs_dict, sort_keys=True, indent=2, cls=lazyEncoder))
+        for state_name, state_bytes in state_files.items():
+            zf.writestr(state_name, state_bytes)
         if sanitize:
             zf.writestr('SANITIZED.txt', _SANITIZED_NOTE)
         for fp in file_list:
@@ -333,6 +382,9 @@ _SANITIZED_NOTE = (
     "    book titles, request paths, application stack traces.\n"
     "\n"
     "Each log file is capped at the last 10 MiB so the zip stays small.\n"
+    "\n"
+    "manifest.json and state/*.json hold versions, sizes, counts and mount\n"
+    "types only: no paths, IPs, usernames, titles or row contents.\n"
     "\n"
     "If you'd rather not share even the sanitized version, the Download Debug\n"
     "Package button (next to this one) generates an UNREDACTED pack for\n"

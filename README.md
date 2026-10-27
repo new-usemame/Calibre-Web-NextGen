@@ -544,6 +544,8 @@ To keep the token out of your compose file, point `HARDCOVER_TOKEN_FILE` at a fi
 
 A key typed into the admin UI wins, then `HARDCOVER_TOKEN`, then `HARDCOVER_TOKEN_FILE`. The **Hardcover API Key** field shows only a key entered there, so it stays empty when the token comes from the environment. The admin page says which variable is active without showing its value.
 
+There are two Hardcover tokens, and both take the same personal API token from https://hardcover.app/account/api. The one above belongs to the server and is used to look up books (metadata search and Hardcover ID fetching), so it only reads from Hardcover. Each user also has their own **Hardcover API Token** on their profile page in the classic UI. Sync uses only that one: it writes to that person's Hardcover library (reading progress and status from Kobo and KOReader, books marked as read, and books added to a Kobo-synced shelf). So each reader's token has to come from the Hardcover account whose library should be updated, and replacing the server token does not fix sync when a reader's own token has expired.
+
 Turn on **Enable Hardcover Sync** once under Admin → Edit Basic Configuration. That one switch controls both scheduled Hardcover ID fetching and Kobo/KOReader reading-progress sync. A declarative deployment can set it instead:
 
 ```yaml

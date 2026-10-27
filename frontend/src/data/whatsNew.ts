@@ -56,6 +56,17 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.56',
+    date: '2026-10-27',
+    items: [
+      {
+        title: 'Opening a book in the web reader keeps the place your Kobo or KOReader shared',
+        body: 'Just opening a book in the browser used to save its first page as the newest place, so a further position from your e-reader was skipped and the book reopened near the start. The web reader now saves your place only once you turn a page, follow a link or pick a chapter.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.55',
     date: '2026-10-25',
     items: [

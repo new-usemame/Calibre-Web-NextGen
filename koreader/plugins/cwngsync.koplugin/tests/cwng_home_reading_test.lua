@@ -31,7 +31,9 @@ BookList.getBookStatus = function(path) -- as KOReader's BookList.getBookStatus
     return info.been_opened and info.status or "new"
 end
 local DocSettings = class()
+local opens = {}
 DocSettings.open = function(_, path)
+    opens[path] = (opens[path] or 0) + 1
     local data = sidecars[path] or {}
     return {
         readSetting = function(_, key) return data[key] end,
@@ -94,6 +96,8 @@ local function testResetBookLeavesReadingAndAReadBookStays()
     sidecars[no_footer.path] = { summary = { status = "reading" }, last_page = 42 }
     assertEqual(reading({ reset, read_here, no_footer, deleted }), "Read here|No footer",
         "a reset or deleted unread book leaves Reading; one read here stays, status bar or not")
+
+    assertEqual(opens[read_here.path], 1, "one Reading build reads a sidecar once")
 
     reset.read_status = "reading"
     assertEqual(reading({ reset, read_here, no_footer, deleted }), "Reset|Read here|No footer",

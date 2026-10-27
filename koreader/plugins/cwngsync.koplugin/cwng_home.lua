@@ -282,7 +282,14 @@ local function localStatus(path)
 end
 
 function Home:readingNow()
-    return Catalog.continueReading(self:entries(), historyPaths(self.plugin:getLibraryRoot()), nil, localStatus)
+    -- localStatus may parse a sidecar, and continueReading asks about a book
+    -- more than once, so each book is read once per build.
+    local statuses = {}
+    local function status(path)
+        if statuses[path] == nil then statuses[path] = { localStatus(path) } end
+        return statuses[path][1]
+    end
+    return Catalog.continueReading(self:entries(), historyPaths(self.plugin:getLibraryRoot()), nil, status)
 end
 
 function Home:defaultTab()

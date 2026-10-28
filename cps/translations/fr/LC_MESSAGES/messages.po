@@ -12174,6 +12174,10 @@ msgid "Merge into the kept copy"
 msgstr "Fusionner dans l’exemplaire gardé"
 
 #: cps/spa_strings.py
+msgid "Merge one copy into “{title}”? Formats it lacks are copied over, then that copy is deleted."
+msgstr "Fusionner un exemplaire dans « {title} » ? Les formats qui lui manquent sont copiés, puis cet exemplaire est supprimé."
+
+#: cps/spa_strings.py
 msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
 msgstr "Fusionner {n} exemplaires dans « {title} » ? Les formats qui lui manquent sont copiés, puis ces exemplaires sont supprimés."
 

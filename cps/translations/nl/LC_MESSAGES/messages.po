@@ -11987,6 +11987,10 @@ msgid "Merge into the kept copy"
 msgstr "Samenvoegen in het behouden exemplaar"
 
 #: cps/spa_strings.py
+msgid "Merge one copy into “{title}”? Formats it lacks are copied over, then that copy is deleted."
+msgstr "Eén exemplaar samenvoegen in ‘{title}’? Formaten die het mist worden gekopieerd, daarna wordt dat exemplaar verwijderd."
+
+#: cps/spa_strings.py
 msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
 msgstr "{n} exemplaren samenvoegen in ‘{title}’? Formaten die het mist worden gekopieerd, daarna worden die exemplaren verwijderd."
 

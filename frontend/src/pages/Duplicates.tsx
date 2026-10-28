@@ -107,8 +107,11 @@ function DuplicateGroupCard({ group: g, onDismiss, dismissing, onMergeResult }: 
 
   const onMerge = () => {
     if (!ids) return;
-    if (!window.confirm(t('Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted.',
-      { n: ids.length - 1, title: keepTitle }))) return;
+    const count = ids.length - 1;
+    if (!window.confirm(count === 1
+      ? t('Merge one copy into “{title}”? Formats it lacks are copied over, then that copy is deleted.', { title: keepTitle })
+      : t('Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted.',
+        { n: count, title: keepTitle }))) return;
     onMergeResult('');
     merge.mutate(ids, {
       // The route answers an empty 200 when it found nothing to merge, so only

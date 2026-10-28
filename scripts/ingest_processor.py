@@ -260,7 +260,7 @@ class ProcessLock:
                 self.lock_file.seek(0)
                 pid_str = self.lock_file.read().strip()
                 return int(pid_str) if pid_str.isdigit() else "unknown"
-        except:
+        except (OSError, ValueError):
             pass
         return "unknown"
 
@@ -281,7 +281,7 @@ class ProcessLock:
             try:
                 self.lock_file.close()
                 self.lock_file = None
-            except:
+            except OSError:
                 pass
 
 def cleanup_lock():

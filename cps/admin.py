@@ -61,6 +61,8 @@ from .services.kobo_reconcile import (
     build_reconciliation_preview,
     scan_from_candidates,
 )
+from .services import cover_flag_repair
+from .services.calibre_db_lock import metadata_db_write_lock
 from .services.support_policy import validate_support_settings
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
@@ -1860,6 +1862,80 @@ def kobo_reconcile_confirm(user_id):
         "skipped_unresolved": preview.skipped_unresolved,
     }
     return _render_kobo_reconcile(user, result=result)
+
+
+def _render_cover_flag_repair(preview=None, confirmation_token=None,
+                              result=None, error=None):
+    return render_title_template(
+        "cover_flag_repair.html",
+        preview=preview,
+        confirmation_token=confirmation_token,
+        result=result,
+        error=error,
+        gdrive=bool(config.config_use_google_drive),
+        title=_("Restore missing covers"),
+        page="admin",
+    )
+
+
+@admi.route("/admin/cover-flags", methods=["GET", "POST"])
+@user_login_required
+@admin_required
+def cover_flag_repair_scan():
+    if request.method == "GET":
+        return _render_cover_flag_repair()
+    if config.config_use_google_drive:
+        return _render_cover_flag_repair(
+            error=_("This is not available for Google Drive libraries.")), 400
+
+    rows = cover_flag_repair.book_rows(calibre_db.session, db.Books)
+    candidates = cover_flag_repair.find_candidates(rows, config.get_book_path())
+    confirmation_token = None
+    if candidates:
+        confirmation_token = cover_flag_repair.make_token(
+            current_app.config["SECRET_KEY"], candidates)
+    return _render_cover_flag_repair(
+        preview=candidates, confirmation_token=confirmation_token)
+
+
+@admi.route("/admin/cover-flags/confirm", methods=["POST"])
+@user_login_required
+@admin_required
+def cover_flag_repair_confirm():
+    if config.config_use_google_drive:
+        return _render_cover_flag_repair(
+            error=_("This is not available for Google Drive libraries.")), 400
+    try:
+        preview_ids = cover_flag_repair.read_token(
+            current_app.config["SECRET_KEY"], request.form.get("confirmation_token", ""))
+    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        return _render_cover_flag_repair(
+            error=_("This preview is invalid or expired. Scan the library again.")), 400
+
+    try:
+        selected_ids = cover_flag_repair.parse_selection(
+            request.form.getlist("book_id"), preview_ids)
+    except cover_flag_repair.SelectionError as selection_error:
+        messages = {
+            "empty": _("Select at least one book to restore."),
+            "invalid": _("The selected books do not match this preview. Scan the library again."),
+            "outside_preview": _("The selected books do not match this preview. Scan the library again."),
+        }
+        return _render_cover_flag_repair(error=messages[selection_error.code]), 400
+
+    try:
+        outcome = cover_flag_repair.apply_selection(
+            calibre_db.session, db.Books, selected_ids, config.get_book_path(),
+            write_lock=metadata_db_write_lock,
+            on_fixed=helper.clear_cover_thumbnail_cache)
+    except Exception as ex:
+        log.error_or_exception(ex)
+        return _render_cover_flag_repair(
+            error=_("Could not update the library database. No covers were changed.")), 500
+    log.info("Restored the cover flag on %d book(s); %d skipped",
+             len(outcome.fixed), outcome.skipped)
+    return _render_cover_flag_repair(
+        result={"fixed": len(outcome.fixed), "skipped": outcome.skipped})
 
 
 def check_valid_read_column(column):

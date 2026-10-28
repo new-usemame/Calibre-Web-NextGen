@@ -94,6 +94,13 @@ const ADMIN_CONTEXT: ContextSidebarDefinition = {
           spa: true,
         },
         {
+          key: 'cover-flag-repair',
+          href: '/admin#cover-flag-repair',
+          label: 'Restore missing covers',
+          icon: Settings,
+          spa: true,
+        },
+        {
           key: 'email-settings',
           href: '/admin#email-settings',
           label: 'Email server',

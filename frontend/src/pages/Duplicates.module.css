@@ -26,7 +26,10 @@
 
 .groups { display: flex; flex-direction: column; gap: var(--sp-4); }
 .group { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-4); }
-.groupHead { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.groupHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+/* #2747 — the merge button made the head too wide for a phone; the name takes
+   the first line there and the count and buttons wrap below it. */
+.groupName { flex: 1 1 14rem; min-width: 0; }
 .groupTitle { font-family: var(--font-display); font-size: var(--fs-md); color: var(--text); margin-right: var(--sp-2); }
 .groupAuthor { color: var(--text-muted); font-size: var(--fs-sm); }
 .groupCount { margin-left: auto; color: var(--text-muted); font-size: var(--fs-sm); }

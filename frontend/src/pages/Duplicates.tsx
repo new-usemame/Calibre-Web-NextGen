@@ -126,7 +126,7 @@ function DuplicateGroupCard({ group: g, onDismiss, dismissing, onMergeResult }: 
   return (
     <section className={styles.group} aria-label={`${g.title} — ${g.author}`}>
       <div className={styles.groupHead}>
-        <div>
+        <div className={styles.groupName}>
           <span className={styles.groupTitle}>{g.title}</span>
           <span className={styles.groupAuthor}>{g.author}</span>
         </div>

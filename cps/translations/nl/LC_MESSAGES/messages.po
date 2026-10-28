@@ -11974,6 +11974,30 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
 
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "Dit exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "Dit exemplaar samenvoegen"
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "Samenvoegen in het behouden exemplaar"
+
+#: cps/spa_strings.py
+msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
+msgstr "{n} exemplaren samenvoegen in ‘{title}’? Formaten die het mist worden gekopieerd, daarna worden die exemplaren verwijderd."
+
+#: cps/spa_strings.py
+msgid "Merged into “{title}”."
+msgstr "Samengevoegd in ‘{title}’."
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "Kan deze boeken niet samenvoegen."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Naamloos label"

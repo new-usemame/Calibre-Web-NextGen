@@ -2225,3 +2225,11 @@ _("Fill the screen")
 _("Show the whole image")
 _("Automatic fills the screen when only a thin edge would be cut off.")
 _("Could not change image fit. Try again.")
+
+# #2747 — merge copies from the new UI's Duplicates page.
+_("Keep this copy")
+_("Merge this copy")
+_("Merge into the kept copy")
+_("Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted.")
+_("Merged into “{title}”.")
+_("Could not merge these books.")

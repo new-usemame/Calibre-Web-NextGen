@@ -11272,6 +11272,30 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr ""
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr ""

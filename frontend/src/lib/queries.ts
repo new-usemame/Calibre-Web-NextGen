@@ -1262,7 +1262,12 @@ export function useMergeBooks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => apiPost('/ajax/mergebooks', { Merge_books: ids }),
-    onSuccess: () => invalidateBookVisibilityViews(qc),
+    onSuccess: () => {
+      invalidateBookVisibilityViews(qc);
+      // The merged-away copies are deleted, so their duplicate group shrinks or
+      // goes; the list reads live book rows and is right on the next fetch.
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+    },
   });
 }
 

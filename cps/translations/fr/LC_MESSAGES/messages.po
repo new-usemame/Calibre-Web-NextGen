@@ -12161,6 +12161,30 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr "Impossible de modifier le cadrage de l’image. Réessayez."
 
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "Garder cet exemplaire"
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "Fusionner cet exemplaire"
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "Fusionner dans l’exemplaire gardé"
+
+#: cps/spa_strings.py
+msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
+msgstr "Fusionner {n} exemplaires dans « {title} » ? Les formats qui lui manquent sont copiés, puis ces exemplaires sont supprimés."
+
+#: cps/spa_strings.py
+msgid "Merged into “{title}”."
+msgstr "Fusionné dans « {title} »."
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "Impossible de fusionner ces livres."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Étiquette sans nom"

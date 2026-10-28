@@ -425,7 +425,7 @@ def test_delete_book_from_table_marks_cache_stale_when_the_incremental_merge_fai
     assert any(instance.invalidated for instance in _CwaDB.instances)
 
 
-def test_batched_delete_leaves_the_duplicate_index_to_the_deferred_scan():
+def test_batched_delete_leaves_the_duplicate_index_to_the_batch_refresh():
     _CwaDB.instances = []
     _index_calls[:] = []
     delete_key_calls = []
@@ -435,7 +435,7 @@ def test_batched_delete_leaves_the_duplicate_index_to_the_deferred_scan():
 
     assert result == "deleted"
     assert ("whole", 12) in calls
-    # Keys stay until the deferred merge, which needs them to find the deleted
+    # Keys stay until the batch merge, which needs them to find the deleted
     # book's surviving group members.
     assert _index_calls == []
     assert delete_key_calls == []
@@ -443,7 +443,7 @@ def test_batched_delete_leaves_the_duplicate_index_to_the_deferred_scan():
     assert all(instance.invalidated is False for instance in _CwaDB.instances)
 
 
-def test_bulk_delete_does_no_per_book_index_work_and_queues_one_scan():
+def test_bulk_delete_refreshes_the_cache_once_for_the_whole_selection():
     _CwaDB.instances = []
     _index_calls[:] = []
     delete_key_calls = []
@@ -457,7 +457,10 @@ def test_bulk_delete_does_no_per_book_index_work_and_queues_one_scan():
     assert [call for call in calls if isinstance(call, tuple) and call[0] == "whole"] == [
         ("whole", 3), ("whole", 4), ("whole", 5)
     ]
-    assert _index_calls == []
+    # One incremental merge after all the deletes, never one per book. It runs
+    # here rather than only in the queued scan, which is skipped unless the
+    # scan frequency is after_import.
+    assert _index_calls == [("merge", [3, 4, 5])]
     assert delete_key_calls == []
     assert queued == [[3, 4, 5]]
 

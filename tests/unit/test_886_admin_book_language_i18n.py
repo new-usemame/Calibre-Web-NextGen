@@ -199,7 +199,7 @@ def test_account_payload_serves_the_translated_options():
     user = SimpleNamespace(
         name="alice", email="a@x.com", kindle_mail="", kindle_mail_subject="",
         kobo_only_shelves_sync=False, opds_only_shelves_sync=False,
-        locale="nl", default_language="all", theme=0,
+        locale="nl", default_language="all", theme=0, password="HASH",
         ui_font_body="", ui_font_display="",
         role_admin=lambda: False, role_upload=lambda: False,
         role_edit=lambda: False, role_download=lambda: True,

@@ -1666,9 +1666,13 @@ export function useUpdateProfile() {
 }
 
 export function useChangePassword() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { current_password: string; new_password: string }) =>
       apiPost('/api/v1/account/password', vars),
+    // A first password flips has_password, which brings back the
+    // "Current password" field for the next change (#2572).
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['account'] }),
   });
 }
 

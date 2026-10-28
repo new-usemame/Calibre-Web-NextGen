@@ -12161,6 +12161,10 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr "Impossible de modifier le cadrage de l’image. Réessayez."
 
+#: cps/spa_strings.py
+msgid "Your account has no password yet. Set one to sign in from e-reader apps and OPDS clients."
+msgstr "Votre compte n’a pas encore de mot de passe. Définissez-en un pour vous connecter depuis les applications de liseuse et les clients OPDS."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Étiquette sans nom"

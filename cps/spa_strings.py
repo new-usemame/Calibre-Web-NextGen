@@ -2225,3 +2225,5 @@ _("Fill the screen")
 _("Show the whole image")
 _("Automatic fills the screen when only a thin edge would be cut off.")
 _("Could not change image fit. Try again.")
+# #2572: an account auto-created by reverse-proxy login has no password yet
+_("Your account has no password yet. Set one to sign in from e-reader apps and OPDS clients.")

@@ -1066,7 +1066,7 @@ export function useUpdateSecurityConfig() {
 export function useUpdateAdminUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; roles?: Record<string, boolean>; email?: string; library_mode?: LibraryModePayload['library_mode'] }) => {
+    mutationFn: (v: { id: number; roles?: Record<string, boolean>; email?: string; library_mode?: LibraryModePayload['library_mode']; start_empty?: boolean }) => {
       const { id, ...body } = v;
       return apiPost<AdminUser>(`/api/v1/admin/users/${id}`, body);
     },

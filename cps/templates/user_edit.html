@@ -386,6 +386,13 @@
             <label for="library_mode_personal">{{_('My Library')}}</label>
             <p class="help-block">{{ profile and _('Only the books you choose. Add them from the global library; remove them any time.') or _('Switching a user to My Library first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.') }}</p>
           </div>
+          {% if not profile and not new_user and not content.user_library_seeded %}
+          <div style="margin-top: 12px; margin-inline-start: 1.5rem;">
+            <input type="checkbox" name="library_start_empty" id="library_start_empty" aria-describedby="library-start-empty-help" style="accent-color: var(--color-secondary);">
+            <label for="library_start_empty">{{_('Start My Library empty')}}</label>
+            <p id="library-start-empty-help" class="help-block">{{_('Only applies when choosing My Library above. The user starts with no books and adds what they want from the global library, so they need the global-browse role. Not available for an account that already syncs books to a Kobo.')}}</p>
+          </div>
+          {% endif %}
           {% if profile and not content.role_browse_global() %}
           <p class="settings-explanation">{{_('Your library contents are managed by an administrator.')}}</p>
           {% elif not profile and content.library_mode() == 'personal_library' and not content.role_browse_global() %}

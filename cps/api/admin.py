@@ -530,9 +530,17 @@ def admin_update_user(user_id):
             "library_mode must be 'monolibrary' or 'personal_library'",
             400,
         )
+    start_empty = data.get("start_empty", False)
+    if not isinstance(start_empty, bool):
+        return _err("invalid_request", "start_empty must be true or false", 400)
+    if start_empty and "library_mode" not in data:
+        return _err(
+            "invalid_request", "start_empty requires library_mode", 400
+        )
     library_seed_prepared = False
     if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
-            and not bool(user.user_library_seeded)):
+            and not bool(user.user_library_seeded)
+            and not start_empty):
         try:
             # Seed before applying the rest of this multi-field update so its
             # chunk commits cannot persist half-validated profile changes.
@@ -578,6 +586,7 @@ def admin_update_user(user_id):
                 desired_library_mode,
                 seed_rows_prepared=library_seed_prepared,
                 commit=False,
+                start_empty=start_empty,
             )
             user_library.mark_response_user_specific()
     except Exception as ex:  # validators raise generic Exception with a message

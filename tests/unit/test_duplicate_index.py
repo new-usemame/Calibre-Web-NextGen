@@ -26,7 +26,7 @@ def _install_stub(name, attrs=None):
 
 def _load_duplicate_index_module():
     for name in list(sys.modules):
-        if name in ("cps.duplicate_index", "cps.duplicates", "cps", "sqlalchemy") or name.startswith(
+        if name in ("cps.duplicate_index", "cps.duplicates", "cps", "cps.cwa_db_loader", "sqlalchemy") or name.startswith(
             "sqlalchemy."
         ):
             sys.modules.pop(name, None)
@@ -42,6 +42,9 @@ def _load_duplicate_index_module():
     class _BookId:
         def in_(self, values):
             return ("book_id_in", tuple(values))
+
+        def desc(self):
+            return self
 
     class _OrderColumn:
         def desc(self):
@@ -90,11 +93,17 @@ def _load_duplicate_index_module():
             "generate_group_hash": _group_hash,
             "get_common_filters": lambda user_id=None: True,
             "normalize_title_for_duplicates": _normalize_title,
+            "normalize_text_for_duplicates": lambda value, default="": (
+                (value or "").lower().strip() or default
+            ),
         },
     )
     cps.duplicates = duplicates
+    constants = _install_stub("cps.constants", {"CONFIG_DIR": "/config"})
+    cps.constants = constants
 
-    _install_stub("cwa_db", {"CWA_DB": object})
+    cwa_db_stub = _install_stub("cwa_db", {"CWA_DB": object})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db_stub})
 
     duplicate_index_path = pathlib.Path(__file__).resolve().parents[2] / "cps" / "duplicate_index.py"
     spec = importlib.util.spec_from_file_location("cps.duplicate_index", duplicate_index_path)
@@ -384,7 +393,7 @@ def test_cache_merge_keeps_serialization_shape(duplicate_index):
 
     assert result["updated"] is True
     assert cache["total_count"] == 1
-    assert set(cache["duplicate_groups"][0]) == {"title", "author", "count", "group_hash", "book_ids"}
+    assert set(cache["duplicate_groups"][0]) == {"title", "author", "count", "group_hash", "duplicate_key", "book_ids"}
     assert cache["duplicate_groups"][0]["book_ids"] == [2, 1]
 
 
@@ -564,7 +573,7 @@ def test_manual_full_scan_not_needed_for_new_books_during_dirty_ingest(duplicate
     duplicate_index.calibre_db.session = _Session(books)
     duplicate_index.upsert_book_keys({1, 2}, settings)
     _seed_cache(scan_pending=True, last_scanned_book_id=2)
-    monkeypatch.setattr(duplicate_index, "INGEST_BATCH_DIRTY_FILE", str(dirty_file))
+    monkeypatch.setenv("CWA_INGEST_BATCH_DIRTY_FILE", str(dirty_file))
     dirty_file.write_text("dirty_at=1\n")
 
     assert duplicate_index.duplicate_index_needs_manual_full_scan(settings) is False
@@ -583,7 +592,7 @@ def test_manual_full_scan_not_needed_for_new_books_during_running_ingest_follow_
     duplicate_index.calibre_db.session = _Session(books)
     duplicate_index.upsert_book_keys({1}, settings)
     _seed_cache(scan_pending=True, last_scanned_book_id=1)
-    monkeypatch.setattr(duplicate_index, "INGEST_BATCH_DIRTY_FILE", str(dirty_file))
+    monkeypatch.setenv("CWA_INGEST_BATCH_DIRTY_FILE", str(dirty_file))
     dirty_file.with_suffix(dirty_file.suffix + ".running").write_text("dirty_at=1\n")
 
     assert duplicate_index.duplicate_index_needs_manual_full_scan(settings) is False
@@ -596,7 +605,7 @@ def test_manual_full_scan_not_needed_while_ingest_active(duplicate_index, monkey
 
     duplicate_index.calibre_db.session = _Session(books)
     _seed_cache(scan_pending=True, last_scanned_book_id=0)
-    monkeypatch.setattr(duplicate_index, "INGEST_BATCH_ACTIVE_FILE", str(active_file))
+    monkeypatch.setenv("CWA_INGEST_BATCH_ACTIVE_FILE", str(active_file))
     active_file.write_text("active_at=1\n")
 
     assert duplicate_index.duplicate_index_needs_manual_full_scan(settings) is False
@@ -609,7 +618,7 @@ def test_initial_manual_full_scan_not_needed_during_dirty_ingest(duplicate_index
 
     duplicate_index.calibre_db.session = _Session(books)
     _seed_cache(scan_pending=True, last_scanned_book_id=0)
-    monkeypatch.setattr(duplicate_index, "INGEST_BATCH_DIRTY_FILE", str(dirty_file))
+    monkeypatch.setenv("CWA_INGEST_BATCH_DIRTY_FILE", str(dirty_file))
     dirty_file.write_text("dirty_at=1\n")
 
     assert duplicate_index.duplicate_index_needs_manual_full_scan(settings) is False
@@ -641,7 +650,7 @@ def test_manual_full_scan_needed_for_old_missing_book_even_during_dirty_ingest(d
     duplicate_index.calibre_db.session = _Session(books)
     duplicate_index.upsert_book_keys({1, 3}, settings)
     _seed_cache(scan_pending=True, last_scanned_book_id=3)
-    monkeypatch.setattr(duplicate_index, "INGEST_BATCH_DIRTY_FILE", str(dirty_file))
+    monkeypatch.setenv("CWA_INGEST_BATCH_DIRTY_FILE", str(dirty_file))
     dirty_file.write_text("dirty_at=1\n")
 
     assert duplicate_index.duplicate_index_needs_manual_full_scan(settings) is True
@@ -687,3 +696,32 @@ def teardown_module(module):
         if name not in _modules_snapshot:
             sys.modules.pop(name, None)
     sys.modules.update(_modules_snapshot)
+
+
+def test_cache_merge_after_delete_keeps_the_surviving_members_of_the_deleted_books_group(duplicate_index):
+    # #2751: a delete no longer rebuilds every group. The incremental merge must
+    # still leave the deleted book's remaining copies grouped, and other groups
+    # untouched, which needs the deleted book's key rows present when it runs.
+    books = [
+        _book(1, "Dune", "Frank Herbert"),
+        _book(2, "Dune", "Frank Herbert"),
+        _book(3, "Dune", "Frank Herbert"),
+        _book(4, "Foundation", "Isaac Asimov"),
+        _book(5, "Foundation", "Isaac Asimov"),
+    ]
+    duplicate_index.calibre_db.session = _Session(books)
+    settings = {"duplicate_detection_title": 1, "duplicate_detection_author": 1, "duplicate_detection_language": 0}
+    duplicate_index.upsert_book_keys({1, 2, 3, 4, 5}, settings)
+    metadata = duplicate_index.rebuild_duplicate_index(settings)
+    groups = duplicate_index.get_duplicate_groups_from_index(settings, include_dismissed=True)
+    _FakeCwaDB().update_duplicate_cache(groups, len(groups), metadata["max_book_id"])
+
+    duplicate_index.calibre_db.session = _Session(books[1:])
+    result = duplicate_index.merge_affected_groups_into_cache({1}, settings)
+    cache = _FakeCwaDB().get_duplicate_cache()
+    groups_by_title = {group["title"]: group for group in cache["duplicate_groups"]}
+
+    assert result["updated"] is True
+    assert sorted(groups_by_title["Dune"]["book_ids"]) == [2, 3]
+    assert sorted(groups_by_title["Foundation"]["book_ids"]) == [4, 5]
+    assert cache["scan_pending"] in (0, False)

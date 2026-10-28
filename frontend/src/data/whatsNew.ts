@@ -56,6 +56,17 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.57',
+    date: '2026-10-28',
+    items: [
+      {
+        title: 'KOReader: a book you reset or deleted leaves the Reading tab',
+        body: 'Opening a book once in KOReader kept it in the Reading tab for good, because KOReader still listed it in its history after Reset or Delete. A book with no progress left on the device now follows the server, so it drops out of Reading when the server has it as unread.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.56',
     date: '2026-10-27',
     items: [

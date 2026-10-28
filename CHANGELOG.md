@@ -16,6 +16,18 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.57] - 2026-10-28
+
+### Changed
+
+- **The README explains the two Hardcover tokens and the scopes each needs.** The server token only reads (metadata search and Hardcover ID fetching), each reader's own profile token is the one sync writes with, and a scoped token needs `read:catalog` and `read:me`, plus `read:library` and `write:library` for a reader's token. Asked for by @DBendit in #1605 and #2189.
+
+- **Five error handlers no longer swallow shutdown and interrupt signals.** Handlers in the DNB metadata provider, the OAuth debug log, the stats device detection and the ingest lock caught everything, including `KeyboardInterrupt`, `SystemExit` and gevent's `GreenletExit`. Each now catches only the errors it expects, and a new check stops a bare `except: pass` from coming back (#2644).
+
+### Fixed
+
+- **KOReader: a book you reset or deleted on the device leaves the Reading tab when the server says it is unread.** Opening a book once kept it in Reading for good, because KOReader's history still listed it after Reset or Delete. A history entry with no progress on the device now follows the server. Reported by @magdalar in #2732.
+
 ## [v4.1.56] - 2026-10-27
 
 ### Fixed

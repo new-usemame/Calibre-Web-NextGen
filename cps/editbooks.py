@@ -1006,7 +1006,9 @@ def _refresh_duplicate_cache_after_delete(book_ids):
         from cps.duplicate_index import merge_affected_groups_into_cache
         from cps.cwa_db_loader import load_cwa_db
 
-        merge_affected_groups_into_cache(book_ids, load_cwa_db().CWA_DB().cwa_settings)
+        merge_affected_groups_into_cache(
+            book_ids, load_cwa_db().CWA_DB().cwa_settings, preserve_pending=True
+        )
     except Exception as e:
         log.warning(
             "Failed to refresh duplicate index/cache after deleting books %s: %s",

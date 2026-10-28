@@ -165,7 +165,8 @@ def _record_full_rebuild(settings, include_dismissed=False, **kwargs):
     return []
 
 
-def _record_incremental_merge(candidate_book_ids, settings):
+def _record_incremental_merge(candidate_book_ids, settings, preserve_pending=False):
+    assert preserve_pending is True, "a delete must not clear a pending full scan"
     _index_calls.append(("merge", sorted(candidate_book_ids)))
     if _merge_raises:
         raise RuntimeError("merge failed")
@@ -467,6 +468,7 @@ def test_bulk_delete_refreshes_the_cache_once_for_the_whole_selection():
 
 def test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates_cache():
     _CwaDB.instances = []
+    _index_calls[:] = []
     delete_key_calls = []
     module, calls = _load_editbooks_module(delete_key_calls)
 
@@ -476,6 +478,7 @@ def test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates
     assert "format-delete" in calls
     assert "commit" in calls
     assert delete_key_calls == []
+    assert _index_calls == []
     assert _CwaDB.instances[-1].invalidated is True
 
 

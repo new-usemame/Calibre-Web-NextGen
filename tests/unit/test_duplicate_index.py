@@ -725,3 +725,46 @@ def test_cache_merge_after_delete_keeps_the_surviving_members_of_the_deleted_boo
     assert sorted(groups_by_title["Dune"]["book_ids"]) == [2, 3]
     assert sorted(groups_by_title["Foundation"]["book_ids"]) == [4, 5]
     assert cache["scan_pending"] in (0, False)
+
+
+def test_cache_merge_keeps_survivors_of_a_cached_group_whose_deleted_member_had_no_key_row(duplicate_index):
+    # The cached group names books 1-3, but book 1 never got a key row under the
+    # current criteria (index lag). Deleting it must still leave 2 and 3 grouped.
+    books = [_book(1, "Dune", "Frank Herbert"), _book(2, "Dune", "Frank Herbert"), _book(3, "Dune", "Frank Herbert")]
+    duplicate_index.calibre_db.session = _Session(books)
+    settings = {"duplicate_detection_title": 1, "duplicate_detection_author": 1, "duplicate_detection_language": 0}
+    duplicate_index.upsert_book_keys({2, 3}, settings)
+    cached = {"title": "Dune", "author": "Frank Herbert", "count": 3, "group_hash": "h", "book_ids": [3, 2, 1]}
+    cwa_db = _FakeCwaDB()
+    cwa_db.cur.execute(
+        "UPDATE cwa_duplicate_cache SET duplicate_groups_json = ?, total_count = 1, scan_pending = 0, "
+        "last_scanned_book_id = 3 WHERE id = 1",
+        (json.dumps([cached]),),
+    )
+    cwa_db.con.commit()
+
+    duplicate_index.calibre_db.session = _Session(books[1:])
+    duplicate_index.merge_affected_groups_into_cache({1}, settings)
+    cache = _FakeCwaDB().get_duplicate_cache()
+
+    assert [sorted(group["book_ids"]) for group in cache["duplicate_groups"]] == [[2, 3]]
+
+
+def test_cache_merge_leaves_an_already_pending_cache_pending(duplicate_index):
+    # A criteria change marks the cache pending until a full scan. A delete's
+    # incremental merge must not report the cache as fresh again.
+    books = [_book(1, "Dune", "Frank Herbert"), _book(2, "Dune", "Frank Herbert"), _book(3, "Dune", "Frank Herbert")]
+    duplicate_index.calibre_db.session = _Session(books)
+    settings = {"duplicate_detection_title": 1, "duplicate_detection_author": 1, "duplicate_detection_language": 0}
+    duplicate_index.upsert_book_keys({1, 2, 3}, settings)
+    metadata = duplicate_index.rebuild_duplicate_index(settings)
+    groups = duplicate_index.get_duplicate_groups_from_index(settings, include_dismissed=True)
+    _FakeCwaDB().update_duplicate_cache(groups, len(groups), metadata["max_book_id"])
+    duplicate_index.mark_duplicate_index_pending("criteria changed")
+
+    duplicate_index.calibre_db.session = _Session(books[1:])
+    duplicate_index.merge_affected_groups_into_cache({1}, settings, preserve_pending=True)
+    cache = _FakeCwaDB().get_duplicate_cache()
+
+    assert cache["scan_pending"] in (1, True)
+    assert [sorted(group["book_ids"]) for group in cache["duplicate_groups"]] == [[2, 3]]

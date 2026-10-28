@@ -59,7 +59,6 @@ _SAFE_ENV_VALUES = (
     "NETWORK_SHARE_MODE",
     "CWA_PORT_OVERRIDE",
     "CWA_CALIBRE_USER_PLUGINS",
-    "CWA_KOBO_RESUME_MAX_ARCHIVE_MIB",
 )
 _ENV_NAME_PATTERN = re.compile(r"^(CWA_|CALIBRE_|HARDCOVER_|FLASK_)")
 # A safe value is short and path-free, so a surprising value degrades to "set".
@@ -129,17 +128,38 @@ def _mem_total_bytes():
     return int(match.group(1)) * 1024 if match else None
 
 
+def _safe_env_values(env) -> dict:
+    """Values of the allow-listed settings that are set in ``env``.
+
+    Every key is written out literally, not looped over, so the environment
+    SSOT test can resolve each read statically and check it against
+    ``examples/.env.example``. Keep this in step with ``_SAFE_ENV_VALUES``
+    (a test asserts they match).
+    """
+    raw = {
+        "TZ": env.get("TZ"),
+        "PUID": env.get("PUID"),
+        "PGID": env.get("PGID"),
+        "NETWORK_SHARE_MODE": env.get("NETWORK_SHARE_MODE"),
+        "CWA_PORT_OVERRIDE": env.get("CWA_PORT_OVERRIDE"),
+        "CWA_CALIBRE_USER_PLUGINS": env.get("CWA_CALIBRE_USER_PLUGINS"),
+    }
+    values = {}
+    for name, value in raw.items():
+        if value is None:
+            continue
+        text = str(value)
+        values[name] = text if len(text) <= 64 and _SAFE_VALUE_PATTERN.match(text) else "set"
+    return values
+
+
 def collect_runtime(environ=None) -> dict:
     """Build and runtime facts. Versions of Calibre, Kepubify and the Python
     packages are already in ``libs.txt`` and are not repeated here."""
     from . import constants
 
     env = os.environ if environ is None else environ
-    values = {}
-    for name in _SAFE_ENV_VALUES:
-        if name in env:
-            raw = str(env[name])
-            values[name] = raw if len(raw) <= 64 and _SAFE_VALUE_PATTERN.match(raw) else "set"
+    values = _safe_env_values(env)
     names_only = sorted(
         n for n in env if _ENV_NAME_PATTERN.match(n) and n not in _SAFE_ENV_VALUES
     )

@@ -62,17 +62,24 @@ class TestRuntime:
             "PUID": "1000",
             "HARDCOVER_TOKEN": TOKEN_CANARY,
             "CWA_TMP_CONVERSION_DIR": f"/mnt/{SHARE_CANARY}/tmp",
-            "CWA_KOBO_RESUME_MAX_ARCHIVE_MIB": "32",
+            "NETWORK_SHARE_MODE": "true",
             "UNRELATED_SECRET": "should-not-appear",
         }
         out = sps.collect_runtime(environ=env)
         text = json.dumps(out)
         assert out["env_values"]["TZ"] == "Australia/Brisbane"
-        assert out["env_values"]["CWA_KOBO_RESUME_MAX_ARCHIVE_MIB"] == "32"
+        assert out["env_values"]["NETWORK_SHARE_MODE"] == "true"
         assert "HARDCOVER_TOKEN" in out["env_names_set"]
         assert "CWA_TMP_CONVERSION_DIR" in out["env_names_set"]
         for canary in (TOKEN_CANARY, SHARE_CANARY, "should-not-appear", "UNRELATED_SECRET"):
             assert canary not in text
+
+    def test_literal_env_reads_match_the_allow_list(self):
+        # _safe_env_values spells each key out literally for the env SSOT
+        # test; this keeps that list and _SAFE_ENV_VALUES from drifting.
+        env = {name: "1" for name in sps._SAFE_ENV_VALUES}
+        assert sps.collect_runtime(environ=env)["env_values"] == env
+        assert set(sps._safe_env_values({"UNLISTED": "1"})) == set()
 
     def test_unexpected_safe_key_value_degrades_to_set(self):
         out = sps.collect_runtime(environ={"PUID": f"/home/{USER_CANARY}"})

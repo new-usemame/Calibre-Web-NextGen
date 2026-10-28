@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import api_v1
 from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
-from ..personal_ratings import ratings_for_books, save_personal_rating
+from ..personal_ratings import ratings_for_books, set_personal_rating
 from ..sort_orders import viewer_id
 from ..usermanagement import login_required_if_no_ano
 
@@ -54,10 +54,13 @@ def book_rating(book_id):
         if type(score) is not int or not 0 <= score <= 10:
             return _error('invalid_rating', 'Rating must be an integer from 0 to 10', 400)
     try:
-        save_personal_rating(ub.session, uid, book_id, score)
+        set_personal_rating(ub.session, uid, book_id, score)
+        saved = ub.session_commit() is not False
     except SQLAlchemyError:
         ub.session.rollback()
-        log.exception('Failed to save personal rating for user %s, book %s', uid, book_id)
+        saved = False
+    if not saved:
+        log.error('Failed to save personal rating for user %s, book %s', uid, book_id)
         return _error('rating_save_failed', 'Could not save your rating.', 500)
     # Describe this committed write rather than racing a subsequent overwrite.
     return _response({'personal_rating': score if score else None})

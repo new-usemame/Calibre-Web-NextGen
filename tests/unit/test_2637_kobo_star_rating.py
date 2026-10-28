@@ -5,11 +5,16 @@
 The device posts ``/v1/products/<book uuid>/rating/<1..5>`` (empty JSON body;
 0 to clear) to whatever URL the init resources give for ``rating``. CWNG used
 to leave that on the Kobo Store, so the rating never reached it (#2637).
+
+Requests go through routing, the Kobo auth token and the real init URL.
 """
 
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
+import requests
+from werkzeug.datastructures import Headers
 
 from tests.unit.kobo_state_world import (  # noqa: F401  (fixtures)
     USER_ID, kw, read_column_class,
@@ -17,11 +22,66 @@ from tests.unit.kobo_state_world import (  # noqa: F401  (fixtures)
 
 pytestmark = pytest.mark.unit
 
+TOKEN = "reader-token"
+OTHER_TOKEN = "other-token"
+GUEST_TOKEN = "guest-token"
+OTHER_ID, GUEST_ID = USER_ID + 1, USER_ID + 2
 
-def rate(kw, book_uuid, rating, method="POST"):
-    path = f"/v1/products/{book_uuid}/rating/{rating}"
-    with kw.app.test_request_context(path, method=method, json={}):
-        return kw.kobo.HandleRatingRequest.__wrapped__(book_uuid, rating)
+
+class _Wsgi:
+    """The world's stand-in for ProxyFix, made callable for the test client."""
+
+    def __init__(self, inner, is_proxied):
+        self.inner, self.is_proxied = inner, is_proxied
+
+    def __call__(self, environ, start_response):
+        return self.inner(environ, start_response)
+
+
+def _token(ub, user_id, value):
+    row = ub.RemoteAuthToken()
+    row.user_id, row.auth_token, row.token_type = user_id, value, 1
+    return row
+
+
+@pytest.fixture
+def device(kw, monkeypatch):
+    from cps import constants, cw_login, kobo_auth
+    from cps.usermanagement import load_user
+
+    kobo, ub = kw.kobo, kw.ub
+    for user_id, name, role, token in (
+            (OTHER_ID, "other", constants.ROLE_USER, OTHER_TOKEN),
+            (GUEST_ID, "Guest", constants.ROLE_ANONYMOUS, GUEST_TOKEN)):
+        kw.session.add(ub.User(id=user_id, name=name, email=f"{name}@example.invalid",
+                               password="unused", role=role))
+        kw.session.add(_token(ub, user_id, token))
+    kw.session.add(_token(ub, USER_ID, TOKEN))
+    kw.session.commit()
+
+    monkeypatch.setattr(kobo_auth, "limiter", SimpleNamespace(check=lambda: None, current_limits=[]))
+    monkeypatch.setattr(kobo, "current_user", cw_login.current_user)
+    monkeypatch.setattr(kobo.config, "config_kobo_sync", True, raising=False)
+    monkeypatch.setattr(kobo.config, "config_external_port", 8083, raising=False)
+    kw.hidden = set()
+    visible = kobo.calibre_db.get_book_by_uuid_for_kobo
+    monkeypatch.setattr(
+        kobo.calibre_db, "get_book_by_uuid_for_kobo",
+        lambda book_uuid, enforce_policy=False: (
+            None if enforce_policy and book_uuid in kw.hidden else visible(book_uuid)))
+
+    manager = cw_login.LoginManager(kw.app)
+    manager.user_loader(load_user)
+    kw.app.config.update(TESTING=True)
+    kw.app.register_blueprint(kobo.kobo)
+    kw.app.add_url_rule("/", endpoint="web.index", view_func=lambda: "")  # init builds image_host from it
+    kw.app.wsgi_app = _Wsgi(type(kw.app).wsgi_app.__get__(kw.app), is_proxied=True)
+    return kw.app.test_client()
+
+
+def rate(device, book_uuid, rating, token=TOKEN, method="POST"):
+    return device.open(f"/kobo/{token}/v1/products/{book_uuid}/rating/{rating}",
+                       method=method, json={})
 
 
 def stored(kw, book, user_id=USER_ID):
@@ -31,10 +91,15 @@ def stored(kw, book, user_id=USER_ID):
     return None if row is None else row.rating
 
 
-def test_stars_are_stored_as_half_star_units(kw):
+def ratings(kw):
+    kw.session.expire_all()
+    return kw.session.query(kw.ub.BookRating).count()
+
+
+def test_stars_are_stored_as_half_star_units(kw, device):
     book = kw.books[0]
 
-    response = rate(kw, book.uuid, 4)
+    response = rate(device, book.uuid, 4)
 
     assert response.status_code == 200
     assert response.get_data() == b""
@@ -43,99 +108,130 @@ def test_stars_are_stored_as_half_star_units(kw):
     assert stored(kw, kw.books[1]) is None
 
 
-def test_rating_again_replaces_the_score_and_zero_clears_it(kw):
+def test_rating_again_replaces_the_score_and_zero_clears_it(kw, device):
     book = kw.books[0]
 
-    rate(kw, book.uuid, 4)
-    rate(kw, book.uuid, 5)
+    rate(device, book.uuid, 4)
+    rate(device, book.uuid, 5)
     assert stored(kw, book) == 10
 
-    rate(kw, book.uuid, 0)
+    rate(device, book.uuid, 0)
     assert stored(kw, book) == 0
-    assert kw.session.query(kw.ub.BookRating).count() == 1
+    assert ratings(kw) == 1
 
 
-def test_another_accounts_rating_is_left_alone(kw):
-    book = kw.books[0]
-    kw.session.add(kw.ub.User(id=USER_ID + 1, name="other",
-                              email="other@example.invalid", role=0))
-    kw.session.add(kw.ub.BookRating(user_id=USER_ID + 1, book_id=book.id, rating=6))
-    kw.session.commit()
-
-    rate(kw, book.uuid, 5)
-
-    assert stored(kw, book) == 10
-    assert stored(kw, book, USER_ID + 1) == 6
-
-
-@pytest.mark.parametrize("rating", ["6", "-1", "x", "3.5"])
-def test_an_unusable_rating_is_refused_and_nothing_is_saved(kw, rating):
-    response = rate(kw, kw.books[0].uuid, rating)
-
-    assert response.status_code == 400
-    assert kw.session.query(kw.ub.BookRating).count() == 0
-
-
-def test_a_put_is_accepted_like_a_post(kw):
+def test_a_put_is_accepted_like_a_post(kw, device):
     book = kw.books[0]
 
-    assert rate(kw, book.uuid, 3, method="PUT").status_code == 200
+    assert rate(device, book.uuid, 3, method="PUT").status_code == 200
     assert stored(kw, book) == 6
 
 
-def test_a_book_cwng_does_not_hold_goes_to_the_store_path_and_is_not_saved(kw, monkeypatch):
-    forwarded = []
-    monkeypatch.setattr(kw.kobo, "redirect_or_proxy_request",
-                        lambda: forwarded.append(True) or "forwarded")
-
-    result = rate(kw, "11111111-2222-3333-4444-555555555555", 5)
-
-    assert result == "forwarded" and forwarded == [True]
-    assert kw.session.query(kw.ub.BookRating).count() == 0
-
-
-def test_a_failed_save_rolls_back_and_answers_503(kw, monkeypatch):
-    from sqlalchemy.exc import OperationalError
-    from werkzeug.exceptions import ServiceUnavailable
-
+def test_each_account_keeps_its_own_rating(kw, device):
     book = kw.books[0]
-    rate(kw, book.uuid, 3)
 
-    def busy(*_a, **_k):
-        raise OperationalError("commit", {}, Exception("busy"))
+    rate(device, book.uuid, 3, token=OTHER_TOKEN)
+    rate(device, book.uuid, 5)
 
-    monkeypatch.setattr(kw.session, "commit", busy)
-    with pytest.raises(ServiceUnavailable):
-        rate(kw, book.uuid, 5)
-    monkeypatch.undo()
+    assert stored(kw, book) == 10
+    assert stored(kw, book, OTHER_ID) == 6
+
+
+def test_an_unknown_token_is_refused_and_nothing_is_saved(kw, device):
+    response = rate(device, kw.books[0].uuid, 4, token="nobody")
+
+    assert response.status_code == 401
+    assert ratings(kw) == 0
+
+
+@pytest.mark.parametrize("rating", ["6", "-1", "x", "3.5"])
+def test_an_unusable_rating_is_refused_and_nothing_is_saved(kw, device, rating):
+    assert rate(device, kw.books[0].uuid, rating).status_code == 400
+    assert ratings(kw) == 0
+
+
+def test_the_guest_account_has_no_personal_rating(kw, device):
+    response = rate(device, kw.books[0].uuid, 4, token=GUEST_TOKEN)
+
+    assert response.status_code == 403
+    assert ratings(kw) == 0
+
+
+def test_a_book_hidden_from_the_reader_is_not_rated(kw, device):
+    book = kw.books[0]
+    kw.hidden.add(book.uuid)
+
+    response = rate(device, book.uuid, 4)
+
+    assert response.status_code == 404
+    assert ratings(kw) == 0
+
+
+def test_a_book_cwng_does_not_serve_is_refused_when_the_proxy_is_off(kw, device):
+    response = rate(device, "11111111-2222-3333-4444-555555555555", 5)
+
+    assert response.status_code == 404
+    assert ratings(kw) == 0
+
+
+def test_a_store_book_goes_to_the_store_when_the_proxy_is_on(kw, device, monkeypatch):
+    sent = []
+    monkeypatch.setattr(kw.kobo.config, "config_kobo_proxy", True, raising=False)
+    monkeypatch.setattr(
+        kw.kobo, "make_request_to_kobo_store",
+        lambda: sent.append(kw.kobo.request.path) or SimpleNamespace(
+            content=b"", status_code=200, headers=Headers()))
+
+    response = rate(device, "11111111-2222-3333-4444-555555555555", 5)
+
+    assert response.status_code == 200
+    assert sent == [f"/kobo/{TOKEN}/v1/products/11111111-2222-3333-4444-555555555555/rating/5"]
+    assert ratings(kw) == 0
+
+
+@pytest.mark.parametrize("failure, status", [
+    (requests.exceptions.Timeout, 504),
+    (requests.exceptions.ConnectionError, 502),
+])
+def test_a_store_that_cannot_answer_is_a_gateway_error_not_a_500(
+        kw, device, monkeypatch, failure, status):
+    def down():
+        raise failure("storeapi unreachable")
+
+    monkeypatch.setattr(kw.kobo.config, "config_kobo_proxy", True, raising=False)
+    monkeypatch.setattr(kw.kobo, "make_request_to_kobo_store", down)
+
+    assert rate(device, "11111111-2222-3333-4444-555555555555", 5).status_code == status
+
+
+def test_a_failed_save_answers_503_and_keeps_the_old_score(kw, device, monkeypatch):
+    book = kw.books[0]
+    rate(device, book.uuid, 3)
+
+    def rolled_back():
+        kw.session.rollback()
+        return False
+
+    monkeypatch.setattr(kw.ub, "session_commit", rolled_back)
+    response = rate(device, book.uuid, 5)
+
+    assert response.status_code == 503
     assert stored(kw, book) == 6
 
 
 @pytest.mark.parametrize("proxied", [True, False])
-def test_init_points_the_rating_resource_at_cwng(kw, monkeypatch, proxied):
-    kobo = kw.kobo
-    seen = {}
+def test_the_device_is_told_to_rate_through_cwng_and_that_url_works(kw, device, proxied):
+    kw.app.wsgi_app.is_proxied = proxied
+    book = kw.books[0]
 
-    def fake_url_for(endpoint, **values):
-        seen[endpoint] = values
-        return f"/kobo/TOKEN/{endpoint}"
+    init = device.get(f"/kobo/{TOKEN}/v1/initialization")
+    assert init.status_code == 200, init.get_data(as_text=True)
+    template = init.get_json()["Resources"]["rating"]
 
-    monkeypatch.setattr(kobo, "url_for", fake_url_for)
-    monkeypatch.setattr(kobo.kobo_auth, "get_auth_token", lambda: "TOKEN")
-    monkeypatch.setattr(kobo.user_library, "mark_response_user_specific",
-                        lambda *_a, **_k: None)
-    monkeypatch.setattr(kobo.user_cover, "kobo_resource_version_for_user",
-                        lambda *_a, **_k: None)
-    monkeypatch.setattr(kobo.config, "config_kobo_sync", True, raising=False)
-    monkeypatch.setattr(kobo.config, "config_external_port", 8083, raising=False)
-    monkeypatch.setattr(kobo, "hardcover", None, raising=False)
-    kw.app.wsgi_app = SimpleNamespace(is_proxied=proxied)
+    assert template.startswith("http")
+    assert "storeapi.kobo.com" not in template
+    assert template.endswith(f"/kobo/{TOKEN}/v1/products/{{ProductId}}/rating/{{Rating}}")
 
-    with kw.app.test_request_context("/v1/initialization", base_url="http://pi.lan:8093"):
-        response = kobo.HandleInitRequest.__wrapped__()
-
-    rating = response.get_json()["Resources"]["rating"]
-    assert rating.endswith("/kobo/TOKEN/kobo.HandleRatingRequest")
-    assert "storeapi.kobo.com" not in rating
-    assert seen["kobo.HandleRatingRequest"]["book_uuid"] == "{ProductId}"
-    assert seen["kobo.HandleRatingRequest"]["rating"] == "{Rating}"
+    path = urlsplit(template.replace("{ProductId}", book.uuid).replace("{Rating}", "4")).path
+    assert device.post(path, json={}).status_code == 200
+    assert stored(kw, book) == 8

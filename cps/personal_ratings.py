@@ -24,10 +24,11 @@ def personal_score(user_id):
     ).correlate(db.Books).scalar_subquery(), 0)
 
 
-def save_personal_rating(session, user_id, book_id, score):
-    """Upsert one account's score for a book and commit; 0 records a clear.
+def set_personal_rating(session, user_id, book_id, score):
+    """Stage one account's score for a book (0 records a clear), uncommitted.
 
-    Raises SQLAlchemyError on failure; the caller rolls back and answers.
+    The caller commits (``ub.session_commit()``) and answers for a failure;
+    a statement error raises SQLAlchemyError for the caller to roll back.
     """
     now = datetime.now(timezone.utc)
     session.execute(sqlite_insert(ub.BookRating).values(
@@ -36,7 +37,6 @@ def save_personal_rating(session, user_id, book_id, score):
         index_elements=[ub.BookRating.user_id, ub.BookRating.book_id],
         set_={'rating': score, 'updated_at': now},
     ))
-    session.commit()
 
 
 def personal_rating_order(user_id, descending=True):

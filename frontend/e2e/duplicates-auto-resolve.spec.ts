@@ -18,7 +18,8 @@ const PLAN = {
   preview: [{
     group_hash: 'g1', title: 'Dune', author: 'Frank Herbert',
     kept_book_id: 12, kept_book_formats: ['EPUB', 'PDF'],
-    deleted_book_ids: [7], deleted_books_info: [{ id: 7, formats: ['MOBI'] }],
+    kept_book_edition: { publisher: 'Penguin Classics', year: 2003 },
+    deleted_book_ids: [7], deleted_books_info: [{ id: 7, formats: ['MOBI'], publisher: 'OUP', year: 1991 }],
   }],
 };
 
@@ -45,6 +46,9 @@ test('admin can preview, confirm and run an automatic duplicate resolution', asy
   await page.getByRole('button', { name: 'Preview' }).click();
 
   await expect(page.getByText('1 books in 1 groups would be deleted.')).toBeVisible();
+  // Publisher and year are shown so different editions stand out from true copies.
+  await expect(page.getByText('#12 (EPUB, PDF, Penguin Classics, 2003)')).toBeVisible();
+  await expect(page.getByText('#7 (MOBI, OUP, 1991)')).toBeVisible();
   expect(calls.preview).toEqual([{ strategy: 'oldest' }]);
   expect(calls.execute, 'a preview must never delete anything').toEqual([]);
 

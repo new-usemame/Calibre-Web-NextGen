@@ -2061,8 +2061,12 @@ export interface DuplicateResolutionPreviewGroup {
   author: string;
   kept_book_id: number;
   kept_book_formats: string[];
+  /** Publisher and year, so different editions in one group stand out (#1902). */
+  kept_book_edition?: { publisher: string | null; year: number | null };
   deleted_book_ids: number[];
-  deleted_books_info: { id: number; formats: string[] }[];
+  deleted_books_info: {
+    id: number; formats: string[]; publisher?: string | null; year?: number | null;
+  }[];
 }
 
 /** Shared by the dry run and the real run: the backend answers both with the

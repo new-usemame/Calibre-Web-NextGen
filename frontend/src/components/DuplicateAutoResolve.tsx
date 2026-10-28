@@ -13,6 +13,13 @@ import styles from './DuplicateAutoResolve.module.css';
 /** Groups listed in the preview before collapsing to "and N more". */
 const PREVIEW_LIMIT = 50;
 
+/** "#12 (EPUB, PDF, Penguin Classics, 2003)" -- the publisher and year make
+ *  it obvious when a group holds different editions rather than true copies. */
+function describeBook(id: number, formats: string[], publisher?: string | null, year?: number | null) {
+  const parts = [...formats, ...(publisher ? [publisher] : []), ...(year ? [String(year)] : [])];
+  return parts.length ? `#${id} (${parts.join(', ')})` : `#${id}`;
+}
+
 function ConfirmDialog({ deleted, busy, error, onClose, onConfirm }: {
   deleted: number; busy: boolean; error: string | null; onClose: () => void; onConfirm: () => void;
 }) {
@@ -134,8 +141,10 @@ export function DuplicateAutoResolve() {
                 <span className={styles.planTitle}>{g.title}</span>
                 <span className={styles.planAuthor}>{g.author}</span>
                 <span className={styles.planDetail}>
-                  {t('Keep')} #{g.kept_book_id} ({g.kept_book_formats.join(', ')}) · {t('Delete')}{' '}
-                  {g.deleted_books_info.map((b) => `#${b.id}`).join(', ')}
+                  {t('Keep')}{' '}
+                  {describeBook(g.kept_book_id, g.kept_book_formats, g.kept_book_edition?.publisher, g.kept_book_edition?.year)}
+                  {' · '}{t('Delete')}{' '}
+                  {g.deleted_books_info.map((b) => describeBook(b.id, b.formats, b.publisher, b.year)).join('; ')}
                 </span>
               </li>
             ))}

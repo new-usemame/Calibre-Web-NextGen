@@ -1700,6 +1700,31 @@ def _refresh_duplicate_cache_after_resolution(cwa_db):
             log.warning("[cwa-duplicates] Failed to invalidate cache after resolution: %s", str(invalidate_ex))
 
 
+def _preview_edition_info(book):
+    """Publisher and publication year of a book, for the resolution preview.
+
+    Duplicate groups match on title/author/language, so two different
+    editions (for example two translations of the same classic) can land in
+    one group. Showing the publisher and year lets an admin spot those before
+    confirming a delete (#1902). Missing or Calibre-default values are None.
+    """
+    publisher = None
+    year = None
+    try:
+        names = [p.name for p in (getattr(book, 'publishers', None) or []) if getattr(p, 'name', None)]
+        publisher = ', '.join(names) or None
+    except Exception:
+        publisher = None
+    try:
+        pubdate = getattr(book, 'pubdate', None)
+        # Calibre stores 0101-01-01 when there is no publication date.
+        if pubdate and pubdate.year > 1000:
+            year = pubdate.year
+    except Exception:
+        year = None
+    return {'publisher': publisher, 'year': year}
+
+
 def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trigger_type='manual', duplicate_groups=None):
     """
     Automatically resolve duplicate books by keeping one and deleting others.
@@ -1867,11 +1892,13 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                         'kept_book_id': book_to_keep.id,
                         'kept_book_timestamp': book_to_keep.timestamp.strftime('%Y-%m-%d %H:%M') if book_to_keep.timestamp else 'Unknown',
                         'kept_book_formats': kept_formats,
+                        'kept_book_edition': _preview_edition_info(book_to_keep),
                         'deleted_book_ids': [b.id for b in books_to_delete],
                         'deleted_books_info': [{
                             'id': b.id,
                             'timestamp': b.timestamp.strftime('%Y-%m-%d %H:%M') if b.timestamp else 'Unknown',
-                            'formats': [d.format for d in b.data] if b.data else []
+                            'formats': [d.format for d in b.data] if b.data else [],
+                            **_preview_edition_info(b)
                         } for b in books_to_delete]
                     })
                     result['kept_count'] += 1

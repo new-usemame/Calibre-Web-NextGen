@@ -34,8 +34,8 @@ def _env(**overrides):
     return env
 
 
-def _umask_seen_by_child(tmp_path, env):
-    """Run `umask` through the wrapper as this (non-root) user; return its output."""
+def _run_child(tmp_path, env, parent_umask=SERVICE_DEFAULT_UMASK):
+    """Run `umask` through the wrapper as this (non-root) user; return (umask, stderr)."""
     if os.geteuid() == 0:
         pytest.skip("must run unprivileged to exercise the direct-exec branch")
     out = tmp_path / "umask"
@@ -44,14 +44,18 @@ def _umask_seen_by_child(tmp_path, env):
         capture_output=True,
         text=True,
         env=env,
-        umask=SERVICE_DEFAULT_UMASK,
+        umask=parent_umask,
         timeout=30,
     )
     assert result.returncode == 0, (
         f"wrapper failed: rc={result.returncode} stderr={result.stderr!r}. "
         "Under set -e a failing umask here would crash-loop every service."
     )
-    return out.read_text().strip()
+    return out.read_text().strip(), result.stderr
+
+
+def _umask_seen_by_child(tmp_path, env):
+    return _run_child(tmp_path, env)[0]
 
 
 @pytest.mark.parametrize("value, expected", [("027", "0027"), ("000", "0000"), ("0002", "0002")])
@@ -62,13 +66,20 @@ def test_child_gets_the_configured_umask(tmp_path, value, expected):
     )
 
 
-def test_unset_umask_keeps_the_container_default(tmp_path):
-    assert _umask_seen_by_child(tmp_path, _env()) == "0022"
+@pytest.mark.parametrize("env", [{}, {"UMASK": ""}])
+def test_unset_umask_keeps_the_inherited_one(tmp_path, env):
+    """No UMASK means no opinion: a stricter umask from a rootless runtime stays."""
+    assert _run_child(tmp_path, _env(**env), parent_umask=0o077)[0] == "0077"
 
 
 @pytest.mark.parametrize("bad", ["abc", "999", "0x27"])
-def test_invalid_umask_falls_back_instead_of_killing_the_service(tmp_path, bad):
-    assert _umask_seen_by_child(tmp_path, _env(UMASK=bad)) == "0022"
+def test_invalid_umask_is_named_and_does_not_kill_the_service(tmp_path, bad):
+    seen, stderr = _run_child(tmp_path, _env(UMASK=bad))
+    assert seen == "0022", "an invalid UMASK must leave the inherited umask in place"
+    assert f"UMASK='{bad}'" in stderr, (
+        "the service log must say why UMASK had no effect, or the user sees 755 "
+        f"folders with no clue; stderr was {stderr!r}"
+    )
 
 
 def test_umask_survives_the_privilege_drop(tmp_path):

@@ -1,2 +1,2 @@
 ### Fixed
-- **`UMASK` now applies to the ingest service and every other library-writing service.** Services not named `svc-*` previously ignored it and created 755 folders (#2670).
+- **`UMASK` now applies to ingest, the metadata enforcer, the auto-zipper and the other background services, not only the web app.** Books imported with `UMASK=027` got 755 folders, because the base image applies `UMASK` only to services named `svc-*`. An invalid value is now named in the service log instead of being ignored silently. Thanks @sgreadly (#2670).

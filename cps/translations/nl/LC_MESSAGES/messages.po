@@ -12013,6 +12013,16 @@ msgstr "Samengevoegd in ‘{title}’."
 msgid "Could not merge these books."
 msgstr "Kan deze boeken niet samenvoegen."
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr "{done} van {total} geïmporteerd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
+msgstr "Er zijn al een tijdje geen nieuwe boeken verschenen; {count} nog niet geïmporteerd."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Naamloos label"

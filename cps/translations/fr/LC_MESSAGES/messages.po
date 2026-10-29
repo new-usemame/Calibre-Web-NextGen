@@ -12200,6 +12200,16 @@ msgstr "Fusionné dans « {title} »."
 msgid "Could not merge these books."
 msgstr "Impossible de fusionner ces livres."
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr "{done} sur {total} importés"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
+msgstr "Aucun nouveau livre n’est apparu depuis un moment ; il en reste {count} à importer."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Étiquette sans nom"

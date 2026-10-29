@@ -28,7 +28,8 @@ ACQ = "http://opds-spec.org/acquisition"
 
 
 def _render(formats):
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(TEMPLATES)))
+    # Flask autoescapes .xml templates; render the same way.
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(TEMPLATES)), autoescape=True)
     env.filters.update(
         mimetype=lambda v: "application/epub+zip" if v in ("epub", "kepub") else "application/pdf",
         formatfloat=lambda v, n=2: str(v),

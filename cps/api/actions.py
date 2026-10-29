@@ -22,7 +22,7 @@ from ..services.ereader_send import (
     ereader_addresses, other_users_with_ereader, record_email_activity,
     send_includes_own_address,
 )
-from ..services.read_status import stop_reading as stop_reading_status
+from ..services.read_status import record_reader_open, stop_reading as stop_reading_status
 
 BATCH_MEMBERSHIP_LIMIT = 200
 
@@ -122,6 +122,38 @@ def stop_reading_book(book_id):
                 book_id, current_user.id)):
             return _err("update_failed", "Could not update reading status", 500)
     return jsonify({"ok": True, "changed": changed})
+
+
+@api_v1.route("/books/<int:book_id>/reader-open", methods=["POST"])
+@login_required_if_no_ano
+def reader_open_book(book_id):
+    """Record an open in the new UI reader, as the classic ``/read`` route does (#2750).
+
+    The SPA posts this once per open outside lookup mode. A refresh is not a
+    new session and a finished book stays finished (``record_reader_open``).
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    if calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
+    ) is None:
+        return _err("not_found", "Book not found", 404)
+
+    record_reader_open(current_user, int(book_id))
+    if not ub.session_commit("Reader open of book {} for user {}".format(
+            book_id, current_user.id)):
+        return _err("update_failed", "Could not update reading status", 500)
+    return jsonify({"ok": True})
 
 
 @api_v1.route("/books/<int:book_id>/my-cover", methods=["GET"])

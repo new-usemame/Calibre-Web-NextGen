@@ -11285,14 +11285,21 @@ msgid "Merge into the kept copy"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Merge one copy into “{title}”? Formats it lacks are copied over, then that copy is deleted."
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then "
+"that copy is deleted."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
 msgid "Merged into “{title}”."
 msgstr ""
 

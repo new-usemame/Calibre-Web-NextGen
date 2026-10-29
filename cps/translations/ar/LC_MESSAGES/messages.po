@@ -11313,6 +11313,41 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr ""
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "وسم بلا اسم"
@@ -11589,8 +11624,7 @@ msgstr ""
 
 #: cps/web.py
 msgid "Success! Book queued for sending to the selected address(es)!"
-msgstr ""
-"تمت العملية بنجاح! أُضيف الكتاب إلى قائمة الإرسال إلى العناوين المحددة!"
+msgstr "تمت العملية بنجاح! أُضيف الكتاب إلى قائمة الإرسال إلى العناوين المحددة!"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -11658,8 +11692,7 @@ msgstr "لقد قمت الآن بتسجيل الدخول باسم: '%(nickname)s
 msgid ""
 "Welcome! Your account has been automatically created. You are now logged in "
 "as: '%(nickname)s'"
-msgstr ""
-"أهلًا بك! تم إنشاء حسابك تلقائيًا. تم تسجيل دخولك باسم: %(nickname)s"
+msgstr "أهلًا بك! تم إنشاء حسابك تلقائيًا. تم تسجيل دخولك باسم: %(nickname)s"
 
 #: cps/web.py
 msgid ""
@@ -12889,8 +12922,7 @@ msgstr ""
 #: cps/templates/broadcast_email.html
 msgid ""
 "The email server is not configured yet, so announcements cannot be sent."
-msgstr ""
-"لم يتم إعداد خادم البريد الإلكتروني بعد، لذلك لا يمكن إرسال الإعلانات."
+msgstr "لم يتم إعداد خادم البريد الإلكتروني بعد، لذلك لا يمكن إرسال الإعلانات."
 
 #: cps/templates/broadcast_email.html
 msgid ""
@@ -14101,8 +14133,7 @@ msgstr "ربط حالة المقروء/غير المقروء بعمود Calibre"
 
 #: cps/templates/config_view_edit.html
 msgid "Sync read/unread status with a Calibre boolean custom column."
-msgstr ""
-"مزامنة حالة القراءة (مقروء/غير مقروء) مع عمود مخصص منطقي في Calibre."
+msgstr "مزامنة حالة القراءة (مقروء/غير مقروء) مع عمود مخصص منطقي في Calibre."
 
 #: cps/templates/config_view_edit.html
 msgid "View Restrictions based on Calibre column"
@@ -16708,8 +16739,8 @@ msgid ""
 "Are you sure you want to reject all matches for this book? This cannot be "
 "undone."
 msgstr ""
-"هل أنت متأكد من رغبتك في رفض جميع التطابقات لهذا الكتاب؟ لا يمكن التراجع "
-"عن هذا الإجراء."
+"هل أنت متأكد من رغبتك في رفض جميع التطابقات لهذا الكتاب؟ لا يمكن التراجع عن "
+"هذا الإجراء."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✗ Reject All Matches"
@@ -16723,8 +16754,8 @@ msgstr "فشل رفض التطابق"
 msgid ""
 "Are you sure you want to reject all pending matches? This cannot be undone."
 msgstr ""
-"هل أنت متأكد من رغبتك في رفض جميع التطابقات المعلقة؟ لا يمكن التراجع عن "
-"هذا الإجراء."
+"هل أنت متأكد من رغبتك في رفض جميع التطابقات المعلقة؟ لا يمكن التراجع عن هذا "
+"الإجراء."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✗ Reject All Pending"

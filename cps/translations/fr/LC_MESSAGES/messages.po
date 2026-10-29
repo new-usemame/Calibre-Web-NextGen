@@ -12174,14 +12174,25 @@ msgid "Merge into the kept copy"
 msgstr "Fusionner dans l’exemplaire gardé"
 
 #: cps/spa_strings.py
-msgid "Merge one copy into “{title}”? Formats it lacks are copied over, then that copy is deleted."
-msgstr "Fusionner un exemplaire dans « {title} » ? Les formats qui lui manquent sont copiés, puis cet exemplaire est supprimé."
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+"Fusionner un exemplaire dans « {title} » ? Les formats qui lui manquent sont "
+"copiés, puis cet exemplaire est supprimé."
 
 #: cps/spa_strings.py
-msgid "Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted."
-msgstr "Fusionner {n} exemplaires dans « {title} » ? Les formats qui lui manquent sont copiés, puis ces exemplaires sont supprimés."
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+"Fusionner {n} exemplaires dans « {title} » ? Les formats qui lui manquent "
+"sont copiés, puis ces exemplaires sont supprimés."
 
 #: cps/spa_strings.py
+#, python-brace-format
 msgid "Merged into “{title}”."
 msgstr "Fusionné dans « {title} »."
 
@@ -16097,15 +16108,15 @@ msgstr "Activer l'application Smart Metadata"
 msgid ""
 "When enabled, fetched metadata only fills in what a book is missing (for "
 "example an empty description, a missing series or cover) and adds new tags, "
-"but never replaces data the book already has. When disabled, fetched metadata"
-" will replace existing data as-is from the preferred provider."
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
 "Lorsque cette option est activée, les métadonnées récupérées complètent "
-"seulement ce qui manque au livre (par exemple une description vide, une série"
-" ou une couverture absente) et ajoutent les nouvelles étiquettes, sans jamais"
-" remplacer les données que le livre possède déjà. Lorsqu'elle est désactivée,"
-" les métadonnées récupérées remplacent telles quelles les données existantes "
-"à partir du fournisseur préféré."
+"seulement ce qui manque au livre (par exemple une description vide, une "
+"série ou une couverture absente) et ajoutent les nouvelles étiquettes, sans "
+"jamais remplacer les données que le livre possède déjà. Lorsqu'elle est "
+"désactivée, les métadonnées récupérées remplacent telles quelles les données "
+"existantes à partir du fournisseur préféré."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"

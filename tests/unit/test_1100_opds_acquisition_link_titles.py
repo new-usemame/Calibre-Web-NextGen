@@ -12,56 +12,22 @@ render the real ``feed.xml`` template and parse the resulting Atom.
 
 from __future__ import annotations
 
-import datetime
 import xml.etree.ElementTree as ET
-from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 pytestmark = pytest.mark.unit
 
-TEMPLATES = Path(__file__).resolve().parents[2] / "cps" / "templates"
 ATOM = "{http://www.w3.org/2005/Atom}"
 ACQ = "http://opds-spec.org/acquisition"
 
 
 @pytest.fixture()
 def render():
-    """Render feed.xml the way the app does: Flask's environment (autoescape
-    on for .xml) with the real ``cps.jinjia`` filters, including the real
-    ``mimetype`` mapping. Only the route-level helpers are stubbed."""
-    from flask import Flask, render_template
-    from flask_babel import Babel
-    from jinja2 import FileSystemLoader
-    from cps.jinjia import jinjia
+    """Render feed.xml for a book with the given formats (opds_feed_world)."""
+    from tests.unit.opds_feed_world import FeedRenderer
 
-    app = Flask(__name__)
-    Babel(app)
-    app.register_blueprint(jinjia)
-    app.jinja_loader = FileSystemLoader(str(TEMPLATES))
-    app.jinja_env.globals.update(
-        url_for=lambda endpoint, **kw: "/opds/download/{}/{}/".format(kw.get("book_id"), kw.get("book_format"))
-        if endpoint == "opds.opds_download_link" else "/x",
-        _is_real_pubdate=lambda d: False,
-        opds_paged_url=lambda o: "/x",
-        opds_search_url_path=lambda: "/x",
-    )
-
-    def _render(formats):
-        book = SimpleNamespace(
-            id=1, uuid="u-1", title="Life of Pi", atom_timestamp=datetime.datetime(2026, 10, 27).isoformat(),
-            authors=[], publishers=[], languages=[], tags=[], series=[], comments=[], has_cover=False,
-            data=[SimpleNamespace(format=f, uncompressed_size=100) for f in formats],
-        )
-        with app.test_request_context("/opds/new"):
-            xml = render_template(
-                "feed.xml", entries=[SimpleNamespace(Books=book)], current_time="2026-10-29T00:00:00+00:00",
-                pagination=None, instance="Test", feed_title="New", listelements=[],
-            )
-        return ET.fromstring(xml)
-
-    return _render
+    return FeedRenderer().entry_with_formats
 
 
 def _acquisition_links(root):

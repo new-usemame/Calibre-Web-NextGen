@@ -1481,6 +1481,20 @@ def update_inventory():
                 "device_identity_unavailable",
             )
 
+        if not device.active:
+            # A removed (soft-deleted) device keeps its identity, so the reader
+            # still resolves to it. Say so instead of failing later with a 500.
+            log.warning(
+                "Inventory report refused: device %s of user %s was removed; "
+                "restore it under Account > Devices to resume reporting",
+                device.public_id, user.id,
+            )
+            return _inventory_error(
+                "This device was removed from the account; restore it to resume reporting",
+                409,
+                "device_inactive",
+            )
+
         if has_free:
             device_capabilities.record_storage(
                 session=ub.session, user_id=user.id, device_id=device.id,
@@ -1533,6 +1547,9 @@ def update_inventory():
             "report_id": report.id,
             "device": device.public_id,
         })
+    except device_capabilities.CapabilityValidationError as error:
+        ub.session.rollback()
+        return _inventory_error(str(error), 409, "device_unavailable")
     except SQLAlchemyError:
         ub.session.rollback()
         log.error("Device inventory could not be stored", exc_info=True)

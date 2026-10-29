@@ -56,6 +56,33 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.58',
+    date: '2026-10-29',
+    items: [
+      {
+        title: 'Merge duplicate copies from the new Duplicates page',
+        body: 'The new Duplicates page could only dismiss a group. Now you pick the copy to keep, untick anything that is not really a duplicate, and merge the rest into it: formats the kept copy lacks are copied over and the other copies are deleted, after you confirm.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Star ratings from your Kobo become your own rating',
+        body: 'Rating a book on your Kobo used to go only to the Kobo Store, so it never reached your library. The stars you give on the device are now saved as your personal rating here. It works one way: a rating you set in the browser is not sent to the Kobo.',
+        category: 'Sync',
+      },
+      {
+        title: 'Deleting books no longer stalls a large library',
+        body: 'Each delete used to rebuild the whole duplicate list, and a bulk delete did it once per book, which could leave the server unresponsive. A delete now refreshes only the duplicate groups the deleted books were in.',
+        category: 'Library',
+      },
+      {
+        title: 'The new reader counts a book as opened, like the classic reader',
+        body: 'Opening a book in the new reader now records the open: it counts one reading session, and on a browser that shares its place an unfinished book shows as Currently Reading straight away instead of after the first page turn.',
+        category: 'Reading',
+      },
+    ],
+  },
+  {
     version: 'v4.1.57',
     date: '2026-10-28',
     items: [

@@ -16,6 +16,20 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.58] - 2026-10-29
+
+### Added
+
+- **The new UI's Duplicates page can merge copies again.** The classic page let you select copies and merge them, and the new one could only dismiss a group. Each group now lets you choose the copy to keep (its metadata stays), untick any copy that is not really a duplicate, and merge the rest into it: formats the kept copy lacks are copied over, then the other copies are deleted. You are asked to confirm first, and the group leaves the list once the merge is done. Requested by @chaosblog (#2747).
+
+- **A star rating you give a book on your Kobo is now saved as your own rating in CWNG.** The Kobo was sending its ratings straight to the Kobo Store, so they never arrived. CWNG now receives them and stores them as that account's personal rating (the Kobo's 1 to 5 stars become the matching half-star score, and clearing the stars clears it), for the same books you could rate in the browser, and never for the shared Guest account. A rating for a Store book is passed on to the Store when the Kobo Store proxy is on; with the proxy off it is not kept, since there is nowhere to send it. This is one way, Kobo to CWNG: a rating set in CWNG is not sent back to the device. Reported by @eagene (#2248, #2637).
+
+### Fixed
+
+- **Deleting a book no longer stalls a large library.** Every whole-book delete rebuilt the entire duplicate list inside the request, and a bulk delete did that once per book, which could leave the server unresponsive until a restart. A delete now recomputes only the duplicate groups the deleted books belonged to, once per delete or once per bulk selection, and the Duplicates page still drops the deleted copies right away. Reported by @kanjieater (#2751).
+
+- **Opening a book in the new UI reader is recorded the way the classic reader records it.** The new reader saved your position but never told the server you had opened the book, so the reading-session count and last-opened time did not move, and a browser that shares its place (Devices, "Share my place") only showed the book as Currently Reading after the first saved page. Opening a book now does what the classic reader does: a book you have not finished is marked Currently Reading for a browser that shares its place, one reading session is counted, a refresh is not a new session, and a finished book stays finished. A browser that does not share its place still keeps its reading status to itself, as with the classic reader. Reported by @ubikq (#2750).
+
 ## [v4.1.57] - 2026-10-28
 
 ### Changed

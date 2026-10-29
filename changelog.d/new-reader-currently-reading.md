@@ -1,3 +1,0 @@
-### Fixed
-
-- **Opening a book in the new UI reader is recorded the way the classic reader records it.** The new reader saved your position but never told the server you had opened the book, so the reading-session count and last-opened time did not move, and a browser that shares its place (Devices, "Share my place") only showed the book as Currently Reading after the first saved page. Opening a book now does what the classic reader does: a book you have not finished is marked Currently Reading for a browser that shares its place, one reading session is counted, a refresh is not a new session, and a finished book stays finished. A browser that does not share its place still keeps its reading status to itself, as with the classic reader. Reported by @ubikq (#2750).

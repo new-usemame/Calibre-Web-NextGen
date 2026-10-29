@@ -1,3 +1,0 @@
-### Added
-
-- **A star rating you give a book on your Kobo is now saved as your own rating in CWNG.** The Kobo was sending its ratings straight to the Kobo Store, so they never arrived. CWNG now receives them and stores them as that account's personal rating (the Kobo's 1 to 5 stars become the matching half-star score, and clearing the stars clears it), for the same books you could rate in the browser, and never for the shared Guest account. A rating for a Store book is passed on to the Store when the Kobo Store proxy is on; with the proxy off it is not kept, since there is nowhere to send it. This is one way, Kobo to CWNG: a rating set in CWNG is not sent back to the device. Reported by @eagene (#2248, #2637).

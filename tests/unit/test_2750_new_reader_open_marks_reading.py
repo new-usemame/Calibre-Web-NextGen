@@ -14,7 +14,6 @@ import inspect
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import flask
 import pytest
 
 
@@ -25,6 +24,7 @@ def _share_place_switch_off(monkeypatch):
 
 
 def _open(row, *, visible=True):
+    from cps import web
     from cps.api import actions
 
     user = SimpleNamespace(is_authenticated=True, is_anonymous=False, id=4,
@@ -32,7 +32,7 @@ def _open(row, *, visible=True):
     session = MagicMock()
     session.query.return_value.filter.return_value.first.return_value = row
     result = (SimpleNamespace(), False, False) if visible else None
-    with flask.Flask(__name__).test_request_context(
+    with web.app.test_request_context(
         "/api/v1/books/23/reader-open", method="POST"
     ), patch.object(actions, "current_user", user), \
             patch.object(actions.user_library, "mark_response_user_specific"), \

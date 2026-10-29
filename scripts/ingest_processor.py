@@ -842,6 +842,23 @@ _ACSM_PLUGIN_RAN_GUIDANCE = (
 )
 
 
+# fork #1228: no import hook turned the ticket into a book and none announced
+# itself, so "install the plugin" may tell someone to place a zip they placed.
+# @sgreadly measured both causes on a real ADE setup.
+_ACSM_TICKET_RETURNED_GUIDANCE = (
+    "ACSM_NOTICE: '{filename}' is an Adobe ACSM fulfillment ticket, not an ebook, "
+    "and no Calibre import plugin turned it into a book. Check two things: "
+    "(1) the plugin is registered, not only copied: the container log should show "
+    "'Registered Calibre plugin' for it, and a zip added after the first batch "
+    "registered needs: docker exec -e HOME=/config <container> "
+    "/opt/calibre/calibre-customize -a \"/config/.config/calibre/plugins/<plugin file>.zip\". "
+    "(2) DeACSM has a completed Adobe activation: without one it hands the ticket "
+    "back unchanged. Create the activation in Calibre desktop and copy its files "
+    "into the container's plugins/DeACSM folder, then restart. Details: "
+    "docs/calibre-plugins.md. The original file has been moved to the failed "
+    "books folder (processed_books/failed)."
+)
+
 def _distinct_book_ids(book_ids):
     """The distinct integer ids in ``book_ids``, ascending.
 
@@ -1127,6 +1144,9 @@ def conversion_failure_guidance(input_format, filename, converter_output=None):
         if reason:
             return _ACSM_PLUGIN_RAN_GUIDANCE.format(
                 filename=filename, reason=reason)
+        from calibre_ticket_fulfillment import TICKET_RETURNED
+        if TICKET_RETURNED in (converter_output or ''):
+            return _ACSM_TICKET_RETURNED_GUIDANCE.format(filename=filename)
     return template.format(filename=filename)
 
 

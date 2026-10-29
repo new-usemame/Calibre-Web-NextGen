@@ -35,10 +35,18 @@ def _env(**overrides):
 
 
 def _run_child(tmp_path, env, parent_umask=SERVICE_DEFAULT_UMASK):
-    """Run `umask` through the wrapper as this (non-root) user; return (umask, stderr)."""
-    if os.geteuid() == 0:
-        pytest.skip("must run unprivileged to exercise the direct-exec branch")
+    """Run `umask` through the wrapper's direct-exec branch; return (umask, stdout, stderr).
+
+    `id` is stubbed to a non-root uid so this branch runs even when the suite
+    itself runs as root, and TMPDIR is per-test so the warn-once marker of one
+    case cannot hide another's warning.
+    """
+    stub_dir = tmp_path / "bin"
+    stub_dir.mkdir(exist_ok=True)
+    (stub_dir / "id").write_text("#!/bin/sh\necho 1000\n")
+    (stub_dir / "id").chmod(0o755)
     out = tmp_path / "umask"
+    env = dict(env, PATH=f"{stub_dir}:{os.environ['PATH']}", TMPDIR=str(tmp_path))
     result = subprocess.run(
         [str(HELPER), "/bin/sh", "-c", f"umask > {shlex.quote(str(out))}"],
         capture_output=True,
@@ -51,16 +59,12 @@ def _run_child(tmp_path, env, parent_umask=SERVICE_DEFAULT_UMASK):
         f"wrapper failed: rc={result.returncode} stderr={result.stderr!r}. "
         "Under set -e a failing umask here would crash-loop every service."
     )
-    return out.read_text().strip(), result.stderr
-
-
-def _umask_seen_by_child(tmp_path, env):
-    return _run_child(tmp_path, env)[0]
+    return out.read_text().strip(), result.stdout, result.stderr
 
 
 @pytest.mark.parametrize("value, expected", [("027", "0027"), ("000", "0000"), ("0002", "0002")])
 def test_child_gets_the_configured_umask(tmp_path, value, expected):
-    assert _umask_seen_by_child(tmp_path, _env(UMASK=value)) == expected, (
+    assert _run_child(tmp_path, _env(UMASK=value))[0] == expected, (
         f"UMASK={value} did not reach the service's child process. New library "
         "folders keep 755 whatever the user configured (#2670)."
     )
@@ -72,14 +76,24 @@ def test_unset_umask_keeps_the_inherited_one(tmp_path, env):
     assert _run_child(tmp_path, _env(**env), parent_umask=0o077)[0] == "0077"
 
 
-@pytest.mark.parametrize("bad", ["abc", "999", "0x27"])
+@pytest.mark.parametrize("bad", ["abc", "999", "0x27", "-S"])
 def test_invalid_umask_is_named_and_does_not_kill_the_service(tmp_path, bad):
-    seen, stderr = _run_child(tmp_path, _env(UMASK=bad))
+    seen, stdout, stderr = _run_child(tmp_path, _env(UMASK=bad))
     assert seen == "0022", "an invalid UMASK must leave the inherited umask in place"
+    assert stdout == "", (
+        "the wrapper must not write to the wrapped command's stdout; ingest "
+        f"captures it with $(cwa-as-abc ...). Got {stdout!r}"
+    )
     assert f"UMASK='{bad}'" in stderr, (
         "the service log must say why UMASK had no effect, or the user sees 755 "
         f"folders with no clue; stderr was {stderr!r}"
     )
+
+
+def test_invalid_umask_is_named_once_not_on_every_call(tmp_path):
+    """A large ingest calls the wrapper thousands of times; one line is enough."""
+    stderrs = [_run_child(tmp_path, _env(UMASK="0x27"))[2] for _ in range(3)]
+    assert sum("UMASK='0x27'" in e for e in stderrs) == 1, stderrs
 
 
 def test_umask_survives_the_privilege_drop(tmp_path):

@@ -14,6 +14,7 @@ import {
   Smartphone,
   Table2,
   Users,
+  Wand2,
 } from 'lucide-react';
 
 export interface ContextSidebarItem {
@@ -112,6 +113,13 @@ const ADMIN_CONTEXT: ContextSidebarDefinition = {
           href: '/admin/acquisition',
           label: 'Book sources',
           icon: Globe,
+          spa: true,
+        },
+        {
+          key: 'metadata-cleanup',
+          href: '/admin/metadata-cleanup',
+          label: 'Metadata clean-up',
+          icon: Wand2,
           spa: true,
         },
       ],

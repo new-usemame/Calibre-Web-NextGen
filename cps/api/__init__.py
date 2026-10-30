@@ -236,3 +236,4 @@ from . import acquisition  # noqa: E402,F401
 from . import discover_source  # noqa: E402,F401
 
 from . import device_sleep_screen  # noqa: E402,F401
+from . import value_maps  # noqa: E402,F401

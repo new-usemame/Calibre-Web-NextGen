@@ -856,6 +856,69 @@ class BookCoverLock(Base):
     locked_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class MetadataValueRule(Base):
+    """One rule of the admin-managed value map (#2438, Discussion #2481).
+
+    ``incoming`` is the value as the admin typed it; ``incoming_key`` is its
+    case- and accent-folded form, which is what incoming values are matched
+    on. ``targets`` is a JSON list: one entry renames, several split, none
+    drops the value. One stored map serves every list field it is used for;
+    ``field`` says which (``tags`` or ``publishers``).
+    """
+    __tablename__ = 'metadata_value_rule'
+    __table_args__ = (
+        UniqueConstraint('field', 'incoming_key', name='uq_metadata_value_rule_field_key'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    field = Column(String(32), nullable=False)
+    incoming = Column(String, nullable=False)
+    incoming_key = Column(String, nullable=False)
+    targets = Column(JSON, nullable=False, default=list)
+    updated_by = Column(Integer)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class MetadataChangeSet(Base):
+    """A reviewed batch of metadata changes: preview, apply, results, undo.
+
+    ``source`` is what proposed it: ``cleanup``, ``ingest``, ``auto_fetch``,
+    ``manual_fetch`` or ``batch``. ``status`` is ``proposed``, ``applied`` or
+    ``undone``. Rows live in ``metadata_change``.
+    """
+    __tablename__ = 'metadata_change_set'
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String(64), nullable=False)
+    created_by = Column(Integer)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    status = Column(String(16), nullable=False, default='proposed')
+    applied_at = Column(DateTime)
+
+
+class MetadataChange(Base):
+    """One book's change to one field inside a change set.
+
+    ``old_value``/``new_value`` are JSON (a list for list fields). ``status``
+    is ``proposed``, ``applied``, ``failed`` (``error`` says why), ``skipped``
+    (excluded or changed since the preview), ``undone``, ``rejected`` (the
+    allow list refused ``old_value`` at ingest or fetch; ``new_value`` null)
+    or ``dismissed``. Keyed by the
+    Calibre book id, like ``BookCoverLock``: metadata.db is never extended.
+    """
+    __tablename__ = 'metadata_change'
+    __table_args__ = (Index('ix_metadata_change_set', 'set_id'),)
+
+    id = Column(Integer, primary_key=True)
+    set_id = Column(Integer, ForeignKey('metadata_change_set.id', ondelete='CASCADE'), nullable=False)
+    book_id = Column(Integer, nullable=False)
+    field = Column(String(32), nullable=False)
+    old_value = Column(JSON)
+    new_value = Column(JSON)
+    status = Column(String(16), nullable=False, default='proposed')
+    error = Column(Text)
+
+
 class BookCoverPreview(Base):
     """Per-user-per-book override of the cover-preview fill style + color.
 
@@ -4075,6 +4138,15 @@ def migrate_book_cover_preview_table(engine, _session):
             print(f"[cover-preview-migration] Could not create idx_bcp_user_locked: {e}", flush=True)
 
 
+def migrate_metadata_value_rule_table(engine, _session):
+    """Create the value-map and change-set tables on upgraded app.db files."""
+    Base.metadata.create_all(
+        engine,
+        tables=[MetadataValueRule.__table__, MetadataChangeSet.__table__, MetadataChange.__table__],
+        checkfirst=True,
+    )
+
+
 def migrate_user_book_cover_table(engine, _session):
     """Create per-user cover metadata on upgraded app.db files."""
     Base.metadata.create_all(
@@ -5748,6 +5820,7 @@ def migrate_Database(_session):
     migrate_kepub_package_repair_disposition(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
     migrate_my_library_admin_intro_table(engine, _session)
+    migrate_metadata_value_rule_table(engine, _session)
 
     # Ensure progress syncing tables in app.db (user-related tables).
     # Schema invariant — must not be gated on KOReader sync being enabled.

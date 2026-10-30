@@ -63,7 +63,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         title: 'A removed KOReader device stops syncing, and you can bring it back',
         body: 'Removing a KOReader device used to leave it syncing your reading progress, and its storage reports failed with a server error. A removed device is now told it no longer syncs. To use it again, restore it from the Removed devices section, even after the Undo notice has gone.',
         category: 'Sync',
-        link: { to: '/account/devices', label: 'Open Devices' },
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
       },
       {
         title: 'Reading apps can tell EPUB and KEPUB downloads apart',

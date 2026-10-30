@@ -19372,6 +19372,14 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Verwijderde apparaten"
+
+#: cps/spa_strings.py
+msgid "Restore {name}"
+msgstr "{name} herstellen"
+
 #~ msgid "Progress is not being saved."
 #~ msgstr "Voortgang wordt niet opgeslagen."
 

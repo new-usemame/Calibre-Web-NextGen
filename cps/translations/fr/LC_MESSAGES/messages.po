@@ -19777,6 +19777,14 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Appareils supprimés"
+
+#: cps/spa_strings.py
+msgid "Restore {name}"
+msgstr "Restaurer {name}"
+
 #~ msgid "Progress is not being saved."
 #~ msgstr "La progression n’est pas enregistrée."
 

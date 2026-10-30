@@ -49,7 +49,7 @@ test('a removed device is listed apart and can be restored from the account page
   await expect(page.getByRole('link', { name: 'Libra Colour', exact: true })).toBeVisible();
 
   await removedRegion.getByRole('button', { name: 'Restore Clara BW' }).click();
-  expect(calls.restores()).toBe(1);
+  await expect.poll(calls.restores).toBe(1);
   await expect(page.getByRole('link', { name: 'Clara BW', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Removed devices' })).toHaveCount(0);
 

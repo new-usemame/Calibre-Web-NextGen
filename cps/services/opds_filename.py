@@ -33,8 +33,9 @@ _FIELDS = frozenset((
 ))
 _FIELD = re.compile(r'([a-z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
 _FORMAT = re.compile(r'(?:(.[<^>]|[<^>]))?([0-9]{1,3})?(?:\.([0-9]{1,3}))?s?\Z')
-_UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
-_UNSAFE_KEEP_COLON = re.compile(r'[\x00-\x1f\x7f-\x9f/\\*?"<>|]')
+_UNSAFE_CHARS = r'\x00-\x1f\x7f-\x9f/\\*?"<>|'
+_UNSAFE = re.compile('[' + _UNSAFE_CHARS + ':]')
+_UNSAFE_KEEP_COLON = re.compile('[' + _UNSAFE_CHARS + ']')
 _RESERVED = re.compile(r'(CON|CONIN\$|CONOUT\$|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³]) *(?:\.|$)', re.I)
 
 

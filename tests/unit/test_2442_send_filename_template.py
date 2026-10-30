@@ -200,10 +200,10 @@ def test_colon_in_title_survives_in_the_attachment_name(delivery):
 
 
 def test_attachment_name_still_drops_every_other_unsafe_character(delivery):
-    delivery.book.title = 'A/B: C*D?E\r\nF'
+    delivery.book.title = 'A/B: C*D?E\r\nF\\G"H<I>J|K'
     filename = next(send(delivery).prepare_message().iter_attachments()).get_filename()
     assert ': C' in filename
-    assert not any(char in filename for char in '/*?\r\n')
+    assert not any(char in filename for char in '/*?\r\n\\"<>|')
 
 
 def test_download_names_keep_replacing_the_colon(delivery):

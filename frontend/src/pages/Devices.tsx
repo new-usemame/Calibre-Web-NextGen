@@ -425,7 +425,7 @@ export function Devices() {
           )}
         </>
       )}
-      {removed.isError && <div className={styles.loadError}>
+      {removed.isError && !error && <div className={styles.loadError}>
         <p role="alert">{t('Could not load devices and browsers.')}</p>
         <button type="button" className={styles.primaryButton} onClick={() => void removed.refetch()}>{t('Try again')}</button>
       </div>}

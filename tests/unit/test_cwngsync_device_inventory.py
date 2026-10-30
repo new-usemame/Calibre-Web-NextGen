@@ -220,19 +220,23 @@ def test_oversized_inventory_is_rejected_without_a_500(inventory_protocol):
 
 
 @pytest.mark.unit
-def test_inventory_from_a_removed_device_is_refused_without_a_500(inventory_protocol):
+@pytest.mark.parametrize("storage", [
+    {"free_space": 1, "total_space": 2},
+    # Without storage fields main answered 200 and stored the report.
+    {},
+])
+def test_inventory_from_a_removed_device_is_refused_without_a_500(inventory_protocol, storage):
     client, session, _user = inventory_protocol
     assert _report(client, [], free_space=1, total_space=2).status_code == 200
     device = session.query(ub.Device).one()
     device.active = False
     session.commit()
 
-    response = _report(
-        client, [_entry("a.epub", EPUB_CHECKSUM)], free_space=1, total_space=2,
-    )
+    response = _report(client, [_entry("a.epub", EPUB_CHECKSUM)], **storage)
 
     assert response.status_code == 409
     assert response.get_json()["error"] == "device_inactive"
     # Only the report made before the removal exists; the refused one stored nothing.
     assert session.query(ub.DeviceStorageSnapshot).count() == 1
     assert session.query(ub.DeviceInventoryReport).count() == 1
+    assert session.query(ub.DeviceInventoryItem).count() == 0

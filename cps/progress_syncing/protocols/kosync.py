@@ -1549,7 +1549,7 @@ def update_inventory():
         })
     except device_capabilities.CapabilityValidationError as error:
         ub.session.rollback()
-        return _inventory_error(str(error), 409, "device_unavailable")
+        return _inventory_error(str(error), 409, "device_inactive")
     except SQLAlchemyError:
         ub.session.rollback()
         log.error("Device inventory could not be stored", exc_info=True)

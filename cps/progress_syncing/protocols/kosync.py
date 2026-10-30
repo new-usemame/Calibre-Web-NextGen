@@ -1489,6 +1489,7 @@ def update_inventory():
                 "from the account, so it no longer syncs",
                 device.public_id, user.id,
             )
+            ub.session.rollback()
             return _inventory_error(
                 "This device was removed from the account, so it no longer syncs",
                 409,

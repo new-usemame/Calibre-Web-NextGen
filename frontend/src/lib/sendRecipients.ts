@@ -1,9 +1,22 @@
 /* The send panel's recipient field is the one record of who receives a book
- * (#2296). An admin's "other users' eReaders" checkboxes edit that field rather
+ * (#2296). The saved-address checkboxes (#1763) and an admin's "other users' eReaders" checkboxes edit that field rather
  * than keeping a second list, so what the field shows is exactly what is sent. */
 
 function addresses(field: string): string[] {
   return field.split(',').map((part) => part.trim()).filter(Boolean);
+}
+
+/** The individual addresses in a comma-separated field, trimmed, blanks dropped,
+ *  and repeats (any case) listed once. The saved e-reader value is one of these
+ *  fields (#1763), so this is how it is split into one checkbox per address. */
+export function splitAddresses(field: string): string[] {
+  const seen = new Set<string>();
+  return addresses(field).filter((address) => {
+    const k = address.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 const key = (address: string) => address.toLowerCase();

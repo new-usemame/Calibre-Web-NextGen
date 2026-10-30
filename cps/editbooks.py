@@ -896,6 +896,7 @@ def delete_selected_books():
     if vals:
         for book_id in vals:
             delete_book_from_table(book_id, "", True, skip_cache_invalidation=True)
+        _refresh_duplicate_cache_after_delete(vals)
         _queue_duplicate_scan_after_change(vals)
         return json.dumps({'success': True})
     return ""
@@ -976,9 +977,45 @@ def merge_list_book():
                 # cursor provenance as ordinary metadata edits.
                 helper.mark_book_modified(to_book)
             calibre_db.session.commit()
+            _refresh_duplicate_cache_after_delete([to_book.id] + vals)
             _queue_duplicate_scan_after_change([to_book.id] + vals)
             return json.dumps({'success': True})
     return ""
+
+
+def _invalidate_duplicate_cache():
+    try:
+        from cps.cwa_db_loader import load_cwa_db
+
+        load_cwa_db().CWA_DB().invalidate_duplicate_cache()
+    except Exception as e:
+        log.error("Failed to invalidate duplicate cache after deletion: %s", str(e))
+
+
+def _refresh_duplicate_cache_after_delete(book_ids):
+    """Recompute only the duplicate groups the given books belonged to.
+
+    Rebuilding every group here loaded the whole library's duplicates inside
+    the request, once per deleted book, and blocked the worker on large
+    libraries (#2751). The incremental merge reads each book's group members
+    from its key rows before dropping the rows of books that no longer exist,
+    so a batch must call it once after all its deletes rather than delete key
+    rows book by book. If it fails, the cache is marked stale instead.
+    """
+    try:
+        from cps.duplicate_index import merge_affected_groups_into_cache
+        from cps.cwa_db_loader import load_cwa_db
+
+        merge_affected_groups_into_cache(
+            book_ids, load_cwa_db().CWA_DB().cwa_settings, preserve_pending=True
+        )
+    except Exception as e:
+        log.warning(
+            "Failed to refresh duplicate index/cache after deleting books %s: %s",
+            list(book_ids),
+            str(e),
+        )
+        _invalidate_duplicate_cache()
 
 
 def _queue_duplicate_scan_after_change(book_ids=None):
@@ -1879,48 +1916,13 @@ def delete_book_from_table(
                             ex,
                         )
 
-            refreshed_duplicate_cache = False
-            if not book_format:
-                try:
-                    from cps.duplicate_index import (
-                        _current_max_book_id,
-                        delete_book_keys,
-                        get_duplicate_groups_from_index,
-                    )
-                    from cps.cwa_db_loader import load_cwa_db
-
-                    CWA_DB = load_cwa_db().CWA_DB
-
-                    delete_book_keys([book_id])
-                    cwa_db = CWA_DB()
-                    duplicate_groups = get_duplicate_groups_from_index(
-                        cwa_db.cwa_settings, include_dismissed=True
-                    )
-                    cwa_db.update_duplicate_cache(
-                        duplicate_groups, len(duplicate_groups), _current_max_book_id()
-                    )
-                    refreshed_duplicate_cache = True
-                except Exception as e:
-                    log.warning(
-                        "Failed to refresh duplicate index/cache after deleting book %s: %s",
-                        book_id,
-                        str(e),
-                    )
-
-            # Skip cache invalidation when batching, or when the indexed refresh
-            # above already handled it; otherwise mark the cache as stale.
-            if not skip_cache_invalidation and not refreshed_duplicate_cache:
-                try:
-                    from cps.cwa_db_loader import load_cwa_db
-
-                    CWA_DB = load_cwa_db().CWA_DB
-                    cwa_db = CWA_DB()
-                    cwa_db.invalidate_duplicate_cache()
-                except Exception as e:
-                    log.error(
-                        "Failed to invalidate duplicate cache after deletion: %s",
-                        str(e),
-                    )
+            # A batching caller (bulk delete, merge) refreshes the duplicate
+            # cache once for its whole selection, so it skips this per-book work.
+            if not skip_cache_invalidation:
+                if book_format:
+                    _invalidate_duplicate_cache()
+                else:
+                    _refresh_duplicate_cache_after_delete([book_id])
 
         except Exception as ex:
             log.error_or_exception(ex)

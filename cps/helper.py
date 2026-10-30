@@ -616,6 +616,9 @@ def get_send_filename(book, book_format):
             template, book, calibre_db.session,
             unicode_filename=bool(config.config_unicode_filename),
             ordered_authors=calibre_db.order_authors([book]), sort_names=False,
+            # An emailed attachment name never lands on our disk, so a colon
+            # in the title can arrive intact (#2650).
+            keep_colon=True,
         )
         return basename + "." + book_format.lower()
     except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):

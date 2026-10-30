@@ -2575,7 +2575,7 @@ msgstr "已将丛书“%(name)s”的 %(count)d 本书添加到书架“%(sname)
 #: cps/shelf.py
 #, python-format
 msgid "Book has been removed from shelf: %(sname)s"
-msgstr "此书已从书架 %(sname)s 中删除"
+msgstr "此书已从书架 %(sname)s 中移除"
 
 #: cps/shelf.py
 msgid "Sorry you are not allowed to remove a book from this shelf"
@@ -6044,7 +6044,7 @@ msgstr "无法保存阅读器设置。"
 
 #: cps/spa_strings.py
 msgid "Could not save that highlight."
-msgstr ""
+msgstr "无法保存该高亮。"
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
@@ -8464,6 +8464,10 @@ msgstr "移除这些项目"
 msgid "Remove {name}?"
 msgstr "移除 {name}？"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "已从“正在阅读”中移除。"
@@ -8540,7 +8544,7 @@ msgstr "请求 {format}"
 
 #: cps/spa_strings.py
 msgid "Requested by a removed account"
-msgstr "请求者账户已删除"
+msgstr "请求者账户已移除"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8582,6 +8586,11 @@ msgstr "恢复默认设置"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "恢复"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11479,26 +11488,61 @@ msgstr "移除此图片吗？下次同步后将恢复您之前的 KOReader 休�
 
 #: cps/spa_strings.py
 msgid "Image fit"
-msgstr ""
+msgstr "图像适配"
 
 #: cps/spa_strings.py
 msgid "Automatic"
-msgstr ""
+msgstr "自动"
 
 #: cps/spa_strings.py
 msgid "Fill the screen"
-msgstr ""
+msgstr "填满屏幕"
 
 #: cps/spa_strings.py
 msgid "Show the whole image"
-msgstr ""
+msgstr "显示完整图像"
 
 #: cps/spa_strings.py
 msgid "Automatic fills the screen when only a thin edge would be cut off."
-msgstr ""
+msgstr "只会裁掉细边时，自动模式将填满屏幕。"
 
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
+msgstr "无法更改图像适配。请重试。"
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -15317,6 +15361,9 @@ msgid ""
 "but never replaces data the book already has. When disabled, fetched "
 "metadata will replace existing data as-is from the preferred provider."
 msgstr ""
+"启用时，抓取的元数据只补全书籍缺失的内容（如空描述、缺失的丛书或封面）并添加"
+"新标签，绝不替换书籍已有的数据。禁用时，抓取的元数据将按首选提供商的原样替换"
+"现有数据。"
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"

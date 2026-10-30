@@ -56,6 +56,71 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.59',
+    date: '2026-10-30',
+    items: [
+      {
+        title: 'A removed KOReader device stops syncing, and you can bring it back',
+        body: 'Removing a KOReader device used to leave it syncing your reading progress, and its storage reports failed with a server error. A removed device is now told it no longer syncs. To use it again, restore it from the Removed devices section, even after the Undo notice has gone.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Reading apps can tell EPUB and KEPUB downloads apart',
+        body: 'A book with both formats showed two download links in apps like KOReader, and both read "epub". Each link in the catalog now names its format, so you can pick the one you want.',
+        category: 'Sync',
+      },
+      {
+        title: 'An Adobe .acsm ticket that did not import says what to check',
+        body: 'When no plugin turned an .acsm ticket into a book, the ingest log told you to add a plugin you had already added. It now names the two usual causes: a plugin zip that was copied but never registered, and DeACSM without a finished Adobe activation.',
+        category: 'Admin',
+      },
+      {
+        title: 'UMASK now covers imported books',
+        body: 'Setting UMASK only changed files the web app wrote, so books added by ingest still got open folder permissions. It now applies to ingest and the other background services too, and an invalid value is named in the service log.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.58',
+    date: '2026-10-29',
+    items: [
+      {
+        title: 'Merge duplicate copies from the new Duplicates page',
+        body: 'The new Duplicates page could only dismiss a group. Now you pick the copy to keep, untick anything that is not really a duplicate, and merge the rest into it: formats the kept copy lacks are copied over and the other copies are deleted, after you confirm.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Star ratings from your Kobo become your own rating',
+        body: 'Rating a book on your Kobo used to go only to the Kobo Store, so it never reached your library. The stars you give on the device are now saved as your personal rating here. It works one way: a rating you set in the browser is not sent to the Kobo.',
+        category: 'Sync',
+      },
+      {
+        title: 'Deleting books no longer stalls a large library',
+        body: 'Each delete used to rebuild the whole duplicate list, and a bulk delete did it once per book, which could leave the server unresponsive. A delete now refreshes only the duplicate groups the deleted books were in.',
+        category: 'Library',
+      },
+      {
+        title: 'The new reader counts a book as opened, like the classic reader',
+        body: 'Opening a book in the new reader now records the open: it counts one reading session, and on a browser that shares its place an unfinished book shows as Currently Reading straight away instead of after the first page turn.',
+        category: 'Reading',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.57',
+    date: '2026-10-28',
+    items: [
+      {
+        title: 'KOReader: a book you reset or deleted leaves the Reading tab',
+        body: 'Opening a book once in KOReader kept it in the Reading tab for good, because KOReader still listed it in its history after Reset or Delete. A book with no progress left on the device now follows the server, so it drops out of Reading when the server has it as unread.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.56',
     date: '2026-10-27',
     items: [

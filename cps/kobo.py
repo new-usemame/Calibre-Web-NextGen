@@ -39,7 +39,7 @@ from .cw_login import current_user
 from werkzeug.datastructures import Headers
 from sqlalchemy import String, case, cast, func, literal
 from sqlalchemy.sql.expression import and_, or_
-from sqlalchemy.exc import OperationalError, StatementError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, StatementError
 from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.sql import select
 import requests
@@ -58,6 +58,8 @@ from .services import kobo_place_gate
 from .fs import FileSystem
 from .web import download_required
 from .kobo_auth import requires_kobo_auth, get_auth_token
+from .personal_ratings import may_rate, set_personal_rating
+from .sort_orders import viewer_id
 
 KOBO_FORMATS = {"KEPUB": ["KEPUB"], "EPUB": ["EPUB3", "EPUB"]}
 KOBO_STOREAPI_URL = "https://storeapi.kobo.com"
@@ -5610,6 +5612,74 @@ def HandleBookDeletionRequest(book_uuid):
     return "", 204
 
 
+def _rating_resource_url(calibre_web_url=""):
+    """The `rating` init resource: CWNG's route with Kobo's placeholders kept literal."""
+    return calibre_web_url + unquote(url_for(
+        "kobo.HandleRatingRequest", auth_token=kobo_auth.get_auth_token(),
+        book_uuid="{ProductId}", rating="{Rating}", _external=not calibre_web_url))
+
+
+def _rating_for_a_book_cwng_does_not_serve(book_uuid):
+    # Only the Store can take this rating, and only through the proxy. With the
+    # proxy off there is nowhere to send it; answer 200 anyway, because a 404 on
+    # a device write makes the Kobo resend it every sync (see HandleTagUpdate).
+    if not config.config_kobo_proxy:
+        log.info("Kobo rating for %s: not a book CWNG serves and the Store proxy is off, so it is not kept",
+                 book_uuid)
+        return redirect_or_proxy_request()
+    try:
+        return redirect_or_proxy_request()
+    except requests.exceptions.Timeout:
+        log.warning("Kobo rating for %s: the Kobo Store timed out", book_uuid)
+        return make_response("", 504)
+    except requests.exceptions.RequestException:
+        log.warning("Kobo rating for %s: the Kobo Store could not be reached", book_uuid, exc_info=True)
+        return make_response("", 502)
+
+
+@csrf.exempt
+@kobo.route("/v1/products/<book_uuid>/rating/<rating>", methods=["POST", "PUT"])
+@requires_kobo_auth
+def HandleRatingRequest(book_uuid, rating):
+    # The device posts a star rating (1 to 5, 0 to clear) with the rating in the
+    # URL and an empty JSON body; it used to go straight to the Kobo Store
+    # because the init resources kept the Store's URL for it. A book this reader
+    # may see is recorded as their personal rating (0 to 10, so stars * 2), as
+    # PUT /api/v1/books/<id>/rating does; anything else is a Store book.
+    # The lookup ignores policy so a library book is never mistaken for a Store
+    # book and sent to Kobo; whether this reader may rate it is may_rate's call.
+    book = calibre_db.get_book_by_uuid_for_kobo(book_uuid, enforce_policy=False)
+    if not book:
+        return _rating_for_a_book_cwng_does_not_serve(book_uuid)
+    reader_id = viewer_id(current_user)
+    if reader_id is None:
+        # The Guest account is one shared row, so it has no personal rating.
+        log.info("Kobo rating for book %s: refused for the Guest account", book.id)
+        return make_response("", 403)
+    if not may_rate(book.id, current_user):
+        # Synced before policy hid it. Settle the device's write without keeping it.
+        log.info("Kobo rating for book %s: not kept, the book is no longer visible to this account", book.id)
+        return make_response("", 200, {"Content-Type": "application/json"})
+    try:
+        stars = int(rating)
+    except ValueError:
+        stars = -1
+    if not 0 <= stars <= 5:
+        log.info("Kobo rating for book %s: ignoring unusable rating %r", book.id, rating)
+        return make_response("", 400)
+    try:
+        set_personal_rating(ub.session, reader_id, book.id, stars * 2)
+        saved = ub.session_commit() is not False
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.exception("Kobo rating for book %s could not be saved", book.id)
+        saved = False
+    if not saved:
+        return abort(503)
+    # The Store answers a rating it accepts with 200 and no body.
+    return make_response("", 200, {"Content-Type": "application/json"})
+
+
 # TODO: Implement the following routes
 @csrf.exempt
 @kobo.route("/v1/library/<dummy>", methods=["DELETE", "GET", "POST"])
@@ -5855,6 +5925,7 @@ def HandleInitRequest():
             kobo_resources["reading_services_host"] = calibre_web_url
         kobo_resources["library_sync"] = calibre_web_url + url_for("kobo.HandleSyncRequest",
                                                                     auth_token=kobo_auth.get_auth_token())
+        kobo_resources["rating"] = _rating_resource_url(calibre_web_url)
     else:
         kobo_resources["image_host"] = url_for("web.index", _external=True).strip("/")
         kobo_resources["image_url_quality_template"] = unquote(url_for("kobo.HandleCoverImageRequest",
@@ -5881,6 +5952,7 @@ def HandleInitRequest():
         kobo_resources["library_sync"] = url_for("kobo.HandleSyncRequest",
                                                   auth_token=kobo_auth.get_auth_token(),
                                                   _external=True)
+        kobo_resources["rating"] = _rating_resource_url()
 
     # When not proxying Kobo Store requests, point oauth_host to CWA and
     # serve dummy OAuth responses for unregistered devices.

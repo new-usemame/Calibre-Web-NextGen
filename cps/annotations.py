@@ -777,7 +777,7 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
     return rows
 
 
-def list_annotation_devices(*, user_id, session, active_only=False,
+def list_annotation_devices(*, user_id, session, active_only=False, inactive_only=False,
                             limit=DEFAULT_DEVICE_LIST_LIMIT, offset=0,
                             return_total=False):
     """List one bounded page with SQL-aggregated, owner-filtered counts."""
@@ -786,6 +786,8 @@ def list_annotation_devices(*, user_id, session, active_only=False,
     )
     if active_only:
         query = query.filter(ub.Device.active.is_(True))
+    elif inactive_only:
+        query = query.filter(ub.Device.active.is_(False))
     total = query.count()
     devices = query.order_by(ub.Device.display_name, ub.Device.id).offset(
         offset,
@@ -966,7 +968,7 @@ def restore_annotation_device(public_id, *, user_id, session, commit):
 @annotations_bp.route("/api/annotations/devices", methods=["GET"])
 @user_login_required
 def annotation_devices_list():
-    active_only = request.args.get("active", "").lower() == "true"
+    active_filter = request.args.get("active", "").lower()
     try:
         pagination, error_response, error_status = _offset_pagination(
             default_limit=DEFAULT_DEVICE_LIST_LIMIT,
@@ -983,7 +985,8 @@ def annotation_devices_list():
             # gates read it; until then a list stays read-only.
             ensure_webreader_device_best_effort(user_id=current_user.id)
         devices, total = list_annotation_devices(
-            user_id=current_user.id, session=ub.session, active_only=active_only,
+            user_id=current_user.id, session=ub.session,
+            active_only=active_filter == "true", inactive_only=active_filter == "false",
             limit=limit, offset=offset, return_total=True,
         )
     except FilteredBookVisibilityUnavailable as error:

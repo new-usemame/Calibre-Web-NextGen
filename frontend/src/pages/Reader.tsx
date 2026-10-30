@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
-  useReadingSources, useSaveBookmark, useSaveReaderSettings, useReaderFonts, type ReadingSource,
+  useReadingSources, useRecordReaderOpen, useSaveBookmark, useSaveReaderSettings, useReaderFonts, type ReadingSource,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
 import { Button } from '../components/Button';
@@ -331,6 +331,13 @@ export function Reader({ id }: { id: string }) {
   const { data: settingsData, isFetched: isSettingsFetched } = useReaderSettings();
   const { data: fontCatalog, isFetched: isFontsFetched, error: fontsError } = useReaderFonts();
   const saveBookmark = useSaveBookmark(id);
+  // #2750: one open per book, outside lookup mode, so reading here puts the
+  // book on Currently Reading like the classic reader. A guest's 401 is ignored.
+  const { mutate: recordReaderOpen } = useRecordReaderOpen(id);
+  const bookLoaded = Boolean(book);
+  useEffect(() => {
+    if (bookLoaded && !lookupMode) recordReaderOpen();
+  }, [id, bookLoaded, lookupMode, recordReaderOpen]);
   const saveSettings = useSaveReaderSettings();
   const readingSources = useReadingSources(id, placesOpen);
 

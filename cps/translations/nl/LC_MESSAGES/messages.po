@@ -8762,6 +8762,10 @@ msgstr "Deze verwijderen"
 msgid "Remove {name}?"
 msgstr "{name} verwijderen?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Verwijderde apparaten"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Verwijderd uit Momenteel aan het lezen."
@@ -8883,6 +8887,11 @@ msgstr "Standaardwaarden herstellen"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Herstellen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr "{name} herstellen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11973,6 +11982,45 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
 msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "Dit exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "Dit exemplaar samenvoegen"
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "Samenvoegen in het behouden exemplaar"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+"Eén exemplaar samenvoegen in ‘{title}’? Formaten die het mist worden "
+"gekopieerd, daarna wordt dat exemplaar verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+"{n} exemplaren samenvoegen in ‘{title}’? Formaten die het mist worden "
+"gekopieerd, daarna worden die exemplaren verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr "Samengevoegd in ‘{title}’."
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "Kan deze boeken niet samenvoegen."
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -15801,14 +15849,14 @@ msgstr ""
 msgid ""
 "When enabled, fetched metadata only fills in what a book is missing (for "
 "example an empty description, a missing series or cover) and adds new tags, "
-"but never replaces data the book already has. When disabled, fetched metadata"
-" will replace existing data as-is from the preferred provider."
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
 "Als dit is ingeschakeld, vult opgehaalde metadata alleen aan wat een boek "
-"mist (bijvoorbeeld een lege beschrijving, of een ontbrekende reeks of omslag)"
-" en voegt nieuwe labels toe, maar vervangt nooit gegevens die het boek al "
-"heeft. Als dit is uitgeschakeld, vervangt opgehaalde metadata de bestaande "
-"gegevens ongewijzigd vanuit de voorkeursbron."
+"mist (bijvoorbeeld een lege beschrijving, of een ontbrekende reeks of "
+"omslag) en voegt nieuwe labels toe, maar vervangt nooit gegevens die het "
+"boek al heeft. Als dit is uitgeschakeld, vervangt opgehaalde metadata de "
+"bestaande gegevens ongewijzigd vanuit de voorkeursbron."
 
 #: cps/templates/cwa_settings.html
 #, fuzzy

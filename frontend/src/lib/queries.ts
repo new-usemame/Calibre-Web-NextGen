@@ -705,6 +705,21 @@ export function useStopReading(id: string | number) {
   });
 }
 
+/** Record a new-UI reader open, as the classic /read route does (#2750): the
+ *  server moves the book onto Currently Reading (a finished book stays
+ *  finished) and counts a session only on that transition. */
+export function useRecordReaderOpen(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean }>(`/api/v1/books/${id}/reader-open`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
 /** Star/unstar a book for the current user. Server is presence-based; we just
  *  refetch the detail so the star reflects the new state. */
 export function useToggleFavorite(id: string | number) {
@@ -1274,7 +1289,12 @@ export function useMergeBooks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => apiPost('/ajax/mergebooks', { Merge_books: ids }),
-    onSuccess: () => invalidateBookVisibilityViews(qc),
+    onSuccess: () => {
+      invalidateBookVisibilityViews(qc);
+      // The merged-away copies are deleted, so their duplicate group shrinks or
+      // goes; the list reads live book rows and is right on the next fetch.
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+    },
   });
 }
 

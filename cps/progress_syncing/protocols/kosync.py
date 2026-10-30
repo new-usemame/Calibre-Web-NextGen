@@ -1481,6 +1481,21 @@ def update_inventory():
                 "device_identity_unavailable",
             )
 
+        if not device.active:
+            # A removed (soft-deleted) device keeps its identity, so the reader
+            # still resolves to it. Say so instead of failing later with a 500.
+            log.warning(
+                "Inventory report refused: device %s of user %s was removed "
+                "from the account, so it no longer syncs",
+                device.public_id, user.id,
+            )
+            ub.session.rollback()
+            return _inventory_error(
+                "This device was removed from the account, so it no longer syncs",
+                409,
+                "device_inactive",
+            )
+
         if has_free:
             device_capabilities.record_storage(
                 session=ub.session, user_id=user.id, device_id=device.id,
@@ -1533,6 +1548,9 @@ def update_inventory():
             "report_id": report.id,
             "device": device.public_id,
         })
+    except device_capabilities.CapabilityValidationError as error:
+        ub.session.rollback()
+        return _inventory_error(str(error), 409, "device_inactive")
     except SQLAlchemyError:
         ub.session.rollback()
         log.error("Device inventory could not be stored", exc_info=True)
@@ -2291,6 +2309,7 @@ def update_progress():
         200: Success with document and timestamp
         400: Validation error
         401: Unauthorized
+        409: Device was removed from the account
         500: Internal error
 
     Response format:
@@ -2390,6 +2409,22 @@ def update_progress():
         except (ValueError, TypeError) as e:
             raise KOSyncError(ERROR_INVALID_FIELDS, f"Invalid percentage value: {e}")
 
+        # Resolve the reader before book matching or any progress/journal writes.
+        # A removed identity stays removed until the account owner restores it.
+        from ...services import kosync_place
+        target, identified, raw_id = kosync_place.request_device(user.id, data, observe=True)
+        if target is not None and not target.active:
+            log.warning(
+                "Progress report refused: device %s of user %s was removed "
+                "from the account, so it no longer syncs",
+                target.public_id, user.id,
+            )
+            ub.session.rollback()
+            return jsonify({
+                "error": "device_inactive",
+                "message": "This device was removed from the account, so it no longer syncs",
+            }), 409
+
         timestamp = datetime.now(timezone.utc)
         received_at = timestamp
         reported_document = document
@@ -2433,8 +2468,6 @@ def update_progress():
                         placed_percent = max(placed_percent, percentage_float)
                     percentage_float = placed_percent
 
-        from ...services import kosync_place
-        target, identified, raw_id = kosync_place.request_device(user.id, data, observe=True)
         internal_device_id = target.id if target is not None else None
         # Unmatched documents cannot have a book journal. They and failed or
         # capped registrations retain the legacy shared path.

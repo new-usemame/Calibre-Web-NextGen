@@ -684,7 +684,7 @@ class DNB(Metadata):
             try:
                 if re.search(pattern, series, flags=re.IGNORECASE):
                     return None
-            except:
+            except re.error:
                 pass
 
         return series

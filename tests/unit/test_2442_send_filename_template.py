@@ -9,6 +9,7 @@ from flask import Flask
 from flask_babel import Babel
 
 from cps import helper, db
+from cps.services import opds_filename
 from cps.tasks import mail
 from cps.api import admin as api_admin
 
@@ -189,3 +190,26 @@ def test_valid_template_with_bad_number_leaves_all_mail_settings_unchanged(monke
         response,status=inspect.unwrap(api_admin.admin_update_mail)()
     assert status==400 and vars(config)==before
     config.save.assert_not_called()
+
+
+def test_colon_in_title_survives_in_the_attachment_name(delivery):
+    delivery.book.title = 'Dune: Messiah'
+    part = next(send(delivery).prepare_message().iter_attachments())
+    assert part.get_filename() == 'The Saga #2.5 - Dune: Messiah.epub'
+    assert part.get_payload(decode=True) == delivery.payload
+
+
+def test_attachment_name_still_drops_every_other_unsafe_character(delivery):
+    delivery.book.title = 'A/B: C*D?E\r\nF'
+    filename = next(send(delivery).prepare_message().iter_attachments()).get_filename()
+    assert ': C' in filename
+    assert not any(char in filename for char in '/*?\r\n')
+
+
+def test_download_names_keep_replacing_the_colon(delivery):
+    book = delivery.book
+    book.title = 'Dune: Messiah'
+    render = lambda **kw: opds_filename.render_filename(
+        '{title}', book, None, ordered_authors=book.authors, sort_names=False, **kw)
+    assert render() == 'Dune_ Messiah'
+    assert render(keep_colon=True) == 'Dune: Messiah'

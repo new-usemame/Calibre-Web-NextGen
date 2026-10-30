@@ -59,10 +59,9 @@ def open_ingest_repository(app_db_path):
 
 def drain_acquisition_jobs():
     """Existing APScheduler callback; one claim and bounded transfer per run."""
-    from ... import ub, logger
-    from ...cwa_functions import get_ingest_dir
-    from ...api.acquisition import worker_available
+    from ... import constants, ub, logger
     from . import admission
+    from .availability import worker_available
     from .worker import AcquisitionWorker
     if not ub.app_DB_path or not admission.instance_enabled(ub.app_DB_path):
         return
@@ -71,7 +70,7 @@ def drain_acquisition_jobs():
             return
         with open_repository(ub.app_DB_path) as repository:
             worker = AcquisitionWorker(repository,
-                Path(ub.app_DB_path).parent / 'acquisition-staging', get_ingest_dir(),
+                Path(ub.app_DB_path).parent / 'acquisition-staging', constants.ingest_folder(),
                 allowed=lambda owner: admission.account_allowed(repository.engine, owner),
                 execution_allowed=lambda job: admission.job_allowed(repository.engine, job.id, job.owner_id),
                 media_allowed=lambda media: admission.format_allowed(repository.engine, media),

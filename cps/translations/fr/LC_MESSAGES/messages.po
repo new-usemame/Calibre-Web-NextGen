@@ -7036,6 +7036,42 @@ msgstr "Serveur e-mail"
 msgid "Email settings saved."
 msgstr "Paramètres de messagerie enregistrés."
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr "Le courrier est configuré et prêt à l'envoi."
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr "Le courrier n'est pas encore configuré. Saisissez un serveur SMTP et enregistrez."
+
+#: cps/spa_strings.py
+msgid "Gmail (OAuth) is selected but not authorised, so mail is switched off. Use standard SMTP below, or authorise Gmail in the classic settings."
+msgstr "Gmail (OAuth) est sélectionné mais n'est pas autorisé, donc le courrier est désactivé. Utilisez le SMTP standard ci-dessous, ou autorisez Gmail dans les paramètres classiques."
+
+#: cps/spa_strings.py
+msgid "Mail currently sends through Gmail (OAuth), which is set up in the classic settings. The SMTP settings below are not used."
+msgstr "Le courrier passe actuellement par Gmail (OAuth), configuré dans les paramètres classiques. Les paramètres SMTP ci-dessous ne sont pas utilisés."
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr "Utiliser plutôt le SMTP standard"
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr "Le SMTP standard sera utilisé une fois enregistré."
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr "Enregistrer et envoyer un e-mail de test"
+
+#: cps/spa_strings.py
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr "E-mail de test mis en file d'attente pour {email}. Consultez les tâches pour le résultat."
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr "Impossible d'envoyer l'e-mail de test."
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "Vide"

@@ -990,6 +990,19 @@ export interface MailConfig {
   mail_filename_template: string;
   mail_server_type: number;
   has_password: boolean;
+  /** Whether the saved settings are enough for the app to send mail (#2771). */
+  mail_configured: boolean;
+  /** Whether Gmail OAuth (classic page only) has been authorised. */
+  gmail_authorised: boolean;
+}
+
+export interface MailTestResult { ok: boolean; email: string; message: string }
+
+/** Queue a test email to the signed-in admin's own address (#2771). */
+export function useSendTestMail() {
+  return useMutation({
+    mutationFn: () => apiPost<MailTestResult>('/api/v1/admin/mailsettings/test', {}),
+  });
 }
 
 export function useMailConfig() {

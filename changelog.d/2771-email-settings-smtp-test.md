@@ -1,0 +1,3 @@
+### Fixed
+
+- **The new UI's email settings now say whether mail is working, can switch from Gmail OAuth to standard SMTP, and can send a test email.** A server left on the Gmail (OAuth) type with no token ignored every SMTP field saved in the new UI, so mail stayed off and "Send to e-reader" silently never appeared. The form now shows whether mail is configured, offers "Use standard SMTP instead" when Gmail OAuth is selected, and has a "Save and send test email" button that queues a test to your own address, like the classic page. A working Gmail OAuth setup is not switched unless you choose it (#2771).

@@ -226,7 +226,8 @@ export function Devices() {
   };
 
   const devices = data?.devices ?? [];
-  const removedDevices = (removed.data?.devices ?? []).filter(device => device.type !== 'webreader');
+  // Browser rows come back by themselves; an active row never belongs here.
+  const removedDevices = (removed.data?.devices ?? []).filter(device => !device.active && device.type !== 'webreader');
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE));
   const currentPage = Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1;
   return (
@@ -447,6 +448,7 @@ export function Devices() {
               </div>
               <p role="alert" className={styles.renameError}>
                 {restore.isError && restore.variables?.public_id === device.public_id
+                  && undoDevice?.public_id !== device.public_id
                   ? t('Could not restore this source. Try again.') : ''}
               </p>
             </li>
@@ -458,7 +460,7 @@ export function Devices() {
       {undoDevice && <div className={styles.toast}>
         <span>{t('{name} removed.', { name: displayName(undoDevice) })}</span>
         <button ref={undoRef} type="button" disabled={restore.isPending || remove.isPending || preflightPending} onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>
-        <span role="alert" className={styles.undoError}>{restore.isError ? t('Could not restore this source. Try again.') : ''}</span>
+        <span role="alert" className={styles.undoError}>{restore.isError && restore.variables?.public_id === undoDevice.public_id ? t('Could not restore this source. Try again.') : ''}</span>
       </div>}
       {removing && <RemoveDialog device={removing.device} name={displayName(removing.device)} counts={removing.counts}
         onCancel={cancelRemoval} pending={remove.isPending} error={remove.isError}

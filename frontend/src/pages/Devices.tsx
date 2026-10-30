@@ -237,7 +237,7 @@ export function Devices() {
       {isLoading || staleDevicePage ? <SpinnerCentered size={40} /> : error ? (
         <div className={styles.loadError}>
           <p role="alert">{t('Could not load devices and browsers.')}</p>
-          <button type="button" className={styles.primaryButton} onClick={() => void refetch()}>{t('Try again')}</button>
+          <button type="button" className={styles.primaryButton} onClick={() => { void refetch(); if (removed.isError) void removed.refetch(); }}>{t('Try again')}</button>
         </div>
       ) : devices.length === 0 ? (
         <section className={styles.empty}>

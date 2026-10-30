@@ -7,47 +7,21 @@ honours that (#2768, 409 device_inactive); progress sync kept accepting and
 storing the removed reader's position. Restoring the device resumes sync.
 """
 
-from types import SimpleNamespace
-
 import pytest
-from flask import Flask
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from cps import ub
-from cps.progress_syncing.models import AppBase, KOSyncProgress
-
-DOCUMENT = "11111111111111111111111111111111"
+from cps.progress_syncing.models import KOSyncProgress
+from tests.unit.test_share_place_kosync_gates import (
+    DIGEST as DOCUMENT, _headers,
+    world,  # noqa: F401 - the shared real HTTP/SQLite fixture
+)
 
 
 @pytest.fixture
-def progress_protocol(tmp_path, monkeypatch):
-    import sys
-    import cps.progress_syncing.protocols.kosync  # noqa: F401
-    module = sys.modules["cps.progress_syncing.protocols.kosync"]
-
-    engine = create_engine(f"sqlite:///{tmp_path / 'progress.db'}")
-    ub.Base.metadata.create_all(engine)
-    AppBase.metadata.create_all(engine)
-    session = sessionmaker(bind=engine)()
-
-    monkeypatch.setattr(ub, "session", session)
-    monkeypatch.setattr(module, "ub", ub)
-    monkeypatch.setattr(module, "is_koreader_sync_enabled", lambda: True)
-    monkeypatch.setattr(module, "authenticate_user", lambda: SimpleNamespace(id=1))
-    monkeypatch.setattr(module, "update_book_read_status", lambda *_args, **_kw: None)
-    monkeypatch.setattr(module, "push_reading_state_to_hardcover", lambda *_args, **_kw: None)
-    # An unmatched document keeps the legacy shared path, which is the one
-    # every stock KOReader uses.
-    monkeypatch.setattr(module, "enrich_response_with_book_info",
-                        lambda response, document: (response, None, None, None, None))
-
-    app = Flask(__name__)
-    app.secret_key = "removed-device-progress-secret"
-    app.register_blueprint(module.kosync)
-    yield app.test_client(), session
-    session.close()
-    engine.dispose()
+def progress_protocol(world, monkeypatch):
+    # The legacy shared path is the one every stock KOReader uses.
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+    return world.client, world.session
 
 
 def _push(client, percentage, *, device_id="reader-1"):
@@ -57,7 +31,7 @@ def _push(client, percentage, *, device_id="reader-1"):
         "percentage": percentage,
         "device": "KOReader",
         "device_id": device_id,
-    })
+    }, headers=_headers())
 
 
 def _stored_percentages(session):

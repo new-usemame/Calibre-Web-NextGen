@@ -56,6 +56,33 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.59',
+    date: '2026-10-30',
+    items: [
+      {
+        title: 'A removed KOReader device stops syncing, and you can bring it back',
+        body: 'Removing a KOReader device used to leave it syncing your reading progress, and its storage reports failed with a server error. A removed device is now told it no longer syncs. To use it again, restore it from the Removed devices section, even after the Undo notice has gone.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Open Devices' },
+      },
+      {
+        title: 'Reading apps can tell EPUB and KEPUB downloads apart',
+        body: 'A book with both formats showed two download links in apps like KOReader, and both read "epub". Each link in the catalog now names its format, so you can pick the one you want.',
+        category: 'Sync',
+      },
+      {
+        title: 'An Adobe .acsm ticket that did not import says what to check',
+        body: 'When no plugin turned an .acsm ticket into a book, the ingest log told you to add a plugin you had already added. It now names the two usual causes: a plugin zip that was copied but never registered, and DeACSM without a finished Adobe activation.',
+        category: 'Admin',
+      },
+      {
+        title: 'UMASK now covers imported books',
+        body: 'Setting UMASK only changed files the web app wrote, so books added by ingest still got open folder permissions. It now applies to ingest and the other background services too, and an invalid value is named in the service log.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.58',
     date: '2026-10-29',
     items: [

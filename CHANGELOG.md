@@ -16,6 +16,20 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.59] - 2026-10-30
+
+### Fixed
+
+- **OPDS apps that show link titles, such as KOReader, can now tell EPUB and KEPUB downloads apart.** A book with both formats listed two download links that differed only in their URL, so apps showed both as "epub". Each link now carries a `title` of EPUB or KEPUB. The MIME type is unchanged. Thanks @sgreadly for the fix (#1100).
+
+- **Removed KOReader devices no longer sync reading progress.** Removed devices can now be restored from the Removed devices section in Account > Devices, even after the Undo notice is gone (#2765).
+
+- **An `.acsm` ticket that no plugin fulfilled now says what to check.** When the Calibre import plugins hand the ticket back unchanged, the ingest log names the two causes seen on a real Adobe setup: a plugin zip that was copied but never registered, and DeACSM without a completed Adobe activation. It no longer tells you to place a plugin zip you already placed. Reported by @sgreadly (#1228).
+
+- **A removed KOReader device no longer causes a 500 on every inventory report.** The reader still resolved to its soft-deleted device row, so storage reporting raised an unhandled "Device was not found for this account" error. The server now answers 409 `device_inactive`, saying the device was removed and no longer syncs, and logs one warning line instead of a traceback (#2765).
+
+- **`UMASK` now applies to the books ingest adds and the other library writes the background services make as the app user, not only to the web app.** With `UMASK=027`, imported books still got 755 folders, because the base image applies `UMASK` only to services named `svc-*`. An invalid value is now named once in the service log instead of being ignored silently. Thanks @sgreadly for the fix and @JohanSF for the diagnosis (#2670).
+
 ## [v4.1.58] - 2026-10-29
 
 ### Added

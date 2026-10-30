@@ -103,16 +103,31 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 
                 # Search for metadata
                 results = provider.search(search_query, "", "en")
-                if not results or len(results) == 0:
-                    continue
-                    
+
                 # Prefer the candidate whose ISBN matches the book's existing ISBN
                 # over a blind first result (fork #402), and refuse a candidate
                 # that isn't plausibly this book at all (fork #1164).
                 metadata = _select_metadata_result(
                     results, book_isbn,
                     book_title=book.title, book_authors=book.authors,
-                )
+                ) if results else None
+
+                # A title search can miss when the library spells the title
+                # differently from the catalog (e.g. without diacritics). A
+                # provider that understands "isbn:<isbn>" gets a second try by
+                # the book's own ISBN, under the same confidence gate.
+                if metadata is None and book_isbn and getattr(provider, "SUPPORTS_ISBN_QUERY", False) is True:
+                    log.debug(f"Retrying {provider.__name__} by ISBN {book_isbn}")
+                    isbn_results = provider.search(f"isbn:{_normalize_isbn(book_isbn)}", "", "en")
+                    if isbn_results:
+                        results = isbn_results
+                        metadata = _select_metadata_result(
+                            isbn_results, book_isbn,
+                            book_title=book.title, book_authors=book.authors,
+                        )
+
+                if not results:
+                    continue
                 if metadata is None:
                     log.info(
                         f"No confident match from {provider.__name__} for book: "

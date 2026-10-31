@@ -86,6 +86,18 @@ def test_get_language_name_resolves_with_locale_object():
     assert out and out != "Unknown"
 
 
+def test_get_language_name_resolves_catalan_catalog_language_names():
+    """The shipped Catalan UI must also name Catalan and Spanish books."""
+    assert isoLanguages.get_language_name("ca", "cat") == "Català"
+    assert isoLanguages.get_language_name("ca", "spa") == "Espanyol"
+    assert isoLanguages.get_language_name("ca", "fra") != "Unknown"
+
+
+def test_get_language_name_falls_back_for_other_shipped_locale_without_table():
+    """A shipped locale without an ISO table must not blank every language."""
+    assert isoLanguages.get_language_name("ar", "cat") != "Unknown"
+
+
 def test_get_language_name_unknown_lang_code_returns_unknown_not_raise():
     out = isoLanguages.get_language_name("en", "totallymadeupcode")
     assert out == "Unknown"

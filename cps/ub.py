@@ -5802,7 +5802,6 @@ def migrate_Database(_session):
     migrate_magic_shelf_relative_dates(_session)
     migrate_kobo_synced_book_uuid(engine, _session)
     migrate_kobo_unique_constraints(engine, _session)
-    migrate_kobo_bookmark_one_per_state(engine, _session)
     migrate_kobo_deleted_book(engine, _session)
     migrate_kobo_bookmark_created_at(engine, _session)
     migrate_bookmark_updated_at(engine, _session)
@@ -5824,6 +5823,8 @@ def migrate_Database(_session):
     migrate_device_share_place(engine, _session)
     migrate_device_sleep_screen(engine, _session)
     migrate_kobo_bookmark_receipt(engine, _session)
+    # After the created_at/server_modified_at columns exist: it reads both (#2783).
+    migrate_kobo_bookmark_one_per_state(engine, _session)
     migrate_kobo_place_delivery(engine, _session)
     migrate_kosync_web_place(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)

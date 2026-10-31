@@ -52,6 +52,8 @@ class _FakeProc:
 def _run_convert_capture_env(monkeypatch, plugins_enabled):
     from cps.tasks import convert as convert_mod
 
+    # The container layout, where CALIBRE_DBPATH is /config.
+    monkeypatch.delenv("CALIBRE_DBPATH", raising=False)
     if plugins_enabled:
         monkeypatch.setenv("CWA_CALIBRE_USER_PLUGINS", "1")
     else:

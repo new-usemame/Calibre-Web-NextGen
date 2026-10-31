@@ -48,6 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 def clean_env(monkeypatch):
     """Each test starts from a known-empty CWA_CALIBRE_USER_PLUGINS state."""
     monkeypatch.delenv("CWA_CALIBRE_USER_PLUGINS", raising=False)
+    monkeypatch.delenv("CALIBRE_DBPATH", raising=False)
     yield monkeypatch
 
 
@@ -171,8 +172,20 @@ class TestCalibreUserPluginsHelper:
     def test_env_var_name_constant(self):
         assert calibre_user_plugins.env_var_name() == "CWA_CALIBRE_USER_PLUGINS"
 
-    def test_home_path_constant(self):
+    def test_home_path_constant(self, clean_env):
         assert calibre_user_plugins.home_path() == "/config"
+
+    @pytest.mark.parametrize("dbpath", ("/srv/cwng", "/srv/cwng/app.db"))
+    def test_home_path_follows_calibre_dbpath(self, clean_env, dbpath):
+        clean_env.setenv("CALIBRE_DBPATH", dbpath)
+        clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "1")
+        assert calibre_user_plugins.home_path() == "/srv/cwng"
+        assert calibre_user_plugins.plugins_dir() == Path(
+            "/srv/cwng/.config/calibre/plugins"
+        )
+        env = calibre_user_plugins.apply_to_env({})
+        assert env["HOME"] == "/srv/cwng"
+        assert env["CALIBRE_CONFIG_DIRECTORY"] == "/srv/cwng/.config/calibre"
 
 
 @pytest.mark.unit
@@ -199,8 +212,7 @@ class TestAutoRegisterPlugins:
         # Point _HOME at an empty tmp; plugins/ doesn't exist
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         monkeypatch.setattr(
-            calibre_user_plugins, "_CUSTOMIZE_JSON",
-            tmp_path / ".config" / "calibre" / "customize.py.json",
+            calibre_user_plugins, "_customize_json", lambda: tmp_path / ".config" / "calibre" / "customize.py.json"
         )
         result = calibre_user_plugins.auto_register_plugins(
             calibre_customize_binary="/nonexistent"
@@ -214,7 +226,9 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         # Pre-populate the registry as if we'd registered before
         registry_path.parent.mkdir(parents=True, exist_ok=True)
         registry_path.write_text('{"plugins": {"DeDRM": "/some/path.zip"}}')
@@ -239,7 +253,9 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
@@ -286,7 +302,9 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "fake.zip").write_bytes(b"PK\x03\x04")
@@ -313,7 +331,9 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "fake.zip").write_bytes(b"PK\x03\x04")
@@ -330,14 +350,16 @@ class TestAutoRegisterPlugins:
         registry_path.write_text(
             '{"plugins": {"DeDRM": "/p/dedrm.zip", "Obok DeDRM": "/p/obok.zip"}}'
         )
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         names = calibre_user_plugins._registered_plugin_names()
         assert names == {"DeDRM", "Obok DeDRM"}
 
     def test_registered_plugin_names_handles_missing_file(
             self, clean_env, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            calibre_user_plugins, "_CUSTOMIZE_JSON", tmp_path / "missing.json"
+            calibre_user_plugins, "_customize_json", lambda: tmp_path / "missing.json"
         )
         assert calibre_user_plugins._registered_plugin_names() == set()
 
@@ -345,7 +367,9 @@ class TestAutoRegisterPlugins:
             self, clean_env, tmp_path, monkeypatch):
         registry_path = tmp_path / "corrupt.json"
         registry_path.write_text("{not valid json")
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         # Must not raise — return empty set
         assert calibre_user_plugins._registered_plugin_names() == set()
 
@@ -369,7 +393,9 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         # Filename that would collide if not staged: matches a plausible
@@ -426,7 +452,9 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "test.zip").write_bytes(b"PK\x03\x04")
@@ -455,10 +483,10 @@ class TestAutoRegisterPlugins:
     def test_registration_runs_with_HOME_pointed_at_the_config_tree(
             self, clean_env, tmp_path, monkeypatch):
         """`calibre-customize -a` must run with HOME set to the same tree
-        that `_CUSTOMIZE_JSON` is read from.
+        that `_customize_json()` is read from.
 
         calibre writes its plugin registry under `$HOME/.config/calibre/`,
-        and `_registered_plugin_names()` reads `_CUSTOMIZE_JSON`, which is
+        and `_registered_plugin_names()` reads `_customize_json()`, which is
         derived from `_HOME`. If registration inherits an ambient HOME
         (the service runs as root, so `/root`) the registry is written
         somewhere the reader never looks: the idempotency short-circuit
@@ -471,7 +499,9 @@ class TestAutoRegisterPlugins:
         monkeypatch.setenv("HOME", "/root")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
@@ -498,7 +528,7 @@ class TestAutoRegisterPlugins:
             "_registered_plugin_names() reads it from _HOME."
         )
         assert env.get("HOME") == str(tmp_path), (
-            f"HOME must point at the config tree that _CUSTOMIZE_JSON is "
+            f"HOME must point at the config tree that _customize_json() is "
             f"derived from ({tmp_path}); got {env.get('HOME')!r}. Writing "
             f"the registry outside that tree breaks both the idempotency "
             f"guard and plugin visibility at conversion time."
@@ -521,7 +551,9 @@ class TestAutoRegisterPlugins:
         monkeypatch.setenv("CWA_SENTINEL_VAR", "inherited")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
         registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
-        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        monkeypatch.setattr(
+            calibre_user_plugins, "_customize_json", lambda: registry_path
+        )
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")

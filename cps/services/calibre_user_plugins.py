@@ -8,10 +8,11 @@
 
 When ``CWA_CALIBRE_USER_PLUGINS`` is set to a truthy value (``1`` /
 ``true`` / ``yes`` / ``on``), Calibre subprocess invocations launched by
-the ingest pipeline run with ``HOME=/config`` and
-``CALIBRE_CONFIG_DIRECTORY=/config/.config/calibre`` so that the
+the ingest pipeline run with ``HOME`` set to the config dir (``/config``
+in the container, ``CALIBRE_DBPATH`` elsewhere) and
+``CALIBRE_CONFIG_DIRECTORY=<config dir>/.config/calibre`` so that the
 embedded Calibre process loads any plugins the operator has placed under
-``/config/.config/calibre/plugins/``. The plugins directory is created
+``<config dir>/.config/calibre/plugins/``. The plugins directory is created
 on first use if missing.
 
 ``CALIBRE_CONFIG_DIRECTORY`` is Calibre's documented configuration
@@ -49,6 +50,14 @@ from typing import Mapping
 
 _ENV_VAR = "CWA_CALIBRE_USER_PLUGINS"
 _HOME = "/config"
+
+
+def _home() -> str:
+    """The config dir from ``CALIBRE_DBPATH``, or ``/config`` when it is unset."""
+    configured = os.environ.get("CALIBRE_DBPATH", "").strip()
+    if not configured:
+        return _HOME
+    return os.path.dirname(configured) if configured.endswith(".db") else configured
 _PLUGINS_SUBPATH = ".config/calibre/plugins"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 
@@ -84,7 +93,7 @@ def apply_to_env(env: dict[str, str]) -> dict[str, str]:
     the intended off-state.
     """
     if is_enabled():
-        env["HOME"] = _HOME
+        env["HOME"] = _home()
         env["CALIBRE_CONFIG_DIRECTORY"] = str(config_dir())
     return env
 
@@ -93,13 +102,13 @@ def config_dir() -> Path:
     """Absolute path to the Calibre configuration directory the opt-in
     points subprocesses at (``/config/.config/calibre``). The plugins
     directory lives directly beneath it."""
-    return Path(_HOME) / _PLUGINS_SUBPATH.rsplit("/", 1)[0]
+    return Path(_home()) / _PLUGINS_SUBPATH.rsplit("/", 1)[0]
 
 
 def plugins_dir() -> Path:
     """Absolute path to where Calibre will look for user plugins when
     HOME=/config. Always returns a path; doesn't check existence."""
-    return Path(_HOME) / _PLUGINS_SUBPATH
+    return Path(_home()) / _PLUGINS_SUBPATH
 
 
 def ensure_plugins_dir() -> Path | None:
@@ -125,11 +134,9 @@ def ensure_plugins_dir() -> Path | None:
         return None
 
 
-# Path to the calibre customize.py.json registry under our HOME=/config.
-# When a plugin is added via `calibre-customize -a`, calibre records it
-# under the "plugins" key of this file. We use that to detect what's
-# already registered so we don't redundantly re-register on every boot.
-_CUSTOMIZE_JSON = Path(_HOME) / ".config" / "calibre" / "customize.py.json"
+def _customize_json() -> Path:
+    """Calibre's plugin registry under our HOME, read to skip re-registering on every boot."""
+    return Path(_home()) / ".config" / "calibre" / "customize.py.json"
 
 
 def _registered_plugin_names() -> set[str]:
@@ -137,10 +144,11 @@ def _registered_plugin_names() -> set[str]:
     calibre. Empty set if customize.py.json doesn't exist or can't be
     parsed."""
     import json
-    if not _CUSTOMIZE_JSON.is_file():
+    customize_json = _customize_json()
+    if not customize_json.is_file():
         return set()
     try:
-        data = json.loads(_CUSTOMIZE_JSON.read_text())
+        data = json.loads(customize_json.read_text())
     except (json.JSONDecodeError, OSError):
         return set()
     plugins = data.get("plugins", {})
@@ -188,12 +196,12 @@ def auto_register_plugins(
     # Inherit the ambient environment so `calibre-customize` resolves off
     # the real PATH, but keep HOME pinned to the config tree: calibre
     # writes its plugin registry under `$HOME/.config/calibre/`, which is
-    # exactly where `_CUSTOMIZE_JSON` above reads it back from. Letting
+    # exactly where `_customize_json()` above reads it back from. Letting
     # HOME default to the service's own (`/root`) would write the registry
     # somewhere nothing reads, so the short-circuit never fires and the
     # running calibre never sees the plugins.
     env = os.environ.copy()
-    env["HOME"] = _HOME
+    env["HOME"] = _home()
 
     registered: list[str] = []
     # `calibre-customize -a` copies the source .zip into
@@ -252,4 +260,4 @@ def env_var_name() -> str:
 
 def home_path() -> str:
     """Public accessor for the HOME value injected when enabled."""
-    return _HOME
+    return _home()

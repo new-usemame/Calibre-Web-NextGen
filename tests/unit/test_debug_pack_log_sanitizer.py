@@ -145,3 +145,43 @@ class TestSanitizerIdempotent:
         once = _sanitizer()(line)
         twice = _sanitizer()(once)
         assert once == twice, "double-sanitize must be a no-op"
+
+
+@pytest.mark.unit
+class TestSanitizerRedactsInstallPaths:
+    """A bare-metal install's own config and library dirs are hidden too."""
+
+    def _patterns(self, monkeypatch, config_dir, library_dir):
+        from cps import constants, debug_info
+
+        monkeypatch.setattr(constants, "CONFIG_DIR", config_dir)
+        monkeypatch.setattr(
+            debug_info, "config", type("Cfg", (), {"config_calibre_dir": library_dir})()
+        )
+        return debug_info._install_path_patterns()
+
+    def test_configured_dirs_redacted(self, monkeypatch):
+        patterns = self._patterns(
+            monkeypatch, "/srv/jane/cwng", "/home/jane/Books/Calibre Library"
+        )
+        s = _sanitizer()(
+            "Opening /srv/jane/cwng/app.db for /home/jane/Books/Calibre Library/A/b.epub",
+            patterns,
+        )
+        assert "jane" not in s
+        assert "<config>/app.db" in s
+        assert "<library>/A/b.epub" in s
+
+    def test_bare_dir_and_sibling_prefix(self, monkeypatch):
+        patterns = self._patterns(monkeypatch, "/srv/cwng", None)
+        s = _sanitizer()("config dir is /srv/cwng, not /srv/cwng-old/x", patterns)
+        assert "config dir is <config>," in s
+        assert "/srv/cwng-old/x" in s
+
+    def test_nested_library_wins_over_config(self, monkeypatch):
+        patterns = self._patterns(monkeypatch, "/srv/cwng", "/srv/cwng/library")
+        s = _sanitizer()("/srv/cwng/library/metadata.db", patterns)
+        assert s == "<library>/metadata.db"
+
+    def test_root_and_relative_dirs_ignored(self, monkeypatch):
+        assert self._patterns(monkeypatch, "/", "relative/lib") == ()

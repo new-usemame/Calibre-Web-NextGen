@@ -271,13 +271,22 @@ class Updater(threading.Thread):
         except Exception:
             nsm = False
 
+        # The container mounts plus wherever this install has put the same dirs.
+        share_roots = {"/config", "/calibre-library", "/cwa-book-ingest"}
+        if nsm:
+            share_roots.add(constants.CONFIG_DIR)
+            for resolver in (constants.calibre_library_dir, constants.ingest_folder):
+                try:
+                    share_roots.add(resolver())
+                except constants.RuntimePathError:
+                    pass
+
         def should_chown(path):
             if not nsm:
                 return True
-            return not (
-                path == "/config" or path.startswith("/config/") or
-                path == "/calibre-library" or path.startswith("/calibre-library/") or
-                path == "/cwa-book-ingest" or path.startswith("/cwa-book-ingest/")
+            return not any(
+                path == root or path.startswith(root.rstrip("/") + "/")
+                for root in share_roots
             )
         for src_dir, __, files in os.walk(root_src_dir):
             dst_dir = src_dir.replace(root_src_dir, root_dst_dir, 1)

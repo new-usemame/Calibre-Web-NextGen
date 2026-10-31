@@ -1165,25 +1165,35 @@ export function Reader({ id }: { id: string }) {
     if (composer) void commitNote(composer, '');
   }, [composer, commitNote]);
 
-  // Remove the tapped highlight server-side, then un-paint it (#782). Fails
-  // silently (the reader has no toast) and leaves the highlight painted on
-  // error — the row is still on the server, so keeping it painted stays honest.
+  // Remove or recolour the tapped highlight (#782). The popover closes while
+  // the request is out; a refusal reopens it on the same highlight and tells
+  // the reader, so another tap retries the same request (#2779). The paint is
+  // only changed once the server has the change, so it keeps matching the
+  // server either way. A reader who has since opened another highlight keeps
+  // that one: the failure is announced, but their popover is not replaced.
+  const reopenRefusedHighlight = useCallback((hl: NonNullable<typeof activeHl>) => {
+    setActiveHl((cur) => cur ?? hl);
+    announce(t('Could not save that highlight.'), { assertive: true });
+  }, [announce, t]);
+
   const removeHighlight = useCallback(async () => {
     const hl = activeHl;
     if (!hl) return;
     setActiveHl(null);
     try {
       await apiDelete(`/annotations/${id}/${hl.id}`);
-      notesRef.current.delete(hl.id);
-      setAnnList((rows) => rows.filter((r) => r.annotation_id !== hl.id));
-      try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
-    } catch { /* silent: keep the highlight painted */ }
-  }, [activeHl, id]);
+    } catch {
+      reopenRefusedHighlight(hl);
+      return;
+    }
+    notesRef.current.delete(hl.id);
+    setAnnList((rows) => rows.filter((r) => r.annotation_id !== hl.id));
+    try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
+  }, [activeHl, id, reopenRefusedHighlight]);
 
-  // Recolor the tapped highlight (PATCH supports highlight_color). epub.js keys
-  // an annotation by (cfiRange + type), so a new color is applied by removing
-  // the old paint and re-adding with the new fill. Silent on error (old paint
-  // is untouched, server keeps the prior color).
+  // PATCH supports highlight_color. epub.js keys an annotation by (cfiRange +
+  // type), so a new colour is applied by removing the old paint and re-adding
+  // it with the new fill.
   const recolorHighlight = useCallback(async (color: string) => {
     const hl = activeHl;
     if (!hl) return;
@@ -1191,12 +1201,15 @@ export function Reader({ id }: { id: string }) {
     if (hl.color === color) return;
     try {
       await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color });
-      setAnnList((rows) => rows.map((r) =>
-        r.annotation_id === hl.id ? { ...r, highlight_color: color } : r));
-      // Recolouring must not silently drop the note marker.
-      repaintHighlight(hl.cfiRange, color, hl.id, !!notesRef.current.get(hl.id));
-    } catch { /* silent: keep the highlight in its original color */ }
-  }, [activeHl, id, repaintHighlight]);
+    } catch {
+      reopenRefusedHighlight(hl);
+      return;
+    }
+    setAnnList((rows) => rows.map((r) =>
+      r.annotation_id === hl.id ? { ...r, highlight_color: color } : r));
+    // Recolouring must not silently drop the note marker.
+    repaintHighlight(hl.cfiRange, color, hl.id, !!notesRef.current.get(hl.id));
+  }, [activeHl, id, repaintHighlight, reopenRefusedHighlight]);
 
   useEffect(() => {
     savedCfiRef.current = savedBookmark?.bookmark ?? savedCfiRef.current;

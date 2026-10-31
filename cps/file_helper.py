@@ -32,6 +32,7 @@ def get_mimetype(ext):
              ".cbz": "application/zip",
              ".cbr": "application/x-rar",
              ".cbt": "application/x-tar",
+             ".fbz": "application/zip",
              ".kfx": "application/octet-stream",
              ".kfx-zip": "application/zip",
              }

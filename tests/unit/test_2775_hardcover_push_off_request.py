@@ -171,45 +171,36 @@ def test_no_token_means_no_hardcover_work(kobo):
 
 
 @pytest.mark.unit
-def test_a_kosync_put_answers_while_hardcover_is_still_answering(kobo, monkeypatch):
+def test_a_kosync_put_answers_while_hardcover_is_still_answering(kobo, monkeypatch, tmp_path):
     """The reporter's flow: KOReader PUTs a matched book's reading with
     Hardcover sync on. The PUT must answer inside the plugin's 2 s limit."""
-    import sys
-    from flask import Flask
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    import cps
-    import cps.progress_syncing.protocols.kosync  # noqa: F401
-    from cps.progress_syncing.models import AppBase
+    from cps import db
+    from cps.progress_syncing.models import BookFormatChecksum
+    from tests.unit.koreader_library_world import LibraryWorld
 
     module, fake, queue = kobo
-    kosync = sys.modules["cps.progress_syncing.protocols.kosync"]
-    engine = create_engine("sqlite:///:memory:")
-    AppBase.metadata.create_all(engine)
-    session = sessionmaker(bind=engine)()
-    monkeypatch.setattr(kosync, "ub", MagicMock(session=session))
-    monkeypatch.setattr(kosync, "is_koreader_sync_enabled", lambda: True)
-    monkeypatch.setattr(kosync, "authenticate_user", lambda: _user())
-    monkeypatch.setattr(kosync, "update_book_read_status", lambda *_a: None)
-    monkeypatch.setattr(kosync, "get_book_checksums", lambda book_id: ["digest-a"] if book_id else [])
-    monkeypatch.setattr(kosync, "enrich_response_with_book_info",
-                        lambda response, document: (response, 595, "EPUB", "Reporter book", "koreader"))
-    book = _book(595)
-    monkeypatch.setattr(cps.calibre_db, "get_book", lambda book_id: book, raising=False)
+    world = LibraryWorld(monkeypatch, tmp_path)
+    try:
+        reader = world.add_user("reader")
+        reader.hardcover_token = "tok"
+        world.add_book(595, "Reporter book")
+        world.session.add(db.Identifiers("hc-1", "hardcover-id", 595))
+        world.session.add(BookFormatChecksum(book=595, format="EPUB", checksum="digest-a"))
+        world.session.commit()
 
-    app = Flask(__name__)
-    app.register_blueprint(kosync.kosync)
-    started = time.monotonic()
-    pushed = app.test_client().put("/kosync/syncs/progress", json={
-        "document": "digest-a", "progress": "/body/DocFragment[6]/body/div/text().0",
-        "percentage": 0.97, "device": "Kobo Clara BW", "device_id": "clara",
-    })
-    elapsed = time.monotonic() - started
-    session.close()
+        started = time.monotonic()
+        pushed = world.client.put("/kosync/syncs/progress", json={
+            "document": "digest-a", "progress": "/body/DocFragment[6]/body/div/text().0",
+            "percentage": 0.97, "device": "Kobo Clara BW", "device_id": "clara",
+        }, headers=LibraryWorld.basic("reader"))
+        elapsed = time.monotonic() - started
 
-    assert pushed.status_code == 200
-    assert elapsed < 1.0, f"the PUT took {elapsed:.1f}s while Hardcover was not answering"
-    assert fake.started.wait(5), "the matched reading never reached Hardcover"
-    fake.release.set()
-    assert queue.wait_idle(5)
-    assert fake.calls == [("tok", {"hardcover-id": "hc-1"}, 97)]
+        assert pushed.status_code == 200, pushed.get_data(as_text=True)
+        assert elapsed < 1.0, f"the PUT took {elapsed:.1f}s while Hardcover was not answering"
+        assert fake.started.wait(5), "the matched reading never reached Hardcover"
+        fake.release.set()
+        assert queue.wait_idle(5)
+        assert fake.calls == [("tok", {"hardcover-id": "hc-1"}, 97)]
+    finally:
+        fake.release.set()
+        world.close()

@@ -1157,7 +1157,8 @@ test.describe('reader: a failed highlight removal or recolour can be retried (#2
   // and 3, so these share the #2778 slots (that describe runs before this one).
   const slot = (project: string) => (project === 'mobile' ? 5 : 4);
 
-  const serverRows = (page: Page, bookId: number) => page.evaluate(async (id) => {
+  type ServerRow = { id: string; color: string | null };
+  const serverRows = (page: Page, bookId: number): Promise<ServerRow[]> => page.evaluate(async (id) => {
     const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
     return (j.annotations || []).map((a: { annotation_id: string; highlight_color: string | null }) =>
       ({ id: a.annotation_id, color: a.highlight_color }));

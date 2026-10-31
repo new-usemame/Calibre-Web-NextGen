@@ -33,6 +33,7 @@ import { useMe } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { SpinnerCentered } from '../components/Spinner';
 import { SectionError } from '../components/SectionError';
+import { PasswordInput } from '../components/PasswordInput';
 import styles from './AdminAcquisition.module.css';
 
 function errorCode(error: unknown): string | undefined {
@@ -625,10 +626,9 @@ export function AdminAcquisition() {
             {((adapter !== 'opds' && !passwordClient) || draft.auth_kind !== 'none') && (
               <label className={styles.field}>
                 <span>{adapter !== 'opds' && !passwordClient ? t('API key') : draft.auth_kind === 'basic' ? t('Password') : t('Token')}</span>
-                <input
+                <PasswordInput
                 aria-invalid={formError ? true : undefined}
                 aria-describedby={formError ? `${formId}-error` : undefined}
-                  type="password"
                   value={draft.secret}
                   autoComplete="new-password"
                   onChange={(event) => setDraft({ ...draft, secret: event.target.value })}

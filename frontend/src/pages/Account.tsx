@@ -14,6 +14,9 @@ import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { PasswordInput } from '../components/PasswordInput';
+import { PasswordPolicyHint } from '../components/PasswordPolicyHint';
+import { passwordRequirementsText } from '../lib/passwordPolicy';
 import { ApiError } from '../lib/api';
 import { apiGet } from '../lib/api';
 import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
@@ -624,20 +627,24 @@ export function Account() {
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="acc-cur">{t('Current password')}</label>
-            <input id="acc-cur" type="password" autoComplete="current-password" className={styles.input}
+            <PasswordInput id="acc-cur" autoComplete="current-password" className={styles.input}
               value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
           </div>
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="acc-new">{t('New password')}</label>
-              <input id="acc-new" type="password" autoComplete="new-password" className={styles.input}
+              <PasswordInput id="acc-new" autoComplete="new-password" className={styles.input}
                 value={newPw} onChange={(e) => setNewPw(e.target.value)}
                 aria-invalid={pwMsg && !pwMsg.ok ? true : undefined}
-                aria-describedby={pwMsg && !pwMsg.ok ? 'acc-pw-msg' : undefined} />
+                aria-describedby={[
+                  passwordRequirementsText(account.password_policy, t) ? 'acc-pw-rules' : '',
+                  pwMsg && !pwMsg.ok ? 'acc-pw-msg' : '',
+                ].filter(Boolean).join(' ') || undefined} />
+              <PasswordPolicyHint policy={account.password_policy} id="acc-pw-rules" />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="acc-confirm">{t('Confirm new password')}</label>
-              <input id="acc-confirm" type="password" autoComplete="new-password" className={styles.input}
+              <PasswordInput id="acc-confirm" autoComplete="new-password" className={styles.input}
                 value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
                 aria-invalid={pwMsg && !pwMsg.ok ? true : undefined}
                 aria-describedby={pwMsg && !pwMsg.ok ? 'acc-pw-msg' : undefined} />

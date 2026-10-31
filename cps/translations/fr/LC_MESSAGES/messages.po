@@ -4734,6 +4734,86 @@ msgid "Refresh library"
 msgstr "Actualiser la bibliothèque"
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr "Impossible d’afficher l’aperçu de la résolution."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr "Impossible de résoudre les doublons."
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr "Supprimer les doublons"
+
+#: cps/spa_strings.py
+msgid "Delete {count} duplicate books?"
+msgstr "Supprimer {count} livres en double ?"
+
+#: cps/spa_strings.py
+msgid "Keep"
+msgstr "Conserver"
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr "Conserver le meilleur format"
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr "Conserver les fichiers les plus volumineux"
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr "Conserver les métadonnées les plus complètes"
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr "Conserver l’exemplaire le plus récent"
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr "Conserver l’exemplaire le plus ancien"
+
+#: cps/spa_strings.py
+msgid "Keeps one book in every group and deletes the other copies, using the strategy you choose."
+msgstr "Conserve un livre par groupe et supprime les autres exemplaires, selon la stratégie choisie."
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr "Fusionner les formats dans l’exemplaire le plus récent"
+
+#: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr "Rien à supprimer avec cette stratégie."
+
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr "Aperçu en cours…"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr "Résoudre automatiquement"
+
+#: cps/spa_strings.py
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr "{groups} groupes résolus et {deleted} livres supprimés."
+
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr "Stratégie"
+
+#: cps/spa_strings.py
+msgid "This permanently removes the extra copies from your library. It cannot be undone."
+msgstr "Cela supprime définitivement les exemplaires en trop de votre bibliothèque. Cette action est irréversible."
+
+#: cps/spa_strings.py
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr "{deleted} livres répartis dans {groups} groupes seraient supprimés."
+
+#: cps/spa_strings.py
+msgid "…and {count} more groups"
+msgstr "… et {count} autres groupes"
+
+#: cps/spa_strings.py
 msgid "<"
 msgstr "<"
 

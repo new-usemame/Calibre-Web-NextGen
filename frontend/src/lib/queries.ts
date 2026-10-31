@@ -2078,6 +2078,62 @@ export function useDismissDuplicate() {
   });
 }
 
+export type DuplicateStrategy =
+  | 'newest' | 'oldest' | 'merge'
+  | 'highest_quality_format' | 'most_metadata' | 'largest_file_size';
+
+export interface DuplicateResolutionPreviewGroup {
+  group_hash: string;
+  title: string;
+  author: string;
+  kept_book_id: number;
+  kept_book_formats: string[];
+  /** Publisher and year, so different editions in one group stand out (#1902). */
+  kept_book_edition?: { publisher: string | null; year: number | null };
+  deleted_book_ids: number[];
+  deleted_books_info: {
+    id: number; formats: string[]; publisher?: string | null; year?: number | null;
+  }[];
+}
+
+/** Shared by the dry run and the real run: the backend answers both with the
+ *  same counters and only adds `preview` for the dry run. */
+export interface DuplicateResolutionResult {
+  success: boolean;
+  resolved_count?: number;
+  kept_count?: number;
+  deleted_count?: number;
+  errors?: string[];
+  message?: string;
+  error?: string;
+  preview?: DuplicateResolutionPreviewGroup[] | null;
+}
+
+/** Dry run of the classic "Auto-Resolve Duplicates" panel (#1902). Admin only
+ *  on the server; nothing is deleted. */
+export function usePreviewDuplicateResolution() {
+  return useMutation<DuplicateResolutionResult, Error, DuplicateStrategy>({
+    mutationFn: (strategy) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/preview-resolution', { strategy }),
+  });
+}
+
+/** Real run: keeps one book per group and deletes the rest. */
+export function useExecuteDuplicateResolution() {
+  const qc = useQueryClient();
+  return useMutation<DuplicateResolutionResult, Error, DuplicateStrategy>({
+    mutationFn: (strategy) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/execute-resolution', { strategy }),
+    // Books were deleted, so every list that can show them is stale -- not just
+    // the duplicates view. Refresh on either outcome: a partial failure still
+    // deletes some groups before it reports its errors.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+      void qc.invalidateQueries({ queryKey: ['books'] });
+    },
+  });
+}
+
 // ── Generic user notices ───────────────────────────────────────────────────
 
 export function useNotices(bookId?: string | number) {

@@ -988,6 +988,155 @@ test.describe('reader: writing a standalone note (#325)', () => {
 });
 
 /*
+ * A refused note write keeps the composer open for a retry (#2778).
+ *
+ * #2550 made a failed CREATE retryable. Editing a note (PATCH), removing an
+ * unanchored note (DELETE) and writing a note with no passage (POST) still
+ * closed the composer before the request and swallowed the failure, so the
+ * reader saw nothing wrong and the old note came back on the next open. Each
+ * test refuses the first request, checks the composer kept the typed text and
+ * the error was announced, then lets the retry reach the real server and
+ * checks it sent the same request and the server holds the change.
+ */
+test.describe('reader: a failed note edit, removal or standalone save can be retried (#2778)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  // Desktop and mobile run these at the same time against the same book, so
+  // every note carries its test's tag and only tagged notes are read or removed.
+  const unanchoredNotes = (page: Page, bookId: number, tag: string) => page.evaluate(async ([id, mark]) => {
+    const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+    return (j.annotations || [])
+      .filter((a: { position_type: string; note_text: string | null }) =>
+        a.position_type === 'unanchored' && (a.note_text ?? '').includes(mark))
+      .map((a: { note_text: string }) => a.note_text);
+  }, [String(bookId), tag] as const);
+
+  const removeUnanchored = (page: Page, bookId: number, tag: string) => page.evaluate(async ([id, mark]) => {
+    const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+    const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+    for (const a of (j.annotations || [])) {
+      if (a.position_type !== 'unanchored' || !(a.note_text ?? '').includes(mark)) continue;
+      await fetch(`/annotations/${id}/${a.annotation_id}`, {
+        method: 'DELETE', credentials: 'include', headers: { 'X-CSRFToken': csrf },
+      });
+    }
+  }, [String(bookId), tag] as const);
+
+  // Open the reader on a book holding exactly one unanchored note, and open that
+  // note's composer from the drawer.
+  async function editSeededNote(page: Page, note: string): Promise<number> {
+    const bookId = await openReaderOnEpub(page, 2);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    const status = await page.evaluate(async ([id, text]) => {
+      const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+      return (await fetch(`/annotations/${id}`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify({ position_type: 'unanchored', note_text: text }),
+      })).status;
+    }, [String(bookId), note] as const);
+    expect(status, 'the seeded note is stored').toBe(201);
+    await page.reload();
+    await waitForReaderRender(page);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await drawer(page).locator('li', { hasText: note }).getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(note);
+    return bookId!;
+  }
+
+  test('a refused note edit keeps the edited text and retries the same change', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const TAG = `${testInfo.project.name}-${Date.now()}`;
+    const ORIGINAL = `Before the edit. ${TAG}`;
+    const bookId = await editSeededNote(page, ORIGINAL);
+    const EDITED = `After the edit. ${TAG}`;
+    await setNote(page, EDITED);
+
+    const sent: { url: string; body: unknown }[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'PATCH') return route.continue();
+      sent.push({ url: route.request().url(), body: route.request().postDataJSON() });
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(EDITED);
+    expect((await unanchoredNotes(page, bookId, TAG))).toEqual([ORIGINAL]);
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    await expect.poll(async () => (await unanchoredNotes(page, bookId, TAG))).toEqual([EDITED]);
+
+    await removeUnanchored(page, bookId, TAG);
+  });
+
+  test('a refused note removal keeps the note and retries the same removal', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const TAG = `${testInfo.project.name}-${Date.now()}`;
+    const NOTE = `Remove me. ${TAG}`;
+    const bookId = await editSeededNote(page, NOTE);
+
+    const sent: string[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'DELETE') return route.continue();
+      sent.push(route.request().url());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Remove note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(NOTE);
+    expect((await unanchoredNotes(page, bookId, TAG))).toEqual([NOTE]);
+
+    await page.getByRole('button', { name: 'Remove note' }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
+    await expect.poll(async () => (await unanchoredNotes(page, bookId, TAG)).length).toBe(0);
+  });
+
+  test('a refused standalone note keeps the text and retries the same note', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, 2);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    const TAG = `${testInfo.project.name}-${Date.now()}`;
+    const NOTE = `A note about the whole book. ${TAG}`;
+
+    const sent: unknown[] = [];
+    await page.route(`**/annotations/${bookId}`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      sent.push(route.request().postDataJSON());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await page.getByRole('button', { name: 'Write a note' }).click();
+    await setNote(page, NOTE);
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Write a note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(NOTE);
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('dialog', { name: 'Write a note' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    await expect.poll(async () => (await unanchoredNotes(page, bookId!, TAG))).toEqual([NOTE]);
+
+    await removeUnanchored(page, bookId!, TAG);
+  });
+});
+
+/*
  * Device labels in the highlights drawer (#325).
  *
  * The affordance was built when the drawer landed and deliberately left unwired:

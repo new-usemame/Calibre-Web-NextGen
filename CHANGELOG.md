@@ -16,6 +16,20 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.60] - 2026-10-31
+
+### Fixed
+
+- **The New UI Authors and Series lists load in pages as you scroll.** Name and minimum book filters run on the server so large libraries open faster (#2720).
+
+- **KOReader no longer reports a stored reading as "the server took too long" when Hardcover sync is on.** Each matched reading from KOReader or a Kobo waited for several Hardcover requests before the server answered, 2.7 to 5 seconds on a Raspberry Pi, past the plugin's 2 second limit, and the rest of the app waited with it. The reading is now saved and answered first, and Hardcover gets it a moment later. If you turn pages while Hardcover is slow, it gets your latest place rather than every step. Found and measured by @sgreadly (#2775).
+
+- **A failed note edit or removal in the web reader can be retried.** Before, when saving an edited note, removing a note that has no passage, or writing a note about the whole book failed, the reader closed the note box and said nothing, and the old note came back next time. Now the box stays open with your text, the reader says the save failed, and pressing Save or Remove again sends the same change (#2778).
+
+- **A failed highlight removal or colour change in the web reader can be retried.** Before, when removing a highlight or changing its colour failed, the reader closed the highlight menu and said nothing, so the highlight looked handled while it was still there or still the old colour. Now the reader says the change was not saved and reopens the menu on that highlight, and tapping Remove or the colour again sends the same change (#2779).
+
+- **A colon in a title now survives in the Send to eReader attachment name.** With the eReader attachment filename template set, `Dune: Messiah` arrived as `Dune_ Messiah` because the name went through the same cleaner as files written to disk. An emailed attachment is never a file on the server, so its name now keeps the colon; every other unsafe character is still replaced, and OPDS download names and KOReader filename matching are unchanged. Reported by @LightSBM (#2442, #2650), fixed by @sgreadly.
+
 ## [v4.1.59] - 2026-10-30
 
 ### Fixed

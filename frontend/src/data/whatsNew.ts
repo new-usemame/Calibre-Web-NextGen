@@ -56,6 +56,33 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.60',
+    date: '2026-10-31',
+    items: [
+      {
+        title: 'Authors and Series open faster in big libraries',
+        body: 'The Authors and Series lists now load a page at a time as you scroll, and the name and minimum book filters run on the server, so a large library no longer loads every entry before showing the list.',
+        category: 'Library',
+        link: { to: '/authors', label: 'Browse authors' },
+      },
+      {
+        title: 'KOReader saves your place without timing out when Hardcover is on',
+        body: 'With Hardcover sync turned on, each reading from KOReader or a Kobo waited on several Hardcover requests before the server answered, long enough on a Raspberry Pi for the plugin to report that the server took too long. The reading is now saved and answered first, and Hardcover gets it a moment later. Found and measured by @sgreadly.',
+        category: 'Sync',
+      },
+      {
+        title: 'A failed note or highlight change in the web reader can be retried',
+        body: 'When editing or removing a note, or removing or recolouring a highlight, failed to save, the reader closed the box and said nothing. Now it tells you the change was not saved and keeps the note box or highlight menu open, so trying again sends the same change.',
+        category: 'Reading',
+      },
+      {
+        title: 'Colons stay in Send to eReader attachment names',
+        body: 'With an attachment filename template set, a title like "Dune: Messiah" arrived as "Dune_ Messiah". The emailed name now keeps the colon, and other unsafe characters are still replaced. Reported by @LightSBM, fixed by @sgreadly.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.59',
     date: '2026-10-30',
     items: [

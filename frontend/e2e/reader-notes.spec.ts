@@ -1141,6 +1141,103 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
 });
 
 /*
+ * A refused highlight removal or recolour can be retried (#2779).
+ *
+ * The edit popover closed before its DELETE or PATCH and swallowed a refusal,
+ * so the reader tapped Remove or a colour, saw the popover go, and could not
+ * tell the highlight was still there or still the old colour. Each test
+ * refuses the first request, checks the reader said so, the popover came back
+ * and the paint still matches the server, then lets the retry reach the real
+ * server and checks it sent the same request and the server holds the change.
+ */
+test.describe('reader: a failed highlight removal or recolour can be retried (#2779)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  // Opening a book clears its annotations, and the drawer tests use slots 2
+  // and 3, so these share the #2778 slots (that describe runs before this one).
+  const slot = (project: string) => (project === 'mobile' ? 5 : 4);
+
+  const serverRows = (page: Page, bookId: number) => page.evaluate(async (id) => {
+    const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+    return (j.annotations || []).map((a: { annotation_id: string; highlight_color: string | null }) =>
+      ({ id: a.annotation_id, color: a.highlight_color }));
+  }, bookId);
+
+  const paintedFill = (page: Page) => page.evaluate(
+    () => document.querySelector('.cwng-hl')?.getAttribute('fill') ?? null);
+
+  // Open the reader, make one yellow highlight, and open its edit popover.
+  async function yellowHighlightOpen(page: Page, project: string): Promise<number> {
+    const bookId = await openReaderOnEpub(page, slot(project));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
+    expect(await selectSomeText(page), 'text selected in the book frame').not.toBe('');
+    await page.getByRole('button', { name: 'Yellow' }).click();
+    await expect.poll(async () => (await serverRows(page, bookId!)).length).toBe(1);
+    await expect.poll(async () => (await paintCounts(page)).plain).toBe(1);
+    await tapHighlight(page, '.cwng-hl');
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+    return bookId!;
+  }
+
+  test('a refused removal keeps the highlight and retries the same removal', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await yellowHighlightOpen(page, testInfo.project.name);
+
+    const sent: string[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'DELETE') return route.continue();
+      sent.push(route.request().url());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Remove highlight' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that highlight.');
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+    expect((await paintCounts(page)).plain, 'the refused highlight stays painted').toBe(1);
+    expect(await serverRows(page, bookId)).toHaveLength(1);
+
+    await page.getByRole('button', { name: 'Remove highlight' }).click();
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
+    await expect.poll(async () => (await serverRows(page, bookId)).length).toBe(0);
+    await expect.poll(async () => (await paintCounts(page)).plain).toBe(0);
+  });
+
+  test('a refused recolour keeps the old colour and retries the same change', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await yellowHighlightOpen(page, testInfo.project.name);
+    const yellowFill = await paintedFill(page);
+
+    const sent: unknown[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'PATCH') return route.continue();
+      sent.push(route.request().postDataJSON());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Green' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that highlight.');
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Yellow' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await paintedFill(page), 'the paint keeps the colour the server holds').toBe(yellowFill);
+    expect((await serverRows(page, bookId)).map((r) => r.color)).toEqual(['yellow']);
+
+    await page.getByRole('button', { name: 'Green' }).click();
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    await expect.poll(async () => (await serverRows(page, bookId)).map((r) => r.color)).toEqual(['green']);
+    await expect.poll(() => paintedFill(page)).not.toBe(yellowFill);
+
+    await clearAnnotationsViaApi(page, bookId);
+  });
+});
+
+/*
  * Device labels in the highlights drawer (#325).
  *
  * The affordance was built when the drawer landed and deliberately left unwired:

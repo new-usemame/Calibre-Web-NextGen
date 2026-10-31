@@ -26,7 +26,7 @@ import { ApiError, resourceUrl, resourceSrcSet, TASK_FAILED, TASK_FINISHED, TASK
 import { useT, useI18n } from '../lib/i18n';
 import { formatCustomColumnDate, formatPublishedDate } from '../lib/customColumnDisplay';
 import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
-import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
+import { hasRecipients, splitAddresses, toggleRecipients } from '../lib/sendRecipients';
 import {
   canDeleteBooks, canDownloadBooks, canEditBookCover, canReadBooks, canUploadBooks,
 } from '../lib/permissions';
@@ -104,6 +104,11 @@ function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSe
   const [convert, setConvert] = useState(false);
   const [emails, setEmails] = useState(defaultEmail);
   const dirty = useRef(false);
+  // Several saved addresses get a tickbox each (#1763), all ticked to start so
+  // the default is still "send to everything saved". With one address the
+  // field alone is enough, as before.
+  const savedAddresses = splitAddresses(defaultEmail);
+  const manySaved = savedAddresses.length > 1;
   // The account query (which serves kindle_mail) may resolve after the panel
   // first mounts; keep seeding the saved address until the user edits the field.
   useEffect(() => {
@@ -134,6 +139,26 @@ function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSe
           )}
         </label>
       </div>
+      {/* Each saved address as a tickbox, editing the recipient field above
+          (#1763); type into the field to also send to an address not saved. */}
+      {manySaved && (
+        <fieldset className={styles.sendOthers} data-testid="send-saved-ereaders">
+          <legend>{t('Saved e-reader addresses:')}</legend>
+          {savedAddresses.map((address) => (
+            <label key={address} className={styles.sendConvert}>
+              <input
+                type="checkbox"
+                checked={hasRecipients(emails, [address])}
+                onChange={(e) => {
+                  dirty.current = true;
+                  setEmails(toggleRecipients(emails, [address], e.target.checked));
+                }}
+              />
+              {address}
+            </label>
+          ))}
+        </fieldset>
+      )}
       {/* Admin-only (the server lists nobody for anyone else): tick another
           user's eReader to add it to the recipients above (#2296, fork #276). */}
       {otherEreaders.length > 0 && (
@@ -161,7 +186,10 @@ function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSe
         </label>
         <button
           className={styles.actionPrimary}
-          disabled={pending || !format}
+          // An empty field means "your saved address" to the server, which with
+          // several saved would send to all of them — not what unticking every
+          // box means, so nothing to send until one is ticked or typed.
+          disabled={pending || !format || (manySaved && !emails.trim())}
           onClick={() => onSend(format, convert, emails.trim())}
         >
           {pending ? t('Sending…') : t('Send')}

@@ -99,7 +99,7 @@ def test_audit_names_every_s6_service_reaching_a_calibre_tool():
         "metadata-change-detector": "metadata_change_dispatch.py",
         "svc-calibre-web-automated": (
             "cwa-as-abc /usr/bin/env -u PYTHONPATH "
-            "PYTHONNOUSERSITE=1 python3 -P -m cps"
+            "PYTHONNOUSERSITE=1 python3 -X faulthandler -P -m cps"
         ),
     }
     assert set(reachability_markers) == expected

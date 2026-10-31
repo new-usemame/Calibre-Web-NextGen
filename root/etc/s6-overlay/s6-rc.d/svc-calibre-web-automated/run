@@ -9,6 +9,10 @@ echo "[svc-calibre-web-automated] Starting Calibre-Web server on port ${CWA_PORT
 
 export CALIBRE_DBPATH=/config
 
+# Retain bounded fatal Python stacks on stderr for unexplained native signals.
+# Do not capture a core (credentials/process memory); s6 finish retains exit facts.
+ulimit -c 0
+
 # s6-setuidgid/cwa-as-abc changes uid/gid but deliberately does not rewrite
 # HOME. Without an explicit Calibre config path the abc process therefore
 # falls back to /root/.config/calibre and cannot write files created there by
@@ -27,4 +31,4 @@ export CALIBRE_CONFIG_DIRECTORY="${CALIBRE_CONFIG_DIRECTORY:-/config/.config/cal
 # the image is built; those files are part of the trusted image, not /config.
 exec \
     s6-notifyoncheck -d -n 300 -w 1000 -c "nc -z localhost ${CWA_PORT_OVERRIDE:-8083}" \
-        cwa-as-abc /usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -P -m cps
+        cwa-as-abc /usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -X faulthandler -P -m cps

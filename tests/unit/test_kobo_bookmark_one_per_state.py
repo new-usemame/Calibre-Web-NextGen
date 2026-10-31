@@ -228,3 +228,39 @@ def test_fresh_install_refuses_a_second_row_for_a_state():
     finally:
         engine.dispose()
 
+
+
+@pytest.mark.unit
+def test_first_start_after_upgrade_from_before_the_receipt_columns(tmp_path, monkeypatch):
+    """An app.db from before ``created_at``/``server_modified_at`` existed is
+    repaired on its first start, through the real startup migration runner."""
+    from cps import constants, ub
+
+    monkeypatch.setattr(constants, "CONFIG_DIR", str(tmp_path), raising=False)
+    engine = create_engine("sqlite:///%s" % (tmp_path / "app.db"), future=True)
+    ub.Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.exec_driver_sql("DROP TABLE kobo_bookmark")
+        conn.exec_driver_sql(
+            "CREATE TABLE kobo_bookmark (id INTEGER PRIMARY KEY, "
+            "kobo_reading_state_id INTEGER, last_modified DATETIME, "
+            "location_source VARCHAR, location_type VARCHAR, location_value VARCHAR, "
+            "progress_percent FLOAT, content_source_progress_percent FLOAT)")
+        _state(conn, 7)
+        conn.exec_driver_sql(
+            "INSERT INTO kobo_bookmark (id, kobo_reading_state_id, last_modified, "
+            "progress_percent, location_type) VALUES "
+            "(1, 7, '2026-10-31 08:44:49.000000', 12.0, 'KoboSpan'), "
+            "(186, 7, '2026-10-27 22:47:28.017032', 2.37, NULL)")
+    session = sessionmaker(bind=engine, future=True)()
+    try:
+        ub.migrate_Database(session)
+    finally:
+        session.close()
+
+    rows = _bookmarks(engine, 7)
+    assert [r.progress_percent for r in rows] == [12.0]
+    with pytest.raises(IntegrityError):
+        with engine.begin() as conn:
+            _bookmark(conn, 2, 7, 2.0, None, datetime(2026, 11, 1), datetime(2026, 11, 1))
+    engine.dispose()

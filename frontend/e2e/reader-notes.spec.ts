@@ -1022,10 +1022,14 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
     }
   }, [String(bookId), tag] as const);
 
-  // Open the reader on a book holding exactly one unanchored note, and open that
+  // Opening a book clears its annotations, and the other tests in this file
+  // start on slots 0 to 3, so these start on slots of their own.
+  const slot = (project: string) => (project === 'mobile' ? 5 : 4);
+
+  // Open the reader on a book holding the given unanchored note, and open that
   // note's composer from the drawer.
-  async function editSeededNote(page: Page, note: string): Promise<number> {
-    const bookId = await openReaderOnEpub(page, 2);
+  async function editSeededNote(page: Page, project: string, note: string): Promise<number> {
+    const bookId = await openReaderOnEpub(page, slot(project));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     const status = await page.evaluate(async ([id, text]) => {
       const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
@@ -1049,7 +1053,7 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
     test.setTimeout(120_000);
     const TAG = `${testInfo.project.name}-${Date.now()}`;
     const ORIGINAL = `Before the edit. ${TAG}`;
-    const bookId = await editSeededNote(page, ORIGINAL);
+    const bookId = await editSeededNote(page, testInfo.project.name, ORIGINAL);
     const EDITED = `After the edit. ${TAG}`;
     await setNote(page, EDITED);
 
@@ -1080,7 +1084,7 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
     test.setTimeout(120_000);
     const TAG = `${testInfo.project.name}-${Date.now()}`;
     const NOTE = `Remove me. ${TAG}`;
-    const bookId = await editSeededNote(page, NOTE);
+    const bookId = await editSeededNote(page, testInfo.project.name, NOTE);
 
     const sent: string[] = [];
     await page.route(`**/annotations/${bookId}/*`, async (route) => {
@@ -1105,7 +1109,7 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
 
   test('a refused standalone note keeps the text and retries the same note', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 2);
+    const bookId = await openReaderOnEpub(page, slot(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     const TAG = `${testInfo.project.name}-${Date.now()}`;
     const NOTE = `A note about the whole book. ${TAG}`;

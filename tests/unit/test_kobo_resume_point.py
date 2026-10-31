@@ -302,3 +302,61 @@ def test_member_integrity_is_checked_after_bounded_inflation(epub, field):
     snapshot = kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
     print(f'false {field}, snapshot={snapshot}')
     assert snapshot is None, f'valid XML must not bypass the final {field} check'
+
+
+@pytest.mark.parametrize('raw, expected_mib', [
+    (None, 16), ('', 16), ('  ', 16), ('32', 32), ('1', 1), ('256', 256),
+    ('0', 16), ('-4', 16), ('257', 16), ('1.5', 16), ('invalid', 16),
+])
+def test_resume_archive_limit_configuration(monkeypatch, raw, expected_mib):
+    if raw is None:
+        monkeypatch.delenv('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', raising=False)
+    else:
+        monkeypatch.setenv('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', raw)
+    assert kobo_position._resume_archive_limit() == expected_mib * 1024 * 1024
+
+
+def test_archive_over_cap_is_explained_once_and_never_resolves(epub, monkeypatch, caplog):
+    """The cap stays a hard bound, but the operator can see why exact resume was skipped."""
+    import logging
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', epub.stat().st_size - 1)
+    kobo_position._note_archive_over_cap.cache_clear()
+    with caplog.at_level(logging.INFO, logger=kobo_position.log.name):
+        for _ in range(3):
+            assert kobo_position._resume_snapshot(
+                epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') is None
+    messages = [r.getMessage() for r in caplog.records if 'Exact Kobo resume skipped' in r.getMessage()]
+    assert len(messages) == 1
+    assert 'CWA_KOBO_RESUME_MAX_ARCHIVE_MIB' in messages[0]
+    assert str(epub) in messages[0]
+
+
+def test_archive_at_cap_still_resolves(epub, monkeypatch):
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', epub.stat().st_size)
+    point, digest = kobo_position._resume_snapshot(
+        epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    assert point == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
+    assert len(digest) == 64
+
+
+def test_chapter_snapshot_over_cap_is_explained(epub, monkeypatch, caplog):
+    import logging
+    from cps.services import kobo_resume
+    monkeypatch.setattr(kobo_resume, 'MAX_RESUME_ARCHIVE_BYTES', epub.stat().st_size - 1)
+    kobo_position._note_archive_over_cap.cache_clear()
+    with caplog.at_level(logging.INFO, logger=kobo_position.log.name):
+        assert kobo_resume._chapter_snapshot(epub, 'OEBPS/chapter.xhtml', 50) is None
+    assert any('Exact Kobo resume skipped' in r.getMessage() for r in caplog.records)
+
+
+def test_large_illustrated_archive_resolves_once_the_cap_allows_it(epub, monkeypatch):
+    """A >16 MiB archive (stored images) is refused by default and exact when admitted."""
+    with zipfile.ZipFile(epub, 'a', zipfile.ZIP_STORED) as archive:
+        archive.writestr('OEBPS/images/plate.jpg', b'\0' * (17 * 1024 * 1024))
+    assert epub.stat().st_size > kobo_position.MAX_RESUME_ARCHIVE_BYTES
+    args = (epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    assert kobo_position._resume_snapshot(*args) is None
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', 32 * 1024 * 1024)
+    point, digest = kobo_position._resume_snapshot(*args)
+    assert point == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
+    assert len(digest) == 64

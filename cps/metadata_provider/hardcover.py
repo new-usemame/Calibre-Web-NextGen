@@ -40,6 +40,7 @@ try:  # pragma: no cover - normal app path
     from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata  # type: ignore
     from cps.services.Metadata import ProviderRefused  # type: ignore
     from cps.isoLanguages import get_language_name  # type: ignore
+    from cps.services.isbn import isbn13  # type: ignore
     from ..cw_login import current_user  # type: ignore
 except Exception:  # pragma: no cover - CLI/testing path
     import logging as _logging
@@ -108,6 +109,9 @@ except Exception:  # pragma: no cover - CLI/testing path
 
     def get_language_name(locale: str, code3: str) -> str:  # type: ignore
         return code3 or ""
+
+    def isbn13(value):  # type: ignore
+        return str(value or "").replace("-", "").replace(" ", "") or None
 
     class _DummyUser:
         hardcover_token: Optional[str] = None
@@ -468,10 +472,11 @@ class Hardcover(Metadata):
         reasons = []
         
         # ISBN match (if available) - highest confidence
+        # Compared as ISBN-13s with a valid check digit, so an edition's
+        # ISBN-10 and ISBN-13 match each other and junk matches nothing.
         if query_isbn and result.identifiers.get('isbn'):
-            result_isbn = str(result.identifiers.get('isbn', '')).replace('-', '').replace(' ', '')
-            query_isbn_clean = query_isbn.replace('-', '').replace(' ', '')
-            if result_isbn == query_isbn_clean:
+            result_isbn = isbn13(result.identifiers.get('isbn'))
+            if result_isbn and result_isbn == isbn13(query_isbn):
                 return (1.0, "ISBN exact match")
         
         # Title similarity (base score: 0.5-0.95)

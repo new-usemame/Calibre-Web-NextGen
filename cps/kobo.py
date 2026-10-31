@@ -55,6 +55,7 @@ from .services import cover_preview, ereader_scope, parallel, user_cover
 from .services import device_reading_position as device_positions
 from .services import kobo_removal, device_book_scope
 from .services import kobo_place_gate
+from .services import hardcover_progress
 from .fs import FileSystem
 from .web import download_required
 from .kobo_auth import requires_kobo_auth, get_auth_token
@@ -5062,8 +5063,9 @@ def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: i
     """
     Sync reading progress to Hardcover if enabled for the user and book is not blacklisted.
 
-    Most exceptions are caught and logged so that issues with Hardcover do not prevent
-    the Kobo from clearing its reading state sync queue.
+    The Hardcover calls run on a worker thread after this returns, and their
+    failures are logged there, so Hardcover never delays or fails the device's
+    request (#2775).
 
     :param book: The book for which to sync reading progress.
     :param progress_percentage: Reading progress percentage.
@@ -5081,20 +5083,30 @@ def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: i
         log.debug(f"Skipping reading progress sync for book {book.id} - blacklisted for reading progress")
         return
 
-    try:
-        hardcoverClient = hardcover.HardcoverClient(user.hardcover_token)
-    except hardcover.MissingHardcoverToken:
+    if not user.hardcover_token:
         log.info(f"User {user.name} has no Hardcover token, not syncing reading progress to Hardcover")
         return
-    except Exception as e:
-        log.error(f"Failed to create Hardcover client for user {user.name}: {e}")
-        return
 
-    try:
-        hardcoverClient.update_reading_progress(book.identifiers, progress_percentage)
-    except Exception as e:
-        log.error(f"Failed to update reading progress for book {book.id} in Hardcover: {e}",
-                  exc_info=True)
+    # Hardcover takes several round trips, so the request that reported this
+    # reading answers first and a worker thread sends it (#2775). Only plain
+    # values cross: the identifiers are read here, on the request's session.
+    identifiers = {i.type: i.val for i in book.identifiers if "hardcover" in i.type}
+    user_name = user.name
+
+    def client_for(token):
+        try:
+            return hardcover.HardcoverClient(token)
+        except hardcover.MissingHardcoverToken:
+            log.info(f"User {user_name} has no valid Hardcover token, not syncing reading progress to Hardcover")
+        except Exception as e:
+            log.error(f"Failed to create Hardcover client for user {user_name}: {e}")
+        return None
+
+    hardcover_progress.enqueue(
+        user_id=user.id, user_name=user_name, book_id=book.id,
+        token=user.hardcover_token, identifiers=identifiers,
+        percent=progress_percentage, client_factory=client_for,
+    )
 
 
 def get_read_status_for_kobo(ub_book_read):

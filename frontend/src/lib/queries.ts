@@ -14,6 +14,7 @@ import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
+import { beginImportWatch } from './uploadImportStore';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
 import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
@@ -1300,17 +1301,32 @@ export function useMergeBooks() {
 
 // ── Upload ───────────────────────────────────────────────────────────────────
 
+/** The library's current book total, or null if it cannot be read. One row is
+ *  requested; only the total is wanted. */
+async function readLibraryTotal(): Promise<number | null> {
+  try {
+    const page = await apiGet<BooksPage>('/api/v1/books?page=1&per_page=1&sort=new');
+    return typeof page.total === 'number' ? page.total : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useUploadBooks() {
-  const qc = useQueryClient();
   return useMutation({
+    // The total before the files are queued is what later arrivals are counted
+    // against (#1044).
+    onMutate: async () => ({ baseline: await readLibraryTotal() }),
     mutationFn: (files: File[]) => {
       const fd = new FormData();
       for (const f of files) fd.append('file', f);
       return apiUpload<UploadResult>('/api/v1/upload', fd);
     },
-    onSuccess: () => {
-      // The library will populate as ingest processes; nudge the catalog.
-      void qc.invalidateQueries({ queryKey: ['books'] });
+    onSuccess: (result, _files, context) => {
+      // Ingest runs after this request returns, so refetching the catalog now
+      // would still show the old list. Follow the books in instead; the
+      // library views refresh as they arrive (UploadImportWatcher).
+      beginImportWatch(result.queued.length, context?.baseline ?? null);
     },
   });
 }

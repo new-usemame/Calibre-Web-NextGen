@@ -58,6 +58,21 @@ If you'd rather type, the e-reader also offers **Sign in with username and passw
 
 Each e-reader gets its own app password, which you can revoke on your account page.
 
+## Naming your e-reader
+
+Each e-reader appears on your account's **Devices** page, under **E-readers**, with the
+model name KOReader reports. On a Kobo that can be an internal code such as `Kobo_spaBW`
+rather than the name on the box.
+
+To change it, tap the pencil beside the name, type the name you want and choose
+**Save**. The name stays: later syncs from the e-reader don't change it. The plugin has
+no name setting of its own, so the Devices page is the one place an e-reader is named,
+the same as for a Kobo or the web reader.
+
+A Kobo that syncs both through Kobo sync and through the KOReader plugin appears as two
+entries, one for each. Rename them separately, for example "Clara (KOReader)" and
+"Clara (stock)".
+
 ## Which books appear
 
 The same choice your Kobo uses. By default that's your whole library. To carry only some

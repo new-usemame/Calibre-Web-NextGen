@@ -5767,7 +5767,9 @@ def HandleProductsRequest(dummy=None):
 def make_calibre_web_auth_response():
     # As described in kobo_auth.py, CalibreWeb doesn't make use practical use of this auth/device API call for
     # authentation (nor for authorization). We return a dummy response just to keep the device happy.
-    content = request.get_json(silent=True) or {}
+    content = request.get_json(silent=True)
+    if not isinstance(content, dict):
+        content = {}
     AccessToken = base64.b64encode(os.urandom(24)).decode('utf-8')
     RefreshToken = base64.b64encode(os.urandom(24)).decode('utf-8')
     return make_response(

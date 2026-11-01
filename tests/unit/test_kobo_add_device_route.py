@@ -107,3 +107,11 @@ def test_an_unknown_token_is_still_refused(kobo_app):
         "/kobo/not-a-token/v1/user/add-device", headers=HEADERS, json=ADD_DEVICE_BODY)
 
     assert response.status_code in (401, 403)
+
+
+def test_a_json_body_that_is_not_an_object_is_answered_not_crashed(kobo_app):
+    response = kobo_app.app.test_client().post(
+        "/kobo/reader-token/v1/user/add-device", headers=HEADERS, json=[1])
+
+    assert response.status_code == 200, response.data[:200]
+    assert response.get_json()["UserKey"] == ""

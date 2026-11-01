@@ -153,7 +153,7 @@ def auto_register_plugins(
     calibre_customize_binary: str = "calibre-customize",
 ) -> list[str]:
     """If enabled, scan the plugins dir for ``*.zip`` files and call
-    ``calibre-customize -a`` on each one with HOME=/config so calibre
+    ``calibre-customize -a`` on each one with the ingest env so calibre
     records it in customize.py.json. Returns the list of plugin names
     successfully registered this call (could be empty if nothing new).
 
@@ -186,14 +186,13 @@ def auto_register_plugins(
         return []
 
     # Inherit the ambient environment so `calibre-customize` resolves off
-    # the real PATH, but keep HOME pinned to the config tree: calibre
-    # writes its plugin registry under `$HOME/.config/calibre/`, which is
-    # exactly where `_CUSTOMIZE_JSON` above reads it back from. Letting
-    # HOME default to the service's own (`/root`) would write the registry
-    # somewhere nothing reads, so the short-circuit never fires and the
-    # running calibre never sees the plugins.
-    env = os.environ.copy()
-    env["HOME"] = _HOME
+    # the real PATH, but pin the config dir the same way ingest does: calibre
+    # writes its plugin registry under `$CALIBRE_CONFIG_DIRECTORY`, which
+    # must be where `_CUSTOMIZE_JSON` above reads it back from. Letting the
+    # service's own value (the `/tmp` dir cwa-auto-library exports) through
+    # would write the registry somewhere nothing reads, so the short-circuit
+    # never fires and the running calibre never sees the plugins.
+    env = apply_to_env(os.environ.copy())
 
     registered: list[str] = []
     # `calibre-customize -a` copies the source .zip into

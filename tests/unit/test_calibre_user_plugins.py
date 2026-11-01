@@ -276,6 +276,34 @@ class TestAutoRegisterPlugins:
         assert len(result) == 2
         assert all(name == "FakePlugin (1, 0, 0)" for name in result)
 
+    def test_registers_into_ingest_config_dir(
+            self, clean_env, tmp_path, monkeypatch):
+        """#2798: the inherited CALIBRE_CONFIG_DIRECTORY must not win over the
+        config dir ingest reads."""
+        from unittest.mock import patch, MagicMock
+
+        clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
+        clean_env.setenv("CALIBRE_CONFIG_DIRECTORY", "/tmp/cwa-calibre-config-0")
+        monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
+        config = tmp_path / ".config" / "calibre"
+        monkeypatch.setattr(
+            calibre_user_plugins, "_CUSTOMIZE_JSON", config / "customize.py.json")
+        (config / "plugins").mkdir(parents=True)
+        (config / "plugins" / "Probe.zip").write_bytes(b"PK\x03\x04")
+
+        envs = []
+
+        def fake_run(args, **kwargs):
+            envs.append(kwargs["env"])
+            return MagicMock(returncode=0, stdout="Plugin added: Probe (1, 0, 0)\n")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            calibre_user_plugins.auto_register_plugins(
+                calibre_customize_binary="/fake/calibre-customize"
+            )
+
+        assert [e["CALIBRE_CONFIG_DIRECTORY"] for e in envs] == [str(config)]
+
     def test_failed_calibre_customize_doesnt_block_boot(
             self, clean_env, tmp_path, monkeypatch):
         """If the binary is missing or returns nonzero, bootstrap should

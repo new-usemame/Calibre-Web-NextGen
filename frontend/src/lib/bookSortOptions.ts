@@ -17,6 +17,32 @@ export const SORT_OPTIONS = [
   { label: 'Oldest published', value: 'pubold' },
 ] as const;
 
+// "Date read" is only offered while the Read filter is on (#2800): it ranks the
+// books this reader finished by when they finished them, which the library
+// fields above cannot say. Like Recent it is per reader and resolved
+// server-side (cps/sort_orders.py::read_date_order).
+export const READ_DATE_SORT_OPTIONS = [
+  { label: 'Date read, newest first', value: 'readnew' },
+  { label: 'Date read, oldest first', value: 'readold' },
+] as const;
+
+export const READ_DATE_SORT_VALUES: readonly string[] = READ_DATE_SORT_OPTIONS.map((o) => o.value);
+
+/**
+ * The menu for the Read list. "Newest" there reads as "newest read" but means
+ * newest added to the library, so the two date-added options say so.
+ */
+export function readListSortOptions<T extends { label: string; value: string }>(options: readonly T[]) {
+  return [
+    ...READ_DATE_SORT_OPTIONS,
+    ...options.map((o) => (
+      o.value === 'new' ? { ...o, label: 'Added, newest first' }
+        : o.value === 'old' ? { ...o, label: 'Added, oldest first' }
+          : o
+    )),
+  ];
+}
+
 export type BookSortValue = (typeof SORT_OPTIONS)[number]['value'];
 
 /** What the plain Library view opens on when the reader has expressed no choice. */

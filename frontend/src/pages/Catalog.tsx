@@ -36,7 +36,7 @@ import { advancedSearchHref } from '../lib/advancedSearchUrl';
 import { canUploadBooks } from '../lib/permissions';
 import {
   LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
-  defaultCatalogSort, resolveLibrarySort,
+  READ_DATE_SORT_VALUES, defaultCatalogSort, readListSortOptions, resolveLibrarySort,
 } from '../lib/bookSortOptions';
 
 const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
@@ -72,7 +72,7 @@ const READ_FILTERS: { label: string; value: ReadFilter }[] = [
 // defaults (#573 series-order, #498 saved view) and are intentionally excluded — a
 // remembered whole-library sort must not leak into a series or author listing.
 const LIBRARY_READ_FILTER_KEY = 'cwng:library-readfilter-v1';
-const LIBRARY_SORT_VALUES = SORT_OPTIONS.map((o) => o.value);
+const LIBRARY_SORT_VALUES = [...SORT_OPTIONS.map((o) => o.value), ...READ_DATE_SORT_VALUES];
 const LIBRARY_READ_FILTER_VALUES: ReadFilter[] = READ_FILTERS.map((f) => f.value);
 
 // A stored choice is honoured only if it is still a valid option; anything else
@@ -781,7 +781,13 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     filterActive ? advQuery : booksQuery;
   const customSortOptions = view === 'hot' || view === 'discover'
     ? [] : (data?.custom_sort_options ?? []);
-  const activeSortOptions = [...sortOptions, ...customSortOptions];
+  const onReadList = readFilter === 'read';
+  const activeSortOptions = [...(onReadList ? readListSortOptions(sortOptions) : sortOptions), ...customSortOptions];
+  // "Date read" exists only on the Read list; leaving it must not strand the menu
+  // on a value it no longer offers (#2800).
+  useEffect(() => {
+    if (!onReadList && READ_DATE_SORT_VALUES.includes(sort)) setSort(defaultSort);
+  }, [onReadList, sort, defaultSort]);
   const customColumnDefinitions = (data?.custom_column_definitions ?? []).map((column) => ({
     ...column,
     name: customFieldLabels[String(column.id)]?.trim() || column.name,

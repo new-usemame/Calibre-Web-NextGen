@@ -341,6 +341,142 @@ def _csrf_meta_tag():
         generate_csrf(), quote=True)
 
 
+# ---------------------------------------------------------------------------
+# Installable web app (PWA): manifest + service worker for the new UI.
+#
+# Both are served from Flask rather than the Vite bundle because:
+#   * scope: a service worker controls only URLs under its own path, and the
+#     shell lives at <prefix>/app while the bundle lives at <prefix>/static/app;
+#   * prefix: start_url, scope and the precache list must carry the reverse-
+#     proxy mount prefix, which only the server knows (see _mount_prefix).
+# Opt out with CWNG_PWA=0. Turning it off serves a worker that deletes its
+# caches and unregisters itself, so browsers that installed it are cleaned up.
+# ---------------------------------------------------------------------------
+
+_SW_SOURCE = os.path.join(os.path.dirname(__file__), "static", "js", "cwng-service-worker.js")
+_SW_CACHE_PREFIX = "cwng-app-"
+_PWA_THEME_COLOR = "#141c24"  # --bg in frontend/src/styles/tokens.css (dark theme)
+_PWA_ICON_SIZES = (192, 512)  # Firefox for Android needs >= 192px to offer "Install"
+
+_SW_UNREGISTER_SOURCE = """'use strict';
+self.addEventListener('install', function () { self.skipWaiting(); });
+self.addEventListener('activate', function (event) {
+  event.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (key) {
+      return key.indexOf(%s) === 0;
+    }).map(function (key) { return caches.delete(key); }));
+  }).then(function () { return self.registration.unregister(); }));
+});
+""" % json.dumps(_SW_CACHE_PREFIX)
+
+
+def _pwa_enabled():
+    """Installable-app support. OPT-OUT, like the SPA itself; it also requires
+    the SPA, since the shell is what the installed app opens."""
+    value = os.environ.get("CWNG_PWA")
+    if value is not None and value.strip().lower() in _DISABLE_VALUES:
+        return False
+    return _spa_enabled() and _spa_bundle_present()
+
+
+def _spa_asset_files():
+    """Bundle files (relative to the SPA dir) the worker precaches: every file
+    under assets/, which is everything the shell can lazy-import, so a page
+    never opened online (the reader) still opens offline. Source maps are only
+    for debugging and are skipped."""
+    assets_dir = os.path.join(_SPA_DIR, "assets")
+    files = []
+    for root, _dirs, names in os.walk(assets_dir):
+        for name in names:
+            if name.endswith(".map"):
+                continue
+            rel = os.path.relpath(os.path.join(root, name), _SPA_DIR)
+            files.append(rel.replace(os.sep, "/"))
+    return sorted(files)
+
+
+def _spa_build_id(asset_files):
+    """Identify the deployed bundle. Changes whenever index.html, any asset
+    name (names are content-hashed) or the release changes. That changes the
+    worker script, which is what makes browsers install the new build."""
+    import hashlib
+    digest = hashlib.sha256()
+    digest.update(str(constants.INSTALLED_VERSION).encode("utf-8"))
+    with open(os.path.join(_SPA_DIR, "index.html"), "rb") as fh:
+        digest.update(fh.read())
+    for name in asset_files:
+        digest.update(b"\0" + name.encode("utf-8"))
+    return digest.hexdigest()[:16]
+
+
+def _pwa_head_tags(prefix):
+    if not _pwa_enabled():
+        return ""
+    return (
+        '<link rel="manifest" href="%s/app/manifest.webmanifest">'
+        '<meta name="theme-color" content="%s">'
+        '<script>window.__CWNG_PWA__=true;</script>'
+    ) % (html_escape(prefix, quote=True), _PWA_THEME_COLOR)
+
+
+def _always_revalidate(resp):
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@spa.route("/app/sw.js")
+def service_worker():
+    """The worker script. Always answers, even when disabled, so a browser
+    that registered it earlier receives the self-unregistering version."""
+    prefix = _mount_prefix()
+    if not _pwa_enabled():
+        resp = Response(_SW_UNREGISTER_SOURCE, mimetype="text/javascript")
+    else:
+        asset_files = _spa_asset_files()
+        sw_config = {
+            "prefix": prefix,
+            "build": _spa_build_id(asset_files),
+            "precache": [prefix + "/static/app/" + name for name in asset_files],
+        }
+        with open(_SW_SOURCE, "r", encoding="utf-8") as fh:
+            source = fh.read()
+        body = "self.__CWNG_SW__ = %s;\n%s" % (_inline_script_json(sw_config), source)
+        resp = Response(body, mimetype="text/javascript")
+    # Browsers byte-compare this script to detect a new build, so it must be
+    # revalidated every time rather than served from an HTTP cache.
+    return _always_revalidate(resp)
+
+
+@spa.route("/app/manifest.webmanifest")
+def web_manifest():
+    if not _pwa_enabled():
+        abort(404)
+    prefix = _mount_prefix()
+    title = (getattr(config, "config_calibre_web_title", None) or "").strip() \
+        or "Calibre-Web NextGen"
+    manifest = {
+        "id": prefix + "/app/",
+        "name": title,
+        "short_name": title if len(title) <= 12 else "CWNG",
+        "start_url": prefix + "/app/",
+        "scope": prefix + "/app/",
+        "display": "standalone",
+        "background_color": _PWA_THEME_COLOR,
+        "theme_color": _PWA_THEME_COLOR,
+        "icons": [
+            {
+                "src": "%s/static/img/pwa-icon-%d.png" % (prefix, size),
+                "sizes": "%dx%d" % (size, size),
+                "type": "image/png",
+                "purpose": "any",
+            }
+            for size in _PWA_ICON_SIZES
+        ],
+    }
+    resp = Response(json.dumps(manifest), mimetype="application/manifest+json")
+    return _always_revalidate(resp)
+
+
 def _render_shell(index_path, prefix):
     """Serve the built index.html adapted to the current mount prefix.
 
@@ -394,6 +530,7 @@ def _render_shell(index_path, prefix):
         _inline_script_json(constants.INSTALLED_VERSION),
     )
     inject += _csrf_meta_tag()
+    inject += _pwa_head_tags(prefix)
     html = html.replace("</head>", inject + "</head>", 1)
     resp = Response(html, mimetype="text/html")
     # The shell NAMES the content-addressed bundle files, which are served

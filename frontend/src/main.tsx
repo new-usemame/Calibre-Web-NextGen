@@ -8,6 +8,7 @@ import { AnnouncerProvider } from './lib/a11y/announcer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthTransitionError, navigateToLogout, BASE_PREFIX } from './lib/api';
 import { createQueryClient } from './lib/queryClient';
+import { registerServiceWorker } from './lib/pwa';
 
 // Protected wrappers normalize every auth-loss shape and start the canonical
 // top-level logout navigation. Keep the cache transition here so no stale
@@ -37,3 +38,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </React.StrictMode>,
 );
+
+registerServiceWorker();

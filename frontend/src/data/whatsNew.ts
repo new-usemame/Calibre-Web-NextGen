@@ -56,6 +56,17 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.61',
+    date: '2026-11-02',
+    items: [
+      {
+        title: 'Your Kobo gets your newest place again',
+        body: 'Some libraries had stored two saved places for the same book, and the server picked one at random when your Kobo synced, so a place saved on another device could be held back. The server now keeps the place it received last and removes the extra copy when it starts.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.60',
     date: '2026-10-31',
     items: [

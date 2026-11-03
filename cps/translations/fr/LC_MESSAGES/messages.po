@@ -19786,6 +19786,10 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr "CrossPoint"
+
 #~ msgid "Progress is not being saved."
 #~ msgstr "La progression n’est pas enregistrée."
 

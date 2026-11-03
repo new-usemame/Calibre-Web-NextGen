@@ -14,6 +14,7 @@ receipt is ``KoboBookmark.server_modified_at``. The stored device clock is
 never treated as a receipt.
 """
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -23,13 +24,15 @@ from types import SimpleNamespace
 from sqlalchemy import and_, case, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from .. import ub
+from .. import logger, ub
 from .place_arbiter import Report, report_wins
 from .share_place import gates_enforced
 from .place_journal import (
     _journal_place_report, _journal_status_report, _status_receipt, _same,
     write_report,
 )
+
+log = logger.create()
 
 CHECKED = "checked"
 UNCHECKED = "unchecked"
@@ -684,6 +687,7 @@ def delivery_bookmark(book, bookmark, response, device_id):
             and bookmark.location_source and bookmark.location_type == "KoboSpan"
             and bookmark.span_kepub_identity == receiver_identity):
         clear_echo_guard(device_id, book.id)
+        _log_delivery(book, device_id, "exact shared place", response)
         return response
     if own is not None and own.location_value:
         held = own
@@ -699,6 +703,8 @@ def delivery_bookmark(book, bookmark, response, device_id):
     # No shared place has ever been written, so no inexact delivery to arm.
     if bookmark.progress_percent is None and not bookmark.location_value:
         return None
+    held_reason = (_held_reason(device_id, book, bookmark, receiver_identity)
+                   if log.isEnabledFor(logging.DEBUG) else None)
     table = ub.KoboPlaceEchoGuard.__table__
     values = dict(device_id=int(device_id), book_id=int(book.id),
                   location_value=held.location_value, location_source=held.location_source,
@@ -713,12 +719,53 @@ def delivery_bookmark(book, bookmark, response, device_id):
         where=~_same(table.c.shared_received_at, bookmark.server_modified_at),
     ))
     if not held.location_value:
+        if held_reason is not None:
+            _log_delivery(book, device_id, held_reason + "; no own place to hold, so no bookmark", None)
         return None
     response = dict(response)
     response["Location"] = {"Value": held.location_value,
                             "Source": held.location_source,
                             "Type": held.location_type}
+    if held_reason is not None:
+        _log_delivery(book, device_id, held_reason + "; sent this Kobo's own place", response)
     return response
+
+
+def _held_reason(device_id, book, bookmark, receiver_identity):
+    """Why a Kobo was not sent the shared span (#2804). DEBUG only."""
+    try:
+        return "held: " + _held_cause(device_id, book, bookmark, receiver_identity)
+    except Exception:  # a diagnostic must never fail a sync
+        log.debug("Could not explain the held Kobo place", exc_info=True)
+        return "held: reason unavailable"
+
+
+def _held_cause(device_id, book, bookmark, receiver_identity):
+    if receiver_identity is None:
+        _epub, path = _book_paths(book)
+        if _readable_kepub_identity(path) is None:
+            return "the library has no readable KEPUB for this book, so no place can be exact"
+        row = ub.session.query(ub.KoboDeviceBookDownload).filter_by(
+            device_id=int(device_id), book_id=int(book.id)).one_or_none()
+        if row is None or (row.book_format or "").lower() != "kepub":
+            return "this Kobo has no recorded KEPUB download of this book from this server"
+        return "this Kobo has not finished downloading the library's current KEPUB"
+    if not (bookmark.location_value and bookmark.location_source
+            and bookmark.location_type == "KoboSpan"):
+        return "the shared place has no KoboSpan (it could only be shared as a percentage)"
+    return "the shared span was converted against a different KEPUB than this Kobo holds"
+
+
+def _log_delivery(book, device_id, reason, response):
+    response = response or {}
+    location = response.get("Location") or {}
+    log.debug(
+        "Kobo place for book %s device %s: %s; CurrentBookmark ProgressPercent=%s "
+        "ContentSourceProgressPercent=%s Location=%s %s",
+        book.id, device_id, reason, response.get("ProgressPercent"),
+        response.get("ContentSourceProgressPercent"),
+        location.get("Type"), location.get("Value"),
+    )
 
 
 def _span_ordinal(value):

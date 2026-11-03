@@ -72,6 +72,7 @@ mimetypes.add_type('application/vnd.adobe.adept+xml', '.acsm')
 mimetypes.add_type('application/vnd.readium.lcp.license.v1.0+json', '.lcpl')
 mimetypes.add_type('application/vnd.amazon.ebook', '.kfx')
 mimetypes.add_type('application/zip', '.kfx-zip')
+mimetypes.add_type('application/zip', '.fbz')
 
 log = logger.create()
 

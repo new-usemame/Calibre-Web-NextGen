@@ -1148,7 +1148,9 @@ class Enforcer:
         'Cover-file is not a valid image file, or could not be stored'. The metadata-change
         dispatcher runs the enforcer as the app user, so this only acts when run as root.
         """
-        if os.geteuid() != 0:
+        if getattr(os, "geteuid", lambda: 1000)() != 0:
+            # Not root -- or a platform without geteuid at all (Windows),
+            # which is definitionally not a root container.
             return
         try:
             uid = int(os.environ.get("PUID", "1000"))

@@ -41,6 +41,37 @@ RESTORE_SERVED = "served"
 RESTORE_EMPTY = "empty"
 RESTORE_OPEN_STATES = (RESTORE_ARMED, RESTORE_PENDING)
 
+# Nickel's book file GET carries the auth token in its URL but no x-kobo-*
+# headers, so on an account with two or more Kobos the download route cannot
+# tell which one is fetching (#2724). The URL itself comes from that Kobo's own
+# library/sync, which does carry the header, so sync names the device in it.
+DOWNLOAD_DEVICE_PARAM = "device"
+
+
+def download_url_device_tag(device_id):
+    """The public id a download URL handed to Kobo ``device_id`` carries."""
+    if device_id is None:
+        return None
+    device = ub.session.query(ub.Device).filter_by(id=int(device_id)).one_or_none()
+    if device is None or device.kind != "kobo":
+        return None
+    return device.public_id
+
+
+def tagged_download_device(user_id, public_id):
+    """The account's active Kobo a download URL names, or None.
+
+    Only the account's own active Kobos count: a URL edited to name any other
+    device attributes nothing, and the download falls back to the heuristic.
+    """
+    if user_id is None or not public_id:
+        return None
+    device = ub.session.query(ub.Device).filter_by(
+        public_id=str(public_id), user_id=int(user_id), kind="kobo", active=True,
+    ).one_or_none()
+    return device.id if device is not None else None
+
+
 
 def _now():
     return datetime.now(timezone.utc)

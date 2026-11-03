@@ -3646,10 +3646,20 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         # The device is about to replace its local copy; remember that so the
         # annotation GET that follows is answered from CWNG's own rows.
         try:
-            from flask import g
-            from .services.kobo_post_download_restore import record_download, completed_download_body
+            from flask import g, request
+            from .services.kobo_post_download_restore import (
+                DOWNLOAD_DEVICE_PARAM, record_download, completed_download_body,
+                tagged_download_device,
+            )
+            device_id = getattr(g, "annotation_origin_device_id", None)
+            if device_id is None:
+                # No device header (Nickel never sends one on a file GET): the
+                # Kobo named in the URL its own sync handed it is the fetcher.
+                device_id = tagged_download_device(
+                    getattr(current_user, "id", None),
+                    request.args.get(DOWNLOAD_DEVICE_PARAM))
             download = record_download(
-                device_id=getattr(g, "annotation_origin_device_id", None),
+                device_id=device_id,
                 book_id=book.id, book_format=book_format, log=log,
                 user_id=getattr(current_user, "id", None),
                 completed=False,

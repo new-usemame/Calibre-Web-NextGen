@@ -18,10 +18,17 @@ from sqlalchemy import exc as sa_exc
 from sqlalchemy.orm import selectinload
 
 # Import the Hardcover provider
+from cps.utils.text_similarity import main_title, normalize_isbn
+
 try:
     from cps.metadata_provider.hardcover import Hardcover
 except ImportError:
     Hardcover = None
+
+
+# Identifier types that count as "this book is on Hardcover". Shared with the
+# admin "books without a Hardcover ID" view so both agree on the set.
+HARDCOVER_IDENTIFIER_TYPES = ('hardcover-id', 'hardcover-slug', 'hardcover-edition')
 
 
 class TaskAutoHardcoverID(CalibreTask):
@@ -43,10 +50,14 @@ class TaskAutoHardcoverID(CalibreTask):
                  batch_size: int = 50,
                  rate_limit_delay: float = 5.0,
                  max_backoff_errors: int = 5,
+                 include_pending: bool = False,
                  task_message=N_('Auto-fetching Hardcover IDs')):
         super(TaskAutoHardcoverID, self).__init__(task_message)
         self.log = logger.create()
         self.min_confidence = min_confidence
+        # Re-score books already waiting in the review queue (a manual
+        # "match again" run). Rejected books stay excluded either way.
+        self.include_pending = include_pending
         self.batch_size = batch_size
         self.rate_limit_delay = rate_limit_delay
         self.max_backoff_errors = max_backoff_errors
@@ -209,7 +220,7 @@ class TaskAutoHardcoverID(CalibreTask):
         excluded_book_ids = self._get_review_excluded_book_ids()
         query = self.calibre_db.session.query(db.Books.id).filter(
             ~db.Books.identifiers.any(
-                db.Identifiers.type.in_(['hardcover-id', 'hardcover-slug', 'hardcover-edition'])
+                db.Identifiers.type.in_(HARDCOVER_IDENTIFIER_TYPES)
             )
         )
 
@@ -239,15 +250,16 @@ class TaskAutoHardcoverID(CalibreTask):
         ub_session = None
         try:
             ub_session = ub.init_db_thread()
+            rejected = (
+                (ub.HardcoverMatchQueue.reviewed == 1)
+                & (ub.HardcoverMatchQueue.review_action == 'reject')
+            )
+            condition = rejected if getattr(self, 'include_pending', False) else (
+                (ub.HardcoverMatchQueue.reviewed == 0) | rejected
+            )
             rows = (
                 ub_session.query(ub.HardcoverMatchQueue.book_id)
-                .filter(
-                    (ub.HardcoverMatchQueue.reviewed == 0)
-                    | (
-                        (ub.HardcoverMatchQueue.reviewed == 1)
-                        & (ub.HardcoverMatchQueue.review_action == 'reject')
-                    )
-                )
+                .filter(condition)
                 .distinct()
                 .all()
             )
@@ -279,62 +291,40 @@ class TaskAutoHardcoverID(CalibreTask):
         books_by_id = {book.id: book for book in books}
         return [books_by_id[book_id] for book_id in book_ids if book_id in books_by_id]
 
-    def _process_book(self, book: db.Books):
+    # Pause between the extra searches made for one book. Hardcover allows
+    # about one request per second; the configured delay applies between
+    # books on top of this.
+    QUERY_DELAY = 1.0
+
+    @staticmethod
+    def _book_isbn(book) -> Optional[str]:
+        """The book's first identifier that is a valid ISBN, normalized to 13 digits."""
+        for identifier in book.identifiers or []:
+            if (identifier.type or '').lower() in ('isbn', 'isbn13', 'isbn10'):
+                isbn = normalize_isbn(identifier.val)
+                if isbn:
+                    return isbn
+        return None
+
+    def _score_results(self, book, results) -> List[dict]:
+        """Score every candidate against the book, best first.
+
+        Equal scores are broken by how many Hardcover users shelved the book:
+        Hardcover holds many near-empty duplicate records, and the canonical
+        one is almost always the most shelved.
         """
-        Process a single book: search Hardcover API, calculate confidence, apply or queue.
-        """
-        book_id = book.id
-        # Build search query from book metadata
         authors = [author.name for author in book.authors] if book.authors else []
-        authors_csv = ", ".join(authors) if authors else ""
-        author_str = ", ".join(authors[:3]) if authors else ""  # Limit to first 3 authors
-        title = book.title
-        
-        # Build search query
-        if author_str:
-            search_query = f"{title} {author_str}"
-        else:
-            search_query = title
-        
-        self.log.debug(f"Searching Hardcover for: {search_query}")
-        
-        # Initialize Hardcover provider
-        provider = Hardcover()
-        
-        # Search Hardcover API
-        results = provider.search(search_query)
-        
-        if not results:
-            self.log.debug(f"No Hardcover results for book {book_id} '{title}'")
-            self.skipped_no_results += 1
-            return
-        
-        self.log.debug(f"Found {len(results)} Hardcover results for book {book_id}")
-        
-        # Calculate confidence scores for each result
-        scored_results = []
-        for result in results[:50]:  # Score all hits returned (API per_page=50)
-            # Get book's ISBN for matching
-            book_isbn = None
-            for identifier in book.identifiers:
-                if identifier.type.lower() == 'isbn':
-                    book_isbn = identifier.val
-                    break
-            
-            # Get book's series info
-            book_series = book.series[0].name if book.series else None
-            book_series_index = book.series_index if book.series else None
-            
-            # Get publisher
-            book_publisher = book.publishers[0].name if book.publishers else None
-            
-            # Get publication year
-            book_year = str(book.pubdate)[:4] if book.pubdate else None
-            
-            # Calculate confidence score
+        book_isbn = self._book_isbn(book)
+        book_series = book.series[0].name if book.series else None
+        book_series_index = book.series_index if book.series else None
+        book_publisher = book.publishers[0].name if book.publishers else None
+        book_year = str(book.pubdate)[:4] if book.pubdate else None
+
+        scored = []
+        for result in results:
             score, reason = Hardcover.calculate_confidence_score(
                 result=result,
-                query_title=title,
+                query_title=book.title,
                 query_authors=authors,
                 query_isbn=book_isbn,
                 query_series=book_series,
@@ -342,19 +332,73 @@ class TaskAutoHardcoverID(CalibreTask):
                 query_publisher=book_publisher,
                 query_year=book_year
             )
-            
-            scored_results.append({
-                'result': result,
-                'score': score,
-                'reason': reason
-            })
-        
-        # Sort by confidence score (highest first)
-        scored_results.sort(key=lambda x: x['score'], reverse=True)
-        
+            hints = getattr(result, 'match_hints', None) or {}
+            try:
+                popularity = int(hints.get('users_count') or 0)
+            except (TypeError, ValueError):
+                popularity = 0
+            scored.append({'result': result, 'score': score, 'reason': reason,
+                           'popularity': popularity})
+        scored.sort(key=lambda x: (x['score'], x['popularity']), reverse=True)
+        return scored
+
+    def _search_plan(self, book) -> List[str]:
+        """Queries to try, in order, until one gives a confident match.
+
+        1. The ISBN: Hardcover indexes every edition's ISBN under the book, so
+           a translated edition finds the original work whatever its title.
+        2. Title and up to three authors (the historical query).
+        3. Title without its subtitle and the first author, for titles that
+           Calibre and Hardcover split differently.
+        """
+        authors = [author.name for author in book.authors] if book.authors else []
+        title = book.title or ''
+        plan = []
+        isbn = self._book_isbn(book)
+        if isbn:
+            plan.append(isbn)
+        author_str = ", ".join(authors[:3])
+        plan.append(f"{title} {author_str}".strip())
+        main = main_title(title)
+        if main and main != title:
+            plan.append(f"{main} {authors[0] if authors else ''}".strip())
+        # Keep order, drop repeats.
+        return list(dict.fromkeys(q for q in plan if q))
+
+    def _process_book(self, book: db.Books):
+        """
+        Process a single book: search Hardcover API, calculate confidence, apply or queue.
+        """
+        book_id = book.id
+        authors = [author.name for author in book.authors] if book.authors else []
+        authors_csv = ", ".join(authors) if authors else ""
+        title = book.title
+
+        provider = Hardcover()
+        pool = {}
+        queries_tried = []
+        scored_results = []
+        for position, query in enumerate(self._search_plan(book)):
+            if position and not self._sleep_with_cancel_check(self.QUERY_DELAY):
+                return
+            self.log.debug(f"Searching Hardcover for: {query}")
+            queries_tried.append(query)
+            # Score the whole pool each API page returns (per_page=50, #729),
+            # merged across queries and de-duplicated by Hardcover book id.
+            for result in provider.search(query) or []:
+                pool.setdefault(str(result.id), result)
+            scored_results = self._score_results(book, pool.values())
+            if scored_results and scored_results[0]['score'] >= self.min_confidence:
+                break
+
+        search_query = " | ".join(queries_tried)
+
         if not scored_results:
+            self.log.debug(f"No Hardcover results for book {book_id} '{title}'")
             self.skipped_no_results += 1
             return
+        
+        self.log.debug(f"Found {len(pool)} Hardcover results for book {book_id}")
         
         # Get best match
         best_match = scored_results[0]
@@ -369,8 +413,9 @@ class TaskAutoHardcoverID(CalibreTask):
         # Auto-apply if confidence is high enough
         if best_score >= self.min_confidence:
             self._apply_hardcover_id(book_id, best_result)
+            self._resolve_pending_reviews(book_id)
             self.auto_matched += 1
-            self.log.info(f"Auto-matched book {book_id} '{title}' to Hardcover ID {best_result.id} (confidence: {best_score:.3f})")
+            self.log.info(f"Auto-matched book {book_id} '{title}' to Hardcover ID {best_result.id} (confidence: {best_score:.3f}, {best_match['reason']})")
         else:
             # Queue for manual review
             queued = self._queue_for_review(
@@ -384,6 +429,36 @@ class TaskAutoHardcoverID(CalibreTask):
                     f"Skipped review queue for book {book_id} '{title}' "
                     "because it was rejected while auto-fetch was running"
                 )
+
+    def _resolve_pending_reviews(self, book_id: int):
+        """Close the review rows of a book that has just been matched.
+
+        Only reachable for a pending book on an ``include_pending`` run; the
+        stale candidates would otherwise stay in the review page although the
+        book now has its Hardcover ID.
+        """
+        if not getattr(self, 'include_pending', False):
+            return
+        ub_session = None
+        try:
+            ub_session = ub.init_db_thread()
+            ub_session.query(ub.HardcoverMatchQueue).filter(
+                ub.HardcoverMatchQueue.book_id == book_id,
+                ub.HardcoverMatchQueue.reviewed == 0,
+            ).update({
+                'reviewed': 1,
+                'review_action': 'auto',
+                'reviewed_at': datetime.utcnow().isoformat(),
+                'reviewed_by': 'System',
+            }, synchronize_session=False)
+            ub_session.commit()
+        except Exception as e:
+            self.log.warning(f"Could not close pending review for book {book_id}: {e}")
+            if ub_session is not None:
+                ub_session.rollback()
+        finally:
+            if ub_session is not None:
+                ub_session.close()
 
     def _apply_hardcover_id(self, book_id: int, result):
         """Apply Hardcover identifiers to a book"""

@@ -29,7 +29,7 @@ from ..helper import edit_book_read_status, canonical_read_status, \
     book_ids_with_read_status, read_statuses_for_books, set_explicit_book_read_status, \
     get_convert_options, get_kosync_progress_display, hot_books_page
 from ..sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
-from ..sort_orders import RECENT_SORT
+from ..sort_orders import READ_DATE_SORTS, RECENT_SORT
 from ..personal_ratings import PERSONAL_RATING_SORTS, personal_score, ratings_for_books
 from ..custom_column_sort import (resolve_magic_shelf_sort, custom_sort_options,
                                   load_configured_columns)
@@ -123,7 +123,7 @@ def _original_filename(book_id):
 SORT_MAP = BOOK_SORT_ORDERS
 # Download-count ordering runs against app.db and is intentionally unavailable
 # to the metadata.db-backed generic list/filter queries below.
-_COMPATIBLE_BOOK_SORTS = frozenset((set(SORT_MAP) - {"hotasc", "hotdesc"}) | {RECENT_SORT}) | PERSONAL_RATING_SORTS
+_COMPATIBLE_BOOK_SORTS = frozenset((set(SORT_MAP) - {"hotasc", "hotdesc"}) | {RECENT_SORT}) | PERSONAL_RATING_SORTS | READ_DATE_SORTS
 
 
 def _sort_context(requested_sort):

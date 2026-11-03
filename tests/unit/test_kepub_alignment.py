@@ -206,3 +206,15 @@ def test_a_dummy_page_does_not_excuse_other_differences(tmp_path):
     edited = _copy_with(tmp_path, EPUB, "edited.epub", last, "Alice", "Alise")
     assert ka.span_to_xpointer(edited, kepub, row["source"], row["span"]) is None
     assert ka.xpointer_to_span(edited, kepub, row["xpointer"]) is None
+
+
+def test_an_epub_that_already_carries_the_dummy_page_still_aligns(tmp_path):
+    # A library EPUB made from a KEPUB keeps kepubify's page; the KEPUB made
+    # from it has the page too, and leaving it out of one side only would
+    # break a book that aligns today.
+    epub = _with_kepubify_dummy(tmp_path, EPUB, "dummy.epub")
+    kepub = _with_kepubify_dummy(tmp_path, KEPUB, "dummy.kepub.epub")
+    row = _rows()[0]
+    xpointer = ka.span_to_xpointer(epub, kepub, row["source"], row["span"])
+    assert xpointer is not None
+    assert ka.xpointer_to_span(epub, kepub, xpointer) == (row["source"], row["span"])

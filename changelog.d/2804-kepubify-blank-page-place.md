@@ -1,0 +1,3 @@
+### Fixed
+
+- **A Kobo now opens at the web reader's or KOReader's page in books where kepubify added a blank title page.** For those books the Kobo showed the new percentage but opened at its own older page. The same comparison is used when a Kobo's page is shared with the web reader and KOReader, so those books get the exact place in that direction too. kepubify adds a page reading "Page intentionally left blank by kepubify." to many KEPUBs; that page has no counterpart in the EPUB, so CWNG could never prove a place in the KEPUB matched one in the EPUB. The blank page is now left out of that comparison. @sgreadly found the cause and tested the fix on their Kobo (#2804).

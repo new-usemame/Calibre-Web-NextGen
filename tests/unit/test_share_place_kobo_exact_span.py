@@ -158,6 +158,23 @@ def _kepub_of_another_edition(sw):
     shutil.move(edited, sw.kepub)
 
 
+def test_a_kepub_with_kepubifys_blank_title_page_gets_the_exact_span(account, rows, tmp_path):
+    # #2804: kepubify adds a blank page to many KEPUBs, which made no place in
+    # those books exact; the Kobo opened at its own old page however far the
+    # shared place had moved.
+    from tests.unit.test_kepub_alignment import _with_kepubify_dummy
+    sw = account
+    shutil.move(_with_kepubify_dummy(tmp_path, sw.kepub, "dummy.kepub.epub"), sw.kepub)
+    sw.download(sw.checked)  # holds the library KEPUB as it now is
+
+    sw.push(rows["late"]["xpointer"], 40)
+
+    bookmark = _bookmark(sw, sw.checked)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == span_location(rows["late"]["source"], rows["late"]["span"])
+
+
+
 @pytest.mark.parametrize("failure", ["xpointer-outside-the-book", "kepub-not-this-epub",
                                      "koreader-holds-another-file"])
 def test_when_alignment_fails_every_kobo_keeps_its_location_with_the_new_percentage(

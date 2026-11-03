@@ -3746,10 +3746,24 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 bind=ub.session.get_bind(), download_id=download_proof[0],
                 downloaded_at=download_proof[1], file_identity=download_proof[2],
                 kepub_path=kepub_path, headers=response.headers, log=log,
+                book_id=book.id,
             )
         except Exception:
             log.warning("Could not track Kobo download completion for book %s",
                         book.id, exc_info=True)
+    elif download_proof:
+        # #2804: a download that cannot count as proof says why, so a held
+        # place in a later sync can be traced back to this request.
+        if request.method != "GET":
+            why = "a %s request carries no file" % request.method
+        elif "Range" in request.headers:
+            why = "a Range request (%s) is only part of the file" % request.headers["Range"]
+        elif response.status_code != 200:
+            why = "the response status was %s" % response.status_code
+        else:
+            why = ("the server is %s; only the gevent server can tell that a transfer finished"
+                   % (request.environ.get("SERVER_SOFTWARE") or "unknown"))
+        log.debug("Kobo download of book %s: completion not recorded: %s", book.id, why)
     return response
 
 

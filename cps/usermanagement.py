@@ -8,6 +8,8 @@
 from functools import wraps
 
 from sqlalchemy.sql.expression import func
+from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.orm.exc import ObjectDeletedError
 from .cw_login import login_required
 
 from flask import request, g, make_response
@@ -93,6 +95,27 @@ def _verify_app_password(user, password):
     """True when ``password`` is any of ``user``'s live app passwords."""
     return (_verify_app_password_digest(user, password)
             or _verify_app_password_older(user, password))
+
+
+def _fresh_user(user):
+    """The same User with its columns re-read from app.db, or None if the row is gone.
+
+    The app.db session is long-lived, so a User loaded by an earlier request kept
+    the values it had then. A password, role or account change written by another
+    process (an admin script, a second worker) was not seen: after a browser visit
+    a disabled reader could still download over OPDS, and a newly set password was
+    refused while the old one still worked. Every per-request account lookup goes
+    through this.
+    """
+    if user is None:
+        return None
+    try:
+        ub.session.refresh(user)
+    except ObjectDeletedError:
+        return None
+    except InvalidRequestError:
+        return user     # not attached to this session (a stand-in object): nothing to re-read
+    return user
 
 
 def create_authenticated_user(username, email=None, auth_source="unknown"):
@@ -227,7 +250,7 @@ def verify_password(username, password):
     # browsing is enabled, otherwise return 401.
     if not username:
         return None
-    user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
+    user = _fresh_user(ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first())
 
     # Handle existing users
     if user:
@@ -359,7 +382,7 @@ def load_user_from_reverse_proxy_header(req):
         return None
     
     # Look for existing user first
-    user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first()
+    user = _fresh_user(ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first())
     if user:
         rate_limits.clear_current_limits(limiter)
         log.debug("Reverse proxy authentication: found existing user '%s'", user.name)
@@ -391,7 +414,7 @@ def load_user(user_id, random, session_key):
         # Handle potential invalid user_id
         if not user_id:
             return None
-        user = ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
+        user = _fresh_user(ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first())
         if not user:
             return None
             

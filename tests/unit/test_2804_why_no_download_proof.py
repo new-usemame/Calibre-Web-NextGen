@@ -113,3 +113,21 @@ def test_a_full_download_logs_that_its_completion_was_recorded(
     logged = _download_logs(caplog)
     assert any("completion recorded" in m for m in logged), logged
     assert not any("completion not recorded" in m for m in logged), logged
+
+
+def test_a_transfer_that_stops_partway_logs_how_far_it_got(monkeypatch, caplog, stale_kobo):
+    sw = stale_kobo
+    from flask import Response
+
+    def serve(*_a, **_k):
+        def body():
+            yield b"first chunk"
+            raise OSError("simulated stream failure")
+        return Response(body(), status=200, headers={"Content-Length": "100"})
+
+    with caplog.at_level(logging.DEBUG, logger="cps"):
+        served = _download(monkeypatch, sw, serve=serve)
+    assert not served.complete
+    logged = _download_logs(caplog)
+    assert any("completion not recorded" in m and "stopped after 11 of 100 bytes" in m
+               for m in logged), logged

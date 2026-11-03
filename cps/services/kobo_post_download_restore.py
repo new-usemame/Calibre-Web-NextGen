@@ -337,9 +337,18 @@ def completed_download_body(body, *, application, bind, download_id,
 
     def stream():
         yielded = 0
-        for chunk in body:
-            yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
-            yield chunk
+        try:
+            for chunk in body:
+                yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
+                yield chunk
+        except BaseException as stopped:
+            # A dropped connection closes this generator (GeneratorExit); a
+            # failing file raises. Either way the Kobo did not get the file.
+            log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                      "the transfer stopped after %s of %s bytes (%s)",
+                      book_id, download_id, yielded, content_length,
+                      type(stopped).__name__)
+            raise
         if yielded != content_length:
             log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
                       "the response ended after %s of %s bytes",

@@ -690,6 +690,20 @@
 }
 .annNewNote:hover { background: var(--surface-2); }
 
+/* A failed highlight load (#2780): reads as an error, not as an empty list. */
+.annLoadError {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  margin-bottom: 8px; color: var(--text); font-size: var(--fs-sm);
+}
+.annLoadError p { margin: 0; }
+.annRetry {
+  min-height: 44px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text);
+  font-size: var(--fs-sm); cursor: pointer;
+}
+.annRetry:hover { background: var(--surface-3, var(--surface-2)); }
+
 .resumeNotice {
   position: absolute;
   bottom: 64px;

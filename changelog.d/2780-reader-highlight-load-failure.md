@@ -1,1 +1,3 @@
-Web reader: when a book's highlights and notes fail to load, the Highlights and notes panel now says so and offers Try again, instead of showing "No highlights yet" as if the book had none. Reading the book keeps working either way. (#2780)
+### Fixed
+
+- **The web reader says when a book's highlights and notes fail to load, and offers Try again.** The Highlights and notes panel used to show "No highlights yet" as if the book had none. Reading the book keeps working either way. (#2780)

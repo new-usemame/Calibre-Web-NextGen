@@ -489,9 +489,21 @@ export function Reader({ id }: { id: string }) {
   // Every saved highlight for this book, kept in step locally on each write so
   // the drawer never needs a refetch to look right.
   const [annList, setAnnList] = useState<AnnRow[]>([]);
+  // State of the data.json load (#2780). A failed load, one still under way and
+  // a book with no highlights all leave annList empty, and only the last may
+  // say "No highlights yet": someone told that may conclude theirs were lost.
+  const [annLoad, setAnnLoad] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  // Set by the open-book effect once the book is ready; the drawer's retry
+  // calls it. Null before then and after the book closes.
+  const loadAnnotationsRef = useRef<(() => void) | null>(null);
+  // Ids created in this session since the last successful load: the only rows
+  // a load answer that does not list them is allowed to keep.
+  const createdSinceLoadRef = useRef<Set<string>>(new Set());
   const preferredAnnotation = useRef(new Map<string, string>());
   useEffect(() => {
     setAnnList([]);
+    setAnnLoad('loading');
+    createdSinceLoadRef.current = new Set();
     preferredAnnotation.current.clear();
   }, [id]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -894,7 +906,10 @@ export function Reader({ id }: { id: string }) {
       });
       const newId = created?.annotation_id ?? '';
       if (note && newId) notesRef.current.set(newId, note);
-      setAnnList((rows) => [...rows, {
+      // A highlights load that answered after this save may already list
+      // the row (#2780 retry), so replace by id rather than append twice.
+      if (newId) createdSinceLoadRef.current.add(newId);
+      setAnnList((rows) => [...rows.filter((r) => !newId || r.annotation_id !== newId), {
         annotation_id: newId,
         cfi_range: created?.cfi_range ?? cfiRange,
         highlighted_text: created?.highlighted_text ?? text,
@@ -1017,7 +1032,9 @@ export function Reader({ id }: { id: string }) {
         const created = await apiPost<Partial<AnnRow>>(`/annotations/${id}`, {
           position_type: 'unanchored', note_text: note,
         });
-        setAnnList((rows) => [...rows, {
+        if (created?.annotation_id) createdSinceLoadRef.current.add(created.annotation_id);
+        setAnnList((rows) => [...rows.filter((r) => !created?.annotation_id
+          || r.annotation_id !== created.annotation_id), {
           annotation_id: created?.annotation_id ?? '',
           cfi_range: null,
           highlighted_text: null,
@@ -1944,10 +1961,25 @@ export function Reader({ id }: { id: string }) {
         // Render existing highlights (the CFI-anchored ones we can place). Each
         // row carries its server annotation_id; paintHighlight stashes it in the
         // epub.js data param so a later tap can target the right row (#782).
-        fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
-          .then((r) => (r.ok ? r.json() : null))
+        //
+        // A failed load (non-OK status, network error, unreadable body) is
+        // recorded as failed rather than swallowed, so the drawer can say so and
+        // offer a retry; the book itself keeps working either way (#2780). Each
+        // call supersedes the one before it, so a slow first answer cannot land
+        // on top of a retry's.
+        let annLoadSeq = 0;
+        const loadAnnotations = () => {
+          const seq = ++annLoadSeq;
+          const stale = () => cancelled || seq !== annLoadSeq;
+          setAnnLoad('loading');
+          fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
+          .then((r) => {
+            if (!r.ok) throw new Error(`highlights load answered ${r.status}`);
+            return r.json();
+          })
           .then(async (d) => {
-            if (cancelled || !d) return;
+            if (stale()) return;
+            if (!d || typeof d !== 'object') throw new Error('highlights load returned no data');
             notesRef.current.clear();
             /*
              * Take the rows and the device map from the SAME response, and take
@@ -1967,20 +1999,38 @@ export function Reader({ id }: { id: string }) {
             // the original annotation and preserve its native source anchor.
             const displayRows = sourceRows.map((row) => hasNativeAnchor(row)
               ? { ...row, cfi_range: null } : row);
-            setAnnList(displayRows);
+            // Keep rows made in this session that the answer does not list yet:
+            // a highlight saved while the load had failed, or one whose save is
+            // still landing, must not vanish when a retry answers (#2780).
+            const listed = new Set(displayRows.map((row) => row.annotation_id));
+            const keep = createdSinceLoadRef.current;
+            createdSinceLoadRef.current = new Set();
+            setAnnList((current) => [
+              ...displayRows,
+              ...current.filter((row) => keep.has(row.annotation_id) && !listed.has(row.annotation_id)),
+            ]);
+            setAnnLoad('loaded');
             displayRows.forEach((a) => {
               const note = (a.note_text || '').trim();
               if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
             });
-            const mapped = await resolveNativeAnnotations(epubBook as any, sourceRows, () => cancelled);
-            if (cancelled) return;
+            // Mapping KEPUB anchors is best-effort: the rows are already
+            // listed, so a failure here is not a failed load.
+            const mapped = await resolveNativeAnnotations(epubBook as any, sourceRows, stale)
+              .catch(() => new Map<string, string>());
+            if (stale()) return;
             setAnnList((current) => current.map((row) => {
               const cfi = mapped.get(row.annotation_id);
               if (!cfi) return row;
               return { ...row, cfi_range: cfi };
             }));
           })
-          .catch(() => { /* highlights are best-effort */ });
+          .catch(() => {
+            if (!stale()) setAnnLoad('failed');
+          });
+        };
+        loadAnnotationsRef.current = loadAnnotations;
+        loadAnnotations();
 
         stopSelectionObserver = observeReaderSelections(rendition);
         // Capture a text selection → offer a highlight-color popover.
@@ -2000,6 +2050,8 @@ export function Reader({ id }: { id: string }) {
 
     return () => {
       cancelled = true;
+      loadAnnotationsRef.current = null;
+      setAnnLoad('loading');
       stopSelectionObserver?.();
       archiveRef.current = null;
       linkSyncTimers.current.forEach(clearTimeout); linkSyncTimers.current = [];
@@ -2408,10 +2460,31 @@ export function Reader({ id }: { id: string }) {
               <StickyNote size={14} aria-hidden="true" focusable={false} />
               {t('Write a note')}
             </button>
+            {/* A failed load is not an empty book (#2780): say it failed and
+                offer the load again, instead of "No highlights yet". */}
+            {annLoad === 'failed' && (
+              <div className={styles.annLoadError} role="alert">
+                <p>{t('Could not load highlights and notes.')}</p>
+                <button
+                  type="button"
+                  className={styles.annRetry}
+                  onClick={() => {
+                    // The button unmounts as the retry starts; keep keyboard
+                    // focus inside the open drawer rather than on <body>.
+                    annRef.current?.focus();
+                    loadAnnotationsRef.current?.();
+                  }}
+                >
+                  {t('Try again')}
+                </button>
+              </div>
+            )}
             {annList.length === 0 ? (
-              <p className={styles.tocEmpty}>
-                {t('No highlights yet. Select text in the book to make one.')}
-              </p>
+              annLoad === 'loaded' && (
+                <p className={styles.tocEmpty}>
+                  {t('No highlights yet. Select text in the book to make one.')}
+                </p>
+              )
             ) : (
               <ul role="list">
                 {annList.map((row, index) => {

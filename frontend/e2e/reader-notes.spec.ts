@@ -1266,6 +1266,7 @@ test.describe('reader drawer: a failed highlight load is reported, not shown as 
     await page.route(dataJson(bookId!), async (route) => {
       calls += 1;
       if (calls === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1291,6 +1292,10 @@ test.describe('reader drawer: a failed highlight load is reported, not shown as 
 
     await drawer(page).getByRole('button', { name: 'Try again' }).click();
     await expect.poll(() => calls, 'retry asks the server again').toBe(2);
+    // The retry's answer is held back: while it is under way the drawer must
+    // not fall back to "No highlights yet" either.
+    await expect(emptyState(page), 'a load still under way is not an empty book').toBeHidden();
+    await expect(drawer(page), 'focus stays in the drawer when the retry button goes').toBeFocused();
     await expect(drawer(page).getByText('a note that loads on retry')).toBeVisible();
     await expect(loadError(page)).toBeHidden();
     await expect(drawer(page).getByRole('button', { name: 'Try again' })).toBeHidden();

@@ -506,6 +506,47 @@ def test_a_checked_browser_place_still_reaches_koreader_exactly(w, rows):
     assert w.pull() == (pytest.approx(60), koreader_xpointer.cfi_to_xpointer(w.epub, cfi))
 
 
+def _silent_pull(w):
+    """A KOSync client that sends neither CWNG device headers nor
+    ``?position_kinds=`` (JustRead, #2783): (status, body)."""
+    from tests.unit.koreader_library_world import LibraryWorld
+    headers = LibraryWorld.basic("reader")
+    headers["Accept"] = "application/vnd.koreader.v1+json"
+    response = w.client.get(f"/kosync/syncs/progress/{w.digest}", headers=headers)
+    w.session.expire_all()
+    return response.status_code, response.get_json()
+
+
+def test_a_client_that_asks_for_no_kinds_gets_an_exact_place(w, rows):
+    """#2783: a place that converts exactly into the client's own file is a
+    real locator, so it is served even to a client that never advertised
+    percentage-only support. Before the fix the GET withheld the row before
+    trying the conversion, and JustRead was told there was no place at all."""
+    from cps.services import koreader_xpointer
+    browser(w, checked=True)
+    cfi = cfi_of(w, rows["late"])
+
+    save(w, 60, cfi)
+
+    status, body = _silent_pull(w)
+    assert status == 200
+    assert body.get("progress") == koreader_xpointer.cfi_to_xpointer(w.epub, cfi), body
+    assert body.get("position_kind") == "locator", body
+    assert float(body["percentage"]) * 100 == pytest.approx(60)
+
+
+def test_a_place_that_does_not_convert_is_still_withheld_from_a_silent_client(w, rows):
+    """Control for #2783: a place that is percentage-only and cannot be placed
+    exactly stays withheld, so stock KOReader never gets the sentinel."""
+    browser(w, checked=True)
+    save(w, 60, BAD_CFI)
+
+    status, body = _silent_pull(w)
+    assert status == 200
+    assert "progress" not in body and "percentage" not in body, body
+    assert body.get("position_kinds_available") == ["percentage"], body
+
+
 # == 6. The rollout switch (default off in PR 4) =============================
 
 def _todays_web_save(w, rows, route):

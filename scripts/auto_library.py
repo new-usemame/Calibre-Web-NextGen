@@ -500,9 +500,11 @@ class AutoLibrary:
         .zip files the operator dropped there. No-op when the env var
         CWA_CALIBRE_USER_PLUGINS isn't set. Closes upstream CWA #243.
 
-        Auto-registration runs `calibre-customize -a` per .zip with
-        HOME=/config so calibre persists the plugin into its
-        customize.py.json registry. Without this step, just having a
+        Auto-registration runs `calibre-customize -a` per .zip with the
+        same Calibre environment ingest uses (HOME=/config and
+        CALIBRE_CONFIG_DIRECTORY=/config/.config/calibre), so calibre
+        persists the plugin into the customize.py.json registry ingest
+        reads. Without this step, just having a
         .zip in the plugins folder doesn't make calibre load it during
         ingest — the user-visible symptom previous CWA users hit on
         upstream #243 ('I copied the plugin folder, nothing happens').

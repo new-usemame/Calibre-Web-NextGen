@@ -56,6 +56,37 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.62',
+    date: '2026-11-03',
+    items: [
+      {
+        title: 'A new Kobo finishes its first sync',
+        body: 'Current Kobo firmware asks the server to add the device before its first library sync. The server used to answer "not found", and the Kobo stopped right after connecting. It now answers, so a Kobo being set up syncs your library.',
+        category: 'Sync',
+      },
+      {
+        title: 'Your Kobo opens at the right page in more books',
+        body: 'In books where kepubify added a blank title page, your Kobo showed the new percentage from the web reader or KOReader but opened at its own older page. That blank page is now left out when the server matches places between the two copies, so the Kobo opens where you left off.',
+        category: 'Sync',
+      },
+      {
+        title: 'JustRead and similar KOSync apps get your place again',
+        body: 'Apps that sync with KOSync but do not ask for percentage positions were never sent a place saved on your Kobo or in the web reader. They now get the exact position whenever the server can work it out for their copy of the book.',
+        category: 'Sync',
+      },
+      {
+        title: 'Cloud books on KOReader show their tags',
+        body: 'A book you have not downloaded to a KOReader device yet now carries its Calibre tags, so Book information and anything that groups books by tag see them. Changing a tag updates the device on its next sync.',
+        category: 'Sync',
+      },
+      {
+        title: 'Calibre user plugins load again',
+        body: 'With Calibre user plugins turned on, plugins added since v4.1.44 were saved where book import does not look, so a plugin like DeACSM never ran. They are registered in the right place on the next start.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.61',
     date: '2026-11-02',
     items: [

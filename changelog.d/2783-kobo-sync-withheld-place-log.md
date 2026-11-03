@@ -1,3 +1,0 @@
-### Changed
-
-- **The Kobo sync summary line says when Share my place held a reading position back, and why.** A sync could find changed reading positions and still send the Kobo nothing, and the log gave no reason. The `Kobo Sync summary` line now ends with `share_place mode=checked|unchecked|none withheld box_off=N own_newer=N`, and DEBUG logging names each held-back book with `reason=share_place_off` or `reason=own_place_newer`. `box_off` means the Kobo's Share my place box is off on the Devices page. `own_place_newer` means the Kobo's own saved place is newer than the shared one. Reported by @lukerajah (#2783).

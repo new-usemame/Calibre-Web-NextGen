@@ -1,3 +1,0 @@
-### Changed
-
-- **With logging at DEBUG, the log now says which place each Kobo was sent and why.** When a Kobo shows the web reader's or KOReader's new percentage but opens the book at its own older page, that is CWNG holding back a place the Kobo can't open yet, most often because the Kobo has not finished downloading the library's current KEPUB of that book. Each Kobo sync now logs the `CurrentBookmark` it sent (percentages and Location) and, when the exact place was held back, the reason: no KEPUB in the library, no KEPUB download recorded for that Kobo, an unfinished or older download, or a place that could only be shared as a percentage. Asked for by @sgreadly (#2804).

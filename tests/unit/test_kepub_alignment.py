@@ -151,3 +151,58 @@ def test_a_chapter_split_in_two_maps_into_the_right_piece(tmp_path):
         "/body/DocFragment/body/p[1]/text().0")
     assert ka.xpointer_to_span(epub, kepub, "/body/DocFragment/body/p[2]/text().2") == (
         "OEBPS/c1.xhtml", "kobo.2.1")
+
+
+# kepubify's own blank page, byte for byte (kepub/transform.go,
+# transformDummyTitlepageAdd): it goes next to the OPF and second in the spine
+# when kepubify's heuristic says the book's first page is not a bare title page.
+_KEPUBIFY_DUMMY = (
+    '<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title></head>'
+    '<body><p style="text-align: center; margin: 4em 0; font-size: .7em; font-style: italic;">'
+    'Page intentionally left blank by kepubify.</p></body></html>')
+
+
+def _with_kepubify_dummy(tmp_path, source, name):
+    """A copy of the KEPUB ``source`` with kepubify's dummy title page added."""
+    path = tmp_path / name
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(path, "w") as copy:
+        for info in original.infolist():
+            data = original.read(info)
+            if info.filename.endswith(".opf"):
+                opf = data.decode("utf-8")
+                opf = opf.replace("</manifest>", '<item id="kepubify-titlepage-dummy" href='
+                                  '"kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml"/>'
+                                  "</manifest>", 1)
+                first = opf.index("/>", opf.index("<itemref")) + 2
+                opf = opf[:first] + '<itemref idref="kepubify-titlepage-dummy"/>' + opf[first:]
+                data = opf.encode("utf-8")
+            copy.writestr(info, data)
+        copy.writestr("OEBPS/kepubify-titlepage-dummy.xhtml", _KEPUBIFY_DUMMY)
+    return path
+
+
+def test_kepubifys_blank_title_page_does_not_stop_a_place_crossing(tmp_path):
+    # #2804: with the dummy page the KEPUB holds 37 more characters than the
+    # EPUB ("Page intentionally left blank by kepubify."), so before the fix no
+    # place in such a book ever crossed, and a Kobo always got its own old page.
+    kepub = _with_kepubify_dummy(tmp_path, KEPUB, "dummy.kepub.epub")
+    with zipfile.ZipFile(kepub) as archive:
+        spine = archive.read("OEBPS/content.opf").decode("utf-8")
+    assert spine.index("kepubify-titlepage-dummy") < spine.index('idref="pg-header"')
+    rows = _rows()
+    wrong = [row for row in rows
+             if ka.span_to_xpointer(EPUB, kepub, row["source"], row["span"]) != row["xpointer"]
+             or ka.xpointer_to_span(EPUB, kepub, row["xpointer"]) != (row["source"], row["span"])]
+    assert not wrong, wrong[:3]
+
+
+def test_a_dummy_page_does_not_excuse_other_differences(tmp_path):
+    # Leaving the blank page out must not loosen the proof: an EPUB whose text
+    # changed anywhere still matches nothing.
+    row = _rows()[0]
+    kepub = _with_kepubify_dummy(tmp_path, KEPUB, "dummy.kepub.epub")
+    with zipfile.ZipFile(EPUB) as archive:
+        last = [n for n in archive.namelist() if n.endswith("-h-12.htm.html")][0]
+    edited = _copy_with(tmp_path, EPUB, "edited.epub", last, "Alice", "Alise")
+    assert ka.span_to_xpointer(edited, kepub, row["source"], row["span"]) is None
+    assert ka.xpointer_to_span(edited, kepub, row["xpointer"]) is None

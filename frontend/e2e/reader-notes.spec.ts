@@ -1239,6 +1239,90 @@ test.describe('reader: a failed highlight removal or recolour can be retried (#2
 });
 
 /*
+ * A failed highlight load is not an empty book (#2780).
+ *
+ * The reader fetches data.json once on open. Before this, a non-OK answer or a
+ * network error left the drawer saying "No highlights yet", which is exactly
+ * what a book with no highlights says, so a reader could conclude theirs were
+ * lost and start again. The two states must read differently, and the failed
+ * one must offer a way to load again without reopening the book.
+ */
+test.describe('reader drawer: a failed highlight load is reported, not shown as empty (#2780)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  // data.json is mocked here, so nothing is written to the book; the slot only
+  // has to be one this file owns. Same slots as #2778/#2779, which run before.
+  const slot = (project: string) => (project === 'mobile' ? 5 : 4);
+  const dataJson = (bookId: number) => `**/annotations/${bookId}/data.json*`;
+  const loadError = (page: Page) => drawer(page).getByText('Could not load highlights and notes.');
+  const emptyState = (page: Page) => drawer(page).getByText('No highlights yet. Select text in the book to make one.');
+
+  test('a refused load says so and a retry loads the highlights', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, slot(testInfo.project.name));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    let calls = 0;
+    await page.route(dataJson(bookId!), async (route) => {
+      calls += 1;
+      if (calls === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          annotations: [{
+            annotation_id: 'e2e-2780-note', position_type: 'unanchored',
+            note_text: 'a note that loads on retry', highlighted_text: null,
+            highlight_color: null, cfi_range: null,
+          }],
+          devices: {},
+        }),
+      });
+    });
+
+    await page.reload();
+    await waitForReaderRender(page);
+    await expect.poll(() => calls, 'the reader asked for its highlights').toBe(1);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await expect(drawer(page)).toBeVisible();
+
+    await expect(loadError(page)).toBeVisible();
+    await expect(emptyState(page), 'a failed load must not claim the book has none').toBeHidden();
+
+    await drawer(page).getByRole('button', { name: 'Try again' }).click();
+    await expect.poll(() => calls, 'retry asks the server again').toBe(2);
+    await expect(drawer(page).getByText('a note that loads on retry')).toBeVisible();
+    await expect(loadError(page)).toBeHidden();
+    await expect(drawer(page).getByRole('button', { name: 'Try again' })).toBeHidden();
+  });
+
+  test('an empty answer shows the ordinary empty state and no error', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, slot(testInfo.project.name));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    let calls = 0;
+    await page.route(dataJson(bookId!), async (route) => {
+      calls += 1;
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ annotations: [], devices: {} }),
+      });
+    });
+
+    await page.reload();
+    await waitForReaderRender(page);
+    await expect.poll(() => calls, 'the reader asked for its highlights').toBe(1);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await expect(drawer(page)).toBeVisible();
+
+    await expect(emptyState(page)).toBeVisible();
+    await expect(loadError(page)).toBeHidden();
+    await expect(drawer(page).getByRole('button', { name: 'Try again' })).toBeHidden();
+  });
+});
+
+/*
  * Device labels in the highlights drawer (#325).
  *
  * The affordance was built when the drawer landed and deliberately left unwired:

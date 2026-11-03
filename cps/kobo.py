@@ -1437,6 +1437,9 @@ def _sync_observability(
     reemit_reasons,
     replay_suppression_enabled,
     replay_suppression_eligible,
+    share_place_mode=None,
+    withheld_box_off=0,
+    withheld_own_newer=0,
 ):
     counts = _sync_entitlement_counts(sync_results)
     return {
@@ -1453,6 +1456,9 @@ def _sync_observability(
         "reemit_reasons": dict(sorted(reemit_reasons.items())),
         "replay_suppression_enabled": bool(replay_suppression_enabled),
         "replay_suppression_eligible": bool(replay_suppression_eligible),
+        "share_place_mode": share_place_mode or "none",
+        "withheld_box_off": int(withheld_box_off),
+        "withheld_own_newer": int(withheld_own_newer),
     }
 
 
@@ -1481,6 +1487,9 @@ def _empty_sync_observability():
         "reemit_reasons": {},
         "replay_suppression_enabled": False,
         "replay_suppression_eligible": False,
+        "share_place_mode": "none",
+        "withheld_box_off": 0,
+        "withheld_own_newer": 0,
     }
 
 
@@ -1516,6 +1525,7 @@ def _log_sync_observability(
             "suppressed_removed=%d fingerprint_mismatch_reemitted=%d "
             "reemit_reasons=%s reseeded_shape_change=%d "
             "replay_suppression enabled=%s eligible=%s "
+            "share_place mode=%s withheld box_off=%d own_newer=%d "
             "cursors in=%s out=%s",
             _sync_device_log_id(requesting_device_id),
             capture_id,
@@ -1531,6 +1541,9 @@ def _log_sync_observability(
             observability.get("reseeded_shape_change", 0),
             observability.get("replay_suppression_enabled", False),
             observability.get("replay_suppression_eligible", False),
+            observability.get("share_place_mode", "none"),
+            observability.get("withheld_box_off", 0),
+            observability.get("withheld_own_newer", 0),
             incoming_cursor_log,
             outgoing_cursor_log,
         )
@@ -2647,6 +2660,11 @@ def HandleSyncRequest():
     suppress_shared_states = sync_place_mode == kobo_place_gate.UNCHECKED
     share_place_nudges_emitted = []
     own_place_newer = {}
+    # Books whose shared state some emission site held back, by reason, for
+    # the summary line (#2783: an empty response after "changed states: N"
+    # must say whether the box read as off or the Kobo's own place won).
+    withheld_box_off = set()
+    withheld_own_newer = set()
 
     def _withhold_shared_state(book_id):
         """True when no emission site may send this book's shared state: the
@@ -2654,12 +2672,20 @@ def HandleSyncRequest():
         than the shared place, as when it was turned on after reading on
         its own. The frontier still advances past a withheld state."""
         if suppress_shared_states:
+            if book_id not in withheld_box_off:
+                withheld_box_off.add(book_id)
+                log.debug("Kobo Sync: withheld shared reading state book=%s "
+                          "reason=share_place_off", book_id)
             return True
         if sync_place_mode != kobo_place_gate.CHECKED:
             return False
         if book_id not in own_place_newer:
             own_place_newer[book_id] = kobo_place_gate.own_place_newer(
                 requesting_device_id, book_id)
+            if own_place_newer[book_id]:
+                withheld_own_newer.add(book_id)
+                log.debug("Kobo Sync: withheld shared reading state book=%s "
+                          "reason=own_place_newer", book_id)
         return own_place_newer[book_id]
 
     # Establish one ordered reading-state frontier before rendering any
@@ -3543,6 +3569,9 @@ def HandleSyncRequest():
         reemit_reasons=reemit_reasons,
         replay_suppression_enabled=replay_suppression_enabled,
         replay_suppression_eligible=replay_suppression_eligible,
+        share_place_mode=sync_place_mode,
+        withheld_box_off=len(withheld_box_off),
+        withheld_own_newer=len(withheld_own_newer),
     )
 
     if requesting_device_id:

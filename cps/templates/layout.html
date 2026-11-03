@@ -40,6 +40,7 @@
        on focus (e.g. tapping the navbar search). Must load after caliBlur.css. #}
     <link href="{{ url_for('static', filename='css/mobile-input-zoom.css') }}" rel="stylesheet" media="screen">
     <link href="{{ url_for('static', filename='css/cwa.css') }}" rel="stylesheet" media="screen">
+    <link href="{{ url_for('static', filename='css/password-toggle.css') }}" rel="stylesheet" media="screen">
     <link href="{{ url_for('static', filename='css/book_organizer.css') }}" rel="stylesheet" media="screen">
     {% if current_user.is_authenticated and (current_user.role_admin() or current_user.role_edit()) %}
     <link href="{{ url_for('static', filename='css/duplicates-notifications.css') }}" rel="stylesheet" media="screen">
@@ -616,6 +617,8 @@
     <script src="{{ url_for('static', filename='js/libs/plugins.js') }}"></script>
     <script src="{{ url_for('static', filename='js/libs/jquery.form.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/uploadprogress.js') }}"> </script>
+    <script>window.cwngPasswordToggleLabels = {show: {{ _('Show password')|tojson }}, hide: {{ _('Hide password')|tojson }}};</script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% if current_user.is_authenticated and current_user.role_admin() %}
     <script src="{{ url_for('static', filename='js/update_now.js') }}"></script>

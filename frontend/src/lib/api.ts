@@ -469,6 +469,17 @@ export interface AppPassword {
   last_used_at: string | null;
 }
 
+/** Mirrors the server-side valid_password() settings. */
+export interface PasswordPolicy {
+  enabled: boolean;
+  min_length: number;
+  number: boolean;
+  lower: boolean;
+  upper: boolean;
+  letter: boolean;
+  special: boolean;
+}
+
 export interface Account {
   name: string;
   email: string;
@@ -484,6 +495,7 @@ export interface Account {
   ui_font_display: string;
   role: Record<string, boolean>;
   can_change_password: boolean;
+  password_policy: PasswordPolicy;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
   app_passwords: AppPassword[];

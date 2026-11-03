@@ -14,6 +14,18 @@ from .string_helper import strip_whitespaces
 log = logger.create()
 
 
+# These UI catalogs are shipped, but the generated ISO language-name table
+# predates them. Keep the common Catalan names localised and use the complete
+# English table as a safe fallback for the other language codes. This also
+# prevents a missing generated locale table from rendering every language as
+# "Unknown".
+_LANGUAGE_NAME_TABLE_FALLBACK_LOCALES = {"ar", "ca"}
+_CATALAN_LANGUAGE_NAME_OVERRIDES = {
+    "cat": "Català",
+    "spa": "Espanyol",
+}
+
+
 try:
     from pycountry import languages as pyc_languages
 
@@ -47,22 +59,25 @@ def get_language_names(locale):
     """
     if locale is None:
         return None
+    language = None
     if isinstance(locale, str):
         # Direct match first ("en"), then leading 2-letter component for
         # composites like "en_US" / "en-GB".
         names = _LANGUAGE_NAMES.get(locale)
-        if names is None:
-            head = locale.split("_", 1)[0].split("-", 1)[0]
-            if head and head != locale:
-                names = _LANGUAGE_NAMES.get(head)
-        return names
-    # babel.core.Locale (or any object with .language): try str() first
-    # ("en_US") then the bare .language attribute ("en").
-    names = _LANGUAGE_NAMES.get(str(locale))
-    if names is None:
-        lang_attr = getattr(locale, "language", None)
-        if lang_attr:
-            names = _LANGUAGE_NAMES.get(lang_attr)
+        language = locale.split("_", 1)[0].split("-", 1)[0]
+        if names is None and language != locale:
+            names = _LANGUAGE_NAMES.get(language)
+    else:
+        # babel.core.Locale (or any object with .language): try str() first
+        # ("en_US") then the bare .language attribute ("en").
+        names = _LANGUAGE_NAMES.get(str(locale))
+        language = getattr(locale, "language", None)
+        if names is None and language:
+            names = _LANGUAGE_NAMES.get(language)
+    if names is None and language in _LANGUAGE_NAME_TABLE_FALLBACK_LOCALES:
+        names = dict(_LANGUAGE_NAMES["en"])
+        if language == "ca":
+            names.update(_CATALAN_LANGUAGE_NAME_OVERRIDES)
     return names
 
 

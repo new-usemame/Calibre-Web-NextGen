@@ -16,6 +16,28 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.62] - 2026-11-03
+
+### Changed
+
+- **The Kobo sync summary line says when Share my place held a reading position back, and why.** A sync could find changed reading positions and still send the Kobo nothing, and the log gave no reason. The `Kobo Sync summary` line now ends with `share_place mode=checked|unchecked|none withheld box_off=N own_newer=N`, and DEBUG logging names each held-back book with `reason=share_place_off` or `reason=own_place_newer`. `box_off` means the Kobo's Share my place box is off on the Devices page. `own_place_newer` means the Kobo's own saved place is newer than the shared one. Reported by @lukerajah (#2783).
+
+- **With logging at DEBUG, a Kobo download that doesn't count as holding the current KEPUB now says why.** CWNG only sends a Kobo the exact shared place once it knows that Kobo finished downloading the library's current KEPUB. Each Kobo download now logs whether its completion was recorded and, when it wasn't, the reason: a partial (Range) request, a transfer that ended short, the KEPUB changing during the download, a file handed to the front-end server, or a server other than the bundled one. When a later sync holds a place back, its log line also says which part is missing, with the times: a download that never finished, a KEPUB replaced or rewritten after the download, or a book sent to the Kobo again. Asked for by @sgreadly (#2804).
+
+- **With logging at DEBUG, the log now says which place each Kobo was sent and why.** When a Kobo shows the web reader's or KOReader's new percentage but opens the book at its own older page, that is CWNG holding back a place the Kobo can't open yet, most often because the Kobo has not finished downloading the library's current KEPUB of that book. Each Kobo sync now logs the `CurrentBookmark` it sent (percentages and Location) and, when the exact place was held back, the reason: no KEPUB in the library, no KEPUB download recorded for that Kobo, an unfinished or older download, or a place that could only be shared as a percentage. Asked for by @sgreadly (#2804).
+
+### Fixed
+
+- **A Kobo being set up for the first time syncs instead of stopping after it connects.** Current Kobo firmware asks the server to add the device before its first library sync. CWNG answered that request with "not found", and the Kobo then cancelled the whole sync. CWNG now answers it, and the device's token refresh, the same way it answers the device login: passed to the Kobo Store when store proxying is on, answered by CWNG otherwise. Reported by @orcofthedarkness (Discussion #2781); the same fix landed in Calibre-Web Automated as 93d5b985d (CWA #1476).
+
+- **KOSync apps that don't ask for percentage positions, such as JustRead, get the Kobo's or web reader's place again.** CWNG held back every place saved by a Kobo or the web reader from an app that did not send `?position_kinds=`, even when it could turn that place into an exact KOReader position in the app's own copy of the book. It now tries that conversion first and sends the exact position; a place it can't convert exactly is still held back, so stock KOReader never gets a position it can't open. Reported by @lukerajah (#2783).
+
+- **A book not yet downloaded to a KOReader device carries its Calibre tags.** The small stand-in EPUB a device gets for a cloud book listed the title, authors, language and series but no tags, so KOReader's Book information showed no Keywords and anything grouping books by tag on the device saw every cloud book as untagged. Each tag is now a `dc:subject` in the stand-in, and a tag change (including a rename that leaves the book's modified time alone) makes devices fetch the stand-in again on their next sync. Reported by @adayag (#2792).
+
+- **A Kobo now opens at the web reader's or KOReader's page in books where kepubify added a blank title page.** For those books the Kobo showed the new percentage but opened at its own older page. The same comparison is used when a Kobo's page is shared with the web reader and KOReader, so those books get the exact place in that direction too. kepubify adds a page reading "Page intentionally left blank by kepubify." to many KEPUBs; that page has no counterpart in the EPUB, so CWNG could never prove a place in the KEPUB matched one in the EPUB. The blank page is now left out of that comparison. @sgreadly found the cause and tested the fix on their Kobo (#2804).
+
+- **Calibre user plugin registration works again.** Since v4.1.44, with `CWA_CALIBRE_USER_PLUGINS=true`, startup saved new plugins where ingest doesn't look, so ingest never loaded them, even though the log said "Registered Calibre plugin". For example, a configured DeACSM plugin left `.acsm` files unconverted. After updating, these plugins are registered correctly on the next start. If you already had plugins registered from before v4.1.44 and added another one since, startup still skips registration because the list isn't empty, so register the newer one once with the `calibre-customize -a` command in the README. Plugins registered before v4.1.44 were not affected. Reported and fixed by @satwell (#2798).
+
 ## [v4.1.61] - 2026-11-02
 
 ### Fixed

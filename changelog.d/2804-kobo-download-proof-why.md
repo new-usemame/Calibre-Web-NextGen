@@ -1,3 +1,0 @@
-### Changed
-
-- **With logging at DEBUG, a Kobo download that doesn't count as holding the current KEPUB now says why.** CWNG only sends a Kobo the exact shared place once it knows that Kobo finished downloading the library's current KEPUB. Each Kobo download now logs whether its completion was recorded and, when it wasn't, the reason: a partial (Range) request, a transfer that ended short, the KEPUB changing during the download, a file handed to the front-end server, or a server other than the bundled one. When a later sync holds a place back, its log line also says which part is missing, with the times: a download that never finished, a KEPUB replaced or rewritten after the download, or a book sent to the Kobo again. Asked for by @sgreadly (#2804).

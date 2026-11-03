@@ -532,7 +532,10 @@ class AutoLibrary:
         # on NFS, not the local config volume). Without this, plugins
         # extracted by calibre-customize -a end up root-owned and the abc
         # service user can't read them at conversion time.
-        calibre_config_dir = app_paths.config_dir() / ".config" / "calibre"
+        # The directory registration writes to (see apply_to_env), not a
+        # second path built from app_paths: chowning a different tree would
+        # leave root-owned plugin files where ingest reads them.
+        calibre_config_dir = calibre_user_plugins.config_dir()
         service_user.chown_to_service_user(
             calibre_config_dir,
             "[cwa-auto-library]",
@@ -545,21 +548,18 @@ class AutoLibrary:
         # via `docker exec calibre-web /opt/calibre/calibre-customize -a
         # /config/.config/calibre/plugins/<new>.zip`.
         registered = calibre_user_plugins.auto_register_plugins()
+        # calibre-customize runs as root in the directory ingest (abc) reads
+        # and writes, and it can leave prefs or a partial plugin copy behind
+        # even when it exits nonzero. Hand the tree back after every run,
+        # not only after a successful registration.
+        service_user.chown_to_service_user(
+            calibre_config_dir,
+            "[cwa-auto-library]",
+            respect_network_share_mode=False,
+        )
         if registered:
             for name in registered:
                 print(f"[cwa-auto-library] Registered Calibre plugin: {name}", flush=True)
-            # Calibre extracts plugin contents during registration; some
-            # of those files land owned by whichever uid invoked
-            # calibre-customize (root, if cont-init ran as root). Re-
-            # chown so abc can read them at conversion time. Skipped
-            # ONLY for the library dir (NAS) earlier — the calibre config
-            # dir is chowned unconditionally because it is always a local
-            # volume.
-            service_user.chown_to_service_user(
-                calibre_config_dir,
-                "[cwa-auto-library]",
-                respect_network_share_mode=False,
-            )
         else:
             zip_count = len(list(target.glob("*.zip")))
             if zip_count == 0:

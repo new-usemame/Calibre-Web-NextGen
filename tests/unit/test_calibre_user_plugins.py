@@ -233,7 +233,6 @@ class TestAutoRegisterPlugins:
 
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
@@ -341,7 +340,6 @@ class TestAutoRegisterPlugins:
 
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "fake.zip").write_bytes(b"PK\x03\x04")
@@ -367,7 +365,6 @@ class TestAutoRegisterPlugins:
         (alternate Calibre install, dev container) returns [] cleanly."""
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "fake.zip").write_bytes(b"PK\x03\x04")
@@ -422,7 +419,6 @@ class TestAutoRegisterPlugins:
 
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         # Filename that would collide if not staged: matches a plausible
@@ -478,7 +474,6 @@ class TestAutoRegisterPlugins:
 
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "test.zip").write_bytes(b"PK\x03\x04")
@@ -509,9 +504,11 @@ class TestAutoRegisterPlugins:
         """`calibre-customize -a` must run with HOME set to the same tree
         that `_customize_json()` is read from.
 
-        calibre writes its plugin registry under `$HOME/.config/calibre/`,
+        calibre writes its plugin registry under `$CALIBRE_CONFIG_DIRECTORY`
+        (falling back to `$HOME/.config/calibre/` only when that is unset),
         and `_registered_plugin_names()` reads `_customize_json()`, which is
-        derived from `_HOME`. If registration inherits an ambient HOME
+        derived from `_HOME`. HOME alone is not enough: #2798 pinned HOME
+        while an inherited CALIBRE_CONFIG_DIRECTORY still won. If registration inherits an ambient HOME
         (the service runs as root, so `/root`) the registry is written
         somewhere the reader never looks: the idempotency short-circuit
         never fires, every boot re-registers, and the running calibre —
@@ -522,7 +519,6 @@ class TestAutoRegisterPlugins:
         clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
         monkeypatch.setenv("HOME", "/root")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
@@ -571,7 +567,6 @@ class TestAutoRegisterPlugins:
         monkeypatch.setenv("PATH", "/sentinel/bin")
         monkeypatch.setenv("CWA_SENTINEL_VAR", "inherited")
         monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
-        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
         plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
@@ -661,3 +656,39 @@ class TestCallSiteWiringSourcePin:
             f"The opt-in routing must go through that module so all sites "
             f"share the same env-var contract."
         )
+
+
+class TestBootstrapOwnership:
+    """#2799 review: registration now runs as root inside the config dir the
+    abc ingest user reads, so whatever calibre-customize leaves there must be
+    handed back to the service account even when no plugin registered."""
+
+    @pytest.fixture
+    def auto_library(self, monkeypatch):
+        import importlib
+        import sys
+        scripts = str(Path(__file__).resolve().parents[2] / "scripts")
+        monkeypatch.syspath_prepend(scripts)
+        sys.modules.pop("auto_library", None)
+        return importlib.import_module("auto_library")
+
+    def test_failed_registration_still_returns_the_config_dir_to_the_service_user(
+            self, clean_env, tmp_path, monkeypatch, auto_library):
+        clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
+        monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
+        plugins = calibre_user_plugins.ensure_plugins_dir()
+        (plugins / "Broken.zip").write_bytes(b"PK\x03\x04")
+
+        events = []
+        monkeypatch.setattr(
+            calibre_user_plugins, "auto_register_plugins",
+            lambda *a, **k: events.append(("register",)) or [])
+        monkeypatch.setattr(
+            auto_library.service_user, "chown_to_service_user",
+            lambda path, *a, **k: events.append(("chown", Path(path))) or True)
+
+        auto_library.AutoLibrary.bootstrap_calibre_user_plugins_dir(object())
+
+        assert ("register",) in events
+        after = events[events.index(("register",)) + 1:]
+        assert ("chown", calibre_user_plugins.config_dir()) in after

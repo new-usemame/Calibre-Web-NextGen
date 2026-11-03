@@ -1282,6 +1282,10 @@ def get_progress(document: str):
         target, identified, raw_id = kosync_place.request_device(user.id)
         identified = identified and gates_enforced(user.id)
         own_served = False
+        # An exact XPointer for a percentage-only row, found before deciding
+        # whether to withhold it (#2783): converted into the requesting
+        # device's own file, it is a real locator, safe for any client.
+        exact_place = None
         private = identified and not target.share_place
         if identified and book_id:
             own = kosync_place.own_position(target.id, book_id)
@@ -1293,12 +1297,24 @@ def get_progress(document: str):
                 progress_record = kosync_place.own_record(target, own, raw_id, document)
                 own_served = True
             if progress_record is not None and is_percentage_only(progress_record) and not accepts_percentage:
-                return create_sync_response({POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]})
+                if not own_served:
+                    exact_place = _exact_xpointer(user.id, book_id, progress_record, document)
+                if not exact_place:
+                    return create_sync_response({POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]})
         else:
             progress_record = get_progress_record(
                 user.id, document, book_id,
                 include_percentage_only=accepts_percentage,
             )
+            if not accepts_percentage and book_id:
+                # A client that names no kinds (JustRead, stock KOReader) still
+                # gets the furthest place when it converts exactly; otherwise
+                # it keeps the locator-only answer above (#1366).
+                furthest = get_progress_record(user.id, document, book_id)
+                if furthest is not None and is_percentage_only(furthest):
+                    exact_place = _exact_xpointer(user.id, book_id, furthest, document)
+                    if exact_place:
+                        progress_record = furthest
 
         if not progress_record:
             if private and book_id:
@@ -1321,7 +1337,7 @@ def get_progress(document: str):
             # The web reader's or Kobo's own place, when it can be expressed
             # exactly in the very file this device holds (#324); otherwise the
             # percentage.
-            exact = _exact_xpointer(user.id, book_id, progress_record, document)
+            exact = exact_place or _exact_xpointer(user.id, book_id, progress_record, document)
             if exact:
                 progress_value, percentage_only = exact, False
 

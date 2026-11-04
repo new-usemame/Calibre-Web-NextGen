@@ -630,7 +630,7 @@ Larger libraries may need `128k`, `4 256k` and `256k`. In Nginx Proxy Manager, a
 
 Signing in to a Kobo account, or a factory reset, can rewrite the `api_endpoint=` line back to Kobo's own server, which sends sync to Kobo instead of your library. After signing in, re-check the line over USB and set it back if it changed. Many sideloaded setups stay signed out so the device stops resetting the endpoint.
 
-To use the Kobo Store and your library at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), CWNG answers any request it doesn't recognize with an empty response. That's fine for a sideload-only device, but store features won't load.
+To use the Kobo Store and your library at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), CWNG answers any request it doesn't recognize with an empty response. That's fine for a sideload-only device, but store features won't load. With it on, if the store refuses the calls a Kobo makes just before syncing, CWNG answers them empty, as it does with the setting off, and the log says `Kobo Store refused ...`. Store features still need a signed-in Kobo.
 
 ### Writable cache storage
 

@@ -322,6 +322,23 @@ def place_in_text_range(epub_path, text_range, text: str):
     return _range(epub_path, book, at, needle)
 
 
+def place_near_solid_index(epub_path, member: str, index: int, text: str,
+                           slack: int = 32):
+    """``(start, end, passage)`` of ``text`` starting near a place, or None.
+
+    The place is the ``index``-th non-whitespace character of ``member``. The
+    words must start within ``slack`` such characters of it, exactly once: two
+    parsers may count a chapter a few characters apart, but a repeat of the
+    same words so close is not told apart.
+    """
+    book = _book(epub_path)
+    if book is None or member not in book.members:
+        return None
+    base = book.starts[book.members.index(member)]
+    return place_in_text_range(
+        epub_path, (base + max(index - slack, 0), base + index + slack + 1), text)
+
+
 def _range(epub_path, book: _Folded, at: int, exact: str):
     """``(start, end, passage)`` around folded ``exact`` found at ``at``, or None."""
     (m, i), (m_last, j) = book.source(at), book.source(at + len(exact) - 1)

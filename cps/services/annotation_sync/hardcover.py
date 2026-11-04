@@ -18,6 +18,15 @@ from .base import AnnotationSyncTargetHandler, SyncResult
 
 log = logging.getLogger(__name__)
 
+# The tag that names the reader of an annotation, as the Annotations page
+# names its source. A source with no known reader gets no tag.
+_SOURCE_TAGS = {
+    "kobo": "Kobo",
+    "koreader": "KOReader",
+    "webreader": "Web reader",
+    "crosspoint": "CrossPoint",
+}
+
 
 def _default_client_factory(token):
     """Lazy import so unit tests don't need the full Hardcover service."""
@@ -42,6 +51,31 @@ def _default_book_identifiers(book):
             if id_type in ("hardcover-id", "hardcover-edition", "hardcover-slug", "isbn"):
                 identifiers[id_type] = identifier.val
     return identifiers
+
+
+def _default_book_percent(book, annotation):
+    """Percent of the book's text before an XPointer annotation, or None."""
+    xpointer = getattr(annotation, "start_xpointer", None)
+    if not xpointer:
+        return None
+    from cps.annotations import _book_format_path
+    from cps.services import koreader_xpointer as kx
+    # A crengine XPointer addresses the plain EPUB, not the KEPUB.
+    epub_path = _book_format_path(book, "EPUB")
+    if not epub_path:
+        return None
+    found = kx.solid_index_of_xpointer(epub_path, xpointer)
+    spine = kx.spine_solid_texts(epub_path)
+    if not found or not spine:
+        return None
+    member, index = found
+    total = sum(len(text) for _member, text in spine)
+    before = 0
+    for name, text in spine:
+        if name == member:
+            return round(100 * (before + index) / total, 2) if total else None
+        before += len(text)
+    return None
 
 
 def _blacklist_check_for(session, book_id):
@@ -71,12 +105,14 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
         book_identifiers_getter: Callable = _default_book_identifiers,
         blacklist_check: Callable[[int], bool] = _default_blacklist_check,
         not_found_exception: Optional[type] = None,
+        book_percent_getter: Callable = _default_book_percent,
     ):
         self._client_factory = client_factory
         self._config_getter = config_getter
         self._book_identifiers_getter = book_identifiers_getter
         self._blacklist_check = blacklist_check
         self._not_found_exception = not_found_exception
+        self._book_percent_getter = book_percent_getter
 
     def for_session(self, session):
         """Rebind the blacklist lookup to ``session`` (see base docstring).
@@ -95,6 +131,7 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
             book_identifiers_getter=self._book_identifiers_getter,
             blacklist_check=lambda book_id: _blacklist_check_for(session, book_id),
             not_found_exception=self._not_found_exception,
+            book_percent_getter=self._book_percent_getter,
         )
 
     def is_enabled(self, user) -> bool:
@@ -142,6 +179,12 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
                 if payload:
                     span = (payload.get("location") or {}).get("span") or {}
                     progress_percent = span.get("chapterProgress")
+                if progress_percent is None:
+                    try:
+                        progress_percent = self._book_percent_getter(book, annotation)
+                    except Exception as exc:  # the entry still goes without a page
+                        log.warning("HardcoverHandler: no book percent for %s: %s",
+                                    annotation.annotation_id, exc)
                 response = client.add_journal_entry(
                     identifiers=identifiers,
                     note_text=annotation.note_text,
@@ -153,6 +196,7 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
                     # nor a foreign vocabulary's word is a tag anyone wants,
                     # and the caller skips the tag on a falsy value.
                     highlight_color=to_known_display_name(annotation.highlight_color),
+                    source_tag=_SOURCE_TAGS.get(annotation.source),
                 )
         except Exception as exc:
             log.warning("HardcoverHandler.push raised: %s", exc)

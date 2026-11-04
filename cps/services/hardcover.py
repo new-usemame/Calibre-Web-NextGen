@@ -304,7 +304,7 @@ class HardcoverClient:
         return result.get("user_book") or {}
 
 
-    def add_journal_entry(self, identifiers, note_text, progress_percent=None, progress_page=None, highlighted_text=None, highlight_color=None):
+    def add_journal_entry(self, identifiers, note_text, progress_percent=None, progress_page=None, highlighted_text=None, highlight_color=None, source_tag=None):
         """
         Add a journal entry (reading note) to Hardcover.
 
@@ -313,6 +313,7 @@ class HardcoverClient:
             note_text: The note text to add
             progress_percent: Optional reading progress (0-100)
             highlighted_text: Optional highlighted quote
+            source_tag: Optional tag that names the reader the entry came from
 
         Returns:
             Response from Hardcover API or None if failed
@@ -400,11 +401,13 @@ class HardcoverClient:
             "privacySettingId": self.privacy,
             "editionId": int(book["edition"]["id"]) if (book.get("edition") or {}).get("id") else None,
             "tags": [
-                {"tag": "CWA", "category": "general", "spoiler": False},
-                {"tag": "Kobo", "category": "general", "spoiler": False}
+                {"tag": "CWA", "category": "general", "spoiler": False}
             ],
             "metadata": metadata if metadata else None
         }
+
+        if source_tag:
+            variables["tags"].append({"tag": source_tag, "category": "general", "spoiler": False})
 
         # Add the highlight color as a tag
         if highlight_color:

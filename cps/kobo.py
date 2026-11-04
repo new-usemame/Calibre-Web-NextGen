@@ -18,7 +18,7 @@ import uuid
 import zipfile
 from time import gmtime, monotonic, strftime
 import json
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from flask import (
     Blueprint,
@@ -1784,7 +1784,7 @@ def get_kobo_activated():
     return config.config_kobo_sync
 
 
-def make_request_to_kobo_store(sync_token=None):
+def make_request_to_kobo_store(sync_token=None, log_content=True):
     outgoing_headers = Headers(request.headers)
     outgoing_headers.remove("Host")
     if sync_token:
@@ -1804,7 +1804,8 @@ def make_request_to_kobo_store(sync_token=None):
         allow_redirects=False,
         timeout=(2, 10)
     ))
-    log.debug("Content: " + str(store_response.content))
+    if log_content:
+        log.debug("Content: " + str(store_response.content))
     log.debug("StatusCode: " + str(store_response.status_code))
     return store_response
 
@@ -5735,7 +5736,6 @@ def HandleUnimplementedRequest(dummy=None):
 # TODO: Implement the following routes
 @csrf.exempt
 @kobo.route("/v1/user/loyalty/<dummy>", methods=["GET", "POST"])
-@kobo.route("/v1/user/profile", methods=["GET", "POST"])
 @kobo.route("/v1/user/wishlist", methods=["GET", "POST"])
 @kobo.route("/v1/user/recommendations", methods=["GET", "POST"])
 @kobo.route("/v1/analytics/<dummy>", methods=["GET", "POST"])
@@ -5769,7 +5769,6 @@ def handle_getests():
 @csrf.exempt
 @kobo.route("/v1/products/<dummy>/prices", methods=["GET", "POST"])
 @kobo.route("/v1/products/<dummy>/recommendations", methods=["GET", "POST"])
-@kobo.route("/v1/products/<dummy>/nextread", methods=["GET", "POST"])
 @kobo.route("/v1/products/<dummy>/reviews", methods=["GET", "POST"])
 @kobo.route("/v1/products/featured/<dummy>", methods=["GET", "POST"])
 @kobo.route("/v1/products/featured/", methods=["GET", "POST"])
@@ -5782,7 +5781,6 @@ def handle_getests():
 @kobo.route("/v1/products/featuredforkoboplus/")
 @kobo.route("/v1/products", methods=["GET", "POST"])
 @kobo.route("/v1/affiliate", methods=["GET", "POST"])
-@kobo.route("/v1/deals", methods=["GET", "POST"])
 @kobo.route("/v1/categories/<dummy>", methods=["GET", "POST"])
 @kobo.route("/v1/categories/<dummy>/featured", methods=["GET", "POST"])
 @kobo.route("/v1/categories/<dummy>/products")
@@ -5791,6 +5789,50 @@ def HandleProductsRequest(dummy=None):
               request.base_url,
               'forwarded to Kobo Store' if config.config_kobo_proxy else 'returning empty response')
     return redirect_or_proxy_request()
+
+
+def _store_error_code(store_response):
+    try:
+        status = store_response.json().get("ResponseStatus") or {}
+        return status.get("ErrorCode") or ""
+    except (ValueError, AttributeError):
+        return ""
+
+
+# The store calls a Kobo makes between /v1/initialization and /v1/library/sync.
+# Nickel runs them in one queue with the sync, so one that fails can cost the
+# sync (D#2781 saw that on add-device). With the proxy on, a redirect would leave
+# the store's answer on the device, out of the server's sight (#2797, #2807), so
+# these go to the store from here. A refusal gets the empty answer they get with
+# the proxy off, except ExpiredToken, which is how the Kobo learns to sign in again.
+@csrf.exempt
+@kobo.route("/v1/user/profile", methods=["GET", "POST"])
+@kobo.route("/v1/products/books/subscriptions", methods=["GET", "POST"])
+@kobo.route("/v1/products/<dummy>/nextread", methods=["GET", "POST"])
+@kobo.route("/v1/deals", methods=["GET", "POST"])
+def HandleStoreCallBeforeSync(dummy=None):
+    if not config.config_kobo_proxy:
+        return make_response(jsonify({}))
+
+    store_path = urlsplit(get_store_url_for_current_request()).path
+    try:
+        # The body can hold the Kobo account's details, and people paste these logs.
+        store_response = make_request_to_kobo_store(log_content=False)
+    except Exception as error:
+        log.warning("Kobo Store could not be reached for %s (%s). Answering it empty so the "
+                    "library sync can carry on.", store_path, type(error).__name__)
+        return make_response(jsonify({}))
+
+    status = store_response.status_code
+    error_code = _store_error_code(store_response)
+    log.debug("Kobo Store answered %s %s for %s", status, error_code, store_path)
+    refused = status in (401, 403) or status >= 500
+    if refused and error_code != "ExpiredToken":
+        log.warning("Kobo Store refused %s with %s %s. Answering it empty so the library sync "
+                    "can carry on. Store features need this Kobo signed in to a Kobo account.",
+                    store_path, status, error_code)
+        return make_response(jsonify({}))
+    return make_proxy_response(store_response)
 
 
 def make_calibre_web_auth_response():

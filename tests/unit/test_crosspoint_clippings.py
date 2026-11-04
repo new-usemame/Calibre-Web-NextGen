@@ -362,7 +362,7 @@ def test_a_long_quote_is_cut_for_placement_and_kept_whole(world):
     assert len(json.loads(row.text_quote)["exact"]) == 4000
 
 
-def _write_epub(path, paragraphs):
+def _write_epub(path, paragraphs, between=""):
     with zipfile.ZipFile(path, "w") as archive:
         info = zipfile.ZipInfo("mimetype")
         info.compress_type = zipfile.ZIP_STORED
@@ -381,7 +381,7 @@ def _write_epub(path, paragraphs):
         archive.writestr("p.xhtml", (
             '<?xml version="1.0" encoding="utf-8"?>'
             '<html xmlns="http://www.w3.org/1999/xhtml"><body>%s</body></html>'
-            % "".join("<p>%s</p>" % p for p in paragraphs)))
+            % between.join("<p>%s</p>" % p for p in paragraphs)))
 
 
 def test_a_quote_found_in_the_book_is_placed(world):
@@ -396,6 +396,41 @@ def test_a_quote_found_in_the_book_is_placed(world):
     # The same upload places to the same words again and changes nothing.
     assert upload(world, item(text=words))["unchanged"] == 1
     assert page(world)["items"][0]["revision"] == first["revision"]
+
+
+_REPEATS = ["I will never forget that day.", "Some other words in between.",
+            "And I will never forget this one."]
+# Indented source, as most books have: the firmware counts these whitespace-only
+# text nodes too (every code point of <body> character data, ChapterHtmlSlimParser).
+_BETWEEN = "\n    "
+
+
+def _visible_offset(paragraph, words):
+    """The firmware's start_offset of ``words`` in ``_REPEATS[paragraph]``."""
+    return (sum(len(p) for p in _REPEATS[:paragraph]) + len(_BETWEEN) * paragraph
+            + _REPEATS[paragraph].index(words))
+
+
+def test_a_short_repeated_quote_is_placed_by_its_offset(world):
+    # Too short for a text search (12 characters folded) and found twice.
+    _write_epub(world.book_file(BOOK, "EPUB"), _REPEATS, between=_BETWEEN)
+    start = _visible_offset(2, "never forget")
+    upload(world, item(text="never forget", spine=0, start_offset=start,
+                       end_offset=start + len("never forget")))
+    row = annotation(world, "a" * 32)
+    assert row.position_type == "koreader_xpointer"
+    # The third paragraph, after "And I will " (11 characters).
+    assert row.start_xpointer.endswith("/body/p[3]/text().11")
+    assert page(world)["items"][0]["text"] == "never forget"
+
+
+def test_an_offset_that_does_not_match_the_words_places_nothing(world):
+    _write_epub(world.book_file(BOOK, "EPUB"), _REPEATS, between=_BETWEEN)
+    start = _visible_offset(1, "other words")
+    upload(world, item(text="never forget", spine=0, start_offset=start,
+                       end_offset=start + 12))
+    row = annotation(world, "a" * 32)
+    assert row.position_type == "text_quote" and not row.start_xpointer
 
 
 def test_offsets_and_no_offsets_both_come_back_exactly(world):

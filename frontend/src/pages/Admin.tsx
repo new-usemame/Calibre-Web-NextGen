@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import {
   useAdminUsers, useUpdateAdminUser, useDeleteAdminUser, useCreateAdminUser, useMe,
   useResetAdminUserPassword,
-  useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig,
+  useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig, useSendTestMail,
   useSecurityConfig, useUpdateSecurityConfig,
   useAdminAddBookToLibrary,
 } from '../lib/queries';
@@ -542,6 +542,7 @@ function MailConfigForm() {
   const t = useT();
   const { data: cfg } = useMailConfig();
   const update = useUpdateMailConfig();
+  const sendTest = useSendTestMail();
   const [form, setForm] = useState<Record<string, string | number>>({});
   const [pw, setPw] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -552,20 +553,33 @@ function MailConfigForm() {
       mail_server: cfg.mail_server, mail_port: cfg.mail_port, mail_use_ssl: cfg.mail_use_ssl,
       mail_login: cfg.mail_login, mail_from: cfg.mail_from, mail_size_mb: cfg.mail_size_mb,
       mail_filename_template: cfg.mail_filename_template,
+      mail_server_type: cfg.mail_server_type,
     });
   }, [cfg]);
 
   if (!cfg) return null;
   const set = (k: string, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
+  // Gmail OAuth is authorised on the classic page only. While it is the server
+  // type the SMTP fields are ignored, so say so and offer the way out (#2771).
+  const usesGmail = Number(form.mail_server_type ?? 0) !== 0;
+  const busy = update.isPending || sendTest.isPending;
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (after?: () => void) => {
     setMsg(null);
     update.mutate({ ...form, ...(pw ? { mail_password: pw } : {}) }, {
-      onSuccess: () => { setMsg({ ok: true, text: t('Email settings saved.') }); setPw(''); },
+      onSuccess: () => {
+        setPw('');
+        if (after) after(); else setMsg({ ok: true, text: t('Email settings saved.') });
+      },
       onError: (err: unknown) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
     });
   };
+  const onSubmit = (e: React.FormEvent) => { e.preventDefault(); save(); };
+  // Same as the classic page's "Save and Send Test Email": test what was just saved.
+  const saveAndTest = () => save(() => sendTest.mutate(undefined, {
+    onSuccess: (r) => setMsg({ ok: true, text: t('Test email queued for {email}. Check Tasks for the result.', { email: r.email }) }),
+    onError: (err: unknown) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not send the test email.') }),
+  }));
 
   return (
     <form id="email-settings" className={`${styles.newForm} ${styles.anchorSection}`} onSubmit={onSubmit}>
@@ -573,6 +587,23 @@ function MailConfigForm() {
         <Mail size={18} className={styles.headerIcon} />
         <h2 className={styles.settingsTitle}>{t('Email (SMTP) server')}</h2>
       </div>
+      <p className={cfg.mail_configured ? styles.msgOk : styles.msgErr} role="status" data-testid="mail-status">
+        {cfg.mail_configured
+          ? t('Mail is configured and ready to send.')
+          : cfg.mail_server_type !== 0 && !cfg.gmail_authorised
+            ? t('Gmail (OAuth) is selected but not authorised, so mail is switched off. Use standard SMTP below, or authorise Gmail in the classic settings.')
+            : t('Mail is not configured yet. Enter an SMTP server and save.')}
+      </p>
+      {usesGmail ? (
+        <div className={styles.fieldHint} data-testid="mail-gmail-notice">
+          <p>{t('Mail currently sends through Gmail (OAuth), which is set up in the classic settings. The SMTP settings below are not used.')}</p>
+          <button type="button" className={styles.submitBtn} onClick={() => set('mail_server_type', 0)}>
+            {t('Use standard SMTP instead')}
+          </button>
+        </div>
+      ) : Number(cfg.mail_server_type) !== 0 && (
+        <p className={styles.fieldHint} data-testid="mail-smtp-pending">{t('Standard SMTP will be used once you save.')}</p>
+      )}
       <div className={styles.newRow}>
         <label className={styles.field}>
           <span>{t('SMTP server')}</span>
@@ -616,8 +647,12 @@ function MailConfigForm() {
         </div>
       </div>
       <div className={styles.newActions}>
-        <button type="submit" className={styles.submitBtn} disabled={update.isPending}>
+        <button type="submit" className={styles.submitBtn} disabled={busy}>
           {update.isPending ? t('Saving…') : t('Save email settings')}
+        </button>
+        <button type="button" className={styles.submitBtn} disabled={busy} onClick={saveAndTest}
+          data-testid="mail-save-and-test">
+          {sendTest.isPending ? t('Sending…') : t('Save and send test email')}
         </button>
         <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>

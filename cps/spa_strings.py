@@ -2236,3 +2236,5 @@ _("Merge one copy into “{title}”? Formats it lacks are copied over, then tha
 _("Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted.")
 _("Merged into “{title}”.")
 _("Could not merge these books.")
+_("{done} of {total} imported")
+_("No new books have appeared for a while; {count} not imported yet.")

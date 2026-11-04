@@ -306,7 +306,34 @@ def _sidecar_values(item):
     return values
 
 
-def _portable(item) -> dict:
+def _place_by_offset(item, epub_path):
+    """``(start, end, passage)`` of the clipping where the reader made it, or None.
+
+    The reader sends the spine item and its text offset of the first word. A
+    quote search cannot place words that are short or repeat in the book; the
+    offset says which repeat it is.
+    """
+    if not epub_path or item["start_offset"] is None:
+        return None
+    from ...services import koreader_xpointer as kx, text_anchor
+    from ...services.parallel import run_blocking
+
+    def place():
+        # The reader numbers the spine items it can open; crengine's
+        # DocFragment numbers count the same items, from 1.
+        found = kx.solid_index_of_visible_offset(epub_path, item["spine"] + 1,
+                                                 item["start_offset"])
+        return text_anchor.place_near_solid_index(epub_path, *found, item["text"]) if found else None
+    try:
+        # Reading the book's text is file work; keep it off the request greenlet.
+        return run_blocking(place)
+    except Exception:
+        log.warning("CrossPoint clippings: could not place id=%s by its offset",
+                    _loggable(item["id"]), exc_info=True)
+        return None
+
+
+def _portable(item, epub_path=None) -> dict:
     from ...services.text_anchor import MAX_QUOTE_CHARS, parse_quote
     payload = {"annotation_id": item["id"], "source": SOURCE, "type": "highlight",
                "highlighted_text": item["text"]}
@@ -314,6 +341,12 @@ def _portable(item) -> dict:
     quote = {"exact": item["text"][:MAX_QUOTE_CHARS]}
     if parse_quote(quote) is not None:
         payload["text_quote"] = quote
+    placed = _place_by_offset(item, epub_path)
+    if placed:
+        # A native anchor: apply_push then keeps the quote but does not search for it.
+        start, end, passage = placed
+        payload.update(position_type="koreader_xpointer", start_xpointer=start,
+                       end_xpointer=end, highlighted_text=passage)
     return payload
 
 
@@ -327,7 +360,7 @@ def _apply_upload(item, *, user, book, document, device_id, session, epub_path,
             user.id, book.id, _loggable(item["id"]), row.source, row.origin_device_id)
         counts["unchanged"] += 1
         return
-    summary = apply_push([_portable(item)], user=user, book=book, session=session,
+    summary = apply_push([_portable(item, epub_path)], user=user, book=book, session=session,
                          commit=ub.session_commit, delete_source=SOURCE,
                          origin_device_id=device_id, epub_path=epub_path)
     row = _find_row(session, user.id, book.id, item["id"])

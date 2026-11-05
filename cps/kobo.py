@@ -4904,20 +4904,20 @@ def HandleStateRequest(book_uuid):
         if resolved_bookmark_accepted:
             if request_bookmark and request_bookmark.get("ProgressPercent") is not None:
                 accepted_progress = bookmark_outcome.percentage
-                push_reading_state_to_hardcover(
-                    current_user, book, accepted_progress,
-                )
                 if checked:
-                    share_kobo_progress_with_koreader(
+                    shared_progress = share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
                         report=kobo_place_gate.Report(client_lm, bookmark_outcome.received_at),
                         location=location, device_id=device_id,
                     )
                 else:
-                    share_kobo_progress_with_koreader(
+                    shared_progress = share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
                         location=location, device_id=device_id,
                     )
+                push_reading_state_to_hardcover(
+                    current_user, book, shared_progress,
+                )
 
         ub.session.merge(kobo_reading_state)
         # #1318 again, on the reading-state path: ``session_commit()`` returns
@@ -5061,7 +5061,9 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     their own. When ``location`` is the reporting Kobo's span in the library
     KEPUB, the row gets the percentage CrossPoint computes at that span
     instead (``koreader_position.kobo_share_percent``). The Kobo's own
-    bookmark keeps the device's value: the device echoes it back.
+    bookmark keeps the device's value: the device echoes it back. The caller
+    sends the returned value to Hardcover, so Hardcover gets the same
+    measure as a CrossPoint or KOReader push.
 
     With an accepted checked report, ``report`` supplies its raw client clock
     and bookmark receipt to the latest-wins carrier. Legacy calls retain the
@@ -5076,7 +5078,8 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     :param percentage: Reading progress, 0-100, as the device reported it.
     :param location: The ``Location`` of the device's report, if any.
     :param device_id: The reporting Kobo's ``Device`` id.
-    :return: None
+    :return: The percentage for the row: the CrossPoint value, or else
+        ``percentage``. It is returned also when the row write fails.
     """
     # Imported lazily: ``kosync`` imports this module for
     # ``push_reading_state_to_hardcover``, so a module-level import is a cycle.
@@ -5133,6 +5136,7 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     except Exception as e:
         log.warning("Could not share Kobo progress with KOReader for user %s book %s: %s",
                     user_id, book_id, e)
+    return percentage
 
 
 def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: int):

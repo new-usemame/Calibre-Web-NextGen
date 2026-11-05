@@ -248,7 +248,8 @@ def state_harness(monkeypatch):
     monkeypatch.setattr(
         kobo,
         "share_kobo_progress_with_koreader",
-        lambda *_args, **_kwargs: fanout.append(("kosync", _args[-1])),
+        # The share returns the percentage it wrote, which Hardcover gets.
+        lambda *_args, **_kwargs: fanout.append(("kosync", _args[-1])) or _args[-1],
     )
 
     app = Flask(__name__)
@@ -310,7 +311,7 @@ def test_newer_backward_jump_updates_resolved_row_and_both_fanouts(
     assert harness.state.statistics.spent_reading_minutes == 40
     journal = harness.session.query(ub.DeviceReadingPosition).one()
     assert journal.progress_percent == 20.0
-    assert harness.fanout == [("hardcover", 20.0), ("kosync", 20.0)]
+    assert harness.fanout == [("kosync", 20.0), ("hardcover", 20.0)]
 
     higher = harness.put(
         90.0,
@@ -324,10 +325,10 @@ def test_newer_backward_jump_updates_resolved_row_and_both_fanouts(
     assert harness.read.read_status == ub.ReadBook.STATUS_FINISHED
     assert harness.state.statistics.spent_reading_minutes == 40
     assert harness.fanout == [
-        ("hardcover", 20.0),
         ("kosync", 20.0),
-        ("hardcover", 90.0),
+        ("hardcover", 20.0),
         ("kosync", 90.0),
+        ("hardcover", 90.0),
     ]
 
 
@@ -358,7 +359,7 @@ def test_stored_70_and_older_device_80_becomes_80(state_harness):
 
     assert harness.state.current_bookmark.progress_percent == 80.0
     assert harness.state.current_bookmark.location_value == "device.80.0"
-    assert harness.fanout == [("hardcover", 80.0), ("kosync", 80.0)]
+    assert harness.fanout == [("kosync", 80.0), ("hardcover", 80.0)]
 
 
 def test_older_device_clock_cannot_move_resolved_clocks_backwards(
@@ -396,7 +397,7 @@ def test_equal_progress_refreshes_location_without_regressing_clocks(
     assert harness.state.current_bookmark.location_value == "device.80.0"
     assert harness.state.current_bookmark.last_modified >= bookmark_clock
     assert harness.state.last_modified >= state_clock
-    assert harness.fanout == [("hardcover", 80.0), ("kosync", 80.0)]
+    assert harness.fanout == [("kosync", 80.0), ("hardcover", 80.0)]
 
 
 def test_malformed_nonempty_location_is_rejected(state_harness):
@@ -509,7 +510,7 @@ def test_armed_non_cover_backward_jump_is_not_misclassified_as_reset(
     assert position.progress_percent == 30.0
     assert position.rehydrate_needed is True
     assert harness.state.current_bookmark.progress_percent == 30.0
-    assert harness.fanout == [("hardcover", 30.0), ("kosync", 30.0)]
+    assert harness.fanout == [("kosync", 30.0), ("hardcover", 30.0)]
 
 
 @pytest.mark.parametrize(

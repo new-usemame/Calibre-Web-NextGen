@@ -17,6 +17,7 @@ Real book (``alice-pg11`` and its served KEPUB), real kosync HTTP, real Kobo
 handlers (``share_place_span_world``).
 """
 
+import os
 import zipfile
 from bisect import bisect_right
 from datetime import timedelta
@@ -164,3 +165,60 @@ def test_a_failure_to_compute_it_does_not_fail_the_kobos_sync(sw, kobo, monkeypa
     sw.put(kobo, row["source"], row["span"], DEVICE_PERCENT, after_now())  # 200, Success
 
     assert sw.pull()[0] == pytest.approx(DEVICE_PERCENT)
+
+
+# == What Hardcover and the book page show ==================================
+
+@pytest.fixture
+def hardcover_pushes(monkeypatch):
+    from cps import kobo as kobo_module
+    pushes = []
+    monkeypatch.setattr(kobo_module, "push_reading_state_to_hardcover",
+                        lambda _user, book, percent: pushes.append((book.id, percent)))
+    return pushes
+
+
+def test_hardcover_gets_the_percentage_koreader_gets(sw, kobo, hardcover_pushes):
+    row = span_rows()[300]
+
+    sw.put(kobo, row["source"], row["span"], DEVICE_PERCENT, after_now())
+
+    assert hardcover_pushes == [(sw.book.id, crosspoint_percent(sw, row))]
+
+
+def test_hardcover_gets_the_devices_percentage_without_the_proof(sw, kobo, hardcover_pushes):
+    row = span_rows()[300]
+
+    sw.put(kobo, row["source"], "kobo.9999.1", DEVICE_PERCENT, after_now())
+
+    assert hardcover_pushes == [(sw.book.id, pytest.approx(DEVICE_PERCENT))]
+
+
+def _shown(world):
+    from cps import helper
+    return helper.get_kosync_progress_display(world.session, world.reader.id, world.book.id)[0]
+
+
+def test_the_book_page_shows_the_percentage_of_the_same_kobo_report(sw, kobo):
+    row = span_rows()[300]
+
+    sw.put(kobo, row["source"], row["span"], DEVICE_PERCENT, after_now())
+
+    if os.environ[SWITCH] == "1":
+        assert _shown(sw) == crosspoint_percent(sw, row)
+    else:
+        # With the gates off the row gets its own receipt, so it cannot be
+        # matched to the bookmark. The page keeps the device's value.
+        assert _shown(sw) == pytest.approx(DEVICE_PERCENT)
+
+
+def test_the_book_page_shows_the_bookmark_after_a_later_koreader_push(sw, kobo):
+    from cps import ub
+    rows = span_rows()
+    sw.put(kobo, rows[300]["source"], rows[300]["span"], DEVICE_PERCENT, after_now(2))
+    sw.push(rows[310]["xpointer"], 61.25, client_at=after_now(4))
+
+    bookmark = sw.session.query(ub.KoboReadingState).filter_by(
+        user_id=sw.reader.id, book_id=sw.book.id).one().current_bookmark
+    assert _shown(sw) == bookmark.progress_percent
+    assert _shown(sw) != crosspoint_percent(sw, rows[300])

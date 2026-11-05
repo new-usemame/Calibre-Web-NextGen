@@ -60,6 +60,9 @@ class _Document:
     spans: dict    # span id -> (start, end) in the document's own text
     starts: tuple  # sorted starts of spans that hold text, for lookups
     ids: tuple     # the span id at each of ``starts``
+    length: int = 0      # characters of text in the document
+    byte_start: int = 0  # bytes of the spine documents before it
+    size: int = 0        # its own size in bytes, uncompressed
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,7 @@ class _Kepub:
     text: str          # every document's non-whitespace text, in spine order
     documents: tuple   # _Document per spine item
     by_member: dict    # member -> _Document, for members read exactly once
+    total_bytes: int = 0  # every spine document's size, the dummy page included
 
 
 def span_to_xpointer(epub_path, kepub_path, source: str, span_id: str) -> Optional[str]:
@@ -114,6 +118,28 @@ def span_text_range(epub_path, kepub_path, source: str, span_id: str) -> Optiona
     if start == end or _aligned_epub(epub_path, kepub) is None:
         return None
     return document.offset + start, document.offset + end
+
+
+def kobo_progress_percent(kepub_path, source: str, span_id: str) -> Optional[float]:
+    """The percentage of the book a Kobo reports at a span of ``kepub_path``.
+
+    A Kobo weights each spine document by its uncompressed size in the KEPUB
+    (its ``content.___FileSize`` is that document's share of the book) and
+    counts a span's place in its document by the text before it, so it is
+    not the share of the text the web reader shows (#2821). None unless the
+    KEPUB names the span.
+    """
+    if not isinstance(span_id, str) or not _SPAN_ID.fullmatch(span_id):
+        return None
+    kepub = _kepub(kepub_path)
+    if kepub is None or kepub.total_bytes <= 0:
+        return None
+    document = _document(kepub, source)
+    if document is None or span_id not in document.spans:
+        return None
+    start, _end = document.spans[span_id]
+    inside = start / document.length if document.length else 0.0
+    return 100.0 * (document.byte_start + inside * document.size) / kepub.total_bytes
 
 
 def xpointer_to_span(epub_path, kepub_path, xpointer: str) -> Optional[tuple[str, str]]:
@@ -214,25 +240,30 @@ def _load_kepub(path: str, _mtime_ns: int, _size: int,
         spine = package.find(f"{{{kx._OPF_NS}}}spine")
         if spine is None:
             return None
-        parts, documents, offset = [], [], 0
+        parts, documents, offset, byte_offset = [], [], 0, 0
         for ref in spine.iterfind(f"{{{kx._OPF_NS}}}itemref"):
             member = manifest.get(ref.get("idref"))
             if member not in names or archive.getinfo(member).file_size > kx.MAX_CHAPTER_BYTES:
                 return None
+            size = archive.getinfo(member).file_size
             if posixpath.basename(member) == _KEPUBIFY_DUMMY:
+                byte_offset += size  # a Kobo counts the page it displays
                 continue
             text, spans = _read_document(archive.read(member))
             ordered = sorted((s, i) for i, (s, e) in spans.items() if e > s)
             documents.append(_Document(member, offset, spans,
                                        tuple(s for s, _i in ordered),
-                                       tuple(i for _s, i in ordered)))
+                                       tuple(i for _s, i in ordered),
+                                       len(text), byte_offset, size))
             parts.append(text)
             offset += len(text)
+            byte_offset += size
     counts = {}
     for document in documents:
         counts[document.member] = counts.get(document.member, 0) + 1
     return _Kepub("".join(parts), tuple(documents),
-                  {d.member: d for d in documents if counts[d.member] == 1})
+                  {d.member: d for d in documents if counts[d.member] == 1},
+                  byte_offset)
 
 
 def _read_document(raw: bytes):

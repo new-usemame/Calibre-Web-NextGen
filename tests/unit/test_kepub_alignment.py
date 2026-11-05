@@ -218,3 +218,47 @@ def test_an_epub_that_already_carries_the_dummy_page_still_aligns(tmp_path):
     xpointer = ka.span_to_xpointer(epub, kepub, row["source"], row["span"])
     assert xpointer is not None
     assert ka.xpointer_to_span(epub, kepub, xpointer) == (row["source"], row["span"])
+
+
+def test_a_kobo_weights_by_document_size_not_by_text(tmp_path):
+    # #2821: a Kobo's percentage is its documents' share of the KEPUB's bytes
+    # (content.___FileSize), so a document with much markup per character
+    # counts for more than one of plain prose, unlike the web reader's text.
+    plain = "<p>" + "word " * 400 + "</p>"
+    marked = "".join(f'<p><span class="koboSpan" id="kobo.{i}.1">word </span></p>'
+                     for i in range(1, 401))
+    kepub = _book(tmp_path / "w.kepub.epub", [plain, marked], spans=True)
+    with zipfile.ZipFile(kepub) as archive:
+        first, second = (archive.getinfo(f"OEBPS/c{i}.xhtml").file_size for i in (0, 1))
+    start = ka.kobo_progress_percent(kepub, "OEBPS/c1.xhtml", "kobo.1.1")
+    middle = ka.kobo_progress_percent(kepub, "OEBPS/c1.xhtml", "kobo.200.1")
+    assert start == pytest.approx(100 * first / (first + second))
+    assert start < 25  # where the text, half of it before the second file, says 50
+    assert middle == pytest.approx(start + (100 - start) / 2, abs=1)
+
+
+def test_kepubifys_blank_page_counts_in_the_kobo_percentage_but_has_no_place(tmp_path):
+    # The helper puts the blank page after the first chapter, so the second
+    # chapter starts after both files' bytes.
+    base = _book(tmp_path / "b.kepub.epub", [
+        '<p><span class="koboSpan" id="kobo.1.1">One two three.</span></p>',
+        '<p><span class="koboSpan" id="kobo.1.1">Four five six.</span></p>'], spans=True)
+    kepub = _with_kepubify_dummy(tmp_path, base, "d.kepub.epub")
+    with zipfile.ZipFile(kepub) as archive:
+        sizes = {name: archive.getinfo(name).file_size for name in (
+            "OEBPS/c0.xhtml", "OEBPS/c1.xhtml", "OEBPS/kepubify-titlepage-dummy.xhtml")}
+    total = sum(sizes.values())
+    before = sizes["OEBPS/c0.xhtml"] + sizes["OEBPS/kepubify-titlepage-dummy.xhtml"]
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c1.xhtml", "kobo.1.1") == pytest.approx(
+        100 * before / total)
+    assert ka.kobo_progress_percent(kepub, "OEBPS/kepubify-titlepage-dummy.xhtml",
+                                    "kobo.1.1") is None
+
+
+def test_the_kobo_percentage_needs_a_span_the_kepub_holds(tmp_path):
+    kepub = _book(tmp_path / "b.kepub.epub", [
+        '<p><span class="koboSpan" id="kobo.1.1">One.</span></p>'], spans=True)
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "kobo.9.9") is None
+    assert ka.kobo_progress_percent(kepub, "OEBPS/nope.xhtml", "kobo.1.1") is None
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "bad") is None
+    assert ka.kobo_progress_percent(tmp_path / "missing.kepub", "OEBPS/c0.xhtml", "kobo.1.1") is None

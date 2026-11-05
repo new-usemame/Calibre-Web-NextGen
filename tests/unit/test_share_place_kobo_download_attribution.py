@@ -158,7 +158,13 @@ def _ledger(sw, device):
 
 def _served(sw, device):
     bookmark = _bookmark(sw, device)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    # An exact span arrives with the percentage a Kobo works out for it
+    # (#2821); a Kobo held on its own place is sent the shared figure.
+    where = bookmark.get("Location") or {}
+    worked = (kepub_alignment.kobo_progress_percent(sw.kepub, where.get("Source"), where.get("Value"))
+              if where else None)
+    assert (bookmark.get("ProgressPercent") == pytest.approx(40)
+            or (worked is not None and bookmark.get("ProgressPercent") == pytest.approx(worked, abs=0.01)))
     return location_of(bookmark)
 
 

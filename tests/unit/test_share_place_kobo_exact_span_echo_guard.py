@@ -29,6 +29,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import DateTime, select, update
 
+from cps.services import kepub_alignment
 from cps import ub
 from cps.progress_syncing.models import KOSyncProgress
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
@@ -99,7 +100,14 @@ def _close_at(sw, kobo, row_or_none, percent, *, status="Reading", seconds=4):
 def _not_rewound(sw, rows, percent=40):
     """The shared place is still KOReader's: the other checked Kobo and
     KOReader itself both get it."""
-    assert sw.get(sw.observer)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(percent)
+    bookmark = sw.get(sw.observer)["CurrentBookmark"]
+    # An exact span arrives with the percentage a Kobo works out for it
+    # (#2821); a Kobo held on its own place is sent the shared figure.
+    where = bookmark.get("Location") or {}
+    worked = (kepub_alignment.kobo_progress_percent(sw.kepub, where.get("Source"), where.get("Value"))
+              if where else None)
+    assert (bookmark["ProgressPercent"] == pytest.approx(percent)
+            or (worked is not None and bookmark["ProgressPercent"] == pytest.approx(worked, abs=0.01)))
     seen_percent, progress = sw.pull()
     assert seen_percent == pytest.approx(percent)
     assert progress == rows["koreader"]["xpointer"]

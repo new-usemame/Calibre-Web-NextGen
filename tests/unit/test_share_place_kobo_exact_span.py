@@ -74,6 +74,11 @@ def _expected(sw, row):
     return span_location(*found)
 
 
+def _kobo_percent(sw, row):
+    """The percentage a Kobo reports at the row's span in these very files (#2821)."""
+    return kepub_alignment.kobo_progress_percent(sw.kepub, row["source"], row["span"])
+
+
 def _bookmark(sw, device):
     return sw.get(device).get("CurrentBookmark") or {}
 
@@ -85,7 +90,10 @@ def test_a_checked_koreader_place_reaches_a_checked_kobo_as_the_exact_span(accou
     sw.push(rows["late"]["xpointer"], 40)
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    # Not the 40 KOReader sent, which counts the book another way: the exact
+    # span arrives with the percentage the Kobo itself works out for it.
+    assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["late"]), abs=0.01)
+    assert bookmark.get("ProgressPercent") != pytest.approx(40, abs=1)
     assert location_of(bookmark) == _expected(sw, rows["late"])
     assert sw.synced_location(sw.checked) == _expected(sw, rows["late"])
 
@@ -98,7 +106,7 @@ def test_a_backward_move_from_koreader_reaches_the_kobo_as_the_earlier_span(acco
     sw.push(rows["early"]["xpointer"], 20, client_at=after_now(4))
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(20)
+    assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["early"]), abs=0.01)
     assert location_of(bookmark) == _expected(sw, rows["early"])
     assert sw.synced_location(sw.checked) == _expected(sw, rows["early"])
 
@@ -170,7 +178,7 @@ def test_a_kepub_with_kepubifys_blank_title_page_gets_the_exact_span(account, ro
     sw.push(rows["late"]["xpointer"], 40)
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["late"]), abs=0.01)
     assert location_of(bookmark) == span_location(rows["late"]["source"], rows["late"]["span"])
 
 

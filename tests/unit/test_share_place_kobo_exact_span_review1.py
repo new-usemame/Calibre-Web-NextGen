@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from flask import g
 
+from cps.services import kepub_alignment
 from cps import kobo
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
     _now, after_now, location_of, span_location, span_rows, sw,
@@ -73,7 +74,14 @@ def world(sw, rows):
 
 def _not_rewound(sw, percent=40):
     """Neither the other checked Kobo nor KOReader moved off ``percent``."""
-    assert sw.get(sw.observer)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(percent)
+    bookmark = sw.get(sw.observer)["CurrentBookmark"]
+    # An exact span arrives with the percentage a Kobo works out for it
+    # (#2821); a Kobo held on its own place is sent the shared figure.
+    where = bookmark.get("Location") or {}
+    worked = (kepub_alignment.kobo_progress_percent(sw.kepub, where.get("Source"), where.get("Value"))
+              if where else None)
+    assert (bookmark["ProgressPercent"] == pytest.approx(percent)
+            or (worked is not None and bookmark["ProgressPercent"] == pytest.approx(worked, abs=0.01)))
     assert sw.pull()[0] == pytest.approx(percent)
 
 

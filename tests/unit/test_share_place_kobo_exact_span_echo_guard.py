@@ -32,7 +32,7 @@ from sqlalchemy import DateTime, select, update
 from cps import ub
 from cps.progress_syncing.models import KOSyncProgress
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
-    BOOK, _now, after_now, location_of, span_location, span_rows, sw,
+    BOOK, _now, after_now, crosspoint_percent, location_of, span_location, span_rows, sw,
 )
 
 pytestmark = pytest.mark.unit
@@ -105,11 +105,12 @@ def _not_rewound(sw, rows, percent=40):
     assert progress == rows["koreader"]["xpointer"]
 
 
-def _won(sw, percent):
+def _won(sw, percent, pulled=None):
     """The Kobo's report is the shared place: the other checked Kobo gets it,
-    and so does KOReader's KOSync GET (section 14b: mirrored latest-wins)."""
+    and so does KOReader's KOSync GET (section 14b: mirrored latest-wins).
+    ``pulled`` is what KOReader gets, when it is not ``percent``."""
     assert sw.get(sw.observer)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(percent)
-    assert sw.pull()[0] == pytest.approx(percent)
+    assert sw.pull()[0] == (pytest.approx(percent) if pulled is None else pulled)
 
 
 @pytest.fixture
@@ -231,7 +232,7 @@ def test_an_exact_serve_leaves_no_guard(armed, rows):
 
     _close_at(sw, sw.kobo, rows["held"], HELD_PERCENT)
 
-    _won(sw, HELD_PERCENT)
+    _won(sw, HELD_PERCENT, crosspoint_percent(sw, rows["held"]))
 
 
 # == Unchanged paths (controls) ==============================================
@@ -283,7 +284,7 @@ def test_koreader_gets_a_checked_kobos_backward_move(sw, rows):
 
     _close_at(sw, kobo, rows["page-back-far"], HELD_PERCENT - 3)
 
-    assert sw.pull()[0] == pytest.approx(HELD_PERCENT - 3)
+    assert sw.pull()[0] == crosspoint_percent(sw, rows["page-back-far"])
 
 
 def test_an_unchecked_kobos_report_does_not_reach_koreader(sw, rows):

@@ -299,7 +299,7 @@ def sync_harness(monkeypatch):
         kobo, "push_reading_state_to_hardcover", lambda *_args: None,
     )
     monkeypatch.setattr(
-        kobo, "share_kobo_progress_with_koreader", lambda *_args: None,
+        kobo, "share_kobo_progress_with_koreader", lambda *_args, **_kwargs: None,
     )
 
     app = Flask(__name__)

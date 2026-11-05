@@ -75,6 +75,39 @@ def span_to_xpointer(epub_path, kepub_path, source: str, span_id: str) -> Option
     ``source`` names the KEPUB document the span is in (a Kobo's
     ``Location.Source``); ``kepub_path`` is the KEPUB the Kobo holds.
     """
+    found = _span_start(epub_path, kepub_path, source, span_id)
+    if found is None:
+        return None
+    (members, texts, offsets), index = found
+    k = bisect_right(offsets, index) - 1
+    return kx.xpointer_at_solid_index(epub_path, members[k], index - offsets[k], texts[k])
+
+
+def span_book_percent(epub_path, kepub_path, source: str, span_id: str) -> Optional[float]:
+    """CrossPoint's reading percentage (0-100) at the first character of a Kobo span.
+
+    CrossPoint weighs each spine document of the EPUB it holds by its
+    uncompressed size in the archive, and places a reader inside a document
+    by its page (``Epub::calculateProgress``). The span's offset in the text
+    of its EPUB document stands in for the page, since the pages follow that
+    text. None where ``span_to_xpointer`` gives None.
+    """
+    found = _span_start(epub_path, kepub_path, source, span_id)
+    sizes = _member_sizes(epub_path) if found is not None else None
+    if sizes is None:
+        return None
+    (members, texts, offsets), index = found
+    weights = [sizes.get(member) for member in members]
+    total = sum(weights) if None not in weights else 0
+    if not total:
+        return None
+    k = bisect_right(offsets, index) - 1
+    within = (index - offsets[k]) / len(texts[k])
+    return 100 * (sum(weights[:k]) + within * weights[k]) / total
+
+
+def _span_start(epub_path, kepub_path, source, span_id):
+    """``(aligned EPUB spine, index)`` of a Kobo span's first character, or None."""
     if not isinstance(span_id, str) or not _SPAN_ID.fullmatch(span_id):
         return None
     kepub = _kepub(kepub_path)
@@ -89,10 +122,7 @@ def span_to_xpointer(epub_path, kepub_path, source: str, span_id: str) -> Option
     epub = _aligned_epub(epub_path, kepub)
     if epub is None:
         return None
-    index = document.offset + start
-    members, texts, offsets = epub
-    k = bisect_right(offsets, index) - 1
-    return kx.xpointer_at_solid_index(epub_path, members[k], index - offsets[k], texts[k])
+    return epub, document.offset + start
 
 
 def span_text_range(epub_path, kepub_path, source: str, span_id: str) -> Optional[tuple[int, int]]:
@@ -192,6 +222,23 @@ def _kepub(kepub_path) -> Optional[_Kepub]:
     except Exception:
         log.debug("kepub_alignment: cannot read %s", path, exc_info=True)
         return None
+
+
+def _member_sizes(epub_path) -> Optional[dict]:
+    """Uncompressed size of each member of an archive, by member name."""
+    try:
+        path = os.fspath(epub_path)
+        stat = os.stat(path)
+        return _load_member_sizes(path, stat.st_mtime_ns, stat.st_size,
+                                  (stat.st_dev, stat.st_ino, stat.st_ctime_ns))
+    except (OSError, TypeError, zipfile.BadZipFile):
+        return None
+
+
+@lru_cache(maxsize=16)
+def _load_member_sizes(path: str, _mtime_ns: int, _size: int, _identity=None) -> dict:
+    with zipfile.ZipFile(path) as archive:
+        return {info.filename: info.file_size for info in archive.infolist()}
 
 
 @lru_cache(maxsize=8)

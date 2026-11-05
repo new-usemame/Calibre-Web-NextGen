@@ -23,7 +23,7 @@ from flask import g
 
 from cps import kobo
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
-    _now, after_now, location_of, span_location, span_rows, sw,
+    _now, after_now, crosspoint_percent, location_of, span_location, span_rows, sw,
 )
 
 pytestmark = pytest.mark.unit
@@ -71,10 +71,11 @@ def world(sw, rows):
     return sw
 
 
-def _not_rewound(sw, percent=40):
-    """Neither the other checked Kobo nor KOReader moved off ``percent``."""
+def _not_rewound(sw, percent=40, pulled=None):
+    """Neither the other checked Kobo nor KOReader moved off ``percent``.
+    ``pulled`` is what KOReader holds, when it is not ``percent``."""
     assert sw.get(sw.observer)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(percent)
-    assert sw.pull()[0] == pytest.approx(percent)
+    assert sw.pull()[0] == (pytest.approx(percent) if pulled is None else pulled)
 
 
 # == 1. No library KEPUB is inexact, and guarded =============================
@@ -83,6 +84,7 @@ def test_without_a_library_kepub_the_kobo_gets_its_own_location_and_its_close_do
         world, rows):
     sw = world
     _put(sw, sw.observer, rows["shared"], 40, 2)  # a Kobo-origin shared place
+    shared = crosspoint_percent(sw, rows["shared"])
     os.unlink(sw.kepub)
 
     bookmark = sw.get(sw.target)["CurrentBookmark"]
@@ -90,7 +92,7 @@ def test_without_a_library_kepub_the_kobo_gets_its_own_location_and_its_close_do
     assert bookmark["ProgressPercent"] == pytest.approx(40)
 
     _put(sw, sw.target, rows["held"], 5, 4)  # Nickel closes where it opened
-    _not_rewound(sw)
+    _not_rewound(sw, pulled=shared)
 
 
 # == 2. Only a completed download proves the current KEPUB ===================

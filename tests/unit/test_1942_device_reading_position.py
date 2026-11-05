@@ -248,7 +248,7 @@ def state_harness(monkeypatch):
     monkeypatch.setattr(
         kobo,
         "share_kobo_progress_with_koreader",
-        lambda *_args: fanout.append(("kosync", _args[-1])),
+        lambda *_args, **_kwargs: fanout.append(("kosync", _args[-1])),
     )
 
     app = Flask(__name__)

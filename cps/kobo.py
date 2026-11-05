@@ -4911,10 +4911,12 @@ def HandleStateRequest(book_uuid):
                     share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
                         report=kobo_place_gate.Report(client_lm, bookmark_outcome.received_at),
+                        location=location, device_id=device_id,
                     )
                 else:
                     share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
+                        location=location, device_id=device_id,
                     )
 
         ub.session.merge(kobo_reading_state)
@@ -5036,7 +5038,8 @@ def _handle_unchecked_state_request(book, device_id):
     })
 
 
-def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=None):
+def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=None,
+                                      location=None, device_id=None):
     """Publish a Kobo's reading percentage onto the carrier KOReader pulls from.
 
     #1425 gap 1. KOReader fetches ``KOSyncProgress`` over kosync; a Kobo sync
@@ -5053,6 +5056,13 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     have not advertised support for that are served nothing, exactly as
     before (see ``record_percentage_only_progress``).
 
+    A Kobo's percentage is a whole number, measured on its own KEPUB, so
+    KOReader and CrossPoint would compare and show a coarser value than
+    their own. When ``location`` is the reporting Kobo's span in the library
+    KEPUB, the row gets the percentage CrossPoint computes at that span
+    instead (``koreader_position.kobo_share_percent``). The Kobo's own
+    bookmark keeps the device's value: the device echoes it back.
+
     With an accepted checked report, ``report`` supplies its raw client clock
     and bookmark receipt to the latest-wins carrier. Legacy calls retain the
     existing furthest-wins write.
@@ -5064,12 +5074,14 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     :param user_id: Owner of the reading position.
     :param book_id: Calibre book id — the key ``update_progress`` converges on.
     :param percentage: Reading progress, 0-100, as the device reported it.
+    :param location: The ``Location`` of the device's report, if any.
+    :param device_id: The reporting Kobo's ``Device`` id.
     :return: None
     """
     # Imported lazily: ``kosync`` imports this module for
     # ``push_reading_state_to_hardcover``, so a module-level import is a cycle.
     from .progress_syncing.protocols.kosync import record_percentage_only_progress
-    from .services.koreader_position import KOBO_DEVICE
+    from .services.koreader_position import KOBO_DEVICE, kobo_share_percent
 
     try:
         # A SAVEPOINT only contains what is flushed after it, so the Kobo's own
@@ -5077,6 +5089,13 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
         # rollback here would take them with it (#1318, same precondition the
         # web reader path documents).
         ub.session_flush()
+        try:
+            finer = kobo_share_percent(book_id=book_id, device_id=device_id, location=location)
+        except Exception:
+            log.debug("No CrossPoint percentage for book %s", book_id, exc_info=True)
+            finer = None
+        if finer is not None:
+            percentage = finer
         with ub.begin_contained_nested(ub.session):
             if report is None:
                 record_percentage_only_progress(user_id, book_id, percentage, device=KOBO_DEVICE)

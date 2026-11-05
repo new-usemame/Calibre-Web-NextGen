@@ -77,6 +77,7 @@ def stale_kobo(sw, rows):
     found = kepub_alignment.xpointer_to_span(sw.epub, sw.kepub, rows["late"]["xpointer"])
     assert found == (rows["late"]["source"], rows["late"]["span"])
     sw.exact = span_location(*found)
+    sw.exact_percent = kepub_alignment.kobo_progress_percent(sw.kepub, *found)
     assert location_of(_bookmark(sw)) == sw.own  # not yet proven
     return sw
 
@@ -250,7 +251,9 @@ def test_a_full_download_read_to_the_end_delivers_the_exact_span(monkeypatch, st
         assert served.body == handle.read()
 
     bookmark = _bookmark(sw)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    # The exact span arrives with the percentage the Kobo works out for it
+    # (#2821), not the 40 KOReader counted the book by.
+    assert bookmark.get("ProgressPercent") == pytest.approx(sw.exact_percent, abs=0.01)
     assert location_of(bookmark) == sw.exact
     assert sw.synced_location(sw.checked) == sw.exact
 

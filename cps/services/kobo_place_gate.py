@@ -687,6 +687,7 @@ def delivery_bookmark(book, bookmark, response, device_id):
             and bookmark.location_source and bookmark.location_type == "KoboSpan"
             and bookmark.span_kepub_identity == receiver_identity):
         clear_echo_guard(device_id, book.id)
+        response = _with_kobo_percentage(book, bookmark, response)
         _log_delivery(book, device_id, "exact shared place", response)
         return response
     if own is not None and own.location_value:
@@ -728,6 +729,31 @@ def delivery_bookmark(book, bookmark, response, device_id):
                             "Type": held.location_type}
     if held_reason is not None:
         _log_delivery(book, device_id, held_reason + "; sent this Kobo's own place", response)
+    return response
+
+
+def _with_kobo_percentage(book, bookmark, response):
+    """``response`` with the percentage a Kobo itself reports at the exact place.
+
+    The web reader weights the book by text and a Kobo by the size of each
+    KEPUB document, so the same place is 26% in one and 16% in the other, and
+    the shelf showed the web's figure until the book was opened (#2821).
+    """
+    from .kepub_alignment import kobo_progress_percent
+    from ..kobo import _clean_progress
+    if not bookmark.shared_from_koreader:
+        return response  # a Kobo's own report is already in its own terms
+    try:
+        _epub, kepub = _book_paths(book)
+        percent = (kobo_progress_percent(kepub, bookmark.location_source,
+                                         bookmark.location_value) if kepub else None)
+    except Exception:  # the shared figure is still a fair answer
+        log.debug("Could not work out the Kobo's percentage", exc_info=True)
+        return response
+    if percent is None:
+        return response
+    response = dict(response)
+    response["ProgressPercent"] = _clean_progress(round(percent, 2))
     return response
 
 

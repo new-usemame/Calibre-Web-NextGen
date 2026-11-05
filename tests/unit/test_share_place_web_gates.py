@@ -44,6 +44,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.pool import StaticPool
 
+from cps.services import kepub_alignment
 from cps import constants, db, ub
 from cps.progress_syncing.models import KOSyncProgress
 from cps.services import device_registry
@@ -451,7 +452,11 @@ def test_a_proven_checked_kobo_receives_the_browsers_exact_span(w, rows):
     save(w, 60, cfi_of(w, rows["late"]))
 
     bookmark = w.get(kobo)["CurrentBookmark"]
-    assert bookmark["ProgressPercent"] == pytest.approx(60)
+    # The shared place stays the browser's 60; the Kobo gets the exact span
+    # with the percentage it works out for it (#2821).
+    where = bookmark["Location"]
+    assert bookmark["ProgressPercent"] == pytest.approx(
+        kepub_alignment.kobo_progress_percent(w.kepub, where["Source"], where["Value"]), abs=0.01)
     assert location_of(bookmark) == row_span(rows, "late")
     assert w.synced_location(kobo) == row_span(rows, "late")
 

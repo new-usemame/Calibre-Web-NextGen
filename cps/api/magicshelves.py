@@ -73,6 +73,28 @@ def _shelf_item(shelf, viewer):
     }
 
 
+def _sort_for_navigation(shelves, viewer):
+    """Order the sidebar list the way the classic sidebar does (#2824).
+
+    The classic sidebar (cps/__init__.py) sorts with the user's saved Smart
+    shelves "Order Mode" (manual drag order, name, book count, created,
+    modified).  The SPA used to hard-code A->Z, so every mode other than
+    name_asc was ignored in the new UI.
+    """
+    settings = (getattr(viewer, 'view_settings', None) or {}).get('magic_shelves') or {}
+    try:
+        if settings.get('order_mode') in ('book_count_asc', 'book_count_desc'):
+            # The count modes sort on shelf.book_count, which the classic
+            # sidebar fills in before sorting; do the same.
+            for shelf in shelves:
+                shelf.book_count = magic_shelf.cached_book_count_for_magic_shelf(
+                    viewer.id, shelf.id)
+        magic_shelf.sort_magic_shelves_for_user(shelves, viewer)
+    except Exception as e:
+        log.warning("Failed to sort magic shelves for user %s: %s", viewer.id, e)
+        shelves.sort(key=lambda s: (s.name or "").casefold())
+
+
 @api_v1.route("/magicshelves")
 @login_required_if_no_ano
 def list_magic_shelves():
@@ -91,7 +113,9 @@ def list_magic_shelves():
         if request.args.get('manage') == '1':
             shelves = ub.session.query(ub.MagicShelf).filter(or_(
                 ub.MagicShelf.user_id == uid, ub.MagicShelf.is_public == 1)).all()
-        shelves.sort(key=lambda s: (s.name or "").casefold())
+            shelves.sort(key=lambda s: (s.name or "").casefold())
+        else:
+            _sort_for_navigation(shelves, current_user)
     else:
         shelves = ub.session.query(ub.MagicShelf).filter(
             ub.MagicShelf.is_public == 1).order_by(ub.MagicShelf.name).all()

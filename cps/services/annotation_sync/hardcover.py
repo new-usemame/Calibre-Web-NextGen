@@ -53,11 +53,30 @@ def _default_book_identifiers(book):
     return identifiers
 
 
-def _default_book_percent(book, annotation):
-    """Percent of the book's text before an XPointer annotation, or None."""
+def _span_book_percent(book, span):
+    """Percent of the book's text before a Kobo span, or None.
+
+    The span gives the chapter file and a progress from 0 to 1 in that
+    chapter, not in the book.
+    """
+    chapter = span.get("chapterFilename")
+    progress = span.get("chapterProgress")
+    if not chapter or isinstance(progress, bool) or not isinstance(progress, (int, float)):
+        return None
+    from cps.readingservices import EpubProgressCalculator
+    percent = EpubProgressCalculator(book).calculate(chapter, progress)
+    return round(percent, 2) if percent is not None else None
+
+
+def _default_book_percent(book, annotation, span=None):
+    """Percent of the book's text before an annotation, or None.
+
+    An XPointer annotation (KOReader, CrossPoint) uses its XPointer. A Kobo
+    annotation uses the span of its payload.
+    """
     xpointer = getattr(annotation, "start_xpointer", None)
     if not xpointer:
-        return None
+        return _span_book_percent(book, span or {})
     from cps.annotations import _book_format_path
     from cps.services import koreader_xpointer as kx
     # A crengine XPointer addresses the plain EPUB, not the KEPUB.
@@ -176,15 +195,12 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
                 )
             else:
                 progress_percent = None
-                if payload:
-                    span = (payload.get("location") or {}).get("span") or {}
-                    progress_percent = span.get("chapterProgress")
-                if progress_percent is None:
-                    try:
-                        progress_percent = self._book_percent_getter(book, annotation)
-                    except Exception as exc:  # the entry still goes without a page
-                        log.warning("HardcoverHandler: no book percent for %s: %s",
-                                    annotation.annotation_id, exc)
+                span = ((payload or {}).get("location") or {}).get("span") or {}
+                try:
+                    progress_percent = self._book_percent_getter(book, annotation, span)
+                except Exception as exc:  # the entry still goes without a page
+                    log.warning("HardcoverHandler: no book percent for %s: %s",
+                                annotation.annotation_id, exc)
                 response = client.add_journal_entry(
                     identifiers=identifiers,
                     note_text=annotation.note_text,

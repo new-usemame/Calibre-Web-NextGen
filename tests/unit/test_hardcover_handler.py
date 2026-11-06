@@ -190,25 +190,27 @@ def _handler_with_percent(client, percent_getter):
 def test_push_without_a_payload_sends_the_book_percent_of_the_annotation():
     client = MockHardcoverClient(add_response={"id": 1})
     seen = []
-    h = _handler_with_percent(client, lambda book, ann: seen.append(ann) or 37.5)
+    h = _handler_with_percent(client, lambda book, ann, span: seen.append(ann) or 37.5)
     ann = FakeAnnotation(source="koreader")
     h.push(ann, _book_with_isbn(), FakeUser())
     assert seen == [ann]
     assert client.calls[0][2]["progress_percent"] == 37.5
 
 
-def test_push_keeps_the_payload_progress_over_the_book_percent():
+def test_push_gives_the_payload_span_to_the_book_percent_and_never_sends_it_raw():
     client = MockHardcoverClient(add_response={"id": 1})
-    h = _handler_with_percent(client, lambda book, ann: 37.5)
-    payload = {"location": {"span": {"chapterProgress": 12.0}}}
-    h.push(FakeAnnotation(), _book_with_isbn(), FakeUser(), payload=payload)
-    assert client.calls[0][2]["progress_percent"] == 12.0
+    seen = []
+    h = _handler_with_percent(client, lambda book, ann, span: seen.append(span) or 50.36)
+    span = {"chapterFilename": "OEBPS/c40.xhtml", "chapterProgress": 0.76}
+    h.push(FakeAnnotation(), _book_with_isbn(), FakeUser(), payload={"location": {"span": span}})
+    assert seen == [span]
+    assert client.calls[0][2]["progress_percent"] == 50.36
 
 
 def test_push_still_adds_the_entry_when_the_book_percent_fails():
     client = MockHardcoverClient(add_response={"id": 1})
 
-    def broken(book, ann):
+    def broken(book, ann, span):
         raise ValueError("unreadable book")
     result = _handler_with_percent(client, broken).push(
         FakeAnnotation(source="koreader"), _book_with_isbn(), FakeUser())
@@ -230,6 +232,21 @@ def test_book_percent_counts_the_text_before_the_xpointer(tmp_path, monkeypatch)
     assert _default_book_percent(book, FakeAnnotation(start_xpointer=None)) is None
     assert _default_book_percent(
         book, FakeAnnotation(start_xpointer="/body/DocFragment[9]/body/p/text().0")) is None
+
+
+def test_book_percent_of_a_kobo_span_counts_the_chapters_before_it(tmp_path, monkeypatch):
+    from cps import readingservices
+    from cps.services.annotation_sync.hardcover import _default_book_percent
+    from tests.unit.test_koreader_xpointer import _html_book
+    (tmp_path / "b").mkdir()
+    _html_book(tmp_path / "b", ["<p>aaaa</p>", "<p>bbbb</p>"])
+    monkeypatch.setattr(readingservices.config, "get_book_path", lambda: str(tmp_path))
+    book = SimpleNamespace(id=1, path="b", data=[SimpleNamespace(format="EPUB", name="book")])
+    # Each chapter has 5 characters with its title "t". Half of chapter 2: 7.5 of 10.
+    span = {"chapterFilename": "OEBPS/c1.html", "chapterProgress": 0.5}
+    assert _default_book_percent(book, FakeAnnotation(), span) == 75.0
+    assert _default_book_percent(book, FakeAnnotation(), {"chapterProgress": 0.5}) is None
+    assert _default_book_percent(book, FakeAnnotation(), None) is None
 
 
 class _RecordingHardcoverClient:

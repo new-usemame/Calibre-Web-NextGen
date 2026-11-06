@@ -61,6 +61,8 @@ USER_ACCOUNT_MODELS = (
     "KoboSharePlaceNudge",
     # KOReader (kosync protocol) positions and device names.
     "KOSyncProgress",
+    # CrossPoint clippings revision clock (the clippings go with Annotation).
+    "CrossPointClippingClock",
     # Shelves and magic shelves, including other users' rows that point at
     # them (hide records, OPDS exposure, per-viewer cache).
     "Shelf",
@@ -107,6 +109,8 @@ def purge_user_account(user_id, session=None):
     _delete(session, ub.FavoriteBook, ub.FavoriteBook.user_id == user_id)
     _delete(session, ub.UserBookCover, ub.UserBookCover.user_id == user_id)
     _delete(session, ub.KoboDeletedBook, ub.KoboDeletedBook.user_id == user_id)
+    _delete(session, ub.CrossPointClippingClock,
+            ub.CrossPointClippingClock.user_id == user_id)
 
     # Devices: every child before the device rows themselves. The book purge
     # above already removed the device-scoped Kobo entitlement, pending-page,

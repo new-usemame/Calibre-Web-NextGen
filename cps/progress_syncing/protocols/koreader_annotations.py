@@ -89,7 +89,8 @@ def _device_annotations_predicate(device):
     Both branches produce a boolean even for NULL provenance, so negating this
     predicate also finds legacy rows outside the device's original sources.
     """
-    legacy_sources = ("koreader", "textquote") if device.kind == "koreader" else ()
+    legacy_sources = (("koreader", "textquote", "crosspoint")
+                      if device.kind == "koreader" else ())
     return or_(
         and_(ub.Annotation.origin_device_id.isnot(None),
              ub.Annotation.origin_device_id == device.id),
@@ -354,10 +355,11 @@ def _anchored_elsewhere(annotations, *, user, book, session) -> set:
     }
     if not ids:
         return set()
+    from ...services.annotation_portable import QUOTE_SOURCES
     rows = session.query(ub.Annotation).filter(
         ub.Annotation.user_id == user.id, ub.Annotation.book_id == book.id,
         ub.Annotation.annotation_id.in_(sorted(ids)),
-        ub.Annotation.source != "textquote",
+        ~ub.Annotation.source.in_(sorted(QUOTE_SOURCES)),
     ).all()
     return {
         row.annotation_id for row in rows

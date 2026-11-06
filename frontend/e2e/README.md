@@ -173,12 +173,12 @@ surfaces; reverse dependents cannot be discovered by that traversal and must be 
 prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
 `cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-The isolated file-ISBN parser worker is included in the whole image and launched by its bounded parent service; it deliberately imports no application modules. At this revision the derived set is 260 of 317 local Python modules (the closure correctly picks
+The isolated file-ISBN parser worker is included in the whole image and launched by its bounded parent service; it deliberately imports no application modules. At this revision the derived set is 263 of 317 local Python modules (the closure correctly picks
 up `cps/services/browser_source.py` through the database migration path,
 `cps/user_account_data.py` through the admin user-delete path,
 `cps/services/device_delivery.py` through the book-action request path,
 `cps/user_preferences.py` through the account API path, and the custom-column hierarchy helper
-`cps/hierarchy.py` through `cps/db.py`). The highlight position converter
+`cps/hierarchy.py` through `cps/db.py`). The Kobo reading services `cps/readingservices.py`, with `cps/services/kobo_annotation_authority.py` and `cps/services/kobo_patch_spool.py` behind them, entered through the Hardcover annotation handler, which uses their `EpubProgressCalculator` for the book percent of a Kobo highlight. The highlight position converter
 `cps/services/koreader_xpointer.py` entered through the annotation routes that call it. The shared sign-in pacing helpers `cps/rate_limits.py` entered through the login, Kobo and HTTP Basic sign-in paths. The reverse-proxy module `cps/reverseproxy.py` entered through the internal routes in `cps/cwa_functions.py`, whose local-caller check reads the connecting peer it records. Its position hand-off `cps/services/koreader_position.py` entered through the
 /kosync progress routes. The text-anchor matcher `cps/services/text_anchor.py` entered the same way, through the /kosync
 progress routes that place and serve word anchors. The KOReader

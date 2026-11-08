@@ -16,6 +16,14 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.63] - 2026-11-08
+
+### Fixed
+
+- **The web reader says when a book's highlights and notes fail to load, and offers Try again.** The Highlights and notes panel used to show "No highlights yet" as if the book had none. Reading the book keeps working either way. (#2780)
+
+- **With Proxy unknown requests to Kobo Store on, a store refusal just before a Kobo syncs gets the same empty answer as with the setting off, and the log says what the store answered.** The profile, subscriptions, deals and next-read calls now go to the store from the server instead of by redirect, so a refusal is visible as a `Kobo Store refused` log line. (#2797)
+
 ## [v4.1.62] - 2026-11-03
 
 ### Changed

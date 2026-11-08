@@ -56,6 +56,22 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.63',
+    date: '2026-11-08',
+    items: [
+      {
+        title: 'The web reader tells you when highlights fail to load',
+        body: 'If a book\'s highlights and notes could not be loaded, the panel used to say "No highlights yet" as if there were none. It now says they failed to load and offers Try again. Reading the book works either way.',
+        category: 'Reading',
+      },
+      {
+        title: 'Kobo sync with the store proxy on handles a store refusal',
+        body: 'With Proxy unknown requests to Kobo Store turned on, the server now makes the profile, subscriptions and deals calls to the Kobo store itself. If the store refuses one just before a sync, your Kobo gets the same empty answer it gets with the setting off, and the log says what the store answered.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.62',
     date: '2026-11-03',
     items: [

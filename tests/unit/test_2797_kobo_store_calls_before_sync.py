@@ -220,3 +220,30 @@ def test_an_unreachable_store_during_sign_in_still_gets_cwngs_own_token(kobo_app
 
     assert response.status_code == 200, response.status_code
     assert response.get_json().get("AccessToken")
+
+
+def test_cwngs_own_cookies_are_not_sent_to_the_store(kobo_app, store):
+    store.reply = store_reply(200, b'{"from": "store"}')
+    client = kobo_app.app.test_client()
+    session_name = kobo_app.app.config.get("SESSION_COOKIE_NAME", "session")
+    remember_name = kobo_app.app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+    client.set_cookie(session_name, "cwng-session-secret")
+    client.set_cookie(remember_name, "cwng-remember-secret")
+    client.set_cookie("store_pref", "kept")
+
+    client.get("/kobo/reader-token/v1/products/dailydeal", headers=AUTH)
+
+    sent = store.calls[0].headers.get("Cookie") or ""
+    assert "cwng-session-secret" not in sent and "cwng-remember-secret" not in sent
+    assert "store_pref=kept" in sent
+
+
+def test_the_store_is_asked_only_for_encodings_cwng_can_decode(kobo_app, store):
+    # CWNG drops Content-Encoding from the store's answer, so the body must be
+    # one requests has already decoded.
+    store.reply = store_reply(200, b'{"from": "store"}')
+
+    kobo_app.app.test_client().get(
+        "/kobo/reader-token/v1/products/dailydeal", headers={**AUTH, "Accept-Encoding": "br, zstd"})
+
+    assert store.calls[0].headers.get("Accept-Encoding") == "gzip, deflate"

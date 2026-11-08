@@ -1818,13 +1818,19 @@ def redirect_or_proxy_request():
     # redirected GET: its library sync never arrives and the Store and Libby pages
     # stay empty (#2797, #2807). The same device answered by CWNG carries on.
     try:
-        store_response = make_request_to_kobo_store(log_content=False)
+        return proxy_to_kobo_store()
     except requests.exceptions.RequestException as error:
         log.warning("Kobo Store could not be reached for %s (%s)",
                     urlsplit(get_store_url_for_current_request()).path, type(error).__name__)
         timed_out = isinstance(error, requests.exceptions.Timeout)
         return make_response("", 504 if timed_out else 502)
-    return make_proxy_response(store_response)
+
+
+def proxy_to_kobo_store():
+    """Send the current request to the store and hand its answer back. Raises when
+    the store can't be reached, for a caller with its own fallback."""
+    # The answer is not logged: people paste DEBUG logs into public issues.
+    return make_proxy_response(make_request_to_kobo_store(log_content=False))
 
 
 def make_proxy_response(store_response: requests.Response) -> Response:
@@ -5885,7 +5891,7 @@ def HandleAuthRequest():
     log.debug('Kobo Auth request: %s', request.path)
     if config.config_kobo_proxy:
         try:
-            return redirect_or_proxy_request()
+            return proxy_to_kobo_store()
         except Exception:
             log.error("Failed to receive or parse response from Kobo's auth endpoint. Falling back to un-proxied mode.")
     return make_calibre_web_auth_response()

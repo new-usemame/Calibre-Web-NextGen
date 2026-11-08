@@ -21121,6 +21121,6 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
 
-#: cps/templates/user_edit.html:331
+#: cps/templates/user_edit.html
 msgid "This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account."
 msgstr "Ce compte ne peut pas télécharger de livres, donc la synchronisation de sa Kobo sera refusée. Un administrateur peut corriger cela en activant Permettre les téléchargements pour ce compte."

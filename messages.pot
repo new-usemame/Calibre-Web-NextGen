@@ -18360,6 +18360,6 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
-#: cps/templates/user_edit.html:331
+#: cps/templates/user_edit.html
 msgid "This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account."
 msgstr ""

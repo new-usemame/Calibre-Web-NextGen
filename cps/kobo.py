@@ -1811,17 +1811,20 @@ def make_request_to_kobo_store(sync_token=None, log_content=True):
 
 
 def redirect_or_proxy_request():
-    if config.config_kobo_proxy:
-        if request.method == "GET":
-            return redirect(get_store_url_for_current_request(), 307)
-        else:
-            # The Kobo device turns other request types into GET requests on redirects,
-            # so we instead proxy to the Kobo store ourselves.
-            store_response = make_request_to_kobo_store()
-
-            return make_proxy_response(store_response)
-    else:
+    if not config.config_kobo_proxy:
         return make_response(jsonify({}))
+    # Every method goes to the store from here, GET included. A Kobo turns other
+    # methods into GET when it follows a redirect, and Kobo firmware 6 stops at a
+    # redirected GET: its library sync never arrives and the Store and Libby pages
+    # stay empty (#2797, #2807). The same device answered by CWNG carries on.
+    try:
+        store_response = make_request_to_kobo_store()
+    except requests.exceptions.RequestException as error:
+        log.warning("Kobo Store could not be reached for %s (%s)",
+                    urlsplit(get_store_url_for_current_request()).path, type(error).__name__)
+        timed_out = isinstance(error, requests.exceptions.Timeout)
+        return make_response("", 504 if timed_out else 502)
+    return make_proxy_response(store_response)
 
 
 def make_proxy_response(store_response: requests.Response) -> Response:
@@ -5668,15 +5671,8 @@ def _rating_for_a_book_cwng_does_not_serve(book_uuid):
     if not config.config_kobo_proxy:
         log.info("Kobo rating for %s: not a book CWNG serves and the Store proxy is off, so it is not kept",
                  book_uuid)
-        return redirect_or_proxy_request()
-    try:
-        return redirect_or_proxy_request()
-    except requests.exceptions.Timeout:
-        log.warning("Kobo rating for %s: the Kobo Store timed out", book_uuid)
-        return make_response("", 504)
-    except requests.exceptions.RequestException:
-        log.warning("Kobo rating for %s: the Kobo Store could not be reached", book_uuid, exc_info=True)
-        return make_response("", 502)
+    # A Store that cannot answer comes back as 504 or 502, never a 500.
+    return redirect_or_proxy_request()
 
 
 @csrf.exempt
@@ -5739,7 +5735,6 @@ def HandleUnimplementedRequest(dummy=None):
 @kobo.route("/v1/user/wishlist", methods=["GET", "POST"])
 @kobo.route("/v1/user/recommendations", methods=["GET", "POST"])
 @kobo.route("/v1/analytics/<dummy>", methods=["GET", "POST"])
-@kobo.route("/v1/assets", methods=["GET"])
 def HandleUserRequest(dummy=None):
     log.debug("Unimplemented User Request received: %s (%s)",
               request.base_url,
@@ -5801,15 +5796,16 @@ def _store_error_code(store_response):
 
 # The store calls a Kobo makes between /v1/initialization and /v1/library/sync.
 # Nickel runs them in one queue with the sync, so one that fails can cost the
-# sync (D#2781 saw that on add-device). With the proxy on, a redirect would leave
-# the store's answer on the device, out of the server's sight (#2797, #2807), so
-# these go to the store from here. A refusal gets the empty answer they get with
-# the proxy off, except ExpiredToken, which is how the Kobo learns to sign in again.
+# sync (D#2781 saw that on add-device). With the proxy on these go to the store
+# from here like every store call, and the store's answer is logged (#2797, #2807).
+# A refusal gets the empty answer they get with the proxy off, except
+# ExpiredToken, which is how the Kobo learns to sign in again.
 @csrf.exempt
 @kobo.route("/v1/user/profile", methods=["GET", "POST"])
 @kobo.route("/v1/products/books/subscriptions", methods=["GET", "POST"])
 @kobo.route("/v1/products/<dummy>/nextread", methods=["GET", "POST"])
 @kobo.route("/v1/deals", methods=["GET", "POST"])
+@kobo.route("/v1/assets", methods=["GET"])
 def HandleStoreCallBeforeSync(dummy=None):
     if not config.config_kobo_proxy:
         return make_response(jsonify({}))

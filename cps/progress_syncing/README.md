@@ -188,8 +188,9 @@ hold one (#2841):
 ```
 
 It is a count only, for the same account, and never names a device or a
-position. A client can use it to suggest turning on Share my place for the
-other device. `GET /kosync/users/auth` sent with `X-CWNG-Device-ID` for a device
+position. A client can use it to explain why no place arrived: places travel
+between devices only when both the device that set the place and the one asking
+have Share my place on. `GET /kosync/users/auth` sent with `X-CWNG-Device-ID` for a device
 the server already knows also returns `"share_place": true|false` for that
 device; an unknown device gets no such field.
 

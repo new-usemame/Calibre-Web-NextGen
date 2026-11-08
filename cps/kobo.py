@@ -1818,7 +1818,7 @@ def redirect_or_proxy_request():
     # redirected GET: its library sync never arrives and the Store and Libby pages
     # stay empty (#2797, #2807). The same device answered by CWNG carries on.
     try:
-        store_response = make_request_to_kobo_store()
+        store_response = make_request_to_kobo_store(log_content=False)
     except requests.exceptions.RequestException as error:
         log.warning("Kobo Store could not be reached for %s (%s)",
                     urlsplit(get_store_url_for_current_request()).path, type(error).__name__)

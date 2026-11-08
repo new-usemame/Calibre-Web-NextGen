@@ -1,0 +1,3 @@
+### Added
+
+- **A KOSync client can tell a private place from no place.** With Share my place on (the default), a device that isn't sharing keeps its place to itself, and another reader asking for that book used to get the same empty answer as a book nobody had opened. That answer now carries `places_not_shared`, the number of the account's other devices that hold a place for the book without sharing it (a count only: no position and no device name). `/kosync/users/auth` sent with `X-CWNG-Device-ID` also returns `share_place` for that device, so a client can show the setting without opening a book. Stock KOReader ignores both fields. (#2841)

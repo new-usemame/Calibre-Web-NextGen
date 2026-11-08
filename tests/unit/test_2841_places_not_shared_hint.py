@@ -120,3 +120,27 @@ def test_auth_without_a_known_device_says_nothing_about_sharing(world):
     assert "share_place" not in _auth(world, "never-seen", "New Kindle")
     # The existing fields are unchanged.
     assert _auth(world)["authorized"] == "OK"
+
+
+def _status_only(world, raw_id, name):
+    """A private device that set a read status but never reported a place."""
+    response = world.client.put(
+        "/kosync/syncs/read_status",
+        json={"book_id": BOOK, "status": "reading", "device": name, "device_id": raw_id},
+        headers=_headers(raw_id, name),
+    )
+    assert response.status_code == 200, response.get_data(as_text=True)
+    world.session.expire_all()
+
+
+def test_a_device_with_a_status_but_no_place_is_not_a_place(world):
+    _status_only(world, "dev-s", "Status Only")
+
+    assert HINT not in _get_json(world)
+
+
+def test_the_asker_is_not_counted_even_when_it_has_only_a_status(world):
+    _status_only(world, "asker", "Asker")
+    _put(world, 55, device_id="dev-k", name="KOReader")
+
+    assert _get_json(world, device_id="asker", name="Asker") == {HINT: 1}

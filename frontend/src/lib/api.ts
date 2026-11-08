@@ -501,6 +501,8 @@ export interface KoboSyncToken {
   sync_url: string | null;
   server_url: string;
   is_localhost: boolean;
+  /** False when the account lacks download permission: the Kobo's library sync is refused (#2807). */
+  download_allowed?: boolean;
 }
 
 /** A KOReader device waiting for its pairing code to be answered. The name is

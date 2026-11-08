@@ -54,7 +54,7 @@ def test_store_proxy_on_forwards_add_device_to_the_kobo_store(kobo_app, monkeypa
         forwarded.append(True)
         return make_response('{"from": "store"}', 200, {"Content-Type": "application/json"})
 
-    monkeypatch.setattr(kobo_app.kobo, "redirect_or_proxy_request", store)
+    monkeypatch.setattr(kobo_app.kobo, "proxy_to_kobo_store", store)
     response = kobo_app.app.test_client().post(
         "/kobo/reader-token/v1/user/add-device", headers=HEADERS, json=ADD_DEVICE_BODY)
 

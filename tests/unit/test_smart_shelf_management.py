@@ -54,6 +54,43 @@ def test_management_overview_includes_hidden_but_never_other_private_shelves(man
     assert {s['id'] for s in client.get('/api/v1/magicshelves').json['items']} == {2, 4}
 
 @pytest.mark.unit
+def test_sidebar_list_follows_the_saved_order_mode_but_manage_stays_alphabetical(management):
+    """#2824: the new-UI sidebar honours Smart shelves "Order Mode" like classic."""
+    from cps.api import magicshelves as api
+    client, _, _, _ = management
+
+    def ids(url='/api/v1/magicshelves'):
+        return [s['id'] for s in client.get(url).json['items']]
+
+    # Visible to user 7 are 'My own' (4) and 'Shared' (2): A->Z is [4, 2].
+    assert ids() == [4, 2]
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [2, 4]}}
+    assert ids() == [2, 4]
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'name_desc'}}
+    assert ids() == [2, 4]
+    # The manage list is a management surface and keeps its A->Z order.
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [2, 4]}}
+    assert ids('/api/v1/magicshelves?manage=1') == [4, 1, 2]
+
+@pytest.mark.unit
+def test_sidebar_count_modes_sort_on_each_shelfs_book_count(management, monkeypatch):
+    """#2824: the count modes need book_count filled in before sorting, as classic does."""
+    from cps import magic_shelf
+    from cps.api import magicshelves as api
+    client, _, _, _ = management
+    counts = {2: 5, 4: 1}
+    monkeypatch.setattr(magic_shelf, 'cached_book_count_for_magic_shelf',
+                        lambda user_id, shelf_id: counts[shelf_id])
+
+    def ids():
+        return [s['id'] for s in client.get('/api/v1/magicshelves').json['items']]
+
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'book_count_desc'}}
+    assert ids() == [2, 4]
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'book_count_asc'}}
+    assert ids() == [4, 2]
+
+@pytest.mark.unit
 def test_restore_and_hide_persist_classic_preferences_idempotently(management):
     client, session, ub, magic = management
     for _ in range(2):

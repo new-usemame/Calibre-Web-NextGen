@@ -208,3 +208,15 @@ def test_a_proxied_store_answer_is_not_written_to_the_log(kobo_app, store):
 
     assert response.get_json() == {"Wishlist": ["reader@private.invalid"]}
     assert "reader@private.invalid" not in "\n".join(store.logged)
+
+
+@pytest.mark.parametrize("path", ["/v1/auth/device", "/v1/auth/refresh", "/v1/user/add-device"])
+def test_an_unreachable_store_during_sign_in_still_gets_cwngs_own_token(kobo_app, store, path):
+    # Pairing must not depend on the store being reachable (D#2781).
+    store.raises = requests.ConnectionError("down")
+
+    response = kobo_app.app.test_client().post(
+        "/kobo/reader-token" + path, headers=AUTH, json={"UserKey": "k"})
+
+    assert response.status_code == 200, response.status_code
+    assert response.get_json().get("AccessToken")

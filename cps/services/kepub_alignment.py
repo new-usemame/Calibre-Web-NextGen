@@ -90,9 +90,11 @@ def span_book_percent(epub_path, kepub_path, source: str, span_id: str) -> Optio
     uncompressed size in the archive, and places a reader inside a document
     by its page (``Epub::calculateProgress``). The span's offset in the text
     of its EPUB document stands in for the page, since the pages follow that
-    text. None where ``span_to_xpointer`` gives None.
+    text. A span with no text, such as a chapter title image, is placed where
+    the text after it starts. Otherwise None where ``span_to_xpointer`` gives
+    None.
     """
-    found = _span_start(epub_path, kepub_path, source, span_id)
+    found = _span_start(epub_path, kepub_path, source, span_id, allow_empty=True)
     sizes = _member_sizes(epub_path) if found is not None else None
     if sizes is None:
         return None
@@ -102,12 +104,16 @@ def span_book_percent(epub_path, kepub_path, source: str, span_id: str) -> Optio
     if not total:
         return None
     k = bisect_right(offsets, index) - 1
-    within = (index - offsets[k]) / len(texts[k])
+    within = (index - offsets[k]) / len(texts[k]) if texts[k] else 0.0
     return 100 * (sum(weights[:k]) + within * weights[k]) / total
 
 
-def _span_start(epub_path, kepub_path, source, span_id):
-    """``(aligned EPUB spine, index)`` of a Kobo span's first character, or None."""
+def _span_start(epub_path, kepub_path, source, span_id, *, allow_empty=False):
+    """``(aligned EPUB spine, index)`` of a Kobo span's first character, or None.
+
+    A span with no text gives None, unless ``allow_empty``. Then it gives the
+    index of the text after it.
+    """
     if not isinstance(span_id, str) or not _SPAN_ID.fullmatch(span_id):
         return None
     kepub = _kepub(kepub_path)
@@ -117,7 +123,7 @@ def _span_start(epub_path, kepub_path, source, span_id):
     if document is None or span_id not in document.spans:
         return None
     start, end = document.spans[span_id]
-    if start == end:
+    if start == end and not allow_empty:
         return None  # a span without text of its own
     epub = _aligned_epub(epub_path, kepub)
     if epub is None:

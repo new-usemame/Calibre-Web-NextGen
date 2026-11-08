@@ -68,6 +68,23 @@ def test_each_chapter_weighs_its_uncompressed_epub_bytes(tmp_path):
         100 * (s0 + s1) / total, abs=0.01)
 
 
+def test_a_chapter_title_image_span_has_the_percentage_of_the_chapter_start(tmp_path):
+    """Wind and Truth opens each chapter with a title image in ``kobo.1.1``.
+    The Kobo reports that span on the first page of a chapter. It holds no
+    text, so it is placed where the text after it starts."""
+    image = '<img src="t.jpg" alt="Chapter two"/>'
+    epub = _book(tmp_path / "b.epub", [
+        "<p>Short.</p>", f"<h2>{image}</h2><p>Alpha beta.</p>", "<p>End.</p>"])
+    kepub = _book(tmp_path / "b.kepub.epub", [
+        '<p><span class="koboSpan" id="kobo.1.1">Short.</span></p>',
+        f'<h2><span class="koboSpan" id="kobo.1.1">{image}</span></h2>'
+        '<p><span class="koboSpan" id="kobo.2.1">Alpha beta.</span></p>',
+        '<p><span class="koboSpan" id="kobo.1.1">End.</span></p>'], spans=True)
+    start = ka.span_book_percent(epub, kepub, "OEBPS/c1.xhtml", "kobo.2.1")
+    assert start is not None
+    assert ka.span_book_percent(epub, kepub, "OEBPS/c1.xhtml", "kobo.1.1") == start
+
+
 def test_a_span_that_does_not_resolve_has_no_percentage(tmp_path):
     epub, kepub, _sizes = _three_chapters(tmp_path)
     other = _book(tmp_path / "other.epub", ["<p>Short.</p>", "<p>Changed.</p>", "<p>End.</p>"])

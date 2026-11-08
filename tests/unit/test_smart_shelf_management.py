@@ -68,6 +68,13 @@ def test_sidebar_list_follows_the_saved_order_mode_but_manage_stays_alphabetical
     assert ids() == [2, 4]
     api.current_user.view_settings = {'magic_shelves': {'order_mode': 'name_desc'}}
     assert ids() == [2, 4]
+    # A hidden shelf (1) in the saved order never shows, and a shelf missing
+    # from it (4) goes after the ordered ones, as on the classic sidebar.
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [1, 2]}}
+    assert ids() == [2, 4]
+    # Malformed saved settings fall back to A->Z instead of failing the sidebar.
+    api.current_user.view_settings = ['not', 'a', 'dict']
+    assert ids() == [4, 2]
     # The manage list is a management surface and keeps its A->Z order.
     api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [2, 4]}}
     assert ids('/api/v1/magicshelves?manage=1') == [4, 1, 2]

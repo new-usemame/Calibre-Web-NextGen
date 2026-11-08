@@ -81,8 +81,8 @@ def _sort_for_navigation(shelves, viewer):
     modified).  The SPA used to hard-code A->Z, so every mode other than
     name_asc was ignored in the new UI.
     """
-    settings = (getattr(viewer, 'view_settings', None) or {}).get('magic_shelves') or {}
     try:
+        settings = (getattr(viewer, 'view_settings', None) or {}).get('magic_shelves') or {}
         if settings.get('order_mode') in ('book_count_asc', 'book_count_desc'):
             # The count modes sort on shelf.book_count, which the classic
             # sidebar fills in before sorting; do the same.

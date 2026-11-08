@@ -302,3 +302,33 @@ def test_member_integrity_is_checked_after_bounded_inflation(epub, field):
     snapshot = kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
     print(f'false {field}, snapshot={snapshot}')
     assert snapshot is None, f'valid XML must not bypass the final {field} check'
+
+
+def _set_flag_on_every_member(path, flag):
+    """OR a general-purpose flag into every local AND central header."""
+    import struct
+    raw = bytearray(path.read_bytes())
+    with zipfile.ZipFile(path) as archive:
+        offsets = [info.header_offset for info in archive.infolist()]
+        cursor = archive.start_dir
+    for offset in offsets:
+        struct.pack_into('<H', raw, offset + 6, struct.unpack_from('<H', raw, offset + 6)[0] | flag)
+    while raw[cursor:cursor + 4] == b'PK\x01\x02':
+        struct.pack_into('<H', raw, cursor + 8, struct.unpack_from('<H', raw, cursor + 8)[0] | flag)
+        name, extra, comment = struct.unpack_from('<3H', raw, cursor + 28)
+        cursor += 46 + name + extra + comment
+    path.write_bytes(raw)
+
+
+def test_enhanced_deflate_flag_does_not_block_exact_resume(epub):
+    """Some EPUB writers set bit 0x10 on every deflated member; zlib and JSZip ignore it."""
+    _set_flag_on_every_member(epub, 0x10)
+    assert kobo_position.compute_cfi_point(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') == (
+        'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)')
+
+
+@pytest.mark.parametrize('flag', [0x1, 0x20, 0x40, 0x1000])
+def test_encrypted_or_patched_members_still_fall_back(epub, flag):
+    """Encryption, patch data and strong encryption stay outside the supported subset."""
+    _set_flag_on_every_member(epub, flag)
+    assert kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') is None

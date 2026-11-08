@@ -20508,3 +20508,7 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
+#: cps/templates/user_edit.html
+msgid "This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account."
+msgstr "Dit account kan geen boeken downloaden, dus de synchronisatie van de Kobo wordt geweigerd. Een beheerder kan dit oplossen door Downloads toestaan in te schakelen voor dit account."

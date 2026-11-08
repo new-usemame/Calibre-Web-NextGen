@@ -1784,9 +1784,27 @@ def get_kobo_activated():
     return config.config_kobo_sync
 
 
+def _store_cookie_header(cookie_header):
+    # The Kobo sends CWNG's own login cookies back with every call; they are a
+    # CWNG session, so they never go to Kobo's server. Anything else is the
+    # store's own, set through an earlier proxied answer.
+    own = {current_app.config.get("SESSION_COOKIE_NAME", "session"),
+           current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")}
+    kept = [part.strip() for part in cookie_header.split(";")
+            if part.strip() and part.strip().split("=", 1)[0] not in own]
+    return "; ".join(kept)
+
+
 def make_request_to_kobo_store(sync_token=None, log_content=True):
     outgoing_headers = Headers(request.headers)
     outgoing_headers.remove("Host")
+    cookie_header = _store_cookie_header(outgoing_headers.get("Cookie", ""))
+    outgoing_headers.remove("Cookie")
+    if cookie_header:
+        outgoing_headers["Cookie"] = cookie_header
+    # make_proxy_response drops Content-Encoding, so ask only for encodings
+    # requests decodes on every install.
+    outgoing_headers["Accept-Encoding"] = "gzip, deflate"
     if sync_token:
         sync_token.set_kobo_store_header(outgoing_headers)
 

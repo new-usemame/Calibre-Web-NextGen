@@ -759,7 +759,7 @@ def _held_cause(device_id, book, bookmark, receiver_identity):
 
 def _unproven_download(row, path):
     """Which part of completed_kepub_identity's proof this download row lacks."""
-    from .kobo_post_download_restore import RESTORE_ARMED
+    from .kobo_post_download_restore import RESTORE_ARMED, RESTORE_PENDING, RESTORE_SERVED
 
     def utc(value):
         return "%s UTC" % _naive_utc(value).isoformat(" ", "seconds") if value else "an unknown time"
@@ -772,9 +772,20 @@ def _unproven_download(row, path):
                 "recorded; the download's own DEBUG line says why)" % utc(row.downloaded_at))
     if row.completed_at is not None and row.kepub_file_identity != _readable_kepub_identity(path):
         return "the library KEPUB was replaced after this Kobo's download at %s" % utc(row.completed_at)
+    if (row.completed_at is None and row.kepub_file_identity is None
+            and row.restore_state not in (RESTORE_PENDING, RESTORE_SERVED)):
+        # completed_kepub_identity accepts an untracked row only in these two
+        # historical states; any other one can never prove the download.
+        return ("this Kobo's download at %s is from before CWNG recorded finished downloads, "
+                "so it cannot be proven; remove the download on the Kobo and download the "
+                "book again" % utc(row.downloaded_at))
     written = datetime.fromtimestamp(os.stat(path).st_mtime, timezone.utc)
-    return ("the library KEPUB was written at %s, after this Kobo's download at %s"
-            % (utc(written), utc(row.completed_at or row.downloaded_at)))
+    downloaded = row.completed_at or row.downloaded_at
+    if downloaded is None or _naive_utc(written) > _naive_utc(downloaded):
+        return ("the library KEPUB was written at %s, after this Kobo's download at %s"
+                % (utc(written), utc(downloaded)))
+    return ("the library KEPUB (written at %s) changed while this sync checked this "
+            "Kobo's download at %s" % (utc(written), utc(downloaded)))
 
 
 def _log_delivery(book, device_id, reason, response):

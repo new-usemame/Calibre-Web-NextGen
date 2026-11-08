@@ -332,3 +332,19 @@ def test_encrypted_or_patched_members_still_fall_back(epub, flag):
     """Encryption, patch data and strong encryption stay outside the supported subset."""
     _set_flag_on_every_member(epub, flag)
     assert kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') is None
+
+
+def test_enhanced_deflate_flag_leaves_member_names_and_bytes_unchanged(epub):
+    """Bit 0x10 must not change which member or which bytes the resume check reads."""
+    with zipfile.ZipFile(epub) as plain:
+        expected = {i.filename: plain.read(i) for i in plain.infolist() if not i.is_dir()}
+    _set_flag_on_every_member(epub, 0x10)
+    raw = epub.read_bytes()
+    with zipfile.ZipFile(epub) as flagged:
+        infos = sorted(flagged.infolist(), key=lambda i: i.header_offset)
+        for n, info in enumerate(infos):
+            if info.is_dir():
+                continue
+            end = infos[n + 1].header_offset if n + 1 < len(infos) else flagged.start_dir
+            bounds = kobo_position._resume_member_bounds(raw, end, info)
+            assert kobo_position._resume_member_bytes(raw, bounds, info) == expected[info.filename]

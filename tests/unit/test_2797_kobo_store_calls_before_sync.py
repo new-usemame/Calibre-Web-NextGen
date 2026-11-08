@@ -197,3 +197,14 @@ def test_an_unreachable_store_answers_a_browsing_call_with_an_error_not_a_crash(
     response = ask(kobo_app, "/v1/products/featured/")
 
     assert response.status_code == 504
+
+
+def test_a_proxied_store_answer_is_not_written_to_the_log(kobo_app, store):
+    # These answers were redirected before, so they never reached the log, and
+    # people paste DEBUG logs into public issues.
+    store.reply = store_reply(200, b'{"Wishlist": ["reader@private.invalid"]}')
+
+    response = ask(kobo_app, "/v1/user/wishlist")
+
+    assert response.get_json() == {"Wishlist": ["reader@private.invalid"]}
+    assert "reader@private.invalid" not in "\n".join(store.logged)

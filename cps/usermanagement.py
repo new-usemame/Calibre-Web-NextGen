@@ -316,6 +316,11 @@ def requires_basic_auth_if_no_ano(f):
 def login_required_if_no_ano(func):
     @wraps(func)
     def decorated_view(*args, **kwargs):
+        # An /api/v1 write the API already authenticated by Basic (#2842) runs
+        # as that user. Explicit credentials win over a proxy header, as they
+        # do on OPDS (requires_basic_auth_if_no_ano).
+        if g.get("api_basic_auth_user") is not None:
+            return func(*args, **kwargs)
         if config.config_allow_reverse_proxy_header_login:
             user = load_user_from_reverse_proxy_header(request)
             if user:

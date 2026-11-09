@@ -105,6 +105,7 @@ dependencies = [
     # metadata extraction
     "rarfile>=3.2,<5.0",
     "scholarly>=1.2.0,<1.8",
+    "bibtexparser>=1.4.0,<2.0.0", # scholarly 1.7.x declares bibtexparser unpinned but imports the 1.x API (bibtexparser.bibdatabase); 2.x removed it, so Google Scholar failed to load (#2579)
     "markdown2>=2.0.0,<2.6.0",
     "html2text>=2020.1.16,<2025.2.26",
     "python-dateutil>=2.1,<2.10.0",

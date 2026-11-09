@@ -321,7 +321,10 @@ def login_required_if_no_ano(func):
             if user:
                 g.flask_httpauth_user = user
                 return func(*args, **kwargs)
-            g.flask_httpauth_user = None
+            # An /api/v1 write already authenticated by Basic (#2842) keeps
+            # that user; clearing it here would answer it as signed out.
+            if g.get("api_basic_auth_user") is None:
+                g.flask_httpauth_user = None
         if config.config_anonbrowse == 1:
             return func(*args, **kwargs)
         return login_required(func)(*args, **kwargs)

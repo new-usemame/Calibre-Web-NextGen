@@ -5,12 +5,12 @@ import os
 import traceback
 from urllib.parse import urlsplit
 
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, current_app, jsonify, request, g
 from werkzeug.exceptions import HTTPException
 
-from .. import logger, config
+from .. import logger, config, csrf
 from ..cw_login import current_user
-from ..usermanagement import load_user_from_reverse_proxy_header
+from ..usermanagement import auth as basic_auth, load_user_from_reverse_proxy_header
 
 log = logger.create()
 
@@ -93,6 +93,19 @@ def _require_api_auth():
     defence-in-depth and per-route documentation."""
     if request.endpoint in _PUBLIC_ENDPOINTS:
         return None
+    if request.endpoint in _BASIC_AUTH_WRITE_ENDPOINTS:
+        if _sent_basic_credentials():
+            return _authenticate_basic_write()
+        denied = _session_auth_gate()
+        if denied is None:
+            _protect_session_write()
+        return denied
+    return _session_auth_gate()
+
+
+def _session_auth_gate():
+    """None when the caller may proceed by session, proxy header or anonymous
+    browsing; otherwise the JSON 401."""
     if config.config_allow_reverse_proxy_header_login:
         user = load_user_from_reverse_proxy_header(request)
         if user:
@@ -105,6 +118,58 @@ def _require_api_auth():
         return None
     return jsonify({"error": {"code": "unauthorized",
                               "message": "Authentication required"}}), 401
+
+
+# #2842: a native client that holds an app password (the credential OPDS and
+# KOSync already take over HTTP Basic) may make these writes without a browser
+# session. They are exempt from the global CSRFProtect hook below; the token is
+# checked again in _protect_session_write for every request that did not send
+# Basic credentials, so a cookie session still needs it. A Basic request has no
+# token to carry, and needs none: a cross-site page cannot set an Authorization
+# header without a CORS preflight this app never answers, and a browser that
+# replays cached Basic credentials on a cross-site form post also sends Origin,
+# which _reject_cross_site_mutation refuses. Filled in after the route imports.
+_BASIC_AUTH_WRITE_ENDPOINTS = frozenset()
+
+
+def _sent_basic_credentials():
+    authorization = request.authorization
+    return authorization is not None and (authorization.type or "").lower() == "basic"
+
+
+def _authenticate_basic_write():
+    """Run the request as the Basic user, or refuse it with a JSON 401.
+
+    Credentials that were sent and are wrong are refused outright: never answered
+    as the guest under anonymous browsing, and never replaced by a session cookie
+    the same client also holds, so a client learns its app password is wrong
+    instead of seeing a write land on another account or nowhere. Guest
+    credentials cannot write either. verify_password applies the usual sign-in
+    pacing, so guessing here costs the same as guessing on OPDS."""
+    user = basic_auth.authenticate(request.authorization, "")
+    if not user or user is True or (user.name or "").lower() == "guest":
+        response = jsonify({"error": {"code": "unauthorized",
+                                      "message": "Authentication required"}})
+        response.headers["WWW-Authenticate"] = 'Basic realm="Authentication Required"'
+        return response, 401
+    g.flask_httpauth_user = user
+    g.api_basic_auth_user = user
+    return None
+
+
+def _protect_session_write():
+    """Apply the CSRF check the global hook skipped for an allow-listed endpoint
+    reached without Basic credentials, with the same switches it obeys."""
+    if csrf is None or current_app.extensions.get("csrf") is not csrf:
+        return      # no CSRFProtect, or another instance that never exempted these
+    app_config = current_app.config
+    if not app_config.get("WTF_CSRF_ENABLED", True) \
+            or not app_config.get("WTF_CSRF_CHECK_DEFAULT", True):
+        return
+    if request.method not in app_config.get("WTF_CSRF_METHODS",
+                                            {"POST", "PUT", "PATCH", "DELETE"}):
+        return
+    csrf.protect()
 
 
 @api_v1.before_request
@@ -236,3 +301,11 @@ from . import acquisition  # noqa: E402,F401
 from . import discover_source  # noqa: E402,F401
 
 from . import device_sleep_screen  # noqa: E402,F401
+
+_BASIC_AUTH_WRITE_VIEWS = (books.set_book_read_status, books.toggle_book_read,
+                           actions.toggle_book_archived)
+_BASIC_AUTH_WRITE_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
+                                        for view in _BASIC_AUTH_WRITE_VIEWS)
+if csrf is not None:
+    for _view in _BASIC_AUTH_WRITE_VIEWS:
+        csrf.exempt(_view)

@@ -2363,12 +2363,16 @@ def get_book_cover_internal(book, resolution=None):
             # Determine which thumbnail format to serve based on request context
             try:
                 from flask import has_request_context, request
-                is_kobo_request = (has_request_context() and
-                                 request.path and
-                                 '/kobo/' in request.path)
+                # Kobo devices and OPDS clients get JPEG: the OPDS feed
+                # declares image/jpeg, and e-reader OPDS clients cannot all
+                # decode WebP (#2845).
+                wants_jpeg = (has_request_context() and
+                              request.path and
+                              ('/kobo/' in request.path
+                               or request.path.startswith('/opds/')))
 
-                # Prefer jpg for Kobo requests, webp for web requests
-                if is_kobo_request:
+                # Prefer jpg for Kobo and OPDS requests, webp for web requests
+                if wants_jpeg:
                     thumbnail_to_serve = jpg_thumb if jpg_exists else (webp_thumb if webp_exists else None)
                 else:
                     thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)

@@ -2,7 +2,7 @@
 """#2842: a native client holding an app password can set read status,
 archive a book and mark it read through /api/v1, without a browser session.
 
-Real pieces: the api_v1 blueprint with its before_request hooks, the
+Real pieces (built by tests/unit/api_basic_auth_world.py): the api_v1 blueprint with its before_request hooks, the
 project's own CSRFProtect instance (``cps.csrf``, the one production
 initialises), the HTTP Basic verifier with app-password digests, and SQLite
 user rows. Substituted: only the book-side writers each route calls, which
@@ -15,17 +15,14 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from flask import Flask
-from flask_babel import Babel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from werkzeug.security import generate_password_hash
 
-import cps
-from cps import config, constants, limiter, ub
-from cps.api import api_v1
-from cps.cw_login import LoginManager, current_user
+from cps import config, constants, ub
+from cps.cw_login import current_user
 from cps.services import app_passwords
+from tests.unit.api_basic_auth_world import build_api_app
 
 pytestmark = pytest.mark.unit
 
@@ -92,19 +89,7 @@ def api(tmp_path, monkeypatch):
     monkeypatch.setattr(books.user_library, "contains_book", lambda *a, **k: True)
     monkeypatch.setattr(books, "_can_browse_global", lambda: True, raising=False)
 
-    app = Flask(__name__)
-    app.config.update(TESTING=True, SECRET_KEY="basic-2842",
-                      WTF_CSRF_ENABLED=True, RATELIMIT_ENABLED=True,
-                      RATELIMIT_STORAGE_URI="memory://")
-    Babel(app)
-    manager = LoginManager(app)
-    manager.user_loader(lambda user_id, user_random, session_key:
-                        session.get(ub.User, int(user_id)))
-    limiter.init_app(app)
-    with app.app_context():
-        limiter.reset()
-    app.register_blueprint(api_v1)
-    cps.csrf.init_app(app)      # the instance production initialises
+    app = build_api_app(session, secret_key="basic-2842")
     client = app.test_client()
 
     def sign_in(name, password):

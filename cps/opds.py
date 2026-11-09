@@ -1271,14 +1271,25 @@ def get_database_stats():
     return Response(json.dumps(stat), mimetype="application/json")
 
 
-@opds.route("/opds/thumb_240_240/<book_id>")
-@opds.route("/opds/cover_240_240/<book_id>")
-@opds.route("/opds/cover_90_90/<book_id>")
 @opds.route("/opds/cover/<book_id>")
 @requires_basic_auth_if_no_ano
 def feed_get_cover(book_id):
     abort_unless_opds_book_exposed(book_id)
     return get_book_cover(book_id)
+
+
+# The feed's image/thumbnail link points here (#2845). These routes used to
+# share feed_get_cover and send the full-size cover.jpg, so an OPDS client's
+# browse grid fetched every original. They now send the smallest generated
+# thumbnail (as JPEG, see get_book_cover_internal); until it exists the
+# original stands in, revalidating, as on the web.
+@opds.route("/opds/cover_90_90/<book_id>")
+@opds.route("/opds/cover_240_240/<book_id>")
+@opds.route("/opds/thumb_240_240/<book_id>")
+@requires_basic_auth_if_no_ano
+def feed_get_cover_thumbnail(book_id):
+    abort_unless_opds_book_exposed(book_id)
+    return get_book_cover(book_id, constants.COVER_THUMBNAIL_SMALL)
 
 
 @opds.route("/opds/readbooks")

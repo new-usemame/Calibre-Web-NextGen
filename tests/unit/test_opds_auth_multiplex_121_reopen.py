@@ -422,7 +422,7 @@ class TestSixQuadrantBehavioralMatrix:
         """#2844 reverses the v4.0.46 fallback for credentials that name an
         account: anon=1 + wrong password is 401, as KOSync and the web
         sign-in form answer it. An empty-username probe still gets Guest
-        (tests/unit/test_opds_wrong_credentials_2844.py)."""
+        (TestWrongCredentialsAreRefusedUnderAnonymousBrowsing2844 below)."""
         app, um = app_with_decorator
         mocker.patch.object(um.config, "config_anonbrowse", 1, create=True)
         mocker.patch.object(um.config, "config_allow_reverse_proxy_header_login", 0, create=True)
@@ -478,3 +478,84 @@ class TestSixQuadrantBehavioralMatrix:
         })
         assert resp.status_code == 200
         assert resp.get_json()["user_name"] == "cwng84test"
+
+
+def _basic_2844(username, password):
+    import base64
+    raw = ("%s:%s" % (username, password)).encode("utf-8")
+    return {"Authorization": "Basic " + base64.b64encode(raw).decode("ascii")}
+
+
+@pytest.mark.unit
+class TestWrongCredentialsAreRefusedUnderAnonymousBrowsing2844:
+    """#2844: with anonymous browsing on, credentials that name an account and
+    are wrong get 401 instead of the guest catalog. The guest fallback stays
+    for no header, an empty-username probe (#121) and Guest credentials.
+
+    ``auth.authenticate`` is replaced with a stand-in that behaves like
+    ``verify_password``: the right password returns the user, anything else
+    None, and Guest authenticates whenever anonymous browsing is on."""
+
+    app_with_decorator = TestSixQuadrantBehavioralMatrix.app_with_decorator
+    _make_user_stub = TestSixQuadrantBehavioralMatrix._make_user_stub
+
+    @pytest.fixture
+    def opds(self, app_with_decorator, mocker):
+        app, um = app_with_decorator
+        mocker.patch.object(um.config, "config_anonbrowse", 1, create=True)
+        mocker.patch.object(um.config, "config_allow_reverse_proxy_header_login", 0, create=True)
+        guest = self._make_user_stub("Guest", is_anonymous=True)
+        alice = self._make_user_stub("alice")
+
+        def fake_authenticate(authorisation, _stored):
+            username = (authorisation or {}).get("username") or ""
+            password = (authorisation or {}).get("password") or ""
+            if not username:
+                return None
+            if username.lower() == "guest":
+                return guest if um.config.config_anonbrowse == 1 else None
+            if username == "alice" and password == "right":
+                return alice
+            return None
+
+        mocker.patch.object(um.auth, "authenticate", side_effect=fake_authenticate)
+        return app.test_client(), um
+
+    def test_known_user_wrong_password_gets_401(self, opds):
+        client, _ = opds
+        assert client.get("/opds/", headers=_basic_2844("alice", "WRONG")).status_code == 401
+
+    def test_unknown_user_gets_401_like_a_known_one(self, opds):
+        # Same answer for an unknown name, so the status does not reveal
+        # which accounts exist.
+        client, _ = opds
+        assert client.get("/opds/", headers=_basic_2844("nobody", "whatever")).status_code == 401
+
+    def test_right_password_still_gets_the_user(self, opds):
+        client, _ = opds
+        resp = client.get("/opds/", headers=_basic_2844("alice", "right"))
+        assert resp.status_code == 200
+        assert resp.get_json()["user_name"] == "alice"
+
+    def test_no_header_still_gets_the_guest(self, opds):
+        client, _ = opds
+        resp = client.get("/opds/")
+        assert resp.status_code == 200
+        assert resp.get_json()["user_name"] == "Guest"
+
+    def test_empty_username_probe_still_gets_the_guest(self, opds):
+        client, _ = opds
+        resp = client.get("/opds/", headers=_basic_2844("", ""))
+        assert resp.status_code == 200
+        assert resp.get_json()["user_name"] == "Guest"
+
+    def test_explicit_guest_credentials_get_the_guest(self, opds):
+        client, _ = opds
+        resp = client.get("/opds/", headers=_basic_2844("Guest", "anything"))
+        assert resp.status_code == 200
+        assert resp.get_json()["user_name"] == "Guest"
+
+    def test_anonymous_browsing_off_wrong_password_still_401(self, opds, mocker):
+        client, um = opds
+        mocker.patch.object(um.config, "config_anonbrowse", 0, create=True)
+        assert client.get("/opds/", headers=_basic_2844("alice", "WRONG")).status_code == 401

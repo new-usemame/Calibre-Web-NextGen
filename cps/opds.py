@@ -84,14 +84,20 @@ def _opds_paged_url(offset):
     return base + '?' + urlencode(args)
 
 
-def _opds_search_url_path():
-    """Build the OpenSearch search-URL template (path form) with
-    ``{searchTerms}`` in the right spot relative to any propagated
-    query string (notably ``?lang=xx``). Issue #160 follow-up.
+def _opds_search_url_template():
+    """The OpenSearch template every catalog document advertises:
+    ``/opds/search?query={searchTerms}``, merged onto any query string
+    ``url_defaults`` produced (notably ``?lang=xx``, issue #160) instead of
+    clobbering it.
+
+    #2846: the query form, not the path form ``/opds/search/{searchTerms}``.
+    In a path ``+`` is a literal plus, so clients leave it unencoded, but the
+    path route reads ``+`` as a space for an old reader that sends it that way,
+    and "C++" searched for "C". In a query value ``+`` already means space and
+    clients encode a literal plus as ``%2B``, so both readings agree.
     """
-    placeholder = '__OPDS_SEARCH_PLACEHOLDER__'
-    built = url_for('opds.feed_cc_search', query=placeholder)
-    return built.replace(placeholder, '{searchTerms}')
+    base = url_for('opds.feed_normal_search')
+    return base + ('&' if '?' in base else '?') + 'query={searchTerms}'
 
 
 def _format_opds_rating(value):
@@ -131,7 +137,7 @@ def _is_real_pubdate(pubdate):
 def _opds_template_helpers():
     return {
         'opds_paged_url': _opds_paged_url,
-        'opds_search_url_path': _opds_search_url_path,
+        'opds_search_url_template': _opds_search_url_template,
         '_is_real_pubdate': _is_real_pubdate,
     }
 
@@ -620,20 +626,9 @@ def feed_osd():
     # hardcoded en-EN, so OPDS search clients that present a localized UI from
     # OSD metadata pick up the language the user picked via ``?lang=`` or
     # Accept-Language. Falls back to the get_locale() default ('en') when
-    # nothing else applies, matching pre-fix behavior.
-    #
-    # Build the atom search URL template here so the
-    # ``?query={searchTerms}`` OpenSearch marker is merged onto whatever
-    # query string ``url_defaults`` produced (notably ``?lang=xx``)
-    # instead of clobbering it. The path-form template is rendered via
-    # the ``opds_search_url_path`` context helper.
-    atom_base = url_for('opds.feed_normal_search')
-    atom_url = atom_base + ('&' if '?' in atom_base else '?') + 'query={searchTerms}'
-    return render_xml_template(
-        'osd.xml',
-        lang=str(get_locale()),
-        search_url_atom=atom_url,
-    )
+    # nothing else applies, matching pre-fix behavior. Both search templates
+    # come from the opds_search_url_template() context helper (#2846).
+    return render_xml_template('osd.xml', lang=str(get_locale()))
 
 
 # @opds.route("/opds/search", defaults={'query': ""})
@@ -646,10 +641,19 @@ def feed_cc_search(query):
     # ``/opds/search/<query>?lang=xx`` and the previous .split() picked up
     # ``<query>?lang=xx`` as the search term, breaking every search.
     # Strip the query string before extracting the term.
-    raw_uri = request.environ['RAW_URI'].split('/opds/search/', 1)[1]
-    path_only = raw_uri.split('?', 1)[0]
-    plus_query = unquote_plus(path_only).strip()
-    return feed_search(plus_query)
+    #
+    # #2846: the catalog now advertises the query form instead, so this path
+    # form is only for readers that build it themselves; it keeps their "+ is a
+    # space" reading. RAW_URI is set by both bundled servers but is not WSGI;
+    # REQUEST_URI is the common alternative. Without either, only the decoded
+    # path is left, where an encoded %2B can no longer be told from a "+".
+    raw_uri = request.environ.get('RAW_URI') or request.environ.get('REQUEST_URI')
+    if raw_uri and '/opds/search/' in raw_uri:
+        path_only = raw_uri.split('/opds/search/', 1)[1].split('?', 1)[0]
+        plus_query = unquote_plus(path_only)
+    else:
+        plus_query = query.replace('+', ' ')
+    return feed_search(plus_query.strip())
 
 
 @opds.route("/opds/search", methods=["GET"])

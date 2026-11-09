@@ -199,6 +199,20 @@ KOReader's format; it is stored as 0–100 internally. Progress is furthest-wins
 across producers, so a lower percentage is dropped rather than dragging a
 device backwards — a deliberate flip back to re-read a chapter does not travel.
 
+The `PUT /kosync/syncs/progress` reply says what happened to the push (#2843),
+on top of KOReader's `document` and `timestamp`:
+
+```jsonc
+{ "document": "…", "timestamp": 1794175156,
+  "accepted": false, "shared": true, "kept_percentage": 0.3 }
+```
+
+`accepted` is true when this push is now the place kept for it: the shared
+place, or the device's own place when that device is not sharing. `shared` is
+false when the device's Share my place is off, so the place stays on that
+device. When `accepted` is false, `kept_percentage` is the place kept instead,
+as a fraction like `percentage`. Stock KOReader ignores all three.
+
 ## Testing
 
 ```bash

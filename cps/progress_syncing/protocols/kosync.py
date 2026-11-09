@@ -2531,8 +2531,9 @@ def update_progress():
             device_id = raw_id
             device = request.headers.get("X-CWNG-Device-Name") or device
             report = Report(kosync_place.client_clock(data.get("timestamp"), received_at), received_at)
-            kosync_place.journal(target.id, book_id, journal_document,
-                                 journal_progress, proposed_percentage, report)
+            journal_accepted = kosync_place.journal(
+                target.id, book_id, journal_document,
+                journal_progress, proposed_percentage, report)
             if not private:
                 current = get_progress_record(user.id, document, book_id)
                 # Converge a legacy checksum key before judging the report.
@@ -2590,6 +2591,7 @@ def update_progress():
             timestamp = survived.server_modified_at if private else survived.timestamp
             percentage_float = survived.progress_percent if private else survived.percentage
             response_data["timestamp"] = int(kosync_place.utc(timestamp).timestamp())
+            push_accepted = journal_accepted if private else shared_accepted
         else:
             # #633 legacy convergence remains a key-resolution read, not an
             # acceptance decision. Seed the canonical key through the same SQL
@@ -2638,6 +2640,7 @@ def update_progress():
             timestamp = _aware_datetime(outcome.clock) or timestamp
             document = canonical_document
             response_data["timestamp"] = int(timestamp.timestamp())
+            push_accepted = outcome.accepted
 
             # CRITICAL: Always commit kosync_progress first before attempting ReadBook updates
             # This ensures sync location is persisted even if ReadBook update fails
@@ -2660,6 +2663,14 @@ def update_progress():
                     user.id, internal_device_id, book_id, journal_document,
                     journal_progress, proposed_percentage, received_at,
                 )
+
+        # #2843: say whether this push is the place now kept for it, and
+        # whether that place is the shared one. Additive: stock KOReader
+        # plugins read only document and timestamp.
+        response_data["accepted"] = bool(push_accepted)
+        response_data["shared"] = not private
+        if not push_accepted:
+            response_data["kept_percentage"] = percentage_float / 100.0
 
         # Update user's ReadBook status if we matched a book
         # This is done AFTER kosync_progress is committed, so sync location is always safe

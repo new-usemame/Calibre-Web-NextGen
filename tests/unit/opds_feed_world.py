@@ -63,3 +63,27 @@ class FeedRenderer:
             data=[SimpleNamespace(format=f, uncompressed_size=100) for f in formats],
         )
         return self.render([SimpleNamespace(Books=book)])
+
+
+def opds_route_app():
+    """The REAL ``cps.opds`` blueprint on an app that can render its templates.
+
+    Route table, context processor (the ``opds_*`` template helpers) and
+    templates are the shipped ones. Only the Basic-auth decorators are stepped
+    around (each route's ``__wrapped__``); auth has its own tests.
+    """
+    from flask import Flask
+    from flask_babel import Babel
+    from jinja2 import FileSystemLoader
+    from cps import opds
+    from cps.jinjia import jinjia
+
+    app = Flask(__name__)
+    Babel(app)
+    app.register_blueprint(jinjia)
+    app.register_blueprint(opds.opds)
+    app.jinja_loader = FileSystemLoader(str(TEMPLATES))
+    for endpoint, view in list(app.view_functions.items()):
+        if endpoint.startswith("opds.") and hasattr(view, "__wrapped__"):
+            app.view_functions[endpoint] = view.__wrapped__
+    return app

@@ -418,8 +418,11 @@ class TestSixQuadrantBehavioralMatrix:
             % body["user_name"]
         )
 
-    def test_q3_anon_on_bad_creds_falls_back_to_guest(self, app_with_decorator, mocker):
-        """The v4.0.46 fix: stale/invalid creds + anon=1 → Guest, not 401."""
+    def test_q3_anon_on_bad_creds_returns_401(self, app_with_decorator, mocker):
+        """#2844 reverses the v4.0.46 fallback for credentials that name an
+        account: anon=1 + wrong password is 401, as KOSync and the web
+        sign-in form answer it. An empty-username probe still gets Guest
+        (tests/unit/test_opds_wrong_credentials_2844.py)."""
         app, um = app_with_decorator
         mocker.patch.object(um.config, "config_anonbrowse", 1, create=True)
         mocker.patch.object(um.config, "config_allow_reverse_proxy_header_login", 0, create=True)
@@ -435,8 +438,7 @@ class TestSixQuadrantBehavioralMatrix:
         resp = client.get("/opds/", headers={
             "Authorization": "Basic Y3duZzg0dGVzdDpXUk9OR1BBU1M=",
         })
-        assert resp.status_code == 200, "Q3: anon-on + bad creds must fall back to Guest"
-        assert resp.get_json()["user_name"] == "Guest"
+        assert resp.status_code == 401, "Q3: anon-on + wrong creds for an account must 401"
 
     def test_q4_anon_off_no_creds_returns_401(self, app_with_decorator, mocker):
         app, um = app_with_decorator

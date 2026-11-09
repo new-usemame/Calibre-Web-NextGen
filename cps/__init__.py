@@ -858,9 +858,11 @@ def create_app(config=None, services=None):
                 calibre_db.session.expire_all()
             except Exception as e:
                 log.debug("DESKTOP_COMPAT_MODE: rollback failed, snapshot may be stale: %s", e)
-        # Clear the shelf count cache so sidebar counts stay fresh.
+        # Sidebar counts are kept until Calibre desktop (or anything else) writes
+        # metadata.db; recounting on every request stalled big libraries (#2862).
         from . import magic_shelf
-        magic_shelf.forget_book_counts()
+        magic_shelf.forget_book_counts_if_library_changed(
+            getattr(calibre_db, "_metadata_db_path", None))
 
     @application.teardown_appcontext
     def shutdown_session(exception=None):

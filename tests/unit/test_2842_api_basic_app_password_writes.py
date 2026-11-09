@@ -201,13 +201,32 @@ def test_basic_is_not_accepted_on_writes_outside_the_allow_list(api, monkeypatch
     monkeypatch.setattr(actions, "_require_real_user", lambda: hits.append(1) or None)
     response = api.client.post("/api/v1/books/7/favorite",
                                headers=_basic("alice", APP_PASSWORD_A))
-    assert response.status_code in (400, 401)
+    assert response.status_code == 400          # the CSRF refusal, not a Basic sign-in
+    assert b"CSRF" in response.data
     assert hits == []
 
 
-def test_reverse_proxy_login_enabled_does_not_drop_the_basic_user(api, monkeypatch):
+def test_proxy_basic_header_on_a_browser_session_write_stays_a_session_write(api):
+    """A proxy's own auth_basic layer makes the browser replay its credentials on
+    every request. The SPA's write carries the CSRF token, so it is a session
+    write: it must not be refused as a wrong app password, nor count towards
+    sign-in pacing."""
+    token = api.sign_in("bob", "bob-account-pw")
+    headers = {**_basic("proxyuser", "proxy-pw"), "X-CSRFToken": token}
+    for _ in range(5):
+        response = api.client.post("/api/v1/books/7/read-status",
+                                   json={"status": "finished"}, headers=headers)
+        assert response.status_code == 200, response.data
+    assert {(w[0], w[1]) for w in api.writes} == {("read-status", "bob")}
+
+
+@pytest.mark.parametrize("proxy_header", [None, "bob"])
+def test_reverse_proxy_login_does_not_replace_the_basic_user(api, monkeypatch, proxy_header):
     monkeypatch.setattr(config, "config_allow_reverse_proxy_header_login", True)
+    headers = _basic("alice", APP_PASSWORD_A)
+    if proxy_header:
+        headers["X-Remote-User"] = proxy_header
     response = api.client.post("/api/v1/books/7/read-status", json={"status": "finished"},
-                               headers=_basic("alice", APP_PASSWORD_A))
+                               headers=headers)
     assert response.status_code == 200, response.data
     assert [(w[0], w[1]) for w in api.writes] == [("read-status", "alice")]

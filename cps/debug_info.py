@@ -200,12 +200,24 @@ _KOBO_TOKEN_PATTERN = re.compile(r"(/kobo/)[0-9A-Za-z_\-]{16,}")
 
 # Email addresses (SMTP errors, login failures, send-to-eReader logs).
 _EMAIL_PATTERN = re.compile(
-    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}"
+    r"[\w.%+\-]+(?:@|%40)[\w\-]+(?:\.[\w\-]+)*\.[^\W\d_]{2,}"
 )
 
 # Shortest account name we will replace by exact match. Anything shorter
 # ("pi", "me") would mangle unrelated log text more often than it helps.
 _MIN_KNOWN_NAME_LEN = 3
+
+# Account names that are also the words logs are made of: HTTP methods, log
+# levels, this scrubber's own placeholder words, and the default accounts and
+# product names. Replacing these would rewrite every access-log line ("GET")
+# or every admin hint ("Enable in Admin ->") and make the pack unreadable,
+# and none of them identifies a person. Compared case-insensitively.
+_NAME_SCRUB_SKIP = frozenset({
+    "get", "post", "put", "patch", "delete", "head", "options",
+    "debug", "info", "warn", "warning", "error", "critical",
+    "token", "user", "email", "redacted", "config", "library", "ip",
+    "admin", "guest", "kobo", "opds", "kosync", "calibre",
+})
 
 
 # Sentinel for IPv4-mapped loopback during sanitization. The plain IPv6
@@ -272,13 +284,14 @@ class _LogScrubber:
         self._emails = {}
         self._users = {}
         names = {n.strip() for n in known_names
-                 if isinstance(n, str) and len(n.strip()) >= _MIN_KNOWN_NAME_LEN}
+                 if isinstance(n, str) and len(n.strip()) >= _MIN_KNOWN_NAME_LEN
+                 and n.strip().lower() not in _NAME_SCRUB_SKIP}
         # Longest first so "alice2" wins over "alice".
         ordered = sorted(names, key=len, reverse=True)
         self._names_pattern = None
         if ordered:
             self._names_pattern = re.compile(
-                r"(?<![\w/.\-@])(?:" + "|".join(re.escape(n) for n in ordered)
+                r"(?<![\w/.\-@<])(?:" + "|".join(re.escape(n) for n in ordered)
                 + r")(?![\w/\-@]|\.\w)",
                 re.IGNORECASE,
             )

@@ -124,10 +124,10 @@ class TestLogScrubber:
     def test_short_and_path_like_names_are_not_mangled(self):
         from cps.debug_info import _LogScrubber
 
-        s = _LogScrubber(known_names=["admin", "pi"])
-        line = 'GET /admin/logfile via admin.admin by user "admin" and pi'
+        s = _LogScrubber(known_names=["alice", "pi"])
+        line = 'GET /alice/logfile via alice.alice by user "alice" and pi'
         out = s(line)
-        assert "/admin/logfile" in out and "admin.admin" in out
+        assert "/alice/logfile" in out and "alice.alice" in out
         assert 'user "<user_1>"' in out
         assert out.endswith(" and pi")  # 2 chars: below the minimum, left alone
 
@@ -142,3 +142,54 @@ class TestLogScrubber:
         from cps.debug_info import _sanitize_log_line
 
         assert _sanitize_log_line("GET /kobo/v1/library") == "GET /kobo/v1/library"
+
+
+@pytest.mark.unit
+class TestNamesThatAreLogVocabulary:
+    """Account names that are also words the logs are made of (HTTP methods,
+    log levels, the scrubber's own placeholder words, the default accounts)
+    must not rewrite those words on every line. Seen on a running build: the
+    default "admin" account turned "Enable in Admin -> CWA Settings" into
+    "Enable in <user_1> -> CWA Settings"."""
+
+    def test_vocabulary_names_leave_log_text_readable(self):
+        from cps.debug_info import _LogScrubber
+
+        s = _LogScrubber(known_names=["get", "token", "info", "admin", "Guest", "kobo", "alice"])
+        access = '<ip> - - [x] "GET /kobo/0123456789abcdef0123456789abcdef/v1/library/sync HTTP/1.1" 200'
+        assert s(access) == '<ip> - - [x] "GET /kobo/<token>/v1/library/sync HTTP/1.1" 200'
+        app = "[t]  INFO {cps.kosync:97} Enable in Admin -> CWA Settings for Guest and Kobo"
+        assert s(app) == app
+        # A real account name on the same line is still replaced.
+        assert s('Login failed for user "alice"') == 'Login failed for user "<user_1>"'
+
+    def test_placeholders_are_never_relabelled(self):
+        from cps.debug_info import _LogScrubber
+
+        s = _LogScrubber(known_names=["user", "email", "redacted"])
+        line = "x <user_1> <email_1> <redacted> <token>"
+        assert s(line) == line
+
+
+@pytest.mark.unit
+class TestEmailForms:
+    def test_url_encoded_and_non_ascii_emails(self):
+        from cps.debug_info import _LogScrubber
+
+        s = _LogScrubber()
+        out = s("GET /search?query=alice%40example.com and bob@bücher.de")
+        assert "example.com" not in out and "bücher" not in out, out
+        assert "alice" not in out and "bob" not in out, out
+
+
+@pytest.mark.unit
+class TestKnownUsernamesReadsTheUserTable:
+    def test_db_failure_returns_none(self, monkeypatch):
+        from cps import debug_info, ub
+
+        class _Broken:
+            def query(self, *a, **k):
+                raise RuntimeError("session in a bad state")
+
+        monkeypatch.setattr(ub, "session", _Broken(), raising=False)
+        assert debug_info._known_usernames() is None

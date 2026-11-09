@@ -128,13 +128,27 @@ def _session_auth_gate():
 # token to carry, and needs none: a cross-site page cannot set an Authorization
 # header without a CORS preflight this app never answers, and a browser that
 # replays cached Basic credentials on a cross-site form post also sends Origin,
-# which _reject_cross_site_mutation refuses. Filled in after the route imports.
+# which _reject_cross_site_mutation refuses for another host. That check ignores
+# the port, so a page on another port of this same hostname is not refused by it;
+# it would also need the browser to hold this user's own credentials for this
+# host. Filled in after the route imports.
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset()
 
 
 def _sent_basic_credentials():
+    """True for a native client's Basic request: Basic credentials and no CSRF token.
+
+    A request that carries a token is a browser session's write, even when the
+    browser also replays Basic credentials for a proxy's own auth layer in front
+    of this app; that credential is the proxy's, not an app password, so it goes
+    the session way and keeps needing the token."""
     authorization = request.authorization
-    return authorization is not None and (authorization.type or "").lower() == "basic"
+    if authorization is None or (authorization.type or "").lower() != "basic":
+        return False
+    header_names = current_app.config.get("WTF_CSRF_HEADERS", ["X-CSRFToken", "X-CSRF-Token"])
+    if any(request.headers.get(name) for name in header_names):
+        return False
+    return not request.form.get(current_app.config.get("WTF_CSRF_FIELD_NAME", "csrf_token"))
 
 
 def _authenticate_basic_write():

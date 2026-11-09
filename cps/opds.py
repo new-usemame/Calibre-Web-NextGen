@@ -1407,12 +1407,21 @@ def feed_search(term):
         # policy as every other catalog feed. Pass the Basic-auth identity into
         # search_query as well as the final OPDS exposure filter: that query
         # builds both common policy predicates and per-user status joins.
-        entries = calibre_db.search_query(term, config=config, user=user).filter(
+        query = calibre_db.search_query(term, config=config, user=user).filter(
             get_opds_restricted_common_filter(user)
-        ) \
-            .order_by(locale_sort_key(db.Books.sort, user=auth.current_user()), db.Books.sort, db.Books.id).all()
-        entries_count = len(entries) if len(entries) > 0 else 1
-        pagination = Pagination(1, entries_count, entries_count)
+        )
+        # #2847: page like every other OPDS list feed (books_per_page, with
+        # rel=next/previous), instead of sending every match in one document.
+        per_page = int(config.config_books_per_page) or 1
+        try:
+            off = max(int(request.args.get("offset") or 0), 0)
+        except ValueError:
+            off = 0
+        page = off // per_page + 1
+        total_count = query.order_by(None).count()
+        entries = query.order_by(locale_sort_key(db.Books.sort, user=user), db.Books.sort, db.Books.id) \
+            .limit(per_page).offset((page - 1) * per_page).all()
+        pagination = Pagination(page, per_page, total_count)
         # #750: name the feed after the query (reuses the existing "Search" msgid).
         return render_xml_template('feed.xml', searchterm=term, entries=entries, pagination=pagination,
                                    feed_title="{}: {}".format(_('Search'), term))

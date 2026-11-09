@@ -12191,13 +12191,14 @@
   "title": "[bug] Calibre plugins in /config/.config/calibre/plugins are never loaded during ingest (regression since v4.1.44)",
   "person": "satwell",
   "delivered_via": [
-   "PR #2812"
+   "PR #2812",
+   "closed"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "Based on installing plugins in an empty test install, this seems to be working now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2798#issuecomment-6723539211",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2798@2026-11-03T09:49:22Z"
  },
  {
@@ -12238,11 +12239,57 @@
   "delivered_via": [
    "PR #2820"
   ],
+  "outcome": "not_fixed",
+  "basis": "reply: partial",
+  "quote": "Libby and Kobo Store load correctly, syncing _seems_ to fail (same behaviour as before with proxy `on`)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6722361901",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2797@2026-11-04T02:37:03Z"
+ },
+ {
+  "date": "2026-11-08",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797",
+  "title": "[bug] Kobo syncing issues after update to v4.1.58",
+  "person": "Duckbilled",
+  "delivered_via": [
+   "PR #2834"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "That seems to fix it for me, I am both able to access the store and Libby, as well as sync.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6727615735",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2797@2026-11-08T15:18:41Z"
+ },
+ {
+  "date": "2026-11-08",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2807",
+  "title": "[bug] Kobo fails to sync",
+  "person": "IceSentry",
+  "delivered_via": [
+   "PR #2835",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "After checking the \"Share my place\" setting I now see my progress tracked in the book page so I think everything is good now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2807#issuecomment-6733404059",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2807@2026-11-08T19:17:52Z"
+ },
+ {
+  "date": "2026-11-08",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2828",
+  "title": "Plugin installation guide",
+  "person": "uschi1",
+  "delivered_via": [
+   "closed"
+  ],
   "outcome": "no_reply",
   "basis": "nothing heard",
   "quote": "",
   "evidence": "",
   "judged_by": "rule",
-  "id": "issue#2797@2026-11-04T02:37:03Z"
+  "id": "issue#2828@2026-11-08T23:26:53Z"
  }
 ]

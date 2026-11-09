@@ -40,7 +40,7 @@
     <link rel="search"
       href="{{url_for('opds.feed_osd')}}"
       type="application/opensearchdescription+xml"/>
-  <link type="application/atom+xml" rel="search" title="{{_('Search')}}" href="{{ opds_search_url_path() }}" />
+  <link type="application/atom+xml" rel="search" title="{{_('Search')}}" href="{{ opds_search_url_template() }}" />
   <title>{% if feed_title %}{{ instance }} - {{ feed_title }}{% else %}{{ instance }}{% endif %}</title>
   <author>
     <name>{{instance}}</name>

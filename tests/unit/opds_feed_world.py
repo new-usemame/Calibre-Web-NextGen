@@ -41,7 +41,7 @@ class FeedRenderer:
             url_for=_url_for,
             _is_real_pubdate=lambda d: False,
             opds_paged_url=lambda o: "/x",
-            opds_search_url_path=lambda: "/x",
+            opds_search_url_template=lambda: "/x",
         )
 
     def render(self, entries):

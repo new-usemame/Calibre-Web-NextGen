@@ -291,7 +291,7 @@ class _LogScrubber:
         self._names_pattern = None
         if ordered:
             self._names_pattern = re.compile(
-                r"(?<![\w/.\-@<])(?:" + "|".join(re.escape(n) for n in ordered)
+                r"(?<![\w/.\-@])(?:" + "|".join(re.escape(n) for n in ordered)
                 + r")(?![\w/\-@]|\.\w)",
                 re.IGNORECASE,
             )

@@ -193,3 +193,10 @@ class TestKnownUsernamesReadsTheUserTable:
 
         monkeypatch.setattr(ub, "session", _Broken(), raising=False)
         assert debug_info._known_usernames() is None
+
+
+@pytest.mark.unit
+def test_name_in_angle_brackets_is_still_replaced():
+    from cps.debug_info import _LogScrubber
+
+    assert _LogScrubber(known_names=["alice"])("from <alice>") == "from <<user_1>>"

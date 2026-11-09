@@ -56,6 +56,38 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.64',
+    date: '2026-11-09',
+    items: [
+      {
+        title: 'Kobo sync works with the store proxy on, on current firmware',
+        body: 'With Proxy unknown requests to Kobo Store turned on, a Kobo on firmware 6 stopped at the first store call the server redirected, so its library never synced and the Store and Libby pages stayed empty. The server now fetches every store call itself and passes the answer back to your Kobo.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo setup says when your account cannot download books',
+        body: 'The server refuses a Kobo library sync for an account without download permission, and the Kobo only says the sync failed. The Kobo pairing section now says so up front and points to the Allow Downloads permission.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Reading apps can mark books read with an app password',
+        body: 'A reading app that signs in with an app password can now set a book\'s reading status, mark it read and archive it, the same way it already reads your library over OPDS and syncs your place over KOSync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOSync apps can tell a private place from no place',
+        body: 'When another device keeps its place to itself because Share my place is off for it, a KOSync app now learns that a private place exists instead of hearing that nobody has opened the book. When it saves your place, it also learns whether the place was kept or an earlier one stayed. KOReader works as before.',
+        category: 'Sync',
+      },
+      {
+        title: 'A clearer log line when a Kobo keeps its own place',
+        body: 'With DEBUG logging on, a Kobo holding its own place because the book was downloaded before the server tracked finished downloads now says that, and says to download the book again.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.63',
     date: '2026-11-08',
     items: [

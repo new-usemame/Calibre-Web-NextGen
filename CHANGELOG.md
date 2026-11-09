@@ -16,6 +16,24 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.64] - 2026-11-09
+
+### Added
+
+- **A KOSync client can tell a private place from no place.** With Share my place on (the default), a device that isn't sharing keeps its place to itself, and another reader asking for that book used to get the same empty answer as a book nobody had opened. That answer now carries `places_not_shared`, the number of the account's other devices that hold a place for the book without sharing it (a count only: no position and no device name). `/kosync/users/auth` sent with `X-CWNG-Device-ID` also returns `share_place` for that device, so a client can show the setting without opening a book. Stock KOReader ignores both fields. (#2841)
+
+- **An app password can set reading status, mark a book read and archive it over the API.** A reading app that signs in with an app password (the one OPDS and KOSync already take) can now call `POST /api/v1/books/<id>/read-status` (`finished`, `in_progress`, `unread`, `did_not_finish`, `on_hold`), `POST /api/v1/books/<id>/read` and `POST /api/v1/books/<id>/archived` with HTTP Basic, without a browser session or CSRF token. Like OPDS, the account password also works there. A request that carries a CSRF token stays a browser-session write, so a proxy that adds its own Basic sign-in in front of CWNG does not affect the web UI, and explicit Basic credentials win over a reverse-proxy login header. Only those three endpoints take Basic. A wrong password gets a 401 rather than being answered as the guest or as another signed-in account, the guest account cannot write, and a request that says it came from another site is still refused. Browser sessions still need the CSRF token as before. (#2842)
+
+- **A KOSync progress push now hears whether it was kept.** A push behind the stored place, or an older report arriving late, was dropped with the same 200 reply as one that was saved, so a client moving back on purpose could not tell the move did not land. The reply now carries `accepted`, `shared` (false when that device's Share my place is off, so the place stays on the device) and, when the push was not kept, `kept_percentage` with the place kept instead. Stock KOReader ignores the new fields. (#2843)
+
+### Fixed
+
+- **With Proxy unknown requests to Kobo Store on, CWNG now fetches every Kobo Store call itself instead of redirecting the Kobo to Kobo's server.** A Kobo on firmware 6 stopped at the first redirected call, so its library sync never started and the Store and Libby pages stayed empty. The store's answer now comes back through CWNG, and a store that cannot be reached is answered with a gateway error instead of a server error. (#2797, #2807, reported by @Duckbilled and @IceSentry)
+
+- **With DEBUG on, a Kobo held on its own place because its download is from before CWNG recorded finished downloads now says so, and says to download the book again.** It used to say the library KEPUB had been written after the download, even when it was written before it. (#2804, reported by @sgreadly)
+
+- **Kobo setup now says when the account can't download books.** CWNG refuses a Kobo's library sync for an account without download permission, and the Kobo only shows that the sync failed. The pairing section in the New UI and the Kobo Sync Token row in the classic user settings now say so and point to Allow Downloads. (#2807, reported by @noja11)
+
 ## [v4.1.63] - 2026-11-08
 
 ### Fixed

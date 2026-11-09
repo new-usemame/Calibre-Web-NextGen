@@ -190,6 +190,23 @@ _LIBRARY_PATH_PATTERN = re.compile(r"/calibre-library/")
 _BEARER_PATTERN = re.compile(r"(Bearer\s+)\S+", re.IGNORECASE)
 _BASIC_PATTERN = re.compile(r"(Basic\s+)\S+", re.IGNORECASE)
 
+# Kobo sync URLs carry the per-user auth token as a path segment
+# (``/kobo/<auth_token>/v1/library/sync``, 32 hex chars from
+# ``kobo_auth``). It is a bearer credential: anyone holding it can sync
+# as that user, and it lands verbatim in the access log and in
+# ``cps.kobo`` request lines. The 16-char floor keeps ``/kobo/v1`` style
+# segments intact.
+_KOBO_TOKEN_PATTERN = re.compile(r"(/kobo/)[0-9A-Za-z_\-]{16,}")
+
+# Email addresses (SMTP errors, login failures, send-to-eReader logs).
+_EMAIL_PATTERN = re.compile(
+    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}"
+)
+
+# Shortest account name we will replace by exact match. Anything shorter
+# ("pi", "me") would mangle unrelated log text more often than it helps.
+_MIN_KNOWN_NAME_LEN = 3
+
 
 # Sentinel for IPv4-mapped loopback during sanitization. The plain IPv6
 # regex would otherwise match `::ffff:127` after the loopback was
@@ -228,7 +245,60 @@ def _sanitize_log_line(line: str) -> str:
     # Auth headers.
     line = _BEARER_PATTERN.sub(r"\1<redacted>", line)
     line = _BASIC_PATTERN.sub(r"\1<redacted>", line)
+    # Kobo auth token in the URL path.
+    line = _KOBO_TOKEN_PATTERN.sub(r"\1<token>", line)
     return line
+
+
+class _LogScrubber:
+    """Per-pack log scrubber: the stateless line sanitiser plus consistent
+    pseudonyms for emails and known account names.
+
+    The same email or username maps to the same label (``<email_1>``,
+    ``<user_1>``) across every file in one pack, so a maintainer can still
+    follow one account through the app log and the access log. The mapping
+    is never written to the pack and a new scrubber is created per build,
+    so labels cannot be correlated between packs.
+
+    Account names cannot be found by pattern in free-text logs, so they are
+    replaced by exact, whole-token match against ``known_names`` (the user
+    table). Names shorter than ``_MIN_KNOWN_NAME_LEN`` are skipped, and a
+    name is not matched inside a path segment, a dotted identifier or an
+    email, which keeps ``/admin/...`` and ``admin.admin`` intact for an
+    account called "admin".
+    """
+
+    def __init__(self, known_names=()):
+        self._emails = {}
+        self._users = {}
+        names = {n.strip() for n in known_names
+                 if isinstance(n, str) and len(n.strip()) >= _MIN_KNOWN_NAME_LEN}
+        # Longest first so "alice2" wins over "alice".
+        ordered = sorted(names, key=len, reverse=True)
+        self._names_pattern = None
+        if ordered:
+            self._names_pattern = re.compile(
+                r"(?<![\w/.\-@])(?:" + "|".join(re.escape(n) for n in ordered)
+                + r")(?![\w/\-@]|\.\w)",
+                re.IGNORECASE,
+            )
+
+    def _email_label(self, match):
+        key = match.group(0).lower()
+        return self._emails.setdefault(key, "<email_%d>" % (len(self._emails) + 1))
+
+    def _user_label(self, match):
+        key = match.group(0).lower()
+        return self._users.setdefault(key, "<user_%d>" % (len(self._users) + 1))
+
+    def __call__(self, line: str) -> str:
+        line = _sanitize_log_line(line)
+        if not line:
+            return line
+        line = _EMAIL_PATTERN.sub(self._email_label, line)
+        if self._names_pattern is not None:
+            line = self._names_pattern.sub(self._user_label, line)
+        return line
 
 
 # Truncation safety net. A multi-MiB log over a slow link is enough to
@@ -238,7 +308,7 @@ def _sanitize_log_line(line: str) -> str:
 _PER_FILE_MAX_BYTES = 10 * 1024 * 1024
 
 
-def _sanitize_log_bytes(raw: bytes) -> bytes:
+def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
     """Read a log file, sanitize each line, return the sanitized bytes
     capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the most
     recent content, drop the head if oversize)."""
@@ -252,9 +322,10 @@ def _sanitize_log_bytes(raw: bytes) -> bytes:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
         return raw
+    scrub = scrubber if scrubber is not None else _sanitize_log_line
     sanitized_lines = []
     for line in text.splitlines(keepends=True):
-        sanitized_lines.append(_sanitize_log_line(line))
+        sanitized_lines.append(scrub(line))
     return "".join(sanitized_lines).encode("utf-8")
 
 
@@ -288,6 +359,20 @@ def assemble_logfiles(file_name):
                          download_name=os.path.basename(file_name))
 
 
+def _known_usernames():
+    """Account names from the user table, for exact-match scrubbing of logs.
+
+    Returns ``None`` if the lookup fails, so the caller can say so in the
+    pack rather than silently shipping logs with usernames intact.
+    """
+    try:
+        from . import ub
+        return [name for (name,) in ub.session.query(ub.User.name).all() if name]
+    except Exception as ex:  # pylint: disable=broad-except
+        log.warning("Support pack: could not read account names for log scrubbing: %s", ex)
+        return None
+
+
 def _build_debug_zip(sanitize: bool):
     """Build the in-memory debug pack. When ``sanitize`` is True the
     settings file is redacted and every log line is scrubbed for IPs,
@@ -300,25 +385,37 @@ def _build_debug_zip(sanitize: bool):
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
+    scrubber = None
+    note = _SANITIZED_NOTE
     if sanitize:
         settings_dict = _redact_for_export(settings_dict)
+        names = _known_usernames()
+        scrubber = _LogScrubber(known_names=names or ())
+        if names is None:
+            note += _USERNAME_LOOKUP_FAILED_NOTE
 
     memory_zip = BytesIO()
     with zipfile.ZipFile(memory_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('settings.txt', json.dumps(settings_dict, sort_keys=True, indent=2))
         zf.writestr('libs.txt', json.dumps(libs_dict, sort_keys=True, indent=2, cls=lazyEncoder))
         if sanitize:
-            zf.writestr('SANITIZED.txt', _SANITIZED_NOTE)
+            zf.writestr('SANITIZED.txt', note)
         for fp in file_list:
             if sanitize:
                 with open(fp, 'rb') as fd:
                     raw = fd.read()
-                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw))
+                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber))
             else:
                 zf.write(fp, os.path.basename(fp))
     memory_zip.seek(0)
     return memory_zip
 
+
+_USERNAME_LOOKUP_FAILED_NOTE = (
+    "\n"
+    "WARNING: account names could not be read from the user table, so they\n"
+    "were NOT replaced in the logs. Check the logs before sharing.\n"
+)
 
 _SANITIZED_NOTE = (
     "This debug pack has been sanitized for sharing in public issues.\n"
@@ -326,7 +423,11 @@ _SANITIZED_NOTE = (
     "What was removed or replaced:\n"
     "  * Settings: passwords, OAuth tokens, LDAP bind passwords, API keys.\n"
     "  * Logs: public IPs, /config/ and /calibre-library/ paths,\n"
-    "          Authorization: Bearer/Basic header values, JWT-shaped tokens.\n"
+    "          Authorization: Bearer/Basic header values, JWT-shaped tokens,\n"
+    "          Kobo sync tokens in /kobo/<token>/ URLs, email addresses\n"
+    "          (<email_1>, <email_2>, ...) and account names (<user_1>, ...).\n"
+    "          The same email or account gets the same label throughout this\n"
+    "          pack; labels are not stable between packs.\n"
     "\n"
     "What was kept:\n"
     "  * Loopback IP (127.0.0.1), timestamps, log levels, error messages,\n"

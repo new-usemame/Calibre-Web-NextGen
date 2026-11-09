@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+import os
 import threading
 import time
 
@@ -1226,6 +1227,10 @@ def get_books_for_magic_shelf(shelf_id, page=1, page_size=None, sort_order=None,
 BOOK_COUNT_CACHE_SECONDS = 300
 _book_count_cache = {}
 _book_count_cache_lock = threading.Lock()
+# Bumped by every full forget, so a count that was being worked out while the
+# library changed is not stored over the forget.
+_book_count_generation = 0
+_library_signature = None
 
 
 def cached_book_count_for_magic_shelf(user_id, shelf_id, now=None):
@@ -1234,22 +1239,65 @@ def cached_book_count_for_magic_shelf(user_id, shelf_id, now=None):
     key = (user_id, shelf_id)
     with _book_count_cache_lock:
         cached = _book_count_cache.get(key)
+        generation = _book_count_generation
     if cached and now - cached[1] < BOOK_COUNT_CACHE_SECONDS:
         return cached[0]
     count = get_book_count_for_magic_shelf(shelf_id)
     with _book_count_cache_lock:
-        _book_count_cache[key] = (count, now)
+        if generation == _book_count_generation:
+            _book_count_cache[key] = (count, now)
     return count
 
 
 def forget_book_counts(shelf_id=None):
     """Drop cached counts for one shelf (every user), or all of them."""
+    global _book_count_generation
     with _book_count_cache_lock:
         if shelf_id is None:
             _book_count_cache.clear()
+            _book_count_generation += 1
         else:
             for key in [k for k in _book_count_cache if k[1] == shelf_id]:
                 del _book_count_cache[key]
+
+
+def _file_signature(path):
+    """What changes when SQLite writes ``path``: its identity, size and mtime,
+    plus those of its WAL. None when ``path`` cannot be read."""
+    if not path:
+        return None
+    parts = []
+    for candidate in (path, path + "-wal"):
+        try:
+            st = os.stat(candidate)
+        except FileNotFoundError:
+            if candidate == path:
+                return None
+            parts.append(None)
+            continue
+        except OSError:
+            return None
+        parts.append((st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns))
+    return tuple(parts)
+
+
+def forget_book_counts_if_library_changed(metadata_db_path):
+    """Drop every cached count when ``metadata_db_path`` changed on disk since
+    the last call (DESKTOP_COMPAT_MODE, where Calibre desktop writes the
+    library between requests). Returns True when the counts were dropped.
+
+    Dropping them on every request instead re-ran every shelf's COUNT query on
+    every page, cover and API call (#2862). When the file cannot be read there
+    is no way to tell, so the counts are dropped as before.
+    """
+    global _library_signature
+    signature = _file_signature(metadata_db_path)
+    with _book_count_cache_lock:
+        if signature is not None and signature == _library_signature:
+            return False
+        _library_signature = signature
+    forget_book_counts()
+    return True
 
 
 def get_book_count_for_magic_shelf(shelf_id):

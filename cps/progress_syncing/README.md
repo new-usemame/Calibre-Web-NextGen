@@ -178,6 +178,22 @@ means "ask for these and you get something". A book with no progress at all
 returns `{}`. The server also logs the withholding at WARNING with the
 parameter to send, so it is diagnosable from the server side too.
 
+With Share my place on (the default), a device that is not sharing keeps its
+place to itself. When the only places for a book belong to such devices, the
+otherwise-empty response says how many of the account's other active devices
+hold one (#2841):
+
+```jsonc
+{ "places_not_shared": 1 }
+```
+
+It is a count only, for the same account, and never names a device or a
+position. A client can use it to explain why no place arrived: places travel
+between devices only when both the device that set the place and the one asking
+have Share my place on. `GET /kosync/users/auth` sent with `X-CWNG-Device-ID` for a device
+the server already knows also returns `"share_place": true|false` for that
+device; an unknown device gets no such field.
+
 `percentage` is a decimal fraction on the wire (`0.4567` = 45.67%), which is
 KOReader's format; it is stored as 0–100 internally. Progress is furthest-wins
 across producers, so a lower percentage is dropped rather than dragging a

@@ -136,6 +136,12 @@ POSITION_KIND_LOCATOR = "locator"
 # resolves the bare ``{}`` it gets today.
 POSITION_KINDS_AVAILABLE_FIELD = "position_kinds_available"
 
+# On an otherwise-empty GET: how many of the account's other devices hold a
+# place for this book without sharing it (#2841). With Share my place gates on,
+# a private place and no place at all were the same ``{}``. A count only, same
+# account only; inert to a stock plugin for the reason given above.
+PLACES_NOT_SHARED_FIELD = "places_not_shared"
+
 # A client that keeps its place as words rather than as an engine locator
 # (``services/text_anchor``) asks for this kind on GET to receive ``anchor``,
 # the words at the winning position, and may send one on a percentage PUT.
@@ -195,6 +201,22 @@ def _withheld_position_hint(user_id, document, book_id,
         POSITION_KIND_LOCATOR, POSITION_KIND_PERCENTAGE,
     )
     return {POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]}
+
+
+def _places_not_shared_hint(user_id, book_id, asker) -> dict:
+    """``{"places_not_shared": n}`` for a miss with private places, else ``{}``."""
+    if not book_id or not gates_enforced(user_id):
+        return {}
+    from ...services import kosync_place
+    try:
+        count = kosync_place.places_not_shared(
+            user_id, book_id, exclude_device_id=getattr(asker, "id", None))
+    except Exception:
+        # Advisory only: failing to count must not turn "no progress" into a
+        # sync error, which stops the client's whole progress sync.
+        log.warning("Could not count unshared places for book %s", book_id, exc_info=True)
+        return {}
+    return {PLACES_NOT_SHARED_FIELD: count} if count else {}
 
 
 def _advertised_position_kinds() -> set:
@@ -1208,9 +1230,18 @@ def auth_user():
 
     user = authenticate_user()
     if user:
-        return create_sync_response({"authorized": "OK",
-                                     "capabilities": list(SERVER_CAPABILITIES),
-                                     "share_place_gates": gates_enforced(user.id)})
+        body = {"authorized": "OK",
+                "capabilities": list(SERVER_CAPABILITIES),
+                "share_place_gates": gates_enforced(user.id)}
+        # A client that names itself learns its own Share my place setting
+        # without needing a book (#2841). Read-only: an unknown device is not
+        # registered here, and gets no field rather than a guessed one.
+        if request.headers.get("X-CWNG-Device-ID"):
+            from ...services import kosync_place
+            device, _identified, _raw = kosync_place.request_device(user.id)
+            if device is not None:
+                body["share_place"] = bool(device.share_place)
+        return create_sync_response(body)
     else:
         return create_sync_response({
             "error": ERROR_UNAUTHORIZED_USER,
@@ -1318,12 +1349,15 @@ def get_progress(document: str):
 
         if not progress_record:
             if private and book_id:
-                return create_sync_response({})
-            # A miss and a withheld position looked identical on the wire, which
-            # is what sent @sroebert to our source to find the parameter (#1445).
-            return create_sync_response(_withheld_position_hint(
-                user.id, document, book_id, accepts_percentage, endpoint
-            ))
+                miss = {}
+            else:
+                # A miss and a withheld position looked identical on the wire, which
+                # is what sent @sroebert to our source to find the parameter (#1445).
+                miss = _withheld_position_hint(
+                    user.id, document, book_id, accepts_percentage, endpoint
+                )
+            miss.update(_places_not_shared_hint(user.id, book_id, target))
+            return create_sync_response(miss)
 
         # KOReader expects percentage as a decimal fraction (0.9411 = 94.11%)
         # We store it as percentage (0-100), so convert back to decimal (0-1)

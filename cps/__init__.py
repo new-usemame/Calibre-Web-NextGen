@@ -778,6 +778,12 @@ def create_app(config=None, services=None):
                 # Counts are cached server-side; drop the copy older versions
                 # kept in the session cookie (#2386).
                 session.pop('magic_shelf_counts', None)
+                if calibre_db._desktop_compat:
+                    # Calibre desktop writes the library between requests, so drop
+                    # the counts when metadata.db changed, before they are read.
+                    # Dropping them on every request stalled big libraries (#2862).
+                    magic_shelf.forget_book_counts_if_library_changed(
+                        getattr(calibre_db, "_metadata_db_path", None))
                 for shelf in g.magic_shelves_access:
                     shelf.book_count = magic_shelf.cached_book_count_for_magic_shelf(
                         current_user.id, shelf.id)
@@ -858,11 +864,6 @@ def create_app(config=None, services=None):
                 calibre_db.session.expire_all()
             except Exception as e:
                 log.debug("DESKTOP_COMPAT_MODE: rollback failed, snapshot may be stale: %s", e)
-        # Sidebar counts are kept until Calibre desktop (or anything else) writes
-        # metadata.db; recounting on every request stalled big libraries (#2862).
-        from . import magic_shelf
-        magic_shelf.forget_book_counts_if_library_changed(
-            getattr(calibre_db, "_metadata_db_path", None))
 
     @application.teardown_appcontext
     def shutdown_session(exception=None):

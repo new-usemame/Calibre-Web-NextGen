@@ -92,6 +92,8 @@ def _require_api_auth():
     expiry). The per-route @login_required_if_no_ano decorators remain as
     defence-in-depth and per-route documentation."""
     if request.endpoint in _PUBLIC_ENDPOINTS:
+        if request.endpoint == "api_v1.auth_me" and _native_basic_read():
+            return _authenticate_basic_read()
         return None
     if request.endpoint in _BASIC_AUTH_WRITE_ENDPOINTS:
         if _sent_basic_credentials():
@@ -100,6 +102,8 @@ def _require_api_auth():
         if denied is None:
             _protect_session_write()
         return denied
+    if _native_basic_read():
+        return _authenticate_basic_read()
     return _session_auth_gate()
 
 
@@ -149,6 +153,41 @@ def _sent_basic_credentials():
     if any(request.headers.get(name) for name in header_names):
         return False
     return not request.form.get(current_app.config.get("WTF_CSRF_FIELD_NAME", "csrf_token"))
+
+
+def _native_basic_read():
+    """True for a native client's read that sent HTTP Basic credentials (#2844).
+
+    Only reads: writes go through _sent_basic_credentials and the allow-list.
+    A browser's fetch is left on the session path, so nothing changes for the
+    new UI: browsers mark every fetch with Sec-Fetch-Site, and behind a reverse
+    proxy with its own Basic login they replay the proxy's credentials on each
+    request, which are no CWNG account. Refusing those would sign out every
+    anonymous visitor on that setup, and honouring a match would keep a browser
+    signed in after it logs out. A request that already has a signed-in session
+    keeps it for the same reason."""
+    if request.method not in _SAFE_METHODS:
+        return False
+    authorization = request.authorization
+    if authorization is None or (authorization.type or "").lower() != "basic":
+        return False
+    if request.headers.get("Sec-Fetch-Site"):
+        return False
+    return not current_user.is_authenticated
+
+
+def _authenticate_basic_read():
+    """Read as the Basic user, or answer the JSON 401 when the credentials are wrong.
+
+    Credentials that name no account (an empty username, or Guest) are a probe,
+    as on OPDS: they get whatever the session path gives an anonymous caller, the
+    guest view under anonymous browsing and the 401 otherwise. Credentials that
+    name an account and are wrong get the 401 even under anonymous browsing, so
+    a client's connection test fails instead of browsing as the guest."""
+    username = ((request.authorization or {}).get("username") or "").strip()
+    if not username or username.lower() == "guest":
+        return _session_auth_gate()
+    return _authenticate_basic_write()
 
 
 def _authenticate_basic_write():

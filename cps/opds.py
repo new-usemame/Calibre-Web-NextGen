@@ -22,7 +22,8 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyErro
 from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy, tag_hierarchy
 from .custom_column_visibility import retryable_column_reads, browsable_columns, is_cc_visible
 from .usermanagement import requires_basic_auth_if_no_ano, auth
-from .helper import get_download_link, get_book_cover, hot_books_page
+from .helper import get_download_link, get_book_cover, hot_books_page, read_statuses_for_books, \
+    SQLITE_IN_CHUNK_SIZE
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS
 from .web import render_read_books, render_personal_read_status_books
@@ -1509,6 +1510,41 @@ def _opds_internal_error(_error):
     return response
 
 
+def _entry_read_statuses(entries):
+    """The requester's own read status for each book entry, by book id (#2849).
+
+    Empty for a guest or anonymous caller: the element is personal state, and a
+    guest's would be the shared guest account's. Carriers are looked up by id
+    rather than read off the rows, because not every feed query joins the read
+    state, and the status names come from the same resolver the API uses, so a
+    custom read column and the personal DNF/on-hold overlays read the same here.
+    """
+    user = auth.current_user()
+    if not entries or user is None or getattr(user, "is_anonymous", True):
+        return {}
+    ids = sorted({int(entry.Books.id) for entry in entries
+                  if getattr(entry, "Books", None) is not None})
+    if not ids:
+        return {}
+    read_column = config.config_read_column
+    if read_column:
+        column = getattr(db, "cc_classes", {}).get(read_column)
+        if column is None:
+            return {}
+    carriers = dict.fromkeys(ids)
+    for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+        chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+        if read_column:
+            rows = calibre_db.session.query(column.book, column.value).filter(
+                column.book.in_(chunk)).all()
+        else:
+            rows = ub.session.query(ub.ReadBook.book_id, ub.ReadBook.read_status).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk)).all()
+        carriers.update((int(book_id), value) for book_id, value in rows)
+    return read_statuses_for_books(carriers.items(), read_column, user)
+
+
 def render_xml_template(*args, feed_title=None, **kwargs):
     # ToDo: return time in current timezone similar to %z
     currtime = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
@@ -1520,6 +1556,7 @@ def render_xml_template(*args, feed_title=None, **kwargs):
     # renders "Instance - Feed Name".
     if feed_title is None:
         feed_title = _opds_feed_title_for_endpoint(request.endpoint)
+    kwargs.setdefault("read_statuses", _entry_read_statuses(kwargs.get("entries")))
     xml = render_template(current_time=currtime, instance=config.config_calibre_web_title,
                           feed_title=feed_title, constants=constants.sidebar_settings, *args, **kwargs)
     response = make_response(xml)

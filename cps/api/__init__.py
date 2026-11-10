@@ -138,6 +138,11 @@ def _session_auth_gate():
 # host. Filled in after the route imports.
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset()
 
+# #2844: the header the new UI sends on its own /api/v1 fetches, so a browser
+# replaying a proxy's Basic login is told apart from a native client over plain
+# HTTP too. Mirrored in frontend/src/lib/api.ts.
+WEB_CLIENT_HEADER = "X-CWNG-Client"
+
 # #2844: the library reads a native client makes with the same app password,
 # plus /auth/me so its connection test learns who it signed in as. An allow-list,
 # not every read: an app password is a credential for a reader app, and must not
@@ -167,18 +172,20 @@ def _native_basic_read():
 
     Only reads, and only on _BASIC_AUTH_READ_ENDPOINTS: writes go through _sent_basic_credentials and the allow-list.
     A browser's fetch is left on the session path, so nothing changes for the
-    new UI: browsers mark every fetch with Sec-Fetch-Site, and behind a reverse
-    proxy with its own Basic login they replay the proxy's credentials on each
-    request, which are no CWNG account. Refusing those would sign out every
-    anonymous visitor on that setup, and honouring a match would keep a browser
-    signed in after it logs out. A request that already has a signed-in session
-    keeps it for the same reason."""
+    new UI: behind a reverse proxy with its own Basic login a browser replays the
+    proxy's credentials on each request, which are usually no CWNG account.
+    Refusing those would sign out every anonymous visitor on that setup, and
+    honouring a match would keep a browser signed in after it logs out. The new
+    UI marks its own fetches with X-CWNG-Client (a browser sends Sec-Fetch-Site
+    only to a secure origin, so plain HTTP behind such a proxy has no Fetch
+    Metadata); Sec-Fetch-Site still counts for any other browser fetch. A request
+    that already has a signed-in session keeps it for the same reason."""
     if request.method not in _SAFE_METHODS:
         return False
     authorization = request.authorization
     if authorization is None or (authorization.type or "").lower() != "basic":
         return False
-    if request.headers.get("Sec-Fetch-Site"):
+    if request.headers.get(WEB_CLIENT_HEADER) or request.headers.get("Sec-Fetch-Site"):
         return False
     return not current_user.is_authenticated
 

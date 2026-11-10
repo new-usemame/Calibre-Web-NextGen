@@ -92,6 +92,8 @@ def _require_api_auth():
     expiry). The per-route @login_required_if_no_ano decorators remain as
     defence-in-depth and per-route documentation."""
     if request.endpoint in _PUBLIC_ENDPOINTS:
+        if request.endpoint in _BASIC_AUTH_READ_ENDPOINTS and _native_basic_read():
+            return _authenticate_basic_read()
         return None
     if request.endpoint in _BASIC_AUTH_WRITE_ENDPOINTS:
         if _sent_basic_credentials():
@@ -100,6 +102,8 @@ def _require_api_auth():
         if denied is None:
             _protect_session_write()
         return denied
+    if request.endpoint in _BASIC_AUTH_READ_ENDPOINTS and _native_basic_read():
+        return _authenticate_basic_read()
     return _session_auth_gate()
 
 
@@ -134,6 +138,18 @@ def _session_auth_gate():
 # host. Filled in after the route imports.
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset()
 
+# #2844: the header the new UI sends on its own /api/v1 fetches, so a browser
+# replaying a proxy's Basic login is told apart from a native client over plain
+# HTTP too. Mirrored in frontend/src/lib/api.ts.
+WEB_CLIENT_HEADER = "X-CWNG-Client"
+
+# #2844: the library reads a native client makes with the same app password,
+# plus /auth/me so its connection test learns who it signed in as. An allow-list,
+# not every read: an app password is a credential for a reader app, and must not
+# open account settings, app-password or device-token listings, or admin pages.
+# Filled in after the route imports.
+_BASIC_AUTH_READ_ENDPOINTS = frozenset()
+
 
 def _sent_basic_credentials():
     """True for a native client's Basic request: Basic credentials and no CSRF token.
@@ -149,6 +165,43 @@ def _sent_basic_credentials():
     if any(request.headers.get(name) for name in header_names):
         return False
     return not request.form.get(current_app.config.get("WTF_CSRF_FIELD_NAME", "csrf_token"))
+
+
+def _native_basic_read():
+    """True for a native client's read that sent HTTP Basic credentials (#2844).
+
+    Only reads, and only on _BASIC_AUTH_READ_ENDPOINTS: writes go through _sent_basic_credentials and the allow-list.
+    A browser's fetch is left on the session path, so nothing changes for the
+    new UI: behind a reverse proxy with its own Basic login a browser replays the
+    proxy's credentials on each request, which are usually no CWNG account.
+    Refusing those would sign out every anonymous visitor on that setup, and
+    honouring a match would keep a browser signed in after it logs out. The new
+    UI marks its own fetches with X-CWNG-Client (a browser sends Sec-Fetch-Site
+    only to a secure origin, so plain HTTP behind such a proxy has no Fetch
+    Metadata); Sec-Fetch-Site still counts for any other browser fetch. A request
+    that already has a signed-in session keeps it for the same reason."""
+    if request.method not in _SAFE_METHODS:
+        return False
+    authorization = request.authorization
+    if authorization is None or (authorization.type or "").lower() != "basic":
+        return False
+    if request.headers.get(WEB_CLIENT_HEADER) or request.headers.get("Sec-Fetch-Site"):
+        return False
+    return not current_user.is_authenticated
+
+
+def _authenticate_basic_read():
+    """Read as the Basic user, or answer the JSON 401 when the credentials are wrong.
+
+    Credentials that name no account (an empty username, or Guest) are a probe,
+    as on OPDS: they get whatever the session path gives an anonymous caller, the
+    guest view under anonymous browsing and the 401 otherwise. Credentials that
+    name an account and are wrong get the 401 even under anonymous browsing, so
+    a client's connection test fails instead of browsing as the guest."""
+    username = ((request.authorization or {}).get("username") or "").strip()
+    if not username or username.lower() == "guest":
+        return _session_auth_gate()
+    return _authenticate_basic_write()
 
 
 def _authenticate_basic_write():
@@ -320,6 +373,15 @@ _BASIC_AUTH_WRITE_VIEWS = (books.set_book_read_status, books.toggle_book_read,
                            actions.toggle_book_archived)
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
                                         for view in _BASIC_AUTH_WRITE_VIEWS)
+_BASIC_AUTH_READ_VIEWS = (auth.auth_me, books.list_books, books.book_detail,
+                          books.list_global_library, browse.list_authors,
+                          browse.list_series, browse.list_tags, browse.tag_tree,
+                          browse.list_publishers, browse.list_languages,
+                          browse.list_ratings, browse.list_formats,
+                          shelves.list_shelves, shelves.shelf_detail,
+                          shelves.book_shelf_membership)
+_BASIC_AUTH_READ_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
+                                       for view in _BASIC_AUTH_READ_VIEWS)
 if csrf is not None:
     for _view in _BASIC_AUTH_WRITE_VIEWS:
         csrf.exempt(_view)

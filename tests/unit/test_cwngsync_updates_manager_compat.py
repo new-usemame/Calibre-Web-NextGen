@@ -127,6 +127,27 @@ def test_publishing_is_automated_on_release_rather_than_a_remembered_step():
     )
 
 
+def test_a_failed_plugin_publish_reaches_a_person():
+    """fork #1688: a failure nobody sees is a release that never ships.
+
+    v4.1.34, v4.1.35 and v4.1.36 each failed the stale-version guard. The only
+    trace was a red run on a workflow with no other consumer, so three releases
+    went by with every device stuck on the old plugin. The publish step must be
+    followed by a failure-only notification on the channel the project already
+    uses for release-blocking failures.
+    """
+    body = RELEASE_WORKFLOW.read_text()
+    assert "failure()" in body, (
+        "the workflow needs a failure-only step so a failed publish is announced"
+    )
+    assert "secrets.DISCORD_WEBHOOK" in body, (
+        "notify through the existing DISCORD_WEBHOOK secret rather than a new service"
+    )
+    assert body.index("failure()") > body.index("publish-cwngsync-plugin.sh"), (
+        "the notification has to come after the publish step it reports on"
+    )
+
+
 def test_publish_is_skipped_when_the_plugin_did_not_change():
     body = PUBLISH_SCRIPT.read_text()
     assert "--auto" in body, (

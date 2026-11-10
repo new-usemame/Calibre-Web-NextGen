@@ -169,3 +169,20 @@ def test_app_password_does_not_open_account_settings(api, monkeypatch, anonbrows
     response = api.get("/api/v1/account", headers=_basic("alice", APP_PASSWORD_A))
     assert response.status_code == 401, response.data
     assert b"alice" not in response.data
+
+
+WEB_UI = {"X-CWNG-Client": "web"}
+
+
+@pytest.mark.parametrize("credentials", [("proxyuser", "proxy-pw"), ("alice", "proxy-pw"),
+                                         ("alice", APP_PASSWORD_A)])
+@pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/shelves"])
+def test_new_ui_over_plain_http_keeps_the_guest_view_behind_proxy_basic(api, credentials, path):
+    """Browsers send Sec-Fetch-Site only to a secure origin, so over plain HTTP a
+    new-UI fetch behind a proxy's auth_basic carries the proxy's credentials and
+    no Fetch Metadata. The new UI marks its own fetches; a marked request stays
+    on the session path whatever Basic credentials ride along, including ones
+    that happen to match an account (a logged-out browser must stay logged out)."""
+    response = api.get(path, headers={**_basic(*credentials), **WEB_UI})
+    assert response.status_code == 200, response.data
+    assert _reader_name(response) == "Guest"

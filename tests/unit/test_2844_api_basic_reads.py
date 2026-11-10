@@ -151,11 +151,14 @@ def test_browser_replaying_proxy_basic_stays_an_anonymous_visitor(api):
         assert _reader_name(response) == "Guest"
 
 
-def test_signed_in_browser_keeps_its_session_under_proxy_basic(api):
+@pytest.mark.parametrize("path", ["/api/v1/account", "/api/v1/auth/me"])
+def test_signed_in_browser_keeps_its_session_under_proxy_basic(api, path):
+    """/auth/me takes Basic; a signed-in session still wins there, also for a
+    browser too old to send Sec-Fetch-Site."""
     api.sign_in("bob", "bob-account-pw")
     for headers in (_basic("proxyuser", "proxy-pw"),
                     {**_basic("proxyuser", "proxy-pw"), **BROWSER}):
-        response = api.get("/api/v1/account", headers=headers)
+        response = api.get(path, headers=headers)
         assert response.status_code == 200, response.data
         assert _reader_name(response) == "bob"
 

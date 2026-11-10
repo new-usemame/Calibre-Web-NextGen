@@ -234,9 +234,12 @@ def convert_api(api, monkeypatch):
     monkeypatch.setattr(edit, "get_convert_options", lambda book: (["azw3"], ["epub", "kepub"]))
     monkeypatch.setattr(edit, "convert_book_format", fake_convert)
     monkeypatch.setattr(config, "get_book_path", lambda: "/library", raising=False)
-    monkeypatch.setattr(info, "render_task_status",
-                        lambda tasks: [{"id": "task-42",
-                                                     "user": getattr(current_user, "name", None)}])
+    def task(task_id):
+        return SimpleNamespace(id=task_id, name="Convert", message="", start_time=None,
+                               stat=0, progress=0, is_cancellable=False, error=None)
+    worker = SimpleNamespace(tasks=[(None, "alice", None, task("task-alice"), None),
+                                    (None, "bob", None, task("task-bob"), None)])
+    monkeypatch.setattr(info.WorkerThread, "get_instance", staticmethod(lambda: worker))
     alice = api.session.query(ub.User).filter_by(name="alice").one()
     alice.role = constants.ROLE_DOWNLOAD | constants.ROLE_EDIT
     api.session.commit()
@@ -296,4 +299,13 @@ def test_app_password_reads_its_own_task_list(convert_api, monkeypatch, anonbrow
     monkeypatch.setattr(config, "config_anonbrowse", anonbrowse)
     response = convert_api.client.get("/api/v1/tasks", headers=_basic("alice", APP_PASSWORD_A))
     assert response.status_code == 200, response.data
-    assert response.json["items"] == [{"id": "task-42", "user": "alice"}]
+    assert [row["task_id"] for row in response.json["items"]] == ["task-alice"]
+
+
+def test_admin_app_password_reads_every_task(convert_api):
+    alice = convert_api.session.query(ub.User).filter_by(name="alice").one()
+    alice.role = constants.ROLE_DOWNLOAD | constants.ROLE_ADMIN
+    convert_api.session.commit()
+    response = convert_api.client.get("/api/v1/tasks", headers=_basic("alice", APP_PASSWORD_A))
+    assert response.status_code == 200, response.data
+    assert [row["task_id"] for row in response.json["items"]] == ["task-alice", "task-bob"]

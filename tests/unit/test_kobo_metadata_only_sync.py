@@ -10,7 +10,7 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def metadata_sync(sync_harness, monkeypatch):
-    monkeypatch.setattr(kobo.calibre_db, "kobo_metadata_edits_available", True, raising=False)
+    monkeypatch.setattr(kobo.calibre_db, "book_metadata_edits_available", True, raising=False)
     monkeypatch.setattr(helper, "calibre_db", kobo.calibre_db)
     monkeypatch.setattr(kobo.config, "config_kobo_suppress_replayed_entitlements", True)
     initial = sync_harness.sync()

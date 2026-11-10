@@ -2824,10 +2824,10 @@ def HandleSyncRequest():
         # replays and classify a genuine mismatch as Changed.
         prior_entitlement_fingerprints = known_entitlement_fingerprints
         metadata_edits = {}
-        if prior_entitlement_fingerprints and getattr(calibre_db, "kobo_metadata_edits_available", False):
+        if prior_entitlement_fingerprints and getattr(calibre_db, "book_metadata_edits_available", False):
             metadata_edits = {
-                edit.book_id: edit for edit in calibre_db.session.query(db.KoboMetadataEdit)
-                .filter(db.KoboMetadataEdit.book_id.in_(prior_entitlement_fingerprints))
+                edit.book_id: edit for edit in calibre_db.session.query(db.BookMetadataEdit)
+                .filter(db.BookMetadataEdit.book_id.in_(prior_entitlement_fingerprints))
             }
         for book in candidate_page:
             candidate_emitted_work = False

@@ -148,9 +148,8 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False, metadata_only=Fals
         if now <= previous < now + timedelta(seconds=1):
             now = previous + timedelta(microseconds=1)
     book.last_modified = now
-    if metadata_only and previous is not None and getattr(calibre_db, "kobo_metadata_edits_available", False):
-        from .kobo_sync_status import record_metadata_edit
-        record_metadata_edit(calibre_db.session, book, previous)
+    if metadata_only and previous is not None and getattr(calibre_db, "book_metadata_edits_available", False):
+        db.record_book_metadata_edit(calibre_db.session, book, previous)
     if set_dirty:
         calibre_db.set_metadata_dirty(book.id)
     if unsync:

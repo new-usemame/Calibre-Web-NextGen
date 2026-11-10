@@ -56,6 +56,9 @@
     {% if read_statuses and entry.Books.id in read_statuses %}
     <cwng:read_status>{{ read_statuses[entry.Books.id] }}</cwng:read_status>
     {% endif %}
+    {% if shared_places and entry.Books.id in shared_places %}
+    <cwng:progress>{{ shared_places[entry.Books.id] }}</cwng:progress>
+    {% endif %}
     <updated>{{entry.Books.atom_timestamp}}</updated>
     {% for author in entry.Books.authors %}
       <author>

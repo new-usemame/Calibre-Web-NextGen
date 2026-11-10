@@ -16,6 +16,28 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.65] - 2026-11-10
+
+### Fixed
+
+- **Signing in and creating app passwords no longer hang behind a proxy that sends `Connection: upgrade` on every request.** A common nginx and Nginx Proxy Manager WebSocket snippet sets `proxy_set_header Connection "upgrade"` for all traffic. The web server then treated every request as a protocol switch and waited on the raw connection for the request body, so sign-in, app-password creation and other form or JSON posts sat until the proxy gave up with a 504. Requests are now always read as ordinary HTTP requests, since nothing in CWNG uses a protocol upgrade. (#2838)
+
+- **`/api/v1` reads now honour an app password sent over HTTP Basic.** A reader app that signed in with HTTP Basic got the guest's view of `/api/v1` with anonymous browsing on (your read status, shelves and library missing), and a 401 with it off, whether the password was right or wrong. The right username and app password now read the library, shelves and `/api/v1/auth/me` as that account, so a connection test reports who it signed in as. Account settings and admin pages still need a signed-in session. A wrong password gets 401 instead of the guest view. Browsers are unchanged: the web UI keeps its session, and a reverse proxy that adds its own Basic login in front of CWNG does not sign anonymous visitors out. (#2844)
+
+- **OPDS no longer accepts a wrong password as the guest.** With anonymous browsing on, a reader app that sent a username with the wrong password got the guest catalog with 200, so its connection test passed and your own shelves, read status and download rights were silently missing. Wrong credentials now get 401, as KOSync and the sign-in page already answer them. A client that sends no credentials, or an empty username, still gets the guest catalog. If a reverse proxy in front of CWNG adds its own Basic login and passes it through to `/opds`, either use matching CWNG credentials there or have the proxy drop the `Authorization` header for `/opds`. (#2844)
+
+- **OPDS reader apps get small covers they can keep.** Every OPDS cover address, including the thumbnail one a reader app uses for its browse grid, sent the full-size cover, and none of them could be cached, so each visit to a shelf downloaded every full cover again. The thumbnail addresses (`/opds/thumb_240_240`, `/opds/cover_240_240`, `/opds/cover_90_90`) now send the generated thumbnail as JPEG, and the cover and thumbnail links in the feed carry a version, so an app can keep a cover until the book's cover changes. `/opds/cover` still sends the original. (#2845)
+
+- **OPDS search finds "C++".** The catalog told reader apps to search at `/opds/search/<term>`, where an app leaves a `+` as it is, but the server read that `+` as a space, so a search for "C++" ran as "C". The catalog and its search description now point apps at `/opds/search?query=<term>`, where a plus is sent as `%2B` and comes through intact. `/opds/search/<term>` still works for apps that build it themselves, and no longer fails on servers other than the bundled one. (#2846)
+
+- **OPDS search results come in pages.** Every other OPDS list pages at the "Books per page" setting and links the next page, but a search sent every match in one feed, so a broad search on a large library made a reader app download the whole library before showing anything. Search results now page the same way, with next and previous links that keep the search term and language. (#2847)
+
+- **Desktop compatibility mode no longer recounts every Magic Shelf on every request.** With `DESKTOP_COMPAT_MODE=true`, each page, cover and API request threw away the sidebar's Magic Shelf counts and ran every shelf's count query again, which on a large library held requests for tens of seconds. The counts are now kept until `metadata.db` changes on disk, so a book added in Calibre desktop still shows up in the counts on the next request. (#2862)
+
+### Security
+
+- **The sanitised support pack no longer leaks Kobo sync tokens, email addresses or account names.** Logs in the pack now have `/kobo/<token>/` URL tokens replaced, emails replaced with consistent labels (`<email_1>`), and account names from the user table replaced with `<user_1>`, so the same account can still be followed across the pack. If account names cannot be read, the pack says so in `SANITIZED.txt` instead of staying silent.
+
 ## [v4.1.64] - 2026-11-09
 
 ### Added

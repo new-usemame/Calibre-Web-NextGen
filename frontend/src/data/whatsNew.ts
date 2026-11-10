@@ -56,6 +56,48 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.65',
+    date: '2026-11-10',
+    items: [
+      {
+        title: 'Signing in works behind a proxy that asks every request to upgrade',
+        body: 'A common nginx and Nginx Proxy Manager WebSocket snippet marks every request as a connection upgrade. Behind it, signing in and creating app passwords hung until the proxy gave up with a 504. Requests are now read normally whatever that header says.',
+        category: 'Account',
+      },
+      {
+        title: 'Reading apps see your own library with an app password',
+        body: 'An app that signs in with your username and an app password now reads the library, your shelves and your read status as you, instead of getting the guest view or a refusal. Account settings and admin pages still need you signed in.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'OPDS apps hear about a wrong password',
+        body: 'With anonymous browsing on, an OPDS app with the wrong password used to get the guest catalog, so its connection test passed while your shelves and read status were missing. It now gets a clear sign-in failure. Apps that send no login still get the guest catalog.',
+        category: 'Sync',
+      },
+      {
+        title: 'OPDS apps load covers faster',
+        body: 'Reader apps that browse over OPDS now get small thumbnails for their grids instead of every full-size cover, and can keep them until a book\'s cover changes, so returning to a shelf no longer downloads every cover again.',
+        category: 'Sync',
+      },
+      {
+        title: 'OPDS search finds "C++" and comes in pages',
+        body: 'A search containing a plus sign lost it, so "C++" ran as "C". Search results also arrived as one long feed. Both are fixed: the plus comes through, and results page at your Books per page setting like every other OPDS list.',
+        category: 'Sync',
+      },
+      {
+        title: 'Desktop compatibility mode is quicker on large libraries',
+        body: 'With desktop compatibility mode on, every request recounted every Magic Shelf, which could hold pages for tens of seconds. The counts are now kept until the library file changes, so a book added in Calibre still shows up on the next request.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Support packs hide Kobo tokens, emails and account names',
+        body: 'The logs in a sanitised support pack now replace Kobo sync tokens, email addresses and account names with consistent labels, so you can share the pack without exposing them and the same account can still be followed through it.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.64',
     date: '2026-11-09',
     items: [

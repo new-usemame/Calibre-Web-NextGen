@@ -1,3 +1,0 @@
-### Fixed
-
-- **`/api/v1` reads now honour an app password sent over HTTP Basic.** A reader app that signed in with HTTP Basic got the guest's view of `/api/v1` with anonymous browsing on (your read status, shelves and library missing), and a 401 with it off, whether the password was right or wrong. The right username and app password now read the library, shelves and `/api/v1/auth/me` as that account, so a connection test reports who it signed in as. Account settings and admin pages still need a signed-in session. A wrong password gets 401 instead of the guest view. Browsers are unchanged: the web UI keeps its session, and a reverse proxy that adds its own Basic login in front of CWNG does not sign anonymous visitors out. (#2844)

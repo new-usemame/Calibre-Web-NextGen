@@ -12254,8 +12254,8 @@
   "delivered_via": [
    "PR #2834"
   ],
-  "outcome": "happy",
-  "basis": "reply: fixed",
+  "outcome": "unread",
+  "basis": "reply not judged yet",
   "quote": "That seems to fix it for me, I am both able to access the store and Libby, as well as sync.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6727615735",
   "judged_by": "deepseek-v4.1-flash",
@@ -12291,5 +12291,80 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "issue#2828@2026-11-08T23:26:53Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/121",
+  "title": "[bug] OPDS issues",
+  "person": "droM4X",
+  "delivered_via": [
+   "PR #2854"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#121@2026-11-09T11:19:55Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2764",
+  "title": "[Bug report] reading status not syncing",
+  "person": "eagene",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2764@2026-11-09T13:17:10Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797",
+  "title": "[bug] Kobo syncing issues after update to v4.1.58",
+  "person": "Duckbilled",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "unread",
+  "basis": "reply not judged yet",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2797@2026-11-09T11:18:48Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2838",
+  "title": "[bug] cannot create app password - timeout",
+  "person": "nkfs",
+  "delivered_via": [
+   "PR #2866"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2838@2026-11-09T22:16:06Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2862",
+  "title": "[Performance] DESKTOP_COMPAT_MODE clears Magic Shelf count cache on every request",
+  "person": "JALindsay4444",
+  "delivered_via": [
+   "PR #2863"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2862@2026-11-09T20:17:26Z"
  }
 ]

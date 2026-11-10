@@ -92,7 +92,7 @@ def _require_api_auth():
     expiry). The per-route @login_required_if_no_ano decorators remain as
     defence-in-depth and per-route documentation."""
     if request.endpoint in _PUBLIC_ENDPOINTS:
-        if request.endpoint == "api_v1.auth_me" and _native_basic_read():
+        if request.endpoint in _BASIC_AUTH_READ_ENDPOINTS and _native_basic_read():
             return _authenticate_basic_read()
         return None
     if request.endpoint in _BASIC_AUTH_WRITE_ENDPOINTS:
@@ -102,7 +102,7 @@ def _require_api_auth():
         if denied is None:
             _protect_session_write()
         return denied
-    if _native_basic_read():
+    if request.endpoint in _BASIC_AUTH_READ_ENDPOINTS and _native_basic_read():
         return _authenticate_basic_read()
     return _session_auth_gate()
 
@@ -138,6 +138,13 @@ def _session_auth_gate():
 # host. Filled in after the route imports.
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset()
 
+# #2844: the library reads a native client makes with the same app password,
+# plus /auth/me so its connection test learns who it signed in as. An allow-list,
+# not every read: an app password is a credential for a reader app, and must not
+# open account settings, app-password or device-token listings, or admin pages.
+# Filled in after the route imports.
+_BASIC_AUTH_READ_ENDPOINTS = frozenset()
+
 
 def _sent_basic_credentials():
     """True for a native client's Basic request: Basic credentials and no CSRF token.
@@ -158,7 +165,7 @@ def _sent_basic_credentials():
 def _native_basic_read():
     """True for a native client's read that sent HTTP Basic credentials (#2844).
 
-    Only reads: writes go through _sent_basic_credentials and the allow-list.
+    Only reads, and only on _BASIC_AUTH_READ_ENDPOINTS: writes go through _sent_basic_credentials and the allow-list.
     A browser's fetch is left on the session path, so nothing changes for the
     new UI: browsers mark every fetch with Sec-Fetch-Site, and behind a reverse
     proxy with its own Basic login they replay the proxy's credentials on each
@@ -359,6 +366,15 @@ _BASIC_AUTH_WRITE_VIEWS = (books.set_book_read_status, books.toggle_book_read,
                            actions.toggle_book_archived)
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
                                         for view in _BASIC_AUTH_WRITE_VIEWS)
+_BASIC_AUTH_READ_VIEWS = (auth.auth_me, books.list_books, books.book_detail,
+                          books.list_global_library, browse.list_authors,
+                          browse.list_series, browse.list_tags, browse.tag_tree,
+                          browse.list_publishers, browse.list_languages,
+                          browse.list_ratings, browse.list_formats,
+                          shelves.list_shelves, shelves.shelf_detail,
+                          shelves.book_shelf_membership)
+_BASIC_AUTH_READ_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
+                                       for view in _BASIC_AUTH_READ_VIEWS)
 if csrf is not None:
     for _view in _BASIC_AUTH_WRITE_VIEWS:
         csrf.exempt(_view)

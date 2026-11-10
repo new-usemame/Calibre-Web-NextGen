@@ -13,8 +13,13 @@ the request on the session path, exactly as before.
 
 Real pieces (tests/unit/api_basic_auth_world.py): the api_v1 blueprint and its
 before_request hooks, cw_login sessions over SQLite user rows, the HTTP Basic
-verifier with app-password digests. Substituted: only the /account payload
-builder, which reports the user it ran as.
+verifier with app-password digests, ub shelf rows. Substituted: the /account
+payload builder (reports the user it ran as) and the shelf book counter and
+sort, which read the Calibre library this world does not have.
+
+The reads that take Basic are an allow-list (library and shelf reads, /auth/me).
+An app password is a reader app's credential, so it must not open /account,
+whose payload lists app passwords and device tokens.
 """
 import base64
 from unittest.mock import Mock
@@ -76,9 +81,14 @@ def api(tmp_path, monkeypatch):
     row.token_digest = app_passwords.token_digest(APP_PASSWORD_A)
     session.commit()
 
-    from cps.api import account
+    session.add(ub.Shelf(name="alice-private", is_public=0, user_id=alice.id))
+    session.commit()
+
+    from cps.api import account, shelves
     monkeypatch.setattr(account, "_serialize_account",
                         lambda: {"name": current_user.name})
+    monkeypatch.setattr(shelves, "sort_shelves_for_user", lambda *a, **k: None)
+    monkeypatch.setattr(shelves, "_shelf_book_count", lambda *a, **k: 0)
 
     app = build_api_app(session, secret_key="basic-2844")
     app.login_manager.anonymous_user = ub.Anonymous     # as cps/__init__.py wires it
@@ -98,11 +108,14 @@ def api(tmp_path, monkeypatch):
 
 
 def _reader_name(response):
+    if "items" in response.json:        # /shelves: whose private shelf is visible
+        names = {item["name"] for item in response.json["items"]}
+        return "alice" if "alice-private" in names else "Guest"
     return response.json.get("name") or response.json.get("username")
 
 
 @pytest.mark.parametrize("anonbrowse", [0, 1])
-@pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/account"])
+@pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/shelves"])
 def test_right_app_password_reads_as_its_owner(api, monkeypatch, anonbrowse, path):
     monkeypatch.setattr(config, "config_anonbrowse", anonbrowse)
     response = api.get(path, headers=_basic("alice", APP_PASSWORD_A))
@@ -112,7 +125,7 @@ def test_right_app_password_reads_as_its_owner(api, monkeypatch, anonbrowse, pat
 
 @pytest.mark.parametrize("anonbrowse", [0, 1])
 @pytest.mark.parametrize("name", ["alice", "nobody-by-this-name"])
-@pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/account"])
+@pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/shelves"])
 def test_wrong_credentials_get_401_never_the_guest(api, monkeypatch, anonbrowse, name, path):
     monkeypatch.setattr(config, "config_anonbrowse", anonbrowse)
     response = api.get(path, headers=_basic(name, "not-the-password"))
@@ -145,3 +158,11 @@ def test_signed_in_browser_keeps_its_session_under_proxy_basic(api):
         response = api.get("/api/v1/account", headers=headers)
         assert response.status_code == 200, response.data
         assert _reader_name(response) == "bob"
+
+
+@pytest.mark.parametrize("anonbrowse", [0, 1])
+def test_app_password_does_not_open_account_settings(api, monkeypatch, anonbrowse):
+    monkeypatch.setattr(config, "config_anonbrowse", anonbrowse)
+    response = api.get("/api/v1/account", headers=_basic("alice", APP_PASSWORD_A))
+    assert response.status_code == 401, response.data
+    assert b"alice" not in response.data

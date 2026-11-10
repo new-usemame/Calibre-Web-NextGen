@@ -49,10 +49,10 @@ Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-outcomes-dark.svg">
-  <img alt="Fix outcomes by week: 274 happy, 82 not fixed, 450 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
+  <img alt="Fix outcomes by week: 275 happy, 82 not fixed, 450 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
 </picture>
 
-On November 10, 2026, 60 pull requests were open and 1,862 closed, 1,703 of them merged. Of 806 fixes delivered to a person, 34% heard back happy, 10% not fixed and 56% got no reply. When someone did answer, the answer was happy 77% of the time. 3 replies wait to be judged and are left out.
+On November 10, 2026, 60 pull requests were open and 1,862 closed, 1,703 of them merged. Of 807 fixes delivered to a person, 34% heard back happy, 10% not fixed and 56% got no reply. When someone did answer, the answer was happy 77% of the time.
 
 A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model and checked by a second; where they disagree the thread is reread and settled. Every verdict and the quote behind it are in [docs/progress-tracker](docs/progress-tracker/). Replies on Discord and Reddit are not counted.
 
@@ -66,7 +66,7 @@ A fix is one moment someone was told their problem was dealt with: a fix PR merg
 | Aug 2026 | 578 | 573 | 11 | 35 | 14 | 71 |
 | Sep 2026 | 224 | 218 | 12 | 23 | 5 | 32 |
 | Oct 2026 | 279 | 241 | 35 | 36 | 5 | 74 |
-| Nov 2026 | 44 | 34 | 54 | 3 | 3 | 8 |
+| Nov 2026 | 44 | 34 | 54 | 4 | 3 | 8 |
 
 Regenerate with `python3 scripts/progress_tracker.py fetch`, then `queue`, judge the new replies, `apply` and `render`.
 

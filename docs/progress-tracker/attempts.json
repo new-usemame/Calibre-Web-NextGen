@@ -12145,21 +12145,7 @@
   "title": "[bug] - CWNG no longer syncing with Justread",
   "person": "lukerajah",
   "delivered_via": [
-   "PR #2809"
-  ],
-  "outcome": "unread",
-  "basis": "reply not judged yet",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
-  "id": "issue#2783@2026-11-03T04:24:54Z"
- },
- {
-  "date": "2026-11-03",
-  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783",
-  "title": "[bug] - CWNG no longer syncing with Justread",
-  "person": "lukerajah",
-  "delivered_via": [
+   "PR #2809",
    "PR #2816"
   ],
   "outcome": "not_fixed",
@@ -12252,13 +12238,14 @@
   "title": "[bug] Kobo syncing issues after update to v4.1.58",
   "person": "Duckbilled",
   "delivered_via": [
-   "PR #2834"
+   "PR #2834",
+   "closed"
   ],
-  "outcome": "unread",
-  "basis": "reply not judged yet",
+  "outcome": "happy",
+  "basis": "reply: fixed",
   "quote": "That seems to fix it for me, I am both able to access the store and Libby, as well as sync.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6727615735",
-  "judged_by": "deepseek-v4.1-flash",
+  "judged_by": "review",
   "id": "issue#2797@2026-11-08T15:18:41Z"
  },
  {
@@ -12321,21 +12308,6 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "issue#2764@2026-11-09T13:17:10Z"
- },
- {
-  "date": "2026-11-09",
-  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797",
-  "title": "[bug] Kobo syncing issues after update to v4.1.58",
-  "person": "Duckbilled",
-  "delivered_via": [
-   "closed"
-  ],
-  "outcome": "unread",
-  "basis": "reply not judged yet",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
-  "id": "issue#2797@2026-11-09T11:18:48Z"
  },
  {
   "date": "2026-11-09",

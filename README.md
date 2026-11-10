@@ -572,7 +572,31 @@ KOReader sync is built in, so you don't need a separate kosync server. With the 
 2. To install the plain plugin by hand instead, visit `http://your-host:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
 3. Read on any device. Progress syncs back to CWNG, and from there to Kobo if Kobo sync is on.
 
-To keep the plugin updated, point KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) or [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases), not this one. Both update it in place. The plugin is released only when it changes, and its version is the server version it last changed in, so it can trail your server version with nothing wrong. An update manager still pointed at this repository keeps working, but it sees the plugin only on releases that change it, which looks like "no update available". To update by hand, `/kosync` always serves the plugin bundled with your running server.
+To keep the plugin updated, use KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) or [appstore.koplugin](https://github.com/omer-faruq/appstore.koplugin) and point it at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases), not this one. Both update it in place. The plugin is released only when it changes, and its version is the server version it last changed in, so it can trail your server version with nothing wrong. An update manager still pointed at this repository keeps working, but it sees the plugin only on releases that change it, which looks like "no update available". To update by hand, `/kosync` always serves the plugin bundled with your running server.
+
+**Updates Manager.** It has no screen for adding a repository, so you add this one by creating a config file:
+
+1. Connect the e-reader over USB and open the `settings` folder inside KOReader's folder (for example `koreader/settings/`).
+2. Create a plain-text file there named `updatesmanager_config.json`:
+
+   ```json
+   {
+     "plugins": [
+       {
+         "owner": "new-usemame",
+         "repo": "cwngsync.koplugin",
+         "description": "CWNG library sync"
+       }
+     ]
+   }
+   ```
+
+   If the file already exists, add the entry to its existing `"plugins"` list instead. Your entries are merged with the built-in list.
+3. Eject the e-reader and restart KOReader. **Updates Manager ▸ Settings ▸ Repository Settings** should now show one custom plugin repository. Then run **Check for Updates** (**Force Refresh** the first time, to skip the cache).
+
+If Repository Settings says "No custom configuration file found", the file is misnamed or in the wrong folder. Make sure the name doesn't end in `.json.txt` and that the quotes are straight quotes. Without a GitHub token, Updates Manager is limited to 60 GitHub requests per hour. Put a token with `public_repo` scope in `settings/updatesmanager_github_token.txt` if checks stall.
+
+**appstore.koplugin.** Use the gear icon (⚙️) ▸ **Install from URL** and enter `new-usemame` and `cwngsync.koplugin`. If the plugin is already installed, use **Match with URL** to link it to that repository so updates are tracked.
 
 For matching OPDS filenames across devices, turn on **Use server filenames** in KOReader's OPDS catalog settings. By default KOReader builds `Author - Title.epub` from the feed, while the server suggests `Title - Author.epub` with only the first author. With the setting on, KOReader uses the server's name. Administrators can change that name with the OPDS download filename template preference; a blank preference keeps the current naming. Fields, examples and device limits: [OPDS download filenames](docs/opds-filename-template.md).
 

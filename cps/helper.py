@@ -111,7 +111,7 @@ def validate_cover_dimensions(width, height):
     return width, height
 
 
-def mark_book_modified(book, *, set_dirty=True, unsync=False):
+def mark_book_modified(book, *, set_dirty=True, unsync=False, metadata_only=False):
     """Single source of truth for "this book changed".
 
     Stamps ``book.last_modified`` — the value that drives BOTH the web
@@ -124,6 +124,7 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
       * ``set_dirty``  → queue CWA metadata write-back (``set_metadata_dirty``).
       * ``unsync``     → drop Kobo synced-book records for all users so every
                          device re-pulls (``remove_synced_book(all=True)``).
+      * ``metadata_only`` → record a metadata edit in the same library transaction.
 
     The caller still owns the ``calibre_db.session.commit()``. ``kobo_sync_status``
     is imported lazily to keep this module's import graph unchanged.
@@ -147,6 +148,9 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
         if now <= previous < now + timedelta(seconds=1):
             now = previous + timedelta(microseconds=1)
     book.last_modified = now
+    if metadata_only and previous is not None and getattr(calibre_db, "kobo_metadata_edits_available", False):
+        from .kobo_sync_status import record_metadata_edit
+        record_metadata_edit(calibre_db.session, book, previous)
     if set_dirty:
         calibre_db.set_metadata_dirty(book.id)
     if unsync:

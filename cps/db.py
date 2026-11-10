@@ -723,6 +723,18 @@ class Metadata_Dirtied(Base):
         self.book = book
 
 
+class KoboMetadataEdit(Base):
+    """The latest uninterrupted run of metadata-only edits to a book."""
+
+    __tablename__ = "cwng_kobo_metadata_edit"
+    __table_args__ = {"schema": "calibre"}
+
+    book_id = Column(Integer, ForeignKey("books.id", ondelete="CASCADE"), primary_key=True)
+    book_uuid = Column(String, nullable=False)
+    first_modified = Column(TIMESTAMP, nullable=False)
+    last_modified = Column(TIMESTAMP, nullable=False)
+
+
 # Import BookFormatChecksum from progress_syncing.models to keep model definition centralized
 # Import directly from models module to avoid triggering progress_syncing/__init__.py chain
 # which would cause circular import (models needs Base from db, but progress_syncing imports kosync)
@@ -1020,6 +1032,7 @@ class CalibreDB:
     config = None
     session_factory = None
     _desktop_compat = False
+    kobo_metadata_edits_available = False
     # This is a WeakSet so that references here don't keep other CalibreDB
     # instances alive once they reach the end of their respective scopes
     instances = WeakSet()
@@ -1398,6 +1411,7 @@ class CalibreDB:
         with cls._reconnect_lock:
             # Always call dispose to clean up old sessions/connections
             cls.dispose()
+            cls.kobo_metadata_edits_available = False
 
             if not config_calibre_dir:
                 log.error("setup_db failed: config_calibre_dir is None or empty")
@@ -1569,6 +1583,13 @@ class CalibreDB:
                 and not desktop_compat
             ):
                 ensure_calibre_db_tables(conn)
+                try:
+                    KoboMetadataEdit.__table__.create(conn, checkfirst=True)
+                    conn.commit()
+                    cls.kobo_metadata_edits_available = True
+                except SQLAlchemyError:
+                    conn.rollback()
+                    log.warning("Kobo metadata edit tracking is unavailable", exc_info=True)
 
             # With NullPool (DESKTOP_COMPAT_MODE) the setup connection is not the
             # shared persistent connection — close it so the file lock is released

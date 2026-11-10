@@ -8,7 +8,7 @@
 from .cw_login import current_user
 from . import logger, ub
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.sql.expression import and_, bindparam, true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 # from sqlalchemy import exc
@@ -18,6 +18,33 @@ log = logger.create()
 _LEDGER_UPSERT_BATCH_SIZE = 250
 PENDING_SYNC_PAGE_TTL = timedelta(days=7)
 PENDING_SYNC_PAGE_PRUNE_LIMIT = 10
+
+
+def record_metadata_edit(session, book, previous):
+    """Join contiguous metadata edits in the transaction that stamps the book."""
+    from .db import KoboMetadataEdit
+    table = KoboMetadataEdit.__table__
+    first_modified = previous.astimezone(timezone.utc).replace(tzinfo=None)
+    last_modified = book.last_modified.astimezone(timezone.utc).replace(tzinfo=None)
+    if not book.uuid or last_modified <= first_modified:
+        return
+    insert = sqlite_insert(table).values(
+        book_id=book.id, book_uuid=book.uuid,
+        first_modified=first_modified, last_modified=last_modified,
+    )
+    session.execute(insert.on_conflict_do_update(
+        index_elements=[table.c.book_id],
+        set_={
+            "book_uuid": insert.excluded.book_uuid,
+            "first_modified": case(
+                (and_(table.c.book_uuid == insert.excluded.book_uuid,
+                      table.c.last_modified == insert.excluded.first_modified),
+                 table.c.first_modified),
+                else_=insert.excluded.first_modified,
+            ),
+            "last_modified": insert.excluded.last_modified,
+        },
+    ))
 
 
 # Record the current user's delivered book identity.

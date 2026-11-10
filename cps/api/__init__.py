@@ -369,8 +369,12 @@ from . import discover_source  # noqa: E402,F401
 
 from . import device_sleep_screen  # noqa: E402,F401
 
+# #2842 part 2: convert_format lets a reader app ask for a format the book lacks
+# (an EPUB of an AZW3-only book); it keeps its own edit-role check, so an app
+# password can do no more than its owner's session. tasks_list lets the app
+# follow the task_id it gets back; render_task_status scopes rows to the caller.
 _BASIC_AUTH_WRITE_VIEWS = (books.set_book_read_status, books.toggle_book_read,
-                           actions.toggle_book_archived)
+                           actions.toggle_book_archived, edit.convert_format)
 _BASIC_AUTH_WRITE_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
                                         for view in _BASIC_AUTH_WRITE_VIEWS)
 _BASIC_AUTH_READ_VIEWS = (auth.auth_me, books.list_books, books.book_detail,
@@ -379,7 +383,7 @@ _BASIC_AUTH_READ_VIEWS = (auth.auth_me, books.list_books, books.book_detail,
                           browse.list_publishers, browse.list_languages,
                           browse.list_ratings, browse.list_formats,
                           shelves.list_shelves, shelves.shelf_detail,
-                          shelves.book_shelf_membership)
+                          shelves.book_shelf_membership, info.tasks_list)
 _BASIC_AUTH_READ_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
                                        for view in _BASIC_AUTH_READ_VIEWS)
 if csrf is not None:

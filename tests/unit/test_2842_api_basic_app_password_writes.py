@@ -215,3 +215,97 @@ def test_reverse_proxy_login_does_not_replace_the_basic_user(api, monkeypatch, p
                                headers=headers)
     assert response.status_code == 200, response.data
     assert [(w[0], w[1]) for w in api.writes] == [("read-status", "alice")]
+
+
+# #2842 part 2: a native client asks for a format the book lacks (an EPUB of an
+# AZW3-only book) with the same app password, then follows the conversion task.
+
+@pytest.fixture
+def convert_api(api, monkeypatch):
+    from cps.api import edit, info
+    queued = []
+
+    def fake_convert(book_id, calibre_path, src, dst, user_name, queued_tasks=None):
+        queued.append((book_id, src, dst, user_name, current_user.name))
+        queued_tasks.append(SimpleNamespace(id="task-42"))
+        return None
+
+    monkeypatch.setattr(edit, "_editable_book", lambda book_id: SimpleNamespace(id=book_id))
+    monkeypatch.setattr(edit, "get_convert_options", lambda book: (["azw3"], ["epub", "kepub"]))
+    monkeypatch.setattr(edit, "convert_book_format", fake_convert)
+    monkeypatch.setattr(config, "get_book_path", lambda: "/library", raising=False)
+    def task(task_id):
+        return SimpleNamespace(id=task_id, name="Convert", message="", start_time=None,
+                               stat=0, progress=0, is_cancellable=False, error=None)
+    worker = SimpleNamespace(tasks=[(None, "alice", None, task("task-alice"), None),
+                                    (None, "bob", None, task("task-bob"), None)])
+    monkeypatch.setattr(info.WorkerThread, "get_instance", staticmethod(lambda: worker))
+    alice = api.session.query(ub.User).filter_by(name="alice").one()
+    alice.role = constants.ROLE_DOWNLOAD | constants.ROLE_EDIT
+    api.session.commit()
+    api.queued = queued
+    return api
+
+
+def test_app_password_queues_a_conversion_as_its_owner(convert_api):
+    response = convert_api.client.post("/api/v1/books/7/convert",
+                                       json={"from": "AZW3", "to": "EPUB"},
+                                       headers=_basic("alice", APP_PASSWORD_A))
+    assert response.status_code == 200, response.data
+    assert response.json["task_id"] == "task-42"
+    assert convert_api.queued == [(7, "AZW3", "EPUB", "alice", "alice")]
+
+
+def test_app_password_convert_still_needs_the_edit_role(convert_api):
+    alice = convert_api.session.query(ub.User).filter_by(name="alice").one()
+    alice.role = constants.ROLE_DOWNLOAD
+    convert_api.session.commit()
+    response = convert_api.client.post("/api/v1/books/7/convert",
+                                       json={"from": "AZW3", "to": "EPUB"},
+                                       headers=_basic("alice", APP_PASSWORD_A))
+    assert response.status_code == 403
+    assert response.json["error"]["code"] == "forbidden"
+    assert convert_api.queued == []
+
+
+@pytest.mark.parametrize("anonbrowse", [0, 1])
+def test_wrong_app_password_never_queues_a_conversion(convert_api, monkeypatch, anonbrowse):
+    monkeypatch.setattr(config, "config_anonbrowse", anonbrowse)
+    response = convert_api.client.post("/api/v1/books/7/convert",
+                                       json={"from": "AZW3", "to": "EPUB"},
+                                       headers=_basic("alice", "not-the-password"))
+    assert response.status_code == 401
+    assert convert_api.queued == []
+
+
+def test_cookie_session_convert_still_needs_the_csrf_token(convert_api):
+    token = convert_api.sign_in("bob", "bob-account-pw")
+    bob = convert_api.session.query(ub.User).filter_by(name="bob").one()
+    bob.role = constants.ROLE_DOWNLOAD | constants.ROLE_EDIT
+    convert_api.session.commit()
+    refused = convert_api.client.post("/api/v1/books/7/convert",
+                                      json={"from": "AZW3", "to": "EPUB"})
+    assert refused.status_code == 400
+    assert convert_api.queued == []
+    allowed = convert_api.client.post("/api/v1/books/7/convert",
+                                      json={"from": "AZW3", "to": "EPUB"},
+                                      headers={"X-CSRFToken": token})
+    assert allowed.status_code == 200, allowed.data
+    assert [q[3] for q in convert_api.queued] == ["bob"]
+
+
+@pytest.mark.parametrize("anonbrowse", [0, 1])
+def test_app_password_reads_its_own_task_list(convert_api, monkeypatch, anonbrowse):
+    monkeypatch.setattr(config, "config_anonbrowse", anonbrowse)
+    response = convert_api.client.get("/api/v1/tasks", headers=_basic("alice", APP_PASSWORD_A))
+    assert response.status_code == 200, response.data
+    assert [row["task_id"] for row in response.json["items"]] == ["task-alice"]
+
+
+def test_admin_app_password_reads_every_task(convert_api):
+    alice = convert_api.session.query(ub.User).filter_by(name="alice").one()
+    alice.role = constants.ROLE_DOWNLOAD | constants.ROLE_ADMIN
+    convert_api.session.commit()
+    response = convert_api.client.get("/api/v1/tasks", headers=_basic("alice", APP_PASSWORD_A))
+    assert response.status_code == 200, response.data
+    assert [row["task_id"] for row in response.json["items"]] == ["task-alice", "task-bob"]

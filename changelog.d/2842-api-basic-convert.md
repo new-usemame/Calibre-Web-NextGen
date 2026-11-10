@@ -1,0 +1,3 @@
+### Added
+
+- **A reading app can ask for a format a book lacks with its app password.** `POST /api/v1/books/<id>/convert` (body `{"from": "AZW3", "to": "EPUB"}`) now takes HTTP Basic with an app password, so an app that needs an EPUB of an AZW3-only book can queue the conversion without a browser session or CSRF token. It answers with a `task_id`, and `GET /api/v1/tasks` now also takes the app password, so the app can follow that task until the new format appears on the book. Converting still needs the account's edit permission, the same as in the web UI, and a wrong password gets a 401. (#2842)

@@ -219,7 +219,10 @@ def test_a_guessed_download_leaves_the_guessed_kobos_proof_alone(
         device_id=sw.libra.id, book_id=sw.book.id).one()
     proven_at = proven.downloaded_at
 
-    sw.libra.last_seen_at = _now()  # the guess lands on the Libra
+    # The guess lands on the Libra, the Kobo seen last; both are recent, so
+    # it stays a guess.
+    sw.clara.last_seen_at = _now() - timedelta(minutes=5)
+    sw.libra.last_seen_at = _now()
     sw.session.commit()
     _download(monkeypatch, sw, _untagged(_url_from_sync(sw, sw.clara)))
 

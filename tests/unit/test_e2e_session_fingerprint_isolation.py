@@ -1,3 +1,6 @@
+import importlib
+import logging
+
 import flask
 import pytest
 from sqlalchemy import create_engine
@@ -10,6 +13,10 @@ from cps.cw_login import current_user, login_required, login_user
 from cps.cw_login import utils as login_utils
 from cps.logout import cleanup_local_logout
 
+
+# ``cps.MyLoginManager`` the name is the class (re-exported by ``cps``), so the
+# module has to be imported explicitly to reach its module-level state.
+login_manager_module = importlib.import_module("cps.MyLoginManager")
 
 REMOTE_ADDR = "192.0.2.10"
 SEEDED_USER_AGENT = "CWNG-E2E-seeded-browser"
@@ -115,3 +122,46 @@ def test_distinct_user_agents_keep_server_sessions_independent(session_app):
     assert _request(isolated, "post", "/logout", ISOLATED_USER_AGENT).status_code == 204
     assert db_session.query(ub.User_Sessions).count() == 1
     assert _request(seeded, "get", "/protected", SEEDED_USER_AGENT).status_code == 200
+
+
+def _mismatch_records(caplog):
+    return [
+        record
+        for record in caplog.records
+        if "Session protection triggered" in record.getMessage()
+    ]
+
+
+@pytest.mark.unit
+def test_identifier_mismatch_is_logged_once_not_on_every_request(
+    session_app, monkeypatch, caplog
+):
+    # #2882: after a browser update the User-Agent changes, a remember-me
+    # session keeps its old stored id, and every request used to log the same
+    # mismatch (dozens of lines for one page load).
+    monkeypatch.setattr(login_manager_module, "_reported_mismatches", set())
+    app, _db_session = session_app
+    client = app.test_client()
+
+    assert _request(client, "post", "/login", SEEDED_USER_AGENT).status_code == 204
+    with caplog.at_level(logging.DEBUG, logger=login_manager_module.log.name):
+        for _ in range(5):
+            response = _request(client, "get", "/protected", ISOLATED_USER_AGENT)
+            assert response.status_code == 200
+
+    assert len(_mismatch_records(caplog)) == 1
+
+
+@pytest.mark.unit
+def test_a_different_mismatch_is_still_logged(session_app, monkeypatch, caplog):
+    monkeypatch.setattr(login_manager_module, "_reported_mismatches", set())
+    app, _db_session = session_app
+    client = app.test_client()
+
+    assert _request(client, "post", "/login", SEEDED_USER_AGENT).status_code == 204
+    with caplog.at_level(logging.DEBUG, logger=login_manager_module.log.name):
+        assert _request(client, "get", "/protected", ISOLATED_USER_AGENT).status_code == 200
+        assert _request(client, "get", "/protected", ISOLATED_USER_AGENT).status_code == 200
+        assert _request(client, "get", "/protected", "CWNG-E2E-third-browser").status_code == 200
+
+    assert len(_mismatch_records(caplog)) == 2

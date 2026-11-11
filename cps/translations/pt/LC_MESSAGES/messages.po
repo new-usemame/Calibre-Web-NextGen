@@ -22,7 +22,7 @@ msgstr "Estatísticas"
 
 #: cps/admin.py
 msgid "Calibre database unavailable. Please reconfigure the library path."
-msgstr ""
+msgstr "Banco de dados do Calibre indisponível. Reconfigure o caminho da biblioteca."
 
 #: cps/admin.py
 #, fuzzy
@@ -2417,11 +2417,11 @@ msgstr ""
 #: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
 #: cps/templates/user_table.html
 msgid "My Library"
-msgstr ""
+msgstr "Minha biblioteca"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Library"
-msgstr ""
+msgstr "Biblioteca"
 
 #: cps/render_template.py
 msgid "Show recent books"
@@ -3015,63 +3015,63 @@ msgstr "Adicionar"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Add to my library"
-msgstr ""
+msgstr "Adicionar à minha biblioteca"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Add {title} to my library"
-msgstr ""
+msgstr "Adicionar {title} à minha biblioteca"
 
 #: cps/spa_strings.py
 msgid "Added to your library"
-msgstr ""
+msgstr "Adicionado à sua biblioteca"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added to your library and to {shelf}"
-msgstr ""
+msgstr "Adicionado à sua biblioteca e a {shelf}"
 
 #: cps/spa_strings.py
 msgid "Adding this book to a shelf also adds it to your library."
-msgstr ""
+msgstr "Adicionar este livro a uma estante também o inclui na sua biblioteca."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Adding…"
-msgstr ""
+msgstr "Adicionando…"
 
 #: cps/spa_strings.py
 msgid "Add book to this library"
-msgstr ""
+msgstr "Adicionar livro a esta biblioteca"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added book {book} to {name}."
-msgstr ""
+msgstr "Livro {book} adicionado a {name}."
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Browse global library"
-msgstr ""
+msgstr "Explorar biblioteca global"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Browse the global library"
-msgstr ""
+msgstr "Explore a biblioteca global"
 
 #: cps/spa_strings.py
 msgid "Could not add the book."
-msgstr ""
+msgstr "Não foi possível adicionar o livro."
 
 #: cps/spa_strings.py
 msgid "Could not add this book to the shelf."
-msgstr ""
+msgstr "Não foi possível adicionar este livro à estante."
 
 #: cps/spa_strings.py
 msgid "Could not add the book. Please try again."
-msgstr ""
+msgstr "Não foi possível adicionar o livro. Tente novamente."
 
 #: cps/spa_strings.py
 msgid "Could not remove the book. Please try again."
-msgstr ""
+msgstr "Não foi possível remover o livro. Tente novamente."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8010,39 +8010,40 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open administration"
-msgstr ""
+msgstr "Abrir Administração"
 
 #: cps/spa_strings.py cps/templates/annotations_view.html
 msgid "Open book"
-msgstr ""
+msgstr "Abrir Livro"
 
 #: cps/spa_strings.py
 msgid "Open classic reader"
-msgstr ""
+msgstr "
+Abrir leitor clássico"
 
 #: cps/spa_strings.py
 msgid "Open cover editor"
-msgstr ""
+msgstr "Abrir editor de capa"
 
 #: cps/spa_strings.py
 msgid "Open navigation"
-msgstr ""
+msgstr "Abrir navegação"
 
 #: cps/spa_strings.py
 msgid "Open reader"
-msgstr ""
+msgstr "Abrir leitor"
 
 #: cps/spa_strings.py
 msgid "Open the classic interface"
-msgstr ""
+msgstr "Abra a interface clássica"
 
 #: cps/spa_strings.py
 msgid "Open the link below on your signed-in device."
-msgstr ""
+msgstr "Abra o link abaixo no dispositivo em que está conectado."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Open without saving progress"
-msgstr ""
+msgstr "Abrir sem salvar o progresso"
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
@@ -8055,7 +8056,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Opening…"
-msgstr ""
+msgstr "Aberindo…"
 
 #: cps/spa_strings.py
 msgid ""
@@ -8099,33 +8100,33 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Other users' eReaders:"
-msgstr ""
+msgstr "eReaders de outros utilizadores"
 
 #: cps/spa_strings.py
 msgid "PDF reader"
-msgstr ""
+msgstr "Leitor de PDF"
 
 #: cps/spa_strings.py
 msgid "Page margins"
-msgstr ""
+msgstr "Margens da página"
 
 #: cps/spa_strings.py
 msgid "Page theme"
-msgstr ""
+msgstr "Tema da página"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Page {number}"
-msgstr ""
+msgstr "Página {number}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Page {page} of {pages}"
-msgstr ""
+msgstr "Página {page} de {pages}"
 
 #: cps/spa_strings.py
 msgid "Pagination"
-msgstr ""
+msgstr "Paginação"
 
 #: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
@@ -12358,21 +12359,21 @@ msgstr "Ordenar de acordo com a data do livro, o mais antigo primeiro"
 
 #: cps/templates/_book_organizer.html
 msgid "Title A → Z"
-msgstr ""
+msgstr "Título A → Z"
 
 #: cps/templates/_book_organizer.html
 msgid "Title Z → A"
-msgstr ""
+msgstr "Título Z → A"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
 msgid "Author A → Z"
-msgstr "Autor"
+msgstr "Autor A → Z"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
 msgid "Author Z → A"
-msgstr "Autor"
+msgstr "Autor Z → A"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
@@ -12386,11 +12387,11 @@ msgstr "Publicado antes de "
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, ascending"
-msgstr ""
+msgstr "Número de série, ordem crescente"
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, descending"
-msgstr ""
+msgstr "Número de série, ordem decrescente"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
@@ -12425,7 +12426,7 @@ msgstr "Estante pública"
 
 #: cps/templates/admin.html
 msgid "Manage Profile Pictures"
-msgstr ""
+msgstr "Gerir fotos de perfil"
 
 #: cps/templates/admin.html
 msgid "Import LDAP Users"
@@ -12507,7 +12508,7 @@ msgstr "Nome do cabeçalho do Proxy reverso"
 
 #: cps/templates/admin.html
 msgid "NextGen Settings"
-msgstr ""
+msgstr "Configurações NextGen"
 
 #: cps/templates/admin.html
 msgid "Edit Basic Configuration"
@@ -12523,7 +12524,7 @@ msgstr "Editar configuração da base de dados do Calibre"
 
 #: cps/templates/admin.html
 msgid "Manage reader fonts"
-msgstr ""
+msgstr "Gerir fontes de leitura"
 
 #: cps/templates/admin.html
 #, fuzzy
@@ -12541,7 +12542,7 @@ msgstr "Duração máxima"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Scheduled Thumbnail Refresh"
-msgstr ""
+msgstr "Atualização agendada de miniatura"
 
 #: cps/templates/admin.html
 msgid "Generate series cover thumbnails"
@@ -12565,7 +12566,7 @@ msgstr ""
 
 #: cps/templates/admin.html
 msgid "Show NextGen Stats"
-msgstr ""
+msgstr "Mostrar estado NextGen"
 
 #: cps/templates/admin.html
 msgid "Check NextGen Status"

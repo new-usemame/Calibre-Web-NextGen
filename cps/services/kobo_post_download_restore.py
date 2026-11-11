@@ -242,8 +242,11 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
         # fetcher may be another Kobo using a link from before downloads named
         # their Kobo (#2724). It may arm the restore, but proof this Kobo
         # already earned stays (the gate still checks it against the file).
+        # A guess in another format may mean this Kobo now holds that format,
+        # so it falls through to the clear below.
         keeps_proof = (not unambiguous and row.completed_at is not None
-                       and bool(row.kepub_file_identity))
+                       and bool(row.kepub_file_identity)
+                       and (book_format or "").lower() == (row.book_format or "").lower())
         if keeps_proof:
             log.info(
                 "Kobo download of book %s: the guess cannot prove device_id=%s's "

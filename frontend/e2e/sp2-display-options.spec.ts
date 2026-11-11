@@ -114,9 +114,17 @@ test('View settings radios use the active theme accent', async ({ page }) => {
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
+  // Report every failing node, not just the rule id: #2654 has failed this
+  // scan intermittently with only "target-size" in the log, which cannot name
+  // the element or its measured size. axe's failureSummary carries the size.
   expect(results.violations
     .filter((violation) => ['critical', 'serious'].includes(violation.impact ?? ''))
-    .map((violation) => violation.id)).toEqual([]);
+    .flatMap((violation) => violation.nodes.map((node) => [
+      violation.id,
+      JSON.stringify(node.target),
+      (node.failureSummary ?? '').replace(/\s+/g, ' ').trim(),
+      node.html.slice(0, 200),
+    ].join(' | ')))).toEqual([]);
 });
 
 test('library density control persists and produces a denser mobile grid', async ({ page }) => {

@@ -190,3 +190,43 @@ def test_a_url_naming_another_accounts_device_proves_nothing(monkeypatch, two_ko
     assert location_of(_bookmark(sw, sw.libra)) == sw.own
     assert sw.session.query(ub.KoboDeviceBookDownload).filter_by(
         device_id=theirs.id).count() == 0
+
+
+def _untagged(url):
+    """The same download link with no Kobo named in it: a link a Kobo stored
+    before the update, so the route has to guess which Kobo is fetching."""
+    from urllib.parse import parse_qsl, urlencode
+    from cps.services.kobo_post_download_restore import DOWNLOAD_DEVICE_PARAM
+    parts = urlsplit(url)
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query)
+                       if k != DOWNLOAD_DEVICE_PARAM])
+    return parts._replace(query=query).geturl()
+
+
+def test_a_guessed_download_leaves_the_guessed_kobos_proof_alone(
+        monkeypatch, two_kobos):
+    """teisho on #2724: one Kobo had no proof (completed_at empty, identity
+    empty) until it downloaded the book again. The Libra proved its copy
+    through its own link; the other Kobo then fetched the book through an old
+    untagged link, the route guessed the Libra (the Kobo seen last), and that
+    guess wiped the Libra's proof. A guess may arm the annotation restore, but
+    it says nothing about the file the Libra holds."""
+    from cps import ub
+    sw = two_kobos
+    _download(monkeypatch, sw, _url_from_sync(sw, sw.libra))
+    assert location_of(_bookmark(sw, sw.libra)) == sw.exact
+    proven = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.libra.id, book_id=sw.book.id).one()
+    proven_at = proven.downloaded_at
+
+    # The guess lands on the Libra, the Kobo seen last; both are recent, so
+    # it stays a guess.
+    sw.clara.last_seen_at = _now() - timedelta(minutes=5)
+    sw.libra.last_seen_at = _now()
+    sw.session.commit()
+    _download(monkeypatch, sw, _untagged(_url_from_sync(sw, sw.clara)))
+
+    row = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.libra.id, book_id=sw.book.id).one()
+    assert row.downloaded_at != proven_at  # the guess did land on the Libra
+    assert location_of(_bookmark(sw, sw.libra)) == sw.exact

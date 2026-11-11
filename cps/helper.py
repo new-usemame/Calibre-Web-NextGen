@@ -3668,7 +3668,10 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 user_id=getattr(current_user, "id", None),
                 completed=False,
             )
-            if isinstance(download, ub.KoboDeviceBookDownload):
+            # A row already completed is proof kept from an earlier download,
+            # not an attempt this response can confirm.
+            if (isinstance(download, ub.KoboDeviceBookDownload)
+                    and download.completed_at is None):
                 download_proof = (download.id, download.downloaded_at,
                                   download.kepub_file_identity)
         except Exception:

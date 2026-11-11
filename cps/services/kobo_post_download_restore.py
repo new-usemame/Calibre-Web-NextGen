@@ -238,12 +238,29 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
         if row is None:
             row = ub.KoboDeviceBookDownload(device_id=device_id, book_id=book_id)
             ub.session.add(row)
-        row.book_format = (book_format or "")[:16] or None
+        # A guess says nothing about the file the guessed Kobo holds: the
+        # fetcher may be another Kobo using a link from before downloads named
+        # their Kobo (#2724). It may arm the restore, but proof this Kobo
+        # already earned stays (the gate still checks it against the file).
+        # A guess in another format may mean this Kobo now holds that format,
+        # so it falls through to the clear below.
+        keeps_proof = (not unambiguous and row.completed_at is not None
+                       and bool(row.kepub_file_identity)
+                       and (book_format or "").lower() == (row.book_format or "").lower())
+        if keeps_proof:
+            log.info(
+                "Kobo download of book %s: the guess cannot prove device_id=%s's "
+                "copy, so its proof from %s is kept", book_id, device_id,
+                row.completed_at,
+            )
+        else:
+            row.book_format = (book_format or "")[:16] or None
         row.downloaded_at = _now()
-        row.completed_at = row.downloaded_at if completed and unambiguous else None
-        # An ambiguous restore attribution must never become exact-place proof,
-        # even when the guessed device successfully receives the whole file.
-        row.kepub_file_identity = None if unambiguous else ""
+        if not keeps_proof:
+            row.completed_at = row.downloaded_at if completed and unambiguous else None
+            # An ambiguous restore attribution must never become exact-place proof,
+            # even when the guessed device successfully receives the whole file.
+            row.kepub_file_identity = None if unambiguous else ""
         if unambiguous and (book_format or "").lower() == "kepub":
             # Best-effort file proof is independent of annotation restoration.
             # Failure to prove it must not prevent the pending row being saved.

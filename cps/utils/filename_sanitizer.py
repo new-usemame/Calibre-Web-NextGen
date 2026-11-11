@@ -83,7 +83,8 @@ def build_content_disposition(disposition: str, filename: str) -> str:
     if unidecode is not None:
         fallback = unidecode.unidecode(filename)
     fallback = fallback.encode("ascii", "ignore").decode("ascii")
-    fallback = fallback.replace("\\", "_").replace('"', "'").strip()
+    # RFC 6266 4.3: some clients percent-decode filename=, so keep "%" out of it.
+    fallback = fallback.replace("\\", "_").replace('"', "'").replace("%", "_").strip()
     if not fallback or fallback == "." + ext:
         fallback = "book" + ("." + ext if ext else "")
     return "%s; filename=\"%s\"; filename*=UTF-8''%s" % (

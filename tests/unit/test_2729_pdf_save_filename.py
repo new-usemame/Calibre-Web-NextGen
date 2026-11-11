@@ -16,9 +16,10 @@ from cps.utils.filename_sanitizer import build_content_disposition
 
 def _parse(value):
     disposition = value.split(";", 1)[0]
-    plain = re.search(r'filename="([^"]*)"', value).group(1)
-    star = re.search(r"filename\*=UTF-8''(\S+)$", value).group(1)
-    return disposition, plain, unquote(star)
+    plain = re.search(r'filename="([^"]*)"', value)
+    star = re.search(r"filename\*=UTF-8''(\S+)$", value)
+    assert plain and star, "no filename in Content-Disposition: %r" % value
+    return disposition, plain.group(1), unquote(star.group(1))
 
 
 @pytest.mark.unit
@@ -77,3 +78,34 @@ def test_naming_failure_leaves_the_plain_inline_header(monkeypatch):
     headers = Headers([("Content-Disposition", "inline")])
     helper.set_inline_filename(headers, object(), "pdf")  # no title/authors: must not raise
     assert headers["Content-Disposition"] == "inline"
+
+
+# The real /show/ route, through serve_book and the viewer guard. The tests above
+# exercise the helpers directly; this one fails if serve_book stops calling them
+# (or overwrites the named header with the bare "inline" afterwards).
+from tests.unit.test_shared_book_continuation import shared_books  # noqa: E402,F401  (fixture)
+
+
+@pytest.mark.unit
+def test_show_route_names_the_pdf_it_serves_inline(shared_books):
+    env = shared_books
+    env.session.add(ub_exposure(env))
+    env.session.commit()
+    response = env.client.get('/show/1/pdf')
+    assert response.status_code == 200
+    assert response.data == b'%PDF-shared-reader-bytes'
+    disposition, plain, star = _parse(response.headers['Content-Disposition'])
+    assert disposition == 'inline'
+    assert star == plain == 'Book 1.pdf'
+
+
+def ub_exposure(env):
+    from cps import ub
+    return ub.OpdsShelfExposure(user_id=env.viewer.id, shelf_id=env.public.id)
+
+
+@pytest.mark.unit
+def test_percent_in_a_title_stays_out_of_the_plain_fallback():
+    _, plain, star = _parse(build_content_disposition("inline", "100% Cotton - A. Author.pdf"))
+    assert star == "100% Cotton - A. Author.pdf"
+    assert "%" not in plain

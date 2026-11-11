@@ -3633,7 +3633,7 @@ def set_inline_filename(headers, book, book_format):
         headers['Content-Disposition'] = build_content_disposition(
             'inline', "%s.%s" % (get_download_file_name(book), book_format.lower()))
     except Exception as ex:
-        log.debug("Could not name inline %s for book %s: %s", book_format, getattr(book, 'id', '?'), ex)
+        log.warning("Could not name inline %s for book %s: %s", book_format, getattr(book, 'id', '?'), ex)
 
 
 def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,

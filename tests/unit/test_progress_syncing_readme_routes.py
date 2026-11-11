@@ -10,11 +10,10 @@ url_map: a route added without a row, a row for a route that is gone, or a
 wrong method fails here.
 """
 
-import importlib
 import re
 from pathlib import Path
 
-from flask import Flask
+from tests.unit.koreader_library_world import LibraryWorld
 
 REPO = Path(__file__).resolve().parents[2]
 README = REPO / "cps" / "progress_syncing" / "README.md"
@@ -41,13 +40,7 @@ def _readme_routes():
     return routes
 
 
-def _served_routes():
-    # The package re-exports the blueprint under the module's own name, so
-    # import the module itself; importing it registers every route file.
-    module = importlib.import_module("cps.progress_syncing.protocols.kosync")
-
-    app = Flask(__name__)
-    app.register_blueprint(module.kosync)
+def _served_routes(app):
     routes = set()
     for rule in app.url_map.iter_rules():
         if not rule.endpoint.startswith("kosync."):
@@ -57,8 +50,14 @@ def _served_routes():
     return routes
 
 
-def test_readme_route_table_lists_exactly_the_served_routes():
-    served = _served_routes()
+def test_readme_route_table_lists_exactly_the_served_routes(monkeypatch, tmp_path):
+    # LibraryWorld registers the kosync blueprint the way the other KOSync
+    # tests do; importing it pulls in every route file.
+    world = LibraryWorld(monkeypatch, tmp_path)
+    try:
+        served = _served_routes(world.app)
+    finally:
+        world.close()
     documented = _readme_routes()
     assert served, "kosync blueprint registered no routes; the comparison would be vacuous"
     undocumented = sorted(served - documented)

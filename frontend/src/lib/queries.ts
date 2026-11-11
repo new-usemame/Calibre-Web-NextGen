@@ -588,7 +588,7 @@ export function useEntityList(plural: string) {
   return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
 }
 
-/** Authors and series browse in pages; other useEntityList callers stay full-list. */
+/** Authors, series and publishers browse in pages; other useEntityList callers stay full-list. */
 export function usePagedEntityList(plural: string, q: string, minimum: number | null, enabled: boolean) {
   const me = useMe().data;
   return useInfiniteQuery({

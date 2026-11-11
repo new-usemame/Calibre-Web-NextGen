@@ -28,7 +28,7 @@ def list_series():
     return _list_browse_entities(db.Series, db.books_series_link, 'series')
 
 
-def _list_browse_entities(entity, link, foreign_key, authors=False):
+def _list_browse_entities(entity, link, foreign_key, authors=False, order_column=None):
     """Filter grouped book counts before paging; legacy callers omit limit."""
     try:
         values = {}
@@ -71,6 +71,7 @@ def _list_browse_entities(entity, link, foreign_key, authors=False):
         return calibre_db.session.query(func.count()).select_from(
             grouped.with_entities(entity.id).subquery()).scalar()
 
+    order = entity.sort if order_column is None else order_column
     response = {}
     if 'limit' in values:
         total = total_rows(query)
@@ -79,10 +80,10 @@ def _list_browse_entities(entity, link, foreign_key, authors=False):
         next_offset = offset + values['limit']
         response.update(total=total, unfiltered_total=unfiltered_total,
                         next_offset=next_offset if next_offset < total else None)
-        query = query.order_by(locale_sort_key(entity.sort), entity.sort, entity.id)
+        query = query.order_by(locale_sort_key(order), order, entity.id)
         rows = query.limit(values['limit']).offset(offset).all() if offset < total else []
     else:
-        rows = query.order_by(locale_sort_key(entity.sort), entity.sort, entity.id).all()
+        rows = query.order_by(locale_sort_key(order), order, entity.id).all()
     response['items'] = [{"id": row.id, "name": row.name.replace('|', ',') if authors else row.name,
                           "count": books} for row, books in rows]
     return response
@@ -250,15 +251,9 @@ def delete_tag(tag_id):
 @api_v1.route("/publishers")
 @login_required_if_no_ano
 def list_publishers():
-    rows = (calibre_db.session.query(db.Publishers, func.count(db.books_publishers_link.c.book).label('count'))
-            .join(db.books_publishers_link, db.Publishers.id == db.books_publishers_link.c.publisher)
-            .join(db.Books, db.books_publishers_link.c.book == db.Books.id)
-            .filter(calibre_db.common_filters())
-            .group_by(db.Publishers.id)
-            .order_by(locale_sort_key(db.Publishers.name), db.Publishers.name, db.Publishers.id)
-            .all())
-    items = [{"id": p.id, "name": p.name, "count": cnt} for p, cnt in rows]
-    return {"items": items}
+    # Calibre leaves publishers.sort empty, so publishers order by name.
+    return _list_browse_entities(db.Publishers, db.books_publishers_link, 'publisher',
+                                 order_column=db.Publishers.name)
 
 
 @api_v1.route("/languages")

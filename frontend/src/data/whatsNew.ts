@@ -56,6 +56,37 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.66',
+    date: '2026-11-11',
+    items: [
+      {
+        title: 'OPDS apps can show your place and a read mark in any list',
+        body: 'Each book in an OPDS feed now carries its book id and, when you are signed in, your read status and your shared reading place. A reading app can mark finished and in-progress books in any list without opening the read-list feeds. A device with Share my place off keeps its place to itself.',
+        category: 'Sync',
+      },
+      {
+        title: 'Reading apps can ask for a missing format',
+        body: 'An app signed in with your app password can now queue a conversion, for example AZW3 to EPUB, and follow it until the new format appears on the book. Converting still needs your account\'s edit permission, as it does in the web UI.',
+        category: 'Sync',
+      },
+      {
+        title: 'The web reader opens at the Kobo\'s exact place for more books',
+        body: 'Some EPUBs mark their files with a ZIP flag the exact-place check refused, so the web reader fell back to the Kobo\'s percentage. Those books now open at the exact spot the Kobo left off.',
+        category: 'Reading',
+      },
+      {
+        title: 'Book languages have names in Catalan and Arabic',
+        body: 'With the interface in Catalan or Arabic, every book\'s language read "Unknown" on the book page and in the Languages list. The names now show, translated where a translation exists.',
+        category: 'Library',
+      },
+      {
+        title: 'KOReader setup: a working plugin store link and Updates Manager steps',
+        body: 'The appstore.koplugin link on the KOReader setup page opened a missing page and now goes to the plugin\'s real repository. The README also explains how to point Updates Manager at the sync plugin.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.65',
     date: '2026-11-10',
     items: [

@@ -16,6 +16,32 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.66] - 2026-11-11
+
+### Added
+
+- **A reading app can ask for a format a book lacks with its app password.** `POST /api/v1/books/<id>/convert` (body `{"from": "AZW3", "to": "EPUB"}`) now takes HTTP Basic with an app password, so an app that needs an EPUB of an AZW3-only book can queue the conversion without a browser session or CSRF token. It answers with a `task_id`, and `GET /api/v1/tasks` now also takes the app password, so the app can follow that task until the new format appears on the book. Converting still needs the account's edit permission, the same as in the web UI, and a wrong password gets a 401. (#2842)
+
+- **OPDS entries now carry your shared reading place.** For a signed-in account, each book in an OPDS feed has a `<cwng:progress>` with the place as a fraction from 0 to 1 (`0.42` is 42%), the same shared place KOReader sync serves for that book (the furthest one, across every copy of the book). A device with "Share my place" off keeps its place to itself, so it never appears here, and guests get none. Apps that do not know the element ignore it (#2849).
+
+- **OPDS entries now say whether you have read the book, and carry its book id.** Each book in an OPDS feed has a `<calibre:id>` with its numeric id, and for a signed-in account a `<cwng:read_status>` (`finished`, `in_progress`, `unread`, `did_not_finish` or `on_hold`), so a reading app can show a read mark in any list without fetching the read-list feeds one by one. Guests get the id only. Apps that do not know these elements ignore them (#2849).
+
+### Changed
+
+- **A failed KOReader plugin publish is now announced instead of sitting unseen.** When publishing the plugin to its own repository fails after a release, a message goes to the project's release channel with the tag and a link to the run, so devices are not left on an old plugin for several releases. Nothing changes when the publish succeeds or the plugin did not change (#1688).
+
+- **The KOSync reference for third-party apps now covers everything past the stock protocol.** `cps/progress_syncing/README.md` documents the `capabilities` list on `/kosync/users/auth`, the `X-CWNG-Device-ID` and `X-CWNG-Device-Name` headers and how they change which place wins (latest by the app's clock instead of furthest), the 20-device limit and the 409 `device_inactive` reply, pushing a place as a percentage with the words at it, and the highlight sync wire (`text_quote`, named deletions, `book_known` and `matched: false`), each with a working curl example (#2848).
+
+- **The README now says how to point Updates Manager at the KOReader plugin.** Updates Manager has no screen for adding a repository, so the KOReader sync section gives the `updatesmanager_config.json` file to create, how to check it was picked up, and what to do if it is not found or GitHub rate-limits the check. (#2878)
+
+### Fixed
+
+- **Book languages show their names in the Catalan and Arabic interface.** Both interfaces shipped without a table of language names, so every book's language read "Unknown" on the book page and in the Languages list. They now have complete tables, translated wherever iso-codes has a translation (Català, Espanyol, Francès; العربية) and in English otherwise, and a test fails if a new interface language is ever added without one. Thanks @Tofax for finding the cause. (#2652)
+
+- **The web reader opens at the Kobo's exact place for books whose ZIP archive marks its members with the "enhanced deflating" flag.** Such an EPUB was refused as a whole by the exact-place check, so the reader fell back to the percentage and logged "unsupported resume ZIP member encoding" at debug level. Zlib and JSZip both ignore that flag for the compression methods accepted here, so it is now allowed. Thanks @sgreadly for finding the cause and writing the fix. (#2836, #2837)
+
+- **The appstore.koplugin link on the KOReader setup page (`/kosync`) and in the README opened a missing page.** It now points to the plugin's real repository, `omer-faruq/appstore.koplugin`. (#2878)
+
 ## [v4.1.65] - 2026-11-10
 
 ### Fixed

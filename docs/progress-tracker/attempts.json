@@ -12338,5 +12338,82 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "issue#2862@2026-11-09T20:17:26Z"
+ },
+ {
+  "date": "2026-11-10",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2652",
+  "title": "Fix missing language names for shipped locales",
+  "person": "Tofax",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2652@2026-11-10T23:26:05Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2836",
+  "title": "[bug] Web reader falls back to the percentage for EPUBs whose ZIP members set flag bit 0x10 (unsupported resume ZIP member encoding)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2880",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2836@2026-11-11T00:22:33Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2878",
+  "title": "[bug] Updates Manager setup is undocumented (no UI to add the repo) and the appstore.koplugin link is dead",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2884",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2878@2026-11-11T04:31:38Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2837",
+  "title": "Kobo resume: accept ZIP flag 0x10 on stored/deflated members (#2836)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2837@2026-11-11T00:23:04Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2881",
+  "title": "ci: announce a failed KOReader plugin publish instead of leaving a red run (#1688)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2881@2026-11-11T03:58:27Z"
  }
 ]

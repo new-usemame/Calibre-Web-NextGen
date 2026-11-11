@@ -214,7 +214,6 @@ def test_root_helper_lock_is_assigned_to_the_service_directory_owner(monkeypatch
     spec.loader.exec_module(locks)
     real_stat = locks.os.stat
     real_fstat = locks.os.fstat
-    monkeypatch.setattr(locks.os, 'geteuid', lambda: 0, raising=False)
     def directory_stat(path, *args, **kwargs):
         if Path(path) == tmp_path:
             return SimpleNamespace(st_uid=501, st_gid=20)
@@ -223,10 +222,15 @@ def test_root_helper_lock_is_assigned_to_the_service_directory_owner(monkeypatch
         info = real_fstat(fd)
         return SimpleNamespace(st_uid=0, st_mode=info.st_mode, st_nlink=info.st_nlink,
                                st_dev=info.st_dev, st_ino=info.st_ino)
-    monkeypatch.setattr(locks.os, 'stat', directory_stat)
-    monkeypatch.setattr(locks.os, 'fstat', root_inode)
     assignments = []
-    monkeypatch.setattr(locks.os, 'fchown', lambda fd, uid, gid: assignments.append((uid, gid)), raising=False)
-    fd = locks.open_lock(tmp_path / 'owner.lock')
+    # locks.os is the process-wide os module. Keep the fakes to the one call:
+    # left in place until teardown, something in teardown on the Linux runner
+    # read st_size from the fake os.fstat result (CI, PRs #2742 and #2743).
+    with monkeypatch.context() as patched:
+        patched.setattr(locks.os, 'geteuid', lambda: 0, raising=False)
+        patched.setattr(locks.os, 'stat', directory_stat)
+        patched.setattr(locks.os, 'fstat', root_inode)
+        patched.setattr(locks.os, 'fchown', lambda fd, uid, gid: assignments.append((uid, gid)), raising=False)
+        fd = locks.open_lock(tmp_path / 'owner.lock')
     os.close(fd)
     assert assignments == [(501, 20)]

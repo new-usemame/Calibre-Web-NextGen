@@ -1482,8 +1482,11 @@ class KoboBookmark(Base):
     # The parent FK is how every reader of this table reaches it. Unindexed,
     # SQLite reports "AUTOMATIC PARTIAL COVERING INDEX" — it rebuilds a
     # throwaway index on each statement (measured on the "Recent" order).
+    # One place per reading state (#2783): ``current_bookmark`` is
+    # ``uselist=False``, so a second row makes every reader pick one at random.
     __table_args__ = (
         Index('ix_kobo_bookmark_state', 'kobo_reading_state_id'),
+        Index('uq_kobo_bookmark_state', 'kobo_reading_state_id', unique=True),
     )
 
 
@@ -1495,6 +1498,10 @@ class KoboStatistics(Base):
     last_modified = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     remaining_time_minutes = Column(Integer)
     spent_reading_minutes = Column(Integer)
+
+    __table_args__ = (
+        Index('uq_kobo_statistics_state', 'kobo_reading_state_id', unique=True),
+    )
 
 
 class Device(Base):
@@ -5626,6 +5633,90 @@ def migrate_thumbnail_lookup_index(engine, _session):
         )
 
 
+#: (table, survivor order, unique index) for :func:`migrate_kobo_bookmark_one_per_state`.
+_ONE_PER_STATE_TABLES = (
+    ("kobo_bookmark",
+     "server_modified_at IS NULL, server_modified_at DESC, "
+     "last_modified IS NULL, last_modified DESC, id DESC",
+     "uq_kobo_bookmark_state"),
+    ("kobo_statistics",
+     "last_modified IS NULL, last_modified DESC, id DESC",
+     "uq_kobo_statistics_state"),
+)
+
+
+def migrate_kobo_bookmark_one_per_state(engine, _session):
+    """Leave each Kobo reading state with one bookmark and one statistics row (#2783).
+
+    ``KoboReadingState.current_bookmark`` and ``.statistics`` are one-to-one in
+    the ORM, but nothing in the schema enforced it. With two bookmark rows for
+    one state SQLAlchemy returns whichever row SQLite yields first, so the
+    Share my place arbitration compared a new place against a stale one and a
+    Kobo was sent nothing.
+
+    The repair removes rows whose state is NULL or gone (a state created later
+    must not adopt them), keeps the bookmark the server received last
+    (``server_modified_at``; the device clock only breaks ties) while keeping the
+    earliest ``created_at`` of the group, keeps the newest statistics row, and
+    then adds a UNIQUE index so a second row is refused from now on.
+
+    Not gated on a CONFIG_DIR marker: a restored or swapped app.db under the
+    same config directory must be repaired too. Every step is a no-op on a
+    clean database, and ``IF NOT EXISTS`` guards the indexes.
+    """
+    from sqlalchemy import inspect as sa_inspect
+    try:
+        tables = set(sa_inspect(engine).get_table_names())
+    except Exception as error:
+        log.warning("[kobo-one-per-state] could not list tables: %s", error)
+        return
+    if "kobo_reading_state" not in tables:
+        return
+
+    for table, order, index_name in _ONE_PER_STATE_TABLES:
+        if table not in tables:
+            continue
+        orphan_sql = (
+            "DELETE FROM {t} WHERE kobo_reading_state_id IS NULL "
+            "OR kobo_reading_state_id NOT IN (SELECT id FROM kobo_reading_state)"
+        ).format(t=table)
+        duplicate_sql = (
+            "DELETE FROM {t} WHERE id IN (SELECT id FROM ("
+            "SELECT id, ROW_NUMBER() OVER (PARTITION BY kobo_reading_state_id "
+            "ORDER BY {o}) AS rn FROM {t}) WHERE rn > 1)"
+        ).format(t=table, o=order)
+        statements = [orphan_sql]
+        if table == "kobo_bookmark":
+            # The survivor keeps the group's first "started reading" date.
+            statements.append(
+                "UPDATE kobo_bookmark SET created_at = ("
+                "SELECT MIN(b2.created_at) FROM kobo_bookmark b2 "
+                "WHERE b2.kobo_reading_state_id = kobo_bookmark.kobo_reading_state_id) "
+                "WHERE kobo_reading_state_id IN (SELECT kobo_reading_state_id "
+                "FROM kobo_bookmark GROUP BY kobo_reading_state_id HAVING COUNT(*) > 1)"
+            )
+        statements.append(duplicate_sql)
+        statements.append(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {i} ON {t}(kobo_reading_state_id)"
+            .format(i=index_name, t=table)
+        )
+        try:
+            with engine.connect() as conn:
+                before = conn.execute(text("SELECT COUNT(*) FROM %s" % table)).scalar()
+            _run_ddl_with_retry(engine, statements)
+            with engine.connect() as conn:
+                after = conn.execute(text("SELECT COUNT(*) FROM %s" % table)).scalar()
+        except Exception as error:
+            log.error("[kobo-one-per-state] %s repair failed: %s", table, error)
+            _safe_session_rollback(_session, "kobo_one_per_state")
+            continue
+        if before != after:
+            log.info(
+                "[kobo-one-per-state] %s: removed %d orphaned or duplicate row(s)",
+                table, before - after,
+            )
+
+
 def migrate_reading_activity_indexes(engine, _session):
     """Index the two reading-position tables by how they are actually read.
 
@@ -5732,6 +5823,8 @@ def migrate_Database(_session):
     migrate_device_share_place(engine, _session)
     migrate_device_sleep_screen(engine, _session)
     migrate_kobo_bookmark_receipt(engine, _session)
+    # After the created_at/server_modified_at columns exist: it reads both (#2783).
+    migrate_kobo_bookmark_one_per_state(engine, _session)
     migrate_kobo_place_delivery(engine, _session)
     migrate_kosync_web_place(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)

@@ -182,3 +182,26 @@ test('a paired user can force a full Kobo sync, and cancelling sends nothing (#2
     .toHaveText('Full sync requested. Sync your Kobo to receive your library again.');
   expect(resets).toEqual(['POST']);
 });
+
+test('an account without download permission is told its Kobo sync will be refused (#2807)', async ({ page }) => {
+  await enableKoboFeature(page);
+  let downloadAllowed = false;
+  await page.route('**/api/v1/account/kobo-sync-token', (route) => route.fulfill({ json: {
+    user_id: 1, configured: true, sync_url: syncUrl, server_url: serverUrl, is_localhost: false,
+    download_allowed: downloadAllowed,
+  } }));
+  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
+    devices: [], limit: 100, offset: 0, total: 0,
+  } }));
+  const notice = /can't download books, so its Kobo will be refused when it syncs/;
+
+  await page.goto('/app/account/devices#kobo-pairing');
+  const pairing = page.getByRole('region', { name: 'Pair a Kobo or KOReader' });
+  await expect(pairing.getByRole('alert').filter({ hasText: notice })).toBeVisible();
+  await expect(pairing.getByText(syncUrl, { exact: true })).toBeVisible();
+
+  downloadAllowed = true;
+  await page.reload();
+  await expect(pairing.getByText(syncUrl, { exact: true })).toBeVisible();
+  await expect(pairing.getByText(notice)).toHaveCount(0);
+});

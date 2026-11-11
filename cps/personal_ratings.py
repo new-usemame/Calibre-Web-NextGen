@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Per-account scores and opt-in aggregate projections at the SQL seam."""
 import json
+from datetime import datetime, timezone
 
 from sqlalchemy import Text, case, cast, func, literal, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.sql.functions import coalesce
 
-from . import constants, db, ub
+from . import calibre_db, config, constants, db, ub
 
 
 PERSONAL_RATING_SORTS = frozenset(('ratingdesc', 'ratingasc'))
@@ -20,6 +22,35 @@ def personal_score(user_id):
         ub.BookRating.user_id == int(user_id),
         ub.BookRating.book_id == db.Books.id,
     ).correlate(db.Books).scalar_subquery(), 0)
+
+
+def may_rate(book_id, user):
+    """Whether ``user`` may keep a personal score for ``book_id``.
+
+    One answer for every rating surface (the web API and the Kobo), so a
+    book the reader can rate in the browser is the book their device can rate.
+    """
+    return calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=bool(user.role_browse_global()),
+        allow_public_shelf_books=True,
+    )
+
+
+def set_personal_rating(session, user_id, book_id, score):
+    """Stage one account's score for a book (0 records a clear), uncommitted.
+
+    The caller commits (``ub.session_commit()``) and answers for a failure;
+    a statement error raises SQLAlchemyError for the caller to roll back.
+    """
+    now = datetime.now(timezone.utc)
+    session.execute(sqlite_insert(ub.BookRating).values(
+        user_id=user_id, book_id=book_id, rating=score, updated_at=now,
+    ).on_conflict_do_update(
+        index_elements=[ub.BookRating.user_id, ub.BookRating.book_id],
+        set_={'rating': score, 'updated_at': now},
+    ))
 
 
 def personal_rating_order(user_id, descending=True):

@@ -26,10 +26,21 @@
 
 .groups { display: flex; flex-direction: column; gap: var(--sp-4); }
 .group { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-4); }
-.groupHead { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.groupHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+/* #2747 — the merge button made the head too wide for a phone; the name takes
+   the first line there and the count and buttons wrap below it. */
+.groupName { flex: 1 1 14rem; min-width: 0; }
 .groupTitle { font-family: var(--font-display); font-size: var(--fs-md); color: var(--text); margin-right: var(--sp-2); }
 .groupAuthor { color: var(--text-muted); font-size: var(--fs-sm); }
 .groupCount { margin-left: auto; color: var(--text-muted); font-size: var(--fs-sm); }
+.mergeBtn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3); border: 1px solid var(--border);
+  border-radius: var(--r-md); background: var(--surface-1);
+  color: var(--text); font-size: var(--fs-sm); white-space: nowrap;
+}
+.mergeBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.mergeBtn:disabled { opacity: 0.6; cursor: default; }
 .dismissBtn {
   width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--r-md); color: var(--text-muted);
@@ -48,4 +59,7 @@
 /* No opacity: 0.8 — it dropped --text-muted below 4.5:1 on the Light theme.
    --text-muted at full opacity is AA on every theme surface. */
 .bookFormats { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; }
+.bookKept { border-color: var(--accent); }
+.bookChoices { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-1); }
+.choice { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text); font-size: var(--fs-xs); cursor: pointer; }
 .bookEdit { color: var(--accent); font-size: var(--fs-xs); flex-shrink: 0; }

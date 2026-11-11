@@ -16,7 +16,8 @@ import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from '.
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
-import { createEntityListQueryOptions } from './entityListQueryOptions';
+import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
+import type { EntityListPage } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
@@ -587,6 +588,17 @@ export function useEntityList(plural: string) {
   return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
 }
 
+/** Authors and series browse in pages; other useEntityList callers stay full-list. */
+export function usePagedEntityList(plural: string, q: string, minimum: number | null, enabled: boolean) {
+  const me = useMe().data;
+  return useInfiniteQuery({
+    ...createPagedEntityListQueryOptions(plural, q, minimum, me?.id,
+      (url, signal) => apiGet<EntityListPage>(url, { signal }), enabled),
+    // Keep the filter controls mounted while a new filter's first page loads.
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** The tag a rename collided with, carried on the 409 so the caller can offer
  *  to merge into it rather than showing a dead end (#973). */
 export interface TagConflict { id: number; name: string; count: number }
@@ -685,6 +697,21 @@ export function useStopReading(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
+/** Record a new-UI reader open, as the classic /read route does (#2750): the
+ *  server moves the book onto Currently Reading (a finished book stays
+ *  finished) and counts a session only on that transition. */
+export function useRecordReaderOpen(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean }>(`/api/v1/books/${id}/reader-open`),
     onSuccess: () => {
       for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
@@ -1262,7 +1289,12 @@ export function useMergeBooks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => apiPost('/ajax/mergebooks', { Merge_books: ids }),
-    onSuccess: () => invalidateBookVisibilityViews(qc),
+    onSuccess: () => {
+      invalidateBookVisibilityViews(qc);
+      // The merged-away copies are deleted, so their duplicate group shrinks or
+      // goes; the list reads live book rows and is right on the next fetch.
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+    },
   });
 }
 

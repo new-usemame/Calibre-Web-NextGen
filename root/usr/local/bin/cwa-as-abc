@@ -24,6 +24,24 @@
 # eventually differs in one of them.
 set -eu
 
+# Apply UMASK for every service that goes through this wrapper (#2670). The
+# LSIO base image's with-contenv only applies UMASK to services whose directory
+# is named svc-*, so cwa-ingest-service, cwa-auto-zipper, metadata-change-detector
+# and the rest ran with the container default (022) and created 755 folders
+# whatever UMASK was set to. Unset, the inherited umask is kept. An invalid
+# value is ignored rather than aborting, because set -e would otherwise
+# crash-loop every service. It is named once per container, not on each of the
+# thousands of calls a large ingest makes; changing UMASK recreates the
+# container, which clears the marker. `--` keeps a value such as `-S` from
+# being read as an option that prints to the wrapped command's stdout.
+if [ -n "${UMASK:-}" ] && ! umask -- "$UMASK" 2>/dev/null; then
+  warned="${TMPDIR:-/tmp}/cwa-as-abc-invalid-umask-warned"
+  if [ ! -e "$warned" ]; then
+    echo "cwa-as-abc: ignoring invalid UMASK='${UMASK}'; use an octal value such as 022 or 027" >&2
+    : > "$warned" 2>/dev/null || true
+  fi
+fi
+
 if [ "$(id -u)" = "0" ]; then
   exec s6-setuidgid abc "$@"
 fi

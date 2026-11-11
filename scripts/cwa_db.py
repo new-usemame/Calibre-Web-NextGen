@@ -1137,7 +1137,7 @@ class CWA_DB:
                     device_type = 'desktop'
                 
                 extra_data_dict['device_type'] = device_type
-            except:
+            except Exception:
                 # If flask context not available, skip device detection
                 pass
             

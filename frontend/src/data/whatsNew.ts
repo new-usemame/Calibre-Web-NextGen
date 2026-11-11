@@ -56,6 +56,241 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.65',
+    date: '2026-11-10',
+    items: [
+      {
+        title: 'Signing in works behind a proxy that asks every request to upgrade',
+        body: 'A common nginx and Nginx Proxy Manager WebSocket snippet marks every request as a connection upgrade. Behind it, signing in and creating app passwords hung until the proxy gave up with a 504. Requests are now read normally whatever that header says.',
+        category: 'Account',
+      },
+      {
+        title: 'Reading apps see your own library with an app password',
+        body: 'An app that signs in with your username and an app password now reads the library, your shelves and your read status as you, instead of getting the guest view or a refusal. Account settings and admin pages still need you signed in.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'OPDS apps hear about a wrong password',
+        body: 'With anonymous browsing on, an OPDS app with the wrong password used to get the guest catalog, so its connection test passed while your shelves and read status were missing. It now gets a clear sign-in failure. Apps that send no login still get the guest catalog.',
+        category: 'Sync',
+      },
+      {
+        title: 'OPDS apps load covers faster',
+        body: 'Reader apps that browse over OPDS now get small thumbnails for their grids instead of every full-size cover, and can keep them until a book\'s cover changes, so returning to a shelf no longer downloads every cover again.',
+        category: 'Sync',
+      },
+      {
+        title: 'OPDS search finds "C++" and comes in pages',
+        body: 'A search containing a plus sign lost it, so "C++" ran as "C". Search results also arrived as one long feed. Both are fixed: the plus comes through, and results page at your Books per page setting like every other OPDS list.',
+        category: 'Sync',
+      },
+      {
+        title: 'Desktop compatibility mode is quicker on large libraries',
+        body: 'With desktop compatibility mode on, every request recounted every Magic Shelf, which could hold pages for tens of seconds. The counts are now kept until the library file changes, so a book added in Calibre still shows up on the next request.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Support packs hide Kobo tokens, emails and account names',
+        body: 'The logs in a sanitised support pack now replace Kobo sync tokens, email addresses and account names with consistent labels, so you can share the pack without exposing them and the same account can still be followed through it.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.64',
+    date: '2026-11-09',
+    items: [
+      {
+        title: 'Kobo sync works with the store proxy on, on current firmware',
+        body: 'With Proxy unknown requests to Kobo Store turned on, a Kobo on firmware 6 stopped at the first store call the server redirected, so its library never synced and the Store and Libby pages stayed empty. The server now fetches every store call itself and passes the answer back to your Kobo.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo setup says when your account cannot download books',
+        body: 'The server refuses a Kobo library sync for an account without download permission, and the Kobo only says the sync failed. The Kobo pairing section now says so up front and points to the Allow Downloads permission.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Reading apps can mark books read with an app password',
+        body: 'A reading app that signs in with an app password can now set a book\'s reading status, mark it read and archive it, the same way it already reads your library over OPDS and syncs your place over KOSync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOSync apps can tell a private place from no place',
+        body: 'When another device keeps its place to itself because Share my place is off for it, a KOSync app now learns that a private place exists instead of hearing that nobody has opened the book. When it saves your place, it also learns whether the place was kept or an earlier one stayed. KOReader works as before.',
+        category: 'Sync',
+      },
+      {
+        title: 'A clearer log line when a Kobo keeps its own place',
+        body: 'With DEBUG logging on, a Kobo holding its own place because the book was downloaded before the server tracked finished downloads now says that, and says to download the book again.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.63',
+    date: '2026-11-08',
+    items: [
+      {
+        title: 'The web reader tells you when highlights fail to load',
+        body: 'If a book\'s highlights and notes could not be loaded, the panel used to say "No highlights yet" as if there were none. It now says they failed to load and offers Try again. Reading the book works either way.',
+        category: 'Reading',
+      },
+      {
+        title: 'Kobo sync with the store proxy on handles a store refusal',
+        body: 'With Proxy unknown requests to Kobo Store turned on, the server now makes the profile, subscriptions and deals calls to the Kobo store itself. If the store refuses one just before a sync, your Kobo gets the same empty answer it gets with the setting off, and the log says what the store answered.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.62',
+    date: '2026-11-03',
+    items: [
+      {
+        title: 'A new Kobo finishes its first sync',
+        body: 'Current Kobo firmware asks the server to add the device before its first library sync. The server used to answer "not found", and the Kobo stopped right after connecting. It now answers, so a Kobo being set up syncs your library.',
+        category: 'Sync',
+      },
+      {
+        title: 'Your Kobo opens at the right page in more books',
+        body: 'In books where kepubify added a blank title page, your Kobo showed the new percentage from the web reader or KOReader but opened at its own older page. That blank page is now left out when the server matches places between the two copies, so the Kobo opens where you left off.',
+        category: 'Sync',
+      },
+      {
+        title: 'JustRead and similar KOSync apps get your place again',
+        body: 'Apps that sync with KOSync but do not ask for percentage positions were never sent a place saved on your Kobo or in the web reader. They now get the exact position whenever the server can work it out for their copy of the book.',
+        category: 'Sync',
+      },
+      {
+        title: 'Cloud books on KOReader show their tags',
+        body: 'A book you have not downloaded to a KOReader device yet now carries its Calibre tags, so Book information and anything that groups books by tag see them. Changing a tag updates the device on its next sync.',
+        category: 'Sync',
+      },
+      {
+        title: 'Calibre user plugins load again',
+        body: 'With Calibre user plugins turned on, plugins added since v4.1.44 were saved where book import does not look, so a plugin like DeACSM never ran. They are registered in the right place on the next start.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.61',
+    date: '2026-11-02',
+    items: [
+      {
+        title: 'Your Kobo gets your newest place again',
+        body: 'Some libraries had stored two saved places for the same book, and the server picked one at random when your Kobo synced, so a place saved on another device could be held back. The server now keeps the place it received last and removes the extra copy when it starts.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.60',
+    date: '2026-10-31',
+    items: [
+      {
+        title: 'Authors and Series open faster in big libraries',
+        body: 'The Authors and Series lists now load a page at a time as you scroll, and the name and minimum book filters run on the server, so a large library no longer loads every entry before showing the list.',
+        category: 'Library',
+        link: { to: '/authors', label: 'Browse authors' },
+      },
+      {
+        title: 'KOReader saves your place without timing out when Hardcover is on',
+        body: 'With Hardcover sync turned on, each reading from KOReader or a Kobo waited on several Hardcover requests before the server answered, long enough on a Raspberry Pi for the plugin to report that the server took too long. The reading is now saved and answered first, and Hardcover gets it a moment later. Found and measured by @sgreadly.',
+        category: 'Sync',
+      },
+      {
+        title: 'A failed note or highlight change in the web reader can be retried',
+        body: 'When editing or removing a note, or removing or recolouring a highlight, failed to save, the reader closed the box and said nothing. Now it tells you the change was not saved and keeps the note box or highlight menu open, so trying again sends the same change.',
+        category: 'Reading',
+      },
+      {
+        title: 'Colons stay in Send to eReader attachment names',
+        body: 'With an attachment filename template set, a title like "Dune: Messiah" arrived as "Dune_ Messiah". The emailed name now keeps the colon, and other unsafe characters are still replaced. Reported by @LightSBM, fixed by @sgreadly.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.59',
+    date: '2026-10-30',
+    items: [
+      {
+        title: 'A removed KOReader device stops syncing, and you can bring it back',
+        body: 'Removing a KOReader device used to leave it syncing your reading progress, and its storage reports failed with a server error. A removed device is now told it no longer syncs. To use it again, restore it from the Removed devices section, even after the Undo notice has gone.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Reading apps can tell EPUB and KEPUB downloads apart',
+        body: 'A book with both formats showed two download links in apps like KOReader, and both read "epub". Each link in the catalog now names its format, so you can pick the one you want.',
+        category: 'Sync',
+      },
+      {
+        title: 'An Adobe .acsm ticket that did not import says what to check',
+        body: 'When no plugin turned an .acsm ticket into a book, the ingest log told you to add a plugin you had already added. It now names the two usual causes: a plugin zip that was copied but never registered, and DeACSM without a finished Adobe activation.',
+        category: 'Admin',
+      },
+      {
+        title: 'UMASK now covers imported books',
+        body: 'Setting UMASK only changed files the web app wrote, so books added by ingest still got open folder permissions. It now applies to ingest and the other background services too, and an invalid value is named in the service log.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.58',
+    date: '2026-10-29',
+    items: [
+      {
+        title: 'Merge duplicate copies from the new Duplicates page',
+        body: 'The new Duplicates page could only dismiss a group. Now you pick the copy to keep, untick anything that is not really a duplicate, and merge the rest into it: formats the kept copy lacks are copied over and the other copies are deleted, after you confirm.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Star ratings from your Kobo become your own rating',
+        body: 'Rating a book on your Kobo used to go only to the Kobo Store, so it never reached your library. The stars you give on the device are now saved as your personal rating here. It works one way: a rating you set in the browser is not sent to the Kobo.',
+        category: 'Sync',
+      },
+      {
+        title: 'Deleting books no longer stalls a large library',
+        body: 'Each delete used to rebuild the whole duplicate list, and a bulk delete did it once per book, which could leave the server unresponsive. A delete now refreshes only the duplicate groups the deleted books were in.',
+        category: 'Library',
+      },
+      {
+        title: 'The new reader counts a book as opened, like the classic reader',
+        body: 'Opening a book in the new reader now records the open: it counts one reading session, and on a browser that shares its place an unfinished book shows as Currently Reading straight away instead of after the first page turn.',
+        category: 'Reading',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.57',
+    date: '2026-10-28',
+    items: [
+      {
+        title: 'KOReader: a book you reset or deleted leaves the Reading tab',
+        body: 'Opening a book once in KOReader kept it in the Reading tab for good, because KOReader still listed it in its history after Reset or Delete. A book with no progress left on the device now follows the server, so it drops out of Reading when the server has it as unread.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.56',
+    date: '2026-10-27',
+    items: [
+      {
+        title: 'Opening a book in the web reader keeps the place your Kobo or KOReader shared',
+        body: 'Just opening a book in the browser used to save its first page as the newest place, so a further position from your e-reader was skipped and the book reopened near the start. The web reader now saves your place only once you turn a page, follow a link or pick a chapter.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.55',
     date: '2026-10-25',
     items: [

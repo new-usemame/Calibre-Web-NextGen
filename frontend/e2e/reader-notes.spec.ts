@@ -46,6 +46,27 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 /*
+ * One book per project, and the file in order within each project.
+ *
+ * Opening a book clears its annotations, so two tests that are in the same book
+ * at the same time delete each other's fixtures. This file used to give each
+ * describe its own "slot" (0 to 5), but CI seeds only three EPUBs that clear
+ * MIN_BYTES below, so the slots wrapped onto three books: 4 became 1 and 5
+ * became 2. Each describe was serial on its own, yet fullyParallel still ran
+ * different describes at the same time on two workers. OBSERVED on main
+ * b00e557b0 (run 42584895816): the #2778 and #2779 retry tests ran interleaved
+ * on one book, and #2778's seeded note was gone when it looked (Received []).
+ *
+ * So the whole file runs in order inside a project (mode 'default' opts it out
+ * of fullyParallel without serial's skip-the-rest-on-failure), and desktop and
+ * mobile, which do run side by side, start on different books. A test reuses
+ * its project's book after the one before it finished, which is safe because
+ * every open clears the book first.
+ */
+test.describe.configure({ mode: 'default' });
+const lane = (project: string) => (project === 'mobile' ? 1 : 0);
+
+/*
  * Open the LOWEST-id book that has an EPUB and renders.
  *
  * Deliberately not "newest": sibling specs (reader-rtl, discover-upload) upload
@@ -364,7 +385,7 @@ test.describe('reader notes (#325)', () => {
     // Renders the book three times (open, clear+reload, reload); the 45s default
     // is not enough for that when two workers share this container.
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
 
@@ -424,7 +445,7 @@ test.describe('reader notes (#325)', () => {
   // the selection cleared, so the reader lost the note with nothing to retry.
   test('a failed highlight and note create keeps the selection and retries the same payload', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const before = await paintCounts(page);
@@ -468,7 +489,7 @@ test.describe('reader notes (#325)', () => {
 
   test('a failed one-tap highlight keeps the colour choice open and retries the same payload', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const before = await paintCounts(page);
@@ -494,7 +515,7 @@ test.describe('reader notes (#325)', () => {
 
   test('the one-tap colour highlight still creates without a note', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
 
@@ -523,7 +544,7 @@ test.describe('reader highlights & notes drawer (#325)', () => {
 
   test('lists a highlight with its note, and jumps to it', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 3 : 2);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const preExisting = await annotationIds(page, bookId!);
@@ -568,7 +589,7 @@ test.describe('reader highlights & notes drawer (#325)', () => {
 
   test('the drawer reflects a removed highlight without a reload', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 3 : 2);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const preExisting = await annotationIds(page, bookId!);
@@ -612,7 +633,7 @@ test.describe('reader fullscreen (#325)', () => {
 
   test('the control targets the reader shell and follows the browser state', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     // Record requests instead of entering real fullscreen.
@@ -679,7 +700,7 @@ test.describe('reader toolbar touch targets (#325)', () => {
   test('every toolbar control is at least 44x44 and receives a tap at its edges',
     async ({ page }, testInfo) => {
       test.setTimeout(120_000);
-      const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 2 : 1);
+      const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const NAMES = ['Close reader', 'Table of contents', 'Reading appearance',
@@ -746,7 +767,7 @@ test.describe('reader column count (#325)', () => {
       test.skip(testInfo.project.name === 'mobile',
         'two-column layout needs a wide viewport; the comparison is vacuous on a phone');
 
-      const bookId = await openReaderOnEpub(page, 0);
+      const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const layout = () => page.evaluate(() => {
@@ -818,7 +839,7 @@ test.describe('reader black page theme (#325)', () => {
 
   test('Black is a distinct pure-black ground, and it persists', async ({ page }) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 1);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     const ground = () => page.evaluate(() => {
@@ -873,7 +894,7 @@ test.describe('reader drawer: standalone notes (#325)', () => {
 
   test('a note with no passage is not drawn as a broken highlight', async ({ page }) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 3);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     const NOTE = `A thought about the whole book. ${Date.now()}`;
@@ -933,7 +954,7 @@ test.describe('reader: writing a standalone note (#325)', () => {
   test('a note can be written without selecting anything, and it lasts',
     async ({ page }) => {
       test.setTimeout(120_000);
-      const bookId = await openReaderOnEpub(page, 1);
+      const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const NOTE = `The frame narrative never pays off. ${Date.now()}`;
@@ -988,6 +1009,337 @@ test.describe('reader: writing a standalone note (#325)', () => {
 });
 
 /*
+ * A refused note write keeps the composer open for a retry (#2778).
+ *
+ * #2550 made a failed CREATE retryable. Editing a note (PATCH), removing an
+ * unanchored note (DELETE) and writing a note with no passage (POST) still
+ * closed the composer before the request and swallowed the failure, so the
+ * reader saw nothing wrong and the old note came back on the next open. Each
+ * test refuses the first request, checks the composer kept the typed text and
+ * the error was announced, then lets the retry reach the real server and
+ * checks it sent the same request and the server holds the change.
+ */
+test.describe('reader: a failed note edit, removal or standalone save can be retried (#2778)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  // Every note carries its test's tag, and only tagged notes are read or removed,
+  // so a note left behind by another run is never mistaken for this test's.
+  const unanchoredNotes = (page: Page, bookId: number, tag: string) => page.evaluate(async ([id, mark]) => {
+    const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+    return (j.annotations || [])
+      .filter((a: { position_type: string; note_text: string | null }) =>
+        a.position_type === 'unanchored' && (a.note_text ?? '').includes(mark))
+      .map((a: { note_text: string }) => a.note_text);
+  }, [String(bookId), tag] as const);
+
+  const removeUnanchored = (page: Page, bookId: number, tag: string) => page.evaluate(async ([id, mark]) => {
+    const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+    const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+    for (const a of (j.annotations || [])) {
+      if (a.position_type !== 'unanchored' || !(a.note_text ?? '').includes(mark)) continue;
+      await fetch(`/annotations/${id}/${a.annotation_id}`, {
+        method: 'DELETE', credentials: 'include', headers: { 'X-CSRFToken': csrf },
+      });
+    }
+  }, [String(bookId), tag] as const);
+
+
+  // Open the reader on a book holding the given unanchored note, and open that
+  // note's composer from the drawer.
+  async function editSeededNote(page: Page, project: string, note: string): Promise<number> {
+    const bookId = await openReaderOnEpub(page, lane(project));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    const status = await page.evaluate(async ([id, text]) => {
+      const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+      return (await fetch(`/annotations/${id}`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify({ position_type: 'unanchored', note_text: text }),
+      })).status;
+    }, [String(bookId), note] as const);
+    expect(status, 'the seeded note is stored').toBe(201);
+    await page.reload();
+    await waitForReaderRender(page);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await drawer(page).locator('li', { hasText: note }).getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(note);
+    return bookId!;
+  }
+
+  test('a refused note edit keeps the edited text and retries the same change', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const TAG = `${testInfo.project.name}-${Date.now()}`;
+    const ORIGINAL = `Before the edit. ${TAG}`;
+    const bookId = await editSeededNote(page, testInfo.project.name, ORIGINAL);
+    const EDITED = `After the edit. ${TAG}`;
+    await setNote(page, EDITED);
+
+    const sent: { url: string; body: unknown }[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'PATCH') return route.continue();
+      sent.push({ url: route.request().url(), body: route.request().postDataJSON() });
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(EDITED);
+    expect((await unanchoredNotes(page, bookId, TAG))).toEqual([ORIGINAL]);
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    await expect.poll(async () => (await unanchoredNotes(page, bookId, TAG))).toEqual([EDITED]);
+
+    await removeUnanchored(page, bookId, TAG);
+  });
+
+  test('a refused note removal keeps the note and retries the same removal', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const TAG = `${testInfo.project.name}-${Date.now()}`;
+    const NOTE = `Remove me. ${TAG}`;
+    const bookId = await editSeededNote(page, testInfo.project.name, NOTE);
+
+    const sent: string[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'DELETE') return route.continue();
+      sent.push(route.request().url());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Remove note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(NOTE);
+    expect((await unanchoredNotes(page, bookId, TAG))).toEqual([NOTE]);
+
+    await page.getByRole('button', { name: 'Remove note' }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
+    await expect.poll(async () => (await unanchoredNotes(page, bookId, TAG)).length).toBe(0);
+  });
+
+  test('a refused standalone note keeps the text and retries the same note', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    const TAG = `${testInfo.project.name}-${Date.now()}`;
+    const NOTE = `A note about the whole book. ${TAG}`;
+
+    const sent: unknown[] = [];
+    await page.route(`**/annotations/${bookId}`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      sent.push(route.request().postDataJSON());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await page.getByRole('button', { name: 'Write a note' }).click();
+    await setNote(page, NOTE);
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that note.');
+    await expect(page.getByRole('dialog', { name: 'Write a note' })).toBeVisible();
+    await expect(page.locator('textarea')).toHaveValue(NOTE);
+
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByRole('dialog', { name: 'Write a note' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    await expect.poll(async () => (await unanchoredNotes(page, bookId!, TAG))).toEqual([NOTE]);
+
+    await removeUnanchored(page, bookId!, TAG);
+  });
+});
+
+/*
+ * A refused highlight removal or recolour can be retried (#2779).
+ *
+ * The edit popover closed before its DELETE or PATCH and swallowed a refusal,
+ * so the reader tapped Remove or a colour, saw the popover go, and could not
+ * tell the highlight was still there or still the old colour. Each test
+ * refuses the first request, checks the reader said so, the popover came back
+ * and the paint still matches the server, then lets the retry reach the real
+ * server and checks it sent the same request and the server holds the change.
+ */
+test.describe('reader: a failed highlight removal or recolour can be retried (#2779)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+
+  type ServerRow = { id: string; color: string | null };
+  const serverRows = (page: Page, bookId: number): Promise<ServerRow[]> => page.evaluate(async (id) => {
+    const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+    return (j.annotations || []).map((a: { annotation_id: string; highlight_color: string | null }) =>
+      ({ id: a.annotation_id, color: a.highlight_color }));
+  }, bookId);
+
+  const paintedFill = (page: Page) => page.evaluate(
+    () => document.querySelector('.cwng-hl')?.getAttribute('fill') ?? null);
+
+  // Open the reader, make one yellow highlight, and open its edit popover.
+  async function yellowHighlightOpen(page: Page, project: string): Promise<number> {
+    const bookId = await openReaderOnEpub(page, lane(project));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
+    expect(await selectSomeText(page), 'text selected in the book frame').not.toBe('');
+    await page.getByRole('button', { name: 'Yellow' }).click();
+    await expect.poll(async () => (await serverRows(page, bookId!)).length).toBe(1);
+    await expect.poll(async () => (await paintCounts(page)).plain).toBe(1);
+    await tapHighlight(page, '.cwng-hl');
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+    return bookId!;
+  }
+
+  test('a refused removal keeps the highlight and retries the same removal', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await yellowHighlightOpen(page, testInfo.project.name);
+
+    const sent: string[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'DELETE') return route.continue();
+      sent.push(route.request().url());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Remove highlight' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that highlight.');
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+    expect((await paintCounts(page)).plain, 'the refused highlight stays painted').toBe(1);
+    expect(await serverRows(page, bookId)).toHaveLength(1);
+
+    await page.getByRole('button', { name: 'Remove highlight' }).click();
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
+    await expect.poll(async () => (await serverRows(page, bookId)).length).toBe(0);
+    await expect.poll(async () => (await paintCounts(page)).plain).toBe(0);
+  });
+
+  test('a refused recolour keeps the old colour and retries the same change', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await yellowHighlightOpen(page, testInfo.project.name);
+    const yellowFill = await paintedFill(page);
+
+    const sent: unknown[] = [];
+    await page.route(`**/annotations/${bookId}/*`, async (route) => {
+      if (route.request().method() !== 'PATCH') return route.continue();
+      sent.push(route.request().postDataJSON());
+      if (sent.length === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      return route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Green' }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not save that highlight.');
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Yellow' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await paintedFill(page), 'the paint keeps the colour the server holds').toBe(yellowFill);
+    expect((await serverRows(page, bookId)).map((r) => r.color)).toEqual(['yellow']);
+
+    await page.getByRole('button', { name: 'Green' }).click();
+    await expect(page.getByRole('button', { name: 'Remove highlight' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    await expect.poll(async () => (await serverRows(page, bookId)).map((r) => r.color)).toEqual(['green']);
+    await expect.poll(() => paintedFill(page)).not.toBe(yellowFill);
+
+    await clearAnnotationsViaApi(page, bookId);
+  });
+});
+
+/*
+ * A failed highlight load is not an empty book (#2780).
+ *
+ * The reader fetches data.json once on open. Before this, a non-OK answer or a
+ * network error left the drawer saying "No highlights yet", which is exactly
+ * what a book with no highlights says, so a reader could conclude theirs were
+ * lost and start again. The two states must read differently, and the failed
+ * one must offer a way to load again without reopening the book.
+ */
+test.describe('reader drawer: a failed highlight load is reported, not shown as empty (#2780)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  const dataJson = (bookId: number) => `**/annotations/${bookId}/data.json*`;
+  const loadError = (page: Page) => drawer(page).getByText('Could not load highlights and notes.');
+  const emptyState = (page: Page) => drawer(page).getByText('No highlights yet. Select text in the book to make one.');
+
+  test('a refused load says so and a retry loads the highlights', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    let calls = 0;
+    await page.route(dataJson(bookId!), async (route) => {
+      calls += 1;
+      if (calls === 1) return route.fulfill({ status: 500, body: 'temporary failure' });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          annotations: [{
+            annotation_id: 'e2e-2780-note', position_type: 'unanchored',
+            note_text: 'a note that loads on retry', highlighted_text: null,
+            highlight_color: null, cfi_range: null,
+          }],
+          devices: {},
+        }),
+      });
+    });
+
+    await page.reload();
+    await waitForReaderRender(page);
+    await expect.poll(() => calls, 'the reader asked for its highlights').toBe(1);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await expect(drawer(page)).toBeVisible();
+
+    await expect(loadError(page)).toBeVisible();
+    await expect(emptyState(page), 'a failed load must not claim the book has none').toBeHidden();
+
+    await drawer(page).getByRole('button', { name: 'Try again' }).click();
+    await expect.poll(() => calls, 'retry asks the server again').toBe(2);
+    // The retry's answer is held back: while it is under way the drawer must
+    // not fall back to "No highlights yet" either.
+    await expect(emptyState(page), 'a load still under way is not an empty book').toBeHidden();
+    await expect(drawer(page), 'focus stays in the drawer when the retry button goes').toBeFocused();
+    await expect(drawer(page).getByText('a note that loads on retry')).toBeVisible();
+    await expect(loadError(page)).toBeHidden();
+    await expect(drawer(page).getByRole('button', { name: 'Try again' })).toBeHidden();
+  });
+
+  test('an empty answer shows the ordinary empty state and no error', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    let calls = 0;
+    await page.route(dataJson(bookId!), async (route) => {
+      calls += 1;
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ annotations: [], devices: {} }),
+      });
+    });
+
+    await page.reload();
+    await waitForReaderRender(page);
+    await expect.poll(() => calls, 'the reader asked for its highlights').toBe(1);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await expect(drawer(page)).toBeVisible();
+
+    await expect(emptyState(page)).toBeVisible();
+    await expect(loadError(page)).toBeHidden();
+    await expect(drawer(page).getByRole('button', { name: 'Try again' })).toBeHidden();
+  });
+});
+
+/*
  * Device labels in the highlights drawer (#325).
  *
  * The affordance was built when the drawer landed and deliberately left unwired:
@@ -1006,7 +1358,7 @@ test.describe('reader drawer: device labels (#325)', () => {
 
   test('every highlight is listed, whether or not its device resolves', async ({ page }) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 2);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     /*
@@ -1086,7 +1438,7 @@ test.describe('reader search inside the book', () => {
 
   test('finds book text and moves the rendition to the selected result', async ({ page }) => {
     test.setTimeout(180_000);
-    const bookId = await openReaderOnEpub(page, 0);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     await waitForReaderRender(page);
     expect(await pageUntilText(page), 'the EPUB has searchable prose').toBe(true);

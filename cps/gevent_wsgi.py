@@ -25,6 +25,17 @@ class MyWSGIHandler(WSGIHandler):
         self.close_connection = True
         return is_valid
 
+    def _connection_upgrade_requested(self):
+        # gevent treats ``Connection: upgrade`` (or ``Upgrade: websocket``) as a
+        # protocol switch and gives the app the raw socket instead of a body
+        # stream bounded by Content-Length, so reading a POST body blocks until
+        # the proxy gives up. Many nginx/NPM WebSocket snippets set
+        # ``Connection "upgrade"`` on every request, and CWNG serves no upgrade
+        # routes (every response closes, above), so a request is always read as
+        # an ordinary one. Issue #2838: app passwords and sign-in took 90s and
+        # ended in a 504 behind such a proxy.
+        return False
+
     def finalize_headers(self):
         # Let gevent validate and encode application headers, and make all of its
         # Content-Length/chunking decisions, before enforcing the close policy.

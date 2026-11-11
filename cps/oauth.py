@@ -45,7 +45,7 @@ class OAuthBackend(SQLAlchemyBackend):
         # Debug session contents
         try:
             debug_log(f"Session keys: {list(session.keys())}")
-        except:
+        except Exception:
             pass
 
         if self.provider_id + '_oauth_token' in session:

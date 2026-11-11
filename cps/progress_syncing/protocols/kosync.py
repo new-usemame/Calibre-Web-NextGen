@@ -136,6 +136,12 @@ POSITION_KIND_LOCATOR = "locator"
 # resolves the bare ``{}`` it gets today.
 POSITION_KINDS_AVAILABLE_FIELD = "position_kinds_available"
 
+# On an otherwise-empty GET: how many of the account's other devices hold a
+# place for this book without sharing it (#2841). With Share my place gates on,
+# a private place and no place at all were the same ``{}``. A count only, same
+# account only; inert to a stock plugin for the reason given above.
+PLACES_NOT_SHARED_FIELD = "places_not_shared"
+
 # A client that keeps its place as words rather than as an engine locator
 # (``services/text_anchor``) asks for this kind on GET to receive ``anchor``,
 # the words at the winning position, and may send one on a percentage PUT.
@@ -195,6 +201,22 @@ def _withheld_position_hint(user_id, document, book_id,
         POSITION_KIND_LOCATOR, POSITION_KIND_PERCENTAGE,
     )
     return {POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]}
+
+
+def _places_not_shared_hint(user_id, book_id, asker) -> dict:
+    """``{"places_not_shared": n}`` for a miss with private places, else ``{}``."""
+    if not book_id or not gates_enforced(user_id):
+        return {}
+    from ...services import kosync_place
+    try:
+        count = kosync_place.places_not_shared(
+            user_id, book_id, exclude_device_id=getattr(asker, "id", None))
+    except Exception:
+        # Advisory only: failing to count must not turn "no progress" into a
+        # sync error, which stops the client's whole progress sync.
+        log.warning("Could not count unshared places for book %s", book_id, exc_info=True)
+        return {}
+    return {PLACES_NOT_SHARED_FIELD: count} if count else {}
 
 
 def _advertised_position_kinds() -> set:
@@ -1208,9 +1230,18 @@ def auth_user():
 
     user = authenticate_user()
     if user:
-        return create_sync_response({"authorized": "OK",
-                                     "capabilities": list(SERVER_CAPABILITIES),
-                                     "share_place_gates": gates_enforced(user.id)})
+        body = {"authorized": "OK",
+                "capabilities": list(SERVER_CAPABILITIES),
+                "share_place_gates": gates_enforced(user.id)}
+        # A client that names itself learns its own Share my place setting
+        # without needing a book (#2841). Read-only: an unknown device is not
+        # registered here, and gets no field rather than a guessed one.
+        if request.headers.get("X-CWNG-Device-ID"):
+            from ...services import kosync_place
+            device, _identified, _raw = kosync_place.request_device(user.id)
+            if device is not None:
+                body["share_place"] = bool(device.share_place)
+        return create_sync_response(body)
     else:
         return create_sync_response({
             "error": ERROR_UNAUTHORIZED_USER,
@@ -1282,6 +1313,10 @@ def get_progress(document: str):
         target, identified, raw_id = kosync_place.request_device(user.id)
         identified = identified and gates_enforced(user.id)
         own_served = False
+        # An exact XPointer for a percentage-only row, found before deciding
+        # whether to withhold it (#2783): converted into the requesting
+        # device's own file, it is a real locator, safe for any client.
+        exact_place = None
         private = identified and not target.share_place
         if identified and book_id:
             own = kosync_place.own_position(target.id, book_id)
@@ -1293,21 +1328,36 @@ def get_progress(document: str):
                 progress_record = kosync_place.own_record(target, own, raw_id, document)
                 own_served = True
             if progress_record is not None and is_percentage_only(progress_record) and not accepts_percentage:
-                return create_sync_response({POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]})
+                if not own_served:
+                    exact_place = _exact_xpointer(user.id, book_id, progress_record, document)
+                if not exact_place:
+                    return create_sync_response({POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]})
         else:
             progress_record = get_progress_record(
                 user.id, document, book_id,
                 include_percentage_only=accepts_percentage,
             )
+            if not accepts_percentage and book_id:
+                # A client that names no kinds (JustRead, stock KOReader) still
+                # gets the furthest place when it converts exactly; otherwise
+                # it keeps the locator-only answer above (#1366).
+                furthest = get_progress_record(user.id, document, book_id)
+                if furthest is not None and is_percentage_only(furthest):
+                    exact_place = _exact_xpointer(user.id, book_id, furthest, document)
+                    if exact_place:
+                        progress_record = furthest
 
         if not progress_record:
             if private and book_id:
-                return create_sync_response({})
-            # A miss and a withheld position looked identical on the wire, which
-            # is what sent @sroebert to our source to find the parameter (#1445).
-            return create_sync_response(_withheld_position_hint(
-                user.id, document, book_id, accepts_percentage, endpoint
-            ))
+                miss = {}
+            else:
+                # A miss and a withheld position looked identical on the wire, which
+                # is what sent @sroebert to our source to find the parameter (#1445).
+                miss = _withheld_position_hint(
+                    user.id, document, book_id, accepts_percentage, endpoint
+                )
+            miss.update(_places_not_shared_hint(user.id, book_id, target))
+            return create_sync_response(miss)
 
         # KOReader expects percentage as a decimal fraction (0.9411 = 94.11%)
         # We store it as percentage (0-100), so convert back to decimal (0-1)
@@ -1321,7 +1371,7 @@ def get_progress(document: str):
             # The web reader's or Kobo's own place, when it can be expressed
             # exactly in the very file this device holds (#324); otherwise the
             # percentage.
-            exact = _exact_xpointer(user.id, book_id, progress_record, document)
+            exact = exact_place or _exact_xpointer(user.id, book_id, progress_record, document)
             if exact:
                 progress_value, percentage_only = exact, False
 
@@ -1481,6 +1531,21 @@ def update_inventory():
                 "device_identity_unavailable",
             )
 
+        if not device.active:
+            # A removed (soft-deleted) device keeps its identity, so the reader
+            # still resolves to it. Say so instead of failing later with a 500.
+            log.warning(
+                "Inventory report refused: device %s of user %s was removed "
+                "from the account, so it no longer syncs",
+                device.public_id, user.id,
+            )
+            ub.session.rollback()
+            return _inventory_error(
+                "This device was removed from the account, so it no longer syncs",
+                409,
+                "device_inactive",
+            )
+
         if has_free:
             device_capabilities.record_storage(
                 session=ub.session, user_id=user.id, device_id=device.id,
@@ -1533,6 +1598,9 @@ def update_inventory():
             "report_id": report.id,
             "device": device.public_id,
         })
+    except device_capabilities.CapabilityValidationError as error:
+        ub.session.rollback()
+        return _inventory_error(str(error), 409, "device_inactive")
     except SQLAlchemyError:
         ub.session.rollback()
         log.error("Device inventory could not be stored", exc_info=True)
@@ -2291,6 +2359,7 @@ def update_progress():
         200: Success with document and timestamp
         400: Validation error
         401: Unauthorized
+        409: Device was removed from the account
         500: Internal error
 
     Response format:
@@ -2390,6 +2459,22 @@ def update_progress():
         except (ValueError, TypeError) as e:
             raise KOSyncError(ERROR_INVALID_FIELDS, f"Invalid percentage value: {e}")
 
+        # Resolve the reader before book matching or any progress/journal writes.
+        # A removed identity stays removed until the account owner restores it.
+        from ...services import kosync_place
+        target, identified, raw_id = kosync_place.request_device(user.id, data, observe=True)
+        if target is not None and not target.active:
+            log.warning(
+                "Progress report refused: device %s of user %s was removed "
+                "from the account, so it no longer syncs",
+                target.public_id, user.id,
+            )
+            ub.session.rollback()
+            return jsonify({
+                "error": "device_inactive",
+                "message": "This device was removed from the account, so it no longer syncs",
+            }), 409
+
         timestamp = datetime.now(timezone.utc)
         received_at = timestamp
         reported_document = document
@@ -2433,8 +2518,6 @@ def update_progress():
                         placed_percent = max(placed_percent, percentage_float)
                     percentage_float = placed_percent
 
-        from ...services import kosync_place
-        target, identified, raw_id = kosync_place.request_device(user.id, data, observe=True)
         internal_device_id = target.id if target is not None else None
         # Unmatched documents cannot have a book journal. They and failed or
         # capped registrations retain the legacy shared path.
@@ -2448,8 +2531,9 @@ def update_progress():
             device_id = raw_id
             device = request.headers.get("X-CWNG-Device-Name") or device
             report = Report(kosync_place.client_clock(data.get("timestamp"), received_at), received_at)
-            kosync_place.journal(target.id, book_id, journal_document,
-                                 journal_progress, proposed_percentage, report)
+            journal_accepted = kosync_place.journal(
+                target.id, book_id, journal_document,
+                journal_progress, proposed_percentage, report)
             if not private:
                 current = get_progress_record(user.id, document, book_id)
                 # Converge a legacy checksum key before judging the report.
@@ -2507,6 +2591,7 @@ def update_progress():
             timestamp = survived.server_modified_at if private else survived.timestamp
             percentage_float = survived.progress_percent if private else survived.percentage
             response_data["timestamp"] = int(kosync_place.utc(timestamp).timestamp())
+            push_accepted = journal_accepted if private else shared_accepted
         else:
             # #633 legacy convergence remains a key-resolution read, not an
             # acceptance decision. Seed the canonical key through the same SQL
@@ -2555,6 +2640,7 @@ def update_progress():
             timestamp = _aware_datetime(outcome.clock) or timestamp
             document = canonical_document
             response_data["timestamp"] = int(timestamp.timestamp())
+            push_accepted = outcome.accepted
 
             # CRITICAL: Always commit kosync_progress first before attempting ReadBook updates
             # This ensures sync location is persisted even if ReadBook update fails
@@ -2577,6 +2663,14 @@ def update_progress():
                     user.id, internal_device_id, book_id, journal_document,
                     journal_progress, proposed_percentage, received_at,
                 )
+
+        # #2843: say whether this push is the place now kept for it, and
+        # whether that place is the shared one. Additive: stock KOReader
+        # plugins read only document and timestamp.
+        response_data["accepted"] = bool(push_accepted)
+        response_data["shared"] = not private
+        if not push_accepted:
+            response_data["kept_percentage"] = percentage_float / 100.0
 
         # Update user's ReadBook status if we matched a book
         # This is done AFTER kosync_progress is committed, so sync location is always safe

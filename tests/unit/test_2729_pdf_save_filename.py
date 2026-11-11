@@ -88,15 +88,19 @@ from tests.unit.test_shared_book_continuation import shared_books  # noqa: E402,
 
 @pytest.mark.unit
 def test_show_route_names_the_pdf_it_serves_inline(shared_books):
+    from cps import db
     env = shared_books
     env.session.add(ub_exposure(env))
+    book = env.session.get(db.Books, 1)
+    book.authors.append(db.Authors('Ursula K. Le Guin', 'Le Guin, Ursula K.'))
     env.session.commit()
     response = env.client.get('/show/1/pdf')
     assert response.status_code == 200
     assert response.data == b'%PDF-shared-reader-bytes'
     disposition, plain, star = _parse(response.headers['Content-Disposition'])
     assert disposition == 'inline'
-    assert star == plain == 'Book 1.pdf'
+    # The Download link's "Title - Author" name, not pdf.js's document.pdf.
+    assert star == plain == 'Book 1 - Ursula K. Le Guin.pdf'
 
 
 def ub_exposure(env):

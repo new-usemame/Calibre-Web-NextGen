@@ -1,0 +1,3 @@
+### Fixed
+
+- **With two or more Kobos and Share my place ticked, a Kobo that had read a book before now moves to the place you reached on another one.** A Kobo's book download doesn't say which Kobo is fetching it, so on an account with several Kobos CWNG could never confirm which copy of the book each one held. Without that, a Kobo was sent the new percentage but kept its own old page location, so the book opened where it was and no sync prompt appeared. Each Kobo's download link now names that Kobo. This covers books a Kobo downloads after the update; a book already on the device before it keeps the old behaviour for now. Reported by @dwerkson (#2724).

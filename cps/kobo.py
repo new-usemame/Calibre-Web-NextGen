@@ -5058,9 +5058,10 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
 
     A Kobo's percentage is a whole number, measured on its own KEPUB, so
     KOReader and CrossPoint would compare and show a coarser value than
-    their own. When ``location`` is the reporting Kobo's span in the library
-    KEPUB, the row gets the percentage CrossPoint computes at that span
-    instead (``koreader_position.kobo_share_percent``). The Kobo's own
+    their own. When the reporting Kobo has the opt-in ``align_percent`` on and
+    ``location`` is its span in the library KEPUB, the row
+    gets the percentage CrossPoint computes at that span instead
+    (``koreader_position.kobo_share_percent``). The Kobo's own
     bookmark keeps the device's value: the device echoes it back. The caller
     sends the returned value to Hardcover, so Hardcover gets the same
     measure as a CrossPoint or KOReader push.
@@ -5092,11 +5093,13 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
         # rollback here would take them with it (#1318, same precondition the
         # web reader path documents).
         ub.session_flush()
-        try:
-            finer = kobo_share_percent(book_id=book_id, device_id=device_id, location=location)
-        except Exception:
-            log.debug("No CrossPoint percentage for book %s", book_id, exc_info=True)
-            finer = None
+        finer = None
+        if _aligns_percent(device_id):
+            try:
+                finer = kobo_share_percent(book_id=book_id, device_id=device_id,
+                                           location=location)
+            except Exception:
+                log.debug("No CrossPoint percentage for book %s", book_id, exc_info=True)
         if finer is not None:
             percentage = finer
         with ub.begin_contained_nested(ub.session):
@@ -5137,6 +5140,17 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
         log.warning("Could not share Kobo progress with KOReader for user %s book %s: %s",
                     user_id, book_id, e)
     return percentage
+
+
+def _aligns_percent(device_id):
+    """True when the Kobo ``device_id`` has the opt-in ``align_percent`` on."""
+    if device_id is None:
+        return False
+    try:
+        device = ub.session.get(ub.Device, int(device_id))
+    except (TypeError, ValueError, SQLAlchemyError):
+        return False
+    return bool(device is not None and device.kind == "kobo" and device.align_percent)
 
 
 def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: int):

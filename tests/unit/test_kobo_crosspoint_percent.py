@@ -8,15 +8,18 @@ document weighs its uncompressed size in the archive, and the reader's page
 places it inside the document (``Epub::calculateProgress``). So the two
 readers disagreed, and the furthest-wins compare saw only whole numbers.
 
-When the reporting Kobo holds the library KEPUB as it is now, the shared
-``kosync_progress`` row gets CrossPoint's percentage at the Kobo's span. The
-Kobo's own bookmark keeps the device's value, and anything short of that
-proof keeps the device's value on the row too.
+When the reporting Kobo has the opt-in device setting ``align_percent`` on
+and holds the library KEPUB as it is now, the shared ``kosync_progress`` row
+gets CrossPoint's percentage at the Kobo's span. The Kobo's own bookmark keeps
+the device's value, and anything short of that proof keeps the device's value
+on the row too. With the setting off, the default, every reader, Hardcover and
+the book page get the device's value, as before. Only a Kobo has the setting.
 
 Real book (``alice-pg11`` and its served KEPUB), real kosync HTTP, real Kobo
 handlers (``share_place_span_world``).
 """
 
+import inspect
 import os
 import zipfile
 from bisect import bisect_right
@@ -118,16 +121,68 @@ def test_crosspoint_maps_the_percentage_back_into_the_same_chapter():
 
 # == What KOReader and CrossPoint pull ======================================
 
-@pytest.fixture(params=["checked", "unchecked"])
-def kobo(request, sw, monkeypatch):
-    """A Kobo that holds the library KEPUB: a checked one with the place
-    gates on (latest-wins), or one under the gates off (furthest-wins)."""
+def _patch(world, device, body):
+    """The device settings PATCH, as the Devices page sends it."""
+    path = f"/api/annotations/devices/{device.public_id}"
+    app = world.app
+    with app.test_request_context(path, method="PATCH", json=body):
+        endpoint, args = app.url_map.bind("localhost").match(path, method="PATCH")
+        result = inspect.unwrap(app.view_functions[endpoint])(**args)
+        response = result[0] if isinstance(result, tuple) else result
+        status = result[1] if isinstance(result, tuple) else result.status_code
+        data = response.get_json()
+    world.session.expire_all()
+    return status, data
+
+
+def _align(world, device, on):
+    status, data = _patch(world, device, {"align_percent": on})
+    assert status == 200
+    assert data["align_percent"] is on
+
+
+def _kobo(request, sw, monkeypatch, align):
     checked = request.param == "checked"
     monkeypatch.setenv(SWITCH, "1" if checked else "0")
     sw.koreader("koreader-1", "KOReader", checked=checked)
     device = sw.kobo_device("Kobo", checked=checked)
     sw.download(device)
+    if align:
+        _align(sw, device, True)
     return device
+
+
+@pytest.fixture(params=["checked", "unchecked"])
+def kobo(request, sw, monkeypatch):
+    """A Kobo that holds the library KEPUB, with the setting on: a checked
+    one with the place gates on (latest-wins), or one under the gates off
+    (furthest-wins)."""
+    return _kobo(request, sw, monkeypatch, True)
+
+
+@pytest.fixture(params=["checked", "unchecked"])
+def kobo_off(request, sw, monkeypatch):
+    """The same Kobo with the setting off."""
+    return _kobo(request, sw, monkeypatch, False)
+
+
+def test_the_setting_is_off_by_default_and_only_for_a_kobo(sw):
+    from cps import ub
+    column = ub.Device.__table__.c.align_percent
+    assert column.default.arg is False
+    assert str(column.server_default.arg) == "0"
+
+    kobo = sw.kobo_device("Kobo", checked=False)
+    status, data = _patch(sw, kobo, {"label": "Libra"})
+    assert status == 200 and data["align_percent"] is False
+
+    koreader = sw.koreader("koreader-1", "KOReader", checked=False)
+    assert _patch(sw, koreader, {"align_percent": True}) == (
+        400, {"error": "invalid_align_percent"})
+    assert _patch(sw, kobo, {"align_percent": "yes"}) == (
+        400, {"error": "invalid_align_percent"})
+    assert sw.session.get(ub.Device, koreader.id).align_percent is False
+    assert sw.session.get(ub.Device, kobo.id).align_percent is False
 
 
 def test_a_kobos_span_reaches_koreader_as_crosspoints_percentage_and_exact_place(sw, kobo):
@@ -239,3 +294,44 @@ def test_the_book_page_shows_the_bookmark_after_a_later_koreader_push(sw, kobo):
         user_id=sw.reader.id, book_id=sw.book.id).one().current_bookmark
     assert _shown(sw) == bookmark.progress_percent
     assert _shown(sw) != crosspoint_percent(sw, rows[300])
+
+
+# == The setting off: the device's whole number, as before ==================
+
+def test_with_the_setting_off_koreader_gets_the_devices_percentage(sw, kobo_off):
+    row = span_rows()[300]
+
+    sw.put(kobo_off, row["source"], row["span"], DEVICE_PERCENT, after_now())
+
+    percent, progress = sw.pull()
+    assert percent == pytest.approx(DEVICE_PERCENT)
+    assert progress == row["xpointer"]  # the exact place still crosses
+
+
+def test_with_the_setting_off_hardcover_gets_the_devices_percentage(
+        sw, kobo_off, hardcover_pushes):
+    row = span_rows()[300]
+
+    sw.put(kobo_off, row["source"], row["span"], DEVICE_PERCENT, after_now())
+
+    assert hardcover_pushes == [(sw.book.id, pytest.approx(DEVICE_PERCENT))]
+
+
+def test_with_the_setting_off_the_book_page_shows_the_bookmark(sw, kobo_off):
+    row = span_rows()[300]
+
+    sw.put(kobo_off, row["source"], row["span"], DEVICE_PERCENT, after_now())
+
+    assert _shown(sw) == pytest.approx(DEVICE_PERCENT)
+
+
+def test_turning_the_setting_off_shares_the_devices_percentage_again(sw, kobo):
+    rows = span_rows()
+    sw.put(kobo, rows[300]["source"], rows[300]["span"], DEVICE_PERCENT, after_now(2))
+    assert sw.pull()[0] == crosspoint_percent(sw, rows[300])
+
+    _align(sw, kobo, False)
+    sw.put(kobo, rows[350]["source"], rows[350]["span"], 90, after_now(4))
+
+    assert sw.pull()[0] == pytest.approx(90)
+    assert _shown(sw) == pytest.approx(90)

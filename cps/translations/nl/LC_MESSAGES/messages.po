@@ -5100,6 +5100,18 @@ msgstr ""
 "of werk deze bij om te kiezen."
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr "Percentage van deze Kobo afstemmen op CrossPoint"
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr "Kan de percentage-instelling niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Off by default. When on, and this Kobo holds the current KEPUB, its place is shared as the percentage CrossPoint shows there, not the whole number the Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that percentage, so the page Hardcover shows changes. The Kobo keeps its own value."
+msgstr "Standaard uit. Als dit aan staat en deze Kobo de huidige KEPUB heeft, wordt zijn positie gedeeld als het percentage dat CrossPoint daar toont, niet als het hele getal dat de Kobo meldt. KOReader, CrossPoint, Hardcover en de boekpagina krijgen dat percentage, dus de pagina die Hardcover toont verandert. De Kobo houdt zijn eigen waarde."
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "Boeken op dit apparaat"
 

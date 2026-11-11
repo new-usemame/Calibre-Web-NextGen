@@ -1523,6 +1523,10 @@ class Device(Base):
     created_by = Column(String(32), nullable=False, default="auto")
     share_place = Column(Boolean, nullable=False, default=False, server_default='0')
     share_place_enabled_at = Column(DateTime, nullable=True)
+    # Opt-in, Kobo only: share this Kobo's place with the percentage that
+    # CrossPoint computes at its span, not the device's whole number. It
+    # changes the value that KOSync, Hardcover and the book page get.
+    align_percent = Column(Boolean, nullable=False, default=False, server_default='0')
     cwng_header_seen_at = Column(DateTime, nullable=True)
     # NULL is the account setting. JSON retains deleted selection ids for the
     # fallback notice; it holds no foreign keys or reading state.
@@ -4771,6 +4775,7 @@ def migrate_device_share_place(engine, _session):
     for table, name, ddl in (
         ("device", "share_place", "share_place BOOLEAN NOT NULL DEFAULT 0"),
         ("device", "share_place_enabled_at", "share_place_enabled_at DATETIME"),
+        ("device", "align_percent", "align_percent BOOLEAN NOT NULL DEFAULT 0"),
         ("device", "cwng_header_seen_at", "cwng_header_seen_at DATETIME"),
         ("device_reading_position", "reading_status", "reading_status INTEGER"),
         ("device_reading_position", "status_modified_at", "status_modified_at DATETIME"),

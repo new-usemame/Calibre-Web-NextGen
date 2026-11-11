@@ -57,15 +57,6 @@ def _span(n):
     return row["source"], row["span"], row["xpointer"]
 
 
-def _shared(n):
-    """The KOSync percentage (0-1) a Libra holding the library KEPUB shares
-    at span ``n``: CrossPoint's, not the Libra's whole number."""
-    from cps.services.kepub_alignment import span_book_percent
-    source, span, _xpointer = _span(n)
-    return pytest.approx(span_book_percent(
-        FIXTURES / "alice-pg11.epub", FIXTURES / "alice-pg11.kepub.epub", source, span) / 100)
-
-
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     kosync = importlib.import_module("cps.progress_syncing.protocols.kosync")
@@ -167,7 +158,7 @@ def test_the_kindle_opens_at_the_sentence_the_libra_stopped_on(world):
 
     assert body["progress"] == xpointer
     assert body["position_kind"] == "locator"
-    assert body["percentage"] == _shared(200)
+    assert body["percentage"] == pytest.approx(0.37)
     assert body["device"] == "Kobo"
 
 
@@ -180,7 +171,7 @@ def test_a_kindle_holding_another_copy_gets_the_percentage(world):
 
     assert body["progress"] is None
     assert body["position_kind"] == "percentage"
-    assert body["percentage"] == _shared(200)
+    assert body["percentage"] == pytest.approx(0.37)
 
 
 def test_a_libra_with_no_recorded_kepub_download_gets_the_percentage(world):
@@ -248,9 +239,9 @@ def test_a_libra_that_paged_back_leaves_the_furthest_place_as_a_percentage(world
 
     body = world.koreader_pull(world.digest)
 
-    # Furthest still wins: the row stays at the first place. The span stored
-    # for it is no longer what the Libra last reported, so nothing proves it.
-    assert body["percentage"] == _shared(300)
+    # Furthest still wins: the row stays at 62%. The span stored for it is no
+    # longer what the Libra last reported, so nothing proves it any more.
+    assert body["percentage"] == pytest.approx(0.62)
     assert body["progress"] is None
     assert body["position_kind"] == "percentage"
 

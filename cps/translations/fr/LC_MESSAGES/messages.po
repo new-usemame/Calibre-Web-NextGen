@@ -5234,6 +5234,18 @@ msgstr ""
 "d’extension NextGen Sync sur cet appareil pour choisir."
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr "Aligner le pourcentage de cette Kobo sur CrossPoint"
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr "Impossible d’enregistrer le réglage du pourcentage. Réessayez."
+
+#: cps/spa_strings.py
+msgid "Off by default. When on, and this Kobo holds the current KEPUB, its place is shared as the percentage CrossPoint shows there, not the whole number the Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that percentage, so the page Hardcover shows changes. The Kobo keeps its own value."
+msgstr "Désactivé par défaut. Une fois activé, et si cette Kobo contient le KEPUB actuel, sa position est partagée avec le pourcentage que CrossPoint affiche à cet endroit, et non avec le nombre entier que la Kobo indique. KOReader, CrossPoint, Hardcover et la page du livre reçoivent ce pourcentage, donc la page affichée par Hardcover change. La Kobo conserve sa propre valeur."
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "Livres sur cet appareil"
 

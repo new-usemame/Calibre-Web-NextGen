@@ -428,7 +428,7 @@ when this table and the served routes disagree.
 
 | Method | Path | What it does |
 |---|---|---|
-| `GET` | `/kosync` | Web page with the plugin download and setup steps (website login, not Basic). |
+| `GET` | `/kosync` | Web page with the plugin download and setup steps. Not an API call: no Basic auth, and it still loads when sync is off. |
 | `GET` | `/kosync/users/auth` | Checks credentials; the JSON lists `capabilities` (see Feature detection). |
 | `GET` | `/kosync/syncs/progress/<document>` | Reading position for a document digest. |
 | `PUT` | `/kosync/syncs/progress` | Stores a reading position; the reply says whether it was accepted. |

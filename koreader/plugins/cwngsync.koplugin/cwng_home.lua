@@ -17,6 +17,7 @@ local Button = require("ui/widget/button")
 local ButtonDialog = require("ui/widget/buttondialog")
 local Catalog = require("cwng_catalog")
 local Device = require("device")
+local DocSettings = require("docsettings")
 local DocumentRegistry = require("document/documentregistry")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -255,15 +256,40 @@ local function historyPaths(root)
     return paths
 end
 
--- KOReader's own status for a book here, or nil when it has none.
+-- KOReader's own status for a book here, or nil when it has no progress here.
 local function localStatus(path)
+    if BookList.getBookInfo then
+        local cached = BookList.getBookInfo(path)
+        local info = {
+            been_opened = cached.been_opened,
+            status = cached.status,
+            percent_finished = cached.percent_finished,
+        }
+        -- BookList says "reading" both for a book read here and for one that
+        -- was Reset; only the sidecar tells them apart (#2732).
+        if info.been_opened and info.status == "reading" then
+            local ok, settings = pcall(DocSettings.open, DocSettings, path)
+            if ok and settings then
+                info.has_summary = settings:readSetting("summary") ~= nil
+                info.reset = settings:isTrue("docsettings_reset_done")
+            end
+        end
+        return Catalog.deviceStatus(info)
+    end
     local status = BookList.getBookStatus(path)
     if status == "new" then return nil end
     return status
 end
 
 function Home:readingNow()
-    return Catalog.continueReading(self:entries(), historyPaths(self.plugin:getLibraryRoot()), nil, localStatus)
+    -- localStatus may parse a sidecar, and continueReading asks about a book
+    -- more than once, so each book is read once per build.
+    local statuses = {}
+    local function status(path)
+        if statuses[path] == nil then statuses[path] = { localStatus(path) } end
+        return statuses[path][1]
+    end
+    return Catalog.continueReading(self:entries(), historyPaths(self.plugin:getLibraryRoot()), nil, status)
 end
 
 function Home:defaultTab()

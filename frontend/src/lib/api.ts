@@ -501,6 +501,8 @@ export interface KoboSyncToken {
   sync_url: string | null;
   server_url: string;
   is_localhost: boolean;
+  /** False when the account lacks download permission: the Kobo's library sync is refused (#2807). */
+  download_allowed?: boolean;
 }
 
 /** A KOReader device waiting for its pairing code to be answered. The name is
@@ -824,6 +826,19 @@ function sessionIsGone(): Promise<boolean> {
  * which is a worse version of the symptom being fixed. */
 const SESSION_PROBE_TIMEOUT_MS = 5000;
 
+/** #2844: marks a fetch as the new UI's own. Behind a reverse proxy with its own
+ * Basic login the browser replays the proxy's credentials on every request; the
+ * server reads /api/v1 as a native client's app password only when this header
+ * is absent, so the proxy's login never signs a visitor in, out, or into a 401.
+ * Mirrored by WEB_CLIENT_HEADER in cps/api/__init__.py. */
+export const WEB_CLIENT_HEADERS = { 'X-CWNG-Client': 'web' } as const;
+
+function asWebClient(init: RequestInit): RequestInit {
+  const headers = new Headers(init.headers);
+  for (const [name, value] of Object.entries(WEB_CLIENT_HEADERS)) headers.set(name, value);
+  return { ...init, headers };
+}
+
 async function probeSession(): Promise<boolean> {
   let probe: Response;
   // AbortController rather than AbortSignal.timeout(): this ships to whatever
@@ -831,11 +846,11 @@ async function probeSession(): Promise<boolean> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), SESSION_PROBE_TIMEOUT_MS);
   try {
-    probe = await fetch(apiUrl('/api/v1/auth/me'), {
+    probe = await fetch(apiUrl('/api/v1/auth/me'), asWebClient({
       credentials: 'include',
       redirect: 'manual',
       signal: abort.signal,
-    });
+    }));
   } catch {
     // The probe could not reach the server, or ran out of time. That is evidence
     // about the network, not about the session — fail safe and keep the session.
@@ -879,7 +894,7 @@ async function classifiedFetch(
 ): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), init);
+    response = await fetch(apiUrl(path), asWebClient(init));
   } catch (error) {
     // A rejected fetch is a TRANSPORT failure — connection reset, read timeout,
     // DNS, offline, or a CORS-blocked redirect. None of those are proof that the

@@ -559,6 +559,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/121#issuecomment-4470001046",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#1244@2026-10-02T23:45:23Z": {
+  "hash": "dcab4876600d1788",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#1248@2026-07-30T10:50:47Z": {
   "hash": "55f3fbd608295782",
   "verdict": "fixed",
@@ -767,6 +774,13 @@
   "verdict": "fixed",
   "quote": "Huzzah! Thanks, this is very helpful. Works well for me!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/1702#issuecomment-5371754829",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#1703@2026-10-01T01:00:01Z": {
+  "hash": "64a3ca0976186076",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
   "by": "deepseek-v4.1-flash"
  },
  "issue#1706@2026-08-18T03:56:42Z": {
@@ -1029,9 +1043,9 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2248@2026-10-07T13:29:07Z": {
-  "hash": "2eded2fecc3a049b",
+  "hash": "df92a4c0d4681666",
   "verdict": "fixed",
-  "quote": "Aside from that, the feature is working as expected, thanks!",
+  "quote": "the feature is working as expected, thanks!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2248#issuecomment-6238373802",
   "by": "deepseek-v4.1-flash"
  },
@@ -1068,6 +1082,13 @@
   "verdict": "content",
   "quote": "Thanks for the extra fixes.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2264#issuecomment-5900764884",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2255@2026-10-04T01:13:23Z": {
+  "hash": "d7d20b4cd83b4283",
+  "verdict": "fixed",
+  "quote": "This fix well solved my problem~! perfect, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2255#issuecomment-6410268509",
   "by": "deepseek-v4.1-flash"
  },
  "issue#225@2026-05-22T02:01:08Z": {
@@ -1120,10 +1141,24 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2329@2026-10-09T20:42:53Z": {
-  "hash": "dc6200729d5fadbe",
+  "hash": "33bfa75eaedacb75",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6118474428",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2329@2026-10-25T04:47:13Z": {
+  "hash": "a1f5357f7d8661b7",
   "verdict": "not_fixed",
-  "quote": "Effectively made the app unusable.",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6387618590",
+  "quote": "Tried 4.1.55 this morning; hit a \"KOReader isn't responding\" while in the CWNGSync Library view",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6419057024",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2331@2026-10-02T13:15:25Z": {
+  "hash": "3faba3435ab27b1e",
+  "verdict": "content",
+  "quote": "I'm closing this one as I believe it's added - and we are able to add our own fonts anyway. \n\nThanks for the implementation!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2331#issuecomment-6460265603",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2334@2026-09-27T08:53:23Z": {
@@ -1145,6 +1180,13 @@
   "verdict": "fixed",
   "quote": "Fixed, thanks!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2341#issuecomment-6097234235",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2342@2026-10-18T08:39:57Z": {
+  "hash": "6b5318e58b392f50",
+  "verdict": "fixed",
+  "quote": "yes, it no longer fails with LDAP libs.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2342#issuecomment-6401845625",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2343@2026-09-28T00:49:18Z": {
@@ -1197,10 +1239,10 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2386@2026-10-10T12:09:34Z": {
-  "hash": "ffbacec2d75ef566",
-  "verdict": "partial",
-  "quote": "Sorry, for the first view it worked fine. But as soon I login again, the covers start loading again from scratch.",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2386#issuecomment-6098087376",
+  "hash": "8cbc5d65edf96290",
+  "verdict": "fixed",
+  "quote": "Meanwhile (v 4.1.54) it works perfectly fast! Thanks.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2386#issuecomment-6398604197",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2387@2026-09-30T20:52:40Z": {
@@ -1210,11 +1252,32 @@
   "evidence": "",
   "by": "review"
  },
+ "issue#2435@2026-10-05T05:30:13Z": {
+  "hash": "fbc81f4a26038cb9",
+  "verdict": "fixed",
+  "quote": "On v4.1.55 the same book got its metadata, rating included, reusing the existing `ratings` row, with no errors. Confirmed fixed, thanks again!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2435#issuecomment-6425380202",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2437@2026-10-05T17:15:34Z": {
+  "hash": "eea351fa8037d98b",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed, thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2437#issuecomment-6425408880",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2442@2026-10-11T05:10:11Z": {
   "hash": "62b35a4277da21d6",
   "verdict": "partial",
   "quote": "It pulls the data properly now with one exception so far. Titles with a colon : in the name are converted to underscore _. Other than that it seems to work as it should.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2442#issuecomment-6250095576",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2442@2026-10-18T16:36:08Z": {
+  "hash": "da23ca6b7452eaa7",
+  "verdict": "fixed",
+  "quote": "Just did a quick test and looks like it works thanks for this.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2442#issuecomment-6548126246",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2479@2026-10-07T16:49:58Z": {
@@ -1294,6 +1357,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2647#issuecomment-6267096452",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2670@2026-10-29T12:48:03Z": {
+  "hash": "f56b85bb78ca799e",
+  "verdict": "fixed",
+  "quote": "Confirmed fixed. Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2670#issuecomment-6527378634",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2673@2026-10-20T16:18:06Z": {
   "hash": "c8e6583e3471fa99",
   "verdict": "fixed",
@@ -1315,11 +1385,95 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2699#issuecomment-6383492490",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2710@2026-10-24T04:17:35Z": {
+  "hash": "4f281a3492512762",
+  "verdict": "fixed",
+  "quote": "Confirmed! Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2710#issuecomment-6393652341",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2747@2026-10-28T20:40:03Z": {
+  "hash": "fd3dedfd3b48246c",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2750@2026-10-29T05:11:15Z": {
+  "hash": "18803b6b3a848b8b",
+  "verdict": "fixed",
+  "quote": "I can confirm that if I enable \"Share my place\", the currently reading smart shelf show the in progress books, which resolves my issue.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2750#issuecomment-6492166215",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2765@2026-10-30T04:17:41Z": {
+  "hash": "4414b12aaf5c6d01",
+  "verdict": "fixed",
+  "quote": "Yes this is sorted now. Thanks!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2765#issuecomment-6588418480",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#276@2026-05-21T20:53:22Z": {
   "hash": "dab949a11c3712d5",
   "verdict": "fixed",
   "quote": "That's fantastic, thank you! Works well for me.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/276#issuecomment-4512957199",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2783@2026-11-01T00:23:17Z": {
+  "hash": "be2ecb8ec5ef3ce1",
+  "verdict": "partial",
+  "quote": "Syncing TO Justread: JustRead still doesn’t pull progress when I read on either the web reader or Kobo (share place enabled on both)\n\nSyncing FROM JustRead: If I read ahead on JustRead, it does now seem to push to CWNG.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6591061911",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2783@2026-11-03T04:24:54Z": {
+  "hash": "89b3d88f38b88d5e",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "issue#2783@2026-11-03T16:22:11Z": {
+  "hash": "39fe7e78a023a605",
+  "verdict": "partial",
+  "quote": "JustRead and the web reader now sync with each other nicely. However, two things seem to be stopping places reaching the Kobo:",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6643117884",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2797@2026-11-04T02:37:03Z": {
+  "hash": "c0d286009cc4beb9",
+  "verdict": "partial",
+  "quote": "Libby and Kobo Store load correctly, syncing _seems_ to fail (same behaviour as before with proxy `on`)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6722361901",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2797@2026-11-08T15:18:41Z": {
+  "hash": "c106cbcba4ab49cd",
+  "verdict": "fixed",
+  "quote": "That seems to fix it for me, I am both able to access the store and Libby, as well as sync.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6727615735",
+  "by": "review"
+ },
+ "issue#2797@2026-11-09T11:18:48Z": {
+  "hash": "990c1239a2af393a",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
+ "issue#2798@2026-11-03T09:49:22Z": {
+  "hash": "3bc86699ef644b8a",
+  "verdict": "fixed",
+  "quote": "Based on installing plugins in an empty test install, this seems to be working now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2798#issuecomment-6723539211",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2807@2026-11-08T19:17:52Z": {
+  "hash": "8e5eb4b01da12ada",
+  "verdict": "fixed",
+  "quote": "After checking the \"Share my place\" setting I now see my progress tracked in the book page so I think everything is good now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2807#issuecomment-6733404059",
   "by": "deepseek-v4.1-flash"
  },
  "issue#283@2026-05-21T17:41:55Z": {
@@ -1463,10 +1617,10 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#324@2026-09-24T04:46:25Z": {
-  "hash": "6d95bc739398a454",
+  "hash": "6c1497f8e9d7088b",
   "verdict": "not_fixed",
-  "quote": "Hmm, nothing seems to work for me in 4.1.51 (between native Kobo and Web Reader).",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-6352552291",
+  "quote": "it was again at the beggining, and the popup never appeared again",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/324#issuecomment-6413581350",
   "by": "deepseek-v4.1-flash"
  },
  "issue#331@2026-05-27T05:31:40Z": {
@@ -2377,6 +2531,13 @@
   "verdict": "fixed",
   "quote": "I updated to v4.1.13 and the missing fields in the new UI are there. Thx.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/878#issuecomment-4979997521",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#917@2026-10-02T15:08:35Z": {
+  "hash": "074e01562f4e9e75",
+  "verdict": "content",
+  "quote": "I'm so sorry for my late reply, but thank you so much for this. Much much appreciated.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/917#issuecomment-6562039101",
   "by": "deepseek-v4.1-flash"
  },
  "issue#928@2026-07-16T14:33:57Z": {

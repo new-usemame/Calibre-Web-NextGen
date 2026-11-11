@@ -262,7 +262,11 @@ def _resume_member_bounds(raw, member_end, info):
     import struct
     import zlib
 
-    if (info.flag_bits & ~0x80e
+    # Allowed flag bits: 0x2/0x4 (deflate level hint), 0x8 (data descriptor),
+    # 0x10 ("enhanced deflating", which only means something for Deflate64 and
+    # is ignored by zlib and JSZip for the stored/deflate methods accepted below;
+    # some EPUB writers set it on every member) and 0x800 (UTF-8 names).
+    if (info.flag_bits & ~0x81e
             or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
             or (not info.flag_bits & 0x800 and not info.orig_filename.isascii())):
         raise ValueError("unsupported resume ZIP member encoding")

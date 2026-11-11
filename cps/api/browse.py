@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Entity-list browse endpoints for /api/v1."""
+import re
+
 from ..unicode_collation import locale_sort_key
 from flask import abort, jsonify, request
 from flask_babel import gettext as _
@@ -17,29 +19,73 @@ from ..usermanagement import login_required_if_no_ano
 @api_v1.route("/authors")
 @login_required_if_no_ano
 def list_authors():
-    rows = (calibre_db.session.query(db.Authors, func.count('books_authors_link.book').label('count'))
-            .join(db.books_authors_link)
-            .join(db.Books)
-            .filter(calibre_db.common_filters())
-            .group_by(text('books_authors_link.author'))
-            .order_by(locale_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
-            .all())
-    items = [{"id": a.id, "name": a.name.replace("|", ","), "count": cnt} for a, cnt in rows]
-    return {"items": items}
+    return _list_browse_entities(db.Authors, db.books_authors_link, 'author', authors=True)
 
 
 @api_v1.route("/series")
 @login_required_if_no_ano
 def list_series():
-    rows = (calibre_db.session.query(db.Series, func.count('books_series_link.book').label('count'))
-            .join(db.books_series_link)
+    return _list_browse_entities(db.Series, db.books_series_link, 'series')
+
+
+def _list_browse_entities(entity, link, foreign_key, authors=False):
+    """Filter grouped book counts before paging; legacy callers omit limit."""
+    try:
+        values = {}
+        for key, minimum, maximum in (('limit', 1, 500), ('offset', 0, None), ('min_count', 1, None)):
+            raw = request.args.get(key)
+            if raw is not None:
+                if not raw.isascii() or not raw.isdecimal():
+                    raise ValueError(key)
+                value = int(raw)
+                if value < minimum or (maximum is not None and value > maximum):
+                    raise ValueError(key)
+                values[key] = value
+        # Reject ambiguous repeated parameters, including q on the legacy path.
+        if any(len(request.args.getlist(key)) > 1 for key in ('limit', 'offset', 'q', 'min_count')):
+            raise ValueError('Repeated browse parameter')
+        needle = request.args.get('q', '')
+        if '\x00' in needle:
+            raise ValueError('Invalid name filter')
+    except ValueError:
+        return jsonify({"error": {"code": "bad_request", "message": "Invalid browse parameters"}}), 400
+
+    count = func.count(link.c.book)
+    base = (calibre_db.session.query(entity, count.label('count'))
+            .join(link)
             .join(db.Books)
             .filter(calibre_db.common_filters())
-            .group_by(text('books_series_link.series'))
-            .order_by(locale_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
-            .all())
-    items = [{"id": s.id, "name": s.name, "count": cnt} for s, cnt in rows]
-    return {"items": items}
+            .group_by(link.c[foreign_key]))
+    query = base
+    if needle:
+        displayed_name = func.replace(entity.name, '|', ',') if authors else entity.name
+        # SQLAlchemy's SQLite REGEXP handles Unicode case, without the accent
+        # transliteration of this database's custom lower(). Escape the input
+        # so punctuation (including SQL LIKE wildcards) stays literal.
+        query = query.filter(displayed_name.regexp_match('(?i)' + re.escape(needle)))
+    if 'min_count' in values:
+        # SQLite counts are signed 64-bit integers, even for a larger input.
+        query = query.having(count >= min(values['min_count'], 2**63 - 1))
+
+    def total_rows(grouped):
+        return calibre_db.session.query(func.count()).select_from(
+            grouped.with_entities(entity.id).subquery()).scalar()
+
+    response = {}
+    if 'limit' in values:
+        total = total_rows(query)
+        unfiltered_total = total_rows(base) if needle or 'min_count' in values else total
+        offset = values.get('offset', 0)
+        next_offset = offset + values['limit']
+        response.update(total=total, unfiltered_total=unfiltered_total,
+                        next_offset=next_offset if next_offset < total else None)
+        query = query.order_by(locale_sort_key(entity.sort), entity.sort, entity.id)
+        rows = query.limit(values['limit']).offset(offset).all() if offset < total else []
+    else:
+        rows = query.order_by(locale_sort_key(entity.sort), entity.sort, entity.id).all()
+    response['items'] = [{"id": row.id, "name": row.name.replace('|', ',') if authors else row.name,
+                          "count": books} for row, books in rows]
+    return response
 
 
 @api_v1.route("/tags")

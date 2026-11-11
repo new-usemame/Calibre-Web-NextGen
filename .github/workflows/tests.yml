@@ -495,7 +495,11 @@ jobs:
   # ============================================================================
   e2e-tests:
     name: E2E Tests (SPA)
-    runs-on: ubuntu-latest
+    # Pinned: on the ubuntu-26.04 image (ubuntu-latest from 2026-11) the
+    # Playwright WebKit build cannot launch (it links libicu*.so.74; 26.04
+    # ships libicu78), which failed every WebKit project. Move this pin only
+    # together with a Playwright release that supports the newer image.
+    runs-on: ubuntu-24.04
     # `always()` matters: changed_paths only runs on PRs, and without it a
     # skipped dependency would drag the tag and dispatch runs down with it —
     # silently turning the release gate off, which is the exact class of
@@ -990,7 +994,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
       # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for

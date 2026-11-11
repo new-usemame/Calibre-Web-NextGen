@@ -4267,57 +4267,12 @@ def read_book(book_id, book_format):
         except Exception as e:
             log.debug(f"Failed to log read activity: {e}")
 
-    # CWA #1364 fix: bump `book_read_link.last_time_started_reading` and
-    # `times_started_reading` when an authenticated user opens the web
-    # reader. The Kobo + KOSync code paths already do this; the web
-    # reader was the only book-opening surface that never wrote to
-    # those fields, so a user who only reads through the browser had
-    # no "read history" recorded at all (`/read`, `/unread` filters
-    # never reflected web-reader activity).
-    #
-    # Debounce: only bump the counter when the transition is into
-    # IN_PROGRESS from a NON-in-progress state. A user refreshing the
-    # reader tab or hitting Back/Forward doesn't count as a new
-    # reading session. Always touch `last_time_started_reading` so
-    # "recently read" sorting reflects every open.
+    # CWA #1364: record the open (Currently Reading, session count, last-open
+    # time). Shared with the new UI reader's reader-open call (#2750).
     if current_user.is_authenticated and not lookup_mode:
         try:
-            from .services.share_place import gates_enforced
-            if gates_enforced(int(current_user.id)):
-                reading_position.record_gated_reader_open(current_user, book_id)
-            else:
-                read_row = ub.session.query(ub.ReadBook).filter(
-                    ub.ReadBook.user_id == int(current_user.id),
-                    ub.ReadBook.book_id == book_id,
-                ).first()
-                now = datetime.now(timezone.utc)
-                if read_row is None:
-                    read_row = ub.ReadBook(
-                        user_id=int(current_user.id),
-                        book_id=book_id,
-                        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
-                        times_started_reading=1,
-                        last_time_started_reading=now,
-                        read_status_choice_at=now,
-                    )
-                    ub.session.add(read_row)
-                else:
-                    prev_status = read_row.read_status or 0
-                    can_resume = True
-                    if (prev_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
-                                        ub.ReadBook.STATUS_ON_HOLD)
-                            and config.config_read_column):
-                        # Opening the ordinary reader is an explicit resume. A
-                        # prior shared finished marker must not mask that resume.
-                        can_resume = helper.set_custom_read_column_value(
-                            book_id, False, source="web reader resume")
-                    if prev_status != ub.ReadBook.STATUS_IN_PROGRESS \
-                            and prev_status != ub.ReadBook.STATUS_FINISHED and can_resume:
-                        read_row.times_started_reading = (read_row.times_started_reading or 0) + 1
-                        read_row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
-                    if can_resume and prev_status != ub.ReadBook.STATUS_FINISHED:
-                        read_row.read_status_choice_at = now
-                    read_row.last_time_started_reading = now
+            from .services.read_status import record_reader_open
+            record_reader_open(current_user, book_id)
             ub.session_commit()
         except Exception as e:
             log.debug(f"Failed to record web reader open in book_read_link: {e}")

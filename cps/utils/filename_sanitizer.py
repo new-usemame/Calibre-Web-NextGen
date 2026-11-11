@@ -27,10 +27,13 @@ def strip_whitespaces(text: str) -> str:
 def get_valid_filename_shared(value: str,
                                replace_whitespace: bool = True,
                                chars: int = 128,
-                               unicode_filename: bool = False) -> str:
+                               unicode_filename: bool = False,
+                               keep_colon: bool = False) -> str:
     """Mirror cps.helper.get_valid_filename but without relying on CPS config.
     - unicode_filename: if True, transliterate using unidecode to ASCII.
     - chars: max length in UTF-8 safe truncation.
+    - keep_colon: leave ":" alone. Only for names that never reach a disk
+      (an emailed attachment); every other caller keeps the default.
     """
     if not isinstance(value, str):
         value = str(value) if value is not None else ""
@@ -38,14 +41,17 @@ def get_valid_filename_shared(value: str,
     if value[-1:] == '.':
         value = value[:-1] + '_'
 
-    value = value.replace("/", "_").replace(":", "_").strip('\0')
+    value = value.replace("/", "_")
+    if not keep_colon:
+        value = value.replace(":", "_")
+    value = value.strip('\0')
 
     if unicode_filename and unidecode is not None:
         value = unidecode.unidecode(value)
 
     if replace_whitespace:
         #  *+:\"/<>? are replaced by _
-        value = re.sub(r'[*+:\\\"/<>?]+', '_', value, flags=re.U)
+        value = re.sub(r'[*+\\\"/<>?]+' if keep_colon else r'[*+:\\\"/<>?]+', '_', value, flags=re.U)
         # pipe has to be replaced with comma
         value = re.sub(r'[|]+', ',', value, flags=re.U)
 

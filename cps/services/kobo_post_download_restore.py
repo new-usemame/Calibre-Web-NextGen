@@ -281,7 +281,7 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
 
 
 def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
-                     session, log):
+                     session, log, book_id=None):
     """Confirm this attempt's file proof without changing annotation restore.
 
     A failed or incomplete stream never reaches this seam. A replacement file, another
@@ -289,9 +289,14 @@ def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
     the earlier attempt's identity. No content/hash work runs on the request.
     """
     if not file_identity:
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                  "no readable library KEPUB was identified when the download began",
+                  book_id, download_id)
         return False
     from .kobo_place_gate import _readable_kepub_identity
     if file_identity != _readable_kepub_identity(kepub_path):
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                  "the library KEPUB changed during the download", book_id, download_id)
         return False
     table = ub.KoboDeviceBookDownload.__table__
     try:
@@ -310,7 +315,13 @@ def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
                     download_id, exc_info=True)
         return False
     if confirmed:
+        log.debug("Kobo download of book %s (attempt %s): completion recorded",
+                  book_id, download_id)
         _re_send_shared_place(download_id, session=session, log=log)
+    else:
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                  "the download was superseded (a newer download of the book, or the "
+                  "book was sent to this Kobo again)", book_id, download_id)
     return confirmed
 
 
@@ -336,7 +347,8 @@ def _re_send_shared_place(download_id, *, session, log):
 
 
 def completed_download_body(body, *, application, bind, download_id,
-                            downloaded_at, file_identity, kepub_path, headers, log):
+                            downloaded_at, file_identity, kepub_path, headers, log,
+                            book_id=None):
     """Confirm only natural exhaustion matching the declared byte count.
 
     No context or session is held while yielding bytes. The independent
@@ -347,20 +359,37 @@ def completed_download_body(body, *, application, bind, download_id,
     if (content_length is None or content_length <= 0
             or "X-Sendfile" in headers or "X-Accel-Redirect" in headers):
         # Delegated transfers and lengthless streams cannot prove a full file.
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: %s",
+                  book_id, download_id,
+                  "the file was handed to the front-end server (X-Sendfile)"
+                  if ("X-Sendfile" in headers or "X-Accel-Redirect" in headers)
+                  else "the response declared no length")
         return body
 
     def stream():
         yielded = 0
-        for chunk in body:
-            yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
-            yield chunk
+        try:
+            for chunk in body:
+                yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
+                yield chunk
+        except BaseException as stopped:
+            # A dropped connection closes this generator (GeneratorExit); a
+            # failing file raises. Either way the Kobo did not get the file.
+            log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                      "the transfer stopped after %s of %s bytes (%s)",
+                      book_id, download_id, yielded, content_length,
+                      type(stopped).__name__)
+            raise
         if yielded != content_length:
+            log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                      "the response ended after %s of %s bytes",
+                      book_id, download_id, yielded, content_length)
             return
         try:
             with application.app_context(), sessionmaker(bind=bind)() as owned:
                 confirm_download(download_id=download_id, downloaded_at=downloaded_at,
                                  file_identity=file_identity, kepub_path=kepub_path,
-                                 session=owned, log=log)
+                                 session=owned, log=log, book_id=book_id)
         except Exception:
             # Proof is best effort; a persistence failure must not fail a body
             # already delivered. The owned session is rolled back and closed.

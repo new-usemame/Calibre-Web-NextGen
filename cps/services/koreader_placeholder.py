@@ -49,7 +49,7 @@ MIN_COVER_SIDE = 120
 # How placeholders look. A device replaces a placeholder only when its book's
 # ``rev`` changes, and ``rev`` includes this: bump it whenever a change here
 # alters the bytes of existing placeholders, so devices fetch them again.
-LAYOUT = 2
+LAYOUT = 3
 _ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 _CONTAINER = """<?xml version="1.0" encoding="UTF-8"?>
@@ -211,10 +211,15 @@ def cover_jpeg(cover_path, title, authors):
     return output.getvalue()
 
 
-def _opf(*, book_id, title, authors, series, series_index, language, modified):
+def _opf(*, book_id, title, authors, series, series_index, language, modified,
+         tags=()):
     creators = "\n".join(
         '    <dc:creator id="creator%d">%s</dc:creator>' % (index, escape(name))
         for index, name in enumerate(authors or (), start=1))
+    # One dc:subject per Calibre tag: what KOReader shows as Keywords and what
+    # anything grouping books by tag on the device reads (#2792).
+    subjects = "".join("\n    <dc:subject>%s</dc:subject>" % escape(name)
+                       for name in tags or ())
     series_meta = ""
     if series:
         index_text = ("%g" % series_index) if series_index is not None else "1"
@@ -231,7 +236,7 @@ def _opf(*, book_id, title, authors, series, series_index, language, modified):
     <dc:identifier id="bookid">urn:cwng:book:%(id)d</dc:identifier>
     <dc:title>%(title)s</dc:title>
 %(creators)s
-    <dc:language>%(lang_text)s</dc:language>
+    <dc:language>%(lang_text)s</dc:language>%(subjects)s
     <meta property="dcterms:modified">%(modified)s</meta>
     <meta name="cover" content="cover-image"/>
     <meta name="cwng:placeholder" content="%(id)d"/>%(series)s
@@ -255,6 +260,7 @@ def _opf(*, book_id, title, authors, series, series_index, language, modified):
         "id": book_id, "title": escape(title or ""), "creators": creators,
         "lang": quoteattr(language), "lang_text": escape(language),
         "modified": escape(modified), "series": series_meta,
+        "subjects": subjects,
     }
 
 
@@ -331,7 +337,7 @@ def _page(*, title, authors, language, heading, lines):
 
 
 def build(*, book_id, rev, title, authors, series, series_index, cover_path,
-          language, modified, heading, lines):
+          language, modified, heading, lines, tags=()):
     """Return the placeholder EPUB for one book as bytes."""
     book_id = int(book_id)
     language = language or "en"
@@ -343,7 +349,7 @@ def build(*, book_id, rev, title, authors, series, series_index, cover_path,
         ("OEBPS/content.opf", _opf(
             book_id=book_id, title=title, authors=authors, series=series,
             series_index=series_index, language=language,
-            modified=modified).encode("utf-8"), zipfile.ZIP_DEFLATED),
+            modified=modified, tags=tags).encode("utf-8"), zipfile.ZIP_DEFLATED),
         ("OEBPS/nav.xhtml", _nav(title, language).encode("utf-8"), zipfile.ZIP_DEFLATED),
         ("OEBPS/toc.ncx", _ncx(book_id, title).encode("utf-8"), zipfile.ZIP_DEFLATED),
         ("OEBPS/cover.xhtml", _cover_page(title, language).encode("utf-8"),

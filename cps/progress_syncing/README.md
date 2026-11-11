@@ -178,10 +178,241 @@ means "ask for these and you get something". A book with no progress at all
 returns `{}`. The server also logs the withholding at WARNING with the
 parameter to send, so it is diagnosable from the server side too.
 
+With Share my place on (the default), a device that is not sharing keeps its
+place to itself. When the only places for a book belong to such devices, the
+otherwise-empty response says how many of the account's other active devices
+hold one (#2841):
+
+```jsonc
+{ "places_not_shared": 1 }
+```
+
+It is a count only, for the same account, and never names a device or a
+position. A client can use it to explain why no place arrived: places travel
+between devices only when both the device that set the place and the one asking
+have Share my place on. `GET /kosync/users/auth` sent with `X-CWNG-Device-ID` for a device
+the server already knows also returns `"share_place": true|false` for that
+device; an unknown device gets no such field.
+
 `percentage` is a decimal fraction on the wire (`0.4567` = 45.67%), which is
-KOReader's format; it is stored as 0–100 internally. Progress is furthest-wins
-across producers, so a lower percentage is dropped rather than dragging a
+KOReader's format; it is stored as 0–100 internally. For a client that does
+not send `X-CWNG-Device-ID` (below), progress is furthest-wins across
+producers, so a lower percentage is dropped rather than dragging a
 device backwards — a deliberate flip back to re-read a chapter does not travel.
+
+The `PUT /kosync/syncs/progress` reply says what happened to the push (#2843),
+on top of KOReader's `document` and `timestamp`:
+
+```jsonc
+{ "document": "…", "timestamp": 1794175156,
+  "accepted": false, "shared": true, "kept_percentage": 0.3 }
+```
+
+`accepted` is true when this push is now the place kept for it: the shared
+place, or the device's own place when that device is not sharing. `shared` is
+false when the device's Share my place is off, so the place stays on that
+device. When `accepted` is false, `kept_percentage` is the place kept instead,
+as a fraction like `percentage`. Stock KOReader ignores all three.
+
+### Feature detection: `GET /kosync/users/auth`
+
+A client should not guess what this server supports from its version. The
+auth reply names it:
+
+```bash
+curl -s -u alice:APP_PASSWORD \
+     -H 'X-CWNG-Device-ID: 3f2a9c1e-reader-1' -H 'X-CWNG-Device-Name: Reader 1' \
+     https://cwng.example/kosync/users/auth
+```
+
+```jsonc
+{ "authorized": "OK",
+  "capabilities": ["position_kinds", "percentage_push", "anchor", "book_id_document",
+                   "annotations_text_quote", "sleep_screen_v1"],
+  "share_place_gates": true,
+  "share_place": false }   // only for a device the server already knows
+```
+
+| Capability | What it means |
+|---|---|
+| `position_kinds` | `GET` honours `?position_kinds=` (see above). |
+| `percentage_push` | `PUT /kosync/syncs/progress` accepts `position_kind: "percentage"` with no `progress`. |
+| `anchor` | A percentage `PUT` may carry an `anchor`, and `GET` returns one on `?position_kinds=…,anchor`. |
+| `book_id_document` | A decimal Calibre book id is accepted as `document`, alongside the KOReader digest. |
+| `annotations_text_quote` | `/kosync/syncs/annotations` places pushed `text_quote` highlights and, on `?text_quote=1`, names pulled ones by their words. |
+| `sleep_screen_v1` | The sleep-screen routes used by our own plugin. |
+
+`share_place_gates` is `true` when Share my place is enforced for this account
+(the default; an administrator can turn it off with `CWNG_SHARE_PLACE_GATES`).
+When it is `false`, every device shares and the rules below about private
+places do not apply. A stock KOReader plugin reads only the status code, so
+none of these fields affect it.
+
+### Identifying your device
+
+Send these two headers on every KOSync request (auth, progress and
+annotations):
+
+| Header | Value |
+|---|---|
+| `X-CWNG-Device-ID` | A stable id you generate once per install: printable, up to 100 characters. The server stores only a keyed hash of it. |
+| `X-CWNG-Device-Name` | What the account owner sees on the Devices page, for example `Reader 1`. |
+
+The first progress `PUT` with the header registers the device on the account,
+with Share my place **off**. The owner can turn it on per device on the Devices
+page. A `GET` never registers a device, so read-only use leaves no trace.
+
+The header changes how your pushes are judged, and this is the part most worth
+knowing:
+
+| | No header (plain KOSync) | With `X-CWNG-Device-ID` |
+|---|---|---|
+| Who wins | The **furthest** place across all devices. A backward move is dropped. | The **latest** report by the client's clock, so a backward move (re-reading a chapter) lands. |
+| Share my place | Not honoured: the device always shares. | Honoured per device. A device that is not sharing keeps its own place, and `GET` returns that place to it. |
+| Clock | Ignored. | The `timestamp` in the `PUT` body, in Unix seconds, is used as the time of the report. One missing, before 2000, or more than five minutes ahead of the server is replaced by the time the server received it. |
+
+The latest-wins rule applies only when the book is matched in the library; a
+push for a document the server cannot match stays on the plain path. A
+headerless push whose body `device_id` names a reader that was earlier seen
+with the header is treated as that reader (this is how KOReader's built-in
+Progress sync and our plugin share one device).
+
+An account holds at most 20 KOReader-protocol devices. Past that a new id is
+not registered and its pushes take the plain, always-shared path; the server
+logs this once. When the owner removes a device, its progress `PUT`s are
+refused until they restore it:
+
+```jsonc
+// HTTP 409
+{ "error": "device_inactive",
+  "message": "This device was removed from the account, so it no longer syncs" }
+```
+
+Stop pushing and tell the user; retrying does not help.
+
+### Writing a position: `PUT /kosync/syncs/progress`
+
+A client with an engine locator sends the stock KOSync body (`document`,
+`progress`, `percentage`, `device`, optional `device_id`). A client without
+one, such as a text-to-speech player or a plain-text renderer, says so with
+`position_kind: "percentage"` and leaves `progress` out. It may add an
+`anchor`, the words at its place:
+
+```bash
+curl -s -u alice:APP_PASSWORD -X PUT \
+     -H 'Content-Type: application/json' \
+     -H 'X-CWNG-Device-ID: 3f2a9c1e-reader-1' -H 'X-CWNG-Device-Name: Reader 1' \
+     -d '{"document": "221", "position_kind": "percentage", "percentage": 0.42,
+          "device": "Reader 1", "timestamp": 1794175156,
+          "anchor": {"text": "lighthouse",
+                     "before": "she walked down to the old",
+                     "after": "and waited for the boat"}}' \
+     https://cwng.example/kosync/syncs/progress
+```
+
+- `anchor.text` is required and is the word or words at the position;
+  `before` and `after` are optional context, up to 8 words each is plenty.
+  Limits: 200 characters for `text`, 600 for each context field. A longer
+  field is refused with a 400, not clipped.
+- `anchor` without `position_kind: "percentage"` is a 400, and so is a
+  `progress` value alongside it.
+- The server looks for the words in the library EPUB, ignoring case, accents,
+  whitespace and quote or dash style. When it finds them, the place is stored
+  as a locator in that EPUB, so KOReader, the web reader and a Kobo land on the
+  same sentence, and the stored percentage becomes where those words are in
+  the EPUB. Your percentage then only chooses between repeats of the same
+  words. When they are not found, your percentage is stored as is.
+- `"document": "221"` uses the `book_id_document` capability; the KOReader
+  digest works too.
+
+To read the place back as words, ask for the `anchor` kind:
+
+```bash
+curl -s -u alice:APP_PASSWORD -H 'X-CWNG-Device-ID: 3f2a9c1e-reader-1' \
+     'https://cwng.example/kosync/syncs/progress/221?position_kinds=locator,percentage,anchor'
+```
+
+```jsonc
+{ "document": "221", "progress": "/body/DocFragment[10]/body/div/p[4]/text().19",
+  "position_kind": "locator", "percentage": 0.3972, "device": "Reader 1",
+  "timestamp": 1794175300,
+  "anchor": { "text": "lighthouse", "before": "…", "after": "…" } }
+```
+
+Here the anchor pushed above was found, so the place is a locator and
+`percentage` is where those words sit in the EPUB, not the 0.42 that was sent.
+`anchor` is present only when the server could turn the winning place into
+words in the library EPUB and the account may read that book. A device that
+is not sharing gets its own place back as a percentage, without an
+`anchor`.
+
+### Highlights and notes: `/kosync/syncs/annotations`
+
+```
+GET /kosync/syncs/annotations/<document>[?text_quote=1]   server -> device
+PUT /kosync/syncs/annotations                             device -> server
+```
+
+Each annotation travels as one portable object (`annotation_id`, `type`,
+`highlighted_text`, `note_text`, `color`, `hidden`, `source`, the anchor
+fields, and `text_quote`). Send the device headers on both.
+
+**Pull.** The reply always has `book_known`:
+
+```jsonc
+{ "document": "…", "calibre_book_id": 221, "book_known": true,
+  "annotations": [ … ], "annotation_count": 3,
+  "foreign_annotation_ids": ["…"] }   // only when X-CWNG-Device-ID names a known device
+```
+
+`book_known: false` with an empty list means the server does not know this
+book, not that it has no highlights. Never delete local highlights to match
+that reply. If `book_known` is absent you are talking to an older server: be
+just as careful. Hidden rows are included so you can mirror a deletion made
+elsewhere. With `?text_quote=1`, a highlight whose words could be found in the
+library EPUB also carries `text_quote: {"exact", "prefix", "suffix"}`.
+
+**Push.** A client without an engine anchor names each highlight by its words:
+
+```bash
+curl -s -u alice:APP_PASSWORD -X PUT -H 'Content-Type: application/json' \
+     -H 'X-CWNG-Device-ID: 3f2a9c1e-reader-1' -H 'X-CWNG-Device-Name: Reader 1' \
+     -d '{"document": "221", "device_id": "3f2a9c1e-reader-1", "device": "Reader 1",
+          "delete_source": "textquote",
+          "annotations": [{"annotation_id": "reader1-0007", "type": "highlight",
+                           "source": "textquote", "percentage": 0.42,
+                           "text_quote": {"exact": "the old lighthouse",
+                                          "prefix": "she walked down to",
+                                          "suffix": "and waited"}}],
+          "deleted": ["reader1-0003"]}' \
+     https://cwng.example/kosync/syncs/annotations
+```
+
+```jsonc
+{ "document": "221", "calibre_book_id": 221, "matched": true,
+  "created": 1, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0,
+  "resolved": ["reader1-0007"], "unresolved": [], "reconciled": true }
+```
+
+`reconciled: true` means the push named deletions. `deleted` counts the rows
+actually hidden, so naming an id the server never had, or one already
+deleted, reports `deleted: 0`.
+
+- `annotation_id` is yours to choose and must stay stable for that highlight.
+- A quote found in the library EPUB is stored as a KOReader locator range and
+  listed in `resolved`; one not found is kept with the quote as its only anchor
+  and listed in `unresolved`. `percentage` (0 to 1) only picks between repeats.
+  `exact` may be up to 4000 characters.
+- **Deletions are named, never inferred.** List the ids the user deleted in
+  `deleted`. Leaving a highlight out of `annotations` deletes nothing.
+  `delete_source` says whose rows you may delete: `koreader` (the default) or
+  `textquote`. A push can never delete a Kobo or web-reader highlight, or one
+  another identified device made.
+- `matched: false` (still HTTP 200) means the server could not match the book
+  and **saved nothing**. Treat it as a failure to report, not a success.
+- The device that made a highlight is recorded, so its own rows are not echoed
+  back as someone else's; `foreign_annotation_ids` on pull lists rows other
+  devices made.
 
 ## Testing
 

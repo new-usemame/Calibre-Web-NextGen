@@ -616,6 +616,9 @@ def get_send_filename(book, book_format):
             template, book, calibre_db.session,
             unicode_filename=bool(config.config_unicode_filename),
             ordered_authors=calibre_db.order_authors([book]), sort_names=False,
+            # An emailed attachment name never lands on our disk, so a colon
+            # in the title can arrive intact (#2650).
+            keep_colon=True,
         )
         return basename + "." + book_format.lower()
     except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
@@ -2360,12 +2363,16 @@ def get_book_cover_internal(book, resolution=None):
             # Determine which thumbnail format to serve based on request context
             try:
                 from flask import has_request_context, request
-                is_kobo_request = (has_request_context() and
-                                 request.path and
-                                 '/kobo/' in request.path)
+                # Kobo devices and OPDS clients get JPEG: the OPDS feed
+                # declares image/jpeg, and e-reader OPDS clients cannot all
+                # decode WebP (#2845).
+                wants_jpeg = (has_request_context() and
+                              request.path and
+                              ('/kobo/' in request.path
+                               or request.path.startswith('/opds/')))
 
-                # Prefer jpg for Kobo requests, webp for web requests
-                if is_kobo_request:
+                # Prefer jpg for Kobo and OPDS requests, webp for web requests
+                if wants_jpeg:
                     thumbnail_to_serve = jpg_thumb if jpg_exists else (webp_thumb if webp_exists else None)
                 else:
                     thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
@@ -3753,10 +3760,24 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 bind=ub.session.get_bind(), download_id=download_proof[0],
                 downloaded_at=download_proof[1], file_identity=download_proof[2],
                 kepub_path=kepub_path, headers=response.headers, log=log,
+                book_id=book.id,
             )
         except Exception:
             log.warning("Could not track Kobo download completion for book %s",
                         book.id, exc_info=True)
+    elif download_proof:
+        # #2804: a download that cannot count as proof says why, so a held
+        # place in a later sync can be traced back to this request.
+        if request.method != "GET":
+            why = "a %s request carries no file" % request.method
+        elif "Range" in request.headers:
+            why = "a Range request (%s) is only part of the file" % request.headers["Range"]
+        elif response.status_code != 200:
+            why = "the response status was %s" % response.status_code
+        else:
+            why = ("the server is %s; only the gevent server can tell that a transfer finished"
+                   % (request.environ.get("SERVER_SOFTWARE") or "unknown"))
+        log.debug("Kobo download of book %s: completion not recorded: %s", book.id, why)
     return response
 
 

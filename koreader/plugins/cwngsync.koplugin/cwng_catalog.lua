@@ -194,11 +194,28 @@ function Catalog.recentlyAdded(entries, limit)
     return list
 end
 
+-- KOReader's status for a book on this device, or nil when the book has no
+-- progress here. info is BookList's { been_opened, status, percent_finished }
+-- plus, from the sidecar, has_summary and reset. Delete removes the sidecar
+-- (been_opened false). Reset keeps the sidecar but deletes its summary and
+-- marks it docsettings_reset_done, and BookList then reports "reading". Every
+-- open saves summary.status, so a book read here always has a summary, even
+-- with the status bar off (which leaves percent_finished unset).
+function Catalog.deviceStatus(info)
+    if type(info) ~= "table" or not info.been_opened then return nil end
+    local status = info.status
+    if status == nil or status == "new" then return nil end
+    if info.reset then return nil end
+    if info.has_summary == false and not ((tonumber(info.percent_finished) or 0) > 0) then return nil end
+    return status
+end
+
 -- Books being read: first those opened on this device, most recent first
 -- (KOReader's history), then books being read elsewhere (another e-reader,
 -- the web reader) by when they were last read. A finished book is not
 -- "continue reading", wherever it was finished. local_status(path) gives
--- KOReader's own status for a book on this device, or nil.
+-- KOReader's own status for a book on this device, or nil when it has no
+-- progress here (never opened, Reset, or deleted).
 function Catalog.continueReading(entries, history_paths, limit, local_status)
     local by_path = {}
     for _, e in ipairs(entries) do by_path[e.path] = e end
@@ -209,9 +226,17 @@ function Catalog.continueReading(entries, history_paths, limit, local_status)
         if status == nil and e.read_status == "finished" then return true end
         return false
     end
+    -- Opening a book once puts it in KOReader's history for good: Reset and
+    -- Delete leave the entry behind (#2732). So a history entry with no
+    -- progress on this device counts only when the server says it is being
+    -- read; otherwise the server's unread wins.
+    local function opened_here(e)
+        if not local_status then return true end
+        return local_status(e.path) ~= nil or e.read_status == "reading"
+    end
     for _, path in ipairs(history_paths or {}) do
         local e = by_path[path]
-        if e and not seen[e.book_id] and not finished(e) then
+        if e and not seen[e.book_id] and not finished(e) and opened_here(e) then
             seen[e.book_id] = true
             list[#list + 1] = e
         end

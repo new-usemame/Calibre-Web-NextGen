@@ -56,6 +56,38 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.67',
+    date: '2026-11-12',
+    items: [
+      {
+        title: 'Search is much faster on large libraries',
+        body: 'The top search box now matches each tag, author, series and publisher name once per search, not once for every book that uses it. On a 270,000-book library a one-word search dropped from several seconds to under one. Results are unchanged, accents included.',
+        category: 'Library',
+      },
+      {
+        title: 'Publishers load a page at a time',
+        body: 'The Publishers list now loads as you scroll and filters by name on the server, like Authors and Series, so it no longer stalls on a library with many publishers.',
+        category: 'Library',
+        link: { to: '/publishers', label: 'Publishers' },
+      },
+      {
+        title: 'A second Kobo picks up the place you reached on the first',
+        body: 'With several Kobos and Share my place on, a Kobo that had read a book before kept its own old page. Each Kobo\'s download link now names that Kobo, so it moves to the shared place. This covers books downloaded after the update.',
+        category: 'Sync',
+      },
+      {
+        title: 'Smart shelves follow the order you chose',
+        body: 'The sidebar in the new UI listed Smart shelves A to Z whatever Order Mode you had set. It now uses the same order as the classic profile page.',
+        category: 'Library',
+      },
+      {
+        title: 'Saved PDFs keep the book\'s name',
+        body: 'The PDF reader\'s Save button always wrote document.pdf. It now saves the file as "Title - Author", the same name the Download link uses.',
+        category: 'Reading',
+      },
+    ],
+  },
+  {
     version: 'v4.1.66',
     date: '2026-11-11',
     items: [

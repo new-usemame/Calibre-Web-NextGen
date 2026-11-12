@@ -12356,6 +12356,37 @@
  },
  {
   "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2724",
+  "title": "[Bug report] KoboSync - Reading Progress not synced anymore",
+  "person": "Dirk71",
+  "delivered_via": [
+   "PR #2733",
+   "PR #2888"
+  ],
+  "outcome": "happy",
+  "basis": "reaction",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2724@2026-11-11T10:17:32Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729",
+  "title": "Name of downloaded PDF",
+  "person": "darkmatterpelican",
+  "delivered_via": [
+   "PR #2890"
+  ],
+  "outcome": "happy",
+  "basis": "reply: content",
+  "quote": "Thank you very much @sgreadly ! (and @new-usemame of course)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729#issuecomment-6803799205",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2729@2026-11-11T18:16:37Z"
+ },
+ {
+  "date": "2026-11-11",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2836",
   "title": "[bug] Web reader falls back to the percentage for EPUBs whose ZIP members set flag bit 0x10 (unsupported resume ZIP member encoding)",
   "person": "sgreadly",
@@ -12388,6 +12419,21 @@
  },
  {
   "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2735",
+  "title": "Name the PDF reader's saved file after the book (#2729)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2735@2026-11-11T18:17:41Z"
+ },
+ {
+  "date": "2026-11-11",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2837",
   "title": "Kobo resume: accept ZIP flag 0x10 on stored/deflated members (#2836)",
   "person": "sgreadly",
@@ -12415,5 +12461,36 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2881@2026-11-11T03:58:27Z"
+ },
+ {
+  "date": "2026-11-12",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2824",
+  "title": "[bug] Manual Smart shelves order not working",
+  "person": "orcofthedarkness",
+  "delivered_via": [
+   "PR #2839",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2824@2026-11-12T02:19:26Z"
+ },
+ {
+  "date": "2026-11-12",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2827",
+  "title": "New UI: list Smart shelves in the user's chosen Order Mode (#2824)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2827@2026-11-12T02:19:52Z"
  }
 ]

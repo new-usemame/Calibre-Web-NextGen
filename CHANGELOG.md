@@ -16,6 +16,24 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.67] - 2026-11-12
+
+### Fixed
+
+- **The New UI Publishers list loads in pages as you scroll, like Authors and Series.** Its name filter runs on the server, so a library with many publishers no longer stalls on that page (#2720).
+
+- **Searching from the top search box is much faster on large libraries.** Each tag, author, series, publisher and custom-column name is now matched once per search instead of once for every book linked to it. On a 270,000-book test library a one-word search went from 3 to 7 seconds per query to under a second. Results are the same, including accent-insensitive matches such as "cafe" finding "Café" (#2720).
+
+- **With two or more Kobos, one Kobo fetching a book through a link from before the update no longer stops the other Kobo picking up the shared place.** CWNG has to guess which Kobo made such a download, and that guess cleared the record that the other Kobo held the current copy of the book, so it went back to its own old page until it downloaded the book again. A guessed download now leaves that record alone. Found by @teisho while testing #2724.
+
+- **With two or more Kobos and Share my place ticked, a Kobo that had read a book before now moves to the place you reached on another one.** A Kobo's book download doesn't say which Kobo is fetching it, so on an account with several Kobos CWNG could never confirm which copy of the book each one held. Without that, a Kobo was sent the new percentage but kept its own old page location, so the book opened where it was and no sync prompt appeared. Each Kobo's download link now names that Kobo. This covers books a Kobo downloads after the update; a book already on the device before it keeps the old behaviour for now. Reported by @dwerkson (#2724).
+
+- **Saving a PDF from the reader now keeps the book's name.** The PDF reader's Save button always wrote `document.pdf`, because the page it loads the file from has no `.pdf` in its address and the server gave it no filename. The reader now sends the same "Title - Author" name the Download link uses, made safe for file systems (#2729).
+
+- **The new UI sidebar now lists Smart shelves in the order you chose.** It always sorted them A to Z, ignoring the Order Mode set on the classic profile page (Manual drag order, book count, created, modified). Both UIs now follow the same setting. (#2824)
+
+- **With KOReader sync switched off, the sleep-screen device report answers "sync is disabled" (503) like every other sync call.** It returned a server error instead, and logged one on every report.
+
 ## [v4.1.66] - 2026-11-11
 
 ### Added

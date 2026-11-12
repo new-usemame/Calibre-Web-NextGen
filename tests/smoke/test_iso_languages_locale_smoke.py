@@ -86,6 +86,40 @@ def test_get_language_name_resolves_with_locale_object():
     assert out and out != "Unknown"
 
 
+def _shipped_ui_locales():
+    """Every UI catalog the app ships, named the way get_locale() names it."""
+    import os
+    root = os.path.join(os.path.dirname(isoLanguages.__file__), "translations")
+    return sorted(
+        d for d in os.listdir(root)
+        if os.path.isfile(os.path.join(root, d, "LC_MESSAGES", "messages.po"))
+    )
+
+
+@pytest.mark.parametrize("ui_locale", _shipped_ui_locales())
+def test_every_shipped_ui_locale_has_a_language_name_table(ui_locale):
+    """A UI catalog shipped without a language-name table showed every book's
+    language as "Unknown" (Catalan and Arabic, PR #2652). A new catalog must
+    arrive with its table, so the next one fails here instead of in the UI.
+    """
+    from babel import Locale
+
+    names = isoLanguages.get_language_names(Locale.parse(ui_locale))
+    assert isinstance(names, dict) and names, ui_locale
+    assert isoLanguages.get_language_name(Locale.parse(ui_locale), "fra") != "Unknown"
+
+
+def test_catalan_ui_names_languages_in_catalan():
+    """Language names in the Catalan UI are Catalan, not English."""
+    assert isoLanguages.get_language_name("ca", "cat") == "Català"
+    assert isoLanguages.get_language_name("ca", "spa") == "Espanyol"
+    assert isoLanguages.get_language_name("ca", "fra") == "Francès"
+
+
+def test_arabic_ui_names_languages_in_arabic():
+    assert isoLanguages.get_language_name("ar", "ara") == "العربية"
+
+
 def test_get_language_name_unknown_lang_code_returns_unknown_not_raise():
     out = isoLanguages.get_language_name("en", "totallymadeupcode")
     assert out == "Unknown"

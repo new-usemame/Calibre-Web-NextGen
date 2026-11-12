@@ -40,6 +40,8 @@ from werkzeug.security import generate_password_hash
 from markupsafe import escape
 from urllib.parse import quote
 
+from .utils.filename_sanitizer import build_content_disposition
+
 try:
     from . import cw_advocate
     from .cw_advocate.exceptions import UnacceptableAddressException
@@ -2363,12 +2365,16 @@ def get_book_cover_internal(book, resolution=None):
             # Determine which thumbnail format to serve based on request context
             try:
                 from flask import has_request_context, request
-                is_kobo_request = (has_request_context() and
-                                 request.path and
-                                 '/kobo/' in request.path)
+                # Kobo devices and OPDS clients get JPEG: the OPDS feed
+                # declares image/jpeg, and e-reader OPDS clients cannot all
+                # decode WebP (#2845).
+                wants_jpeg = (has_request_context() and
+                              request.path and
+                              ('/kobo/' in request.path
+                               or request.path.startswith('/opds/')))
 
-                # Prefer jpg for Kobo requests, webp for web requests
-                if is_kobo_request:
+                # Prefer jpg for Kobo and OPDS requests, webp for web requests
+                if wants_jpeg:
                     thumbnail_to_serve = jpg_thumb if jpg_exists else (webp_thumb if webp_exists else None)
                 else:
                     thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
@@ -3593,6 +3599,43 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
+def get_download_file_name(book, filename_template=None):
+    """The name (without extension) a downloaded copy of ``book`` is given:
+    "Title - First author" or the OPDS filename template, made filesystem-safe."""
+    file_name = book.title
+    first_author = next((author for author in book.authors if author is not None), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + (first_author.name or '')
+    if isinstance(filename_template, str):
+        filename_template = strip_whitespaces(filename_template)
+    if filename_template:
+        try:
+            file_name = render_opds_filename(
+                filename_template, book, calibre_db.session,
+                title_regex=config.config_title_regex,
+                unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
+            )
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+            # A corrupt or manually changed setting must not prevent downloads.
+            log.warning("Invalid OPDS filename template; using the default filename")
+    return get_valid_filename(file_name, replace_whitespace=False)
+
+
+def set_inline_filename(headers, book, book_format):
+    """Serve a book inline (in-browser reader) but still name it after the book.
+
+    pdf.js names its Save button's file from the response's Content-Disposition,
+    else from the URL, which for /show/<id>/pdf ends in no ".pdf" and so became
+    "document.pdf" (#2729). Leaves the plain "inline" header if naming fails.
+    """
+    try:
+        headers['Content-Disposition'] = build_content_disposition(
+            'inline', "%s.%s" % (get_download_file_name(book), book_format.lower()))
+    except Exception as ex:
+        log.warning("Could not name inline %s for book %s: %s", book_format, getattr(book, 'id', '?'), ex)
+
+
 def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,
                       filename_template=None):
     book_format = book_format.split(".")[0]
@@ -3646,15 +3689,28 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         # The device is about to replace its local copy; remember that so the
         # annotation GET that follows is answered from CWNG's own rows.
         try:
-            from flask import g
-            from .services.kobo_post_download_restore import record_download, completed_download_body
+            from flask import g, request
+            from .services.kobo_post_download_restore import (
+                DOWNLOAD_DEVICE_PARAM, record_download, completed_download_body,
+                tagged_download_device,
+            )
+            device_id = getattr(g, "annotation_origin_device_id", None)
+            if device_id is None:
+                # No device header (Nickel never sends one on a file GET): the
+                # Kobo named in the URL its own sync handed it is the fetcher.
+                device_id = tagged_download_device(
+                    getattr(current_user, "id", None),
+                    request.args.get(DOWNLOAD_DEVICE_PARAM))
             download = record_download(
-                device_id=getattr(g, "annotation_origin_device_id", None),
+                device_id=device_id,
                 book_id=book.id, book_format=book_format, log=log,
                 user_id=getattr(current_user, "id", None),
                 completed=False,
             )
-            if isinstance(download, ub.KoboDeviceBookDownload):
+            # A row already completed is proof kept from an earlier download,
+            # not an attempt this response can confirm.
+            if (isinstance(download, ub.KoboDeviceBookDownload)
+                    and download.completed_at is None):
                 download_proof = (download.id, download.downloaded_at,
                                   download.kepub_file_identity)
         except Exception:
@@ -3698,24 +3754,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         except Exception as e:
             log.error(f"Failed to log download stats: {e}")
 
-    file_name = book.title
-    first_author = next((author for author in book.authors if author is not None), None)
-    if first_author is not None:
-        file_name = file_name + ' - ' + (first_author.name or '')
-    if isinstance(filename_template, str):
-        filename_template = strip_whitespaces(filename_template)
-    if filename_template:
-        try:
-            file_name = render_opds_filename(
-                filename_template, book, calibre_db.session,
-                title_regex=config.config_title_regex,
-                unicode_filename=config.config_unicode_filename,
-                ordered_authors=calibre_db.order_authors([book]),
-            )
-        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
-            # A corrupt or manually changed setting must not prevent downloads.
-            log.warning("Invalid OPDS filename template; using the default filename")
-    file_name = get_valid_filename(file_name, replace_whitespace=False)
+    file_name = get_download_file_name(book, filename_template)
     headers = Headers()
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")
     headers["Content-Disposition"] = "attachment; filename=%s.%s; filename*=UTF-8''%s.%s" % (

@@ -201,3 +201,21 @@ def test_plugin_classifies_higher_remote_percentage_as_forward_progress():
             elseif body.timestamp ~= nil then
                 self_older = (body.timestamp > self.last_page_turn_timestamp)"""
     assert expected in source
+
+
+@pytest.mark.unit
+def test_put_reply_says_whether_a_legacy_push_was_kept(protocol):
+    """#2843: a push behind the stored place is dropped; the reply must say so
+    (accepted/kept_percentage), not just echo the stored row's old timestamp."""
+    client, _session = protocol
+
+    first = _push(client, "digest-a", 0.30, "device-a")
+    behind = _push(client, "digest-b", 0.20, "device-b")
+
+    assert first.status_code == behind.status_code == 200
+    assert first.get_json()["accepted"] is True
+    assert first.get_json()["shared"] is True
+    assert "kept_percentage" not in first.get_json()
+    assert behind.get_json()["accepted"] is False
+    assert behind.get_json()["shared"] is True
+    assert behind.get_json()["kept_percentage"] == pytest.approx(0.30)

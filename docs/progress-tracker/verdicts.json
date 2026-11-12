@@ -1427,18 +1427,53 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6591061911",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2783@2026-11-03T04:24:54Z": {
+  "hash": "89b3d88f38b88d5e",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
+ },
  "issue#2783@2026-11-03T16:22:11Z": {
-  "hash": "f045e3970f489536",
+  "hash": "39fe7e78a023a605",
   "verdict": "partial",
   "quote": "JustRead and the web reader now sync with each other nicely. However, two things seem to be stopping places reaching the Kobo:",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6643117884",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2797@2026-11-04T02:37:03Z": {
-  "hash": "9fcc4b2fe7ac44d1",
+  "hash": "c0d286009cc4beb9",
+  "verdict": "partial",
+  "quote": "Libby and Kobo Store load correctly, syncing _seems_ to fail (same behaviour as before with proxy `on`)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6722361901",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2797@2026-11-08T15:18:41Z": {
+  "hash": "c106cbcba4ab49cd",
+  "verdict": "fixed",
+  "quote": "That seems to fix it for me, I am both able to access the store and Libby, as well as sync.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6727615735",
+  "by": "review"
+ },
+ "issue#2797@2026-11-09T11:18:48Z": {
+  "hash": "990c1239a2af393a",
   "verdict": "none",
   "quote": "",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6625800216",
+  "evidence": "",
+  "by": "review"
+ },
+ "issue#2798@2026-11-03T09:49:22Z": {
+  "hash": "3bc86699ef644b8a",
+  "verdict": "fixed",
+  "quote": "Based on installing plugins in an empty test install, this seems to be working now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2798#issuecomment-6723539211",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2807@2026-11-08T19:17:52Z": {
+  "hash": "8e5eb4b01da12ada",
+  "verdict": "fixed",
+  "quote": "After checking the \"Share my place\" setting I now see my progress tracked in the book page so I think everything is good now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2807#issuecomment-6733404059",
   "by": "deepseek-v4.1-flash"
  },
  "issue#283@2026-05-21T17:41:55Z": {

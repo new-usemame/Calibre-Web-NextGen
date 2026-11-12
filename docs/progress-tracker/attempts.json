@@ -12145,21 +12145,7 @@
   "title": "[bug] - CWNG no longer syncing with Justread",
   "person": "lukerajah",
   "delivered_via": [
-   "PR #2809"
-  ],
-  "outcome": "unread",
-  "basis": "reply not judged yet",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
-  "id": "issue#2783@2026-11-03T04:24:54Z"
- },
- {
-  "date": "2026-11-03",
-  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783",
-  "title": "[bug] - CWNG no longer syncing with Justread",
-  "person": "lukerajah",
-  "delivered_via": [
+   "PR #2809",
    "PR #2816"
   ],
   "outcome": "not_fixed",
@@ -12191,13 +12177,14 @@
   "title": "[bug] Calibre plugins in /config/.config/calibre/plugins are never loaded during ingest (regression since v4.1.44)",
   "person": "satwell",
   "delivered_via": [
-   "PR #2812"
+   "PR #2812",
+   "closed"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "Based on installing plugins in an empty test install, this seems to be working now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2798#issuecomment-6723539211",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2798@2026-11-03T09:49:22Z"
  },
  {
@@ -12238,11 +12225,195 @@
   "delivered_via": [
    "PR #2820"
   ],
+  "outcome": "not_fixed",
+  "basis": "reply: partial",
+  "quote": "Libby and Kobo Store load correctly, syncing _seems_ to fail (same behaviour as before with proxy `on`)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6722361901",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2797@2026-11-04T02:37:03Z"
+ },
+ {
+  "date": "2026-11-08",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797",
+  "title": "[bug] Kobo syncing issues after update to v4.1.58",
+  "person": "Duckbilled",
+  "delivered_via": [
+   "PR #2834",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "That seems to fix it for me, I am both able to access the store and Libby, as well as sync.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2797#issuecomment-6727615735",
+  "judged_by": "review",
+  "id": "issue#2797@2026-11-08T15:18:41Z"
+ },
+ {
+  "date": "2026-11-08",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2807",
+  "title": "[bug] Kobo fails to sync",
+  "person": "IceSentry",
+  "delivered_via": [
+   "PR #2835",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "After checking the \"Share my place\" setting I now see my progress tracked in the book page so I think everything is good now.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2807#issuecomment-6733404059",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2807@2026-11-08T19:17:52Z"
+ },
+ {
+  "date": "2026-11-08",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2828",
+  "title": "Plugin installation guide",
+  "person": "uschi1",
+  "delivered_via": [
+   "closed"
+  ],
   "outcome": "no_reply",
   "basis": "nothing heard",
   "quote": "",
   "evidence": "",
   "judged_by": "rule",
-  "id": "issue#2797@2026-11-04T02:37:03Z"
+  "id": "issue#2828@2026-11-08T23:26:53Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/121",
+  "title": "[bug] OPDS issues",
+  "person": "droM4X",
+  "delivered_via": [
+   "PR #2854"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#121@2026-11-09T11:19:55Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2764",
+  "title": "[Bug report] reading status not syncing",
+  "person": "eagene",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2764@2026-11-09T13:17:10Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2838",
+  "title": "[bug] cannot create app password - timeout",
+  "person": "nkfs",
+  "delivered_via": [
+   "PR #2866"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2838@2026-11-09T22:16:06Z"
+ },
+ {
+  "date": "2026-11-09",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2862",
+  "title": "[Performance] DESKTOP_COMPAT_MODE clears Magic Shelf count cache on every request",
+  "person": "JALindsay4444",
+  "delivered_via": [
+   "PR #2863"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2862@2026-11-09T20:17:26Z"
+ },
+ {
+  "date": "2026-11-10",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2652",
+  "title": "Fix missing language names for shipped locales",
+  "person": "Tofax",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2652@2026-11-10T23:26:05Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2836",
+  "title": "[bug] Web reader falls back to the percentage for EPUBs whose ZIP members set flag bit 0x10 (unsupported resume ZIP member encoding)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2880",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2836@2026-11-11T00:22:33Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2878",
+  "title": "[bug] Updates Manager setup is undocumented (no UI to add the repo) and the appstore.koplugin link is dead",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2884",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2878@2026-11-11T04:31:38Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2837",
+  "title": "Kobo resume: accept ZIP flag 0x10 on stored/deflated members (#2836)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2837@2026-11-11T00:23:04Z"
+ },
+ {
+  "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2881",
+  "title": "ci: announce a failed KOReader plugin publish instead of leaving a red run (#1688)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2881@2026-11-11T03:58:27Z"
  }
 ]

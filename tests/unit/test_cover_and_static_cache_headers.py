@@ -608,3 +608,107 @@ def test_spa_shell_is_not_cached(monkeypatch, tmp_path):
 
     assert resp.status_code == 200
     assert "no-cache" in resp.headers.get("Cache-Control", "")
+
+
+# --------------------------------------------------------------------------- #
+# 4. OPDS covers (#2845)                                                        #
+# --------------------------------------------------------------------------- #
+#
+# An OPDS client draws its browse grid from the feed's
+# ``http://opds-spec.org/image/thumbnail`` link. Every OPDS cover route used to
+# serve the full-size cover.jpg, and the feed's links carried no ``c=`` token,
+# so a grid of N books downloaded N full covers on every visit and could never
+# keep one. These tests mount the REAL ``cps.opds`` blueprint so the route
+# table and the template's ``url_for`` are the shipped ones; only the auth
+# decorator (covered by the #121/#2844 tests) and the per-user visibility
+# check are stepped around.
+
+_OPDS_JPG_THUMB = b"\xff\xd8\xff\xe0jpeg-ish"
+
+
+def _opds_cover_client(monkeypatch, tmp_path):
+    from cps import helper, opds
+
+    app = _thumbnail_app(monkeypatch, tmp_path, have_webp=True, have_jpg=True)
+    app.register_blueprint(opds.opds)
+    for endpoint, view in list(app.view_functions.items()):
+        if endpoint.startswith("opds.") and hasattr(view, "__wrapped__"):
+            app.view_functions[endpoint] = view.__wrapped__
+    book = SimpleNamespace(id=42, has_cover=1, path="Some Author/Some Book (42)",
+                           last_modified=LAST_MODIFIED)
+    monkeypatch.setattr(opds, "abort_unless_opds_book_exposed", lambda _book_id: None)
+    monkeypatch.setattr(
+        opds, "get_book_cover",
+        lambda _book_id, resolution=None: helper.get_book_cover_internal(
+            book, resolution=resolution))
+    return app.test_client()
+
+
+@pytest.mark.parametrize("route", ["thumb_240_240", "cover_240_240", "cover_90_90"])
+def test_opds_thumbnail_routes_serve_a_resized_jpeg(monkeypatch, tmp_path, route):
+    """The thumbnail routes answer with the generated thumbnail, as JPEG.
+
+    JPEG even though a WebP exists: the feed declares ``type="image/jpeg"``
+    and e-reader OPDS clients cannot all decode WebP.
+    """
+    client = _opds_cover_client(monkeypatch, tmp_path)
+    original = client.get("/opds/cover/42").data
+    resp = client.get("/opds/%s/42" % route)
+    assert resp.status_code == 200
+    assert resp.data == _OPDS_JPG_THUMB, (
+        "%s did not serve the JPEG thumbnail (%d bytes; original is %d)"
+        % (route, len(resp.data), len(original)))
+    assert resp.mimetype == "image/jpeg"
+
+
+def test_opds_full_cover_route_still_serves_the_original(monkeypatch, tmp_path):
+    client = _opds_cover_client(monkeypatch, tmp_path)
+    resp = client.get("/opds/cover/42")
+    assert resp.status_code == 200
+    assert resp.data == (tmp_path / "Some Author" / "Some Book (42)" / "cover.jpg").read_bytes()
+
+
+def test_opds_versioned_thumbnail_is_cacheable(monkeypatch, tmp_path):
+    client = _opds_cover_client(monkeypatch, tmp_path)
+    resp = client.get("/opds/thumb_240_240/42?c=%s" % LAST_MODIFIED_EPOCH)
+    assert "immutable" in resp.headers.get("Cache-Control", ""), resp.headers.get("Cache-Control")
+
+
+def _render_opds_cover_links():
+    import flask as _flask
+    from cps import opds
+    from cps.cover_version import cover_version_token
+    from tests.unit.opds_feed_world import FeedRenderer
+
+    renderer = FeedRenderer()
+    renderer.app.register_blueprint(opds.opds)
+    renderer.app.jinja_env.globals["url_for"] = _flask.url_for
+    book = SimpleNamespace(
+        id=42, uuid="u-42", title="T", atom_timestamp=LAST_MODIFIED.isoformat(),
+        authors=[], publishers=[], languages=[], tags=[], series=[], comments=[],
+        has_cover=1, last_modified=LAST_MODIFIED, pubdate=LAST_MODIFIED, data=[],
+    )
+    root = renderer.render([SimpleNamespace(Books=book)])
+    links = {}
+    for link in root.iter("{http://www.w3.org/2005/Atom}link"):
+        rel = link.get("rel", "")
+        if rel.startswith("http://opds-spec.org/image"):
+            links[rel] = link.get("href")
+    return links, cover_version_token(book)
+
+
+def test_opds_feed_thumbnail_link_names_the_thumbnail_route():
+    links, _token = _render_opds_cover_links()
+    image = links["http://opds-spec.org/image"]
+    thumbnail = links["http://opds-spec.org/image/thumbnail"]
+    assert image.split("?")[0] == "/opds/cover/42"
+    assert thumbnail.split("?")[0] != image.split("?")[0], (
+        "the thumbnail link points at the full-size cover: %r" % thumbnail)
+
+
+def test_opds_feed_cover_links_carry_the_version_token():
+    """Without ``c=`` the server cannot grant the long lifetime, so a client
+    re-downloads every cover on every visit."""
+    links, token = _render_opds_cover_links()
+    for rel, href in links.items():
+        assert href.endswith("?c=%s" % token), (rel, href)

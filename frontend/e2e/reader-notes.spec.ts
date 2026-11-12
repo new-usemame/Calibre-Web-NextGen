@@ -46,6 +46,27 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 /*
+ * One book per project, and the file in order within each project.
+ *
+ * Opening a book clears its annotations, so two tests that are in the same book
+ * at the same time delete each other's fixtures. This file used to give each
+ * describe its own "slot" (0 to 5), but CI seeds only three EPUBs that clear
+ * MIN_BYTES below, so the slots wrapped onto three books: 4 became 1 and 5
+ * became 2. Each describe was serial on its own, yet fullyParallel still ran
+ * different describes at the same time on two workers. OBSERVED on main
+ * b00e557b0 (run 42584895816): the #2778 and #2779 retry tests ran interleaved
+ * on one book, and #2778's seeded note was gone when it looked (Received []).
+ *
+ * So the whole file runs in order inside a project (mode 'default' opts it out
+ * of fullyParallel without serial's skip-the-rest-on-failure), and desktop and
+ * mobile, which do run side by side, start on different books. A test reuses
+ * its project's book after the one before it finished, which is safe because
+ * every open clears the book first.
+ */
+test.describe.configure({ mode: 'default' });
+const lane = (project: string) => (project === 'mobile' ? 1 : 0);
+
+/*
  * Open the LOWEST-id book that has an EPUB and renders.
  *
  * Deliberately not "newest": sibling specs (reader-rtl, discover-upload) upload
@@ -364,7 +385,7 @@ test.describe('reader notes (#325)', () => {
     // Renders the book three times (open, clear+reload, reload); the 45s default
     // is not enough for that when two workers share this container.
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
 
@@ -424,7 +445,7 @@ test.describe('reader notes (#325)', () => {
   // the selection cleared, so the reader lost the note with nothing to retry.
   test('a failed highlight and note create keeps the selection and retries the same payload', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const before = await paintCounts(page);
@@ -468,7 +489,7 @@ test.describe('reader notes (#325)', () => {
 
   test('a failed one-tap highlight keeps the colour choice open and retries the same payload', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const before = await paintCounts(page);
@@ -494,7 +515,7 @@ test.describe('reader notes (#325)', () => {
 
   test('the one-tap colour highlight still creates without a note', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
 
@@ -523,7 +544,7 @@ test.describe('reader highlights & notes drawer (#325)', () => {
 
   test('lists a highlight with its note, and jumps to it', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 3 : 2);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const preExisting = await annotationIds(page, bookId!);
@@ -568,7 +589,7 @@ test.describe('reader highlights & notes drawer (#325)', () => {
 
   test('the drawer reflects a removed highlight without a reload', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 3 : 2);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     const preExisting = await annotationIds(page, bookId!);
@@ -612,7 +633,7 @@ test.describe('reader fullscreen (#325)', () => {
 
   test('the control targets the reader shell and follows the browser state', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 1 : 0);
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     // Record requests instead of entering real fullscreen.
@@ -679,7 +700,7 @@ test.describe('reader toolbar touch targets (#325)', () => {
   test('every toolbar control is at least 44x44 and receives a tap at its edges',
     async ({ page }, testInfo) => {
       test.setTimeout(120_000);
-      const bookId = await openReaderOnEpub(page, testInfo.project.name === 'mobile' ? 2 : 1);
+      const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const NAMES = ['Close reader', 'Table of contents', 'Reading appearance',
@@ -746,7 +767,7 @@ test.describe('reader column count (#325)', () => {
       test.skip(testInfo.project.name === 'mobile',
         'two-column layout needs a wide viewport; the comparison is vacuous on a phone');
 
-      const bookId = await openReaderOnEpub(page, 0);
+      const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const layout = () => page.evaluate(() => {
@@ -818,7 +839,7 @@ test.describe('reader black page theme (#325)', () => {
 
   test('Black is a distinct pure-black ground, and it persists', async ({ page }) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 1);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     const ground = () => page.evaluate(() => {
@@ -873,7 +894,7 @@ test.describe('reader drawer: standalone notes (#325)', () => {
 
   test('a note with no passage is not drawn as a broken highlight', async ({ page }) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 3);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     const NOTE = `A thought about the whole book. ${Date.now()}`;
@@ -933,7 +954,7 @@ test.describe('reader: writing a standalone note (#325)', () => {
   test('a note can be written without selecting anything, and it lasts',
     async ({ page }) => {
       test.setTimeout(120_000);
-      const bookId = await openReaderOnEpub(page, 1);
+      const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const NOTE = `The frame narrative never pays off. ${Date.now()}`;
@@ -1001,8 +1022,8 @@ test.describe('reader: writing a standalone note (#325)', () => {
 test.describe('reader: a failed note edit, removal or standalone save can be retried (#2778)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  // Desktop and mobile run these at the same time against the same book, so
-  // every note carries its test's tag and only tagged notes are read or removed.
+  // Every note carries its test's tag, and only tagged notes are read or removed,
+  // so a note left behind by another run is never mistaken for this test's.
   const unanchoredNotes = (page: Page, bookId: number, tag: string) => page.evaluate(async ([id, mark]) => {
     const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
     return (j.annotations || [])
@@ -1022,14 +1043,11 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
     }
   }, [String(bookId), tag] as const);
 
-  // Opening a book clears its annotations, and the other tests in this file
-  // start on slots 0 to 3, so these start on slots of their own.
-  const slot = (project: string) => (project === 'mobile' ? 5 : 4);
 
   // Open the reader on a book holding the given unanchored note, and open that
   // note's composer from the drawer.
   async function editSeededNote(page: Page, project: string, note: string): Promise<number> {
-    const bookId = await openReaderOnEpub(page, slot(project));
+    const bookId = await openReaderOnEpub(page, lane(project));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     const status = await page.evaluate(async ([id, text]) => {
       const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
@@ -1109,7 +1127,7 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
 
   test('a refused standalone note keeps the text and retries the same note', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, slot(testInfo.project.name));
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     const TAG = `${testInfo.project.name}-${Date.now()}`;
     const NOTE = `A note about the whole book. ${TAG}`;
@@ -1153,9 +1171,6 @@ test.describe('reader: a failed note edit, removal or standalone save can be ret
 test.describe('reader: a failed highlight removal or recolour can be retried (#2779)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  // Opening a book clears its annotations, and the drawer tests use slots 2
-  // and 3, so these share the #2778 slots (that describe runs before this one).
-  const slot = (project: string) => (project === 'mobile' ? 5 : 4);
 
   type ServerRow = { id: string; color: string | null };
   const serverRows = (page: Page, bookId: number): Promise<ServerRow[]> => page.evaluate(async (id) => {
@@ -1169,7 +1184,7 @@ test.describe('reader: a failed highlight removal or recolour can be retried (#2
 
   // Open the reader, make one yellow highlight, and open its edit popover.
   async function yellowHighlightOpen(page: Page, project: string): Promise<number> {
-    const bookId = await openReaderOnEpub(page, slot(project));
+    const bookId = await openReaderOnEpub(page, lane(project));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     expect(await pageUntilText(page), 'a page with selectable text').toBe(true);
     expect(await selectSomeText(page), 'text selected in the book frame').not.toBe('');
@@ -1250,16 +1265,13 @@ test.describe('reader: a failed highlight removal or recolour can be retried (#2
 test.describe('reader drawer: a failed highlight load is reported, not shown as empty (#2780)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  // data.json is mocked here, so nothing is written to the book; the slot only
-  // has to be one this file owns. Same slots as #2778/#2779, which run before.
-  const slot = (project: string) => (project === 'mobile' ? 5 : 4);
   const dataJson = (bookId: number) => `**/annotations/${bookId}/data.json*`;
   const loadError = (page: Page) => drawer(page).getByText('Could not load highlights and notes.');
   const emptyState = (page: Page) => drawer(page).getByText('No highlights yet. Select text in the book to make one.');
 
   test('a refused load says so and a retry loads the highlights', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, slot(testInfo.project.name));
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     let calls = 0;
@@ -1303,7 +1315,7 @@ test.describe('reader drawer: a failed highlight load is reported, not shown as 
 
   test('an empty answer shows the ordinary empty state and no error', async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, slot(testInfo.project.name));
+    const bookId = await openReaderOnEpub(page, lane(testInfo.project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     let calls = 0;
@@ -1346,7 +1358,7 @@ test.describe('reader drawer: device labels (#325)', () => {
 
   test('every highlight is listed, whether or not its device resolves', async ({ page }) => {
     test.setTimeout(120_000);
-    const bookId = await openReaderOnEpub(page, 2);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
     /*
@@ -1426,7 +1438,7 @@ test.describe('reader search inside the book', () => {
 
   test('finds book text and moves the rendition to the selected result', async ({ page }) => {
     test.setTimeout(180_000);
-    const bookId = await openReaderOnEpub(page, 0);
+    const bookId = await openReaderOnEpub(page, lane(test.info().project.name));
     expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
     await waitForReaderRender(page);
     expect(await pageUntilText(page), 'the EPUB has searchable prose').toBe(true);

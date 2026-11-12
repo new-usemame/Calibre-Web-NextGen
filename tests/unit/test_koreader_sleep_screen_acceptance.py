@@ -957,3 +957,21 @@ def test_french_and_dutch_catalogs_carry_the_image_fit_copy(world):
             assert catalog.get(msgid) == translation, (
                 f"{locale} catalog translated {msgid!r} as {catalog.get(msgid)!r}, expected {translation!r}"
             )
+
+
+def test_device_report_with_sync_switched_off_is_a_503_not_a_server_error(world):
+    """With KOReader sync off, every /kosync call answers 503 sync-disabled.
+
+    The device report read ``.status_code`` off the sync-off guard's
+    ``(response, 503)`` tuple, so it raised and the plugin got a 500 plus a
+    server error in the log on every report while sync was off.
+    """
+    _add_user(world, "ada")
+    _register_device(world, "ada", "kindle-off")
+    assert _report(world, "ada", "kindle-off").status_code == 200
+
+    world.sync_switch(False)
+    response = _report(world, "ada", "kindle-off")
+
+    assert response.status_code == 503
+    assert response.get_json()["message"] == "KOReader sync is disabled"

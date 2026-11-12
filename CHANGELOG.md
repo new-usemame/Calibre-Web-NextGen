@@ -16,6 +16,72 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.66] - 2026-11-11
+
+### Added
+
+- **A reading app can ask for a format a book lacks with its app password.** `POST /api/v1/books/<id>/convert` (body `{"from": "AZW3", "to": "EPUB"}`) now takes HTTP Basic with an app password, so an app that needs an EPUB of an AZW3-only book can queue the conversion without a browser session or CSRF token. It answers with a `task_id`, and `GET /api/v1/tasks` now also takes the app password, so the app can follow that task until the new format appears on the book. Converting still needs the account's edit permission, the same as in the web UI, and a wrong password gets a 401. (#2842)
+
+- **OPDS entries now carry your shared reading place.** For a signed-in account, each book in an OPDS feed has a `<cwng:progress>` with the place as a fraction from 0 to 1 (`0.42` is 42%), the same shared place KOReader sync serves for that book (the furthest one, across every copy of the book). A device with "Share my place" off keeps its place to itself, so it never appears here, and guests get none. Apps that do not know the element ignore it (#2849).
+
+- **OPDS entries now say whether you have read the book, and carry its book id.** Each book in an OPDS feed has a `<calibre:id>` with its numeric id, and for a signed-in account a `<cwng:read_status>` (`finished`, `in_progress`, `unread`, `did_not_finish` or `on_hold`), so a reading app can show a read mark in any list without fetching the read-list feeds one by one. Guests get the id only. Apps that do not know these elements ignore them (#2849).
+
+### Changed
+
+- **A failed KOReader plugin publish is now announced instead of sitting unseen.** When publishing the plugin to its own repository fails after a release, a message goes to the project's release channel with the tag and a link to the run, so devices are not left on an old plugin for several releases. Nothing changes when the publish succeeds or the plugin did not change (#1688).
+
+- **The KOSync reference for third-party apps now covers everything past the stock protocol.** `cps/progress_syncing/README.md` documents the `capabilities` list on `/kosync/users/auth`, the `X-CWNG-Device-ID` and `X-CWNG-Device-Name` headers and how they change which place wins (latest by the app's clock instead of furthest), the 20-device limit and the 409 `device_inactive` reply, pushing a place as a percentage with the words at it, and the highlight sync wire (`text_quote`, named deletions, `book_known` and `matched: false`), each with a working curl example (#2848).
+
+- **The README now says how to point Updates Manager at the KOReader plugin.** Updates Manager has no screen for adding a repository, so the KOReader sync section gives the `updatesmanager_config.json` file to create, how to check it was picked up, and what to do if it is not found or GitHub rate-limits the check. (#2878)
+
+### Fixed
+
+- **Book languages show their names in the Catalan and Arabic interface.** Both interfaces shipped without a table of language names, so every book's language read "Unknown" on the book page and in the Languages list. They now have complete tables, translated wherever iso-codes has a translation (Català, Espanyol, Francès; العربية) and in English otherwise, and a test fails if a new interface language is ever added without one. Thanks @Tofax for finding the cause. (#2652)
+
+- **The web reader opens at the Kobo's exact place for books whose ZIP archive marks its members with the "enhanced deflating" flag.** Such an EPUB was refused as a whole by the exact-place check, so the reader fell back to the percentage and logged "unsupported resume ZIP member encoding" at debug level. Zlib and JSZip both ignore that flag for the compression methods accepted here, so it is now allowed. Thanks @sgreadly for finding the cause and writing the fix. (#2836, #2837)
+
+- **The appstore.koplugin link on the KOReader setup page (`/kosync`) and in the README opened a missing page.** It now points to the plugin's real repository, `omer-faruq/appstore.koplugin`. (#2878)
+
+## [v4.1.65] - 2026-11-10
+
+### Fixed
+
+- **Signing in and creating app passwords no longer hang behind a proxy that sends `Connection: upgrade` on every request.** A common nginx and Nginx Proxy Manager WebSocket snippet sets `proxy_set_header Connection "upgrade"` for all traffic. The web server then treated every request as a protocol switch and waited on the raw connection for the request body, so sign-in, app-password creation and other form or JSON posts sat until the proxy gave up with a 504. Requests are now always read as ordinary HTTP requests, since nothing in CWNG uses a protocol upgrade. (#2838)
+
+- **`/api/v1` reads now honour an app password sent over HTTP Basic.** A reader app that signed in with HTTP Basic got the guest's view of `/api/v1` with anonymous browsing on (your read status, shelves and library missing), and a 401 with it off, whether the password was right or wrong. The right username and app password now read the library, shelves and `/api/v1/auth/me` as that account, so a connection test reports who it signed in as. Account settings and admin pages still need a signed-in session. A wrong password gets 401 instead of the guest view. Browsers are unchanged: the web UI keeps its session, and a reverse proxy that adds its own Basic login in front of CWNG does not sign anonymous visitors out. (#2844)
+
+- **OPDS no longer accepts a wrong password as the guest.** With anonymous browsing on, a reader app that sent a username with the wrong password got the guest catalog with 200, so its connection test passed and your own shelves, read status and download rights were silently missing. Wrong credentials now get 401, as KOSync and the sign-in page already answer them. A client that sends no credentials, or an empty username, still gets the guest catalog. If a reverse proxy in front of CWNG adds its own Basic login and passes it through to `/opds`, either use matching CWNG credentials there or have the proxy drop the `Authorization` header for `/opds`. (#2844)
+
+- **OPDS reader apps get small covers they can keep.** Every OPDS cover address, including the thumbnail one a reader app uses for its browse grid, sent the full-size cover, and none of them could be cached, so each visit to a shelf downloaded every full cover again. The thumbnail addresses (`/opds/thumb_240_240`, `/opds/cover_240_240`, `/opds/cover_90_90`) now send the generated thumbnail as JPEG, and the cover and thumbnail links in the feed carry a version, so an app can keep a cover until the book's cover changes. `/opds/cover` still sends the original. (#2845)
+
+- **OPDS search finds "C++".** The catalog told reader apps to search at `/opds/search/<term>`, where an app leaves a `+` as it is, but the server read that `+` as a space, so a search for "C++" ran as "C". The catalog and its search description now point apps at `/opds/search?query=<term>`, where a plus is sent as `%2B` and comes through intact. `/opds/search/<term>` still works for apps that build it themselves, and no longer fails on servers other than the bundled one. (#2846)
+
+- **OPDS search results come in pages.** Every other OPDS list pages at the "Books per page" setting and links the next page, but a search sent every match in one feed, so a broad search on a large library made a reader app download the whole library before showing anything. Search results now page the same way, with next and previous links that keep the search term and language. (#2847)
+
+- **Desktop compatibility mode no longer recounts every Magic Shelf on every request.** With `DESKTOP_COMPAT_MODE=true`, each page, cover and API request threw away the sidebar's Magic Shelf counts and ran every shelf's count query again, which on a large library held requests for tens of seconds. The counts are now kept until `metadata.db` changes on disk, so a book added in Calibre desktop still shows up in the counts on the next request. (#2862)
+
+### Security
+
+- **The sanitised support pack no longer leaks Kobo sync tokens, email addresses or account names.** Logs in the pack now have `/kobo/<token>/` URL tokens replaced, emails replaced with consistent labels (`<email_1>`), and account names from the user table replaced with `<user_1>`, so the same account can still be followed across the pack. If account names cannot be read, the pack says so in `SANITIZED.txt` instead of staying silent.
+
+## [v4.1.64] - 2026-11-09
+
+### Added
+
+- **A KOSync client can tell a private place from no place.** With Share my place on (the default), a device that isn't sharing keeps its place to itself, and another reader asking for that book used to get the same empty answer as a book nobody had opened. That answer now carries `places_not_shared`, the number of the account's other devices that hold a place for the book without sharing it (a count only: no position and no device name). `/kosync/users/auth` sent with `X-CWNG-Device-ID` also returns `share_place` for that device, so a client can show the setting without opening a book. Stock KOReader ignores both fields. (#2841)
+
+- **An app password can set reading status, mark a book read and archive it over the API.** A reading app that signs in with an app password (the one OPDS and KOSync already take) can now call `POST /api/v1/books/<id>/read-status` (`finished`, `in_progress`, `unread`, `did_not_finish`, `on_hold`), `POST /api/v1/books/<id>/read` and `POST /api/v1/books/<id>/archived` with HTTP Basic, without a browser session or CSRF token. Like OPDS, the account password also works there. A request that carries a CSRF token stays a browser-session write, so a proxy that adds its own Basic sign-in in front of CWNG does not affect the web UI, and explicit Basic credentials win over a reverse-proxy login header. Only those three endpoints take Basic. A wrong password gets a 401 rather than being answered as the guest or as another signed-in account, the guest account cannot write, and a request that says it came from another site is still refused. Browser sessions still need the CSRF token as before. (#2842)
+
+- **A KOSync progress push now hears whether it was kept.** A push behind the stored place, or an older report arriving late, was dropped with the same 200 reply as one that was saved, so a client moving back on purpose could not tell the move did not land. The reply now carries `accepted`, `shared` (false when that device's Share my place is off, so the place stays on the device) and, when the push was not kept, `kept_percentage` with the place kept instead. Stock KOReader ignores the new fields. (#2843)
+
+### Fixed
+
+- **With Proxy unknown requests to Kobo Store on, CWNG now fetches every Kobo Store call itself instead of redirecting the Kobo to Kobo's server.** A Kobo on firmware 6 stopped at the first redirected call, so its library sync never started and the Store and Libby pages stayed empty. The store's answer now comes back through CWNG, and a store that cannot be reached is answered with a gateway error instead of a server error. (#2797, #2807, reported by @Duckbilled and @IceSentry)
+
+- **With DEBUG on, a Kobo held on its own place because its download is from before CWNG recorded finished downloads now says so, and says to download the book again.** It used to say the library KEPUB had been written after the download, even when it was written before it. (#2804, reported by @sgreadly)
+
+- **Kobo setup now says when the account can't download books.** CWNG refuses a Kobo's library sync for an account without download permission, and the Kobo only shows that the sync failed. The pairing section in the New UI and the Kobo Sync Token row in the classic user settings now say so and point to Allow Downloads. (#2807, reported by @noja11)
+
 ## [v4.1.63] - 2026-11-08
 
 ### Fixed

@@ -5,19 +5,14 @@
    <Description>{{_('Calibre-Web NextGen eBook Catalog')}}</Description>
    <Developer>CrocodileStick</Developer>
    <Contact>https://github.com/new-usemame/Calibre-Web-NextGen</Contact>
-   {#- Fork issue #160: the search templates are rendered as
-       OpenSearch URL templates with literal ``{searchTerms}`` markers.
-       url_for produces ``/opds/search`` (potentially with ``?lang=xx``
-       appended via ``url_defaults``), so we can't naively suffix with
-       ``/{searchTerms}`` or ``?query={searchTerms}`` — the path-form
-       would collide with the query string and the query-form would
-       produce ``?lang=xx?query=...``. The opds_search_url_path() helper
-       and search_url_atom value are built in cps/opds.py with the
-       search marker inserted correctly. -#}
+   {#- Both templates use the query form, built by opds_search_url_template()
+       in cps/opds.py so ``{searchTerms}`` sits after any ``?lang=xx`` the
+       request carries (#160). Not the path form: a literal ``+`` in a path
+       is not encoded by clients but reads as a space there (#2846). -#}
    <Url type="text/html"
-        template="{{ opds_search_url_path() }}"/>
+        template="{{ opds_search_url_template() }}"/>
    <Url type="application/atom+xml"
-        template="{{ search_url_atom }}"/>
+        template="{{ opds_search_url_template() }}"/>
    <SyndicationRight>open</SyndicationRight>
    <Language>{{lang}}</Language>
    <OutputEncoding>UTF-8</OutputEncoding>

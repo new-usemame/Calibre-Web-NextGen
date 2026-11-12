@@ -68,7 +68,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         title: 'Publishers load a page at a time',
         body: 'The Publishers list now loads as you scroll and filters by name on the server, like Authors and Series, so it no longer stalls on a library with many publishers.',
         category: 'Library',
-        link: { to: '/publishers', label: 'Open Publishers' },
+        link: { to: '/publishers', label: 'Publishers' },
       },
       {
         title: 'A second Kobo picks up the place you reached on the first',

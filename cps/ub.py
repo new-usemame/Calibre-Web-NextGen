@@ -1641,6 +1641,10 @@ class DeviceReadingPosition(Base):
 
     # Delivery work has its own clock; it is never a reading observation.
     rehydrate_armed_at = deferred(Column(DateTime, nullable=True))
+    # #2783: the receipt of the shared place last sent to this Kobo. A report
+    # repeating the Kobo's own last place cannot replace a shared place it
+    # was never sent. Delivery bookkeeping, never a reading observation.
+    served_shared_received_at = deferred(Column(DateTime, nullable=True))
 
     __table_args__ = (
         UniqueConstraint(
@@ -4751,6 +4755,9 @@ def migrate_kobo_place_delivery(engine, _session):
         ("kepub_file_identity", "kepub_file_identity TEXT"),
     ):
         _add_column_if_missing(engine, "kobo_device_book_download", name, ddl)
+    _add_column_if_missing(engine, "device_reading_position",
+                           "served_shared_received_at",
+                           "served_shared_received_at DATETIME")
     _run_ddl_with_retry(engine, (
         "CREATE TABLE IF NOT EXISTS kobo_place_echo_guard ("
         "id INTEGER NOT NULL PRIMARY KEY, "

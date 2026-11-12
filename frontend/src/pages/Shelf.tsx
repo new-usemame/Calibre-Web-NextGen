@@ -20,6 +20,7 @@ import type { Book } from '../lib/api';
 import { apiGet, ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useRangeSelection } from '../lib/useRangeSelection';
+import { useCatalogDensity } from '../lib/catalogDensity';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
@@ -89,6 +90,8 @@ export function Shelf({ id }: { id: string }) {
   const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
+  // The Library's density choice, read-only here, so a shelf is as dense as the Library (#980).
+  const [density] = useCatalogDensity();
 
   const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort, revision);
   const updateShelf = useUpdateShelf(id);
@@ -478,7 +481,7 @@ export function Shelf({ id }: { id: string }) {
         </ol>
       ) : (
         <>
-          <div className={styles.grid}>
+          <div className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="shelf-grid">
             {books.map((book, i) => (
               <BookCard
                 key={book.id}

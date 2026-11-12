@@ -166,9 +166,24 @@
 }
 
 .grid {
+  --shelf-grid-gap: var(--sp-4);
+  --shelf-grid-min: 140px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--sp-5);
+  grid-template-columns: repeat(auto-fill, minmax(var(--shelf-grid-min), 1fr));
+  gap: var(--shelf-grid-gap);
+}
+/* Mirror the Library's density steps (Catalog.module.css) so one setting means
+   the same thing on both pages. */
+.grid.density_comfortable { --shelf-grid-gap: var(--sp-5); --shelf-grid-min: 180px; }
+.grid.density_compact { --shelf-grid-gap: var(--sp-4); --shelf-grid-min: 140px; }
+.grid.density_dense { --shelf-grid-gap: var(--sp-3); --shelf-grid-min: 110px; }
+/* Phones: fixed 2/3/4 columns like the Library (its breakpoint is 600px). This
+   block must come after the density steps above: the selectors are equally
+   specific, so source order decides the Dense gap. */
+@media (max-width: 600px) {
+  .grid.density_comfortable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.density_compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.density_dense { --shelf-grid-gap: var(--sp-2); grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .grid > * {

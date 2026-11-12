@@ -676,7 +676,8 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
                             shared_accepted=False, client_at=None,
                             source_document=None, source_progress=None,
                             web_report=False, source_cfi=None, source_format="epub",
-                            report_received_at=None, web_status_accepted=True):
+                            report_received_at=None, web_status_accepted=True,
+                            unidentified_place=False):
     """
     Update the user's ReadBook status based on reading progress percentage.
 
@@ -775,9 +776,23 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
             ub.session.expire(reading_state)
         _hold_feed_clock(bookmark.kobo_reading_state_id, moved=outcome.accepted)
     else:
+        # ``unidentified_place``: an accepted report from a KOSync app that
+        # sends no CWNG device header (#2783). It stays forward-only, but its
+        # XPointer goes onto the bookmark as the library KEPUB span in the
+        # same conditional write, so a Kobo opens at the app's place rather
+        # than its own old Location with the app's percentage.
+        location, identity = None, None
+        if unidentified_place:
+            from ...services.kobo_place_gate import koreader_span
+            location, identity = koreader_span(book_id, source_document, source_progress)
         outcome = device_positions.advance_kobo_bookmark(
             bookmark,
             percentage,
+            location_source=(location or {}).get("Source"),
+            location_type=(location or {}).get("Type"),
+            location_value=(location or {}).get("Value"),
+            location_supplied=location is not None,
+            converted_span_identity=identity if location is not None else None,
             clock_accepts=False,
             session=ub.session,
         )
@@ -2678,7 +2693,17 @@ def update_progress():
             try:
                 resolved_percentage = percentage_float
                 if not gated:
-                    bookmark_outcome = update_book_read_status(user, book_id, percentage_float)
+                    # With the gates on, an unidentified requester is a
+                    # shared reader (share-my-place spec section 8), so its
+                    # accepted place also reaches the Kobo exactly (#2783).
+                    # The rollout switch off keeps the percentage-only bridge.
+                    unidentified_place = (bool(push_accepted) and not identified
+                                          and gates_enforced(user.id))
+                    bookmark_outcome = update_book_read_status(
+                        user, book_id, percentage_float,
+                        source_document=journal_document if unidentified_place else None,
+                        source_progress=journal_progress if unidentified_place else None,
+                        unidentified_place=unidentified_place)
                     if bookmark_outcome is not None and bookmark_outcome.percentage is not None:
                         resolved_percentage = bookmark_outcome.percentage
                 ub.session.commit()

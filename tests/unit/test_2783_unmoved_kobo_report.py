@@ -94,3 +94,22 @@ def test_unmoved_report_with_no_other_writer_is_unchanged(sw, rows):
     assert sw.pull()[0] == pytest.approx(10, abs=0.01)
     assert sw.get(kobo)["CurrentBookmark"]["Location"] == span_location(
         place["source"], place["span"])
+
+
+def test_unmoved_report_keeps_a_newer_percentage_only_place(sw, rows):
+    """KOReader read a file the server cannot map to the Kobo's KEPUB, so it
+    shared a percentage only and the shared row kept the Kobo's old Location.
+    The Kobo repeating that Location must not undo the newer percentage."""
+    from tests.unit.share_place_span_world import OTHER_DIGEST
+    sw.koreader("koreader-1", "KOReader", checked=True)
+    kobo = sw.kobo_device("Kobo", checked=True)
+    sw.download(kobo)
+    place = rows["kobo"]
+    sw.put(kobo, place["source"], place["span"], 10.0, _now() - timedelta(hours=1))
+    sw.settle(kobo)
+    sw.push(rows["koreader"]["xpointer"], 40, client_at=after_now(2), document=OTHER_DIGEST)
+    assert sw.pull()[0] == pytest.approx(40, abs=0.01)
+
+    sw.put(kobo, place["source"], place["span"], 10.0, after_now(5))
+
+    assert sw.pull()[0] == pytest.approx(40, abs=0.01)

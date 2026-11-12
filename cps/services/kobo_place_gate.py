@@ -857,8 +857,11 @@ def is_unmoved_report(device_id, book_id, place, bookmark_id):
     ).where(mark.id == bookmark_id)).first()
     if shared is None or shared.server_modified_at is None:
         return False
-    if _same_place(place, shared.location_value, shared.location_source,
-                   shared.progress_percent):
+    if (_same_place(place, shared.location_value, shared.location_source,
+                    shared.progress_percent)
+            and place.get("ProgressPercent") == shared.progress_percent):
+        # Nothing newer to protect. A percentage-only write from another
+        # reader keeps the old Location, so the percentage must match too.
         return False
     if (own.served_shared_received_at is not None
             and _naive_utc(own.served_shared_received_at)

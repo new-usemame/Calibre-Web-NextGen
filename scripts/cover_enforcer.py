@@ -875,9 +875,40 @@ class Enforcer:
                   f"'{book_dir}': {error}", flush=True)
             return False
 
+    def _set_cover_keeping_aspect(self, book, file: str, cover_path: str) -> bool:
+        """Embed the cover with Calibre's keep_aspect option (#2687).
+
+        Runs after ebook-polish has already written the metadata, so a failure
+        here leaves the new metadata with the book's previous cover, and says so.
+        """
+        helper = str(Path(__file__).with_name('calibre_set_cover.py'))
+        cmd = ['calibre-debug', '-e', helper, '--', file, cover_path]
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=120, check=False,
+                env=getattr(self, 'calibre_env', None),
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            print(f"[cover-metadata-enforcer] Warning: metadata updated but the cover was "
+                  f"not replaced for '{book.title_author}' ({book.file_format}): {error}",
+                  flush=True)
+            return False
+        if result.returncode != 0:
+            print(f"[cover-metadata-enforcer] Warning: metadata updated but the cover was "
+                  f"not replaced for '{book.title_author}' ({book.file_format}): "
+                  f"calibre_set_cover.py returned {result.returncode}", flush=True)
+            if result.stderr:
+                print(f"[cover-metadata-enforcer] Error output: {result.stderr.strip()[-2000:]}",
+                      flush=True)
+            return False
+        return True
+
     def enforce_cover(self, book_dir: str) -> list:
         """Will force the Cover & Metadata to update for the supported book files in the given directory"""
         self.generate_missing_cover_if_enabled(book_dir)
+        keep_cover_aspect = bool(
+            (getattr(self, 'cwa_settings', None) or {}).get('cover_keep_aspect_ratio', 0)
+        )
         supported_files = self.get_supported_files_from_dir(book_dir)
         if supported_files:
             if len(supported_files) > 1:
@@ -907,6 +938,7 @@ class Enforcer:
                 clear_kepub_series = False
                 staged_kepub = None
                 write_completed = False
+                aspect_cover = None
                 if lower_name.endswith(".kepub") or lower_name.endswith(".kepub.epub"):
                     tool = 'ebook-meta'
                     cmd = [tool, file, '--from-opf', book.new_metadata_path]
@@ -1000,7 +1032,14 @@ class Enforcer:
                         cmd += ['--cover', book.cover_path]
                 else:
                     tool = 'ebook-polish'
-                    if Path(book.cover_path).exists():
+                    if Path(book.cover_path).exists() and keep_cover_aspect:
+                        # ebook-polish -c always writes the titlepage SVG with
+                        # preserveAspectRatio="none" and has no switch for
+                        # Calibre's keep_aspect option, so the cover goes in
+                        # after polishing, through set_cover itself (#2687).
+                        cmd = [tool, '-o', book.new_metadata_path, '-U', file, file]
+                        aspect_cover = book.cover_path
+                    elif Path(book.cover_path).exists():
                         cmd = [tool, '-c', book.cover_path, '-o', book.new_metadata_path, '-U', file, file]
                     else:
                         cmd = [tool, '-o', book.new_metadata_path, '-U', file, file]
@@ -1055,6 +1094,8 @@ class Enforcer:
                                 write_completed = True
                         else:
                             write_completed = True
+                            if aspect_cover is not None:
+                                self._set_cover_keeping_aspect(book, file, aspect_cover)
                 except subprocess.TimeoutExpired:
                     if clear_kepub_series:
                         print(

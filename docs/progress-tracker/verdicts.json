@@ -1392,6 +1392,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2710#issuecomment-6393652341",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2729@2026-11-11T18:16:37Z": {
+  "hash": "d2e3d0695585c21b",
+  "verdict": "content",
+  "quote": "Thank you very much @sgreadly ! (and @new-usemame of course)",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729#issuecomment-6803799205",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2747@2026-10-28T20:40:03Z": {
   "hash": "fd3dedfd3b48246c",
   "verdict": "none",

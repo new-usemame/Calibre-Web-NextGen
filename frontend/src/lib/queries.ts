@@ -814,18 +814,28 @@ export function useShelves(options?: { enabled?: boolean }) {
 
 // A new revision starts a fresh result set after bulk changes. Do not reuse
 // pre-mutation pages in the local accumulator; pages already skip placeholders.
-export function useShelf(id: string | number | undefined, page = 1, sort = 'stored', revision = 0) {
+export function useShelf(
+  id: string | number | undefined,
+  page = 1,
+  sort = 'stored',
+  revision = 0,
+  perPage = 24,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<ShelfDetail>({
-    queryKey: ['shelf', String(id), sort, page, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 2, and the
+    // invalidations elsewhere match on the ['shelf', id] prefix.
+    queryKey: ['shelf', String(id), sort, page, revision, perPage],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
-        per_page: '24',
+        per_page: String(perPage),
         sort,
       });
       return apiGet<ShelfDetail>(`/api/v1/shelves/${id}?${params.toString()}`);
     },
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== '' && ready,
     // Keep the previous page's rows only while paging within the SAME shelf and
     // sort. Never carry rows across either identity change (#612/#2059).
     placeholderData: (prev, prevQuery) =>

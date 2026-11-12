@@ -4735,6 +4735,19 @@ def HandleStateRequest(book_uuid):
             inexact_echo = bool(checked and request_bookmark and
                                 kobo_place_gate.is_inexact_echo(
                                     device_id, book, request_bookmark))
+            # #2783: the Kobo repeated the place it last reported while
+            # another reader moved the shared place on. Acknowledge it, move
+            # nothing, and leave its journal place clock alone so its next
+            # sync is not told its own old place is the newer one.
+            unmoved = bool(checked and request_bookmark and not inexact_echo
+                           and kobo_reading_state.current_bookmark.id is not None
+                           and kobo_place_gate.is_unmoved_report(
+                               device_id, book.id, request_bookmark,
+                               kobo_reading_state.current_bookmark.id))
+            if unmoved:
+                log.info("Kobo report for book %s device %s repeats its last place; "
+                         "the newer shared place from another reader is kept",
+                         book.id, device_id)
             if checked:
                 # The device's own journal hears every report it makes,
                 # status-only ones included, so turning the box off later
@@ -4747,7 +4760,7 @@ def HandleStateRequest(book_uuid):
                         book_id=book.id,
                         client_at=client_lm,
                         place=(_journal_place(request_bookmark)
-                               if request_bookmark else None),
+                               if request_bookmark and not unmoved else None),
                         status=own_status[1],
                         status_supplied=own_status[0],
                     )
@@ -4774,7 +4787,7 @@ def HandleStateRequest(book_uuid):
                 if checked:
                     if current_bookmark.id is None:
                         ub.session.flush()
-                    if inexact_echo:
+                    if inexact_echo or unmoved:
                         bookmark_outcome = kobo_place_gate.SharedWriteOutcome(
                             False, current_bookmark.progress_percent,
                             current_bookmark.last_modified)

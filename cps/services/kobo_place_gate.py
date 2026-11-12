@@ -682,6 +682,10 @@ def delivery_bookmark(book, bookmark, response, device_id):
     """
     own = ub.session.query(ub.DeviceReadingPosition).filter_by(
         device_id=int(device_id), book_id=int(book.id)).one_or_none()
+    if own is not None and bookmark.server_modified_at is not None:
+        # #2783: this Kobo has now been sent this shared place, exactly or
+        # held; a later return to its old place is its own reading.
+        own.served_shared_received_at = bookmark.server_modified_at
     receiver_identity = completed_kepub_identity(device_id, book)
     if (receiver_identity is not None and bookmark.location_value
             and bookmark.location_source and bookmark.location_type == "KoboSpan"
@@ -812,6 +816,56 @@ def _first_spine_source(book):
         return None
     kepub = _kepub(path)
     return kepub.documents[0].member if kepub and kepub.documents else None
+
+
+def _same_place(place, location_value, location_source, progress_percent):
+    """Whether a CurrentBookmark names the place given by these columns: the
+    same Location when it carries one, else the same percentage with none."""
+    location = place.get("Location") or {}
+    value = location.get("Value")
+    if value:
+        return value == location_value and location.get("Source") == location_source
+    return not location_value and place.get("ProgressPercent") == progress_percent
+
+
+def is_unmoved_report(device_id, book_id, place, bookmark_id):
+    """#2783: a checked Kobo's report at the place it last reported, when
+    another reader has since put a different place on the shared bookmark.
+
+    Nickel clocks each PUT /state when it sends it, so a Kobo that slept with
+    a book open reports its old place with a fresh clock before it syncs.
+    That clock says when the Kobo spoke, not when it read, so it must not
+    beat the other reader's newer place. Once the Kobo has been sent that
+    place (``delivery_bookmark``), a return to its old place is a deliberate
+    move and wins as before. Judge before journaling.
+    """
+    journal = ub.DeviceReadingPosition.__table__
+    own = ub.session.execute(select(
+        journal.c.location_value, journal.c.location_source,
+        journal.c.progress_percent, journal.c.server_modified_at,
+        journal.c.served_shared_received_at,
+    ).where(journal.c.device_id == int(device_id),
+            journal.c.book_id == int(book_id))).first()
+    if (own is None or own.server_modified_at is None
+            or not _same_place(place, own.location_value, own.location_source,
+                               own.progress_percent)):
+        return False
+    mark = ub.KoboBookmark
+    shared = ub.session.execute(select(
+        mark.location_value, mark.location_source, mark.progress_percent,
+        mark.server_modified_at,
+    ).where(mark.id == bookmark_id)).first()
+    if shared is None or shared.server_modified_at is None:
+        return False
+    if _same_place(place, shared.location_value, shared.location_source,
+                   shared.progress_percent):
+        return False
+    if (own.served_shared_received_at is not None
+            and _naive_utc(own.served_shared_received_at)
+            == _naive_utc(shared.server_modified_at)):
+        # The Kobo was sent this place, so a return to its old one is a move.
+        return False
+    return _naive_utc(shared.server_modified_at) > _naive_utc(own.server_modified_at)
 
 
 def is_inexact_echo(device_id, book, place):

@@ -139,6 +139,12 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
     app.add_url_rule('/kosync/syncs/progress', 'sync', kosync.update_progress, methods=['PUT'])
     app.add_url_rule('/api/v1/auth/csrf', 'csrf', lambda: flask.jsonify(csrf_token='fixture'))
     app.add_url_rule('/api/v1/reader/settings', 'settings', inspect.unwrap(reader.get_reader_settings))
+    # The Reader holds the book until the font catalogue settles (#2418). A 404
+    # here is retried with backoff for ~7s before the book opens, which is
+    # longer than the first-display waits below. Serve the built-ins only.
+    from cps.services import reader_fonts
+    monkeypatch.setattr(reader_fonts, 'root_dir', lambda: tmp_path / 'no-uploaded-fonts')
+    app.add_url_rule('/api/v1/reader/fonts', 'fonts', lambda: flask.jsonify(reader_fonts.catalogue()))
     app.add_url_rule('/api/v1/books/42', 'book', lambda: flask.jsonify(id=42,title='A Christmas Carol',authors=[],formats=[{'format':'EPUB','content_url':'/fixture.epub'}]))
     app.add_url_rule('/fixture.epub', 'epub', lambda: flask.send_file(archive_path))
     app.add_url_rule('/annotations/42/data.json', 'annotations', lambda: flask.jsonify(annotations=[]))

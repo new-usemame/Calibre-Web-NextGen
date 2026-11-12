@@ -109,3 +109,16 @@ def test_an_unchecked_kobo_never_receives_a_headerless_apps_place(account, rows)
     sw.push(rows["late"]["xpointer"], 40, **APP)
 
     assert location_of(_bookmark(sw, unchecked)) == before
+
+
+def test_with_the_switch_off_a_headerless_app_moves_only_the_percentage(
+        account, rows, monkeypatch):
+    """The rollout switch off keeps the percentage-only bridge (the merge bar)."""
+    sw = account
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+    own = rows["kobo-own"]
+    sw.push(rows["late"]["xpointer"], 40, **APP)
+
+    bookmark = _bookmark(sw, sw.checked)
+    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert location_of(bookmark) == span_location(own["source"], own["span"])

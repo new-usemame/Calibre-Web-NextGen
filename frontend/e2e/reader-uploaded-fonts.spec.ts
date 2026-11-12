@@ -370,7 +370,9 @@ for (const builtin of ['Arial', 'Literata']) {
   await expect(page.getByLabel('Font family')).toHaveValue(builtin);
   await expect(page.getByLabel('Font family').locator('option')).toHaveCount(6);
   await expect(page.getByLabel('Font family').locator('option[value="Literata"]')).toHaveText('Literata');
-  await expect(page.getByText('Could not load reader fonts.', { exact: true })).toBeVisible();
+  // The book no longer waits for the catalog, so this notice appears only once
+  // the query's retries give up (about 7s), after the book is already open.
+  await expect(page.getByText('Could not load reader fonts.', { exact: true })).toBeVisible({ timeout: 20_000 });
   expect(await savedReaderFont(page)).toBe(builtin);
 });
 
@@ -395,4 +397,40 @@ test('New UI opens a book with a built-in font while the catalog request is stil
     const doc = (element as HTMLIFrameElement).contentDocument!;
     return doc.defaultView!.getComputedStyle(doc.querySelector('p')!).fontFamily;
   })).toContain('Arial');
+});
+
+// The other side of the same gate: an uploaded font's @font-face rule comes
+// from the catalog, so a book set to one must wait for it. Opening early shows
+// the first page without the font and re-lays it out once the catalog lands.
+test('New UI waits for a slow catalog when the saved font is an uploaded one', async ({}, testInfo) => {
+  test.setTimeout(120_000);
+  await uploadThroughUi(testInfo);
+  const page = pageForTest();
+  await verifyViewport(page, testInfo);
+  const save = await page.request.post('/api/v1/reader/settings', {
+    headers: { 'X-CSRFToken': await csrfToken(page) }, data: { font: uploadedFont!.id },
+  });
+  expect(save.ok()).toBeTruthy();
+  await page.route('**/api/v1/reader/fonts', async route => {
+    await new Promise(resolve => setTimeout(resolve, 3_000));
+    await route.continue();
+  });
+  const id = await firstEpubId(page);
+  await page.route('**/show/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/epub+zip', path: EPUB_FIXTURE }),
+  );
+  await page.goto(`/app/read/${id}`);
+  // Read the first page the moment its text appears, before any re-layout.
+  let firstPage = 'not yet';
+  const deadline = Date.now() + 30_000;
+  while (firstPage === 'not yet' && Date.now() < deadline) {
+    firstPage = await page.locator('iframe').first().evaluate((element, family) => {
+      const doc = (element as HTMLIFrameElement).contentDocument;
+      if (!doc?.body?.innerText.includes('NOTEREF-SECTION-1')) return 'not yet';
+      const css = Array.from(doc.querySelectorAll('style')).map(style => style.textContent ?? '').join('\n');
+      return css.includes(`font-family:${family}`) ? 'has uploaded font' : 'missing uploaded font';
+    }, uploadedFont!.family, { timeout: 1_000 }).catch(() => 'not yet');
+    if (firstPage === 'not yet') await page.waitForTimeout(50);
+  }
+  expect(firstPage).toBe('has uploaded font');
 });

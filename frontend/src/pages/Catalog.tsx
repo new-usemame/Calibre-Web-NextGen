@@ -23,6 +23,7 @@ import { saveCatalog, loadCatalog, useCatalogCoverSnapshot } from '../lib/scroll
 import { useLibraryRevision } from '../lib/libraryRevision';
 import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
+import { useCatalogDensity } from '../lib/catalogDensity';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
@@ -422,8 +423,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     }
   }, [customFieldOwner, me?.catalog?.custom_field_ids, me?.catalog?.custom_field_labels,
       updateCatalogCustomFields.isPending]);
-  const [density, setDensity] = usePersistentChoice(
-    'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
+  const [density, setDensity] = useCatalogDensity();
   const [rowsChoice, setRowsChoice] = usePersistentChoice(
     'cwng:catalog-rows-v1', ['1', '2', '3', '4', '5', '6'] as const, '2');
   const rowsPerLoad = Number(rowsChoice);

@@ -1913,6 +1913,17 @@ export function Reader({ id }: { id: string }) {
             if (loc?.start?.cfi && epubBook.locations.length()) {
               setProgress(Math.round(epubBook.locations.percentageFromCfi(loc.start.cfi) * 100));
             }
+            // #2783: a place the reader saved before the index existed went out
+            // without a percentage, and the percentage is what the server shares
+            // with their other devices. Save that same place again now that it
+            // has one, or a reader who turned a page in the first seconds and
+            // then stopped would never share where they are.
+            const ownCfi = lastCfiRef.current;
+            if (readerMoved && ownCfi && lastPercentRef.current == null
+                && epubBook.locations.length()) {
+              const pct = epubBook.locations.percentageFromCfi(ownCfi) * 100;
+              if (Number.isFinite(pct) && pct > 0) persistCfi(ownCfi, pct);
+            }
           })
           .catch(() => {
             // Locations are best-effort. Without them the jump cannot happen,

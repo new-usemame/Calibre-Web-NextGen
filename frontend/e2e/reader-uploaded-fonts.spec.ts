@@ -375,3 +375,24 @@ for (const builtin of ['Arial', 'Literata']) {
 });
 
 }
+
+// A built-in font needs nothing from the catalog, so the book must not wait
+// for it. The request is held open (never answered): if the open waits for the
+// catalog to settle, the book never appears; a failing catalog is the same wait
+// stretched by the query's retry backoff.
+test('New UI opens a book with a built-in font while the catalog request is still pending', async ({}, testInfo) => {
+  const page = pageForTest();
+  await verifyViewport(page, testInfo);
+  const save = await page.request.post('/api/v1/reader/settings', {
+    headers: { 'X-CSRFToken': await csrfToken(page) }, data: { font: 'Arial' },
+  });
+  expect(save.ok()).toBeTruthy();
+  let catalogRequested = false;
+  await page.route('**/api/v1/reader/fonts', () => { catalogRequested = true; });
+  await openFixture(page, await firstEpubId(page), false);
+  expect(catalogRequested).toBe(true);
+  await expect.poll(() => page.locator('iframe').first().evaluate(element => {
+    const doc = (element as HTMLIFrameElement).contentDocument!;
+    return doc.defaultView!.getComputedStyle(doc.querySelector('p')!).fontFamily;
+  })).toContain('Arial');
+});

@@ -19,7 +19,6 @@ import os
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import flask
 import pytest
 from werkzeug.datastructures import FileStorage
 
@@ -102,9 +101,7 @@ def test_upload_gate_accepts_fb2_zip_when_fbz_allowed(monkeypatch):
         raising=False,
     )
 
-    app = flask.Flask(__name__)
-    app.secret_key = "test"
-    with app.test_request_context("/upload", method="POST"), \
+    with cps.app.test_request_context("/upload", method="POST"), \
             patch.object(editbooks, "config", config), \
             patch.object(editbooks, "_", lambda text, **_kwargs: text):
         assert editbooks._validate_uploaded_file(upload) is True
@@ -121,12 +118,13 @@ def test_upload_gate_rejects_fb2_zip_when_fbz_not_allowed(monkeypatch):
         content_type="application/zip",
     )
 
-    app = flask.Flask(__name__)
-    app.secret_key = "test"
-    with app.test_request_context("/upload", method="POST"), \
+    flashed = []
+    with cps.app.test_request_context("/upload", method="POST"), \
             patch.object(editbooks, "config", config), \
-            patch.object(editbooks, "_", lambda text, **_kwargs: text):
+            patch.object(editbooks, "flash", lambda msg, **_kw: flashed.append(msg)), \
+            patch.object(editbooks, "_", lambda text, **kwargs: text % kwargs):
         assert editbooks._validate_uploaded_file(upload) is False
+    assert flashed == ["File extension 'fbz' is not allowed to be uploaded to this server"]
 
 
 def test_get_ingest_path_stages_fb2_zip_as_fbz(tmp_path, monkeypatch):

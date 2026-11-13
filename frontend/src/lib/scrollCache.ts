@@ -31,6 +31,11 @@ export interface CatalogSnapshot {
    *  An edit can change membership there, so the snapshot is dropped rather
    *  than patched (see applyBookEditToCache). */
   membershipFiltered: boolean;
+  /** The page size the pages were loaded at, and the density|rows choice it came
+   *  from. Restoring at this size keeps resetKey matching even when the restored
+   *  grid measures a column fewer or more (#2903). */
+  perPage?: number;
+  layoutChoice?: string;
 }
 
 const _cache = new Map<string, CatalogSnapshot>();

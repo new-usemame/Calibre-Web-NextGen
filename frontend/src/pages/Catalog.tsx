@@ -440,7 +440,41 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // requested; the guess survives only as the fail-open fallback.
   const [columnCount, setColumnCount] = useState(() => Math.max(1, Math.ceil(fallbackPerPage / rowsPerLoad)));
   const [gridMeasured, setGridMeasured] = useState(false);
-  const perPage = rowsPerLoad * columnCount;
+  // The request size is rows x the columns measured off the grid, and it is part
+  // of the list's identity (resetKey), so a column count that changes while pages
+  // are still loading throws the loaded list away and starts again. With 1 row
+  // per load that is a loop: the page is short enough to have no vertical
+  // scrollbar, loading the next row makes it overflow, the scrollbar narrows the
+  // grid by a column, the size changes, the list resets to one row, the scrollbar
+  // goes, the column returns, and so on (#2903). So follow the live measurement
+  // while on page 1 (and until the first measurement has landed, which is what a
+  // restored view needs), then hold the size page 1 used. Choosing a different
+  // Rows per load or density releases it. A view restored on Back keeps the size
+  // its pages were loaded at, so its resetKey still matches and the list survives
+  // even when the scrollbar now costs a column.
+  const livePerPage = rowsPerLoad * columnCount;
+  const layoutChoice = `${density}|${rowsChoice}`;
+  const restoredPerPage = snap?.perPage && snap.layoutChoice === layoutChoice && snap.page > 1
+    ? snap.perPage : null;
+  const perPageRef = useRef(restoredPerPage ?? livePerPage);
+  const perPageSettledRef = useRef(restoredPerPage !== null);
+  const layoutChoiceRef = useRef(layoutChoice);
+  if (layoutChoiceRef.current !== layoutChoice) {
+    layoutChoiceRef.current = layoutChoice;
+    perPageSettledRef.current = false;
+  }
+  // A library-scope or Discover-source change requests page 1 in this same render
+  // (requestPage below), before setPage(1) lands, so it takes the live size now
+  // rather than fetching page 1 at the held size and again at the live one.
+  const previousLibraryScope = useRef(libraryScope);
+  const changedLibrary = previousLibraryScope.current !== libraryScope;
+  const previousDiscoverIdentity = useRef(discoverIdentity);
+  const changedDiscover = previousDiscoverIdentity.current !== discoverIdentity;
+  if (page === 1 || changedLibrary || changedDiscover || !perPageSettledRef.current) {
+    perPageRef.current = livePerPage;
+  }
+  if (gridMeasured) perPageSettledRef.current = true;
+  const perPage = perPageRef.current;
   const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
     'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -660,10 +694,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', encodeURIComponent(tagPath ?? ''), perPage, showHidden,
     filterActive ? JSON.stringify(defaultFilter) : '', libraryScope, discoverIdentity].join('|');
 
-  const previousLibraryScope = useRef(libraryScope);
-  const changedLibrary = previousLibraryScope.current !== libraryScope;
-  const previousDiscoverIdentity = useRef(discoverIdentity);
-  const changedDiscover = previousDiscoverIdentity.current !== discoverIdentity;
   useLayoutEffect(() => {
     if (!changedDiscover) return;
     previousDiscoverIdentity.current = discoverIdentity;
@@ -703,8 +733,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // or has to let the view rebuild (#1169). Computed here because this is where
   // the knowledge lives.
   const membershipFiltered = !!search || !!entityKind || tagPath !== undefined || !!view || filterActive;
-  const persistRef = useRef({ page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter, membershipFiltered });
-  persistRef.current = { page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter, membershipFiltered };
+  const persistRef = useRef({ page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter, membershipFiltered, perPage, layoutChoice });
+  persistRef.current = { page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter, membershipFiltered, perPage, layoutChoice };
 
   // Track the live scroll offset in a ref. Reading window.scrollY in the unmount
   // cleanup is too late: by then the catalog has been swapped for the (shorter)

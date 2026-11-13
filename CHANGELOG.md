@@ -16,6 +16,28 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.68] - 2026-11-13
+
+### Added
+
+- **A new cover no longer has to be stretched to fill your reader's screen.** When you change a book's cover, the enforcement service rewrites the EPUB with a cover page that stretched the image to the screen, so it looked distorted on readers whose screen shape differs from the cover's. A new setting under NextGen Settings, "Preserve cover aspect ratio in EPUBs", keeps the cover's proportions instead, the same as Calibre's own "Preserve cover aspect ratio" option. It is off by default and applies to covers written after you turn it on (#2687, thanks @NeonTink).
+
+### Fixed
+
+- **A place you save in the web reader right after opening a book now reaches your other devices.** The web reader works out a book's percentages a few seconds after it opens. A page turn before then saved your place without a percentage, and the percentage is what CWNG shares with your Kobo and KOReader, so if you read a page and closed the book, your other devices never heard about it. The reader now saves that same place again with its percentage as soon as it can work one out (#2783, thanks @lukerajah).
+
+- **A save from a KOSync app such as JustRead now moves your Kobo to the same place, not only to the same percentage.** Apps that don't send CWNG's device header only moved the Kobo's percentage, so the book showed the new percentage and opened where the Kobo last was. When the app's save is accepted and its place converts exactly into the KEPUB your Kobo holds, the Kobo now gets that place. These saves still only move forward, as before (#2783, thanks @lukerajah).
+
+- **A Kobo that wakes up with a book open no longer undoes a newer place from another reader.** On waking, a Kobo reports the place it closed on with the current time, before it syncs. That fresh time used to beat a place you had just saved in the web reader or KOReader, so the Kobo's old place replaced it everywhere. With Share my place on, a Kobo report that repeats the place that Kobo last sent now leaves the newer place alone, and the Kobo's next sync offers it that place. Reading on the Kobo, forward or back, still wins as before (#2783, thanks @lukerajah).
+
+- **The Library no longer gets stuck on "Loading…" at certain window widths with Rows per load set to 1.** The number of books fetched per page follows the number of columns, and a scrollbar appearing as rows loaded could cost a column, which threw the loaded list away and started it again, repeatedly. The page size now holds once you are past the first page; changing Rows per load or density still starts the list afresh (#2903).
+
+- **Shelves and Smart shelves now follow the book density you pick on the Library page.** Choosing Comfortable, Compact or Dense in the Library's view settings used to apply to the Library alone; a shelf always showed its own fixed layout. Shelves read the same setting, so Dense is dense everywhere, with the Library's 2, 3 or 4 columns on a phone (#980, thanks @sgreadly).
+
+- **Shelves now load the number of rows you choose in the Library's "Rows per load" setting.** A shelf always fetched 24 books at a time, whatever you had picked. It now measures its own columns and asks for whole rows, as the Library does, so Dense with 1 row per load loads one row at a time on a shelf too (#980).
+
+- **A book set to a built-in font opens straight away in the web reader.** The reader used to wait for the list of reader fonts before showing the first page. When that list was slow or failed to load, every book sat on a blank reader for several seconds. Built-in fonts need nothing from that list, so the book now opens without it. A book set to an uploaded font still waits, so that font is there on the first page.
+
 ## [v4.1.67] - 2026-11-12
 
 ### Fixed

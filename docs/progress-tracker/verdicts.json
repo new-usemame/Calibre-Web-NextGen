@@ -1246,7 +1246,7 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#2387@2026-09-30T20:52:40Z": {
-  "hash": "f9649eb35d78b6ad",
+  "hash": "751ec569c83cbac6",
   "verdict": "none",
   "quote": "",
   "evidence": "",
@@ -1371,6 +1371,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2673#issuecomment-6313775324",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2687@2026-11-12T15:18:34Z": {
+  "hash": "1b3458db2005561f",
+  "verdict": "content",
+  "quote": "Thank you, I really appreciate your hard work on this project!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2687#issuecomment-6841101459",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2688@2026-10-21T16:29:24Z": {
   "hash": "5b75ff1ac695c941",
   "verdict": "fixed",
@@ -1392,11 +1399,18 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2710#issuecomment-6393652341",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2724@2026-11-11T12:26:15Z": {
+  "hash": "e7175f0144cc869d",
+  "verdict": "fixed",
+  "quote": "I've tested the new release. It's working now perfectly. You've done a good job! Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2724#issuecomment-6830984521",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2729@2026-11-11T18:16:37Z": {
-  "hash": "d2e3d0695585c21b",
-  "verdict": "content",
-  "quote": "Thank you very much @sgreadly ! (and @new-usemame of course)",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729#issuecomment-6803799205",
+  "hash": "1d5fe898de13d372",
+  "verdict": "fixed",
+  "quote": "Works in v4.1.67!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729#issuecomment-6818006157",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2747@2026-10-28T20:40:03Z": {
@@ -2580,6 +2594,13 @@
   "verdict": "fixed",
   "quote": "Thanks! This is working well now, both on the main screen, and the per-tag screen.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/973#issuecomment-5193426514",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#980@2026-11-12T07:50:13Z": {
+  "hash": "4e382b304ab7174d",
+  "verdict": "content",
+  "quote": "Thanks for picking it up and for the fixes, especially the phone gap",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/980#issuecomment-6839463146",
   "by": "deepseek-v4.1-flash"
  },
  "issue#984@2026-07-29T14:35:37Z": {

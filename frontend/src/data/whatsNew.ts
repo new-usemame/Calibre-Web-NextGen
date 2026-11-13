@@ -56,6 +56,47 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.68',
+    date: '2026-11-13',
+    items: [
+      {
+        title: 'Your Kobo no longer undoes a newer place when it wakes',
+        body: 'A Kobo that woke with a book open reported its old place with a fresh time, which replaced a place you had just saved in the web reader or KOReader. With Share my place on, that repeat report now leaves the newer place alone, and the Kobo picks it up at its next sync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOSync apps move your Kobo to the exact place',
+        body: 'A save from an app such as JustRead used to move only the Kobo\'s percentage, so the book opened where the Kobo last was. When the place converts exactly into your Kobo\'s copy, the Kobo now opens there.',
+        category: 'Sync',
+      },
+      {
+        title: 'A quick read in the web reader reaches your other devices',
+        body: 'Turning a page in the first few seconds after opening a book saved your place without a percentage, so your Kobo and KOReader never heard about it. The reader now saves it again with the percentage as soon as it has one.',
+        category: 'Reading',
+      },
+      {
+        title: 'Shelves follow your Library view settings',
+        body: 'Shelves and Smart shelves now use the book density and Rows per load you pick on the Library page, instead of a fixed layout that fetched 24 books at a time.',
+        category: 'Library',
+      },
+      {
+        title: 'The Library no longer gets stuck on Loading',
+        body: 'At some window widths with Rows per load set to 1, a scrollbar appearing could cost a column and restart the list over and over. The page size now holds once you are past the first page.',
+        category: 'Library',
+      },
+      {
+        title: 'Books with a built-in font open straight away',
+        body: 'The web reader waited for the list of reader fonts before showing the first page, so a slow list meant a blank reader for several seconds. Built-in fonts no longer wait for it.',
+        category: 'Reading',
+      },
+      {
+        title: 'Keep a new cover\'s proportions in your EPUBs',
+        body: 'Changing a cover rewrote the EPUB with a cover page stretched to the screen, which looked distorted on some readers. Turn on "Preserve cover aspect ratio in EPUBs" in NextGen Settings to keep the cover\'s shape. It applies to covers written after you turn it on.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.67',
     date: '2026-11-12',
     items: [

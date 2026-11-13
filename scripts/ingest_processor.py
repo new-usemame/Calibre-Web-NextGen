@@ -2508,7 +2508,22 @@ class NewBookProcessor:
         # Stage file for import
         staged_path = Path(self.staging_dir) / self._presented_name(source_path)
         try:
-            shutil.copy2(source_path, staged_path)
+            try:
+                shutil.copy2(source_path, staged_path)
+            except OSError as e:
+                if staged_path.name == source_path.name:
+                    raise
+                # Some filesystems (SMB, exFAT) refuse characters a browser
+                # name may carry, such as ':' or '?'. Import under the staged
+                # name rather than fail the book.
+                print(f"[ingest-processor] WARN: could not stage {source_path.name} as "
+                      f"{staged_path.name!r}, importing it under its sanitised name: {e}", flush=True)
+                if staged_path.exists():
+                    os.remove(staged_path)
+                staged_path = Path(self.staging_dir) / (
+                    self._UPLOAD_STAGING_PREFIX.sub("", source_path.name, count=1) or source_path.name
+                )
+                shutil.copy2(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for import: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")

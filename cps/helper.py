@@ -1045,11 +1045,11 @@ def set_explicit_book_read_status(book_id, status_name, sync_hardcover=True):
     return ""
 
 
-def reset_reading_position(session, user_id, book_id):
+def reset_reading_position(session, user_id, book_id, *, keep_read_status=False):
     """Clear a user's stored reading position for one book so marking it
     'unread' is a genuine reset (#683).
 
-    Three independent stores surface as the "% read" the user sees:
+    Four independent stores surface as the "% read" the user sees:
       * ``ub.KoboReadingState.current_bookmark`` — the KOReader/Kobo synced
         progress percentage shown on the classic detail page and the new-UI book
         page (fork #587);
@@ -1058,6 +1058,16 @@ def reset_reading_position(session, user_id, book_id):
         scroll, so the ghost would return.
       * ``KOSyncProgress`` — KOReader's server-side resume point, stored under
         either the Calibre book ID or any registered file checksum.
+      * ``ub.DeviceReadingPosition`` — each of the user's devices' own last
+        reported place (#2831). ``GET /kosync/syncs/progress`` serves an
+        identified device its own row when there is no shared row, so leaving
+        these behind handed a "reset" book straight back to the KOReader that
+        had reported it.
+
+    ``keep_read_status=True`` is the position-only clear (#2831): the
+    "Currently reading" marker is left as it is, so a finished book can be
+    reset for a re-read and stay marked read. "Mark as unread" keeps the
+    default and folds the marker back to unread.
 
     Kobo/KOReader propagation is automatic: zeroing the KoboBookmark bumps its
     ``last_modified`` (onupdate) and the before_flush listener in ``ub.py`` lifts
@@ -1128,13 +1138,23 @@ def reset_reading_position(session, user_id, book_id):
     # after via ``mirror_read_status_to_readbook`` (#1343). Filtering FINISHED
     # here too would make a position reset silently un-read a book for any
     # future caller that only wanted the percentage cleared.
-    read_row = session.query(ub.ReadBook).filter(
-        ub.ReadBook.user_id == uid,
-        ub.ReadBook.book_id == book_id,
-        ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
-    if read_row is not None:
-        read_row.read_status = ub.ReadBook.STATUS_UNREAD
-        cleared += 1
+    if not keep_read_status:
+        read_row = session.query(ub.ReadBook).filter(
+            ub.ReadBook.user_id == uid,
+            ub.ReadBook.book_id == book_id,
+            ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
+        if read_row is not None:
+            read_row.read_status = ub.ReadBook.STATUS_UNREAD
+            cleared += 1
+    # #2831: every device's own observation for this book (KOReader and Kobo),
+    # scoped to this user's devices only. The journal's delivery bookkeeping
+    # (rehydrate latch) lives on these rows, so a cleared book is not
+    # re-delivered from a stale observation either.
+    cleared += session.query(ub.DeviceReadingPosition).filter(
+        ub.DeviceReadingPosition.book_id == book_id,
+        ub.DeviceReadingPosition.device_id.in_(
+            session.query(ub.Device.id).filter(ub.Device.user_id == uid)),
+    ).delete(synchronize_session=False)
     # KOSync may have accumulated a canonical book-id row plus legacy rows for
     # any checksum ever registered to this book. Delete every equivalent key;
     # otherwise the next GET can resurrect a finished 100% position. This uses

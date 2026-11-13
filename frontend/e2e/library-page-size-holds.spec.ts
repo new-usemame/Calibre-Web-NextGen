@@ -29,7 +29,7 @@ async function settled(page: Page, seen: () => number) {
   }, { timeout: 15_000, intervals: [100] }).toBe(true);
 }
 
-test('#2903 the Library keeps its page size when the grid width changes mid-scroll', async ({ page }) => {
+async function mockLibrary(page: Page) {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.addInitScript(() => {
     localStorage.setItem('cwng:catalog-density-v1', 'dense');
@@ -53,6 +53,11 @@ test('#2903 the Library keeps its page size when the grid width changes mid-scro
     await route.fulfill({ json: { items, page: number, per_page: count, total: TOTAL } });
   });
 
+  return requests;
+}
+
+test('#2903 the Library keeps its page size when the grid width changes mid-scroll', async ({ page }) => {
+  const requests = await mockLibrary(page);
   await page.goto('/app');
   const grid = page.getByTestId('catalog-grid');
   await expect(grid).toBeVisible();
@@ -79,4 +84,32 @@ test('#2903 the Library keeps its page size when the grid width changes mid-scro
     expect(request.page).toBeGreaterThan(lastPage);
     expect(request.perPage).toBe(size);
   }
+});
+
+test('#2903 Back from a book keeps a list whose grid width changed mid-scroll', async ({ page }) => {
+  const requests = await mockLibrary(page);
+  await page.goto('/app');
+  const grid = page.getByTestId('catalog-grid');
+  await expect.poll(() => requests.length, { timeout: 15_000 }).toBeGreaterThan(1);
+  await settled(page, () => requests.length);
+  const columnsBefore = await grid.getAttribute('data-catalog-column-count');
+  await page.setViewportSize({ width: 900, height: 800 });
+  await expect.poll(() => grid.getAttribute('data-catalog-column-count')).not.toBe(columnsBefore);
+  await settled(page, () => requests.length);
+  const cards = grid.locator('a[href*="/book/"]');
+  const loaded = await cards.count();
+  expect(loaded).toBeGreaterThan(0);
+
+  await cards.first().click();
+  await page.waitForURL('**/book/**');
+  const handled = requests.length;
+  await page.goBack();
+  await page.waitForURL(/\/app\/?$/);
+  await expect(grid).toBeVisible();
+  await settled(page, () => requests.length);
+
+  // The restored list is the one that was loaded: it was not thrown away and
+  // fetched again from page 1.
+  expect(requests.slice(handled).filter((r) => r.page === 1)).toEqual([]);
+  expect(await cards.count()).toBeGreaterThanOrEqual(loaded);
 });

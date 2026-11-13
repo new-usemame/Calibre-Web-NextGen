@@ -2032,17 +2032,29 @@ export interface MagicShelfSortOption {
   label: string;
 }
 
-export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new', revision = 0) {
+export function useMagicShelfBooks(
+  id: string | number,
+  page = 1,
+  sort = 'new',
+  revision = 0,
+  /** Books per request; leave out to use the server's configured page size. */
+  perPage?: number,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<MagicShelfItem & BooksPage & {
     sort: string;
     sort_persistable?: boolean;
     custom_sort_options?: MagicShelfSortOption[];
   }>({
-    queryKey: ['magicshelf', String(id), page, sort, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 3, and the
+    // invalidations elsewhere match on the ['magicshelf', id] prefix.
+    queryKey: ['magicshelf', String(id), page, sort, revision, perPage],
     queryFn: () => apiGet(
-      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`,
+      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`
+        + (perPage ? `&per_page=${perPage}` : ''),
     ),
-    enabled: String(id).length > 0,
+    enabled: String(id).length > 0 && ready,
     // Same-shelf, same-order paging only — see useShelf (#612).
     placeholderData: (prev, prevQuery) =>
       prevQuery

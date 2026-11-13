@@ -34,7 +34,10 @@ if SCRIPTS_DIR not in sys.path:
 
 import ingest_processor  # noqa: E402
 
-STAGED = "new_1_20261113_112627_417824_Rig Doc.docx"
+# The upload routes sanitise the staged name (secure_filename: spaces become
+# underscores, a non-ASCII stem becomes "book"), so the sidecar is the only
+# place the name the user chose survives.
+STAGED = "new_1_20261113_112627_417824_Rig_Doc.docx"
 
 
 def _processor(tmp_path, filename, original_filename=None):
@@ -110,7 +113,7 @@ def test_converter_sees_the_uploaded_name_not_the_staging_name(tmp_path, monkeyp
 
 
 def test_calibredb_stages_the_uploaded_name_when_not_converted(tmp_path, monkeypatch):
-    staged = "new_1_20261113_112627_417824_Rig Doc.txt"
+    staged = "new_1_20261113_112627_417824_Rig_Doc.txt"
     nbp = _processor(tmp_path, staged, original_filename="Rig Doc.txt")
     names = _staged_names(monkeypatch, nbp, nbp.filepath)
     assert "Rig Doc.txt" in names
@@ -125,6 +128,22 @@ def test_fb2_zip_upload_keeps_its_fbz_extension(tmp_path, monkeypatch):
     nbp = _processor(tmp_path, staged, original_filename="Saga.fb2.zip")
     names = _staged_names(monkeypatch, nbp, nbp.filepath)
     assert "Saga.fbz" in names
+
+
+def test_non_ascii_upload_name_survives_staging(tmp_path, monkeypatch):
+    # "龙蛋.txt" is staged as "..._book.txt" (#2701); the title must not be "book".
+    staged = "new_1_20261113_112627_417824_book.txt"
+    nbp = _processor(tmp_path, staged, original_filename="龙蛋.txt")
+    names = _staged_names(monkeypatch, nbp, nbp.filepath)
+    assert "龙蛋.txt" in names
+
+
+def test_unusable_original_name_falls_back_to_the_staged_name(tmp_path, monkeypatch):
+    staged = "new_1_20261113_112627_417824_book.txt"
+    nbp = _processor(tmp_path, staged, original_filename="..txt")
+    names = _staged_names(monkeypatch, nbp, nbp.filepath)
+    assert names and all("/" not in n and n not in (".txt", "..txt") for n in names)
+    assert "book.txt" in names
 
 
 def test_watch_folder_drop_keeps_its_own_name(tmp_path, monkeypatch):

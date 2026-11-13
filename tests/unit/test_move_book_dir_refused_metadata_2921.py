@@ -112,3 +112,13 @@ def test_copying_move_keeps_data_times_and_accepted_xattrs_and_skips_refused_one
     assert os.stat(new_dir / "Example Book - Unknown.epub").st_mtime == pytest.approx(1_600_000_000)
     for name in contents:
         assert accepted.get((name, "user.origin")) == b"keep-me"
+
+
+def test_move_to_new_author_on_one_filesystem_is_a_rename_not_a_copy(tmp_path):
+    library, book_dir, contents = _library_with_book(tmp_path)
+    epub_inode = os.stat(book_dir / "Example Book - Unknown.epub").st_ino
+
+    result, localbook = _move_to_new_author(library, book_dir)
+
+    new_dir = _assert_moved(result, localbook, library, book_dir, contents)
+    assert os.stat(new_dir / "Example Book - Unknown.epub").st_ino == epub_inode

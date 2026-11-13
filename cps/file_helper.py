@@ -35,8 +35,15 @@ def get_mimetype(ext):
              ".fbz": "application/zip",
              ".kfx": "application/octet-stream",
              ".kfx-zip": "application/zip",
+             # Default upload formats the Docker image's mimetypes table does
+             # not know, given as the type its libmagic sniffs for each.
+             ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+             ".odt": "application/vnd.oasis.opendocument.text",
+             ".flac": "audio/flac",
              }
-    return mimes.get(ext, mimetypes.types_map[ext])
+    if ext in mimes:
+        return mimes[ext]
+    return mimetypes.types_map[ext]
 
 
 def get_temp_dir():
@@ -61,7 +68,9 @@ def validate_mime_type(file_buffer, allowed_extensions):
         try:
             allowed_mimetypes.append(get_mimetype("." + x))
         except KeyError:
-            log.error("Unkown mimetype for Extension: {}".format(x))
+            # Not an error: the sniffed type below still decides, and an
+            # admin may allow an extension no MIME table knows (#1026).
+            log.debug("No known mimetype for allowed extension: {}".format(x))
     tmp_mime_type = mime.from_buffer(file_buffer.read())
     file_buffer.seek(0)
     if any(mime_type in tmp_mime_type for mime_type in allowed_mimetypes):

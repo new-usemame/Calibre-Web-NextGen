@@ -23,8 +23,6 @@ import { saveCatalog, loadCatalog, useCatalogCoverSnapshot } from '../lib/scroll
 import { useLibraryRevision } from '../lib/libraryRevision';
 import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
-import { useCatalogDensity } from '../lib/catalogDensity';
-import { useCatalogRowsPerLoad } from '../lib/catalogRowsPerLoad';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
@@ -424,8 +422,10 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     }
   }, [customFieldOwner, me?.catalog?.custom_field_ids, me?.catalog?.custom_field_labels,
       updateCatalogCustomFields.isPending]);
-  const [density, setDensity] = useCatalogDensity();
-  const [rowsChoice, setRowsChoice] = useCatalogRowsPerLoad();
+  const [density, setDensity] = usePersistentChoice(
+    'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
+  const [rowsChoice, setRowsChoice] = usePersistentChoice(
+    'cwng:catalog-rows-v1', ['1', '2', '3', '4', '5', '6'] as const, '2');
   const rowsPerLoad = Number(rowsChoice);
   const [catalogNode, setCatalogNode] = useState<HTMLElement | null>(null);
   const [gridNode, setGridNode] = useState<HTMLDivElement | null>(null);
@@ -440,7 +440,27 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // requested; the guess survives only as the fail-open fallback.
   const [columnCount, setColumnCount] = useState(() => Math.max(1, Math.ceil(fallbackPerPage / rowsPerLoad)));
   const [gridMeasured, setGridMeasured] = useState(false);
-  const perPage = rowsPerLoad * columnCount;
+  // The request size is rows x the columns measured off the grid, and it is part
+  // of the list's identity (resetKey), so a column count that changes while pages
+  // are still loading throws the loaded list away and starts again. With 1 row
+  // per load that is a loop: the page is short enough to have no vertical
+  // scrollbar, loading the next row makes it overflow, the scrollbar narrows the
+  // grid by a column, the size changes, the list resets to one row, the scrollbar
+  // goes, the column returns, and so on (#2903). So follow the live measurement
+  // while on page 1 (and until the first measurement has landed, which is what a
+  // restored view needs), then hold the size page 1 used. Choosing a different
+  // Rows per load or density releases it.
+  const livePerPage = rowsPerLoad * columnCount;
+  const perPageRef = useRef(livePerPage);
+  const perPageSettledRef = useRef(false);
+  const layoutChoiceRef = useRef(`${density}|${rowsChoice}`);
+  if (layoutChoiceRef.current !== `${density}|${rowsChoice}`) {
+    layoutChoiceRef.current = `${density}|${rowsChoice}`;
+    perPageSettledRef.current = false;
+  }
+  if (page === 1 || !perPageSettledRef.current) perPageRef.current = livePerPage;
+  if (gridMeasured) perPageSettledRef.current = true;
+  const perPage = perPageRef.current;
   const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
     'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
   const settingsRef = useRef<HTMLDivElement>(null);

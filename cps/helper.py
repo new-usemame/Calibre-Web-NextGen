@@ -59,7 +59,7 @@ from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait
-from .services.file_move import copy_with_metadata_fallback
+from .services.file_move import copy_with_metadata_fallback, move_path
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
 from .services.conversion_capabilities import get_conversion_capabilities
@@ -1705,17 +1705,10 @@ def move_files_on_change(calibre_path, new_author_dir, new_titledir, localbook, 
             if not os.path.exists(new_path):
                 # move original path to new path
                 log.debug("Moving title: %s to %s", path, new_path)
-                try:
-                    shutil.move(path, new_path)
-                except OSError as ex:
-                    log.error("Failed to move directory %s to %s: %s, trying copy tree approach", path, new_path, ex)
-                    # Fallback: try to copy tree and then remove original
-                    try:
-                        shutil.copytree(path, new_path, dirs_exist_ok=True)
-                        shutil.rmtree(path)
-                    except (OSError, IOError) as fallback_ex:
-                        log.error("Copy tree fallback also failed: %s", fallback_ex)
-                        raise
+                # move_path renames (creating a new author folder first) and only
+                # copies across filesystems, skipping metadata the destination
+                # refuses, such as an NFSv4 ACL (#2921).
+                move_path(path, new_path)
             elif _same_filesystem_entry(path, new_path):
                 # Case-only rename on a case-insensitive filesystem: the "existing"
                 # folder is this book's own folder, so rename it in place (#2559).

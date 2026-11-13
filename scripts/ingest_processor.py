@@ -1818,20 +1818,38 @@ class NewBookProcessor:
         """The file name ebook-convert and calibredb should see for ``path``.
 
         Calibre takes the title from the file name when the file carries none,
-        so an upload staged as "new_1_20261113_112627_417824_Rig Doc.docx" was
-        imported titled "new 1 20261113 112627 417824 Rig Doc". When the sidecar
-        named the original file, drop the staging prefix and keep the staged
-        extension (the upload gate may have normalised it, e.g. .fb2.zip to
-        .fbz). A watch-folder drop has no sidecar and keeps its own name.
+        so an upload staged as "new_1_20261113_112627_417824_Rig_Doc.docx" was
+        imported titled "new 1 20261113 112627 417824 Rig_Doc". The staged name
+        is also sanitised (spaces become underscores, a non-ASCII stem becomes
+        "book", #2701), so when the sidecar names the original file, present
+        its stem with the staged extension (the upload gate may have changed
+        it, e.g. .fb2.zip to .fbz). A watch-folder drop has no sidecar and
+        keeps its own name.
         """
         name = Path(path).name
-        if getattr(self, "original_filename", name) == Path(self.filepath).name:
+        original = getattr(self, "original_filename", name)
+        if original == Path(self.filepath).name:
             return name
         match = self._UPLOAD_STAGING_PREFIX.match(name)
         if not match:
             return name
-        presented = name[match.end():]
-        return presented if Path(presented).stem else name
+        fallback = name[match.end():] or name
+        suffix = Path(name).suffix
+        stem = Path(str(original).replace("\\", "/")).name
+        if suffix and stem.lower().endswith(suffix.lower()):
+            stem = stem[:-len(suffix)]
+        elif suffix.lower() == ".fbz" and stem.lower().endswith(".fb2.zip"):
+            stem = stem[:-len(".fb2.zip")]
+        else:
+            stem = Path(stem).stem
+        stem = "".join(ch for ch in stem if ch.isprintable()).strip().lstrip(".").strip()
+        # Leave room under NAME_MAX for the suffix and any temp-name decoration.
+        while len(stem.encode("utf-8")) > 200:
+            stem = stem[:-1]
+        stem = stem.rstrip()
+        if not stem:
+            return fallback
+        return stem + suffix
 
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""

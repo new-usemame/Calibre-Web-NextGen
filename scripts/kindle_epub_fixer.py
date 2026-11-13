@@ -25,6 +25,7 @@ import shutil
 from typing import Optional, Tuple
 
 import app_paths
+from library_copy import copy_file as _copy_file
 import service_user
 
 from cwa_db import CWA_DB
@@ -145,20 +146,6 @@ def print_and_log(string, log=True) -> None:
     if log:
         logger.info(string.replace("[cwa-kindle-epub-fixer] ", ""))
     print(string)
-
-
-def _copy_file(src, dst) -> None:
-    """Copy the file ``src`` to the file path ``dst`` like ``shutil.copy2``,
-    skipping metadata the destination refuses (#2921): NFSv4 refuses the
-    ``system.nfs4_acl`` attribute ``copy2`` writes back, after the data."""
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    try:
-        from cps.services.file_move import copy_with_metadata_fallback
-    except ImportError:
-        copy_with_metadata_fallback = shutil.copy2
-    copy_with_metadata_fallback(src, dst)
 
 
 def exit_if_cancelled() -> None:

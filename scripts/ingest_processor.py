@@ -26,6 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 import app_paths
+from library_copy import copy_file as _copy_file
 import service_user
 
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
@@ -60,29 +61,6 @@ def _standalone_metadata_db_write_lock(*args, **kwargs):
 
 
 metadata_db_write_lock = _standalone_metadata_db_write_lock
-
-
-_copy_with_metadata_fallback = None
-
-
-def _copy_file(src, dst) -> None:
-    """Copy the file ``src`` to the file path ``dst`` like ``shutil.copy2``,
-    skipping metadata the destination refuses (#2921).
-
-    ``copy2`` writes extended attributes back after the data; NFSv4 refuses
-    ``system.nfs4_acl`` with Errno 524, and ``copy2`` then raises for a copy
-    that is complete. The shared helper copies what the destination accepts.
-    """
-    global _copy_with_metadata_fallback
-    if _copy_with_metadata_fallback is None:
-        if _CPS_ROOT not in sys.path:
-            sys.path.insert(0, _CPS_ROOT)
-        try:
-            from cps.services.file_move import copy_with_metadata_fallback
-            _copy_with_metadata_fallback = copy_with_metadata_fallback
-        except ImportError:
-            _copy_with_metadata_fallback = shutil.copy2
-    _copy_with_metadata_fallback(str(src), str(dst))
 
 
 def _load_fork_cps_imports() -> None:

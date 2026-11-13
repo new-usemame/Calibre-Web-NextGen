@@ -1849,12 +1849,19 @@ class NewBookProcessor:
             # Show the converter the uploaded name without renaming the watched
             # source, which delete and backup still look for under its own name.
             # tmp_conversion_dir is emptied after every ingest run.
-            presented_dir = tempfile.mkdtemp(prefix="presented-", dir=self.tmp_conversion_dir)
-            input_path = os.path.join(presented_dir, presented)
+            # If that copy cannot be made, convert under the staging name as
+            # before rather than fail the book.
             try:
-                os.link(self.filepath, input_path)
-            except OSError:
-                shutil.copy2(self.filepath, input_path)
+                presented_dir = tempfile.mkdtemp(prefix="presented-", dir=self.tmp_conversion_dir)
+                input_path = os.path.join(presented_dir, presented)
+                try:
+                    os.link(self.filepath, input_path)
+                except OSError:
+                    shutil.copy2(self.filepath, input_path)
+            except OSError as e:
+                print(f"[ingest-processor] WARN: could not present {self.filename} under its "
+                      f"uploaded name, converting it as staged: {e}", flush=True)
+                input_path = self.filepath
         target_filepath = f"{self.tmp_conversion_dir}{Path(presented).stem}.{end_format}"
         try:
             t_convert_book_start = time.time()

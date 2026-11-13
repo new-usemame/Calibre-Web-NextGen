@@ -90,10 +90,18 @@ def test_new_book_is_staged_when_the_staging_copy_refuses_metadata(
 
 
 def test_new_format_is_staged_when_the_staging_copy_refuses_metadata(
-        tmp_path, nfs_refuses_metadata, capsys):
+        tmp_path, nfs_refuses_metadata, monkeypatch, capsys):
     book = _book(tmp_path)
     stub, staging, backups = _processor(
         tmp_path, _validate_book_exists=lambda _book_id: True)
+    handed_to_calibredb = []
+
+    def import_starts():
+        # The first step after staging; record what calibredb would be given.
+        handed_to_calibredb.extend(p.read_bytes() for p in staging.iterdir())
+        raise RuntimeError("no calibredb under test")
+
+    monkeypatch.setattr(ingest_processor, "mark_ingest_batch_active", import_starts)
 
     try:
         ingest_processor.NewBookProcessor.add_format_to_book(stub, 7, str(book))
@@ -102,7 +110,8 @@ def test_new_format_is_staged_when_the_staging_copy_refuses_metadata(
 
     out = capsys.readouterr().out
     assert "Failed to stage file for add_format" not in out, out
-    assert (staging / "book.epub").read_bytes() == book.read_bytes()
+    assert handed_to_calibredb == [book.read_bytes()], (
+        "calibredb add_format must receive the complete staged copy")
 
 
 def test_epub_fixer_backs_up_the_original_when_metadata_is_refused(

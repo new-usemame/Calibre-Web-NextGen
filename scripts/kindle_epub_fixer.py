@@ -147,6 +147,20 @@ def print_and_log(string, log=True) -> None:
     print(string)
 
 
+def _copy_file(src, dst) -> None:
+    """Copy the file ``src`` to the file path ``dst`` like ``shutil.copy2``,
+    skipping metadata the destination refuses (#2921): NFSv4 refuses the
+    ``system.nfs4_acl`` attribute ``copy2`` writes back, after the data."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    try:
+        from cps.services.file_move import copy_with_metadata_fallback
+    except ImportError:
+        copy_with_metadata_fallback = shutil.copy2
+    copy_with_metadata_fallback(src, dst)
+
+
 def exit_if_cancelled() -> None:
     if os.path.exists(KILL_TRIGGER_PATH):
         print_and_log(f"NextGen EPUB FIXER PROCESS TERMINATED BY USER AT {datetime.now()}")
@@ -500,7 +514,7 @@ class EPUBFixer:
                     app_paths.processed_books_dir() / "fixed_originals"
                 )
                 os.makedirs(output_path, exist_ok=True)
-                shutil.copy2(epub_path, output_path)
+                _copy_file(epub_path, os.path.join(output_path, os.path.basename(epub_path)))
             except Exception as e:
                 print_and_log(f"[cwa-kindle-epub-fixer] ERROR - Error occurred when backing up {epub_path} to {output_path}:\n{e}", log=self.manually_triggered)
 

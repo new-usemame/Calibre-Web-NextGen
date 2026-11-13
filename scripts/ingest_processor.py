@@ -9,6 +9,7 @@ import collections
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from calibre_library_target import (library_target, calibredb_command, operation,
@@ -1807,6 +1808,49 @@ class NewBookProcessor:
             raise PreserveIngestSourceError("Fulfilled ACSM book import incomplete; original and fulfilled book retained")
         shutil.rmtree(destination, ignore_errors=True)
 
+    # Both upload routes stage a browser upload as
+    # "<new|format>_<id>_<YYYYmmdd>_<HHMMSS>_<ffffff>_<name>" so that parallel
+    # uploads never collide (cps.editbooks._get_ingest_path), and record the
+    # browser's own file name in the .cwa.json sidecar.
+    _UPLOAD_STAGING_PREFIX = re.compile(r"^(?:new|format)_\d+_\d{8}_\d{6}_\d{6}_")
+
+    def _presented_name(self, path) -> str:
+        """The file name ebook-convert and calibredb should see for ``path``.
+
+        Calibre takes the title from the file name when the file carries none,
+        so an upload staged as "new_1_20261113_112627_417824_Rig_Doc.docx" was
+        imported titled "new 1 20261113 112627 417824 Rig_Doc". The staged name
+        is also sanitised (spaces become underscores, a non-ASCII stem becomes
+        "book", #2701), so when the sidecar names the original file, present
+        its stem with the staged extension (the upload gate may have changed
+        it, e.g. .fb2.zip to .fbz). A watch-folder drop has no sidecar and
+        keeps its own name.
+        """
+        name = Path(path).name
+        original = getattr(self, "original_filename", name)
+        if original == Path(self.filepath).name:
+            return name
+        match = self._UPLOAD_STAGING_PREFIX.match(name)
+        if not match:
+            return name
+        fallback = name[match.end():] or name
+        suffix = Path(name).suffix
+        stem = Path(str(original).replace("\\", "/")).name
+        if suffix and stem.lower().endswith(suffix.lower()):
+            stem = stem[:-len(suffix)]
+        elif suffix.lower() == ".fbz" and stem.lower().endswith(".fb2.zip"):
+            stem = stem[:-len(".fb2.zip")]
+        else:
+            stem = Path(stem).stem
+        stem = "".join(ch for ch in stem if ch.isprintable()).strip().lstrip(".").strip()
+        # Leave room under NAME_MAX for the suffix and any temp-name decoration.
+        while len(stem.encode("utf-8")) > 200:
+            stem = stem[:-1]
+        stem = stem.rstrip()
+        if not stem:
+            return fallback
+        return stem + suffix
+
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""
         print(f"[ingest-processor]: Starting conversion process for {self.filename}...", flush=True)
@@ -1817,10 +1861,29 @@ class NewBookProcessor:
             end_format = self.target_format # If end_format isn't given, the file is converted to the target format specified in the CWA Settings page
 
         original_filepath = Path(self.filepath)
-        target_filepath = f"{self.tmp_conversion_dir}{original_filepath.stem}.{end_format}"
+        presented = self._presented_name(self.filepath)
+        input_path = self.filepath
+        if presented != original_filepath.name:
+            # Show the converter the uploaded name without renaming the watched
+            # source, which delete and backup still look for under its own name.
+            # tmp_conversion_dir is emptied after every ingest run.
+            # If that copy cannot be made, convert under the staging name as
+            # before rather than fail the book.
+            try:
+                presented_dir = tempfile.mkdtemp(prefix="presented-", dir=self.tmp_conversion_dir)
+                input_path = os.path.join(presented_dir, presented)
+                try:
+                    os.link(self.filepath, input_path)
+                except OSError:
+                    shutil.copy2(self.filepath, input_path)
+            except OSError as e:
+                print(f"[ingest-processor] WARN: could not present {self.filename} under its "
+                      f"uploaded name, converting it as staged: {e}", flush=True)
+                input_path = self.filepath
+        target_filepath = f"{self.tmp_conversion_dir}{Path(presented).stem}.{end_format}"
         try:
             t_convert_book_start = time.time()
-            _run_converter_streaming(['ebook-convert', self.filepath, target_filepath],
+            _run_converter_streaming(['ebook-convert', input_path, target_filepath],
                                      env=self.calibre_env,
                                      timeout=conversion_budget_remaining())
             t_convert_book_end = time.time()
@@ -1830,7 +1893,7 @@ class NewBookProcessor:
             if self.cwa_settings['auto_backup_conversions']:
                 self.backup(self.filepath, backup_type="converted")
 
-            self.db.conversion_add_entry(original_filepath.stem,
+            self.db.conversion_add_entry(Path(presented).stem,
                                         self.input_format,
                                         self.target_format,
                                         str(self.cwa_settings["auto_backup_conversions"]))
@@ -2443,9 +2506,24 @@ class NewBookProcessor:
             return
 
         # Stage file for import
-        staged_path = Path(self.staging_dir) / source_path.name
+        staged_path = Path(self.staging_dir) / self._presented_name(source_path)
         try:
-            shutil.copy2(source_path, staged_path)
+            try:
+                shutil.copy2(source_path, staged_path)
+            except OSError as e:
+                if staged_path.name == source_path.name:
+                    raise
+                # Some filesystems (SMB, exFAT) refuse characters a browser
+                # name may carry, such as ':' or '?'. Import under the staged
+                # name rather than fail the book.
+                print(f"[ingest-processor] WARN: could not stage {source_path.name} as "
+                      f"{staged_path.name!r}, importing it under its sanitised name: {e}", flush=True)
+                if staged_path.exists():
+                    os.remove(staged_path)
+                staged_path = Path(self.staging_dir) / (
+                    self._UPLOAD_STAGING_PREFIX.sub("", source_path.name, count=1) or source_path.name
+                )
+                shutil.copy2(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for import: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")

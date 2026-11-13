@@ -705,6 +705,20 @@ export function useStopReading(id: string | number) {
   });
 }
 
+/** Clear this user's saved reading position for a book on the web reader, Kobo
+ *  and KOReader together (#2831). The read status is left as it is. */
+export function useClearReadingPosition(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; cleared: number }>(`/api/v1/books/${id}/clear-position`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
 /** Record a new-UI reader open, as the classic /read route does (#2750): the
  *  server moves the book onto Currently Reading (a finished book stays
  *  finished) and counts a session only on that transition. */

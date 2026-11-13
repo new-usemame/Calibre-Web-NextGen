@@ -10322,7 +10322,7 @@
   "date": "2026-09-30",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2387",
   "title": "[bug] Changing an existing identifier's value in the book editor isn't saved (the save looks successful)",
-  "person": "garionjb",
+  "person": "network-jb",
   "delivered_via": [
    "PR #2390",
    "closed"
@@ -12360,8 +12360,7 @@
   "title": "[Bug report] KoboSync - Reading Progress not synced anymore",
   "person": "Dirk71",
   "delivered_via": [
-   "PR #2733",
-   "PR #2888"
+   "PR #2733"
   ],
   "outcome": "happy",
   "basis": "reaction",
@@ -12372,6 +12371,22 @@
  },
  {
   "date": "2026-11-11",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2724",
+  "title": "[Bug report] KoboSync - Reading Progress not synced anymore",
+  "person": "Dirk71",
+  "delivered_via": [
+   "PR #2888",
+   "closed"
+  ],
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "I've tested the new release. It's working now perfectly. You've done a good job! Thank you!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2724#issuecomment-6830984521",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2724@2026-11-11T12:26:15Z"
+ },
+ {
+  "date": "2026-11-11",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729",
   "title": "Name of downloaded PDF",
   "person": "darkmatterpelican",
@@ -12379,9 +12394,9 @@
    "PR #2890"
   ],
   "outcome": "happy",
-  "basis": "reply: content",
-  "quote": "Thank you very much @sgreadly ! (and @new-usemame of course)",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729#issuecomment-6803799205",
+  "basis": "reply: fixed",
+  "quote": "Works in v4.1.67!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2729#issuecomment-6818006157",
   "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2729@2026-11-11T18:16:37Z"
  },
@@ -12464,6 +12479,38 @@
  },
  {
   "date": "2026-11-12",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2687",
+  "title": "[Feature Request] Option to set `preserveAspectRatio=\"xMidYMid meet\"` in cover enforcer",
+  "person": "NeonTink",
+  "delivered_via": [
+   "PR #2910"
+  ],
+  "outcome": "happy",
+  "basis": "reply: content",
+  "quote": "Thank you, I really appreciate your hard work on this project!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2687#issuecomment-6841101459",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#2687@2026-11-12T15:18:34Z"
+ },
+ {
+  "date": "2026-11-12",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783",
+  "title": "[bug] - CWNG no longer syncing with Justread",
+  "person": "lukerajah",
+  "delivered_via": [
+   "PR #2906",
+   "PR #2911",
+   "PR #2913"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2783@2026-11-12T11:18:06Z"
+ },
+ {
+  "date": "2026-11-12",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2824",
   "title": "[bug] Manual Smart shelves order not working",
   "person": "orcofthedarkness",
@@ -12480,6 +12527,21 @@
  },
  {
   "date": "2026-11-12",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/980",
+  "title": "[bug] New UI: shelves don't \"remember\" book density",
+  "person": "mstewart14",
+  "delivered_via": [
+   "PR #2901"
+  ],
+  "outcome": "happy",
+  "basis": "reply: content",
+  "quote": "Thanks for picking it up and for the fixes, especially the phone gap",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/980#issuecomment-6839463146",
+  "judged_by": "deepseek-v4.1-flash",
+  "id": "issue#980@2026-11-12T07:50:13Z"
+ },
+ {
+  "date": "2026-11-12",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2827",
   "title": "New UI: list Smart shelves in the user's chosen Order Mode (#2824)",
   "person": "sgreadly",
@@ -12492,5 +12554,81 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2827@2026-11-12T02:19:52Z"
+ },
+ {
+  "date": "2026-11-12",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2900",
+  "title": "Shelves honour the Library's book density",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2900@2026-11-12T07:50:33Z"
+ },
+ {
+  "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2903",
+  "title": "[bug] New UI: Library, Hot and Discover get stuck on \"Loading…\" at certain window widths with number of books per row change",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2917",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2903@2026-11-13T07:21:20Z"
+ },
+ {
+  "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2879",
+  "title": "docs: add Updates Manager setup steps, fix appstore.koplugin link",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2879@2026-11-13T03:17:04Z"
+ },
+ {
+  "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2902",
+  "title": "Shelves honour the Library's \"Rows per load\" setting",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2902@2026-11-13T01:54:44Z"
+ },
+ {
+  "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2904",
+  "title": "Library holds its page size once past page 1",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2904@2026-11-13T07:21:31Z"
  }
 ]

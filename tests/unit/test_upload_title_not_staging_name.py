@@ -153,3 +153,20 @@ def test_watch_folder_drop_keeps_its_own_name(tmp_path, monkeypatch):
     argv, _ = _converter_argv(monkeypatch, nbp)
     assert Path(argv[1]).name == "new_2_x_Notes.docx"
     assert Path(argv[2]).name == "new_2_x_Notes.epub"
+
+
+def test_staging_falls_back_when_the_filesystem_rejects_the_name(tmp_path, monkeypatch):
+    # An SMB/exFAT tmp dir refuses ':' or '?'; the book must still import under
+    # its staged name rather than be marked failed.
+    staged = "new_1_20261113_112627_417824_Dune_Messiah.txt"
+    nbp = _processor(tmp_path, staged, original_filename="Dune: Messiah?.txt")
+    real_copy = ingest_processor.shutil.copy2
+
+    def picky_copy(src, dst, *a, **k):
+        if ":" in Path(dst).name:
+            raise OSError(22, "Invalid argument")
+        return real_copy(src, dst, *a, **k)
+
+    monkeypatch.setattr(ingest_processor.shutil, "copy2", picky_copy)
+    names = _staged_names(monkeypatch, nbp, nbp.filepath)
+    assert names == ["Dune_Messiah.txt"]

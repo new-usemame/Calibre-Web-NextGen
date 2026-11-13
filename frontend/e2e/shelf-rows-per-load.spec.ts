@@ -66,6 +66,16 @@ test('#980 a shelf requests rows x columns books, in one first request', async (
       expect(three.firstPages).toHaveLength(1);
       expect(three.firstPages[0]).toBe(3 * three.columns);
     }
+
+    // Phones use fixed tracks (2/3/4 columns by density) with no auto-fill
+    // minimum; the request must still be rows x the tracks actually rendered.
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [density, tracks] of [['comfortable', 2], ['compact', 3], ['dense', 4]] as const) {
+      const phone = await openShelf(density, '2');
+      expect(phone.columns, `${density}: phone grid tracks`).toBe(tracks);
+      expect(phone.firstPages, `${density}: one first-page request on a phone`).toHaveLength(1);
+      expect(phone.firstPages[0]).toBe(2 * tracks);
+    }
   } finally {
     await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => {});
   }

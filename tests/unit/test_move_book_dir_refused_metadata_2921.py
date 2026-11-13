@@ -22,6 +22,7 @@ Two behaviours are checked through ``move_files_on_change``:
 import errno
 import os
 import shutil
+import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -79,6 +80,7 @@ def test_move_to_new_author_completes_when_metadata_copy_is_refused(tmp_path):
     _assert_moved(result, localbook, library, book_dir, contents)
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="shutil copies extended attributes through os.*xattr only on Linux")
 def test_copying_move_keeps_data_times_and_accepted_xattrs_and_skips_refused_one(tmp_path):
     library, book_dir, contents = _library_with_book(tmp_path)
     epub = book_dir / "Example Book - Unknown.epub"

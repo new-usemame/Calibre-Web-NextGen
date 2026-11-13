@@ -9,6 +9,7 @@ import collections
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from calibre_library_target import (library_target, calibredb_command, operation,
@@ -1807,6 +1808,31 @@ class NewBookProcessor:
             raise PreserveIngestSourceError("Fulfilled ACSM book import incomplete; original and fulfilled book retained")
         shutil.rmtree(destination, ignore_errors=True)
 
+    # Both upload routes stage a browser upload as
+    # "<new|format>_<id>_<YYYYmmdd>_<HHMMSS>_<ffffff>_<name>" so that parallel
+    # uploads never collide (cps.editbooks._get_ingest_path), and record the
+    # browser's own file name in the .cwa.json sidecar.
+    _UPLOAD_STAGING_PREFIX = re.compile(r"^(?:new|format)_\d+_\d{8}_\d{6}_\d{6}_")
+
+    def _presented_name(self, path) -> str:
+        """The file name ebook-convert and calibredb should see for ``path``.
+
+        Calibre takes the title from the file name when the file carries none,
+        so an upload staged as "new_1_20261113_112627_417824_Rig Doc.docx" was
+        imported titled "new 1 20261113 112627 417824 Rig Doc". When the sidecar
+        named the original file, drop the staging prefix and keep the staged
+        extension (the upload gate may have normalised it, e.g. .fb2.zip to
+        .fbz). A watch-folder drop has no sidecar and keeps its own name.
+        """
+        name = Path(path).name
+        if getattr(self, "original_filename", name) == Path(self.filepath).name:
+            return name
+        match = self._UPLOAD_STAGING_PREFIX.match(name)
+        if not match:
+            return name
+        presented = name[match.end():]
+        return presented if Path(presented).stem else name
+
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""
         print(f"[ingest-processor]: Starting conversion process for {self.filename}...", flush=True)
@@ -1817,10 +1843,22 @@ class NewBookProcessor:
             end_format = self.target_format # If end_format isn't given, the file is converted to the target format specified in the CWA Settings page
 
         original_filepath = Path(self.filepath)
-        target_filepath = f"{self.tmp_conversion_dir}{original_filepath.stem}.{end_format}"
+        presented = self._presented_name(self.filepath)
+        input_path = self.filepath
+        if presented != original_filepath.name:
+            # Show the converter the uploaded name without renaming the watched
+            # source, which delete and backup still look for under its own name.
+            # tmp_conversion_dir is emptied after every ingest run.
+            presented_dir = tempfile.mkdtemp(prefix="presented-", dir=self.tmp_conversion_dir)
+            input_path = os.path.join(presented_dir, presented)
+            try:
+                os.link(self.filepath, input_path)
+            except OSError:
+                shutil.copy2(self.filepath, input_path)
+        target_filepath = f"{self.tmp_conversion_dir}{Path(presented).stem}.{end_format}"
         try:
             t_convert_book_start = time.time()
-            _run_converter_streaming(['ebook-convert', self.filepath, target_filepath],
+            _run_converter_streaming(['ebook-convert', input_path, target_filepath],
                                      env=self.calibre_env,
                                      timeout=conversion_budget_remaining())
             t_convert_book_end = time.time()
@@ -1830,7 +1868,7 @@ class NewBookProcessor:
             if self.cwa_settings['auto_backup_conversions']:
                 self.backup(self.filepath, backup_type="converted")
 
-            self.db.conversion_add_entry(original_filepath.stem,
+            self.db.conversion_add_entry(Path(presented).stem,
                                         self.input_format,
                                         self.target_format,
                                         str(self.cwa_settings["auto_backup_conversions"]))
@@ -2443,7 +2481,7 @@ class NewBookProcessor:
             return
 
         # Stage file for import
-        staged_path = Path(self.staging_dir) / source_path.name
+        staged_path = Path(self.staging_dir) / self._presented_name(source_path)
         try:
             shutil.copy2(source_path, staged_path)
         except Exception as e:

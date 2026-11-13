@@ -11,8 +11,8 @@ entry (e.g. zh_Hans_CN ``"Last %(count)s day"``) still counted as
 missing and the banner kept telling users that strings need
 translating when none did.
 
-``_count_missing_translations`` decides plural entries by their first
-plural form instead.
+``_count_missing_translations`` uses polib's ``translated()`` instead, the
+same definition the README translation table uses.
 
 Pins:
 
@@ -20,6 +20,9 @@ Pins:
 2. Empty singular entries count.
 3. Plural entries with an empty first form count.
 4. A plural entry whose ``msgstr_plural`` dict is empty counts.
+5. A fuzzy entry counts (msgfmt leaves it out of the .mo, so users see
+   English), and so does a plural entry with a later form left empty.
+6. Obsolete entries never count.
 """
 
 from __future__ import annotations
@@ -72,3 +75,22 @@ def test_missing_plural_dict_counts() -> None:
         )
     )
     assert _count_missing_translations(po) == 1
+
+
+def test_fuzzy_and_partly_filled_plural_entries_count() -> None:
+    po = polib.POFile()
+    po.append(polib.POEntry(msgid="Read", msgstr="阅读", flags=["fuzzy"]))
+    po.append(
+        polib.POEntry(
+            msgid="%(count)s book",
+            msgid_plural="%(count)s books",
+            msgstr_plural={0: "%(count)s livre", 1: ""},
+        )
+    )
+    assert _count_missing_translations(po) == 2
+
+
+def test_obsolete_entries_do_not_count() -> None:
+    po = polib.POFile()
+    po.append(polib.POEntry(msgid="Gone", msgstr="", obsolete=True))
+    assert _count_missing_translations(po) == 0

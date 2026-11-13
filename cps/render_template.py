@@ -428,17 +428,16 @@ def _format_update_banner_message(current_version: str, latest_version: str) -> 
 
 
 def _count_missing_translations(po) -> int:
-    """Count entries with no usable translation.
+    """Count the live entries a user of this language still sees in English.
 
-    Plural entries keep their translations in ``msgstr_plural`` — polib leaves
-    ``msgstr`` empty for them by design — so the first plural form decides
-    whether they are translated.
+    Uses polib's ``translated()``, the definition
+    ``scripts/generate_translation_status.py`` publishes in the README table:
+    plural entries are judged by ``msgstr_plural`` (polib leaves ``msgstr``
+    empty for them), every plural form must be filled, and a fuzzy entry
+    counts as missing because msgfmt leaves it out of the compiled .mo.
+    Obsolete (``#~``) entries are not shown anywhere, so they never count.
     """
-    return sum(
-        1
-        for entry in po
-        if not (entry.msgstr_plural or {}).get(0, entry.msgstr).strip()
-    )
+    return sum(1 for entry in po if not entry.obsolete and not entry.translated())
 
 
 def _format_translation_missing_message(language: str, count: int) -> str:

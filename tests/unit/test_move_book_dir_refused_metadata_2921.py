@@ -122,3 +122,26 @@ def test_move_to_new_author_on_one_filesystem_is_a_rename_not_a_copy(tmp_path):
 
     new_dir = _assert_moved(result, localbook, library, book_dir, contents)
     assert os.stat(new_dir / "Example Book - Unknown.epub").st_ino == epub_inode
+
+
+def test_copy_that_fails_part_way_leaves_only_the_original_folder(tmp_path):
+    library, book_dir, contents = _library_with_book(tmp_path)
+    real_copyfile = shutil.copyfile
+
+    def copyfile_fails_on_cover(src, dst, *a, **k):
+        if os.path.basename(src) == "cover.jpg":
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return real_copyfile(src, dst, *a, **k)
+
+    def rename_refused(src, dst, *a, **k):
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    with patch.object(os, "rename", rename_refused), \
+         patch.object(shutil, "copyfile", copyfile_fails_on_cover):
+        result, localbook = _move_to_new_author(library, book_dir)
+
+    assert result, "a failed copy must be reported"
+    assert localbook.path == "Unknown/Example Book (1234)"
+    for name, data in contents.items():
+        assert (book_dir / name).read_bytes() == data
+    assert not (library / "Example Author").exists()

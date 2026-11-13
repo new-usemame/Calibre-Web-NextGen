@@ -30,6 +30,7 @@ uses it where it cannot.
 
 from __future__ import annotations
 
+import errno
 import os
 import shutil
 import stat
@@ -116,33 +117,45 @@ def copytree_best_effort(src: str, dst: str) -> None:
 
 def move_path(src: str, dst: str) -> str:
     """Move the file or folder ``src`` to the path ``dst``, which must not
-    already be a folder.
+    already be a folder (FileExistsError).
 
     The parent of ``dst`` is created first, so a move inside one filesystem is
     a plain rename even to a new author folder. When the rename is refused
     (another filesystem), the data is copied with
     :func:`copy_with_metadata_fallback` and the source removed. A folder copy
-    that fails part way is removed again, so the old folder stays the only one.
+    that fails part way is removed again, so the old folder stays the only one,
+    and so is a parent folder this move created.
     """
+    if os.path.isdir(dst) and not os.path.islink(dst):
+        raise FileExistsError(errno.EEXIST, "Destination folder already exists", dst)
     parent = os.path.dirname(dst)
-    if parent:
+    created_parent = bool(parent) and not os.path.isdir(parent)
+    if created_parent:
         os.makedirs(parent, exist_ok=True)
     try:
-        os.rename(src, dst)
-        return dst
-    except OSError as ex:
-        if not os.path.isdir(src) or os.path.islink(src):
-            log.info("Rename %s to %s failed (%s); copying instead", src, dst, ex)
-            copy_with_metadata_fallback(src, dst)
-            os.unlink(src)
+        try:
+            os.rename(src, dst)
             return dst
-        if os.path.lexists(dst):
+        except OSError as ex:
+            if not os.path.isdir(src) or os.path.islink(src):
+                log.info("Rename %s to %s failed (%s); copying instead", src, dst, ex)
+                copy_with_metadata_fallback(src, dst)
+                os.unlink(src)
+                return dst
+            if os.path.lexists(dst):
+                raise
+            log.info("Rename %s to %s failed (%s); copying the folder instead", src, dst, ex)
+        try:
+            copytree_best_effort(src, dst)
+        except OSError:
+            shutil.rmtree(dst, ignore_errors=True)
             raise
-        log.info("Rename %s to %s failed (%s); copying the folder instead", src, dst, ex)
-    try:
-        copytree_best_effort(src, dst)
+        shutil.rmtree(src)
+        return dst
     except OSError:
-        shutil.rmtree(dst, ignore_errors=True)
+        if created_parent:
+            try:
+                os.rmdir(parent)
+            except OSError:
+                pass
         raise
-    shutil.rmtree(src)
-    return dst

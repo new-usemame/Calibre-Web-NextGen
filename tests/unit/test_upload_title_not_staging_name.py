@@ -160,13 +160,16 @@ def test_staging_falls_back_when_the_filesystem_rejects_the_name(tmp_path, monke
     # its staged name rather than be marked failed.
     staged = "new_1_20261113_112627_417824_Dune_Messiah.txt"
     nbp = _processor(tmp_path, staged, original_filename="Dune: Messiah?.txt")
-    real_copy = ingest_processor.shutil.copy2
+    # The filesystem refuses the name when the destination file is created,
+    # which is copyfile's open(); copy2 and the metadata-tolerant copy both
+    # go through it.
+    real_copyfile = ingest_processor.shutil.copyfile
 
-    def picky_copy(src, dst, *a, **k):
+    def picky_copyfile(src, dst, *a, **k):
         if ":" in Path(dst).name:
             raise OSError(22, "Invalid argument")
-        return real_copy(src, dst, *a, **k)
+        return real_copyfile(src, dst, *a, **k)
 
-    monkeypatch.setattr(ingest_processor.shutil, "copy2", picky_copy)
+    monkeypatch.setattr(ingest_processor.shutil, "copyfile", picky_copyfile)
     names = _staged_names(monkeypatch, nbp, nbp.filepath)
     assert names == ["Dune_Messiah.txt"]

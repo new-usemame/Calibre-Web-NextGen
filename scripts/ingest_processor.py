@@ -26,6 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 import app_paths
+from library_copy import copy_file as _copy_file
 import service_user
 
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
@@ -1875,7 +1876,7 @@ class NewBookProcessor:
                 try:
                     os.link(self.filepath, input_path)
                 except OSError:
-                    shutil.copy2(self.filepath, input_path)
+                    _copy_file(self.filepath, input_path)
             except OSError as e:
                 print(f"[ingest-processor] WARN: could not present {self.filename} under its "
                       f"uploaded name, converting it as staged: {e}", flush=True)
@@ -2308,7 +2309,7 @@ class NewBookProcessor:
             for index, existing_path in enumerate(existing_paths, start=1):
                 destination = recovery_dir / f"{index}_{existing_path.name}"
                 source_digest = _sha256_file(existing_path)
-                shutil.copy2(existing_path, destination)
+                _copy_file(existing_path, destination)
                 if _sha256_file(destination) != source_digest:
                     raise OSError(f"digest mismatch preserving {existing_path}")
                 with destination.open("rb") as preserved_file:
@@ -2344,7 +2345,7 @@ class NewBookProcessor:
                 os.close(restore_fd)
                 restore_path = Path(restore_name)
                 try:
-                    shutil.copy2(preserved_path, restore_path)
+                    _copy_file(preserved_path, restore_path)
                     if _sha256_file(restore_path) != expected_digest:
                         raise OSError(f"digest mismatch restoring {existing_path}")
                     with restore_path.open("rb") as restored_file:
@@ -2446,7 +2447,7 @@ class NewBookProcessor:
             identity_source_path = acquisition.source_path
             processing_dir = Path(tempfile.mkdtemp(prefix="acquisition-process-", dir=self.tmp_conversion_dir))
             processing_path = processing_dir / Path(book_path).name
-            shutil.copy2(book_path, processing_path)
+            _copy_file(book_path, processing_path)
             book_path = str(processing_path)
         # Normalize a KEPUB before it enters the library (#1715). Every ingest
         # route lands here -- kepubify output, a file already in the target
@@ -2509,7 +2510,7 @@ class NewBookProcessor:
         staged_path = Path(self.staging_dir) / self._presented_name(source_path)
         try:
             try:
-                shutil.copy2(source_path, staged_path)
+                _copy_file(source_path, staged_path)
             except OSError as e:
                 if staged_path.name == source_path.name:
                     raise
@@ -2523,7 +2524,7 @@ class NewBookProcessor:
                 staged_path = Path(self.staging_dir) / (
                     self._UPLOAD_STAGING_PREFIX.sub("", source_path.name, count=1) or source_path.name
                 )
-                shutil.copy2(source_path, staged_path)
+                _copy_file(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for import: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")
@@ -2539,7 +2540,7 @@ class NewBookProcessor:
                 )
                 os.close(identity_fd)
                 staged_identity_path = Path(identity_name)
-                shutil.copy2(identity_source_path, staged_identity_path)
+                _copy_file(identity_source_path, staged_identity_path)
             except Exception as e:
                 print(f"[ingest-processor] ERROR: Failed to stage source identity: {e}", flush=True)
                 self.backup(self.filepath, backup_type="failed")
@@ -2935,7 +2936,7 @@ class NewBookProcessor:
         # Stage file for import
         staged_path = Path(self.staging_dir) / source_path.name
         try:
-            shutil.copy2(source_path, staged_path)
+            _copy_file(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for add_format: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")

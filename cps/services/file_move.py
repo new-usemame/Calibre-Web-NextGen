@@ -31,13 +31,15 @@ uses it where it cannot.
 from __future__ import annotations
 
 import errno
+import logging
 import os
 import shutil
 import stat
 
-from .. import logger
-
-log = logger.create()
+# Standard library only: the ingest scripts load this file by path without
+# initialising the cps package (scripts/library_copy.py). This is the logger
+# cps.logger.create() returns for this module.
+log = logging.getLogger(__name__)
 
 
 def copy_with_metadata_fallback(src: str, dst: str) -> None:

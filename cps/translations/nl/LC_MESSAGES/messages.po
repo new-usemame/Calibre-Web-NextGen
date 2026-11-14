@@ -5150,6 +5150,29 @@ msgid "Could not save the book choice. Try again."
 msgstr "De boekkeuze kon niet worden opgeslagen. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr "Leespositie wissen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+"Je opgeslagen leespositie voor \"{title}\" wissen in de webreader, op je "
+"Kobo en in KOReader? Je leesstatus verandert niet. Een apparaat dat nog zijn "
+"eigen positie bewaart, kan die bij de volgende synchronisatie terugsturen."
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr "Leespositie gewist."
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr "Kan de leespositie niet wissen."
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
 
@@ -5926,22 +5949,6 @@ msgstr "Opmaak wissen"
 #: cps/spa_strings.py
 msgid "Clear selection"
 msgstr "Selectie wissen"
-
-#: cps/spa_strings.py
-msgid "Clear reading position"
-msgstr "Leespositie wissen"
-
-#: cps/spa_strings.py
-msgid "Clear your saved reading position for \"{title}\" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs."
-msgstr "Je opgeslagen leespositie voor \"{title}\" wissen in de webreader, op je Kobo en in KOReader? Je leesstatus verandert niet. Een apparaat dat nog zijn eigen positie bewaart, kan die bij de volgende synchronisatie terugsturen."
-
-#: cps/spa_strings.py
-msgid "Reading position cleared."
-msgstr "Leespositie gewist."
-
-#: cps/spa_strings.py
-msgid "Could not clear the reading position."
-msgstr "Kan de leespositie niet wissen."
 
 #: cps/spa_strings.py
 msgid "Client ID"

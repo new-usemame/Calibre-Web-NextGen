@@ -5284,6 +5284,30 @@ msgid "Could not save the book choice. Try again."
 msgstr "Impossible d’enregistrer le choix des livres. Réessayez."
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr "Effacer la position de lecture"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+"Effacer votre position de lecture enregistrée pour « {title} » dans le "
+"lecteur web, sur votre Kobo et dans KOReader ? Votre statut de lecture n'est "
+"pas modifié. Un appareil qui conserve sa propre position peut la renvoyer à "
+"sa prochaine synchronisation."
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr "Position de lecture effacée."
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr "Impossible d'effacer la position de lecture."
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(aucun texte enregistré)"
 
@@ -6060,22 +6084,6 @@ msgstr "Effacer la mise en forme"
 #: cps/spa_strings.py
 msgid "Clear selection"
 msgstr "Effacer la sélection"
-
-#: cps/spa_strings.py
-msgid "Clear reading position"
-msgstr "Effacer la position de lecture"
-
-#: cps/spa_strings.py
-msgid "Clear your saved reading position for \"{title}\" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs."
-msgstr "Effacer votre position de lecture enregistrée pour « {title} » dans le lecteur web, sur votre Kobo et dans KOReader ? Votre statut de lecture n'est pas modifié. Un appareil qui conserve sa propre position peut la renvoyer à sa prochaine synchronisation."
-
-#: cps/spa_strings.py
-msgid "Reading position cleared."
-msgstr "Position de lecture effacée."
-
-#: cps/spa_strings.py
-msgid "Could not clear the reading position."
-msgstr "Impossible d'effacer la position de lecture."
 
 #: cps/spa_strings.py
 msgid "Client ID"

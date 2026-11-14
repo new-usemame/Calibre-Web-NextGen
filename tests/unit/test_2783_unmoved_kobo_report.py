@@ -153,3 +153,19 @@ def test_return_to_old_place_after_the_serve_still_wins(sw, rows):
     sw.put(kobo, place["source"], place["span"], 10.0, after_now(5))
 
     assert sw.pull()[0] == pytest.approx(10, abs=0.01)
+
+
+def test_a_re_serve_does_not_undo_a_move_clocked_after_the_first(sw, rows):
+    """The Kobo was sent KOReader's place, went back to its old place, and
+    the server served the same shared place again before that report
+    arrived. The move was clocked after the first serve, so it still wins."""
+    kobo = _served_setup(sw, rows)
+    place = rows["kobo"]
+    moved_at = _now() + timedelta(seconds=1)
+
+    import time
+    time.sleep(2.1)
+    sw.get(kobo)
+    sw.put(kobo, place["source"], place["span"], 10.0, moved_at)
+
+    assert sw.pull()[0] == pytest.approx(10, abs=0.01)

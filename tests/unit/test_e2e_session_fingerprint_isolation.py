@@ -139,7 +139,9 @@ def test_identifier_mismatch_is_logged_once_not_on_every_request(
     # #2882: after a browser update the User-Agent changes, a remember-me
     # session keeps its old stored id, and every request used to log the same
     # mismatch (dozens of lines for one page load).
-    monkeypatch.setattr(login_manager_module, "_reported_mismatches", set())
+    monkeypatch.setattr(
+        login_manager_module, "_reported_mismatches", set(), raising=False
+    )
     app, _db_session = session_app
     client = app.test_client()
 
@@ -154,7 +156,9 @@ def test_identifier_mismatch_is_logged_once_not_on_every_request(
 
 @pytest.mark.unit
 def test_a_different_mismatch_is_still_logged(session_app, monkeypatch, caplog):
-    monkeypatch.setattr(login_manager_module, "_reported_mismatches", set())
+    monkeypatch.setattr(
+        login_manager_module, "_reported_mismatches", set(), raising=False
+    )
     app, _db_session = session_app
     client = app.test_client()
 

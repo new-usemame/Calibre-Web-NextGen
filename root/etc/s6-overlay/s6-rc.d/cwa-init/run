@@ -221,7 +221,8 @@ ingest_is_local_fs() {
   esac
 }
 if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
-  if ingest_is_local_fs "$INGEST_DIR" && ! cwa-as-abc test -w "$INGEST_DIR" -a -x "$INGEST_DIR" 2>/dev/null; then
+  # A symlink is refused: chown without -h would re-own whatever it points at.
+  if [ ! -L "$INGEST_DIR" ] && ingest_is_local_fs "$INGEST_DIR" && ! cwa-as-abc test -w "$INGEST_DIR" -a -x "$INGEST_DIR" 2>/dev/null; then
     echo "[cwa-init] NETWORK_SHARE_MODE=true, but $INGEST_DIR is on a local filesystem the app user cannot write; setting its owner to abc:abc"
     chown abc:abc "$INGEST_DIR" 2>/dev/null \
       || echo "[cwa-init] WARN: could not change the owner of $INGEST_DIR; uploads will fail until it is writable by PUID/PGID"

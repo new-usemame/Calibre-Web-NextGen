@@ -577,7 +577,9 @@ def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
             total = calibre_db.session.query(
                 func.count(BookFormatChecksum.id)
             ).scalar() or 0
-            _miss_diag_window["total"] = total
+            if total:
+                # An empty table may be a backfill still running; recount.
+                _miss_diag_window["total"] = total
         if total == 0:
             return (
                 "no checksums are registered library-wide; the checksum "

@@ -56,6 +56,49 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.69',
+    date: '2026-11-14',
+    items: [
+      {
+        title: 'Start a finished book over without marking it unread',
+        body: 'Choose "Clear reading position" in a book\'s More actions menu to remove your place in the web reader, on your Kobo and in KOReader at once. The book stays marked as read, so you can re-read it from the start.',
+        category: 'Reading',
+      },
+      {
+        title: 'Mark as unread now resets KOReader too',
+        body: 'A KOReader that had reported a place got that place handed straight back after you marked the book unread. Marking a book unread now also clears the place each KOReader and Kobo device saved for you.',
+        category: 'Sync',
+      },
+      {
+        title: 'Smart shelves load the rows you choose',
+        body: 'Smart shelves now ask for whole rows at a time, following the Library\'s "Rows per load" setting the same way the Library and regular shelves do.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Calibre\'s .fb2.zip exports upload again',
+        body: 'Uploading a .fb2.zip book from Calibre was refused as "File type not allowed". It is now accepted as FB2 in a zip (.fbz). In the Docker image, .docx, .odt and .flac uploads are also no longer refused when the file-content check is on.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Upload a book' },
+      },
+      {
+        title: 'Uploads without a built-in title get a sensible name',
+        body: 'A plain .txt, .docx, .rtf or untitled PDF you uploaded used to be titled with an internal name like "new 1 20261113 112627 Rig Doc". It is now titled from the file name you uploaded. Books already imported keep their titles, so edit them if needed.',
+        category: 'Library',
+      },
+      {
+        title: 'Libraries on NFSv4 shares can edit and import books',
+        body: 'Changing a book\'s author or title, or importing a book, failed with "[Errno 524]" on an NFSv4 share because the share refuses one of its own file attributes. Moves now rename the folder in place, and copies skip any attribute the destination refuses.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The translation banner counts the right strings',
+        body: 'The "strings still need translating" banner counted translated plural entries as missing and skipped fuzzy ones. It now matches what you actually see in English.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.68',
     date: '2026-11-13',
     items: [

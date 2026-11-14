@@ -12,8 +12,8 @@ import inspect
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import flask
 import pytest
+from werkzeug.datastructures import MultiDict
 
 
 def _call(query_string, *, config_per_page=20):
@@ -36,10 +36,13 @@ def _call(query_string, *, config_per_page=20):
         def get(self, shelf_id):
             return shelf if shelf_id == shelf.id else None
 
-    app = flask.Flask(__name__)
-    app.add_url_rule("/api/v1/magicshelf/<int:shelf_id>", "magic-shelf-detail",
-                     inspect.unwrap(mod.magic_shelf_books))
-    with patch.object(mod, "current_user", user), \
+    # The handler reads only request.args and returns jsonify(...); stub both
+    # rather than building another private Flask app (fitness #2546).
+    request = SimpleNamespace(args=MultiDict(
+        [tuple(pair.split("=", 1)) for pair in query_string.split("&") if pair]))
+    with patch.object(mod, "request", request), \
+         patch.object(mod, "jsonify", lambda payload: payload), \
+         patch.object(mod, "current_user", user), \
          patch.object(mod, "ub", SimpleNamespace(
              session=SimpleNamespace(query=lambda _model: _Query()), MagicShelf=object)), \
          patch.object(mod, "config", SimpleNamespace(config_books_per_page=config_per_page,
@@ -54,11 +57,10 @@ def _call(query_string, *, config_per_page=20):
          patch.object(mod.calibre_db, "fill_indexpage", side_effect=fill_indexpage), \
          patch.object(mod, "_rows_to_items", return_value=[]), \
          patch.object(mod, "_selection_response",
-                      side_effect=lambda ids, total: flask.jsonify({"ids": ids})), \
+                      side_effect=lambda ids, total: {"ids": ids}), \
          patch.object(mod, "_list_custom_column_data", return_value=({}, {})):
-        response = app.test_client().get(f"/api/v1/magicshelf/{shelf.id}?{query_string}")
-    assert response.status_code == 200, response.get_data(as_text=True)
-    return seen, response.get_json()
+        body = inspect.unwrap(mod.magic_shelf_books)(shelf.id)
+    return seen, body
 
 
 @pytest.mark.unit

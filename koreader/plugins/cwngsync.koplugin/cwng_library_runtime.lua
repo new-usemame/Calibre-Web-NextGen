@@ -113,9 +113,82 @@ local function manifestStore()
     return shared.manifest_store
 end
 
+-- The per-book records change a few at a time (a step of a sync, a book
+-- opened or sent), but each save used to serialise and rewrite all of them,
+-- on KOReader's main thread: half a megabyte for a few thousand books, long
+-- enough for Android to report KOReader as not responding (#2329). So they
+-- live in files of RECORDS_PER_FILE consecutive book ids each, in a folder
+-- of their own, and a save rewrites only the files holding a record that
+-- changed. cwngsync_library.lua keeps the rest of the state and names those
+-- files; an earlier version kept the records in it, and they move out on the
+-- first save.
+local RECORDS_PER_FILE = 64
+local RECORDS_LAYOUT = 1
+
+local function recordsFolder()
+    return DataStorage:getSettingsDir() .. "/cwngsync_library"
+end
+
+local function partOf(id)
+    local n = tonumber(id)
+    if n and n >= 0 and n == math.floor(n) then
+        return string.format("%d", math.floor(n / RECORDS_PER_FILE))
+    end
+    return "other"
+end
+
+local function partStore(part)
+    shared.part_stores = shared.part_stores or {}
+    local file = shared.part_stores[part]
+    if not file then
+        file = LuaSettings:open(recordsFolder() .. "/books_" .. part .. ".lua")
+        shared.part_stores[part] = file
+    end
+    return file
+end
+
+local function copyValue(value)
+    if type(value) ~= "table" then return value end
+    local out = {}
+    for k, v in pairs(value) do out[k] = copyValue(v) end
+    return out
+end
+
+local function sameValue(a, b)
+    if a == b then return true end
+    if type(a) ~= "table" or type(b) ~= "table" then return false end
+    for k, v in pairs(a) do
+        if not sameValue(v, b[k]) then return false end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then return false end
+    end
+    return true
+end
+
 function Runtime:getLibraryState()
     if not shared.state then
-        local state = Library.loadState(store():readSetting("state"))
+        local file = store()
+        local raw = file:readSetting("state")
+        -- What the record files hold, by book id: a save compares the records
+        -- against it to find the files that need writing.
+        shared.saved_books, shared.saved_parts = {}, {}
+        if type(raw) == "table" and raw.books == nil
+                and file:readSetting("records_layout") == RECORDS_LAYOUT then
+            local books = {}
+            for _, part in ipairs(file:readSetting("record_files") or {}) do
+                local records = partStore(part):readSetting("books")
+                if type(records) == "table" then
+                    for id, record in pairs(records) do
+                        books[id] = record
+                        shared.saved_books[id] = copyValue(record)
+                    end
+                    shared.saved_parts[part] = true
+                end
+            end
+            raw.books = books
+        end
+        local state = Library.loadState(raw)
         if state.manifest == nil then
             local list = manifestStore()
             if list:readSetting("revision") == state.revision then
@@ -132,11 +205,50 @@ end
 local function flush(file, what)
     local ok, err = pcall(file.flush, file)
     if not ok then logger.warn("CWNGSync: could not save library", what, err) end
+    return ok
+end
+
+-- Writes the record files holding a record that changed since they were last
+-- written, and returns the names of every file that holds records.
+local function saveRecords(books)
+    local saved = shared.saved_books
+    local changed = {}
+    for id, record in pairs(books) do
+        if not sameValue(record, saved[id]) then changed[partOf(id)] = {} end
+    end
+    for id in pairs(saved) do
+        if books[id] == nil then changed[partOf(id)] = {} end
+    end
+    if next(changed) then
+        local folder = recordsFolder()
+        if not util.directoryExists(folder) then util.makePath(folder) end
+        for id, record in pairs(books) do
+            local records = changed[partOf(id)]
+            if records then records[id] = record end
+        end
+        for part, records in pairs(changed) do
+            local file = partStore(part)
+            file:saveSetting("books", records)
+            -- A file that could not be written stays changed, so the next
+            -- save tries it again.
+            if flush(file, "records") then
+                for id in pairs(saved) do
+                    if partOf(id) == part and records[id] == nil then saved[id] = nil end
+                end
+                for id, record in pairs(records) do saved[id] = copyValue(record) end
+                shared.saved_parts[part] = next(records) ~= nil or nil
+            end
+        end
+    end
+    local parts = {}
+    for part in pairs(shared.saved_parts) do parts[#parts + 1] = part end
+    table.sort(parts)
+    return parts
 end
 
 function Runtime:saveLibraryState()
     local state = self:getLibraryState()
-    local manifest, shelves = state.manifest, state.shelves
+    local manifest, shelves, books = state.manifest, state.shelves, state.books
     if manifest ~= nil and manifest ~= shared.saved_manifest then
         local list = manifestStore()
         list:saveSetting("revision", state.revision)
@@ -145,12 +257,19 @@ function Runtime:saveLibraryState()
         flush(list, "list")
         shared.saved_manifest = manifest
     end
-    -- The records alone; the list is put back once they are written.
-    state.manifest, state.shelves = nil, nil
-    local file = store()
-    file:saveSetting("state", state)
-    flush(file, "state")
-    state.manifest, state.shelves = manifest, shelves
+    local parts = saveRecords(books)
+    -- The rest of the state, without the list and the records, and only when
+    -- it changed.
+    state.manifest, state.shelves, state.books = nil, nil, nil
+    local head = { state = state, record_files = parts }
+    if not sameValue(head, shared.saved_head) then
+        local file = store()
+        file:saveSetting("state", state)
+        file:saveSetting("records_layout", RECORDS_LAYOUT)
+        file:saveSetting("record_files", parts)
+        if flush(file, "state") then shared.saved_head = copyValue(head) end
+    end
+    state.manifest, state.shelves, state.books = manifest, shelves, books
 end
 
 function Runtime:isConfigured()

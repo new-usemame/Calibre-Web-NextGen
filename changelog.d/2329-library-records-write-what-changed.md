@@ -1,0 +1,3 @@
+### Fixed
+
+- **KOReader Library mode no longer rewrites every book's record on each save.** CWNGSync kept one record per library book in `cwngsync_library.lua` and wrote the whole file, on KOReader's main thread, every 10 steps of a sync, at its end, and each time a book was opened or sent. For 2000 books that was about 800 KB per save, even when nothing had changed. The records now live in small files under `koreader/settings/cwngsync_library/`, and a save rewrites only the files holding a record that changed: about 20 KB when one book changes, nothing when none did. Records saved by an earlier version are kept and move on the first save. (#2329)

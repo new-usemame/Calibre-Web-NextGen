@@ -35,12 +35,12 @@ The 6-quadrant verification matrix this file pins:
 Live-verified against cwn-local under image
 ``calibre-web-nextgen:local`` (built off main @ 6b71e258) with admin /
 Guest / cwng84test users — see ``notes/121-reopen-VERIFICATION.md`` for
-the curl evidence. These tests source-pin the invariants that produce
-that matrix so a future refactor can't silently regress without going
-red.
+the curl evidence. These tests drive the code that produces that
+matrix (the decorator through a test client, ``Anonymous`` from a real
+app.db, ``verify_password`` directly), so a refactor that keeps the
+behaviour passes and one that breaks it goes red (#2939 replaced the
+source-text pins this file used to carry).
 """
-
-import inspect
 
 import pytest
 
@@ -61,35 +61,6 @@ class TestFlaskHttpAuthUserBridge:
     through ``common_filters`` which reads ``current_user`` (flask-login).
     Only the bridge ties them together.
     """
-
-    def test_get_user_checks_flask_httpauth_user_first(self):
-        from cps.cw_login import utils
-        src = inspect.getsource(utils._get_user)
-        assert "flask_httpauth_user" in src, (
-            "cps.cw_login.utils._get_user must consult g.flask_httpauth_user "
-            "so HTTP-Basic-authenticated requests (OPDS, KOReader sync, app "
-            "passwords) surface as the right user to current_user — without "
-            "this, valid OPDS credentials silently see Guest content "
-            "(fork issue #121, droM4X reopen)"
-        )
-        lines = src.splitlines()
-        idx_httpauth = next(
-            (i for i, ln in enumerate(lines) if "flask_httpauth_user" in ln),
-            -1,
-        )
-        idx_load_user = next(
-            (i for i, ln in enumerate(lines) if "_load_user" in ln),
-            -1,
-        )
-        assert idx_httpauth != -1, "flask_httpauth_user check missing"
-        assert idx_load_user != -1, "_load_user call missing"
-        assert idx_httpauth < idx_load_user, (
-            "_get_user must check g.flask_httpauth_user BEFORE falling "
-            "through to Flask-Login's session/cookie load. Reordering "
-            "would cause OPDS requests to always resolve to Anonymous "
-            "regardless of Basic auth state (fork issue #121, droM4X "
-            "reopen scenario)"
-        )
 
     def test_get_user_returns_httpauth_user_when_set(self, mocker):
         """Behavioral: with ``g.flask_httpauth_user`` set, _get_user
@@ -173,169 +144,49 @@ class TestAnonymousUserMirrorsGuestRow:
         "role",
     )
 
-    def test_anonymous_loadsettings_propagates_required_fields(self):
-        """Source-pin: every field common_filters / OPDS callbacks
-        consume must be copied from the Guest DB row in
-        ``Anonymous.loadSettings``. If a future contributor adds a new
-        per-user restriction column to ``User`` but forgets to mirror
-        it on ``Anonymous``, the behaviour for anonymous OPDS requests
-        silently diverges from what the admin configured for Guest.
-        """
+    @pytest.fixture
+    def guest_row(self, tmp_path):
+        """A real app.db whose Guest row has a distinct value in every field
+        the filters and OPDS read, so a field Anonymous fails to copy shows
+        up as the constructor default instead of the Guest's value."""
         from cps import ub
-        src = inspect.getsource(ub.Anonymous.loadSettings)
-        for field in self.REQUIRED_FIELDS:
-            assert f"self.{field}" in src, (
-                f"Anonymous.loadSettings is missing self.{field} = ... — "
-                f"OPDS anonymous requests will not pick up the Guest row's "
-                f"{field} field, breaking the per-user restriction model "
-                f"(fork issue #121, droM4X reopen verification matrix)"
-            )
+        ub.init_db(str(tmp_path / "app.db"))
+        guest = ub.session.query(ub.User).filter(ub.User.name == "Guest").one()
+        guest.denied_tags = "adult"
+        guest.allowed_tags = "kids"
+        guest.denied_column_value = "explicit"
+        guest.allowed_column_value = "family"
+        guest.default_language = "fra"
+        guest.sidebar_view = 4097
+        guest.locale = "hu"
+        guest.kobo_only_shelves_sync = 1
+        guest.opds_only_shelves_sync = 1
+        guest.view_settings = {"shelf": {"sort": "new"}}
+        ub.session.commit()
+        return {field: getattr(guest, field) for field in self.REQUIRED_FIELDS}
 
-    def test_anonymous_class_has_field_attributes(self):
-        """Behavioral-adjacent: every required field must be declared
-        as an attribute on the Anonymous class (typically initialised
-        to None in __init__ before loadSettings populates from DB)."""
+    def test_anonymous_carries_the_guest_rows_restrictions(self, guest_row):
+        """Every field common_filters and the OPDS callbacks read on the
+        current user comes from the Guest row, so an anonymous OPDS request
+        is restricted the way the admin configured Guest."""
         from cps import ub
-        init_src = inspect.getsource(ub.Anonymous.__init__)
-        for field in self.REQUIRED_FIELDS:
-            attr_set_in_init = f"self.{field}" in init_src
-            load_src = inspect.getsource(ub.Anonymous.loadSettings)
-            attr_set_in_load = f"self.{field}" in load_src
-            assert attr_set_in_init or attr_set_in_load, (
-                f"Anonymous class never sets self.{field} — neither in "
-                f"__init__ nor loadSettings. common_filters or an OPDS "
-                f"visibility callback that reads this will AttributeError "
-                f"on anonymous requests"
-            )
+        anon = ub.Anonymous()
+        wrong = {field: (getattr(anon, field, "<missing>"), expected)
+                 for field, expected in guest_row.items()
+                 if getattr(anon, field, "<missing>") != expected}
+        assert not wrong, (
+            "Anonymous does not carry the Guest row's value for %s (got, "
+            "expected); anonymous OPDS requests would not get Guest's "
+            "restrictions (fork issue #121)" % wrong)
 
-    def test_anonymous_is_anonymous_true_is_authenticated_false(self):
-        """Behavioral: ``is_anonymous`` returns True, ``is_authenticated``
-        returns False. The OPDS root entries gate the ``read`` /
-        ``unread`` rows on ``not user.is_anonymous``; if these flip,
-        Guest sees per-user read-status entries that have no meaning."""
-        from cps.cw_login.mixins import AnonymousUserMixin
+    def test_anonymous_is_anonymous_true_is_authenticated_false(self, guest_row):
+        """The OPDS root entries gate the ``read`` / ``unread`` rows on
+        ``not user.is_anonymous``; if these flip, Guest sees per-user
+        read-status entries that have no meaning."""
         from cps import ub
-        assert AnonymousUserMixin().is_anonymous is True
-        assert AnonymousUserMixin().is_authenticated is False
-        anon_src = inspect.getsource(ub.Anonymous)
-        assert "is_anonymous" in anon_src
-        assert "is_authenticated" in anon_src
-
-
-@pytest.mark.unit
-class TestRequiresBasicAuthMultiplexFlow:
-    """Source-pin the four mutually-exclusive branches of
-    ``requires_basic_auth_if_no_ano``. Each branch handles one cell of
-    the 6-quadrant matrix (the 6th — anon-off + valid creds — falls
-    through the same successful-auth path as anon-on + valid creds).
-    """
-
-    def test_decorator_has_no_creds_anon_on_guest_substitution(self):
-        """Quadrant 1 (anon-on + no creds): substitute Guest creds so
-        ``auth.authenticate`` resolves to the Guest user.
-        """
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.requires_basic_auth_if_no_ano)
-        assert "config.config_anonbrowse == 1 and not authorisation" in src, (
-            "Decorator must substitute Guest credentials when both "
-            "(a) anonymous browsing is enabled AND (b) no Authorization "
-            "header was sent. Without this, anon-enabled OPDS deployments "
-            "return 401 to plain GET requests."
-        )
-
-    def test_decorator_has_failed_auth_anon_on_guest_fallback(self):
-        """Quadrant 3 (anon-on + bad creds): after the auth attempt
-        fails, fall through to Guest. This is the v4.0.46 fix that
-        addressed @droM4X's original complaint."""
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.requires_basic_auth_if_no_ano)
-        assert "user in (False, None) and config.config_anonbrowse == 1" in src, (
-            "Decorator must fall back to Guest when (a) auth attempt "
-            "returned None/False AND (b) anonymous browsing is on. This "
-            "is the issue #121 'stale credentials still get Guest catalog' "
-            "fix from v4.0.46."
-        )
-
-    def test_decorator_returns_401_when_anon_off_and_no_user(self):
-        """Quadrant 4+5 (anon-off + no/bad creds): no Guest fallback,
-        emit 401. The status path is reached only when ``user in
-        (False, None)`` and the anon-fallback branch above did not
-        rescue it (which means anon=0)."""
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.requires_basic_auth_if_no_ano)
-        assert "status = 401" in src, "401 branch removed from decorator"
-        idx_fallback = src.find("user in (False, None) and config.config_anonbrowse == 1")
-        idx_401 = src.find("status = 401")
-        assert idx_fallback != -1 and idx_401 != -1
-        assert idx_fallback < idx_401, (
-            "Anon-fallback to Guest must run BEFORE the 401 branch — "
-            "reordering would 401 anon-enabled deployments before they "
-            "got their Guest rescue."
-        )
-
-    def test_decorator_pins_authed_user_into_flask_httpauth_g(self):
-        """After successful auth (any quadrant that lands a user), the
-        user must be stored in ``g.flask_httpauth_user`` so the
-        ``_get_user`` bridge can surface it as ``current_user``."""
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.requires_basic_auth_if_no_ano)
-        assert "g.flask_httpauth_user" in src, (
-            "Decorator must set g.flask_httpauth_user on every successful "
-            "auth path — without this assignment the cw_login bridge "
-            "has nothing to forward, and common_filters surfaces "
-            "Anonymous restrictions to authenticated OPDS requests."
-        )
-
-    def test_decorator_runs_reverse_proxy_before_basic_auth(self):
-        """Decorator order: reverse-proxy header lookup happens FIRST,
-        but only when no Basic auth was sent. Basic auth always wins
-        when both are present (otherwise a misconfigured reverse-proxy
-        header could spoof identity)."""
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.requires_basic_auth_if_no_ano)
-        idx_rp = src.find("config_allow_reverse_proxy_header_login")
-        idx_basic = src.find("auth.authenticate(authorisation")
-        assert idx_rp != -1 and idx_basic != -1
-        assert idx_rp < idx_basic, (
-            "Reverse-proxy header check should be evaluated first "
-            "(when no Basic auth sent), then Basic auth as primary."
-        )
-
-
-@pytest.mark.unit
-class TestVerifyPasswordGuestShortCircuit:
-    """When a client sends ``Authorization: Basic Guest:anything`` and
-    anonymous browsing is on, ``verify_password`` returns Guest without
-    running the password hash check. This is what makes the Guest
-    fallback in the decorator round-trip — the substituted credentials
-    are valid by design.
-    """
-
-    def test_guest_with_anon_returns_user_short_circuit(self):
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.verify_password)
-        assert "user.name.lower() == \"guest\"" in src, (
-            "verify_password must special-case Guest when anon is on "
-            "(no password check); otherwise the substituted Guest "
-            "credentials in the decorator never validate."
-        )
-        idx_guest = src.find("user.name.lower() == \"guest\"")
-        idx_anon = src.find("config.config_anonbrowse == 1", idx_guest)
-        assert idx_anon != -1 and idx_anon - idx_guest < 200, (
-            "Guest short-circuit must be gated on config_anonbrowse == 1 "
-            "— without the gate, anon-off deployments would let any "
-            "client log in as Guest with no password."
-        )
-
-    def test_empty_username_returns_none_without_db_or_log(self):
-        """The pre-fix behaviour of @droM4X's original complaint
-        (issue #121 bug 1) — already pinned in
-        ``test_opds_bugs_121.py``; re-pinned here so the multiplex
-        suite stands on its own and a future refactor that drops one
-        copy can be detected by the other."""
-        from cps import usermanagement
-        src = inspect.getsource(usermanagement.verify_password)
-        assert "if not username:\n        return None" in src
+        anon = ub.Anonymous()
+        assert anon.is_anonymous is True
+        assert anon.is_authenticated is False
 
 
 @pytest.mark.unit
@@ -479,6 +330,96 @@ class TestSixQuadrantBehavioralMatrix:
         assert resp.status_code == 200
         assert resp.get_json()["user_name"] == "cwng84test"
 
+
+    def test_basic_credentials_win_over_a_reverse_proxy_header(self, app_with_decorator, mocker):
+        """With reverse-proxy login on, a request that sends Basic
+        credentials is that user; the proxy header is read only when none
+        were sent, so a misconfigured proxy header cannot replace them."""
+        app, um = app_with_decorator
+        mocker.patch.object(um.config, "config_anonbrowse", 0, create=True)
+        mocker.patch.object(um.config, "config_allow_reverse_proxy_header_login", 1, create=True)
+        proxied = self._make_user_stub("proxied")
+        from_header = mocker.patch.object(um, "load_user_from_reverse_proxy_header",
+                                          return_value=proxied)
+        user = self._make_user_stub("cwng84test")
+        mocker.patch.object(um.auth, "authenticate", return_value=user)
+
+        resp = app.test_client().get("/opds/", headers={
+            "Authorization": "Basic Y3duZzg0dGVzdDpjd25nLXRlc3QtODQ=",
+        })
+        assert resp.status_code == 200
+        assert resp.get_json()["user_name"] == "cwng84test"
+        from_header.assert_not_called()
+
+    def test_reverse_proxy_user_without_basic_credentials(self, app_with_decorator, mocker):
+        app, um = app_with_decorator
+        mocker.patch.object(um.config, "config_anonbrowse", 0, create=True)
+        mocker.patch.object(um.config, "config_allow_reverse_proxy_header_login", 1, create=True)
+        mocker.patch.object(um, "load_user_from_reverse_proxy_header",
+                            return_value=self._make_user_stub("proxied"))
+        authenticate = mocker.patch.object(um.auth, "authenticate", return_value=None)
+
+        resp = app.test_client().get("/opds/")
+        assert resp.status_code == 200
+        assert resp.get_json()["user_name"] == "proxied"
+        authenticate.assert_not_called()
+
+
+@pytest.mark.unit
+class TestVerifyPasswordGuestShortCircuit:
+    """When a client sends ``Authorization: Basic Guest:anything`` and
+    anonymous browsing is on, ``verify_password`` returns Guest without
+    a password. This is what makes the Guest fallback in the decorator
+    round-trip: the substituted credentials are valid by design. With
+    anonymous browsing off, Guest is an account like any other and needs
+    its password.
+    """
+
+    app_with_decorator = TestSixQuadrantBehavioralMatrix.app_with_decorator
+
+    @pytest.fixture
+    def verify(self, app_with_decorator, mocker):
+        """``verify_password`` as a catalogue request reaches it: inside a
+        request (a refused sign-in logs the client address), with one Guest
+        account in the database and no password that matches it."""
+        from cps import constants, ub, usermanagement
+        guest = ub.User()
+        guest.id = 2
+        guest.name = "Guest"
+        guest.password = "not-a-hash"
+        session = mocker.MagicMock()
+        session.query.return_value.filter.return_value.first.return_value = guest
+        mocker.patch.object(usermanagement.ub, "session", session)
+        mocker.patch.object(usermanagement, "limiter", None)
+        mocker.patch.object(usermanagement, "_verify_app_password_digest", return_value=False)
+        mocker.patch.object(usermanagement, "_verify_app_password_older", return_value=False)
+        mocker.patch.object(usermanagement, "check_password_hash", return_value=False)
+        mocker.patch.object(usermanagement.config, "config_login_type",
+                            constants.LOGIN_STANDARD, create=True)
+        app, _ = app_with_decorator
+        with app.test_request_context("/opds/"):
+            yield usermanagement, guest, session
+
+    def test_guest_signs_in_without_a_password_when_anonymous_browsing_is_on(self, verify, mocker):
+        um, guest, _ = verify
+        mocker.patch.object(um.config, "config_anonbrowse", 1, create=True)
+        assert um.verify_password("Guest", "anything") is guest
+        assert um.verify_password("guest", "") is guest
+
+    def test_guest_needs_its_password_when_anonymous_browsing_is_off(self, verify, mocker):
+        """Without the gate, an anonymous-off server would let any client
+        browse as Guest with no password."""
+        um, _, _ = verify
+        mocker.patch.object(um.config, "config_anonbrowse", 0, create=True)
+        assert um.verify_password("Guest", "anything") is None
+
+    def test_empty_username_returns_none_without_a_database_lookup(self, verify, mocker):
+        """An OPDS client's empty-username probe is no credentials, not a
+        failed sign-in (#121 bug 1)."""
+        um, _, session = verify
+        mocker.patch.object(um.config, "config_anonbrowse", 1, create=True)
+        assert um.verify_password("", "") is None
+        session.query.assert_not_called()
 
 def _basic_2844(username, password):
     import base64

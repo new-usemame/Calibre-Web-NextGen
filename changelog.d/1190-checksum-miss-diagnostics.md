@@ -1,0 +1,3 @@
+### Changed
+
+- **"No book found for checksum" now says why it missed.** The same log line used to cover a checksum row whose book no longer exists (for example after a Calibre database rebuild), a library with no checksums registered at all, and a checksum the server never registered. The line now names which of the three it is. Each checksum gets that detail at most once every five minutes, and at most 256 checksums get it in that time, so a device that keeps retrying, or reports thousands of unmatched files at once, neither floods the log nor slows the sync. Sync behaviour is unchanged. (#1190)

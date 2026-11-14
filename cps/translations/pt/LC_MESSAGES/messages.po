@@ -8710,40 +8710,40 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save for the whole library"
-msgstr ""
+msgstr "Guardar para toda a biblioteca"
 
 #: cps/spa_strings.py
 msgid "Save name"
-msgstr ""
+msgstr "Guardar nome"
 
 #: cps/spa_strings.py
 msgid "Save note"
-msgstr ""
+msgstr "Guardar nota"
 
 #: cps/spa_strings.py
 msgid "Save preset"
-msgstr ""
+msgstr "Guardar predefinição"
 
 #: cps/spa_strings.py
 msgid "Save security settings"
-msgstr ""
+msgstr "Guardar configurações de segurança"
 
 #: cps/spa_strings.py
 msgid "Save settings"
-msgstr ""
+msgstr "Guardar configurações"
 
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
-msgstr ""
+msgstr "Guardar o arquivo, ejetar o Kobo com segurança e, em seguida, reinicie-o"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Saved {time}"
-msgstr ""
+msgstr "Guardado {time}"
 
 #: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
-msgstr ""
+msgstr "Guardado. Reinicie o servidor para que as alterações de login entrem em vigor."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid ""
@@ -8753,7 +8753,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Scan for duplicates"
-msgstr ""
+msgstr "Pesquisar por duplicados"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #, python-brace-format
@@ -8762,11 +8762,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "Scanning book files…"
-msgstr ""
+msgstr "Analisando arquivos de livros…"
 
 #: cps/spa_strings.py
 msgid "Scheduled tasks"
-msgstr ""
+msgstr "Tarefas agendadas"
 
 #: cps/spa_strings.py
 msgid "Scopes"
@@ -8774,40 +8774,40 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Search all catalogs"
-msgstr ""
+msgstr "Pesquisar em todos os catálogos"
 
 #: cps/spa_strings.py
 msgid "Search inside book"
-msgstr ""
+msgstr "Pesquisar dentro do livro"
 
 #: cps/spa_strings.py
 msgid "Search remaining catalogs"
-msgstr ""
+msgstr "Pesquisar nos catálogos restantes"
 
 #: cps/spa_strings.py
 msgid "Search sources with different words"
-msgstr ""
+msgstr "Pesquisar fontes usando palavras diferentes"
 
 #: cps/spa_strings.py
 msgid "Search term"
-msgstr ""
+msgstr "Pesquisar termo"
 
 #: cps/spa_strings.py
 msgid "Search this book"
-msgstr ""
+msgstr "Pesquisar neste livro"
 
 #: cps/spa_strings.py
 msgid "Search this catalog"
-msgstr ""
+msgstr "Pesquisar neste catálogo"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
-msgstr ""
+msgstr "Pesquisar título, autor…"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Search: {query}"
-msgstr ""
+msgstr "Pesquisa: {query}"
 
 #: cps/spa_strings.py
 msgid "Searching catalogs…"
@@ -16084,39 +16084,39 @@ msgstr ""
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 #, python-format
 msgid "Review %(count)s Pending Match(es)"
-msgstr ""
+msgstr "Analisar %(count)s correspondência(s) pendente(s)"
 
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 msgid "Click to See More"
-msgstr ""
+msgstr "Clique para ver mais"
 
 #: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
 msgid "Logins"
-msgstr ""
+msgstr "Logins"
 
 #: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
 msgid "Failed Login Attempts"
-msgstr ""
+msgstr "Tentativas de login mal sucedidas"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Logouts"
-msgstr ""
+msgstr "Logouts"
 
 #: cps/templates/cwa_stats_i18n.html cps/templates/cwa_user_activity.html
 msgid "Searches"
-msgstr ""
+msgstr "Pesquisas"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Added to Shelf"
-msgstr ""
+msgstr "Adicionado à estante"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Removed from Shelf"
-msgstr ""
+msgstr "Removido da estante"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Shelf Views"
-msgstr ""
+msgstr "Visualizações de estantes"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Smart Shelf Views"
@@ -16124,59 +16124,59 @@ msgstr "Visualizações de estantes inteligentes"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Kobo Sync"
-msgstr ""
+msgstr "Sincronização Kobo"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "OPDS Feed"
-msgstr ""
+msgstr "Feed OPDS"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Email Delivery"
-msgstr ""
+msgstr "Entrega de e-mail"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Web UI"
-msgstr ""
+msgstr "Interface web"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Other"
-msgstr ""
+msgstr "Outro"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Desktop"
-msgstr ""
+msgstr "Computador"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Mobile"
-msgstr ""
+msgstr "Telemóvel"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Tablet"
-msgstr ""
+msgstr "Tablet"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Book Detail"
-msgstr ""
+msgstr "Detalhes do livro"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Series Page"
-msgstr ""
+msgstr "Página da série"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Author Page"
-msgstr ""
+msgstr "Página do autor"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Shelf"
-msgstr ""
+msgstr "Estante"
 
 #: cps/templates/cwa_stats_i18n.html
 msgid "Direct Link"
-msgstr ""
+msgstr "Link direto"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Server Activity Dashboard"
-msgstr ""
+msgstr "Painel de Atividade do Servidor"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Track server activity, file conversions, and automatic fixes."
@@ -16188,43 +16188,43 @@ msgstr ""
 
 #: cps/templates/cwa_stats_system.html
 msgid "Books Enforced"
-msgstr ""
+msgstr "Livros Impostos"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Books Converted"
-msgstr ""
+msgstr "Livros convertidos"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Books Fixed"
-msgstr ""
+msgstr "Livros Corrigidos"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Hardcover Auto-Fetch Statistics"
-msgstr ""
+msgstr "Estatísticas de pesquisa automática"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Total Processed"
-msgstr ""
+msgstr "Total processado"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Auto-Matched"
-msgstr ""
+msgstr "Correspondência automática"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Pending Review"
-msgstr ""
+msgstr "Pendente de revisão"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Manually Reviewed"
-msgstr ""
+msgstr "Revisto manualmente"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Calibre-Web NextGen Conversion History"
-msgstr ""
+msgstr "Histórico de conversões do Calibre-Web NextGen"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Calibre-Web NextGen Import History"
-msgstr ""
+msgstr "Histórico de Importação do Calibre-Web NextGen"
 
 #: cps/templates/cwa_stats_system.html
 msgid "Calibre-Web NextGen EPUB Fixer History"
@@ -16244,11 +16244,11 @@ msgstr ""
 
 #: cps/templates/cwa_stats_tabs.html
 msgid "User Activity"
-msgstr ""
+msgstr "Atividade do utilizador"
 
 #: cps/templates/cwa_stats_tabs.html
 msgid "Library Stats"
-msgstr ""
+msgstr "Estatísticas da biblioteca"
 
 #: cps/templates/cwa_stats_tabs.html
 msgid "API Usage"
@@ -16256,87 +16256,87 @@ msgstr ""
 
 #: cps/templates/cwa_stats_tabs.html
 msgid "System Stats"
-msgstr ""
+msgstr "Estatísticas do sistema"
 
 #: cps/templates/cwa_user_activity.html
 msgid "User Activity Dashboard"
-msgstr ""
+msgstr "Painel de Atividade do Utilizador"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Track library usage, downloads, and user engagement"
-msgstr ""
+msgstr "Monitorize a utilização da biblioteca, os descarregamentos e o envolvimento dos utilizadores"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Filter by User:"
-msgstr ""
+msgstr "Filtrar por utilizador:"
 
 #: cps/templates/cwa_user_activity.html
 msgid "All Users"
-msgstr ""
+msgstr "Todos os Utilizadores"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Time Period:"
-msgstr ""
+msgstr "Período de tempo:"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Large date ranges may take longer to load"
-msgstr ""
+msgstr "Intervalos de datas extensos podem levar mais tempo para carregar"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Active Users"
-msgstr ""
+msgstr "Utilizadores ativos"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Total Downloads"
-msgstr ""
+msgstr "Total Downloads"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Books Read"
-msgstr ""
+msgstr "Livros lidos"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Activity Timeline"
-msgstr ""
+msgstr "Linha do tempo de atividades"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Peak Usage Hours"
-msgstr ""
+msgstr "Horários de pico de utilização"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Event Types"
-msgstr ""
+msgstr "Tipos de evento"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Format Preferences by User"
-msgstr ""
+msgstr "Preferências de formato por utilizador"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Discovery Sources"
-msgstr ""
+msgstr "Fontes de descoberta"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Device Breakdown"
-msgstr ""
+msgstr "Detalhes do dispositivo"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Most Active Days"
-msgstr ""
+msgstr "Dias de maior atividade"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Top Users"
-msgstr ""
+msgstr "Principais Utilizadores"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Popular Books"
-msgstr ""
+msgstr "Livros populares"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Recent Searches"
-msgstr ""
+msgstr "Pesquisas recentes"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Average Session Duration"
-msgstr ""
+msgstr "Duração média da sessão"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Avg Session Length"
@@ -16382,28 +16382,28 @@ msgstr ""
 
 #: cps/templates/cwa_user_activity.html
 msgid "Reading Velocity (Books per Week)"
-msgstr ""
+msgstr "Velocidade de leitura (livros por semana)"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No format data yet"
-msgstr ""
+msgstr "Ainda não há dados de formato"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No activity data yet"
-msgstr ""
+msgstr "Ainda não há dados de atividade"
 
 #: cps/templates/cwa_user_activity.html
 #, python-format
 msgid "Activity: %(count)s"
-msgstr ""
+msgstr "Atividade: %(count)s"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Activity"
-msgstr ""
+msgstr "Atividade"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No reading data yet"
-msgstr ""
+msgstr "Ainda não há dados de leitura"
 
 #: cps/templates/cwa_user_activity.html
 msgid "4-Week Avg"
@@ -16411,31 +16411,31 @@ msgstr ""
 
 #: cps/templates/cwa_user_activity.html
 msgid "No format preference data yet"
-msgstr ""
+msgstr "Ainda não há dados de preferência de formato"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No discovery data yet"
-msgstr ""
+msgstr "Ainda não há dados de descoberta"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No device data yet"
-msgstr ""
+msgstr "Ainda não há dados do dispositivo"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No failed attempts"
-msgstr ""
+msgstr "Nenhuma tentativa falhada"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No user activity yet"
-msgstr ""
+msgstr "Ainda não há atividade do utilizador"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No popular books yet"
-msgstr ""
+msgstr "Ainda não há livros populares"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No searches yet"
-msgstr ""
+msgstr "Nenhuma pesquisa realizada ainda"
 
 #: cps/templates/cwa_user_activity.html
 #, python-format
@@ -16444,39 +16444,39 @@ msgstr ""
 
 #: cps/templates/cwa_user_activity.html
 msgid "Minutes"
-msgstr ""
+msgstr "Minutos"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Sessions"
-msgstr ""
+msgstr "Sessões"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No session data available"
-msgstr ""
+msgstr "Não há dados de sessão disponíveis"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Success Rate"
-msgstr ""
+msgstr "Taxa de sucesso"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Views"
-msgstr ""
+msgstr "Visualizações"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Added"
-msgstr ""
+msgstr "Adicionado"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Removed"
-msgstr ""
+msgstr "Removido"
 
 #: cps/templates/cwa_user_activity.html
 msgid "No shelf activity yet"
-msgstr ""
+msgstr "Ainda sem atividade na estante"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Before you go — what made you switch back?"
-msgstr ""
+msgstr "Antes de ir — o que fez te voltar atrás?"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
@@ -16526,7 +16526,7 @@ msgstr ""
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Thank you"
-msgstr ""
+msgstr "Obrigado"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Your feedback was sent anonymously. We read every note."
@@ -16606,7 +16606,7 @@ msgstr "Restaurar do ficheiro"
 
 #: cps/templates/detail.html
 msgid "Reloaded metadata from disk"
-msgstr ""
+msgstr "Metadados recarregados do disco"
 
 #: cps/templates/detail.html
 msgid "On-disk metadata matches — nothing to update"
@@ -16614,7 +16614,7 @@ msgstr ""
 
 #: cps/templates/detail.html
 msgid "Unhide from your library"
-msgstr ""
+msgstr "Exibir a partir da sua biblioteca"
 
 #: cps/templates/detail.html
 #, fuzzy
@@ -16623,12 +16623,12 @@ msgstr "Pesquisar na biblioteca"
 
 #: cps/templates/detail.html
 msgid "Unhidden"
-msgstr ""
+msgstr "Revelado"
 
 #: cps/templates/detail.html
 #, python-format
 msgid "Remove \"%(title)s\" from your library?"
-msgstr ""
+msgstr "Remover \"%(title)s\" da sua biblioteca?"
 
 #: cps/templates/detail.html
 #, python-format
@@ -16642,23 +16642,23 @@ msgstr "Livro %(index)s de %(range)s"
 
 #: cps/templates/detail.html
 msgid "ID"
-msgstr ""
+msgstr "ID"
 
 #: cps/templates/detail.html
 msgid "UUID"
-msgstr ""
+msgstr "UUID"
 
 #: cps/templates/detail.html
 msgid "UUID copied to clipboard"
-msgstr ""
+msgstr "UUID copiado para a área de transferência"
 
 #: cps/templates/detail.html
 msgid "Unable to copy UUID"
-msgstr ""
+msgstr "Não foi possível copiar o UUID"
 
 #: cps/templates/detail.html
 msgid "Copy UUID"
-msgstr ""
+msgstr "Copiar UUID"
 
 #: cps/templates/detail.html
 #, fuzzy
@@ -16737,7 +16737,7 @@ msgstr "Mostrar livros mais bem pontuados"
 
 #: cps/templates/duplicates.html
 msgid "Select Duplicates"
-msgstr ""
+msgstr "Selecionar duplicados"
 
 #: cps/templates/duplicates.html
 #, fuzzy
@@ -16751,7 +16751,7 @@ msgstr "Fundir livros selecionados"
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scanning needs a one-time full scan."
-msgstr ""
+msgstr "A detecção de duplicados requer uma verificação completa realizada uma única vez."
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -16777,11 +16777,11 @@ msgstr ""
 
 #: cps/templates/duplicates.html
 msgid "View Background Tasks"
-msgstr ""
+msgstr "Ver tarefas em segundo plano"
 
 #: cps/templates/duplicates.html
 msgid "Auto-Resolve Duplicates"
-msgstr ""
+msgstr "Resolver duplicados automaticamente"
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -16791,19 +16791,19 @@ msgstr ""
 
 #: cps/templates/duplicates.html
 msgid "Strategy:"
-msgstr ""
+msgstr "Estratégia:"
 
 #: cps/templates/duplicates.html
 msgid "Keep Newest - Delete older copies, keep the most recently added"
-msgstr ""
+msgstr "Manter os mais recentes – Excluir cópias mais antigas, manter as adicionadas mais recentemente"
 
 #: cps/templates/duplicates.html
 msgid "Keep Oldest - Delete newer copies, keep the earliest added"
-msgstr ""
+msgstr "Manter a mais antiga – Excluir cópias mais recentes, manter a que foi adicionada primeiro"
 
 #: cps/templates/duplicates.html
 msgid "Merge Formats - Merge formats into the newest book, delete the rest"
-msgstr ""
+msgstr "Unir formatos – Unir formatos no livro mais recente; excluir os restantes"
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -16813,19 +16813,19 @@ msgstr ""
 
 #: cps/templates/duplicates.html
 msgid "Keep Most Metadata - Keep book with most complete information"
-msgstr ""
+msgstr "Manter a maior parte dos metadados – Manter o livro com as informações mais completas"
 
 #: cps/templates/duplicates.html
 msgid "Keep Largest File Size - Keep book with largest total file size"
-msgstr ""
+msgstr "Manter o arquivo de maior tamanho – Manter o livro com o maior tamanho total de arquivo"
 
 #: cps/templates/duplicates.html
 msgid "Execute Resolution"
-msgstr ""
+msgstr "Executar resolução"
 
 #: cps/templates/duplicates.html
 msgid "This will permanently delete books. Original files will be backed up to"
-msgstr ""
+msgstr "Isso excluirá os livros permanentemente. Os arquivos originais serão salvos em"
 
 #: cps/templates/duplicates.html
 #, fuzzy
@@ -16834,7 +16834,7 @@ msgstr "Fundir livros selecionados"
 
 #: cps/templates/duplicates.html
 msgid "Dismiss this duplicate group"
-msgstr ""
+msgstr "Dispensar este grupo duplicado"
 
 #: cps/templates/duplicates.html
 #, fuzzy
@@ -16844,7 +16844,7 @@ msgstr "Detalhes do livro"
 #: cps/templates/duplicates.html
 #, fuzzy
 msgid "Edit book metadata"
-msgstr "editar metadados"
+msgstr "Editar metadados do livro"
 
 #: cps/templates/duplicates.html
 #, fuzzy
@@ -16915,15 +16915,15 @@ msgstr ""
 
 #: cps/templates/duplicates.html
 msgid "Success"
-msgstr ""
+msgstr "Sucesso"
 
 #: cps/templates/duplicates.html
 msgid "Selected duplicate books have been deleted successfully!"
-msgstr ""
+msgstr "Os livros duplicados selecionados foram excluídos com sucesso!"
 
 #: cps/templates/duplicates.html
 msgid "An error occurred while processing your request."
-msgstr ""
+msgstr "Ocorreu um erro ao processar sua solicitação."
 
 #: cps/templates/email_edit.html
 msgid "Email Account Type"

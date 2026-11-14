@@ -33,7 +33,7 @@ except ImportError:
         oauth_support = False
 from sqlalchemy import create_engine, DDL, exc, exists, event, text
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
-from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB, LargeBinary
+from sqlalchemy import String, Integer, SmallInteger, BigInteger, Boolean, DateTime, Float, JSON, Text, BLOB, LargeBinary
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import func
@@ -1953,6 +1953,10 @@ class Annotation(Base):
         "KoboAnnotationMaterialization", back_populates="annotation",
         cascade="all, delete-orphan", uselist=False, single_parent=True,
     )
+    crosspoint_clipping = relationship(
+        "CrossPointClipping", back_populates="annotation",
+        cascade="all, delete-orphan", uselist=False, single_parent=True,
+    )
 
     __table_args__ = (
         Index('ix_annotation_user_annotation', 'user_id', 'annotation_id'),
@@ -1964,7 +1968,7 @@ class Annotation(Base):
         ),
     )
 
-    _VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote"}
+    _VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote", "crosspoint"}
     _VALID_POSITION_TYPES = {
         "cfi", "pdf_quad", "comic_page", "koreader_xpointer", "unanchored",
         "text_quote",
@@ -2038,6 +2042,64 @@ class KoboAnnotationMaterialization(Base):
         ),
         Index('ix_kam_serveable', 'annotation_id', 'serveable'),
     )
+
+
+class CrossPointClipping(Base):
+    """The CrossPoint layout of one ``crosspoint`` annotation row, exactly as
+    the reader sent it.
+
+    The firmware replaces its own record with the server copy on the first
+    pull after an upload, so every field here goes back unchanged, or the
+    highlight moves. ``deleted`` is the tombstone the reader pulls; it is
+    never undone. ``sync_revision`` comes from the owner's
+    ``CrossPointClippingClock``. See notes/CROSSPOINT-CLIPPINGS-DESIGN.md.
+    """
+    __tablename__ = 'crosspoint_clipping'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    annotation_id = Column(
+        Integer, ForeignKey('annotation.id', ondelete='CASCADE'),
+        nullable=False, unique=True,
+    )
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    # The document hash of the last upload: for logs only, the book is the key.
+    document = Column(String(255), nullable=False)
+    spine = Column(Integer, nullable=False)
+    start_page = Column(Integer, nullable=False)
+    end_page = Column(Integer, nullable=False)
+    pages = Column(Integer, nullable=False)
+    start_word = Column(Integer, nullable=False)
+    end_word = Column(Integer, nullable=False)
+    words = Column(Integer, nullable=False)
+    para = Column(Integer, nullable=True)
+    chapter = Column(String(64), nullable=False, default='')
+    text = Column(Text, nullable=False)
+    # The reader's own ``created_at``, in Unix seconds.
+    created_epoch = Column(Integer, nullable=False)
+    layout_signature = Column(Integer, nullable=False)
+    start_offset = Column(Integer, nullable=True)
+    end_offset = Column(Integer, nullable=True)
+    deleted = Column(Boolean, nullable=False, default=False)
+    sync_revision = Column(BigInteger, nullable=False)
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    annotation = relationship("Annotation", back_populates="crosspoint_clipping")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'sync_revision', name='uq_crosspoint_clipping_revision'),
+    )
+
+
+class CrossPointClippingClock(Base):
+    """Each account's CrossPoint clipping revision counter.
+
+    The firmware pages one item at a time with ``revision > cursor``, so two
+    items with one revision would make it skip one. A counter row, not
+    ``MAX()+1``, so that a value is never given out again after a hard delete.
+    """
+    __tablename__ = 'crosspoint_clipping_clock'
+
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), primary_key=True)
+    revision = Column(BigInteger, nullable=False, default=0)
 
 
 class KoboAnnotationBookState(Base):
@@ -5464,6 +5526,16 @@ def migrate_annotation_text_quote(engine, _session):
                 raise
 
 
+def migrate_crosspoint_clippings(engine, _session):
+    """Create the CrossPoint clipping sidecar and clock tables on upgraded
+    app.db files. Idempotent."""
+    Base.metadata.create_all(
+        engine,
+        tables=[CrossPointClipping.__table__, CrossPointClippingClock.__table__],
+        checkfirst=True,
+    )
+
+
 def migrate_annotation_decouple_source_target(engine, _session):
     """Decouple annotation origin from sync target.
 
@@ -5837,6 +5909,7 @@ def migrate_Database(_session):
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)
+    migrate_crosspoint_clippings(engine, _session)
     from .services.browser_source import migrate_account_browser_source
     migrate_account_browser_source(engine)
     migrate_book_cover_preview_table(engine, _session)

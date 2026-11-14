@@ -11,6 +11,8 @@ The caller supplies the protocol's authority for deleting an existing row.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -239,3 +241,42 @@ def test_stale_complete_list_retry_cannot_resurrect_tombstone(session):
     assert action == "skipped"
     assert row.hidden is True
     assert row.highlighted_text == "original"
+
+
+# --- CrossPoint clippings (source ``crosspoint``) ----------------------------
+
+def test_a_crosspoint_row_keeps_its_text_quote(session):
+    quote = {"exact": "boats against the current", "prefix": "", "suffix": ""}
+    row, action = apply_portable(
+        {"annotation_id": "clip-1", "source": "crosspoint", "type": "highlight",
+         "highlighted_text": quote["exact"], "text_quote": quote,
+         "position_type": "text_quote"},
+        user_id=9, book=_book(), session=session, commit=session.commit,
+    )
+    assert action == "created" and row.source == "crosspoint"
+    assert row.position_type == "text_quote"
+    assert json.loads(row.text_quote) == quote
+    assert to_portable(row)["text_quote"] == quote
+
+
+def test_a_koreader_push_cannot_claim_a_crosspoint_row(session):
+    apply_portable(
+        {"annotation_id": "clip-2", "source": "crosspoint", "highlighted_text": "t"},
+        user_id=9, book=_book(), session=session, commit=session.commit,
+    )
+    row, action = apply_portable(
+        {"annotation_id": "clip-2", "source": "koreader", "hidden": True},
+        user_id=9, book=_book(), session=session, commit=session.commit,
+        deletable_sources=_DELETABLE_SOURCES,
+    )
+    assert row.source == "crosspoint" and not row.hidden
+    assert action == "skipped"
+
+
+def test_only_the_clippings_route_makes_crosspoint_rows():
+    from cps.services.annotation_portable import validate_portable_payload
+
+    error = validate_portable_payload({"annotation_id": "c", "source": "crosspoint"})
+
+    assert error == "source must be one of: kobo, koreader, textquote, webreader"
+    assert "crosspoint" not in _DELETABLE_SOURCES

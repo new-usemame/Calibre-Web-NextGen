@@ -16,7 +16,8 @@ from weakref import WeakSet, WeakKeyDictionary
 from uuid import uuid4
 import time
 import sqlite3
-from sqlalchemy import create_engine, event
+from sqlalchemy import case, create_engine, event
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy import Table, Column, ForeignKey, CheckConstraint
 from sqlalchemy import String, Integer, Boolean, TIMESTAMP, Float
 from sqlalchemy.orm import relationship, sessionmaker, scoped_session, joinedload, object_session
@@ -723,6 +724,44 @@ class Metadata_Dirtied(Base):
         self.book = book
 
 
+class BookMetadataEdit(Base):
+    """The latest uninterrupted run of metadata-only edits to a book."""
+
+    __tablename__ = "cwng_book_metadata_edit"
+    __table_args__ = {"schema": "calibre"}
+
+    book_id = Column(Integer, ForeignKey("books.id", ondelete="CASCADE"), primary_key=True)
+    book_uuid = Column(String, nullable=False)
+    first_modified = Column(TIMESTAMP, nullable=False)
+    last_modified = Column(TIMESTAMP, nullable=False)
+
+
+def record_book_metadata_edit(session, book, previous):
+    """Join contiguous metadata edits in the transaction that stamps the book."""
+    table = BookMetadataEdit.__table__
+    first_modified = previous.astimezone(timezone.utc).replace(tzinfo=None)
+    last_modified = book.last_modified.astimezone(timezone.utc).replace(tzinfo=None)
+    if not book.uuid or last_modified <= first_modified:
+        return
+    insert = sqlite_insert(table).values(
+        book_id=book.id, book_uuid=book.uuid,
+        first_modified=first_modified, last_modified=last_modified,
+    )
+    session.execute(insert.on_conflict_do_update(
+        index_elements=[table.c.book_id],
+        set_={
+            "book_uuid": insert.excluded.book_uuid,
+            "first_modified": case(
+                (and_(table.c.book_uuid == insert.excluded.book_uuid,
+                      table.c.last_modified == insert.excluded.first_modified),
+                 table.c.first_modified),
+                else_=insert.excluded.first_modified,
+            ),
+            "last_modified": insert.excluded.last_modified,
+        },
+    ))
+
+
 # Import BookFormatChecksum from progress_syncing.models to keep model definition centralized
 # Import directly from models module to avoid triggering progress_syncing/__init__.py chain
 # which would cause circular import (models needs Base from db, but progress_syncing imports kosync)
@@ -1020,6 +1059,7 @@ class CalibreDB:
     config = None
     session_factory = None
     _desktop_compat = False
+    book_metadata_edits_available = False
     # This is a WeakSet so that references here don't keep other CalibreDB
     # instances alive once they reach the end of their respective scopes
     instances = WeakSet()
@@ -1398,6 +1438,7 @@ class CalibreDB:
         with cls._reconnect_lock:
             # Always call dispose to clean up old sessions/connections
             cls.dispose()
+            cls.book_metadata_edits_available = False
 
             if not config_calibre_dir:
                 log.error("setup_db failed: config_calibre_dir is None or empty")
@@ -1569,6 +1610,13 @@ class CalibreDB:
                 and not desktop_compat
             ):
                 ensure_calibre_db_tables(conn)
+                try:
+                    BookMetadataEdit.__table__.create(conn, checkfirst=True)
+                    conn.commit()
+                    cls.book_metadata_edits_available = True
+                except SQLAlchemyError:
+                    conn.rollback()
+                    log.warning("Book metadata edit tracking is unavailable", exc_info=True)
 
             # With NullPool (DESKTOP_COMPAT_MODE) the setup connection is not the
             # shared persistent connection — close it so the file lock is released

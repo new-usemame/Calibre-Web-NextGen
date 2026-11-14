@@ -258,6 +258,19 @@ def _deleted_entitlement_change_basis(deleted_at):
     return "v1|deleted={}".format(_ledger_timestamp_component(deleted_at))
 
 
+def _is_metadata_only_edit(book, record, edit, change_basis):
+    if edit is None or not record.change_basis or book.is_archived or edit.book_uuid != book.Books.uuid:
+        return False
+    archive_clock = book.last_modified
+    first_basis = _book_entitlement_change_basis(edit.first_modified, archive_clock)
+    last_basis = _book_entitlement_change_basis(edit.last_modified, archive_clock)
+    return (
+        change_basis == last_basis
+        and record.change_basis.endswith("|archive=" + _ledger_timestamp_component(archive_clock))
+        and first_basis <= record.change_basis < last_basis
+    )
+
+
 def _entitlement_replay_decision(record, fingerprint, change_basis,
                                  twin_fingerprint=None):
     """Return ``(suppress, shape_reseed, refresh_record)`` for one candidate.
@@ -2810,6 +2823,12 @@ def HandleSyncRequest():
         # optional diagnostics. They suppress exact absent/partial-token
         # replays and classify a genuine mismatch as Changed.
         prior_entitlement_fingerprints = known_entitlement_fingerprints
+        metadata_edits = {}
+        if prior_entitlement_fingerprints and getattr(calibre_db, "book_metadata_edits_available", False):
+            metadata_edits = {
+                edit.book_id: edit for edit in calibre_db.session.query(db.BookMetadataEdit)
+                .filter(db.BookMetadataEdit.book_id.in_(prior_entitlement_fingerprints))
+            }
         for book in candidate_page:
             candidate_emitted_work = False
             kobo_reading_state = book.KoboReadingState  # None when no record exists yet
@@ -2834,13 +2853,14 @@ def HandleSyncRequest():
                 book.Books.last_modified,
                 book.last_modified,
             )
+            prior_entitlement = prior_entitlement_fingerprints.get(book.Books.id)
             if replay_suppression_eligible:
                 (
                     entitlement_is_unchanged,
                     shape_reseed,
                     refresh_fingerprint_record,
                 ) = _entitlement_replay_decision(
-                    prior_entitlement_fingerprints.get(book.Books.id),
+                    prior_entitlement,
                     entitlement_fingerprint,
                     entitlement_change_basis,
                     lambda: _entitlement_fingerprint_twin(entitlement),
@@ -2850,6 +2870,12 @@ def HandleSyncRequest():
                 shape_reseed = False
                 refresh_fingerprint_record = False
 
+            metadata_only = (
+                not entitlement_is_unchanged and prior_entitlement is not None
+                and _is_metadata_only_edit(
+                    book, prior_entitlement, metadata_edits.get(book.Books.id), entitlement_change_basis,
+                )
+            )
             if (kobo_reading_state is not None
                     and kobo_reading_state.id in reading_state_page_ids
                     and _withhold_shared_state(book.Books.id)):
@@ -2867,10 +2893,8 @@ def HandleSyncRequest():
                     books_cursor_datetime(kobo_reading_state.last_modified),
                 )
                 reading_state_book_ids_emitted.append(book.Books.id)
-                if entitlement_is_unchanged:
-                    # Replay suppression applies only to the byte-identical
-                    # base entitlement. A state admitted to this response's
-                    # ordered frontier must still be emitted independently.
+                if entitlement_is_unchanged or metadata_only:
+                    # Neither case carries a full entitlement for the reading state.
                     sync_results.append({
                         "ChangedReadingState": {"ReadingState": reading_state}
                     })
@@ -2906,6 +2930,13 @@ def HandleSyncRequest():
                         )
                 if book.Books.id not in prior_entitlement_fingerprints:
                     sync_results.append({"NewEntitlement": entitlement})
+                elif metadata_only:
+                    metadata = entitlement["BookMetadata"]
+                    metadata["ContributorRoles"] = [
+                        {**contributor, "Role": "Author"}
+                        for contributor in metadata.get("ContributorRoles", [])
+                    ]
+                    sync_results.append({"ChangedProductMetadata": {"BookMetadata": metadata}})
                 else:
                     sync_results.append({"ChangedEntitlement": entitlement})
                     # Nickel answers a Changed entitlement for a book it
@@ -2919,7 +2950,8 @@ def HandleSyncRequest():
                 # that #1925 suppresses (including a declared #1953 shape
                 # reseed) must not mass-arm the user's position journal.
                 if requesting_device_id:
-                    rehydrate_book_ids.add(book.Books.id)
+                    if not metadata_only:
+                        rehydrate_book_ids.add(book.Books.id)
                     # The per-device ledger is the New-vs-Changed
                     # classification source even when suppression is disabled.
                     entitlement_fingerprint_updates[book.Books.id] = \

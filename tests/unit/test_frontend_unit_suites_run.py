@@ -38,7 +38,11 @@ TYPESCRIPT_RESOLUTION_REGISTER = SUITE_DIR / "registerTypeScriptResolution.mjs"
 # with no assertion behind it, while `node --test <file>` on the same suite
 # passes 49/49. Measured 2026-08-10; a wrapper written the obvious way would
 # have looked like a broken suite rather than a broken invocation.
-SUITES = sorted(SUITE_DIR.glob("*.test.ts"))
+# frontend/unit/ is the older suite directory that `npm run test:unit` runs.
+# Until 2026-11-11 no CI job ran it either: 47 suites, all passing, with nothing
+# executing them except one pytest that shelled out to classicFallback.test.ts.
+LEGACY_SUITE_DIR = REPO / "frontend" / "unit"
+SUITES = sorted(SUITE_DIR.glob("*.test.ts")) + sorted(LEGACY_SUITE_DIR.glob("*.test.ts"))
 
 
 def _node() -> str | None:
@@ -48,10 +52,12 @@ def _node() -> str | None:
 def test_there_are_frontend_suites_to_run():
     """An empty glob must fail rather than pass vacuously -- that is exactly how
     a suite stops running without anyone noticing."""
-    assert SUITES, f"no *.test.ts under {SUITE_DIR}; did they move?"
+    for directory in (SUITE_DIR, LEGACY_SUITE_DIR):
+        assert any(p.parent == directory for p in SUITES), (
+            f"no *.test.ts under {directory}; did they move?")
 
 
-@pytest.mark.parametrize("suite", SUITES, ids=lambda p: p.name)
+@pytest.mark.parametrize("suite", SUITES, ids=lambda p: str(p.relative_to(REPO / "frontend")))
 def test_frontend_unit_suite_passes(suite: Path):
     node = _node()
     if node is None:
@@ -93,7 +99,9 @@ def test_frontend_unit_suite_passes(suite: Path):
     ).strip()
     result = subprocess.run(
         [node, "--test", str(suite)],
-        cwd=REPO,
+        # The legacy suites read paths relative to frontend/, as `npm run
+        # test:unit` runs them from there.
+        cwd=REPO / "frontend" if suite.parent == LEGACY_SUITE_DIR else REPO,
         capture_output=True,
         text=True,
         timeout=300,

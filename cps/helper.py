@@ -40,6 +40,8 @@ from werkzeug.security import generate_password_hash
 from markupsafe import escape
 from urllib.parse import quote
 
+from .utils.filename_sanitizer import build_content_disposition
+
 try:
     from . import cw_advocate
     from .cw_advocate.exceptions import UnacceptableAddressException
@@ -57,7 +59,7 @@ from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait
-from .services.file_move import copy_with_metadata_fallback
+from .services.file_move import copy_with_metadata_fallback, move_path
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
 from .services.conversion_capabilities import get_conversion_capabilities
@@ -1703,17 +1705,10 @@ def move_files_on_change(calibre_path, new_author_dir, new_titledir, localbook, 
             if not os.path.exists(new_path):
                 # move original path to new path
                 log.debug("Moving title: %s to %s", path, new_path)
-                try:
-                    shutil.move(path, new_path)
-                except OSError as ex:
-                    log.error("Failed to move directory %s to %s: %s, trying copy tree approach", path, new_path, ex)
-                    # Fallback: try to copy tree and then remove original
-                    try:
-                        shutil.copytree(path, new_path, dirs_exist_ok=True)
-                        shutil.rmtree(path)
-                    except (OSError, IOError) as fallback_ex:
-                        log.error("Copy tree fallback also failed: %s", fallback_ex)
-                        raise
+                # move_path renames (creating a new author folder first) and only
+                # copies across filesystems, skipping metadata the destination
+                # refuses, such as an NFSv4 ACL (#2921).
+                move_path(path, new_path)
             elif _same_filesystem_entry(path, new_path):
                 # Case-only rename on a case-insensitive filesystem: the "existing"
                 # folder is this book's own folder, so rename it in place (#2559).
@@ -3597,6 +3592,43 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
+def get_download_file_name(book, filename_template=None):
+    """The name (without extension) a downloaded copy of ``book`` is given:
+    "Title - First author" or the OPDS filename template, made filesystem-safe."""
+    file_name = book.title
+    first_author = next((author for author in book.authors if author is not None), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + (first_author.name or '')
+    if isinstance(filename_template, str):
+        filename_template = strip_whitespaces(filename_template)
+    if filename_template:
+        try:
+            file_name = render_opds_filename(
+                filename_template, book, calibre_db.session,
+                title_regex=config.config_title_regex,
+                unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
+            )
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+            # A corrupt or manually changed setting must not prevent downloads.
+            log.warning("Invalid OPDS filename template; using the default filename")
+    return get_valid_filename(file_name, replace_whitespace=False)
+
+
+def set_inline_filename(headers, book, book_format):
+    """Serve a book inline (in-browser reader) but still name it after the book.
+
+    pdf.js names its Save button's file from the response's Content-Disposition,
+    else from the URL, which for /show/<id>/pdf ends in no ".pdf" and so became
+    "document.pdf" (#2729). Leaves the plain "inline" header if naming fails.
+    """
+    try:
+        headers['Content-Disposition'] = build_content_disposition(
+            'inline', "%s.%s" % (get_download_file_name(book), book_format.lower()))
+    except Exception as ex:
+        log.warning("Could not name inline %s for book %s: %s", book_format, getattr(book, 'id', '?'), ex)
+
+
 def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,
                       filename_template=None):
     book_format = book_format.split(".")[0]
@@ -3715,24 +3747,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         except Exception as e:
             log.error(f"Failed to log download stats: {e}")
 
-    file_name = book.title
-    first_author = next((author for author in book.authors if author is not None), None)
-    if first_author is not None:
-        file_name = file_name + ' - ' + (first_author.name or '')
-    if isinstance(filename_template, str):
-        filename_template = strip_whitespaces(filename_template)
-    if filename_template:
-        try:
-            file_name = render_opds_filename(
-                filename_template, book, calibre_db.session,
-                title_regex=config.config_title_regex,
-                unicode_filename=config.config_unicode_filename,
-                ordered_authors=calibre_db.order_authors([book]),
-            )
-        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
-            # A corrupt or manually changed setting must not prevent downloads.
-            log.warning("Invalid OPDS filename template; using the default filename")
-    file_name = get_valid_filename(file_name, replace_whitespace=False)
+    file_name = get_download_file_name(book, filename_template)
     headers = Headers()
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")
     headers["Content-Disposition"] = "attachment; filename=%s.%s; filename*=UTF-8''%s.%s" % (

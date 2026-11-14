@@ -27,7 +27,7 @@ pytestmark = [
 ]
 
 
-@pytest.mark.parametrize('carrier', ['koreader', 'kobo', 'kobo-local-name', 'kobo-unresolved', 'kobo-pending', 'kobo-index-pending'])
+@pytest.mark.parametrize('carrier', ['koreader', 'kobo', 'kobo-local-name', 'kobo-unresolved', 'kobo-pending', 'kobo-index-pending', 'index-save'])
 def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epub, carrier):
     """Replay KOReader HTTP into SQLite, then drive the real Reader with Chromium.
 
@@ -49,6 +49,10 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
     kosync = sys.modules['cps.progress_syncing.protocols.kosync']
     from cps.services import device_registry
     engine, session = store
+    # These carriers pin the shared (pre share-my-place) resume behaviour, the
+    # same switch tests/unit/test_reader_resume.py sets for the store it lends
+    # here. Without it every carrier sees no resume at all.
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
     if carrier == 'kobo':
         from cps.services import kobo_resume
         resolve = kobo_resume._resolve
@@ -135,6 +139,12 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
     app.add_url_rule('/kosync/syncs/progress', 'sync', kosync.update_progress, methods=['PUT'])
     app.add_url_rule('/api/v1/auth/csrf', 'csrf', lambda: flask.jsonify(csrf_token='fixture'))
     app.add_url_rule('/api/v1/reader/settings', 'settings', inspect.unwrap(reader.get_reader_settings))
+    # The Reader holds the book until the font catalogue settles (#2418). A 404
+    # here is retried with backoff for ~7s before the book opens, which is
+    # longer than the first-display waits below. Serve the built-ins only.
+    from cps.services import reader_fonts
+    monkeypatch.setattr(reader_fonts, 'root_dir', lambda: tmp_path / 'no-uploaded-fonts')
+    app.add_url_rule('/api/v1/reader/fonts', 'fonts', lambda: flask.jsonify(reader_fonts.catalogue()))
     app.add_url_rule('/api/v1/books/42', 'book', lambda: flask.jsonify(id=42,title='A Christmas Carol',authors=[],formats=[{'format':'EPUB','content_url':'/fixture.epub'}]))
     app.add_url_rule('/fixture.epub', 'epub', lambda: flask.send_file(archive_path))
     app.add_url_rule('/annotations/42/data.json', 'annotations', lambda: flask.jsonify(annotations=[]))
@@ -164,6 +174,8 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
         runner = 'run-fallback.mjs' if carrier.startswith('kobo-') else ('run-kobo.mjs' if carrier == 'kobo' else 'run.mjs')
         if carrier == 'kobo-index-pending':
             runner = 'run-index.mjs'
+        if carrier == 'index-save':
+            runner = 'run-index-save.mjs'
         result = subprocess.run(['node', 'e2e/reader-resume/' + runner], cwd=root/'frontend', text=True, capture_output=True, timeout=120, env=env)
         print(result.stdout)
         assert result.returncode == 0, result.stdout + result.stderr

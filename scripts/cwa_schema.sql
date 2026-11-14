@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS cwa_settings(
     ingest_stale_temp_minutes INTEGER DEFAULT 120 NOT NULL,
     ingest_stale_temp_interval INTEGER DEFAULT 600 NOT NULL,
     auto_metadata_enforcement SMALLINT DEFAULT 1 NOT NULL,
+    cover_keep_aspect_ratio SMALLINT DEFAULT 0 NOT NULL,
     kindle_epub_fixer SMALLINT DEFAULT 1 NOT NULL,
     kindle_epub_fixer_aggressive SMALLINT DEFAULT 0 NOT NULL,
     comic_flatten_comicinfo SMALLINT DEFAULT 0 NOT NULL,

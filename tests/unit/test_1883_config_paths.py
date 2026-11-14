@@ -125,7 +125,7 @@ def test_kindle_fixer_backup_uses_resolved_processed_books_root(
 
     assert copied == [(
         "/library/book.epub",
-        str(config_root / "processed_books" / "fixed_originals"),
+        str(config_root / "processed_books" / "fixed_originals" / "book.epub"),
     )]
 
 

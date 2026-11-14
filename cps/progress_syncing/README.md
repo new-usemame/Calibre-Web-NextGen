@@ -113,6 +113,8 @@ HTTP Basic Auth endpoints for KOReader devices:
 
 Progress stored in `kosync_progress` table (app.db). Updates `ReadBook` and `KoboReadingState` tables for web UI and Kobo device sync.
 
+The full list of routes is in [Routes](#routes) below.
+
 ### Position encodings and `position_kinds`
 
 Two encodings travel on `GET /kosync/syncs/progress/<document>`, and a client
@@ -413,6 +415,45 @@ deleted, reports `deleted: 0`.
 - The device that made a highlight is recorded, so its own rows are not echoed
   back as someone else's; `foreign_annotation_ids` on pull lists rows other
   devices made.
+
+## Routes
+
+Every route the `kosync` blueprint serves. Unless a row says otherwise, a
+route answers 503 while KOReader sync is switched off and authenticates with
+HTTP Basic (an app password works). Rows marked *device* also need the
+device's identity: the `X-CWNG-Device-ID` and `X-CWNG-Device-Name` headers,
+or `device` and `device_id` in the JSON body for the inventory, delivery,
+deletion and collection calls that send one. `tests/unit/test_progress_syncing_readme_routes.py` fails
+when this table and the served routes disagree.
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/kosync` | Web page with the plugin download and setup steps. Not an API call: no Basic auth, and it still loads when sync is off. |
+| `GET` | `/kosync/users/auth` | Checks credentials; the JSON lists `capabilities` (see Feature detection). |
+| `GET` | `/kosync/syncs/progress/<document>` | Reading position for a document digest. |
+| `PUT` | `/kosync/syncs/progress` | Stores a reading position; the reply says whether it was accepted. |
+| `GET` | `/kosync/export` | All of the user's reading progress as JSON, with titles, authors and identifiers. Percentages are 0-100, not 0-1. |
+| `GET` | `/kosync/syncs/annotations/<document>` | Highlights and notes for a book, server to device. |
+| `PUT` | `/kosync/syncs/annotations` | Highlights and notes the device made, changed or deleted. |
+| `GET` | `/kosync/syncs/library` | The books this account's e-readers should hold, one page at a time. |
+| `GET` | `/kosync/syncs/library/books/<book_id>/placeholder` | Small EPUB that stands in for a book not downloaded yet. |
+| `GET` | `/kosync/syncs/library/books/<book_id>/file` | The book file, in the format KOReader reads best. |
+| `PUT` | `/kosync/syncs/read_status` | Unread, reading or finished, as chosen on the device. |
+| `PUT` | `/kosync/syncs/inventory` | *device* The complete list of books on the device. Nothing is treated as deleted because it is missing. |
+| `POST` | `/kosync/syncs/deliveries/claim` | *device* Leases the oldest book waiting for this device. |
+| `PUT` | `/kosync/syncs/deliveries/refuse` | *device* Gives a lease back, for example when the device is out of space. |
+| `GET` | `/kosync/syncs/deliveries/<delivery_id>/download` | *device* (headers, plus the lease's `X-CWNG-Claim-Token`) Downloads exactly the leased file. Needs the download permission. |
+| `PUT` | `/kosync/syncs/deliveries/complete` | *device* Confirms a delivered file is installed. Safe to repeat. |
+| `POST` | `/kosync/syncs/deletions/claim` | *device* Leases the next book the owner asked to remove from this device. |
+| `PUT` | `/kosync/syncs/deletions/complete` | *device* Reports whether that removal happened. |
+| `POST` | `/kosync/syncs/collections` | *device* Collections this device should show. |
+| `PUT` | `/kosync/syncs/collections/complete` | *device* Confirms the collections were applied. |
+| `PUT` | `/kosync/syncs/sleep-screen/device` | *device* (headers) Reports the device's screen so a sleep screen can be made for it. |
+| `GET` | `/kosync/syncs/sleep-screen` | *device* (headers) The current sleep-screen manifest. |
+| `GET` | `/kosync/syncs/sleep-screen/image` | *device* (headers) The sleep-screen image. |
+| `POST` | `/kosync/syncs/sleep-screen/ack` | *device* (headers) Confirms the device shows that image. |
+| `POST` | `/kosync/pair/start` | Starts pairing with a code. No credentials (the device has none yet); rate-limited per network. |
+| `POST` | `/kosync/pair/poll` | Polls a pairing code; returns credentials once, after the owner approves. No credentials needed. |
 
 ## Testing
 

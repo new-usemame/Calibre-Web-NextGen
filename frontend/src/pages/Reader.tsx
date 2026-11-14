@@ -536,6 +536,11 @@ export function Reader({ id }: { id: string }) {
   // through this ref: a closure kept the values from when the book opened and
   // put them back at the next chapter (#2254).
   const fontChoices: ReaderFont[] = useMemo(() => fontCatalog?.items ?? BUILTIN_READER_FONTS, [fontCatalog]);
+  // Only an uploaded font needs the catalog before the first page: its
+  // @font-face rule comes from there. A built-in renders without it, so a slow
+  // or failing catalog request (retried with backoff, about 7s on an error)
+  // must not hold the book.
+  const fontsReady = isFontsFetched || BUILTIN_READER_FONTS.some(font => font.id === fontFamily);
   const fontCssFamily = readerFontFamily(fontChoices, fontFamily);
   const fontFaceCss = useMemo(() => readerFontFaceCss(fontChoices, window.location.origin), [fontChoices]);
   const appearanceRef = useRef({ theme, fontPct, fontFamily, fontCssFamily, fontFaceCss, margin, lineHeight, spread });
@@ -1715,7 +1720,7 @@ export function Reader({ id }: { id: string }) {
 
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
-    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !isFontsFetched || !settingsHydrated) return;
+    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !fontsReady || !settingsHydrated) return;
     let cancelled = false;
     let stopSelectionObserver: (() => void) | undefined;
     setRendered(false);
@@ -1913,6 +1918,17 @@ export function Reader({ id }: { id: string }) {
             if (loc?.start?.cfi && epubBook.locations.length()) {
               setProgress(Math.round(epubBook.locations.percentageFromCfi(loc.start.cfi) * 100));
             }
+            // #2783: a place the reader saved before the index existed went out
+            // without a percentage, and the percentage is what the server shares
+            // with their other devices. Save that same place again now that it
+            // has one, or a reader who turned a page in the first seconds and
+            // then stopped would never share where they are.
+            const ownCfi = lastCfiRef.current;
+            if (readerMoved && ownCfi && lastPercentRef.current == null
+                && epubBook.locations.length()) {
+              const pct = epubBook.locations.percentageFromCfi(ownCfi) * 100;
+              if (Number.isFinite(pct) && pct > 0) persistCfi(ownCfi, pct);
+            }
           })
           .catch(() => {
             // Locations are best-effort. Without them the jump cannot happen,
@@ -2078,7 +2094,7 @@ export function Reader({ id }: { id: string }) {
     };
     // Re-render only when the source changes; theme/font are applied imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, isFontsFetched, settingsHydrated]);
+  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, fontsReady, settingsHydrated]);
 
   // Apply theme / font changes to a live rendition without rebuilding it, and
   // remember the preference across sessions.

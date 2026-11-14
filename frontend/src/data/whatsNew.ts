@@ -56,6 +56,79 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.68',
+    date: '2026-11-13',
+    items: [
+      {
+        title: 'Your Kobo no longer undoes a newer place when it wakes',
+        body: 'A Kobo that woke with a book open reported its old place with a fresh time, which replaced a place you had just saved in the web reader or KOReader. With Share my place on, that repeat report now leaves the newer place alone, and the Kobo picks it up at its next sync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOSync apps move your Kobo to the exact place',
+        body: 'A save from an app such as JustRead used to move only the Kobo\'s percentage, so the book opened where the Kobo last was. When the place converts exactly into your Kobo\'s copy, the Kobo now opens there.',
+        category: 'Sync',
+      },
+      {
+        title: 'A quick read in the web reader reaches your other devices',
+        body: 'Turning a page in the first few seconds after opening a book saved your place without a percentage, so your Kobo and KOReader never heard about it. The reader now saves it again with the percentage as soon as it has one.',
+        category: 'Reading',
+      },
+      {
+        title: 'Shelves follow your Library view settings',
+        body: 'Shelves and Smart shelves now use the book density and Rows per load you pick on the Library page, instead of a fixed layout that fetched 24 books at a time.',
+        category: 'Library',
+      },
+      {
+        title: 'The Library no longer gets stuck on Loading',
+        body: 'At some window widths with Rows per load set to 1, a scrollbar appearing could cost a column and restart the list over and over. The page size now holds once you are past the first page.',
+        category: 'Library',
+      },
+      {
+        title: 'Books with a built-in font open straight away',
+        body: 'The web reader waited for the list of reader fonts before showing the first page, so a slow list meant a blank reader for several seconds. Built-in fonts no longer wait for it.',
+        category: 'Reading',
+      },
+      {
+        title: 'Keep a new cover\'s proportions in your EPUBs',
+        body: 'Changing a cover rewrote the EPUB with a cover page stretched to the screen, which looked distorted on some readers. Turn on "Preserve cover aspect ratio in EPUBs" in NextGen Settings to keep the cover\'s shape. It applies to covers written after you turn it on.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.67',
+    date: '2026-11-12',
+    items: [
+      {
+        title: 'Search is much faster on large libraries',
+        body: 'The top search box now matches each tag, author, series and publisher name once per search, not once for every book that uses it. On a 270,000-book library a one-word search dropped from several seconds to under one. Results are unchanged, accents included.',
+        category: 'Library',
+      },
+      {
+        title: 'Publishers load a page at a time',
+        body: 'The Publishers list now loads as you scroll and filters by name on the server, like Authors and Series, so it no longer stalls on a library with many publishers.',
+        category: 'Library',
+        link: { to: '/publishers', label: 'Publishers' },
+      },
+      {
+        title: 'A second Kobo picks up the place you reached on the first',
+        body: 'With several Kobos and Share my place on, a Kobo that had read a book before kept its own old page. Each Kobo\'s download link now names that Kobo, so it moves to the shared place. This covers books downloaded after the update.',
+        category: 'Sync',
+      },
+      {
+        title: 'Smart shelves follow the order you chose',
+        body: 'The sidebar in the new UI listed Smart shelves A to Z whatever Order Mode you had set. It now uses the same order as the classic profile page.',
+        category: 'Library',
+      },
+      {
+        title: 'Saved PDFs keep the book\'s name',
+        body: 'The PDF reader\'s Save button always wrote document.pdf. It now saves the file as "Title - Author", the same name the Download link uses.',
+        category: 'Reading',
+      },
+    ],
+  },
+  {
     version: 'v4.1.66',
     date: '2026-11-11',
     items: [

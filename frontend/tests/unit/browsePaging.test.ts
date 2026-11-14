@@ -109,8 +109,13 @@ test('invalid minimums disable requests, including a filter change while invalid
   }
 });
 
+test('publishers page like authors and series (#2720)', () => {
+  const options = createPagedEntityListQueryOptions('publishers', '', null, 1, async () => page(null));
+  assert.equal(options.enabled, true);
+});
+
 test('other lists never enable paging and full-list caches cannot collide', () => {
-  for (const plural of ['tags', 'publishers', 'languages', 'ratings', 'formats', '']) {
+  for (const plural of ['tags', 'languages', 'ratings', 'formats', '']) {
     const options = createPagedEntityListQueryOptions(plural, '', null, 1, async () => page(null));
     assert.equal(options.enabled, false);
     assert.deepEqual(options.queryKey.slice(0, 3), ['entities', plural, 'pages']);

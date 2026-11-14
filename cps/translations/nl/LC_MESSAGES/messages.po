@@ -7969,6 +7969,22 @@ msgid "Newest"
 msgstr "Nieuwste"
 
 #: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr "Toegevoegd, nieuwste eerst"
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr "Toegevoegd, oudste eerst"
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr "Leesdatum, nieuwste eerst"
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr "Leesdatum, oudste eerst"
+
+#: cps/spa_strings.py
 msgid "Newest published"
 msgstr "Nieuwst gepubliceerd"
 

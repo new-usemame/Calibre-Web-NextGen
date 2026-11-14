@@ -8117,6 +8117,22 @@ msgid "Newest"
 msgstr "Plus récent"
 
 #: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr "Ajoutés, du plus récent au plus ancien"
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr "Ajoutés, du plus ancien au plus récent"
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr "Date de lecture, du plus récent au plus ancien"
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr "Date de lecture, du plus ancien au plus récent"
+
+#: cps/spa_strings.py
 msgid "Newest published"
 msgstr "Date de publication (décroissant)"
 

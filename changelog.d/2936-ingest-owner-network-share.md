@@ -1,0 +1,3 @@
+### Fixed
+
+- **Uploads no longer fail with "Ingest directory not writable" after an update when `NETWORK_SHARE_MODE` is on and the ingest folder is not mounted.** That switch skipped every ownership fix on `/cwa-book-ingest`, even when the folder was the image's own local volume, which is created owned by uid 911 and comes back that way on each update. With `PUID` set, the app user could not write it until someone ran `chown` by hand. On start, the container now sets that folder's owner to `PUID`/`PGID` when it is on a local filesystem and the app user cannot write it. A folder on a network share is still left alone. (#2936)

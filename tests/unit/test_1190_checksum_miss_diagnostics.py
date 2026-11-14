@@ -35,7 +35,10 @@ def _kosync():
 
 @pytest.fixture
 def session():
+    from cps.db import Books
+
     engine = create_engine("sqlite:///:memory:")
+    Books.__table__.create(engine)
     BookFormatChecksum.__table__.create(engine)
     s = sessionmaker(bind=engine)()
     yield s
@@ -44,9 +47,15 @@ def session():
 
 @pytest.fixture(autouse=True)
 def _fresh_rate_limit_state():
-    getattr(_kosync(), "_miss_diag_last", {}).clear()
+    def reset():
+        k = _kosync()
+        getattr(k, "_miss_diag_last", {}).clear()
+        window = getattr(k, "_miss_diag_window", None)
+        if window is not None:
+            window.update(start=None, total=None)
+    reset()
     yield
-    getattr(_kosync(), "_miss_diag_last", {}).clear()
+    reset()
 
 
 def _describe(session, checksum=CHECKSUM):
@@ -165,6 +174,10 @@ def test_row_for_a_book_that_exists_is_not_called_stale():
     s.add(row)
     s.commit()
     with patch.object(cps, "calibre_db", SimpleNamespace(session=s), create=True):
-        msg = _kosync()._describe_checksum_miss(CHECKSUM, version="other")
+        filtered = _kosync()._describe_checksum_miss(CHECKSUM, version="other")
+        _kosync()._miss_diag_last.clear()
+        # The book can also appear between the lookup and the diagnosis.
+        unfiltered = _kosync()._describe_checksum_miss(CHECKSUM)
     s.close()
-    assert "stale" not in msg, msg
+    assert "stale" not in filtered, filtered
+    assert "stale" not in unfiltered, unfiltered

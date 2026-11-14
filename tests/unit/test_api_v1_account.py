@@ -511,3 +511,26 @@ def test_me_payload_kobo_flag_survives_missing_attribute_866():
     bare = _user(check_visibility=lambda _bit: True, role_anonymous=lambda: False)
     del bare.kobo_only_shelves_sync
     assert serialize_user(bare)["kobo_only_shelves_sync"] is False
+
+
+# ── password policy exposure (#2632) ─────────────────────────────────────────
+
+@pytest.mark.unit
+def test_password_policy_mirrors_config():
+    from cps.api import account as mod
+    cfg = SimpleNamespace(
+        config_password_policy=True, config_password_min_length=10,
+        config_password_number=True, config_password_lower=False,
+        config_password_upper=True, config_password_character=False,
+        config_password_special=True,
+    )
+    with patch.object(mod, "config", cfg):
+        assert mod._password_policy() == {
+            "enabled": True, "min_length": 10, "number": True, "lower": False,
+            "upper": True, "letter": False, "special": True,
+        }
+    cfg.config_password_policy = False
+    cfg.config_password_min_length = None
+    with patch.object(mod, "config", cfg):
+        out = mod._password_policy()
+    assert out["enabled"] is False and out["min_length"] == 0

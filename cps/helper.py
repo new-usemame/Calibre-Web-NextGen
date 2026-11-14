@@ -1076,8 +1076,10 @@ def reset_reading_position(session, user_id, book_id, *, keep_read_status=False)
     legitimately re-establishes it on its next push — the device owns its own
     position, and device sync never routes through this function.
 
-    Returns the number of position records cleared (bookmarks deleted + a
-    progress row zeroed) so callers/tests can tell it acted.
+    Returns the number of position records cleared (web bookmarks, the Kobo
+    bookmark, device journal rows, KOSync rows and, unless
+    ``keep_read_status``, the folded "Currently reading" marker) so callers and
+    tests can tell it acted.
     """
     uid = int(user_id)
     cleared = session.query(ub.Bookmark).filter(
@@ -1149,11 +1151,18 @@ def reset_reading_position(session, user_id, book_id, *, keep_read_status=False)
     # #2831: every device's own observation for this book (KOReader and Kobo),
     # scoped to this user's devices only. The journal's delivery bookkeeping
     # (rehydrate latch) lives on these rows, so a cleared book is not
-    # re-delivered from a stale observation either.
+    # re-delivered from a stale observation either. The echo guard holds an
+    # earlier inexact delivery's place for the same device and book; left
+    # behind, a report matching that old place would still be read as an echo
+    # rather than a real move. ``purge_user_book_data`` clears the same pair.
+    user_devices = session.query(ub.Device.id).filter(ub.Device.user_id == uid)
     cleared += session.query(ub.DeviceReadingPosition).filter(
         ub.DeviceReadingPosition.book_id == book_id,
-        ub.DeviceReadingPosition.device_id.in_(
-            session.query(ub.Device.id).filter(ub.Device.user_id == uid)),
+        ub.DeviceReadingPosition.device_id.in_(user_devices),
+    ).delete(synchronize_session=False)
+    session.query(ub.KoboPlaceEchoGuard).filter(
+        ub.KoboPlaceEchoGuard.book_id == book_id,
+        ub.KoboPlaceEchoGuard.device_id.in_(user_devices),
     ).delete(synchronize_session=False)
     # KOSync may have accumulated a canonical book-id row plus legacy rows for
     # any checksum ever registered to this book. Delete every equivalent key;

@@ -13,6 +13,7 @@ The same helper now also backs the position-only clear
 alone so a finished book can be reset for a re-read and stay read.
 """
 import inspect
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -114,14 +115,24 @@ def test_clear_covers_kobo_devices_and_is_scoped_to_this_user_and_book(world):
         ub.DeviceReadingPosition(device_id=mine.id, book_id=2, progress_percent=10.0),
         ub.DeviceReadingPosition(device_id=theirs.id, book_id=BOOK, progress_percent=80.0),
     ])
+    # The echo guard holds an earlier inexact delivery's place per device and
+    # book. Left behind, a Kobo report matching that old place after a clear
+    # is still read as an echo of a delivery rather than as a real move.
+    armed = datetime.now(timezone.utc).replace(tzinfo=None)
+    world.session.add_all([
+        ub.KoboPlaceEchoGuard(device_id=device.id, book_id=book, progress_percent=55.0,
+                              armed_at=armed)
+        for device, book in ((mine, BOOK), (mine, 2), (theirs, BOOK))
+    ])
     world.session.commit()
 
     _reset(world, keep_read_status=True)
 
-    remaining = sorted(
-        (row.device_id, row.book_id)
-        for row in world.session.query(ub.DeviceReadingPosition).all())
-    assert remaining == sorted([(mine.id, 2), (theirs.id, BOOK)])
+    expected = sorted([(mine.id, 2), (theirs.id, BOOK)])
+    for model in (ub.DeviceReadingPosition, ub.KoboPlaceEchoGuard):
+        remaining = sorted(
+            (row.device_id, row.book_id) for row in world.session.query(model).all())
+        assert remaining == expected, model.__name__
 
 
 # -- the route ----------------------------------------------------------------

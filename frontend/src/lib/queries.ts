@@ -698,7 +698,7 @@ export function useStopReading(id: string | number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
     onSuccess: () => {
-      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
       }
     },
@@ -712,7 +712,7 @@ export function useClearReadingPosition(id: string | number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean; cleared: number }>(`/api/v1/books/${id}/clear-position`),
     onSuccess: () => {
-      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
       }
     },
@@ -727,7 +727,7 @@ export function useRecordReaderOpen(id: string | number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean }>(`/api/v1/books/${id}/reader-open`),
     onSuccess: () => {
-      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
       }
     },

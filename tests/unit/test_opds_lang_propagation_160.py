@@ -256,56 +256,24 @@ class TestOsdReflectsLocale:
             "feed_osd still hardcodes 'en-EN' somewhere"
         )
 
-    def test_osd_search_templates_use_helper(self):
-        """The OSD search-URL templates must include the ``{searchTerms}``
-        marker in the right spot relative to any propagated query string
-        (notably ``?lang=xx``). The path-form template is rendered via
-        ``opds_search_url_path()`` context helper."""
-        import os
-        from cps import opds as opds_module
-
-        repo_root = os.path.dirname(os.path.dirname(opds_module.__file__))
-        osd_xml_path = os.path.join(repo_root, 'cps', 'templates', 'osd.xml')
-        with open(osd_xml_path) as fh:
-            tpl = fh.read()
-        # Old broken pattern: url_for + literal /{searchTerms} suffix that
-        # collides with any ?lang=xx appended to url_for output.
-        assert "{searchTerms}" in tpl, "OSD lost {searchTerms} marker entirely"
-        assert "}}/{searchTerms}" not in tpl, (
-            "OSD still suffixes /{searchTerms} after url_for — breaks under "
-            "url_defaults lang propagation"
-        )
-        assert "opds_search_url_path()" in tpl, (
-            "OSD must use the opds_search_url_path() helper for the path-form "
-            "search URL"
-        )
-
 
 @pytest.mark.unit
-class TestSearchUrlPathHelper:
-    """The context helper that builds the OpenSearch path-form URL must
-    place the ``{searchTerms}`` marker in the URL path, not the query
-    string — so when ``url_defaults`` adds ``?lang=hu``, the result is
-    ``/opds/search/{searchTerms}?lang=hu`` and the OPDS client can
-    substitute the search term cleanly."""
+class TestSearchUrlTemplateHelper:
+    """The context helper that builds the advertised OpenSearch template must
+    keep ``?lang=hu`` and add ``query={searchTerms}`` as a further parameter,
+    never a second ``?``. Since #2846 it is the query form; the client side of
+    that change is driven end to end in test_opds_search_plus_2846.py."""
 
-    def test_helper_returns_path_marker(self):
+    def test_helper_merges_the_marker_onto_the_lang_query(self):
+        from urllib.parse import parse_qs, urlsplit
         from flask import Flask
         from cps import opds as opds_module
 
         app = Flask(__name__)
         app.register_blueprint(opds_module.opds)
         with app.test_request_context('/opds?lang=hu'):
-            url = opds_module._opds_search_url_path()
-        assert '{searchTerms}' in url, (
-            "OSD search URL must contain the {searchTerms} marker; got %r" % url
-        )
-        # Marker must come before any query string so that the OPDS client's
-        # substitution doesn't accidentally split on '?'.
-        marker_pos = url.find('{searchTerms}')
-        query_pos = url.find('?')
-        if query_pos != -1:
-            assert marker_pos < query_pos, (
-                "{searchTerms} marker must appear in the URL path, before "
-                "any ?lang= query string; got %r" % url
-            )
+            url = opds_module._opds_search_url_template()
+        parts = urlsplit(url)
+        assert parts.path == '/opds/search', url
+        assert url.count('?') == 1, url
+        assert parse_qs(parts.query) == {'lang': ['hu'], 'query': ['{searchTerms}']}, url

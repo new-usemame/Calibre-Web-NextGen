@@ -1,2 +1,0 @@
-### Fixed
-- **`UMASK` now applies to the books ingest adds and the other library writes the background services make as the app user, not only to the web app.** With `UMASK=027`, imported books still got 755 folders, because the base image applies `UMASK` only to services named `svc-*`. An invalid value is now named once in the service log instead of being ignored silently. Thanks @sgreadly for the fix and @JohanSF for the diagnosis (#2670).

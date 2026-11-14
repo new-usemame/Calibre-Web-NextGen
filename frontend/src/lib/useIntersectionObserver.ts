@@ -7,6 +7,17 @@ interface UseIntersectionObserverProps {
   rootMargin?: string;
 }
 
+/** Attach the browser observer; return the effect's cleanup function. */
+export function observeIntersection(
+  sentinel: HTMLDivElement, onIntersect: () => void, threshold: number, rootMargin: string,
+) {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => { if (entry.isIntersecting) onIntersect(); });
+  }, { threshold, rootMargin });
+  observer.observe(sentinel);
+  return () => observer.disconnect();
+}
+
 /*
  * Observe a sentinel element and call onIntersect when it scrolls into view —
  * the auto-load half of every paged list (library, shelf, table, magic shelf,
@@ -46,19 +57,7 @@ export function useIntersectionObserver({
   useEffect(() => {
     if (!enabled || !sentinel) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            onIntersectRef.current();
-          }
-        });
-      },
-      { threshold, rootMargin }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
+    return observeIntersection(sentinel, () => onIntersectRef.current(), threshold, rootMargin);
   }, [sentinel, enabled, threshold, rootMargin]);
 
   return setSentinel;

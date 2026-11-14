@@ -59,7 +59,7 @@ def test_opds_smart_shelf_entry_uses_the_localized_type_name(locale_context, pub
     )
     current_app.jinja_env.globals.update(
         url_for=lambda *_, **__: "/opds",
-        opds_search_url_path=lambda: "/opds/search",
+        opds_search_url_template=lambda: "/opds/search?query={searchTerms}",
     )
     shelf = SimpleNamespace(
         id=17, name="A & <Probe>", icon="🪄", is_magic_shelf=True,

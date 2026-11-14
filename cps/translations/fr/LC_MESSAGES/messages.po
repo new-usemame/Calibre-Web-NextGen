@@ -5284,6 +5284,30 @@ msgid "Could not save the book choice. Try again."
 msgstr "Impossible d’enregistrer le choix des livres. Réessayez."
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr "Effacer la position de lecture"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+"Effacer votre position de lecture enregistrée pour « {title} » dans le "
+"lecteur web, sur votre Kobo et dans KOReader ? Votre statut de lecture n'est "
+"pas modifié. Un appareil qui conserve sa propre position peut la renvoyer à "
+"sa prochaine synchronisation."
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr "Position de lecture effacée."
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr "Impossible d'effacer la position de lecture."
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(aucun texte enregistré)"
 
@@ -8954,6 +8978,10 @@ msgstr "Retirer ceux-ci"
 msgid "Remove {name}?"
 msgstr "Supprimer {name} ?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Appareils supprimés"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Retiré de « Lecture en cours »."
@@ -9075,6 +9103,11 @@ msgstr "Réinitialiser les valeurs par défaut"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Restaurer"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr "Restaurer {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10323,6 +10356,16 @@ msgstr ""
 "Ces réglages n'ont pas pu être actualisés ; ce qui est affiché peut être "
 "obsolète."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+"Ce compte ne peut pas télécharger de livres, donc la synchronisation de sa "
+"Kobo sera refusée. Un administrateur peut corriger cela en activant "
+"Permettre les téléchargements pour ce compte."
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -10434,8 +10477,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Il s’agit de l’adresse propre à cet ordinateur, que la liseuse ne peut pas "
 "joindre. Choisissez « Modifier » et saisissez l’adresse que la liseuse peut "
@@ -10497,8 +10540,8 @@ msgid ""
 "you did not just ask for a code on your own e-reader, choose Deny."
 msgstr ""
 "Cette demande provient d’un autre réseau que celui que vous utilisez. Si "
-"vous ne venez pas de demander un code sur votre propre liseuse, choisissez « "
-"Refuser »."
+"vous ne venez pas de demander un code sur votre propre liseuse, choisissez "
+"« Refuser »."
 
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
@@ -15930,6 +15973,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr ""
 
@@ -15949,9 +16004,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"

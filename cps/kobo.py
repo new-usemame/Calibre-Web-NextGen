@@ -18,7 +18,7 @@ import uuid
 import zipfile
 from time import gmtime, monotonic, strftime
 import json
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode, urlsplit
 
 from flask import (
     Blueprint,
@@ -55,6 +55,7 @@ from .services import cover_preview, ereader_scope, parallel, user_cover
 from .services import device_reading_position as device_positions
 from .services import kobo_removal, device_book_scope
 from .services import kobo_place_gate
+from .services import hardcover_progress
 from .fs import FileSystem
 from .web import download_required
 from .kobo_auth import requires_kobo_auth, get_auth_token
@@ -1436,6 +1437,9 @@ def _sync_observability(
     reemit_reasons,
     replay_suppression_enabled,
     replay_suppression_eligible,
+    share_place_mode=None,
+    withheld_box_off=0,
+    withheld_own_newer=0,
 ):
     counts = _sync_entitlement_counts(sync_results)
     return {
@@ -1452,6 +1456,9 @@ def _sync_observability(
         "reemit_reasons": dict(sorted(reemit_reasons.items())),
         "replay_suppression_enabled": bool(replay_suppression_enabled),
         "replay_suppression_eligible": bool(replay_suppression_eligible),
+        "share_place_mode": share_place_mode or "none",
+        "withheld_box_off": int(withheld_box_off),
+        "withheld_own_newer": int(withheld_own_newer),
     }
 
 
@@ -1480,6 +1487,9 @@ def _empty_sync_observability():
         "reemit_reasons": {},
         "replay_suppression_enabled": False,
         "replay_suppression_eligible": False,
+        "share_place_mode": "none",
+        "withheld_box_off": 0,
+        "withheld_own_newer": 0,
     }
 
 
@@ -1515,6 +1525,7 @@ def _log_sync_observability(
             "suppressed_removed=%d fingerprint_mismatch_reemitted=%d "
             "reemit_reasons=%s reseeded_shape_change=%d "
             "replay_suppression enabled=%s eligible=%s "
+            "share_place mode=%s withheld box_off=%d own_newer=%d "
             "cursors in=%s out=%s",
             _sync_device_log_id(requesting_device_id),
             capture_id,
@@ -1530,6 +1541,9 @@ def _log_sync_observability(
             observability.get("reseeded_shape_change", 0),
             observability.get("replay_suppression_enabled", False),
             observability.get("replay_suppression_eligible", False),
+            observability.get("share_place_mode", "none"),
+            observability.get("withheld_box_off", 0),
+            observability.get("withheld_own_newer", 0),
             incoming_cursor_log,
             outgoing_cursor_log,
         )
@@ -1770,9 +1784,27 @@ def get_kobo_activated():
     return config.config_kobo_sync
 
 
-def make_request_to_kobo_store(sync_token=None):
+def _store_cookie_header(cookie_header):
+    # The Kobo sends CWNG's own login cookies back with every call; they are a
+    # CWNG session, so they never go to Kobo's server. Anything else is the
+    # store's own, set through an earlier proxied answer.
+    own = {current_app.config.get("SESSION_COOKIE_NAME", "session"),
+           current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")}
+    kept = [part.strip() for part in cookie_header.split(";")
+            if part.strip() and part.strip().split("=", 1)[0] not in own]
+    return "; ".join(kept)
+
+
+def make_request_to_kobo_store(sync_token=None, log_content=True):
     outgoing_headers = Headers(request.headers)
     outgoing_headers.remove("Host")
+    cookie_header = _store_cookie_header(outgoing_headers.get("Cookie", ""))
+    outgoing_headers.remove("Cookie")
+    if cookie_header:
+        outgoing_headers["Cookie"] = cookie_header
+    # make_proxy_response drops Content-Encoding, so ask only for encodings
+    # requests decodes on every install.
+    outgoing_headers["Accept-Encoding"] = "gzip, deflate"
     if sync_token:
         sync_token.set_kobo_store_header(outgoing_headers)
 
@@ -1790,23 +1822,33 @@ def make_request_to_kobo_store(sync_token=None):
         allow_redirects=False,
         timeout=(2, 10)
     ))
-    log.debug("Content: " + str(store_response.content))
+    if log_content:
+        log.debug("Content: " + str(store_response.content))
     log.debug("StatusCode: " + str(store_response.status_code))
     return store_response
 
 
 def redirect_or_proxy_request():
-    if config.config_kobo_proxy:
-        if request.method == "GET":
-            return redirect(get_store_url_for_current_request(), 307)
-        else:
-            # The Kobo device turns other request types into GET requests on redirects,
-            # so we instead proxy to the Kobo store ourselves.
-            store_response = make_request_to_kobo_store()
-
-            return make_proxy_response(store_response)
-    else:
+    if not config.config_kobo_proxy:
         return make_response(jsonify({}))
+    # Every method goes to the store from here, GET included. A Kobo turns other
+    # methods into GET when it follows a redirect, and Kobo firmware 6 stops at a
+    # redirected GET: its library sync never arrives and the Store and Libby pages
+    # stay empty (#2797, #2807). The same device answered by CWNG carries on.
+    try:
+        return proxy_to_kobo_store()
+    except requests.exceptions.RequestException as error:
+        log.warning("Kobo Store could not be reached for %s (%s)",
+                    urlsplit(get_store_url_for_current_request()).path, type(error).__name__)
+        timed_out = isinstance(error, requests.exceptions.Timeout)
+        return make_response("", 504 if timed_out else 502)
+
+
+def proxy_to_kobo_store():
+    """Send the current request to the store and hand its answer back. Raises when
+    the store can't be reached, for a caller with its own fallback."""
+    # The answer is not logged: people paste DEBUG logs into public issues.
+    return make_proxy_response(make_request_to_kobo_store(log_content=False))
 
 
 def make_proxy_response(store_response: requests.Response) -> Response:
@@ -2646,6 +2688,11 @@ def HandleSyncRequest():
     suppress_shared_states = sync_place_mode == kobo_place_gate.UNCHECKED
     share_place_nudges_emitted = []
     own_place_newer = {}
+    # Books whose shared state some emission site held back, by reason, for
+    # the summary line (#2783: an empty response after "changed states: N"
+    # must say whether the box read as off or the Kobo's own place won).
+    withheld_box_off = set()
+    withheld_own_newer = set()
 
     def _withhold_shared_state(book_id):
         """True when no emission site may send this book's shared state: the
@@ -2653,12 +2700,20 @@ def HandleSyncRequest():
         than the shared place, as when it was turned on after reading on
         its own. The frontier still advances past a withheld state."""
         if suppress_shared_states:
+            if book_id not in withheld_box_off:
+                withheld_box_off.add(book_id)
+                log.debug("Kobo Sync: withheld shared reading state book=%s "
+                          "reason=share_place_off", book_id)
             return True
         if sync_place_mode != kobo_place_gate.CHECKED:
             return False
         if book_id not in own_place_newer:
             own_place_newer[book_id] = kobo_place_gate.own_place_newer(
                 requesting_device_id, book_id)
+            if own_place_newer[book_id]:
+                withheld_own_newer.add(book_id)
+                log.debug("Kobo Sync: withheld shared reading state book=%s "
+                          "reason=own_place_newer", book_id)
         return own_place_newer[book_id]
 
     # Establish one ordered reading-state frontier before rendering any
@@ -3542,6 +3597,9 @@ def HandleSyncRequest():
         reemit_reasons=reemit_reasons,
         replay_suppression_enabled=replay_suppression_enabled,
         replay_suppression_eligible=replay_suppression_eligible,
+        share_place_mode=sync_place_mode,
+        withheld_box_off=len(withheld_box_off),
+        withheld_own_newer=len(withheld_own_newer),
     )
 
     if requesting_device_id:
@@ -3860,6 +3918,22 @@ def HandleMetadataRequest(book_uuid):
 
 
 def get_download_url_for_book(book_id, book_format):
+    from .services.kobo_post_download_restore import (
+        DOWNLOAD_DEVICE_PARAM, download_url_device_tag,
+    )
+    # One sync builds a URL per book; the device is the same for all of them.
+    device_id = getattr(g, "annotation_origin_device_id", None)
+    cached = g.get("_kobo_download_device_tag")
+    if cached is not None and cached[0] == device_id:
+        device_tag = cached[1]
+    else:
+        device_tag = None
+        try:
+            device_tag = download_url_device_tag(device_id)
+        except Exception:
+            log.debug("Could not name the Kobo in its download URL", exc_info=True)
+        g._kobo_download_device_tag = (device_id, device_tag)
+    device_query = {DOWNLOAD_DEVICE_PARAM: device_tag} if device_tag else {}
     endpoint_name = "kobo.download_book"
     endpoint_path = "download"
     if request.headers.get("x-kobo-deviceos") == "Android":
@@ -3880,13 +3954,14 @@ def get_download_url_for_book(book_id, book_format):
             endpoint_path=endpoint_path,
             book_id=book_id,
             book_format=book_format.lower()
-        )
+        ) + ("?" + urlencode(device_query) if device_query else "")
     return url_for(
         endpoint_name,
         auth_token=kobo_auth.get_auth_token(),
         book_id=book_id,
         book_format=book_format.lower(),
         _external=True,
+        **device_query,
     )
 
 
@@ -4660,6 +4735,19 @@ def HandleStateRequest(book_uuid):
             inexact_echo = bool(checked and request_bookmark and
                                 kobo_place_gate.is_inexact_echo(
                                     device_id, book, request_bookmark))
+            # #2783: the Kobo repeated the place it last reported while
+            # another reader moved the shared place on. Acknowledge it, move
+            # nothing, and leave its journal place clock alone so its next
+            # sync is not told its own old place is the newer one.
+            unmoved = bool(checked and request_bookmark and not inexact_echo
+                           and kobo_reading_state.current_bookmark.id is not None
+                           and kobo_place_gate.is_unmoved_report(
+                               device_id, book.id, request_bookmark,
+                               kobo_reading_state.current_bookmark.id))
+            if unmoved:
+                log.info("Kobo report for book %s device %s repeats its last place; "
+                         "the newer shared place from another reader is kept",
+                         book.id, device_id)
             if checked:
                 # The device's own journal hears every report it makes,
                 # status-only ones included, so turning the box off later
@@ -4672,7 +4760,7 @@ def HandleStateRequest(book_uuid):
                         book_id=book.id,
                         client_at=client_lm,
                         place=(_journal_place(request_bookmark)
-                               if request_bookmark else None),
+                               if request_bookmark and not unmoved else None),
                         status=own_status[1],
                         status_supplied=own_status[0],
                     )
@@ -4699,7 +4787,7 @@ def HandleStateRequest(book_uuid):
                 if checked:
                     if current_bookmark.id is None:
                         ub.session.flush()
-                    if inexact_echo:
+                    if inexact_echo or unmoved:
                         bookmark_outcome = kobo_place_gate.SharedWriteOutcome(
                             False, current_bookmark.progress_percent,
                             current_bookmark.last_modified)
@@ -5062,8 +5150,9 @@ def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: i
     """
     Sync reading progress to Hardcover if enabled for the user and book is not blacklisted.
 
-    Most exceptions are caught and logged so that issues with Hardcover do not prevent
-    the Kobo from clearing its reading state sync queue.
+    The Hardcover calls run on a worker thread after this returns, and their
+    failures are logged there, so Hardcover never delays or fails the device's
+    request (#2775).
 
     :param book: The book for which to sync reading progress.
     :param progress_percentage: Reading progress percentage.
@@ -5081,20 +5170,30 @@ def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: i
         log.debug(f"Skipping reading progress sync for book {book.id} - blacklisted for reading progress")
         return
 
-    try:
-        hardcoverClient = hardcover.HardcoverClient(user.hardcover_token)
-    except hardcover.MissingHardcoverToken:
+    if not user.hardcover_token:
         log.info(f"User {user.name} has no Hardcover token, not syncing reading progress to Hardcover")
         return
-    except Exception as e:
-        log.error(f"Failed to create Hardcover client for user {user.name}: {e}")
-        return
 
-    try:
-        hardcoverClient.update_reading_progress(book.identifiers, progress_percentage)
-    except Exception as e:
-        log.error(f"Failed to update reading progress for book {book.id} in Hardcover: {e}",
-                  exc_info=True)
+    # Hardcover takes several round trips, so the request that reported this
+    # reading answers first and a worker thread sends it (#2775). Only plain
+    # values cross: the identifiers are read here, on the request's session.
+    identifiers = {i.type: i.val for i in book.identifiers if "hardcover" in i.type}
+    user_name = user.name
+
+    def client_for(token):
+        try:
+            return hardcover.HardcoverClient(token)
+        except hardcover.MissingHardcoverToken:
+            log.info(f"User {user_name} has no valid Hardcover token, not syncing reading progress to Hardcover")
+        except Exception as e:
+            log.error(f"Failed to create Hardcover client for user {user_name}: {e}")
+        return None
+
+    hardcover_progress.enqueue(
+        user_id=user.id, user_name=user_name, book_id=book.id,
+        token=user.hardcover_token, identifiers=identifiers,
+        percent=progress_percentage, client_factory=client_for,
+    )
 
 
 def get_read_status_for_kobo(ub_book_read):
@@ -5626,15 +5725,8 @@ def _rating_for_a_book_cwng_does_not_serve(book_uuid):
     if not config.config_kobo_proxy:
         log.info("Kobo rating for %s: not a book CWNG serves and the Store proxy is off, so it is not kept",
                  book_uuid)
-        return redirect_or_proxy_request()
-    try:
-        return redirect_or_proxy_request()
-    except requests.exceptions.Timeout:
-        log.warning("Kobo rating for %s: the Kobo Store timed out", book_uuid)
-        return make_response("", 504)
-    except requests.exceptions.RequestException:
-        log.warning("Kobo rating for %s: the Kobo Store could not be reached", book_uuid, exc_info=True)
-        return make_response("", 502)
+    # A Store that cannot answer comes back as 504 or 502, never a 500.
+    return redirect_or_proxy_request()
 
 
 @csrf.exempt
@@ -5694,11 +5786,9 @@ def HandleUnimplementedRequest(dummy=None):
 # TODO: Implement the following routes
 @csrf.exempt
 @kobo.route("/v1/user/loyalty/<dummy>", methods=["GET", "POST"])
-@kobo.route("/v1/user/profile", methods=["GET", "POST"])
 @kobo.route("/v1/user/wishlist", methods=["GET", "POST"])
 @kobo.route("/v1/user/recommendations", methods=["GET", "POST"])
 @kobo.route("/v1/analytics/<dummy>", methods=["GET", "POST"])
-@kobo.route("/v1/assets", methods=["GET"])
 def HandleUserRequest(dummy=None):
     log.debug("Unimplemented User Request received: %s (%s)",
               request.base_url,
@@ -5728,7 +5818,6 @@ def handle_getests():
 @csrf.exempt
 @kobo.route("/v1/products/<dummy>/prices", methods=["GET", "POST"])
 @kobo.route("/v1/products/<dummy>/recommendations", methods=["GET", "POST"])
-@kobo.route("/v1/products/<dummy>/nextread", methods=["GET", "POST"])
 @kobo.route("/v1/products/<dummy>/reviews", methods=["GET", "POST"])
 @kobo.route("/v1/products/featured/<dummy>", methods=["GET", "POST"])
 @kobo.route("/v1/products/featured/", methods=["GET", "POST"])
@@ -5741,7 +5830,6 @@ def handle_getests():
 @kobo.route("/v1/products/featuredforkoboplus/")
 @kobo.route("/v1/products", methods=["GET", "POST"])
 @kobo.route("/v1/affiliate", methods=["GET", "POST"])
-@kobo.route("/v1/deals", methods=["GET", "POST"])
 @kobo.route("/v1/categories/<dummy>", methods=["GET", "POST"])
 @kobo.route("/v1/categories/<dummy>/featured", methods=["GET", "POST"])
 @kobo.route("/v1/categories/<dummy>/products")
@@ -5752,10 +5840,57 @@ def HandleProductsRequest(dummy=None):
     return redirect_or_proxy_request()
 
 
+def _store_error_code(store_response):
+    try:
+        status = store_response.json().get("ResponseStatus") or {}
+        return status.get("ErrorCode") or ""
+    except (ValueError, AttributeError):
+        return ""
+
+
+# The store calls a Kobo makes between /v1/initialization and /v1/library/sync.
+# Nickel runs them in one queue with the sync, so one that fails can cost the
+# sync (D#2781 saw that on add-device). With the proxy on these go to the store
+# from here like every store call, and the store's answer is logged (#2797, #2807).
+# A refusal gets the empty answer they get with the proxy off, except
+# ExpiredToken, which is how the Kobo learns to sign in again.
+@csrf.exempt
+@kobo.route("/v1/user/profile", methods=["GET", "POST"])
+@kobo.route("/v1/products/books/subscriptions", methods=["GET", "POST"])
+@kobo.route("/v1/products/<dummy>/nextread", methods=["GET", "POST"])
+@kobo.route("/v1/deals", methods=["GET", "POST"])
+@kobo.route("/v1/assets", methods=["GET"])
+def HandleStoreCallBeforeSync(dummy=None):
+    if not config.config_kobo_proxy:
+        return make_response(jsonify({}))
+
+    store_path = urlsplit(get_store_url_for_current_request()).path
+    try:
+        # The body can hold the Kobo account's details, and people paste these logs.
+        store_response = make_request_to_kobo_store(log_content=False)
+    except Exception as error:
+        log.warning("Kobo Store could not be reached for %s (%s). Answering it empty so the "
+                    "library sync can carry on.", store_path, type(error).__name__)
+        return make_response(jsonify({}))
+
+    status = store_response.status_code
+    error_code = _store_error_code(store_response)
+    log.debug("Kobo Store answered %s %s for %s", status, error_code, store_path)
+    refused = status in (401, 403) or status >= 500
+    if refused and error_code != "ExpiredToken":
+        log.warning("Kobo Store refused %s with %s %s. Answering it empty so the library sync "
+                    "can carry on. Store features need this Kobo signed in to a Kobo account.",
+                    store_path, status, error_code)
+        return make_response(jsonify({}))
+    return make_proxy_response(store_response)
+
+
 def make_calibre_web_auth_response():
     # As described in kobo_auth.py, CalibreWeb doesn't make use practical use of this auth/device API call for
     # authentation (nor for authorization). We return a dummy response just to keep the device happy.
-    content = request.get_json()
+    content = request.get_json(silent=True)
+    if not isinstance(content, dict):
+        content = {}
     AccessToken = base64.b64encode(os.urandom(24)).decode('utf-8')
     RefreshToken = base64.b64encode(os.urandom(24)).decode('utf-8')
     return make_response(
@@ -5794,12 +5929,17 @@ def make_calibre_web_oauth_response():
 
 @csrf.exempt
 @kobo.route("/v1/auth/device", methods=["POST"])
+@kobo.route("/v1/auth/refresh", methods=["POST"])
+# A Kobo being paired queues AddDeviceCommand ahead of SyncLibraryCommand, and a
+# 404 here cancels the whole queue, so the device stops right after
+# /v1/initialization (D#2781). Same fix as CWA 93d5b985d (CWA #1476).
+@kobo.route("/v1/user/add-device", methods=["POST"])
 @requires_kobo_auth
 def HandleAuthRequest():
-    log.debug('Kobo Auth request')
+    log.debug('Kobo Auth request: %s', request.path)
     if config.config_kobo_proxy:
         try:
-            return redirect_or_proxy_request()
+            return proxy_to_kobo_store()
         except Exception:
             log.error("Failed to receive or parse response from Kobo's auth endpoint. Falling back to un-proxied mode.")
     return make_calibre_web_auth_response()
@@ -5979,12 +6119,15 @@ def download_book(book_id, book_format):
 @requires_kobo_auth
 @download_required
 def redirect_download_book(book_id, book_format):
+    from .services.kobo_post_download_restore import DOWNLOAD_DEVICE_PARAM
+    device_tag = request.args.get(DOWNLOAD_DEVICE_PARAM)
     return redirect(url_for(
         "kobo.download_book",
         auth_token=kobo_auth.get_auth_token(),
         book_id=book_id,
         book_format=book_format.lower(),
         _external=True,
+        **({DOWNLOAD_DEVICE_PARAM: device_tag} if device_tag else {}),
     ))
 
 

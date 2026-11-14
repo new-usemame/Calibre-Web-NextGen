@@ -18,6 +18,7 @@ import type { Book } from '../lib/api';
 import { apiGet, ApiError } from '../lib/api';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
+import { useCatalogDensity } from '../lib/catalogDensity';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
@@ -55,6 +56,8 @@ export function MagicShelfView({ id }: { id: string }) {
   const announce = useAnnouncer();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  // The Library's density choice, read-only here, like regular shelves (#980).
+  const [density] = useCatalogDensity();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [selecting, setSelecting] = useState(false);
@@ -358,7 +361,7 @@ export function MagicShelfView({ id }: { id: string }) {
         <EmptyState message={t('No books match this smart shelf right now.')} />
       ) : (
         <>
-          <div className={styles.grid}>
+          <div className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="magic-shelf-grid">
             {books.map((b, i) => (
               <BookCard key={b.id} book={b}
                 selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}

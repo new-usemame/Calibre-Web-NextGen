@@ -44,15 +44,15 @@ Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step
 <!-- progress-tracker:start (regenerate with scripts/progress_tracker.py; do not hand-edit) -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-throughput-dark.svg">
-  <img alt="Pull request throughput: 43 open, 1,791 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
+  <img alt="Pull request throughput: 60 open, 1,902 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-outcomes-dark.svg">
-  <img alt="Fix outcomes by week: 258 happy, 80 not fixed, 436 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
+  <img alt="Fix outcomes by week: 280 happy, 82 not fixed, 464 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
 </picture>
 
-On October 24, 2026, 43 pull requests were open and 1,791 closed, 1,641 of them merged. Of 774 fixes delivered to a person, 33% heard back happy, 10% not fixed and 56% got no reply. When someone did answer, the answer was happy 76% of the time.
+On November 13, 2026, 60 pull requests were open and 1,902 closed, 1,734 of them merged. Of 826 fixes delivered to a person, 34% heard back happy, 10% not fixed and 56% got no reply. When someone did answer, the answer was happy 77% of the time.
 
 A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model and checked by a second; where they disagree the thread is reread and settled. Every verdict and the quote behind it are in [docs/progress-tracker](docs/progress-tracker/). Replies on Discord and Reddit are not counted.
 
@@ -65,7 +65,8 @@ A fix is one moment someone was told their problem was dealt with: a fix PR merg
 | Jul 2026 | 359 | 362 | 3 | 107 | 26 | 70 |
 | Aug 2026 | 578 | 573 | 11 | 35 | 14 | 71 |
 | Sep 2026 | 224 | 218 | 12 | 23 | 5 | 32 |
-| Oct 2026 | 235 | 204 | 32 | 23 | 6 | 68 |
+| Oct 2026 | 279 | 241 | 35 | 36 | 5 | 74 |
+| Nov 2026 | 84 | 74 | 56 | 9 | 3 | 22 |
 
 Regenerate with `python3 scripts/progress_tracker.py fetch`, then `queue`, judge the new replies, `apply` and `render`.
 
@@ -571,7 +572,31 @@ KOReader sync is built in, so you don't need a separate kosync server. With the 
 2. To install the plain plugin by hand instead, visit `http://your-host:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
 3. Read on any device. Progress syncs back to CWNG, and from there to Kobo if Kobo sync is on.
 
-To keep the plugin updated, point KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) or [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases), not this one. Both update it in place. The plugin is released only when it changes, and its version is the server version it last changed in, so it can trail your server version with nothing wrong. An update manager still pointed at this repository keeps working, but it sees the plugin only on releases that change it, which looks like "no update available". To update by hand, `/kosync` always serves the plugin bundled with your running server.
+To keep the plugin updated, use KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) or [appstore.koplugin](https://github.com/omer-faruq/appstore.koplugin) and point it at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases), not this one. Both update it in place. The plugin is released only when it changes, and its version is the server version it last changed in, so it can trail your server version with nothing wrong. An update manager still pointed at this repository keeps working, but it sees the plugin only on releases that change it, which looks like "no update available". To update by hand, `/kosync` always serves the plugin bundled with your running server.
+
+**Updates Manager.** It has no screen for adding a repository, so you add this one by creating a config file:
+
+1. Connect the e-reader over USB and open the `settings` folder inside KOReader's folder. On a Kobo that is `.adds/koreader/settings/` (`.adds` is hidden, so turn on hidden files); on a Kindle it is `koreader/settings/`. **Repository Settings** (step 3) prints the exact path it reads.
+2. Create a plain-text file there named `updatesmanager_config.json`:
+
+   ```json
+   {
+     "plugins": [
+       {
+         "owner": "new-usemame",
+         "repo": "cwngsync.koplugin",
+         "description": "CWNG library sync"
+       }
+     ]
+   }
+   ```
+
+   If the file already exists, add the entry to its existing `"plugins"` list instead. Your entries are merged with the built-in list.
+3. Eject the e-reader and restart KOReader. **Updates Manager ▸ Settings ▸ Repository Settings** should now show `Plugins: 1` (or one more than before, if the file already had entries). Then run **Check for Updates** (**Force Refresh** the first time, to skip the cache).
+
+If Repository Settings says "No custom configuration file found", the file is misnamed or in the wrong folder: compare it with the path shown there, and make sure the name doesn't end in `.json.txt`. If it says "File exists but could not be parsed", the JSON is invalid, often because an editor turned the quotes into curly quotes. Without a GitHub token, Updates Manager is limited to 60 GitHub requests per hour. Put a token with `public_repo` scope in `settings/updatesmanager_github_token.txt` if checks stall.
+
+**appstore.koplugin.** Use the gear icon (⚙️) ▸ **Install plugin from URL** and enter `new-usemame` and `cwngsync.koplugin`. If the plugin is already installed, use **Match with URL** to link it to that repository so updates are tracked.
 
 For matching OPDS filenames across devices, turn on **Use server filenames** in KOReader's OPDS catalog settings. By default KOReader builds `Author - Title.epub` from the feed, while the server suggests `Title - Author.epub` with only the first author. With the setting on, KOReader uses the server's name. Administrators can change that name with the OPDS download filename template preference; a blank preference keeps the current naming. Fields, examples and device limits: [OPDS download filenames](docs/opds-filename-template.md).
 
@@ -630,7 +655,7 @@ Larger libraries may need `128k`, `4 256k` and `256k`. In Nginx Proxy Manager, a
 
 Signing in to a Kobo account, or a factory reset, can rewrite the `api_endpoint=` line back to Kobo's own server, which sends sync to Kobo instead of your library. After signing in, re-check the line over USB and set it back if it changed. Many sideloaded setups stay signed out so the device stops resetting the endpoint.
 
-To use the Kobo Store and your library at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), CWNG answers any request it doesn't recognize with an empty response. That's fine for a sideload-only device, but store features won't load.
+To use the Kobo Store and your library at the same time, turn on **Proxy unknown requests to Kobo Store** in Admin → Edit Basic Configuration. With it off (the default), CWNG answers any request it doesn't recognize with an empty response. That's fine for a sideload-only device, but store features won't load. With it on, if the store refuses the calls a Kobo makes just before syncing, CWNG answers them empty, as it does with the setting off, and the log says `Kobo Store refused ...`. Store features still need a signed-in Kobo.
 
 ### Writable cache storage
 
@@ -715,35 +740,35 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | n/a |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4125/4140 | 0 |
-| ca (`ca`) | `████████████████████` 99% | 4090/4140 | 0 |
-| Slovak (`sk`) | `████████████████████` 99% | 4085/4140 | 0 |
-| Russian (`ru`) | `████████████████████` 98% | 4075/4140 | 0 |
-| French (`fr`) | `█████████████████░░░` 87% | 3606/4140 | 123 |
-| Swedish (`sv`) | `████████████████░░░░` 80% | 3298/4140 | 0 |
-| Dutch (`nl`) | `███████████████░░░░░` 77% | 3171/4140 | 279 |
-| Italian (`it`) | `███████████████░░░░░` 75% | 3109/4140 | 0 |
-| Spanish (`es`) | `███████████████░░░░░` 75% | 3093/4140 | 0 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 64% | 2672/4140 | 172 |
-| Polish (`pl`) | `████████████░░░░░░░░` 62% | 2574/4140 | 0 |
-| German (`de`) | `████████████░░░░░░░░` 58% | 2404/4140 | 11 |
-| Hungarian (`hu`) | `████████░░░░░░░░░░░░` 42% | 1758/4140 | 118 |
-| Arabic (`ar`) | `███████░░░░░░░░░░░░░` 35% | 1464/4140 | 0 |
-| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 34% | 1426/4140 | 296 |
-| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1331/4140 | 234 |
-| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1226/4140 | 302 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 23% | 969/4140 | 256 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 731/4140 | 341 |
-| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 706/4140 | 342 |
-| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 707/4140 | 343 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 538/4140 | 381 |
-| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 510/4140 | 390 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 479/4140 | 357 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 465/4140 | 417 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4140 | 338 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 390/4140 | 371 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 324/4140 | 369 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 242/4140 | 330 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4133/4149 | 0 |
+| ca (`ca`) | `████████████████████` 99% | 4090/4149 | 0 |
+| Slovak (`sk`) | `████████████████████` 98% | 4085/4149 | 0 |
+| Russian (`ru`) | `████████████████████` 98% | 4075/4149 | 0 |
+| French (`fr`) | `█████████████████░░░` 87% | 3613/4149 | 123 |
+| Swedish (`sv`) | `████████████████░░░░` 80% | 3298/4149 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 77% | 3178/4149 | 279 |
+| Italian (`it`) | `███████████████░░░░░` 75% | 3109/4149 | 0 |
+| Spanish (`es`) | `███████████████░░░░░` 74% | 3093/4149 | 0 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 64% | 2672/4149 | 172 |
+| Polish (`pl`) | `████████████░░░░░░░░` 62% | 2574/4149 | 0 |
+| German (`de`) | `████████████░░░░░░░░` 58% | 2404/4149 | 11 |
+| Hungarian (`hu`) | `████████░░░░░░░░░░░░` 42% | 1758/4149 | 118 |
+| Arabic (`ar`) | `███████░░░░░░░░░░░░░` 35% | 1464/4149 | 0 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 34% | 1426/4149 | 296 |
+| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1331/4149 | 234 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1226/4149 | 302 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 23% | 969/4149 | 256 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 731/4149 | 341 |
+| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 706/4149 | 342 |
+| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 707/4149 | 343 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 538/4149 | 381 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 510/4149 | 390 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 479/4149 | 357 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 465/4149 | 417 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4149 | 338 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 390/4149 | 371 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 324/4149 | 369 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 242/4149 | 330 |
 <!-- TRANSLATION_STATUS_END -->
 
 </details>

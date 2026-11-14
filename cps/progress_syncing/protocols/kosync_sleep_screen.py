@@ -4,7 +4,7 @@
 import hashlib
 import json
 
-from flask import jsonify, request
+from flask import jsonify, make_response, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from .kosync import kosync, _require_kosync_enabled, authenticate_user
@@ -19,7 +19,8 @@ log = logger.create()
 def _context(*, register=False):
     blocked = _require_kosync_enabled()
     if blocked is not None:
-        return None, blocked
+        # The guard returns a (response, 503) tuple; callers read status_code.
+        return None, make_response(blocked)
     user = authenticate_user()
     if user is None:
         return None, error('unauthorized', 'Authentication required', 401)

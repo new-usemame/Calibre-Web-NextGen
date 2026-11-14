@@ -38,9 +38,23 @@ async function visibleRows(page: import('@playwright/test').Page) {
 test('Authors and Series combine an inclusive minimum with name search and report validation/results', async ({ page }) => {
   for (const plural of ['authors', 'series'] as const) {
     const fixture = fixtures[plural];
-    await page.route(`**/api/v1/${plural}`, (route) =>
-      route.fulfill({ json: { items: fixture.items } }),
-    );
+    // Authors and Series page and filter on the server (#2720), so the mock
+    // answers the paged contract: q and min_count narrow, totals report both.
+    await page.route(new RegExp(`/api/v1/${plural}(\\?|$)`), (route) => {
+      const params = new URL(route.request().url()).searchParams;
+      const needle = (params.get('q') ?? '').toLocaleLowerCase();
+      const minimum = params.has('min_count') ? Number(params.get('min_count')) : null;
+      const matched = fixture.items.filter((item) =>
+        item.name.toLocaleLowerCase().includes(needle) && (minimum === null || item.count >= minimum));
+      const offset = Number(params.get('offset') ?? 0);
+      const limit = Number(params.get('limit') ?? matched.length);
+      return route.fulfill({ json: {
+        items: matched.slice(offset, offset + limit),
+        total: matched.length,
+        unfiltered_total: fixture.items.length,
+        next_offset: offset + limit < matched.length ? offset + limit : null,
+      } });
+    });
     await page.goto(`/app/${plural}`);
     await expect(page.getByRole('heading', { name: fixture.title, level: 1 })).toBeVisible();
 

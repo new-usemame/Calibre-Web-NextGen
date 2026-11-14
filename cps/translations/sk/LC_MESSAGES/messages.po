@@ -5169,6 +5169,26 @@ msgid "Could not save the book choice. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(žiadny zachytený text)"
 
@@ -8749,6 +8769,10 @@ msgstr "Odstrániť tieto"
 msgid "Remove {name}?"
 msgstr "Odstrániť {name}?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Odstránené z Práve čítaných."
@@ -8870,6 +8894,11 @@ msgstr "Obnoviť predvolené"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Obnoviť"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10096,6 +10125,13 @@ msgstr ""
 "Tieto nastavenia sa nepodarilo obnoviť, takže zobrazené údaje môžu byť "
 "neaktuálne."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr "Tento účet nemôže používať zdroje kníh alebo je táto funkcia vypnutá."
@@ -10202,12 +10238,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Toto je vlastná adresa tohto počítača, na ktorú sa čítačka nedostane. Zvoľte "
-"Zmeniť a zadajte adresu, ktorú môže čítačka použiť, napríklad "
-"http://192.168.1.20:8083."
+"Zmeniť a zadajte adresu, ktorú môže čítačka použiť, napríklad http://"
+"192.168.1.20:8083."
 
 #: cps/spa_strings.py
 msgid ""
@@ -15699,6 +15735,18 @@ msgstr ""
 "        alebo AZW3."
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr "Zapnúť Kindle EPUB Fixer NextGen"
 
@@ -15724,9 +15772,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Tento nástroj bol adaptovaný z nástroja <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> vytvoreného používateľom <a "
-"href=\"https://github.com/innocenat\">innocenat</a>."
+"Tento nástroj bol adaptovaný z nástroja <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> vytvoreného používateľom "
+"<a href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"

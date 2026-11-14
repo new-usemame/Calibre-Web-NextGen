@@ -36,6 +36,11 @@ def _is_localhost():
             or host.startswith("::ffff:7f") or host == "::1")
 
 
+def _download_allowed(user_id):
+    user = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
+    return bool(user is not None and user.role_download())
+
+
 def _payload(user_id, auth_token):
     sync_url = None
     if auth_token is not None:
@@ -53,6 +58,10 @@ def _payload(user_id, auth_token):
         # tokenized Kobo endpoint there would produce a broken nested URL.
         "server_url": request.url_root.rstrip("/"),
         "is_localhost": _is_localhost(),
+        # HandleSyncRequest refuses /v1/library/sync with a 403 for an account
+        # without download permission, and the Kobo only says the sync failed
+        # (#2807). Report the same check so the setup screen can say why.
+        "download_allowed": _download_allowed(user_id),
     }
 
 

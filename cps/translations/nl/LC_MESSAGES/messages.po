@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
-"me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
+"proton.me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -5150,6 +5150,29 @@ msgid "Could not save the book choice. Try again."
 msgstr "De boekkeuze kon niet worden opgeslagen. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr "Leespositie wissen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+"Je opgeslagen leespositie voor \"{title}\" wissen in de webreader, op je "
+"Kobo en in KOReader? Je leesstatus verandert niet. Een apparaat dat nog zijn "
+"eigen positie bewaart, kan die bij de volgende synchronisatie terugsturen."
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr "Leespositie gewist."
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr "Kan de leespositie niet wissen."
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
 
@@ -8798,6 +8821,10 @@ msgstr "Deze verwijderen"
 msgid "Remove {name}?"
 msgstr "{name} verwijderen?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Verwijderde apparaten"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Verwijderd uit Momenteel aan het lezen."
@@ -8919,6 +8946,11 @@ msgstr "Standaardwaarden herstellen"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Herstellen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr "{name} herstellen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10157,6 +10189,16 @@ msgstr ""
 "Deze instellingen konden niet worden vernieuwd, dus wat je ziet kan "
 "verouderd zijn."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+"Dit account kan geen boeken downloaden, dus de synchronisatie van de Kobo "
+"wordt geweigerd. Een beheerder kan dit oplossen door Downloads toestaan in "
+"te schakelen voor dit account."
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr "Dit account kan geen boekbronnen gebruiken, of de functie staat uit."
@@ -10265,8 +10307,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Dit is het eigen adres van deze computer, dat de e-reader niet kan bereiken. "
 "Kies ‘Wijzigen’ en voer het adres in dat de e-reader kan gebruiken, zoals "
@@ -12342,8 +12384,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
-"%(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
+"(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -15671,6 +15713,18 @@ msgid ""
 "        are only applied to what you see in the Web UI, not the ebook files "
 "themselves. This feature currently only supports files in EPUB \n"
 "        or AZW3 format."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
@@ -20208,10 +20262,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
-#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
-#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
-#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
+#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
+#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
+#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
+#~ "bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

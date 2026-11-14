@@ -170,7 +170,7 @@ def test_a_book_hidden_from_the_reader_is_not_rated_or_sent_to_the_store(
     sent = []
     monkeypatch.setattr(kw.kobo.config, "config_kobo_proxy", proxied, raising=False)
     monkeypatch.setattr(kw.kobo, "make_request_to_kobo_store",
-                        lambda: sent.append(kw.kobo.request.path))
+                        lambda **_kw: sent.append(kw.kobo.request.path))
 
     response = rate(device, book.uuid, 4)
 
@@ -193,7 +193,7 @@ def test_a_store_book_goes_to_the_store_when_the_proxy_is_on(kw, device, monkeyp
     monkeypatch.setattr(kw.kobo.config, "config_kobo_proxy", True, raising=False)
     monkeypatch.setattr(
         kw.kobo, "make_request_to_kobo_store",
-        lambda: sent.append(kw.kobo.request.path) or SimpleNamespace(
+        lambda **_kw: sent.append(kw.kobo.request.path) or SimpleNamespace(
             content=b"", status_code=200, headers=Headers()))
 
     response = rate(device, "11111111-2222-3333-4444-555555555555", 5)
@@ -209,7 +209,7 @@ def test_a_store_book_goes_to_the_store_when_the_proxy_is_on(kw, device, monkeyp
 ])
 def test_a_store_that_cannot_answer_is_a_gateway_error_not_a_500(
         kw, device, monkeypatch, failure, status):
-    def down():
+    def down(**_kw):
         raise failure("storeapi unreachable")
 
     monkeypatch.setattr(kw.kobo.config, "config_kobo_proxy", True, raising=False)

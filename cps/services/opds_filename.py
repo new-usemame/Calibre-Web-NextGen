@@ -33,7 +33,9 @@ _FIELDS = frozenset((
 ))
 _FIELD = re.compile(r'([a-z_]+|#[a-zA-Z][a-zA-Z0-9_]*)(?:\[([0-9]{1,3})\])?\Z')
 _FORMAT = re.compile(r'(?:(.[<^>]|[<^>]))?([0-9]{1,3})?(?:\.([0-9]{1,3}))?s?\Z')
-_UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
+_UNSAFE_CHARS = r'\x00-\x1f\x7f-\x9f/\\*?"<>|'
+_UNSAFE = re.compile('[' + _UNSAFE_CHARS + ':]')
+_UNSAFE_KEEP_COLON = re.compile('[' + _UNSAFE_CHARS + ']')
 _RESERVED = re.compile(r'(CON|CONIN\$|CONOUT\$|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³]) *(?:\.|$)', re.I)
 
 
@@ -292,8 +294,13 @@ class _BookValues(dict):
         return separator.join(_value(v) for v in values if v is not None)
 
 
-def render_filename(template, book, session, title_regex='', unicode_filename=False, ordered_authors=None, sort_names=True):
-    """Return a safe basename. The download helper adds the actual extension."""
+def render_filename(template, book, session, title_regex='', unicode_filename=False, ordered_authors=None, sort_names=True,
+                    keep_colon=False):
+    """Return a safe basename. The download helper adds the actual extension.
+
+    ``keep_colon`` is for a name that is only ever an email attachment name and
+    never a file on a disk, where ":" is harmless. Downloads keep the default.
+    """
     values = _BookValues(book, session, title_regex, ordered_authors, sort_names=sort_names)
     rendered = expand_template(template, values)
     rendered = ''.join(char for char in rendered if unicodedata.category(char) not in ('Cc', 'Zl', 'Zp')
@@ -302,15 +309,16 @@ def render_filename(template, book, session, title_regex='', unicode_filename=Fa
     try:
         rendered = get_valid_filename_shared(
             rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH,
-            unicode_filename=unicode_filename,
+            unicode_filename=unicode_filename, keep_colon=keep_colon,
         )
     except ValueError:
         rendered = 'book-%s' % book.id
     # Content-Disposition cannot create directories. Sanitize after optional
     # transliteration, which can itself introduce path separators or CON etc.
-    rendered = _UNSAFE.sub('_', rendered).strip(' .') or 'book-%s' % book.id
+    unsafe = _UNSAFE_KEEP_COLON if keep_colon else _UNSAFE
+    rendered = unsafe.sub('_', rendered).strip(' .') or 'book-%s' % book.id
     if _RESERVED.match(rendered):
         rendered = '_' + rendered
     return get_valid_filename_shared(
-        rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH,
+        rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH, keep_colon=keep_colon,
     ).rstrip(' .')

@@ -5202,6 +5202,26 @@ msgid "Could not save the book choice. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(Nessun testo rilevato)"
 
@@ -8723,6 +8743,10 @@ msgstr ""
 msgid "Remove {name}?"
 msgstr "Rimuovere {name}?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr ""
@@ -8843,6 +8867,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10024,6 +10053,13 @@ msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -10119,8 +10155,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -13607,9 +13643,9 @@ msgid ""
 "You can also use Last Resort Restore at the bottom of this page to try "
 "rebuilding your Calibre Database from the OPF files in your library."
 msgstr ""
-"Puoi anche utilizzare l'opzione \"Ripristino del database (ultima "
-"speranza)\" in fondo a questa pagina per provare a ricostruire il database "
-"di Calibre dai file OPF presenti nella tua biblioteca."
+"Puoi anche utilizzare l'opzione \"Ripristino del database (ultima speranza)"
+"\" in fondo a questa pagina per provare a ricostruire il database di Calibre "
+"dai file OPF presenti nella tua biblioteca."
 
 #: cps/templates/config_db.html
 msgid "Location of Calibre Database (metadata.db file)"
@@ -13693,9 +13729,9 @@ msgid ""
 "should remain in <code>/calibre-library</code>, however your library files "
 "can be wherever you desire"
 msgstr ""
-"<b>Separa i file degli Ebook dalla Biblioteca</b> - Il file <code>metadata."
-"db</code> dovrebbe rimanere in <code>/calibre-library</code>, tuttavia, i "
-"file della biblioteca possono essere salvati dove preferisci"
+"<b>Separa i file degli Ebook dalla Biblioteca</b> - Il file "
+"<code>metadata.db</code> dovrebbe rimanere in <code>/calibre-library</code>, "
+"tuttavia, i file della biblioteca possono essere salvati dove preferisci"
 
 #: cps/templates/config_db.html
 msgid "Use Google Drive?"
@@ -14208,8 +14244,8 @@ msgid ""
 msgstr ""
 "Opzionale. Senza una chiave, Google Books è soggetto a un limite di circa "
 "1.000 richieste al giorno per IP, soglia facilmente raggiungibile sui server "
-"condivisi (errore HTTP 429). Ottieni una chiave gratuita su https://console."
-"cloud.google.com — abilita la \"Books API\" e crea una chiave API."
+"condivisi (errore HTTP 429). Ottieni una chiave gratuita su https://"
+"console.cloud.google.com — abilita la \"Books API\" e crea una chiave API."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -15556,6 +15592,18 @@ msgstr ""
 "disabilitata, le modifiche apportate vengono applicate solo a ciò che vedi "
 "nell'interfaccia web, non ai file e-book stessi. Questa funzionalità "
 "attualmente supporta solo i file in formato EPUB o AZW3."
+
+#: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -19033,8 +19081,8 @@ msgid ""
 "→ Recreate with \"Re-pull image\" enabled."
 msgstr ""
 "Immagini → scarica l'immagine qui sotto, quindi Container → seleziona "
-"Calibre-Web NextGen → Ricrea (recreate) abilitando \"Riscarica "
-"immagine\" (Re-pull image)."
+"Calibre-Web NextGen → Ricrea (recreate) abilitando \"Riscarica immagine\" "
+"(Re-pull image)."
 
 #: cps/templates/update_now_modal.html
 msgid "Synology Container Manager:"

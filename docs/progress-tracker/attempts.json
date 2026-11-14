@@ -10907,11 +10907,11 @@
   "delivered_via": [
    "PR #2502"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: content",
+  "quote": "I believe this is included now. Will close this off. Ta.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2499#issuecomment-6871343236",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2499@2026-10-07T08:18:28Z"
  },
  {
@@ -12330,13 +12330,14 @@
   "title": "[Performance] DESKTOP_COMPAT_MODE clears Magic Shelf count cache on every request",
   "person": "JALindsay4444",
   "delivered_via": [
-   "PR #2863"
+   "PR #2863",
+   "closed"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "happy",
+  "basis": "reply: fixed",
+  "quote": "**Verification of #2862 — PASS on v4.1.68**",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2862#issuecomment-6859352597",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2862@2026-11-09T20:17:26Z"
  },
  {
@@ -12531,14 +12532,15 @@
   "title": "[bug] New UI: shelves don't \"remember\" book density",
   "person": "mstewart14",
   "delivered_via": [
-   "PR #2901"
+   "PR #2901",
+   "PR #2930"
   ],
-  "outcome": "happy",
-  "basis": "reply: content",
-  "quote": "Thanks for picking it up and for the fixes, especially the phone gap",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/980#issuecomment-6839463146",
-  "judged_by": "deepseek-v4.1-flash",
-  "id": "issue#980@2026-11-12T07:50:13Z"
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#980@2026-11-14T05:31:40Z"
  },
  {
   "date": "2026-11-12",
@@ -12572,6 +12574,21 @@
  },
  {
   "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2597",
+  "title": "Uploading Calibre's .fb2.zip book exports fails: gate reads the name as \"zip\", .fbz has no registered MIME type",
+  "person": "TovarischSuhov",
+  "delivered_via": [
+   "PR #2919"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2597@2026-11-13T13:18:49Z"
+ },
+ {
+  "date": "2026-11-13",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2903",
   "title": "[bug] New UI: Library, Hot and Discover get stuck on \"Loading…\" at certain window widths with number of books per row change",
   "person": "sgreadly",
@@ -12585,6 +12602,37 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "issue#2903@2026-11-13T07:21:20Z"
+ },
+ {
+  "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2921",
+  "title": "Errno 524 when copying NFSv4 ACL xattrs – Metadata editing failures",
+  "person": "t-schu",
+  "delivered_via": [
+   "PR #2924",
+   "PR #2925"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2921@2026-11-13T19:19:07Z"
+ },
+ {
+  "date": "2026-11-13",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2598",
+  "title": "Accept Calibre's .fb2.zip book exports natively at the upload gate",
+  "person": "TovarischSuhov",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2598@2026-11-13T13:19:08Z"
  },
  {
   "date": "2026-11-13",
@@ -12630,5 +12678,50 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2904@2026-11-13T07:21:31Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2909",
+  "title": "fix: translation banner no longer counts plural entries as missing",
+  "person": "luochen1990",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2909@2026-11-14T00:25:31Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2927",
+  "title": "Add a Clear reading position action (#2831)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2927@2026-11-14T03:36:44Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2928",
+  "title": "Smart shelves honour the Library's \"Rows per load\" setting",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2928@2026-11-14T05:31:59Z"
  }
 ]

@@ -1287,6 +1287,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2479#issuecomment-6112419525",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2499@2026-10-07T08:18:28Z": {
+  "hash": "905f43b3ad340a2f",
+  "verdict": "content",
+  "quote": "I believe this is included now. Will close this off. Ta.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2499#issuecomment-6871343236",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2504@2026-10-08T12:08:31Z": {
   "hash": "501298cd390c169a",
   "verdict": "content",
@@ -1509,6 +1516,13 @@
   "verdict": "fixed",
   "quote": "The buttons and layout look good.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/283#issuecomment-4517275960",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2862@2026-11-09T20:17:26Z": {
+  "hash": "bf51aa102dcfb9b7",
+  "verdict": "fixed",
+  "quote": "**Verification of #2862 — PASS on v4.1.68**",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2862#issuecomment-6859352597",
   "by": "deepseek-v4.1-flash"
  },
  "issue#303@2026-07-14T02:47:33Z": {
@@ -2597,11 +2611,11 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#980@2026-11-12T07:50:13Z": {
-  "hash": "4e382b304ab7174d",
-  "verdict": "content",
-  "quote": "Thanks for picking it up and for the fixes, especially the phone gap",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/980#issuecomment-6839463146",
-  "by": "deepseek-v4.1-flash"
+  "hash": "b49d8dd17670ad27",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
  },
  "issue#984@2026-07-29T14:35:37Z": {
   "hash": "945f2cba8f6248d8",

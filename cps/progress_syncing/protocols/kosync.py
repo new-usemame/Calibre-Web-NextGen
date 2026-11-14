@@ -41,6 +41,7 @@ import base64
 import math
 import os
 import re
+import time
 from datetime import datetime, timezone
 from typing import Dict, Optional, Any, Tuple
 from urllib.parse import quote
@@ -508,6 +509,67 @@ def handle_sync_error(error: KOSyncError) -> tuple:
     }, status)
 
 
+# Issue #1190: a device stuck on an unknown checksum polls repeatedly, so the
+# extra diagnostic detail on a lookup miss is emitted at most once per checksum
+# per interval. The plain "No book found" line is still logged every time.
+_MISS_DIAG_INTERVAL = 300.0
+_MISS_DIAG_MAX_TRACKED = 256
+_miss_diag_last: Dict[str, float] = {}
+
+
+def _describe_checksum_miss(document_checksum: str) -> str:
+    """Say why a checksum lookup missed, or return "" if already said recently.
+
+    Three different causes produce the same miss and need different answers
+    from the admin (#1190):
+
+    * a ``book_format_checksums`` row exists but its book id is no longer in
+      ``books`` (stale id, e.g. after a Calibre database rebuild);
+    * no checksums are registered at all (the backfill never ran, or
+      registration is failing);
+    * checksums exist but not this one (the device holds a file the server
+      never served, or whose bytes changed after it was registered).
+
+    Never raises: diagnostics must not turn a clean miss into an error.
+    """
+    now = time.monotonic()
+    last = _miss_diag_last.get(document_checksum)
+    if last is not None and now - last < _MISS_DIAG_INTERVAL:
+        return ""
+    if len(_miss_diag_last) >= _MISS_DIAG_MAX_TRACKED:
+        _miss_diag_last.clear()
+    _miss_diag_last[document_checksum] = now
+
+    try:
+        from ... import calibre_db
+        from ...db import BookFormatChecksum
+
+        orphan = calibre_db.session.query(
+            BookFormatChecksum.book, BookFormatChecksum.format
+        ).filter(BookFormatChecksum.checksum == document_checksum).first()
+        if orphan:
+            return (
+                "a checksum row exists for book id %s (%s) but that book is not "
+                "in the library; the id is stale, e.g. after a Calibre database "
+                "rebuild" % (orphan[0], orphan[1])
+            )
+        total = calibre_db.session.query(
+            func.count(BookFormatChecksum.id)
+        ).scalar() or 0
+        if total == 0:
+            return (
+                "no checksums are registered library-wide; the checksum "
+                "backfill has not run or registration is failing"
+            )
+        return (
+            "%d checksums are registered library-wide but not this one; the "
+            "device holds a file this server never served, or one whose bytes "
+            "changed after it was registered" % total
+        )
+    except Exception as e:  # noqa: BLE001 - diagnostics only
+        return "diagnostics unavailable (%s)" % e
+
+
 def get_book_by_checksum(document_checksum: str, version: str = None):
     """
     Lookup a book in the Calibre library by its partial MD5 checksum.
@@ -566,7 +628,11 @@ def get_book_by_checksum(document_checksum: str, version: str = None):
         # CWA, my device pushes a checksum, nothing happens" — the
         # checksum is in the message so the admin can grep the
         # book_format_checksums table for it.
-        log.info("KOReader sync: No book found for checksum: %s", document_checksum)
+        detail = _describe_checksum_miss(document_checksum)
+        log.info(
+            "KOReader sync: No book found for checksum: %s%s",
+            document_checksum, " (%s)" % detail if detail else "",
+        )
         return None, None, None, None, None
 
     except SQLAlchemyError as e:

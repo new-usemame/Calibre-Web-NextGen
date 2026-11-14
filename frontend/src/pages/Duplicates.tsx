@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { Files, Merge, RefreshCw, X } from 'lucide-react';
 import {
-  useDuplicates, useDismissDuplicate, useMergeBooks, useTriggerDuplicateScan,
+  useDuplicates, useDismissDuplicate, useMe, useMergeBooks, useTriggerDuplicateScan,
   type DuplicateGroup,
 } from '../lib/queries';
 import { resourceUrl } from '../lib/api';
 import { mergeRequestIds } from '../lib/duplicateMerge';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { DuplicateAutoResolve } from '../components/DuplicateAutoResolve';
 import { useT } from '../lib/i18n';
 import styles from './Duplicates.module.css';
 
@@ -20,6 +21,8 @@ export function Duplicates() {
   const { data, isLoading, error } = useDuplicates();
   const dismiss = useDismissDuplicate();
   const scan = useTriggerDuplicateScan();
+  // #1902 -- the classic page's Auto-Resolve panel; its routes are admin-only.
+  const isAdmin = !!useMe().data?.role?.admin;
   // Page-level, because a successful merge usually removes the group (and the
   // card that ran it) on the next fetch.
   const [mergeMessage, setMergeMessage] = useState('');
@@ -67,6 +70,8 @@ export function Duplicates() {
       ) : data.items.length === 0 ? (
         <EmptyState message={t('No duplicate groups found.')} />
       ) : (
+        <>
+        {isAdmin && <DuplicateAutoResolve />}
         <div className={styles.groups}>
           {data.items.map((g) => (
             <DuplicateGroupCard key={g.group_hash} group={g}
@@ -75,6 +80,7 @@ export function Duplicates() {
               onMergeResult={setMergeMessage} />
           ))}
         </div>
+        </>
       )}
     </main>
   );

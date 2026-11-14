@@ -4606,6 +4606,86 @@ msgid "Refresh library"
 msgstr "Bibliotheek vernieuwen"
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr "Kan het voorbeeld van de oplossing niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr "Kan de duplicaten niet oplossen."
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr "Duplicaten verwijderen"
+
+#: cps/spa_strings.py
+msgid "Delete {count} duplicate books?"
+msgstr "{count} dubbele boeken verwijderen?"
+
+#: cps/spa_strings.py
+msgid "Keep"
+msgstr "Behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr "Beste formaat behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr "Grootste bestanden behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr "Meest complete metadata behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr "Nieuwste exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr "Oudste exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Keeps one book in every group and deletes the other copies, using the strategy you choose."
+msgstr "Behoudt één boek per groep en verwijdert de andere exemplaren, volgens de gekozen strategie."
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr "Formaten samenvoegen in het nieuwste exemplaar"
+
+#: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr "Niets te verwijderen met deze strategie."
+
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr "Voorbeeld laden…"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr "Automatisch oplossen"
+
+#: cps/spa_strings.py
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr "{groups} groepen opgelost en {deleted} boeken verwijderd."
+
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr "Strategie"
+
+#: cps/spa_strings.py
+msgid "This permanently removes the extra copies from your library. It cannot be undone."
+msgstr "Hiermee worden de extra exemplaren definitief uit je bibliotheek verwijderd. Dit kan niet ongedaan worden gemaakt."
+
+#: cps/spa_strings.py
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr "{deleted} boeken in {groups} groepen zouden worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "…and {count} more groups"
+msgstr "… en nog {count} groepen"
+
+#: cps/spa_strings.py
 msgid "<"
 msgstr "<"
 

@@ -427,6 +427,19 @@ def _format_update_banner_message(current_version: str, latest_version: str) -> 
     }
 
 
+def _count_missing_translations(po) -> int:
+    """Count the live entries a user of this language still sees in English.
+
+    Uses polib's ``translated()``, the definition
+    ``scripts/generate_translation_status.py`` publishes in the README table:
+    plural entries are judged by ``msgstr_plural`` (polib leaves ``msgstr``
+    empty for them), every plural form must be filled, and a fuzzy entry
+    counts as missing because msgfmt leaves it out of the compiled .mo.
+    Obsolete (``#~``) entries are not shown anywhere, so they never count.
+    """
+    return sum(1 for entry in po if not entry.obsolete and not entry.translated())
+
+
 def _format_translation_missing_message(language: str, count: int) -> str:
     # Static msgid with named placeholders (see _format_update_banner_message):
     # the old ``_(f"...{language}...{count}...")`` interpolated before gettext,
@@ -506,7 +519,7 @@ def translations_missing_notification() -> None:
     if os.path.isfile(po_path):
         try:
             po = polib.pofile(po_path)
-            missing_count = sum(1 for entry in po if not entry.msgstr.strip())
+            missing_count = _count_missing_translations(po)
         except Exception as e:
             print(f"[translation-notification-service] Error reading {po_path}: {e}", flush=True)
     if missing_count <= 0:

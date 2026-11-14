@@ -560,11 +560,107 @@ local function testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
     runtime:syncLibrary({ force = true })
     while #ticks > 0 do table.remove(ticks, 1)() end
     fresh._shared.running = nil
-    local records = written("cwngsync_library.lua")
+    -- KOReader starts again: a fresh runtime reads only what was written.
+    package.loaded["cwng_library_runtime"] = nil
+    local restarted = setmetatable({}, { __index = require("cwng_library_runtime") })
     local kept = 0
-    for _ in pairs(records and records.written.state and records.written.state.books or {}) do kept = kept + 1 end
+    for _ in pairs(restarted:getLibraryState().books) do kept = kept + 1 end
     assert(kept >= 50, "at most a few covers are fetched again after a restart, but only "
         .. kept .. " of 61 were saved")
+    package.loaded["cwng_library_runtime"] = Runtime
+end
+
+-- How many book records the settings files flushed during `action` hold,
+-- whichever files the runtime keeps them in.
+local function recordsWrittenBy(action)
+    local before = {}
+    for path, file in pairs(settings_files) do before[path] = file.flushes end
+    action()
+    local count = 0
+    local function walk(value)
+        if type(value) ~= "table" then return end
+        if value.kind == "placeholder" or value.kind == "downloaded" then count = count + 1 return end
+        for _, v in pairs(value) do walk(v) end
+    end
+    for path, file in pairs(settings_files) do
+        if file.flushes ~= (before[path] or 0) then walk(file.written) end
+    end
+    return count
+end
+
+local function restartedLibrary()
+    package.loaded["cwng_library_runtime"] = nil
+    local restarted = setmetatable({}, { __index = require("cwng_library_runtime") })
+    return restarted:getLibraryState()
+end
+
+local function testASaveWritesOnlyTheRecordsThatChanged()
+    -- #2329: every save serialised and rewrote the record of every book, on
+    -- KOReader's main thread: every 10 steps of a sync, at its end, and each
+    -- time a book was opened or arrived. At 530 kB on a phone that held the
+    -- screen long enough for Android to report KOReader as not responding.
+    for path in pairs(settings_files) do settings_files[path] = nil end
+    package.loaded["cwng_library_runtime"] = nil
+    local fresh = require("cwng_library_runtime")
+    local root = folder .. "/big"
+    assert(os.execute("mkdir -p '" .. root .. "'"))
+    local books = manyNewBooks(1000)().books
+    local client = { get_library = function(_, _, _, _, _, _, ...)
+        local callback = select(select("#", ...), ...)
+        ticks[#ticks + 1] = function() callback(true, { books = books, revision = "r1" }) end
+    end }
+    local runtime = setmetatable({ device_id = "device",
+        settings = { server = "http://books", username = "reader", password = "secret" },
+    }, { __index = fresh })
+    function runtime:libraryEnabled() return true end
+    function runtime:getLibraryRoot() return root end
+    function runtime:newSyncClient() return client end
+    function runtime:refreshLibraryViews() end
+    function runtime:applyLibraryCollections() end
+    function runtime:fetchPlaceholder() return true, { size = 1, mtime = 1 } end
+    runtime:getLibraryState().owner = runtime:accountOwner()
+    local outcome = {}
+    runtime:syncLibrary({ force = true, on_done = function(ok) outcome.ok = ok end })
+    while #ticks > 0 do table.remove(ticks, 1)() end
+    assertEqual(outcome.ok, true, "the sync of 1000 books finishes")
+
+    local state = runtime:getLibraryState()
+    state.books["500"].status = "reading" -- one book opened
+    local count = recordsWrittenBy(function() runtime:saveLibraryState() end)
+    assert(count >= 1, "the changed record is written")
+    assert(count <= 100, "a save after one book changed writes " .. count .. " of 1000 records")
+    assertEqual(recordsWrittenBy(function() runtime:saveLibraryState() end), 0,
+        "a save with nothing changed writes no records")
+
+    state.books["7"] = nil -- a book left the library
+    runtime:saveLibraryState()
+    local after = restartedLibrary()
+    local kept = 0
+    for _ in pairs(after.books) do kept = kept + 1 end
+    assertEqual(kept, 999, "a restart reads every record back")
+    assertEqual(after.books["7"], nil, "without the one removed")
+    assertEqual(after.books["500"].status, "reading", "and with the change")
+    assertEqual(after.books["1000"].kind, "placeholder", "including the last book")
+    assertEqual(after.revision, "r1", "and the revision")
+    package.loaded["cwng_library_runtime"] = Runtime
+end
+
+local function testRecordsSavedByAnEarlierVersionAreKept()
+    -- The records used to sit inside cwngsync_library.lua itself. A device
+    -- updating the plugin keeps them, and they move out on the first save.
+    for path in pairs(settings_files) do settings_files[path] = nil end
+    local older = { version = 1, revision = "r1", owner = "http://books|reader", books = {
+        ["1"] = { kind = "placeholder", path = "/x/Cover [1].epub", rev = "a", status = "unread" },
+        ["2"] = { kind = "downloaded", path = "/x/Book [2].epub", rev = "b", checksum = "md5:b" },
+    } }
+    settings_files["/tmp/cwngsync_library.lua"] = { written = { state = older }, flushes = 0 }
+    local state = restartedLibrary()
+    assertEqual(state.books["1"].kind, "placeholder", "the earlier cover is known")
+    assertEqual(state.books["2"].checksum, "md5:b", "and the earlier download")
+    package.loaded["cwng_library_runtime"].saveLibraryState(setmetatable({}, { __index = package.loaded["cwng_library_runtime"] }))
+    state = restartedLibrary()
+    assertEqual(state.books["1"] ~= nil and state.books["2"] ~= nil, true, "both are still there after a save and a restart")
+    assertEqual(state.owner, "http://books|reader", "with the account they belong to")
     package.loaded["cwng_library_runtime"] = Runtime
 end
 
@@ -1000,6 +1096,8 @@ testAFirstFillShowsHowFarItHasGot()
 testTheHomeListsCoversAsAFirstFillAddsThem()
 testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
+testASaveWritesOnlyTheRecordsThatChanged()
+testRecordsSavedByAnEarlierVersionAreKept()
 testALibraryWhoseListWasNotSavedIsNotEmptied()
 testAnErrorInASyncDoesNotStopLaterSyncs()
 testAnAutomaticSyncHoldsTheScreenForLessThanSyncNow()

@@ -33,15 +33,22 @@ from .annotation_types import to_storage_type
 
 log = logger.create()
 
-_VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote"}
+_VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote", "crosspoint"}
+# Sources a pushed payload may name. ``crosspoint`` rows are made only by the
+# CrossPoint clippings route, with the layout sidecar the firmware needs back
+# (progress_syncing/protocols/crosspoint_clippings).
+_PUSH_SOURCES = _VALID_SOURCES - {"crosspoint"}
+# Sources whose client names a highlight by its words: the stored quote goes
+# back to that client unchanged.
+QUOTE_SOURCES = frozenset({"textquote", "crosspoint"})
 
 
 def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
     """Return a validation error for fields that would make an upsert unsafe."""
     if not isinstance(payload, dict):
         return None  # non-object entries are deliberately counted as skipped
-    if "source" in payload and payload.get("source") not in _VALID_SOURCES:
-        return "source must be one of: " + ", ".join(sorted(_VALID_SOURCES))
+    if "source" in payload and payload.get("source") not in _PUSH_SOURCES:
+        return "source must be one of: " + ", ".join(sorted(_PUSH_SOURCES))
     for field in ("annotation_id", "highlighted_text", "note_text", "color",
                   "content_id", "context_string", "position_type",
                   "start_xpointer", "end_xpointer", "device_origin_id"):
@@ -278,7 +285,7 @@ def apply_portable(payload, *, user_id, book, session, commit,
 
     # A quote is how its own client names a highlight; on another reader's row
     # it would be served in place of the words that row's anchor holds.
-    if payload.get("text_quote") is not None and row.source == "textquote":
+    if payload.get("text_quote") is not None and row.source in QUOTE_SOURCES:
         from .text_anchor import parse_quote
         quote = parse_quote(payload.get("text_quote"))
         if quote is not None:

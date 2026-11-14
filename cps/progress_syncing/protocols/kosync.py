@@ -157,8 +157,9 @@ POSITION_KIND_ANCHOR = "anchor"
 #   annotations_text_quote  /kosync/syncs/annotations places pushed
 #                     ``text_quote`` highlights and names pulled ones by their
 #                     words on ``?text_quote=1`` (koreader_annotations)
+#   crosspoint_clippings  CrossPoint's /kosync/api/v1/clippings (crosspoint_clippings)
 SERVER_CAPABILITIES = ("position_kinds", "percentage_push", "anchor", "book_id_document",
-                       "annotations_text_quote", "sleep_screen_v1")
+                       "annotations_text_quote", "sleep_screen_v1", "crosspoint_clippings")
 
 
 def is_percentage_only(progress_record) -> bool:
@@ -2803,6 +2804,10 @@ def handle_internal_error(error):
 # Imported at the bottom so kosync is fully defined first (the module imports
 # helpers from here). See koreader_annotations.py.
 from . import koreader_annotations  # noqa: E402,F401
+
+# CrossPoint's Sync Clippings routes. Imported here for the same reason; they
+# reuse helpers of koreader_annotations. See crosspoint_clippings.py.
+from . import crosspoint_clippings  # noqa: E402,F401
 
 # The KOReader library (manifest, placeholders, book files, read status).
 # Imported at the bottom for the same reason as the annotation routes above.

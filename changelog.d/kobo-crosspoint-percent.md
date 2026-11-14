@@ -1,0 +1,3 @@
+### Added
+
+- **New opt-in setting for each Kobo: align its percentage with CrossPoint.** A Kobo reports only whole percents, measured on its own copy of the book. On the Devices page, each Kobo now has **Align this Kobo's percentage with CrossPoint**. With it on, and the Kobo holding the library's current KEPUB, the server works out the percentage CrossPoint would show at the Kobo's place and shares that instead, so the readers agree and a move within one percent still reaches the other devices. Hardcover gets the same percentage, so the page it shows changes, and the book page shows it while that Kobo's report is the latest place. The Kobo itself keeps the value it reported. The setting is off by default, and with it off nothing changes.

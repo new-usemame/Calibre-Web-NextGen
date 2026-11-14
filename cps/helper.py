@@ -1212,12 +1212,42 @@ def get_kosync_progress_display(session, user_id, book_id):
         if kobo_state is None or kobo_state.current_bookmark is None:
             return None, None, None
         bookmark = kobo_state.current_bookmark
-        if bookmark.progress_percent is None:
+        percent = bookmark.progress_percent
+        if percent is None:
             return None, None, None
-        return bookmark.progress_percent, bookmark.last_modified, bookmark.created_at
+        shared = _kobo_shared_percent(session, user_id, book_id, bookmark)
+        if shared is not None:
+            percent = shared
+        return percent, bookmark.last_modified, bookmark.created_at
     except Exception:  # pragma: no cover - defensive around DB/session errors
         log.debug("Could not load KOReader progress for book %s", book_id, exc_info=True)
         return None, None, None
+
+
+def _kobo_shared_percent(session, user_id, book_id, bookmark):
+    """Return the KOSync percentage that the same Kobo report wrote, or None.
+
+    A Kobo bookmark keeps the device's whole-number percentage. The share to
+    KOSync can store the finer CrossPoint value of the same place
+    (``kobo.share_kobo_progress_with_koreader``). That row has the device
+    ``Kobo`` and the bookmark's receipt as its timestamp. Any other row is
+    from another report, so the bookmark value applies.
+    """
+    try:
+        from .progress_syncing.models import KOSyncProgress
+        from .services.koreader_position import KOBO_DEVICE
+        if bookmark.server_modified_at is None:
+            return None
+        row = (session.query(KOSyncProgress.percentage)
+               .filter(KOSyncProgress.user_id == int(user_id),
+                       KOSyncProgress.document == str(book_id),
+                       KOSyncProgress.device == KOBO_DEVICE,
+                       KOSyncProgress.timestamp == bookmark.server_modified_at)
+               .first())
+    except Exception:
+        log.debug("Could not load the shared Kobo percentage for book %s", book_id, exc_info=True)
+        return None
+    return row[0] if row else None
 
 
 def _get_kosync_checksums_for_book(book_id):

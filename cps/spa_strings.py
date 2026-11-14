@@ -663,6 +663,11 @@ _("Devices with this on open each book where you last stopped on any of them. Tu
 _("Could not save Share my place. Try again.")
 _("Always shares its place. Install or update the NextGen Sync plugin on this device to choose.")
 
+# Align a Kobo's percentage with CrossPoint (Devices page, Kobo only).
+_("Align this Kobo's percentage with CrossPoint")
+_("Could not save the percentage setting. Try again.")
+_("Off by default. When on, and this Kobo holds the current KEPUB, its place is shared as the percentage CrossPoint shows there, not the whole number the Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that percentage, so the page Hardcover shows changes. The Kobo keeps its own value.")
+
 
 # Per-device book scope (KOReader, PR A).
 _("Books on this device")
@@ -975,6 +980,7 @@ _("Create user")
 _("Created {name}.")
 _("Creating…")
 _("Crop to fill — no border, trims the edges")
+_("CrossPoint")
 _("Current")
 _("Current cover")
 _("Current password")

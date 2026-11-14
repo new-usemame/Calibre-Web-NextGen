@@ -25,6 +25,7 @@ from bs4.element import Tag
 from cps import logger
 from cps.isoLanguages import get_lang3, get_language_name
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
+from cps.services.isbn import is_valid as isbn_is_valid
 
 log = logger.create()
 
@@ -1332,14 +1333,7 @@ class Kobo(Metadata):
         # Clean ISBN: remove hyphens, spaces, and convert to uppercase
         clean_isbn = re.sub(r'[-\s]', '', isbn.strip().upper())
         
-        # Check if it's ISBN-10 or ISBN-13
-        if len(clean_isbn) == 10:
-            # ISBN-10 validation
-            if re.match(r'^\d{9}[\dX]$', clean_isbn):
-                return clean_isbn
-        elif len(clean_isbn) == 13:
-            # ISBN-13 validation (should start with 978 or 979)
-            if re.match(r'^(978|979)\d{10}$', clean_isbn):
-                return clean_isbn
-                
+        # ISBN-10 or ISBN-13 (978/979) with a valid check digit
+        if re.fullmatch(r'\d{9}[\dX]|\d{13}', clean_isbn) and isbn_is_valid(clean_isbn):
+            return clean_isbn
         return None

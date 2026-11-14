@@ -53,6 +53,7 @@ from urllib.parse import quote_plus
 import requests
 
 from . import parallel
+from .isbn import is_valid as isbn_is_valid
 
 from .. import constants, logger
 
@@ -258,7 +259,7 @@ def _isbn_from(identifiers: Dict) -> Optional[str]:
         val = identifiers.get(key)
         if val:
             digits = re.sub(r"[^0-9Xx]", "", str(val))
-            if len(digits) in (10, 13):
+            if len(digits) in (10, 13) and isbn_is_valid(digits):
                 return digits
     return None
 
@@ -308,6 +309,9 @@ def _to_isbn10(isbn: str) -> Optional[str]:
     return None for those.
     """
     cleaned = re.sub(r"[^0-9Xx]", "", isbn or "")
+    # A value that fails its check digit names some other edition's cover, or none.
+    if not isbn_is_valid(cleaned):
+        return None
     if len(cleaned) == 10:
         return cleaned.upper()
     if len(cleaned) == 13 and cleaned.startswith("978"):

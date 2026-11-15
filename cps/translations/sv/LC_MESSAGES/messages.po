@@ -5144,6 +5144,26 @@ msgid "Could not save the book choice. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(ingen text fångades)"
 

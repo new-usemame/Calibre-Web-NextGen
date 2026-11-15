@@ -146,10 +146,12 @@ def magic_shelf_books(shelf_id):
     select_all = request.args.get("select_all", "").strip().lower() in (
         "1", "true", "yes", "on"
     )
-    page = 1 if select_all else request.args.get("page", 1, type=int)
-    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else request.args.get(
+    page = 1 if select_all else max(1, request.args.get("page", 1, type=int))
+    # The SPA sends rows x measured columns (#980). Bound a hand-made value the
+    # way the author/series lists do: SQLite reads LIMIT -1 as "every match".
+    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else max(1, min(200, request.args.get(
         "per_page", config.config_books_per_page, type=int
-    ))
+    ))))
     configured_sort_columns = load_configured_columns(config)
     resolved_sort = resolve_magic_shelf_sort(
         request.args.get("sort", "new"), config, configured_sort_columns

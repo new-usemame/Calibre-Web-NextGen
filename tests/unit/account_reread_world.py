@@ -13,9 +13,12 @@ from unittest.mock import MagicMock, patch
 
 import flask
 
-from cps import constants, usermanagement
+from cps import constants, opds, usermanagement
 
 app = flask.Flask(__name__)
+app.config["TESTING"] = True
+app.add_url_rule("/opds/download/<book_id>/<book_format>/",
+                 view_func=opds.opds_download_link)
 
 
 def basic_auth(username, password):
@@ -26,3 +29,14 @@ def basic_auth(username, password):
             patch.object(usermanagement, "_verify_app_password_older", return_value=False), \
             patch.object(usermanagement.config, "config_login_type", constants.LOGIN_STANDARD, create=True):
         return usermanagement.verify_password(username, password)
+
+
+def opds_download(username, password):
+    """Real download auth gates; book visibility and file serving are separate."""
+    with patch.object(usermanagement, "limiter", MagicMock()), \
+            patch.object(usermanagement.config, "config_login_type", constants.LOGIN_STANDARD, create=True), \
+            patch.object(usermanagement.config, "config_anonbrowse", 0, create=True), \
+            patch.object(usermanagement.config, "config_allow_reverse_proxy_header_login", False, create=True), \
+            patch.object(opds, "abort_unless_opds_book_exposed"), \
+            patch.object(opds, "get_download_link", return_value="ebook bytes"):
+        return app.test_client().get("/opds/download/1/epub/", auth=(username, password))

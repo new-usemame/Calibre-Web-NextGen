@@ -7,9 +7,8 @@
 
 from functools import wraps
 
+from sqlalchemy import inspect
 from sqlalchemy.sql.expression import func
-from sqlalchemy.exc import InvalidRequestError
-from sqlalchemy.orm.exc import ObjectDeletedError
 from .cw_login import login_required
 
 from flask import request, g, make_response
@@ -104,18 +103,18 @@ def _fresh_user(user):
     the values it had then. A password, role or account change written by another
     process (an admin script, a second worker) was not seen: after a browser visit
     a disabled reader could still download over OPDS, and a newly set password was
-    refused while the old one still worked. Every per-request account lookup goes
-    through this.
+    refused while the old one still worked. The Basic-auth, reverse-proxy and
+    signed-in-session lookups below go through this.
     """
-    if user is None:
-        return None
-    try:
-        ub.session.refresh(user)
-    except ObjectDeletedError:
-        return None
-    except InvalidRequestError:
-        return user     # not attached to this session (a stand-in object): nothing to re-read
-    return user
+    state = inspect(user, raiseerr=False)
+    if state is None or not state.persistent or state.session is not ub.session:
+        return user  # An unattached test stand-in has nothing to re-read.
+    # Re-populate only this User, retaining its identity. Unlike refresh(), a
+    # missing row returns None rather than raising InvalidRequestError, which
+    # can also mean a broken session and must not return cached credentials.
+    return (ub.session.query(ub.User)
+            .populate_existing()
+            .filter(ub.User.id == state.identity[0]).first())
 
 
 def create_authenticated_user(username, email=None, auth_source="unknown"):

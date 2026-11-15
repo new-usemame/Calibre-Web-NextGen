@@ -277,7 +277,9 @@ class TaskEmail(CalibreTask):
                 book_id=self.book_id,
                 book_format=(book_format or "").upper(),
                 file_path=file_path,
-                filename_for_matching=attachment_name,
+                # The MIME name may keep ":" (#2650), but a reader's storage
+                # cannot hold it, so match on the name the device can store.
+                filename_for_matching=(attachment_name or "").replace(":", "_") or None,
             )
         except Exception as ex:
             log.error("Failed to register KOReader checksum for emailed book %s: %s",

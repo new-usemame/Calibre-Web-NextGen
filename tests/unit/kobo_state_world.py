@@ -315,7 +315,7 @@ def kw(monkeypatch, read_column_class):
         session.expire_all()
 
     world = SimpleNamespace(
-        a=kobo_a, b=kobo_b, books=books, session=session, kobo=kobo, ub=ub,
+        a=kobo_a, b=kobo_b, books=books, session=session, kobo=kobo, ub=ub, app=app,
         sync=sync, settle=settle, frontier=frontier, put=put, get=get,
         share=share, seed_shared=seed_shared, journal=journal, shared=shared,
         counts=counts, read_column=read_column, hardcover=hardcover, tokens=tokens,

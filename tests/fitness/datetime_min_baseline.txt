@@ -1,0 +1,9 @@
+# datetime.min reads per file in cps/ and scripts/ (fork #2643). Counts may only go down.
+# Regenerate: python -m tests.fitness.test_no_new_datetime_min --write-baseline
+cps/duplicates.py 1
+cps/kobo.py 6
+cps/magic_shelf.py 2
+cps/services/SyncToken.py 7
+cps/shelf.py 2
+cps/ub.py 3
+cps/user_library.py 1

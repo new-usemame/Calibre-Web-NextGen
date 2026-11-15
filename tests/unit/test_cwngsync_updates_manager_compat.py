@@ -127,6 +127,42 @@ def test_publishing_is_automated_on_release_rather_than_a_remembered_step():
     )
 
 
+def test_a_failed_plugin_publish_reaches_a_person():
+    """fork #1688: a failure nobody sees is a release that never ships.
+
+    v4.1.34, v4.1.35 and v4.1.36 each failed the stale-version guard. The only
+    trace was a red run on a workflow with no other consumer, so three releases
+    went by with every device stuck on the old plugin. After the publish step
+    there must be a step that runs only on failure, only when the webhook is
+    configured, and posts through the existing DISCORD_WEBHOOK secret.
+    """
+    import yaml
+
+    workflow = yaml.safe_load(RELEASE_WORKFLOW.read_text())
+    job = workflow["jobs"]["publish"]
+    steps = job["steps"]
+    publish_at = next(
+        i for i, step in enumerate(steps)
+        if "publish-cwngsync-plugin.sh" in step.get("run", "")
+    )
+    notifiers = [
+        (i, step) for i, step in enumerate(steps)
+        if "failure()" in str(step.get("if", ""))
+    ]
+    assert notifiers, "no failure-only step: a failed publish would go unannounced"
+    at, notify = notifiers[0]
+    assert at > publish_at, "the failure step must come after the publish it reports on"
+    assert "env.DISCORD_WEBHOOK != ''" in notify["if"], (
+        "skip the alert when the webhook is not configured (forks, local runs)"
+    )
+    # The condition reads env.DISCORD_WEBHOOK; job or workflow env is in scope
+    # for a step's `if`, so the alert does not hinge on the step's own env.
+    visible_env = {**workflow.get("env", {}), **job.get("env", {})}
+    assert visible_env.get("DISCORD_WEBHOOK") == "${{ secrets.DISCORD_WEBHOOK }}"
+    assert notify["with"]["webhook"] == "${{ secrets.DISCORD_WEBHOOK }}"
+    assert notify["uses"].startswith("sarisia/actions-status-discord@")
+
+
 def test_publish_is_skipped_when_the_plugin_did_not_change():
     body = PUBLISH_SCRIPT.read_text()
     assert "--auto" in body, (

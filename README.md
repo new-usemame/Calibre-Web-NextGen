@@ -85,6 +85,7 @@ Prefer separate pages with a sidebar? The same guides are on the searchable [doc
 - [Full Docker Compose setup](#full-docker-compose-setup)
   - [What goes in each volume](#what-goes-in-each-volume)
   - [Running with Podman](#running-with-podman)
+- [NixOS](#nixos)
 - [First run](#first-run)
 - [Updating](#updating)
 - [Migrating](#migrating)
@@ -280,6 +281,52 @@ podman run -d --name calibre-web \
 ```
 
 Rootless Podman remaps user IDs, so if the container can't write to your volumes, add `--userns=keep-id` or run it rootful. Podman also has its own automatic updates with rollback (`podman auto-update`). A step-by-step guide will follow once this recipe has been verified against the image.
+
+---
+
+## NixOS
+
+The NixOS channel is community-maintained: the Docker image is the supported
+install, and @BeatLink is the contact for NixOS questions and issues.
+
+The repository is a Nix flake with a package and a NixOS module that runs the
+web app and its background services as systemd units:
+
+```nix
+{
+  inputs.calibre-web-nextgen.url = "github:new-usemame/Calibre-Web-NextGen";
+
+  outputs = { nixpkgs, calibre-web-nextgen, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        calibre-web-nextgen.nixosModules.default
+        {
+          services.calibre-web-nextgen = {
+            enable = true;
+            libraryDir = "/srv/books/library";
+            ingestDir = "/srv/books/ingest";
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+State lives in `/var/lib/calibre-web-nextgen` (`configDir`). The library and
+ingest folders must already exist and be writable by the service user. On first
+start the service creates `app.db` and an empty library, as the container does.
+The web app listens on `127.0.0.1:8083` by default; `listenAddress`, `port`,
+`openFirewall` and `environment` cover the rest.
+
+Alongside `calibre-web-nextgen.service`, the module starts the ingest watcher,
+the metadata change detector, the nightly backup zipper, the cover-preview cache
+sweeper and the KOReader checksum backfill as `calibre-web-nextgen-*` units,
+from the same `scripts/services` bodies the container runs.
+
+`nix build` builds the package, `nix run` starts it with state in
+`~/.calibre-web-automated`, and `nix flake check` runs a NixOS VM test of the
+module.
 
 ---
 
@@ -740,35 +787,35 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | n/a |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4133/4149 | 0 |
-| ca (`ca`) | `████████████████████` 99% | 4090/4149 | 0 |
-| Slovak (`sk`) | `████████████████████` 98% | 4085/4149 | 0 |
-| Russian (`ru`) | `████████████████████` 98% | 4075/4149 | 0 |
-| French (`fr`) | `█████████████████░░░` 87% | 3613/4149 | 123 |
-| Swedish (`sv`) | `████████████████░░░░` 80% | 3298/4149 | 0 |
-| Dutch (`nl`) | `███████████████░░░░░` 77% | 3178/4149 | 279 |
-| Italian (`it`) | `███████████████░░░░░` 75% | 3109/4149 | 0 |
-| Spanish (`es`) | `███████████████░░░░░` 74% | 3093/4149 | 0 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 64% | 2672/4149 | 172 |
-| Polish (`pl`) | `████████████░░░░░░░░` 62% | 2574/4149 | 0 |
-| German (`de`) | `████████████░░░░░░░░` 58% | 2404/4149 | 11 |
-| Hungarian (`hu`) | `████████░░░░░░░░░░░░` 42% | 1758/4149 | 118 |
-| Arabic (`ar`) | `███████░░░░░░░░░░░░░` 35% | 1464/4149 | 0 |
-| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 34% | 1426/4149 | 296 |
-| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1331/4149 | 234 |
-| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1226/4149 | 302 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 23% | 969/4149 | 256 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 18% | 731/4149 | 341 |
-| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 706/4149 | 342 |
-| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 707/4149 | 343 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 538/4149 | 381 |
-| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 510/4149 | 390 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 479/4149 | 357 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 465/4149 | 417 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4149 | 338 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 390/4149 | 371 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 324/4149 | 369 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 242/4149 | 330 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4143/4150 | 0 |
+| ca (`ca`) | `████████████████████` 99% | 4090/4150 | 0 |
+| Slovak (`sk`) | `████████████████████` 98% | 4085/4150 | 0 |
+| Russian (`ru`) | `████████████████████` 98% | 4075/4150 | 0 |
+| French (`fr`) | `█████████████████░░░` 87% | 3614/4150 | 123 |
+| Swedish (`sv`) | `████████████████░░░░` 80% | 3298/4150 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 77% | 3179/4150 | 279 |
+| Italian (`it`) | `███████████████░░░░░` 75% | 3109/4150 | 0 |
+| Spanish (`es`) | `███████████████░░░░░` 74% | 3093/4150 | 0 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 64% | 2672/4150 | 172 |
+| Polish (`pl`) | `████████████░░░░░░░░` 62% | 2574/4150 | 0 |
+| German (`de`) | `████████████░░░░░░░░` 58% | 2404/4150 | 11 |
+| Hungarian (`hu`) | `████████░░░░░░░░░░░░` 42% | 1758/4150 | 118 |
+| Arabic (`ar`) | `███████░░░░░░░░░░░░░` 35% | 1464/4150 | 0 |
+| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 34% | 1426/4150 | 296 |
+| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1331/4150 | 234 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 30% | 1226/4150 | 302 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 23% | 969/4150 | 256 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 19% | 774/4150 | 341 |
+| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 706/4150 | 342 |
+| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 707/4150 | 343 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 538/4150 | 381 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 510/4150 | 390 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 479/4150 | 357 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 465/4150 | 417 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4150 | 338 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 390/4150 | 371 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 324/4150 | 369 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 242/4150 | 330 |
 <!-- TRANSLATION_STATUS_END -->
 
 </details>

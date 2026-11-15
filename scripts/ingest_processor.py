@@ -9,6 +9,7 @@ import collections
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from calibre_library_target import (library_target, calibredb_command, operation,
@@ -25,6 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 import app_paths
+from library_copy import copy_file as _copy_file
 import service_user
 
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
@@ -260,7 +262,7 @@ class ProcessLock:
                 self.lock_file.seek(0)
                 pid_str = self.lock_file.read().strip()
                 return int(pid_str) if pid_str.isdigit() else "unknown"
-        except:
+        except (OSError, ValueError):
             pass
         return "unknown"
 
@@ -281,7 +283,7 @@ class ProcessLock:
             try:
                 self.lock_file.close()
                 self.lock_file = None
-            except:
+            except OSError:
                 pass
 
 def cleanup_lock():
@@ -842,6 +844,23 @@ _ACSM_PLUGIN_RAN_GUIDANCE = (
 )
 
 
+# fork #1228: no import hook turned the ticket into a book and none announced
+# itself, so "install the plugin" may tell someone to place a zip they placed.
+# @sgreadly measured both causes on a real ADE setup.
+_ACSM_TICKET_RETURNED_GUIDANCE = (
+    "ACSM_NOTICE: '{filename}' is an Adobe ACSM fulfillment ticket, not an ebook, "
+    "and no Calibre import plugin turned it into a book. Check two things: "
+    "(1) the plugin is registered, not only copied: the container log should show "
+    "'Registered Calibre plugin' for it, and a zip added after the first batch "
+    "registered needs: docker exec -e HOME=/config <container> "
+    "/opt/calibre/calibre-customize -a \"/config/.config/calibre/plugins/<plugin file>.zip\". "
+    "(2) DeACSM has a completed Adobe activation: without one it hands the ticket "
+    "back unchanged. Create the activation in Calibre desktop and copy its files "
+    "into the container's plugins/DeACSM folder, then restart. Details: "
+    "docs/calibre-plugins.md. The original file has been moved to the failed "
+    "books folder (processed_books/failed)."
+)
+
 def _distinct_book_ids(book_ids):
     """The distinct integer ids in ``book_ids``, ascending.
 
@@ -1127,6 +1146,9 @@ def conversion_failure_guidance(input_format, filename, converter_output=None):
         if reason:
             return _ACSM_PLUGIN_RAN_GUIDANCE.format(
                 filename=filename, reason=reason)
+        from calibre_ticket_fulfillment import TICKET_RETURNED
+        if TICKET_RETURNED in (converter_output or ''):
+            return _ACSM_TICKET_RETURNED_GUIDANCE.format(filename=filename)
     return template.format(filename=filename)
 
 
@@ -1230,9 +1252,6 @@ class NewBookProcessor:
         # remain global-only because they have no authenticated uploader.
         self.uploader_user_id = None
         self.uploader_was_personal_library = False
-        # True when last_added_book_id(s) came from the most-recently-modified
-        # fallback guess rather than parsed calibredb output.
-        self.last_added_ids_are_fallback = False
         self.can_convert, self.input_format = self.can_convert_check()
         # Determine if the file is already in the desired target format using normalized extensions
         self.is_target_format = (self.input_format.lower() == str(self.target_format).lower())
@@ -1293,31 +1312,6 @@ class NewBookProcessor:
             return ids
         except Exception:
             return []
-
-    def _fallback_last_added_book_id(self) -> None:
-        """Fallback to the most recently modified book when calibredb output lacks IDs."""
-        if self.last_added_book_id is not None:
-            return
-        try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
-                cur = con.cursor()
-                row = cur.execute(
-                    "SELECT id FROM books ORDER BY last_modified DESC LIMIT 1"
-                ).fetchone()
-                if row:
-                    self.last_added_book_id = int(row[0])
-                    self.last_added_book_ids = [self.last_added_book_id]
-                    # Guess, not parsed output — under concurrent ingest this
-                    # can be ANOTHER processor's book. Consumers that would
-                    # mis-attribute on a wrong id (original-filename capture)
-                    # check this flag and skip.
-                    self.last_added_ids_are_fallback = True
-                    print(
-                        "[ingest-processor] WARN: Could not parse calibredb output; using most recently modified book ID.",
-                        flush=True,
-                    )
-        except Exception as e:
-            print(f"[ingest-processor] WARN: Failed to infer book ID after import: {e}", flush=True)
 
     def _register_title_sort_function(self, connection: sqlite3.Connection) -> bool:
         """Register title_sort SQL function on a raw SQLite connection."""
@@ -1670,14 +1664,6 @@ class NewBookProcessor:
             if getattr(self, 'last_added_book_id', None) else [])
         if not book_ids:
             return
-        if getattr(self, 'last_added_ids_are_fallback', False):
-            # The id is a most-recently-modified guess (calibredb output
-            # parsing failed) — under concurrent ingest it can belong to a
-            # DIFFERENT book, and a wrong "Imported as" is worse than none.
-            print("[ingest-processor] Skipping original-filename record: "
-                  "book id came from fallback inference, not calibredb "
-                  "output", flush=True)
-            return
         try:
             with sqlite3.connect(get_app_db_path(), timeout=30) as con:
                 for bid in book_ids:
@@ -1823,6 +1809,49 @@ class NewBookProcessor:
             raise PreserveIngestSourceError("Fulfilled ACSM book import incomplete; original and fulfilled book retained")
         shutil.rmtree(destination, ignore_errors=True)
 
+    # Both upload routes stage a browser upload as
+    # "<new|format>_<id>_<YYYYmmdd>_<HHMMSS>_<ffffff>_<name>" so that parallel
+    # uploads never collide (cps.editbooks._get_ingest_path), and record the
+    # browser's own file name in the .cwa.json sidecar.
+    _UPLOAD_STAGING_PREFIX = re.compile(r"^(?:new|format)_\d+_\d{8}_\d{6}_\d{6}_")
+
+    def _presented_name(self, path) -> str:
+        """The file name ebook-convert and calibredb should see for ``path``.
+
+        Calibre takes the title from the file name when the file carries none,
+        so an upload staged as "new_1_20261113_112627_417824_Rig_Doc.docx" was
+        imported titled "new 1 20261113 112627 417824 Rig_Doc". The staged name
+        is also sanitised (spaces become underscores, a non-ASCII stem becomes
+        "book", #2701), so when the sidecar names the original file, present
+        its stem with the staged extension (the upload gate may have changed
+        it, e.g. .fb2.zip to .fbz). A watch-folder drop has no sidecar and
+        keeps its own name.
+        """
+        name = Path(path).name
+        original = getattr(self, "original_filename", name)
+        if original == Path(self.filepath).name:
+            return name
+        match = self._UPLOAD_STAGING_PREFIX.match(name)
+        if not match:
+            return name
+        fallback = name[match.end():] or name
+        suffix = Path(name).suffix
+        stem = Path(str(original).replace("\\", "/")).name
+        if suffix and stem.lower().endswith(suffix.lower()):
+            stem = stem[:-len(suffix)]
+        elif suffix.lower() == ".fbz" and stem.lower().endswith(".fb2.zip"):
+            stem = stem[:-len(".fb2.zip")]
+        else:
+            stem = Path(stem).stem
+        stem = "".join(ch for ch in stem if ch.isprintable()).strip().lstrip(".").strip()
+        # Leave room under NAME_MAX for the suffix and any temp-name decoration.
+        while len(stem.encode("utf-8")) > 200:
+            stem = stem[:-1]
+        stem = stem.rstrip()
+        if not stem:
+            return fallback
+        return stem + suffix
+
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""
         print(f"[ingest-processor]: Starting conversion process for {self.filename}...", flush=True)
@@ -1833,10 +1862,29 @@ class NewBookProcessor:
             end_format = self.target_format # If end_format isn't given, the file is converted to the target format specified in the CWA Settings page
 
         original_filepath = Path(self.filepath)
-        target_filepath = f"{self.tmp_conversion_dir}{original_filepath.stem}.{end_format}"
+        presented = self._presented_name(self.filepath)
+        input_path = self.filepath
+        if presented != original_filepath.name:
+            # Show the converter the uploaded name without renaming the watched
+            # source, which delete and backup still look for under its own name.
+            # tmp_conversion_dir is emptied after every ingest run.
+            # If that copy cannot be made, convert under the staging name as
+            # before rather than fail the book.
+            try:
+                presented_dir = tempfile.mkdtemp(prefix="presented-", dir=self.tmp_conversion_dir)
+                input_path = os.path.join(presented_dir, presented)
+                try:
+                    os.link(self.filepath, input_path)
+                except OSError:
+                    _copy_file(self.filepath, input_path)
+            except OSError as e:
+                print(f"[ingest-processor] WARN: could not present {self.filename} under its "
+                      f"uploaded name, converting it as staged: {e}", flush=True)
+                input_path = self.filepath
+        target_filepath = f"{self.tmp_conversion_dir}{Path(presented).stem}.{end_format}"
         try:
             t_convert_book_start = time.time()
-            _run_converter_streaming(['ebook-convert', self.filepath, target_filepath],
+            _run_converter_streaming(['ebook-convert', input_path, target_filepath],
                                      env=self.calibre_env,
                                      timeout=conversion_budget_remaining())
             t_convert_book_end = time.time()
@@ -1846,7 +1894,7 @@ class NewBookProcessor:
             if self.cwa_settings['auto_backup_conversions']:
                 self.backup(self.filepath, backup_type="converted")
 
-            self.db.conversion_add_entry(original_filepath.stem,
+            self.db.conversion_add_entry(Path(presented).stem,
                                         self.input_format,
                                         self.target_format,
                                         str(self.cwa_settings["auto_backup_conversions"]))
@@ -2261,7 +2309,7 @@ class NewBookProcessor:
             for index, existing_path in enumerate(existing_paths, start=1):
                 destination = recovery_dir / f"{index}_{existing_path.name}"
                 source_digest = _sha256_file(existing_path)
-                shutil.copy2(existing_path, destination)
+                _copy_file(existing_path, destination)
                 if _sha256_file(destination) != source_digest:
                     raise OSError(f"digest mismatch preserving {existing_path}")
                 with destination.open("rb") as preserved_file:
@@ -2297,7 +2345,7 @@ class NewBookProcessor:
                 os.close(restore_fd)
                 restore_path = Path(restore_name)
                 try:
-                    shutil.copy2(preserved_path, restore_path)
+                    _copy_file(preserved_path, restore_path)
                     if _sha256_file(restore_path) != expected_digest:
                         raise OSError(f"digest mismatch restoring {existing_path}")
                     with restore_path.open("rb") as restored_file:
@@ -2399,7 +2447,7 @@ class NewBookProcessor:
             identity_source_path = acquisition.source_path
             processing_dir = Path(tempfile.mkdtemp(prefix="acquisition-process-", dir=self.tmp_conversion_dir))
             processing_path = processing_dir / Path(book_path).name
-            shutil.copy2(book_path, processing_path)
+            _copy_file(book_path, processing_path)
             book_path = str(processing_path)
         # Normalize a KEPUB before it enters the library (#1715). Every ingest
         # route lands here -- kepubify output, a file already in the target
@@ -2459,9 +2507,24 @@ class NewBookProcessor:
             return
 
         # Stage file for import
-        staged_path = Path(self.staging_dir) / source_path.name
+        staged_path = Path(self.staging_dir) / self._presented_name(source_path)
         try:
-            shutil.copy2(source_path, staged_path)
+            try:
+                _copy_file(source_path, staged_path)
+            except OSError as e:
+                if staged_path.name == source_path.name:
+                    raise
+                # Some filesystems (SMB, exFAT) refuse characters a browser
+                # name may carry, such as ':' or '?'. Import under the staged
+                # name rather than fail the book.
+                print(f"[ingest-processor] WARN: could not stage {source_path.name} as "
+                      f"{staged_path.name!r}, importing it under its sanitised name: {e}", flush=True)
+                if staged_path.exists():
+                    os.remove(staged_path)
+                staged_path = Path(self.staging_dir) / (
+                    self._UPLOAD_STAGING_PREFIX.sub("", source_path.name, count=1) or source_path.name
+                )
+                _copy_file(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for import: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")
@@ -2477,7 +2540,7 @@ class NewBookProcessor:
                 )
                 os.close(identity_fd)
                 staged_identity_path = Path(identity_name)
-                shutil.copy2(identity_source_path, staged_identity_path)
+                _copy_file(identity_source_path, staged_identity_path)
             except Exception as e:
                 print(f"[ingest-processor] ERROR: Failed to stage source identity: {e}", flush=True)
                 self.backup(self.filepath, backup_type="failed")
@@ -2718,10 +2781,16 @@ class NewBookProcessor:
             if imported_ids:
                 self.last_added_book_ids = imported_ids
                 self.last_added_book_id = imported_ids[-1]
+            elif acquisition:
+                raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
             else:
-                if acquisition:
-                    raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
-                self._fallback_last_added_book_id()
+                # Never guess which book this was (#2544): the newest row can be a book
+                # someone else just edited, and it would receive this import's metadata,
+                # cover, path fix, auto-send and timestamp.
+                raise PreserveIngestSourceError(
+                    f"Calibre reported no book id for {staged_path.name}; refusing to guess "
+                    "which book was added, so no post-import step ran and the source is kept"
+                )
             if acquisition:
                 self._finish_acquisition(transaction_result)
                 mark_ingest_batch_dirty()
@@ -2742,11 +2811,8 @@ class NewBookProcessor:
             # Optional post-import GDrive sync
             gdrive_sync_if_enabled()
 
-            # Fetch metadata if enabled, prefer exact book id from calibredb
-            if self.last_added_book_id is not None:
-                self.fetch_metadata_if_enabled(book_id=self.last_added_book_id)
-            else:
-                self.fetch_metadata_if_enabled(staged_path.stem)
+            # Fetch metadata if enabled, for the exact book Calibre reported
+            self.fetch_metadata_if_enabled(book_id=self.last_added_book_id)
 
             # Fix paths garbled by calibredb add's ascii_filename() transliteration.
             # Runs after fetch_metadata so any author-name update is already in the DB.
@@ -2762,20 +2828,14 @@ class NewBookProcessor:
                 self.generate_missing_cover_if_enabled(imported_id)
 
             # Trigger auto-send for users who have it enabled
-            if self.last_added_book_id is not None:
-                self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
-            else:
-                self.trigger_auto_send_if_enabled(staged_path.stem, book_path)
+            self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
 
             # Generate KOReader sync checksums for the imported book.
             # Gated on is_koreader_sync_enabled() so disabled-sync instances
             # skip the (slow) partial-MD5 work entirely — see PR #94 for the
             # same pattern in cps/helper.py, and fork #219 for the root cause.
             if _is_koreader_sync_enabled():
-                if self.last_added_book_id is not None:
-                    self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id)
-                else:
-                    self.generate_book_checksums(staged_path.stem)
+                self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id)
 
             # Ensure newly imported books have their timestamp set to the current time
             # so they appear at the top of "Recently Added" views.
@@ -2876,7 +2936,7 @@ class NewBookProcessor:
         # Stage file for import
         staged_path = Path(self.staging_dir) / source_path.name
         try:
-            shutil.copy2(source_path, staged_path)
+            _copy_file(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for add_format: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")
@@ -2934,11 +2994,11 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
-                if book_id is not None:
-                    cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
-                else:
-                    # Fallback: most recently added book
-                    cur.execute("SELECT id, title FROM books ORDER BY timestamp DESC LIMIT 1")
+                if book_id is None:
+                    # Never the newest book instead (#2544): it can be someone else's.
+                    print(f"[ingest-processor] No book id for metadata fetch, skipping: {book_title}", flush=True)
+                    return
+                cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
                 result = cur.fetchone()
 
             if not result:
@@ -2973,10 +3033,11 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
-                if book_id is not None:
-                    cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
-                else:
-                    cur.execute("SELECT id, title FROM books ORDER BY timestamp DESC LIMIT 1")
+                if book_id is None:
+                    # Never the newest book instead (#2544): it can be someone else's.
+                    print(f"[ingest-processor] No book id for auto-send, skipping: {book_title}", flush=True)
+                    return
+                cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
                 result = cur.fetchone()
 
             if not result:
@@ -3438,15 +3499,10 @@ def main(filepath=None):
                         print(f"[ingest-processor]: Retaining original format ({nbp.input_format}) for {nbp.filename}...", flush=True)
                         # Find the book that was just added to get its ID
                         try:
-                            # Prefer the exact id we just added if available
-                            if nbp.last_added_book_id is not None:
-                                target_book_id = nbp.last_added_book_id
-                            else:
-                                with sqlite3.connect(nbp.metadata_db, timeout=30) as con:
-                                    cur = con.cursor()
-                                    cur.execute("SELECT id FROM books ORDER BY timestamp DESC LIMIT 1")
-                                    res = cur.fetchone()
-                                    target_book_id = res[0] if res else None
+                            # Only the exact id this import added. With none (the import
+                            # was skipped or quarantined), the newest book is someone
+                            # else's and must not get this file (#2544).
+                            target_book_id = nbp.last_added_book_id
 
                             if target_book_id is not None:
                                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:

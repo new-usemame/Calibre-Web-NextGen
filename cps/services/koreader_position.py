@@ -158,11 +158,12 @@ def web_position_for_device(*, user_id, book_id, record, document) -> Optional[s
     """The XPointer, in the requesting device's file, of the web reader's place.
 
     ``record`` is the ``kosync_progress`` row about to be served. It qualifies
-    only when the web reader wrote it (a percentage-only row) and the CFI that
-    produced it is known for certain: the browser journal holds an EPUB CFI at
-    exactly that percentage which is also the user's saved EPUB bookmark (the
-    bookmark row is per format, so this also rules out a KEPUB CFI from the
-    classic reader). The XPointer is then derived per request against the
+    only when the web reader wrote it (a percentage-only row) and stored that
+    report's EPUB CFI in the same conditional write. A current private bookmark
+    cannot supply or replace it, even at the same percentage. Retain the existing
+    fallback to percentage when the local bookmark no longer matches that shared
+    CFI (including deletion). Historical rows have no binding and also fall back.
+    The XPointer is then derived per request against the
     library EPUB, and only if ``document`` -- the digest the device asked with
     -- is that EPUB's digest (``device_xpointer``).
     """
@@ -175,23 +176,15 @@ def web_position_for_device(*, user_id, book_id, record, document) -> Optional[s
     if (record is None or record.progress != PERCENTAGE_ONLY_LOCATOR
             or record.device != WEB_READER_DEVICE or record.percentage is None):
         return None
-    cfi = ub.session.query(ub.Bookmark.bookmark_key).filter(
+    cfi = getattr(record, "web_cfi", None)
+    if not cfi:
+        return None
+    saved_cfi = ub.session.query(ub.Bookmark.bookmark_key).filter(
         ub.Bookmark.user_id == int(user_id),
         ub.Bookmark.book_id == int(book_id),
         ub.Bookmark.format == "epub",
     ).scalar()
-    if not cfi:
-        return None
-    reported = ub.session.query(ub.DeviceReadingPosition.id).join(
-        ub.Device, ub.Device.id == ub.DeviceReadingPosition.device_id,
-    ).filter(
-        ub.Device.user_id == int(user_id),
-        ub.Device.kind == "webreader",
-        ub.DeviceReadingPosition.book_id == int(book_id),
-        ub.DeviceReadingPosition.cfi == cfi,
-        ub.DeviceReadingPosition.progress_percent == record.percentage,
-    ).first()
-    if reported is None:
+    if saved_cfi != cfi:
         return None
     book = calibre_db.get_book(int(book_id))
     epub_path = _book_format_path(book, "EPUB") if book is not None else None

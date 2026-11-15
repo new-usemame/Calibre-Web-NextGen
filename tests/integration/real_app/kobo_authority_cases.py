@@ -87,17 +87,17 @@ def test_sticky_local_render_answers_with_a_durable_cwng_etag(
 
 
 def test_sticky_snapshot_exit_replays_the_stored_cwng_etag(
-    kobo_real_app, reader, record_property,
+    kobo_real_app, reader, record_property, monkeypatch,
 ):
     """Without live device proof the sticky GET replays the durable snapshot.
 
     Intent: an ever-authoritative book whose device proof is missing must be
-    answered from CWNG's last complete response -- never from Kobo's stale copy
+    answered from this device's last complete response -- never from Kobo's stale copy
     and never from a partial live read -- carrying the ETag those exact bytes
     were served with.
-    Path: a second authenticated GET for the same book sent without a device
-    id, so ``prepare_authoritative_device_get`` cannot match a device row and
-    answers ``STICKY_GET_SNAPSHOT``. That is the ``answered_from_snapshot``
+    Path: a second authenticated GET from the same device with live proof
+    unavailable, so ``prepare_authoritative_device_get`` answers
+    ``STICKY_GET_SNAPSHOT``. That is the ``answered_from_snapshot``
     exit at cps/readingservices.py:849.
     Breaks if: the exit stops setting ETag, or answers from the live set --
     a highlight added after the snapshot was stored would then appear.
@@ -124,27 +124,37 @@ def test_sticky_snapshot_exit_replays_the_stored_cwng_etag(
     import cps.readingservices as readingservices
     from cps.services.kobo_annotation_authority import (
         STICKY_GET_SNAPSHOT, load_last_served_complete_set,
-        prepare_authoritative_device_get,
     )
 
     stored_snapshot = load_last_served_complete_set(
         user_id=user_id, book_id=book.id, log=readingservices.log,
+        device_id=device_id,
     )
     assert stored_snapshot is not None, "no durable snapshot to replay"
     snapshot_body, snapshot_etag = stored_snapshot
-    assert prepare_authoritative_device_get(
-        user_id=user_id, book_id=book.id, device_id=None,
-        log=readingservices.log,
-    ) == STICKY_GET_SNAPSHOT
+    # PR 5 snapshots belong to their requesting device. Missing live evidence
+    # may replay that device's bytes, but a headerless request cannot replay
+    # an identified device's snapshot as an account-wide replacement set.
+    import cps.services.kobo_annotation_authority as authority
+    proof_requests = []
+
+    def unavailable_live_proof(**kwargs):
+        proof_requests.append((kwargs["user_id"], kwargs["book_id"], kwargs["device_id"]))
+        return STICKY_GET_SNAPSHOT
+
+    monkeypatch.setattr(authority, "prepare_authoritative_device_get",
+                        unavailable_live_proof)
     before = fixture.reload_state(user_id, book.id)
     revision_before = before.authority_revision
     digest_before = before.last_served_body_sha256
 
     with fixture.stubbed_kobo_proxy() as proxied:
         with fixture.route_error_records() as records:
-            response = client.get(fixture.annotations_path(book))
+            response = client.get(fixture.annotations_path(book),
+                                  headers=fixture.DEVICE_HEADERS)
 
     assert response.status_code == 200, response.get_data()
+    assert proof_requests == [(user_id, book.id, device_id)]
     assert proxied == [], "the sticky snapshot exit must not contact Kobo"
     assert [r for r in records if r.exc_info] == [], (
         "the route's exception fallback ran; this is not the snapshot exit")

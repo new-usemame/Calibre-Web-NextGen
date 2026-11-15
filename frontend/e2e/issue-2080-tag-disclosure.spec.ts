@@ -2,6 +2,14 @@ import { expect, Page, test } from '@playwright/test';
 
 const TAG_LINKS = '#book-tags a[href*="/tags/"]';
 
+// The book page can ask for the book once more as the test finishes. Its
+// intercept is then mid route.fetch() when the page closes, and Playwright
+// reports "route.fetch: Test ended" as an error outside any test, which fails
+// the whole run after every test has passed. Drop the routes before teardown.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 async function firstBookId(page: Page): Promise<number | null> {
   await page.goto('/app');
   return page.evaluate(async () => {

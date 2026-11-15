@@ -60,7 +60,7 @@
 .cardHead { display: flex; align-items: flex-start; gap: var(--sp-3); }
 .cardIcon { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
 .cardTitleWrap { min-width: 0; flex: 1; }
-.cardName { margin: 0; font-size: var(--fs-md); line-height: var(--lh-snug); }
+.cardName { margin: 0; font-size: var(--fs-md); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .cardName a { color: var(--text); overflow-wrap: anywhere; transition: color var(--dur-fast) var(--ease); }
 .cardName a:hover { color: var(--accent-text); }
 
@@ -126,6 +126,8 @@
 .menu { position: absolute; z-index: calc(var(--z-overlay) + 2); right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
 .menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--danger); }
 .menu button:hover { background: var(--danger-soft); }
+.menu button.sleepScreenAction { color: var(--text); }
+.menu button.sleepScreenAction:hover { background: var(--surface-3); }
 
 .renameForm { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .renameForm input { min-width: min(260px, 100%); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-3); background: var(--surface-3); color: var(--text); }
@@ -306,3 +308,29 @@
 .undoError { flex-basis: 100%; font-size: var(--fs-sm); }
 .deviceWaiting { grid-template-columns: minmax(0, 1fr) auto; }
 @media (max-width: 600px) { .deviceWaiting { grid-template-columns: minmax(0, 1fr); } }
+
+/* Share my place: one real checkbox per card, set apart from the read-only
+   stats by a hairline so it reads as the card's one setting. The help line is
+   shared by every card (each checkbox points at it with aria-describedby). */
+.sharePlace { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+.sharePlaceLabel { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; color: var(--text); font-weight: var(--fw-medium); cursor: pointer; }
+.sharePlaceLabel input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: inherit; }
+.sharePlaceLabel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sharePlaceLabel:has(input:disabled) { cursor: progress; opacity: .7; }
+.sharePlaceError { flex-basis: 100%; padding: var(--sp-2) var(--sp-3); color: var(--text); background: var(--danger-soft); border: 1px solid var(--danger-border); border-radius: var(--r-md); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.sharePlaceError:empty { display: none; }
+.sharePlaceHelp { margin: calc(-1 * var(--sp-2)) 0 var(--sp-5); color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+.sharePlaceNote { margin: var(--sp-3) 0 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+.bookScope {
+  min-width: 0;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.bookScope legend { font-weight: 600; }
+.bookScopeHelp { color: var(--text-muted); line-height: 1.5; margin: .5rem 0; }
+.bookScopeOption { display: flex; align-items: center; gap: .5rem; min-height: 36px; cursor: pointer; }
+.bookScopeOption input { flex: 0 0 auto; accent-color: var(--accent); }
+.bookScopeOption span { overflow-wrap: anywhere; }
+.bookScopeShelves { padding-left: 1.5rem; }

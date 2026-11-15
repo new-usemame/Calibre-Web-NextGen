@@ -72,6 +72,7 @@ mimetypes.add_type('application/vnd.adobe.adept+xml', '.acsm')
 mimetypes.add_type('application/vnd.readium.lcp.license.v1.0+json', '.lcpl')
 mimetypes.add_type('application/vnd.amazon.ebook', '.kfx')
 mimetypes.add_type('application/zip', '.kfx-zip')
+mimetypes.add_type('application/zip', '.fbz')
 
 log = logger.create()
 
@@ -166,6 +167,30 @@ def _register_reader_font_upload_limiter(application):
         return
     application.before_request(_limit_reader_font_upload_request)
     application.extensions[_READER_FONT_UPLOAD_LIMITER_MARKER] = True
+
+
+def _register_sleep_screen_upload_limiter(application):
+    """Install the image body bound before CSRF can parse multipart data."""
+    if application.extensions.get("cps_sleep_screen_upload_limiter_registered"):
+        return
+
+    @application.before_request
+    def limit_sleep_screen_upload():
+        from flask import jsonify, request
+        if request.endpoint != "api_v1.device_sleep_screen" or request.method != "PUT":
+            return None
+        from .services.device_sleep_screen import UPLOAD_LIMIT
+        request.max_content_length = UPLOAD_LIMIT + 256 * 1024
+        if request.content_length is not None and request.content_length > request.max_content_length:
+            response = jsonify({"error": {
+                "code": "sleep_screen_upload_too_large", "message": "Use an image up to 10 MiB",
+            }})
+            response.status_code = 413
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
+        return None
+
+    application.extensions["cps_sleep_screen_upload_limiter_registered"] = True
 
 
 def _configure_base_app(application, runtime_config=None):
@@ -499,9 +524,10 @@ def create_app(config=None, services=None):
 
     # CSRFProtect inspects request.form before blueprint route handlers run,
     # which parses multipart uploads before a route-local limit can take effect.
-    # Bound only the reader-font endpoint here so other existing upload routes
+    # Bound the font and sleep-screen endpoints here; other upload routes
     # retain their own size policies.
     _register_reader_font_upload_limiter(application)
+    _register_sleep_screen_upload_limiter(application)
 
     if csrf:
         csrf.init_app(application)
@@ -753,6 +779,12 @@ def create_app(config=None, services=None):
                 # Counts are cached server-side; drop the copy older versions
                 # kept in the session cookie (#2386).
                 session.pop('magic_shelf_counts', None)
+                if calibre_db._desktop_compat:
+                    # Calibre desktop writes the library between requests, so drop
+                    # the counts when metadata.db changed, before they are read.
+                    # Dropping them on every request stalled big libraries (#2862).
+                    magic_shelf.forget_book_counts_if_library_changed(
+                        getattr(calibre_db, "_metadata_db_path", None))
                 for shelf in g.magic_shelves_access:
                     shelf.book_count = magic_shelf.cached_book_count_for_magic_shelf(
                         current_user.id, shelf.id)
@@ -833,9 +865,6 @@ def create_app(config=None, services=None):
                 calibre_db.session.expire_all()
             except Exception as e:
                 log.debug("DESKTOP_COMPAT_MODE: rollback failed, snapshot may be stale: %s", e)
-        # Clear the shelf count cache so sidebar counts stay fresh.
-        from . import magic_shelf
-        magic_shelf.forget_book_counts()
 
     @application.teardown_appcontext
     def shutdown_session(exception=None):

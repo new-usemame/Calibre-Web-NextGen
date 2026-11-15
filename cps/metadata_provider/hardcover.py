@@ -120,6 +120,7 @@ log = logger.create()
 class Hardcover(Metadata):
     __name__ = "Hardcover"
     __id__ = "hardcover"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
     DESCRIPTION = "Hardcover"
     META_URL = "https://hardcover.app/"
     BASE_URL = "https://api.hardcover.app/v1/graphql"

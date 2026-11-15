@@ -94,7 +94,7 @@ Migration: a single idempotent `ALTER TABLE annotation ADD COLUMN
 device_origin_id` guarded by `PRAGMA table_info(annotation)` — same pattern as
 the v4.0.131 polymorphic hotfix (`migrate_annotation_polymorphic_position`),
 which learned the hard way to use PRAGMA over the stale SQLAlchemy inspector.
-Nullable, so zero data risk; teenyverse + existing installs no-op-add it on
+Nullable, so zero data risk; the household host + existing installs no-op-add it on
 boot.
 
 `source='koreader'` is already a valid value — annotations the plugin pushes

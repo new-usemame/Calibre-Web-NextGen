@@ -39,8 +39,8 @@ class TestSanitizerStripsIps:
         assert "<ip>" in s, s
 
     def test_ipv4_with_port_redacted(self):
-        s = _sanitizer()("connection from 10.0.30.36:54321 succeeded")
-        assert "10.0.30.36" not in s
+        s = _sanitizer()("connection from 192.0.2.36:54321 succeeded")
+        assert "192.0.2.36" not in s
 
     def test_ipv6_redacted(self):
         s = _sanitizer()("Login from 2001:db8::1 failed")

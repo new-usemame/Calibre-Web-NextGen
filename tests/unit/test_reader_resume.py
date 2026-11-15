@@ -15,6 +15,14 @@ from cps.services import reading_position
 from tests.unit.test_kobo_resume_point import epub
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 @pytest.fixture
 def store(tmp_path, monkeypatch):
     engine = create_engine('sqlite:///' + str(tmp_path / 'app.db'))

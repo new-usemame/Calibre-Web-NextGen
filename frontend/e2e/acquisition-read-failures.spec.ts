@@ -215,7 +215,7 @@ test.describe('acquisition admin — the approval queue does not libel the reque
       },
       [ADMIN.users]: {
         delayMs: 2000,
-        body: { users: [{ id: 42, name: 'maggie', access: true, auto_approve: false }] },
+        body: { users: [{ id: 42, name: 'user_a', access: true, auto_approve: false }] },
       },
     });
     await openAdmin(page);
@@ -228,7 +228,7 @@ test.describe('acquisition admin — the approval queue does not libel the reque
     await expect(row).toContainText('Looking up who asked');
 
     // …and once it lands, they are named.
-    await expect(row).toContainText('Requested by maggie', { timeout: 10_000 });
+    await expect(row).toContainText('Requested by user_a', { timeout: 10_000 });
   });
 
   test('an account that really is gone is still reported as gone', async ({ page }) => {

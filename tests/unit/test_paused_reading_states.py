@@ -27,6 +27,14 @@ USER = SimpleNamespace(id=7, name="reader", is_authenticated=True,
                        view_settings={})
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 @pytest.fixture
 def world(monkeypatch):
     if CC_ID not in db.cc_classes:

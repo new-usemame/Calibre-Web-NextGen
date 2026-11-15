@@ -30,7 +30,7 @@ from sqlalchemy.orm import sessionmaker
 # --- Helpers ---------------------------------------------------------------
 
 # The exact schema kobo_annotation_sync had BEFORE the H1 migration ran.
-# Matches the production app.db on teenyverse pre-v4.0.78 (verified via
+# Matches the production app.db on the household host pre-v4.0.78 (verified via
 # `sqlite3 .schema kobo_annotation_sync` on 2026-05-18).
 PRE_H1_SCHEMA = """
 CREATE TABLE kobo_annotation_sync (

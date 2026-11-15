@@ -22,7 +22,8 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyErro
 from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy, tag_hierarchy
 from .custom_column_visibility import retryable_column_reads, browsable_columns, is_cc_visible
 from .usermanagement import requires_basic_auth_if_no_ano, auth
-from .helper import get_download_link, get_book_cover, hot_books_page
+from .helper import get_download_link, get_book_cover, hot_books_page, read_statuses_for_books, \
+    SQLITE_IN_CHUNK_SIZE
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS
 from .web import render_read_books, render_personal_read_status_books
@@ -1509,6 +1510,103 @@ def _opds_internal_error(_error):
     return response
 
 
+def _signed_in_entry_book_ids(entries):
+    """``(user, sorted book ids)`` for a signed-in requester, else ``(None, [])``.
+
+    Per-entry personal state is never rendered for a guest or anonymous caller:
+    a guest's would be the shared guest account's.
+    """
+    user = auth.current_user()
+    if not entries or user is None or getattr(user, "is_anonymous", True):
+        return None, []
+    return user, sorted({int(entry.Books.id) for entry in entries
+                         if getattr(entry, "Books", None) is not None})
+
+
+def _entry_shared_places(entries):
+    """The requester's shared reading place for each book entry, as a 0-1 fraction (#2849).
+
+    This is the place an unidentified KOSync GET serves for the book: the
+    furthest ``KOSyncProgress`` row across the book id and every file checksum
+    registered for it (``get_progress_record``'s lookup, done here for a whole
+    page in a few queries instead of two per entry). Only shared places live in
+    that table: a device with "share my place" off writes its own
+    ``DeviceReadingPosition`` instead, and a Kobo's own bookmark is not read
+    here, so nothing a device kept to itself reaches a catalog app.
+    """
+    user, ids = _signed_in_entry_book_ids(entries)
+    if not ids:
+        return {}
+    # An optional per-entry element must not take the whole catalog down: a
+    # locked or unreadable app.db serves the feed without places, as the book
+    # page does for the same lookup (helper.get_kosync_progress_display).
+    try:
+        return _shared_places_for_books(user, ids)
+    except SQLAlchemyError:
+        log.warning("OPDS: could not read shared reading places", exc_info=True)
+        return {}
+
+
+def _shared_places_for_books(user, ids):
+    from .progress_syncing.models import KOSyncProgress
+    places = {}
+    for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+        chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+        book_for_key = {str(book_id): book_id for book_id in chunk}
+        checksums = calibre_db.session.query(
+            db.BookFormatChecksum.checksum, db.BookFormatChecksum.book).filter(
+            db.BookFormatChecksum.book.in_(chunk)).all()
+        book_for_key.update((checksum, int(book_id)) for checksum, book_id in checksums
+                            if checksum)
+        keys = list(book_for_key)
+        for key_start in range(0, len(keys), SQLITE_IN_CHUNK_SIZE):
+            rows = ub.session.query(
+                KOSyncProgress.document, KOSyncProgress.percentage,
+                KOSyncProgress.timestamp).filter(
+                KOSyncProgress.user_id == int(user.id),
+                KOSyncProgress.document.in_(keys[key_start:key_start + SQLITE_IN_CHUNK_SIZE])).all()
+            for document, percentage, timestamp in rows:
+                if percentage is None:
+                    continue
+                book_id = book_for_key[document]
+                rank = (percentage, timestamp is not None, timestamp)
+                if book_id not in places or rank > places[book_id][0]:
+                    places[book_id] = (rank, percentage)
+    return {book_id: round(min(max(percentage, 0.0), 100.0) / 100.0, 4)
+            for book_id, (_rank, percentage) in places.items()}
+
+
+def _entry_read_statuses(entries):
+    """The requester's own read status for each book entry, by book id (#2849).
+
+    Empty for a guest or anonymous caller: the element is personal state, and a
+    guest's would be the shared guest account's. Carriers are looked up by id
+    rather than read off the rows, because not every feed query joins the read
+    state, and the status names come from the same resolver the API uses, so a
+    custom read column and the personal DNF/on-hold overlays read the same here.
+    """
+    user, ids = _signed_in_entry_book_ids(entries)
+    if not ids:
+        return {}
+    read_column = config.config_read_column
+    if read_column:
+        column = getattr(db, "cc_classes", {}).get(read_column)
+        if column is None:
+            return {}
+    carriers = dict.fromkeys(ids)
+    for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+        chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+        if read_column:
+            rows = calibre_db.session.query(column.book, column.value).filter(
+                column.book.in_(chunk)).all()
+        else:
+            rows = ub.session.query(ub.ReadBook.book_id, ub.ReadBook.read_status).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk)).all()
+        carriers.update((int(book_id), value) for book_id, value in rows)
+    return read_statuses_for_books(carriers.items(), read_column, user)
+
+
 def render_xml_template(*args, feed_title=None, **kwargs):
     # ToDo: return time in current timezone similar to %z
     currtime = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
@@ -1520,6 +1618,8 @@ def render_xml_template(*args, feed_title=None, **kwargs):
     # renders "Instance - Feed Name".
     if feed_title is None:
         feed_title = _opds_feed_title_for_endpoint(request.endpoint)
+    kwargs.setdefault("read_statuses", _entry_read_statuses(kwargs.get("entries")))
+    kwargs.setdefault("shared_places", _entry_shared_places(kwargs.get("entries")))
     xml = render_template(current_time=currtime, instance=config.config_calibre_web_title,
                           feed_title=feed_title, constants=constants.sidebar_settings, *args, **kwargs)
     response = make_response(xml)

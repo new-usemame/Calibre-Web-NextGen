@@ -26,14 +26,19 @@ export function useImportWatch(): ImportWatch | null {
 
 /** Start (or extend) following `queued` files; `baseline` is the library total
  *  read before they were queued, or null if that read failed. */
-export function beginImportWatch(queued: number, baseline: number | null, now = Date.now()): void {
+export function beginImportWatch(
+  queued: number,
+  baseline: number | null,
+  atUploadStart: ImportWatch | null = null,
+  now = Date.now(),
+): void {
   if (queued <= 0) return;
-  watch = startImportWatch(watch, queued, baseline, now);
+  watch = startImportWatch(watch, queued, baseline, now, atUploadStart);
   emit();
 }
 
 /** Record a library total. Returns true when the library views should refetch. */
-export function recordLibraryTotal(total: number, now = Date.now()): boolean {
+export function recordLibraryTotal(total: number | null, now = Date.now()): boolean {
   if (!watch || watch.status !== 'watching') return false;
   const result = observeLibraryTotal(watch, total, now);
   watch = result.watch;

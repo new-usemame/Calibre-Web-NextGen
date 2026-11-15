@@ -55,9 +55,15 @@ export function startImportWatch(
   queued: number,
   baseline: number | null,
   now: number,
+  atUploadStart: ImportWatch | null = null,
 ): ImportWatch {
-  if (previous && previous.status === 'watching') {
-    return { ...previous, expected: previous.expected + queued, lastGrowthAt: now };
+  // The earlier import can finish while the next upload request is in flight.
+  // Keep those arrivals in the same batch rather than counting them again
+  // against the older total read before this upload.
+  const joinsEarlier = atUploadStart?.status === 'watching'
+    && previous?.startedAt === atUploadStart.startedAt;
+  if (previous && (previous.status === 'watching' || joinsEarlier)) {
+    return { ...previous, expected: previous.expected + queued, lastGrowthAt: now, status: 'watching' };
   }
   return {
     expected: queued,
@@ -77,18 +83,23 @@ export interface ObserveResult {
   refresh: boolean;
 }
 
-/** Fold in a freshly read library total. */
-export function observeLibraryTotal(watch: ImportWatch, total: number, now: number): ObserveResult {
+/** Fold in a freshly read total, or null to check the deadline without a reading. */
+export function observeLibraryTotal(watch: ImportWatch, total: number | null, now: number): ObserveResult {
   if (watch.status !== 'watching') return { watch, refresh: false };
 
   // No baseline could be read before the upload, so the first reading is it.
-  // Books already imported by then are missed, which only delays the count.
-  let baseline = watch.baseline ?? total;
-  // Books deleted while we wait would otherwise hide new arrivals until the
-  // total climbed back; follow the total down instead.
-  if (total < baseline) baseline = total;
+  // Refresh that first reading even without counted growth: it may already
+  // include all our books. The count remains an estimate in this case.
+  const firstReading = watch.baseline === null && total !== null;
+  let baseline = watch.baseline;
+  let imported = watch.imported;
+  if (total !== null) {
+    baseline = Math.min(baseline ?? total, total - imported);
+    // Follow deletions down without undoing imports already observed, so the
+    // next arrival is counted and refreshed even after books were deleted.
+    imported = Math.min(Math.max(total - baseline, 0), watch.expected);
+  }
 
-  const imported = Math.min(Math.max(total - baseline, 0), watch.expected);
   const lastGrowthAt = imported > watch.imported ? now : watch.lastGrowthAt;
 
   let status: ImportWatchStatus = 'watching';
@@ -96,7 +107,7 @@ export function observeLibraryTotal(watch: ImportWatch, total: number, now: numb
   else if (now - lastGrowthAt >= STALL_MS || now - watch.startedAt >= MAX_WATCH_MS) status = 'stalled';
 
   const unrefreshed = imported > watch.refreshedImported;
-  const refresh = unrefreshed && (status !== 'watching' || now - watch.lastRefreshAt >= refreshThrottleMs(watch.expected));
+  const refresh = firstReading || (unrefreshed && (status !== 'watching' || now - watch.lastRefreshAt >= refreshThrottleMs(watch.expected)));
 
   return {
     refresh,

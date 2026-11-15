@@ -175,7 +175,7 @@ test('without a baseline the first reading becomes it', () => {
   let r = step(w, 400, T0 + 3_000);
   assert.equal(r.watch.baseline, 400);
   assert.equal(r.watch.imported, 0);
-  assert.equal(r.refresh, false);
+  assert.equal(r.refresh, true, 'refresh once in case ingest finished before the first successful reading');
   w = r.watch;
 
   r = step(w, 402, T0 + 6_000);
@@ -216,4 +216,51 @@ test('a large batch is refreshed less often than a small one', () => {
     assert.equal(step(cur, 2, T0 + 3_000 + window - 1).refresh, false);
     assert.equal(step(cur, 2, T0 + 3_000 + window).refresh, true);
   }
+});
+
+
+test('deletion after progress preserves arrivals already seen and the next arrival refreshes', () => {
+  let w = startImportWatch(null, 3, 100, T0);
+  w = step(w, 102, T0 + 3_000).watch;
+  assert.equal(w.imported, 2);
+
+  w = step(w, 99, T0 + 6_000).watch;
+  assert.equal(w.imported, 2, 'deleting books does not undo imports');
+
+  const arrival = step(w, 100, T0 + 9_000);
+  assert.equal(arrival.watch.imported, 3);
+  assert.equal(arrival.watch.status, 'done');
+  assert.equal(arrival.refresh, true, 'the final arrival must reach the catalog');
+});
+
+test('a deadline without a successful probe flushes pending arrivals and stops', () => {
+  let w = startImportWatch(null, 5, 100, T0);
+  w = step(w, 101, T0 + 3_000).watch;
+  w = step(w, 102, T0 + 6_000).watch;
+  const expired = observeLibraryTotal(w, null, T0 + 6_000 + STALL_MS);
+  assert.equal(expired.watch.status, 'stalled');
+  assert.equal(expired.watch.imported, 2);
+  assert.equal(expired.refresh, true);
+});
+
+test('the absolute ceiling stops even a batch still making progress', () => {
+  let w = startImportWatch(null, 1_000, 100, T0);
+  for (let i = 1; i < MAX_WATCH_MS / 60_000; i += 1) {
+    w = step(w, 100 + i, T0 + i * 60_000).watch;
+    assert.equal(w.status, 'watching');
+  }
+  const expired = observeLibraryTotal(w, null, T0 + MAX_WATCH_MS);
+  assert.equal(expired.watch.status, 'stalled');
+});
+
+
+test('an upload started during an earlier watch joins it after the earlier import completes', () => {
+  const atUploadStart = startImportWatch(null, 1, 100, T0);
+  const completed = step(atUploadStart, 101, T0 + 3_000).watch;
+  const joined = startImportWatch(completed, 1, 100, T0 + 6_000, atUploadStart);
+  assert.equal(joined.status, 'watching');
+  assert.equal(joined.expected, 2);
+  assert.equal(joined.imported, 1);
+  assert.equal(step(joined, 101, T0 + 9_000).watch.status, 'watching');
+  assert.equal(step(joined, 102, T0 + 12_000).watch.status, 'done');
 });

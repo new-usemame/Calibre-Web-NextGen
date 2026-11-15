@@ -4,7 +4,7 @@ import { apiGet } from '../lib/api';
 import type { BooksPage } from '../lib/api';
 import { refreshLibraryViews } from '../lib/queries';
 import { getImportWatch, recordLibraryTotal, useImportWatch } from '../lib/uploadImportStore';
-import { pollIntervalMs } from '../lib/uploadImportWatch';
+import { MAX_WATCH_MS, STALL_MS, pollIntervalMs } from '../lib/uploadImportWatch';
 
 /** Follows uploaded files into the library (#1044) and refreshes the library
  *  views as they arrive, so a book shows up without a manual reload. Renders
@@ -16,7 +16,8 @@ import { pollIntervalMs } from '../lib/uploadImportWatch';
  *  total straight away. */
 export function UploadImportWatcher() {
   const qc = useQueryClient();
-  const watching = useImportWatch()?.status === 'watching';
+  const watch = useImportWatch();
+  const watching = watch?.status === 'watching';
 
   const probe = useQuery<BooksPage>({
     queryKey: ['upload-import-probe'],
@@ -28,6 +29,8 @@ export function UploadImportWatcher() {
     },
     staleTime: 0,
     gcTime: 0,
+    // The application's default is false; this probe must resume immediately.
+    refetchOnWindowFocus: true,
   });
 
   // dataUpdatedAt, not data: an unchanged total is still a fresh reading.
@@ -35,6 +38,17 @@ export function UploadImportWatcher() {
     if (!probe.data) return;
     if (recordLibraryTotal(probe.data.total)) void refreshLibraryViews(qc);
   }, [probe.dataUpdatedAt]);
+
+  // A deadline must not depend on a successful HTTP response. Otherwise a
+  // disconnected server leaves the watcher (and its polling) alive forever.
+  useEffect(() => {
+    if (!watching || !watch) return;
+    const deadline = Math.min(watch.lastGrowthAt + STALL_MS, watch.startedAt + MAX_WATCH_MS);
+    const timeout = window.setTimeout(() => {
+      if (recordLibraryTotal(null)) void refreshLibraryViews(qc);
+    }, Math.max(0, deadline - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [watching, watch?.lastGrowthAt, watch?.startedAt, qc]);
 
   return null;
 }

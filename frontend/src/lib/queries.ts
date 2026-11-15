@@ -14,7 +14,7 @@ import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
-import { beginImportWatch } from './uploadImportStore';
+import { beginImportWatch, getImportWatch } from './uploadImportStore';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
 import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
@@ -1340,7 +1340,7 @@ export function useUploadBooks() {
   return useMutation({
     // The total before the files are queued is what later arrivals are counted
     // against (#1044).
-    onMutate: async () => ({ baseline: await readLibraryTotal() }),
+    onMutate: async () => ({ watch: getImportWatch(), baseline: await readLibraryTotal() }),
     mutationFn: (files: File[]) => {
       const fd = new FormData();
       for (const f of files) fd.append('file', f);
@@ -1350,7 +1350,7 @@ export function useUploadBooks() {
       // Ingest runs after this request returns, so refetching the catalog now
       // would still show the old list. Follow the books in instead; the
       // library views refresh as they arrive (UploadImportWatcher).
-      beginImportWatch(result.queued.length, context?.baseline ?? null);
+      beginImportWatch(result.queued.length, context?.baseline ?? null, context?.watch);
     },
   });
 }

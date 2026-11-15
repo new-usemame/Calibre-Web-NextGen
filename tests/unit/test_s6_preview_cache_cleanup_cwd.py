@@ -42,7 +42,12 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.service_sources import service_source
+
 pytestmark = pytest.mark.unit
+
+# The sweeper's body lives in scripts/services, which cd's to the app root (#2094).
+APP_CD = r'cd\s+(?:/app/calibre-web-automated|"\$CWA_APP_ROOT")'
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_SCRIPT = (
@@ -61,7 +66,7 @@ def _read_run_script() -> str:
         f"Expected s6 run script at {RUN_SCRIPT}; the cover-preview "
         f"cache cleanup service must remain registered."
     )
-    return RUN_SCRIPT.read_text()
+    return service_source("cwa-preview-cache-cleanup")
 
 
 def test_run_script_cd_into_app_dir():
@@ -69,7 +74,7 @@ def test_run_script_cd_into_app_dir():
     `python3 -m cps.services.<module>` resolves the `cps` package
     against the cwd added to sys.path[0]."""
     src = _read_run_script()
-    assert re.search(r"^cd\s+/app/calibre-web-automated\b", src, re.MULTILINE), (
+    assert re.search(rf"^{APP_CD}", src, re.MULTILINE), (
         "root/etc/s6-overlay/s6-rc.d/cwa-preview-cache-cleanup/run must "
         "contain `cd /app/calibre-web-automated` (anchored at start of "
         "line) so `python3 -m cps.services.cover_preview_cache_sweeper` "
@@ -89,7 +94,8 @@ def test_run_script_cd_precedes_while_loop():
     and `cwa-init/run`.
     """
     src = _read_run_script()
-    cd_idx = src.find("cd /app/calibre-web-automated")
+    cd_match = re.search(rf"^{APP_CD}", src, re.MULTILINE)
+    cd_idx = cd_match.start() if cd_match else -1
     while_idx = src.find("while true")
     assert cd_idx >= 0, "cd missing entirely — see test above"
     assert while_idx >= 0, (
@@ -117,7 +123,7 @@ def test_run_script_cd_has_fatal_guard():
     # block. Be loose about whitespace; require the FATAL banner and an
     # explicit exit.
     cd_line_match = re.search(
-        r"^cd\s+/app/calibre-web-automated\s*\|\|\s*\{[^\n]*FATAL[^\n]*exit",
+        rf"^{APP_CD}\s*\|\|\s*\{{[^\n]*FATAL[^\n]*exit",
         src,
         re.MULTILINE,
     )

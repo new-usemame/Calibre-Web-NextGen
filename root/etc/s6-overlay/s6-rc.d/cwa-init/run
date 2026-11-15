@@ -124,12 +124,24 @@ ensure_runtime_dirs() {
   fi
 }
 
+# CWA_PROCESSED_BOOKS_DIR can put the retained originals on another disk (#1883).
+CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
+if ! PROCESSED_BOOKS_DIR="$(python3 "${CWA_APP_PATHS}" processed_books_dir)"; then
+  echo "[cwa-init] ERROR: processed books path resolver failed; refusing to prepare an unknown path"
+  exit 1
+fi
+case "$PROCESSED_BOOKS_DIR" in
+  ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..|[!/]*)
+    echo "[cwa-init] ERROR: processed books path resolver returned an unsafe path; refusing to continue"
+    exit 1 ;;
+esac
+
 ensure_runtime_dirs \
-  /config/processed_books/converted \
-  /config/processed_books/imported \
-  /config/processed_books/failed \
-  /config/processed_books/fixed_originals \
-  /config/processed_books/duplicate_resolutions \
+  "$PROCESSED_BOOKS_DIR/converted" \
+  "$PROCESSED_BOOKS_DIR/imported" \
+  "$PROCESSED_BOOKS_DIR/failed" \
+  "$PROCESSED_BOOKS_DIR/fixed_originals" \
+  "$PROCESSED_BOOKS_DIR/duplicate_resolutions" \
   /config/log_archive \
   /config/.cwa_conversion_tmp
 
@@ -184,7 +196,6 @@ fi
 # cwa-init:ingest-directory:block-begin
 # Ensure the resolved ingest directory exists and is writable. app_paths keeps
 # the environment -> dirs.json -> default precedence identical to Python.
-CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
 if ! INGEST_DIR="$(python3 "${CWA_APP_PATHS}" ingest_folder)"; then
   echo "[cwa-init] ERROR: runtime ingest path resolver failed; refusing to prepare an unknown path"
   exit 1

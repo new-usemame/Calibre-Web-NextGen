@@ -1,3 +1,0 @@
-### Fixed
-
-- **KOReader no longer freezes for long stretches when the CWNG Sync plugin syncs the library over a weak network.** Without Turbo mode each request holds KOReader's screen until it finishes, and each page of the book list was allowed up to 30 seconds, so on a slow connection an automatic sync could leave KOReader unresponsive long enough for Android to show "not responding". Automatic syncs (on wake, when the network comes up, when the file browser opens) now give each request a few seconds, stop at the first one that runs out, and try again at the next automatic sync about five minutes later instead of on the very next trigger. Sync now and the first sync after connecting keep the long limits. The plugin is now version 4.1.54. Reported by @magdalar (#2329).

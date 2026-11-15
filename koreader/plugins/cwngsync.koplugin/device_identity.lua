@@ -8,8 +8,13 @@
 -- hardware serial. The hash travels with a copied settings file, so when it
 -- no longer matches the hardware it is on, this e-reader gets a new ID.
 --
--- Only e-readers that expose a serial are covered (Kindle, Kobo). Elsewhere
--- the ID is left exactly as it was.
+-- Kindle and Kobo are fingerprinted by their serial. Other e-readers (the
+-- Android build on a Tolino or a Boox, PocketBook) expose no serial we can
+-- read, so they are fingerprinted by KOReader's model name instead. That still
+-- catches a settings file restored onto a different kind of e-reader, such as
+-- a Kindle's onto a Tolino (#2952), but not one copied between two e-readers
+-- of the same model. A Kindle or Kobo whose serial cannot be read on one start
+-- is left exactly as it was.
 
 local DeviceIdentity = {}
 
@@ -40,29 +45,52 @@ function DeviceIdentity.serial(device, read_line)
     return serial
 end
 
+-- What identifies this e-reader's hardware, hashed, or nil when nothing can be
+-- said this time. Only the hash is kept, so a shared settings file does not
+-- carry the serial.
+function DeviceIdentity.fingerprint(device, hash, read_line)
+    if device.isKindle or device.isKobo then
+        local serial = DeviceIdentity.serial(device, read_line)
+        if not serial then return nil end
+        return hash("cwngsync-hardware:" .. serial)
+    end
+    local model = type(device.model) == "string" and device.model:match("^%s*(.-)%s*$")
+    if model == nil or model == "" then return nil end
+    return hash("cwngsync-model:" .. model)
+end
+
 -- Settle the ID for this e-reader. `settings` is KOReader's
--- G_reader_settings (readSetting / saveSetting). Returns true only when the
--- ID was replaced because it belonged to another e-reader.
+-- G_reader_settings (readSetting / saveSetting / flush). Returns true only
+-- when the ID was replaced because it belonged to another e-reader.
+--
+-- Anything it records is flushed at once. KOReader otherwise writes the file
+-- when it exits, so a copy taken while it runs would carry the ID without the
+-- fingerprint, and the second e-reader would keep the first one's ID (#2351).
 function DeviceIdentity.settle(settings, device, hash, new_id, read_line)
+    local changed = false
+    local function save(key, value)
+        settings:saveSetting(key, value)
+        changed = true
+    end
+    local replaced = false
+
     local device_id = settings:readSetting("device_id")
     if device_id == nil or device_id == "" then
-        device_id = new_id()
-        settings:saveSetting("device_id", device_id)
+        save("device_id", new_id())
     end
 
-    local serial = DeviceIdentity.serial(device, read_line)
-    if not serial then return false end
-
-    -- Only the hash is kept, so a shared settings file does not carry the serial.
-    local fingerprint = hash("cwngsync-hardware:" .. serial)
+    local fingerprint = DeviceIdentity.fingerprint(device, hash, read_line)
     local recorded = settings:readSetting(FINGERPRINT_KEY)
-    if recorded == fingerprint then return false end
+    if fingerprint and recorded ~= fingerprint then
+        save(FINGERPRINT_KEY, fingerprint)
+        if recorded ~= nil then
+            save("device_id", new_id())
+            replaced = true
+        end
+    end
 
-    settings:saveSetting(FINGERPRINT_KEY, fingerprint)
-    if recorded == nil then return false end
-
-    settings:saveSetting("device_id", new_id())
-    return true
+    if changed and settings.flush then settings:flush() end
+    return replaced
 end
 
 return DeviceIdentity

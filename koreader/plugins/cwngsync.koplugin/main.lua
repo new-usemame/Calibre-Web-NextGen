@@ -39,6 +39,7 @@ local SleepScreen = require("sleep_screen")
 local device_id_replaced = DeviceIdentity.settle(G_reader_settings, {
     isKindle = Device:isKindle(),
     isKobo = Device:isKobo(),
+    model = Device.model,
 }, md5, random.uuid)
 
 local CWNGSync = WidgetContainer:extend{

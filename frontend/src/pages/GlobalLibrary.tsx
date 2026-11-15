@@ -9,7 +9,7 @@ import { ApiError, type Book } from '../lib/api';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useAddToMyLibrary, useGlobalLibrary, useMe } from '../lib/queries';
 import { usePersistentBool } from '../lib/usePersistentBool';
-import { usePersistentChoice } from '../lib/usePersistentChoice';
+import { useCatalogDensity } from '../lib/catalogDensity';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
@@ -36,8 +36,7 @@ export function GlobalLibrary() {
   const [query, setQuery] = useState(initial.get('q') ?? '');
   const [search, setSearch] = useState(initial.get('q') ?? '');
   const [sort, setSort] = useState('new');
-  const [density] = usePersistentChoice(
-    'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
+  const [density] = useCatalogDensity();
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
   const [shelfBadgesHidden] = useShelfBadgesHidden();

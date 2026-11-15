@@ -56,6 +56,253 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.70',
+    date: '2026-11-15',
+    items: [
+      {
+        title: 'KOReader Library mode saves only what changed',
+        body: 'CWNGSync used to rewrite the record of every book in your library each time it saved, which could freeze a large library for a moment on the device. It now keeps records in small files and writes only the ones that changed. Update the plugin from KOReader\'s Updates Manager to get it.',
+        category: 'Sync',
+      },
+      {
+        title: 'A Kobo no longer undoes a newer place from another reader',
+        body: 'A Kobo that had been sent your newer place from the web reader or KOReader could send an older report it had queued, and the server took that as a move back. A report the Kobo made before it received the newer place now keeps the newer one.',
+        category: 'Sync',
+      },
+      {
+        title: 'Uploads work again with NETWORK_SHARE_MODE on',
+        body: 'With NETWORK_SHARE_MODE on and no ingest folder mounted, uploads failed with "Ingest directory not writable" after an update. The container now fixes that folder\'s owner on start when it is local and the app cannot write it. Folders on a network share are still left alone.',
+        category: 'Library',
+      },
+      {
+        title: 'Clearer sync logs',
+        body: '"No book found for checksum" now says which of three reasons caused the miss, and the "Session protection triggered" debug line is written once instead of on every request.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.69',
+    date: '2026-11-14',
+    items: [
+      {
+        title: 'Start a finished book over without marking it unread',
+        body: 'Choose "Clear reading position" in a book\'s More actions menu to remove your place in the web reader, on your Kobo and in KOReader at once. The book stays marked as read, so you can re-read it from the start.',
+        category: 'Reading',
+      },
+      {
+        title: 'Mark as unread now resets KOReader too',
+        body: 'A KOReader that had reported a place got that place handed straight back after you marked the book unread. Marking a book unread now also clears the place each KOReader and Kobo device saved for you.',
+        category: 'Sync',
+      },
+      {
+        title: 'Smart shelves load the rows you choose',
+        body: 'Smart shelves now ask for whole rows at a time, following the Library\'s "Rows per load" setting the same way the Library and regular shelves do.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Calibre\'s .fb2.zip exports upload again',
+        body: 'Uploading a .fb2.zip book from Calibre was refused as "File type not allowed". It is now accepted as FB2 in a zip (.fbz). In the Docker image, .docx, .odt and .flac uploads are also no longer refused when the file-content check is on.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Upload a book' },
+      },
+      {
+        title: 'Uploads without a built-in title get a sensible name',
+        body: 'A plain .txt, .docx, .rtf or untitled PDF you uploaded used to be titled with an internal name like "new 1 20261113 112627 Rig Doc". It is now titled from the file name you uploaded. Books already imported keep their titles, so edit them if needed.',
+        category: 'Library',
+      },
+      {
+        title: 'Libraries on NFSv4 shares can edit and import books',
+        body: 'Changing a book\'s author or title, or importing a book, failed with "[Errno 524]" on an NFSv4 share because the share refuses one of its own file attributes. Moves now rename the folder in place, and copies skip any attribute the destination refuses.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The translation banner counts the right strings',
+        body: 'The "strings still need translating" banner counted translated plural entries as missing and skipped fuzzy ones. It now matches what you actually see in English.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.68',
+    date: '2026-11-13',
+    items: [
+      {
+        title: 'Your Kobo no longer undoes a newer place when it wakes',
+        body: 'A Kobo that woke with a book open reported its old place with a fresh time, which replaced a place you had just saved in the web reader or KOReader. With Share my place on, that repeat report now leaves the newer place alone, and the Kobo picks it up at its next sync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOSync apps move your Kobo to the exact place',
+        body: 'A save from an app such as JustRead used to move only the Kobo\'s percentage, so the book opened where the Kobo last was. When the place converts exactly into your Kobo\'s copy, the Kobo now opens there.',
+        category: 'Sync',
+      },
+      {
+        title: 'A quick read in the web reader reaches your other devices',
+        body: 'Turning a page in the first few seconds after opening a book saved your place without a percentage, so your Kobo and KOReader never heard about it. The reader now saves it again with the percentage as soon as it has one.',
+        category: 'Reading',
+      },
+      {
+        title: 'Shelves follow your Library view settings',
+        body: 'Shelves and Smart shelves now use the book density and Rows per load you pick on the Library page, instead of a fixed layout that fetched 24 books at a time.',
+        category: 'Library',
+      },
+      {
+        title: 'The Library no longer gets stuck on Loading',
+        body: 'At some window widths with Rows per load set to 1, a scrollbar appearing could cost a column and restart the list over and over. The page size now holds once you are past the first page.',
+        category: 'Library',
+      },
+      {
+        title: 'Books with a built-in font open straight away',
+        body: 'The web reader waited for the list of reader fonts before showing the first page, so a slow list meant a blank reader for several seconds. Built-in fonts no longer wait for it.',
+        category: 'Reading',
+      },
+      {
+        title: 'Keep a new cover\'s proportions in your EPUBs',
+        body: 'Changing a cover rewrote the EPUB with a cover page stretched to the screen, which looked distorted on some readers. Turn on "Preserve cover aspect ratio in EPUBs" in NextGen Settings to keep the cover\'s shape. It applies to covers written after you turn it on.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.67',
+    date: '2026-11-12',
+    items: [
+      {
+        title: 'Search is much faster on large libraries',
+        body: 'The top search box now matches each tag, author, series and publisher name once per search, not once for every book that uses it. On a 270,000-book library a one-word search dropped from several seconds to under one. Results are unchanged, accents included.',
+        category: 'Library',
+      },
+      {
+        title: 'Publishers load a page at a time',
+        body: 'The Publishers list now loads as you scroll and filters by name on the server, like Authors and Series, so it no longer stalls on a library with many publishers.',
+        category: 'Library',
+        link: { to: '/publishers', label: 'Publishers' },
+      },
+      {
+        title: 'A second Kobo picks up the place you reached on the first',
+        body: 'With several Kobos and Share my place on, a Kobo that had read a book before kept its own old page. Each Kobo\'s download link now names that Kobo, so it moves to the shared place. This covers books downloaded after the update.',
+        category: 'Sync',
+      },
+      {
+        title: 'Smart shelves follow the order you chose',
+        body: 'The sidebar in the new UI listed Smart shelves A to Z whatever Order Mode you had set. It now uses the same order as the classic profile page.',
+        category: 'Library',
+      },
+      {
+        title: 'Saved PDFs keep the book\'s name',
+        body: 'The PDF reader\'s Save button always wrote document.pdf. It now saves the file as "Title - Author", the same name the Download link uses.',
+        category: 'Reading',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.66',
+    date: '2026-11-11',
+    items: [
+      {
+        title: 'OPDS apps can show your place and a read mark in any list',
+        body: 'Each book in an OPDS feed now carries its book id and, when you are signed in, your read status and your shared reading place. A reading app can mark finished and in-progress books in any list without opening the read-list feeds. A device with Share my place off keeps its place to itself.',
+        category: 'Sync',
+      },
+      {
+        title: 'Reading apps can ask for a missing format',
+        body: 'An app signed in with your app password can now queue a conversion, for example AZW3 to EPUB, and follow it until the new format appears on the book. Converting still needs your account\'s edit permission, as it does in the web UI.',
+        category: 'Sync',
+      },
+      {
+        title: 'The web reader opens at the Kobo\'s exact place for more books',
+        body: 'Some EPUBs mark their files with a ZIP flag the exact-place check refused, so the web reader fell back to the Kobo\'s percentage. Those books now open at the exact spot the Kobo left off.',
+        category: 'Reading',
+      },
+      {
+        title: 'Book languages have names in Catalan and Arabic',
+        body: 'With the interface in Catalan or Arabic, every book\'s language read "Unknown" on the book page and in the Languages list. The names now show, translated where a translation exists.',
+        category: 'Library',
+      },
+      {
+        title: 'KOReader setup: a working plugin store link and Updates Manager steps',
+        body: 'The appstore.koplugin link on the KOReader setup page opened a missing page and now goes to the plugin\'s real repository. The README also explains how to point Updates Manager at the sync plugin.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.65',
+    date: '2026-11-10',
+    items: [
+      {
+        title: 'Signing in works behind a proxy that asks every request to upgrade',
+        body: 'A common nginx and Nginx Proxy Manager WebSocket snippet marks every request as a connection upgrade. Behind it, signing in and creating app passwords hung until the proxy gave up with a 504. Requests are now read normally whatever that header says.',
+        category: 'Account',
+      },
+      {
+        title: 'Reading apps see your own library with an app password',
+        body: 'An app that signs in with your username and an app password now reads the library, your shelves and your read status as you, instead of getting the guest view or a refusal. Account settings and admin pages still need you signed in.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'OPDS apps hear about a wrong password',
+        body: 'With anonymous browsing on, an OPDS app with the wrong password used to get the guest catalog, so its connection test passed while your shelves and read status were missing. It now gets a clear sign-in failure. Apps that send no login still get the guest catalog.',
+        category: 'Sync',
+      },
+      {
+        title: 'OPDS apps load covers faster',
+        body: 'Reader apps that browse over OPDS now get small thumbnails for their grids instead of every full-size cover, and can keep them until a book\'s cover changes, so returning to a shelf no longer downloads every cover again.',
+        category: 'Sync',
+      },
+      {
+        title: 'OPDS search finds "C++" and comes in pages',
+        body: 'A search containing a plus sign lost it, so "C++" ran as "C". Search results also arrived as one long feed. Both are fixed: the plus comes through, and results page at your Books per page setting like every other OPDS list.',
+        category: 'Sync',
+      },
+      {
+        title: 'Desktop compatibility mode is quicker on large libraries',
+        body: 'With desktop compatibility mode on, every request recounted every Magic Shelf, which could hold pages for tens of seconds. The counts are now kept until the library file changes, so a book added in Calibre still shows up on the next request.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Support packs hide Kobo tokens, emails and account names',
+        body: 'The logs in a sanitised support pack now replace Kobo sync tokens, email addresses and account names with consistent labels, so you can share the pack without exposing them and the same account can still be followed through it.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.64',
+    date: '2026-11-09',
+    items: [
+      {
+        title: 'Kobo sync works with the store proxy on, on current firmware',
+        body: 'With Proxy unknown requests to Kobo Store turned on, a Kobo on firmware 6 stopped at the first store call the server redirected, so its library never synced and the Store and Libby pages stayed empty. The server now fetches every store call itself and passes the answer back to your Kobo.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo setup says when your account cannot download books',
+        body: 'The server refuses a Kobo library sync for an account without download permission, and the Kobo only says the sync failed. The Kobo pairing section now says so up front and points to the Allow Downloads permission.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Reading apps can mark books read with an app password',
+        body: 'A reading app that signs in with an app password can now set a book\'s reading status, mark it read and archive it, the same way it already reads your library over OPDS and syncs your place over KOSync.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOSync apps can tell a private place from no place',
+        body: 'When another device keeps its place to itself because Share my place is off for it, a KOSync app now learns that a private place exists instead of hearing that nobody has opened the book. When it saves your place, it also learns whether the place was kept or an earlier one stayed. KOReader works as before.',
+        category: 'Sync',
+      },
+      {
+        title: 'A clearer log line when a Kobo keeps its own place',
+        body: 'With DEBUG logging on, a Kobo holding its own place because the book was downloaded before the server tracked finished downloads now says that, and says to download the book again.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.63',
     date: '2026-11-08',
     items: [

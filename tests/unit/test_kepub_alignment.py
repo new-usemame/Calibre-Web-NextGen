@@ -262,3 +262,19 @@ def test_the_kobo_percentage_needs_a_span_the_kepub_holds(tmp_path):
     assert ka.kobo_progress_percent(kepub, "OEBPS/nope.xhtml", "kobo.1.1") is None
     assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "bad") is None
     assert ka.kobo_progress_percent(tmp_path / "missing.kepub", "OEBPS/c0.xhtml", "kobo.1.1") is None
+
+
+def test_an_empty_span_has_no_kobo_percentage(tmp_path):
+    """An empty span names no readable place, even at a chapter's end; its
+    offset must not be presented as the next chapter's percentage."""
+    kepub = _book(tmp_path / "empty.kepub.epub", [
+        '<p><span id="kobo.1.1">One.</span><span id="kobo.1.2"></span></p>',
+        '<p><span id="kobo.1.1">Two.</span></p>'], spans=True)
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "kobo.1.2") is None
+
+
+@pytest.mark.parametrize("source, span", [(None, "kobo.1.1"), (1, "kobo.1.1"),
+                                         ("OEBPS/c0.xhtml", None), ("OEBPS/c0.xhtml", [])])
+def test_invalid_location_types_have_no_kobo_percentage(tmp_path, source, span):
+    kepub = _book(tmp_path / "b.kepub.epub", ['<p><span id="kobo.1.1">One.</span></p>'], spans=True)
+    assert ka.kobo_progress_percent(kepub, source, span) is None

@@ -137,8 +137,10 @@ def kobo_progress_percent(kepub_path, source: str, span_id: str) -> Optional[flo
     document = _document(kepub, source)
     if document is None or span_id not in document.spans:
         return None
-    start, _end = document.spans[span_id]
-    inside = start / document.length if document.length else 0.0
+    start, end = document.spans[span_id]
+    if start == end:
+        return None  # an empty span does not name a readable place
+    inside = start / document.length
     return 100.0 * (document.byte_start + inside * document.size) / kepub.total_bytes
 
 

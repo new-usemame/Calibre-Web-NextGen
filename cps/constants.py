@@ -131,6 +131,24 @@ def calibre_library_dir():
     )
 
 
+def detected_calibre_library_dir(_isfile=os.path.isfile):
+    """The configured library dir when it already holds ``metadata.db``.
+
+    This is the auto-detect fallback for an install whose Calibre database
+    location is not set yet. An unsafe configured value is logged and treated
+    as nothing detected, so a bad override cannot stop startup or the admin
+    database page; the user can still type a path there.
+    """
+    try:
+        library_dir = calibre_library_dir()
+    except RuntimePathError as exc:
+        _dirs_logger.warning("Not auto-detecting the Calibre library: %s", exc)
+        return None
+    if _isfile(posixpath.join(library_dir, 'metadata.db')):
+        return library_dir
+    return None
+
+
 AUTO_LIBRARY_UNIT_DIR = '/etc/s6-overlay/s6-rc.d/cwa-auto-library'
 
 
@@ -183,7 +201,13 @@ def config_path(*parts, _join=os.path.join):
 
 
 def processed_books_dir():
-    """Root for retained originals, failed conversions and backup archives."""
+    """Root for retained originals, failed conversions and backup archives.
+
+    ``CWA_PROCESSED_BOOKS_DIR`` places it apart from the config dir (#1883).
+    """
+    override = _dirs_environ.get('CWA_PROCESSED_BOOKS_DIR')
+    if override is not None and override.strip():
+        return _validated_runtime_dir(override, 'CWA_PROCESSED_BOOKS_DIR')
     return config_path("processed_books")
 
 # Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the

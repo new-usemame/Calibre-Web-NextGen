@@ -169,7 +169,9 @@ def _factory_app(monkeypatch, tmp_path):
         schedule, "register_scheduled_tasks", lambda _enabled: None
     )
     monkeypatch.setattr(schedule, "register_startup_tasks", lambda: None)
-    monkeypatch.setattr(sqlalchemy, "inspect", lambda _bind: inspector)
+    inspect = sqlalchemy.inspect
+    monkeypatch.setattr(sqlalchemy, "inspect", lambda target, **kwargs:
+                        inspector if target is db_session.bind else inspect(target, **kwargs))
 
     # The assertion target: this call installs _cwa_ensure_db_session on the
     # app. Removing that production hook makes the trusted cases below fail.

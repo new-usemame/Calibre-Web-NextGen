@@ -72,16 +72,14 @@ def world(sw, rows):
     return sw
 
 
-def _not_rewound(sw, percent=40):
+def _not_rewound(sw, percent=40, *, exact=None):
     """Neither the other checked Kobo nor KOReader moved off ``percent``."""
     bookmark = sw.get(sw.observer)["CurrentBookmark"]
-    # An exact span arrives with the percentage a Kobo works out for it
-    # (#2821); a Kobo held on its own place is sent the shared figure.
-    where = bookmark.get("Location") or {}
-    worked = (kepub_alignment.kobo_progress_percent(sw.kepub, where.get("Source"), where.get("Value"))
-              if where else None)
-    assert (bookmark["ProgressPercent"] == pytest.approx(percent)
-            or (worked is not None and bookmark["ProgressPercent"] == pytest.approx(worked, abs=0.01)))
+    expected = percent
+    if exact is not None:
+        assert location_of(bookmark) == _loc(exact)
+        expected = kepub_alignment.kobo_progress_percent(sw.kepub, exact["source"], exact["span"])
+    assert bookmark["ProgressPercent"] == pytest.approx(expected, abs=0.01)
     assert sw.pull()[0] == pytest.approx(percent)
 
 
@@ -179,7 +177,7 @@ def test_its_first_open_at_the_start_does_not_rewind(placeless, rows, opened_at)
 
     _put(sw, sw.target, target, 0, 4)
 
-    _not_rewound(sw)
+    _not_rewound(sw, exact=rows["shared"])
 
 
 def test_once_it_has_a_location_of_its_own_inexact_serves_resume(placeless, rows):

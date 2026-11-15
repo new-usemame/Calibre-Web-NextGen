@@ -101,13 +101,10 @@ def _not_rewound(sw, rows, percent=40):
     """The shared place is still KOReader's: the other checked Kobo and
     KOReader itself both get it."""
     bookmark = sw.get(sw.observer)["CurrentBookmark"]
-    # An exact span arrives with the percentage a Kobo works out for it
-    # (#2821); a Kobo held on its own place is sent the shared figure.
-    where = bookmark.get("Location") or {}
-    worked = (kepub_alignment.kobo_progress_percent(sw.kepub, where.get("Source"), where.get("Value"))
-              if where else None)
-    assert (bookmark["ProgressPercent"] == pytest.approx(percent)
-            or (worked is not None and bookmark["ProgressPercent"] == pytest.approx(worked, abs=0.01)))
+    place = rows["koreader"]
+    assert location_of(bookmark) == span_location(place["source"], place["span"])
+    assert bookmark["ProgressPercent"] == pytest.approx(
+        kepub_alignment.kobo_progress_percent(sw.kepub, place["source"], place["span"]), abs=0.01)
     seen_percent, progress = sw.pull()
     assert seen_percent == pytest.approx(percent)
     assert progress == rows["koreader"]["xpointer"]

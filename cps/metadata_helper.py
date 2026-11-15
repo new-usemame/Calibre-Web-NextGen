@@ -18,7 +18,7 @@ from cps.metadata_constants import (
 )
 from cps.search_metadata import cl as metadata_providers
 from cps.cwa_db_loader import load_cwa_db
-from cps.services.isbn import isbn13, is_valid as isbn_is_valid
+from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid
 CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
@@ -343,7 +343,7 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             hasattr(metadata, 'identifiers') and metadata.identifiers):
             for identifier_type, identifier_value in metadata.identifiers.items():
                 if (identifier_type and identifier_value
-                        and identifier_type.lower() in _ISBN_IDENTIFIER_TYPES
+                        and identifier_type.lower() in ISBN_IDENTIFIER_TYPES
                         and not isbn_is_valid(identifier_value)):
                     log.info(
                         f"Auto metadata fetch: skipped {identifier_type} {identifier_value!r} "
@@ -515,9 +515,6 @@ def _apply_cover_from_metadata(book, metadata):
     return False
 
 
-_ISBN_IDENTIFIER_TYPES = ("isbn", "isbn13", "isbn_13", "isbn10", "isbn_10")
-
-
 # Trailing words that name the kind of series rather than the series itself:
 # "Dune Chronicles" is the library's "Dune", "Red Rising Saga" its "Red Rising".
 _SERIES_KIND_WORDS = frozenset({
@@ -678,17 +675,16 @@ def _book_isbn(book):
     One whose check digit is valid wins over one that fails it, so a bad
     ``isbn13`` value does not hide a good ``isbn``.
     """
-    found_13 = found = None
+    candidates = []
     for ident in (getattr(book, "identifiers", None) or []):
         itype = (getattr(ident, "type", "") or "").lower()
-        if itype in ("isbn13", "isbn_13"):
-            found_13 = ident.val
-        elif itype == "isbn":
-            found = ident.val
-    for candidate in (found_13, found):
+        if itype in ISBN_IDENTIFIER_TYPES:
+            candidates.append((itype not in ("isbn13", "isbn_13"), ident.val))
+    candidates.sort(key=lambda candidate: candidate[0])
+    for _, candidate in candidates:
         if candidate and isbn_is_valid(candidate):
             return candidate
-    return found_13 or found
+    return next((value for _, value in candidates if value), None)
 
 
 # How close two titles must be, when their identifying words are NOT identical,
@@ -915,7 +911,7 @@ def _select_metadata_result(results, book_isbn, book_title=None, book_authors=No
     if target:
         for result in results:
             identifiers = getattr(result, "identifiers", None) or {}
-            for key in _ISBN_IDENTIFIER_TYPES:
+            for key in ISBN_IDENTIFIER_TYPES:
                 candidate = identifiers.get(key)
                 if candidate and isbn13(candidate) == target:
                     return result

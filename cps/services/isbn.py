@@ -16,8 +16,9 @@ and None for anything else.
 import re
 
 _SEPARATORS = re.compile(r"[\s\-‐-―]")
-_ISBN10 = re.compile(r"^\d{9}[\dX]$")
-_ISBN13 = re.compile(r"^97[89]\d{10}$")
+_ISBN10 = re.compile(r"[0-9]{9}[0-9X]")
+_ISBN13 = re.compile(r"97[89][0-9]{10}")
+ISBN_IDENTIFIER_TYPES = ("isbn", "isbn13", "isbn_13", "isbn10", "isbn_10")
 
 
 def _clean(value):
@@ -37,19 +38,31 @@ def _isbn13_check(first12):
     return str((10 - total % 10) % 10)
 
 
+def normalize(value):
+    """Clean a checksum-valid ISBN, preserving its 10- or 13-digit form.
+
+    Hyphens, spaces and a leading "ISBN" are ignored. Other characters are
+    rejected rather than stripped into a different, apparently valid value.
+    """
+    text = _clean(value)
+    if _ISBN13.fullmatch(text):
+        return text if _isbn13_check(text[:12]) == text[12] else None
+    if _ISBN10.fullmatch(text) and _isbn10_valid(text):
+        return text
+    return None
+
+
 def isbn13(value):
     """The ISBN-13 form of a valid ISBN-10 or ISBN-13, else None.
 
-    Hyphens, spaces and a leading "ISBN" are ignored. An ISBN-10 is converted
-    by its 978 prefix, so the two forms of one edition compare equal.
+    An ISBN-10 is converted by its 978 prefix, so the two forms of one
+    edition compare equal. Formatting follows ``normalize``.
     """
-    text = _clean(value)
-    if _ISBN13.match(text):
-        return text if _isbn13_check(text[:12]) == text[12] else None
-    if _ISBN10.match(text) and _isbn10_valid(text):
-        first12 = "978" + text[:9]
-        return first12 + _isbn13_check(first12)
-    return None
+    text = normalize(value)
+    if text is None or len(text) == 13:
+        return text
+    first12 = "978" + text[:9]
+    return first12 + _isbn13_check(first12)
 
 
 def is_valid(value):

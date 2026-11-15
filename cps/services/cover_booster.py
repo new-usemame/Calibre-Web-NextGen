@@ -53,7 +53,7 @@ from urllib.parse import quote_plus
 import requests
 
 from . import parallel
-from .isbn import is_valid as isbn_is_valid
+from .isbn import ISBN_IDENTIFIER_TYPES, normalize as normalize_isbn
 
 from .. import constants, logger
 
@@ -255,12 +255,10 @@ def _boosted_cover_for(record: Dict) -> Optional[str]:
 
 
 def _isbn_from(identifiers: Dict) -> Optional[str]:
-    for key in ("isbn", "isbn_13", "isbn13", "isbn_10", "isbn10"):
-        val = identifiers.get(key)
-        if val:
-            digits = re.sub(r"[^0-9Xx]", "", str(val))
-            if len(digits) in (10, 13) and isbn_is_valid(digits):
-                return digits
+    for key in ISBN_IDENTIFIER_TYPES:
+        cleaned = normalize_isbn(identifiers.get(key))
+        if cleaned:
+            return cleaned
     return None
 
 
@@ -308,9 +306,9 @@ def _to_isbn10(isbn: str) -> Optional[str]:
     978 prefix is converted). 979-prefixed ISBN-13s have no ISBN-10 form;
     return None for those.
     """
-    cleaned = re.sub(r"[^0-9Xx]", "", isbn or "")
     # A value that fails its check digit names some other edition's cover, or none.
-    if not isbn_is_valid(cleaned):
+    cleaned = normalize_isbn(isbn)
+    if not cleaned:
         return None
     if len(cleaned) == 10:
         return cleaned.upper()

@@ -128,7 +128,85 @@ def test_goodreads_other_books_hides_an_owned_book_whichever_isbn_form_each_side
 
     owned = gr_book(DUNE_13, 1, "Dune: Deluxe Edition With Extras")
     other = gr_book("9780441172719", 2, "Children of Dune")
-    library = [NS(title="Dune", identifiers=[NS(val=DUNE_10)])]
+    library = [NS(title="Dune", identifiers=[NS(type="isbn", val=DUNE_10)])]
     monkeypatch.setattr(goodreads_support, "Levenshtein", None)   # judge by ISBN alone
     found = list(goodreads_support.get_other_books(NS(books=[owned, other]), library))
     assert found == [other]
+
+
+@pytest.mark.parametrize("value", ["０４４１０１３５９7", "978０４４１０１３５９3"])
+def test_non_ascii_digits_do_not_create_a_noncanonical_isbn(value):
+    """Accepted ISBNs must be ASCII keys usable by every provider."""
+    assert isbn13(value) is None
+
+
+@pytest.mark.parametrize("kind", ["isbn10", "isbn_10", "isbn_13"])
+def test_book_isbn_aliases_select_the_matching_edition(kind):
+    """Every accepted identifier spelling must reach ISBN-priority selection."""
+    value = DUNE_13 if kind == "isbn_13" else DUNE_10
+    book = _Book(identifiers=[_Ident(kind, value), _Ident("isbn13", "9780000000000")])
+    first = _cand("Dune", {"isbn": "9780593099322"})
+    right = _cand("Dune", {"isbn": DUNE_13})
+    assert m._select_metadata_result([first, right], m._book_isbn(book),
+                                     book_title="Dune", book_authors=["Frank Herbert"]) is right
+
+
+@pytest.mark.parametrize("consumer", ["cover_identifier", "cover_key", "apple_query"])
+@pytest.mark.parametrize("value", ["garbage0441013597", "9780441013593junk", "0.441013597"])
+def test_malformed_isbns_do_not_become_cover_keys_or_apple_lookups(value, consumer):
+    """Reject unexpected characters before cleaning, rather than repairing junk."""
+    from cps.services import cover_booster
+    from cps.metadata_provider.apple_books import AppleBooks
+    if consumer == "cover_identifier":
+        assert cover_booster._isbn_from({"isbn": value}) is None
+    elif consumer == "cover_key":
+        assert cover_booster._to_isbn10(value) is None
+    else:
+        assert not AppleBooks()._looks_like_isbn(value)
+
+
+@pytest.mark.parametrize("value, cleaned, key", [("ISBN: 978‑0‑441‑01359‑3", DUNE_13, DUNE_10),
+                                                ("ISBN: 0-8044-2957-x", "080442957X", "080442957X")])
+def test_formatted_isbns_reach_cover_and_apple_providers(monkeypatch, value, cleaned, key):
+    """Provider requests carry a clean ISBN even when the input has a label."""
+    from cps.services import cover_booster
+    from cps.metadata_provider.apple_books import AppleBooks
+    assert cover_booster._to_isbn10(value) == key
+    assert cover_booster._isbn_from({"isbn": value}) == cleaned
+    calls = []
+    monkeypatch.setattr(AppleBooks, "_call", lambda self, url, params: calls.append(params) or [])
+    assert AppleBooks()._looks_like_isbn(value)
+    AppleBooks()._lookup_isbn(value)
+    assert calls == [{"isbn": cleaned, "country": "us", "media": "ebook"}]
+
+
+@pytest.mark.parametrize("value, kind", [("9780000000000", "isbn"), (DUNE_10, "goodreads")])
+def test_goodreads_does_not_hide_a_book_for_invalid_or_non_isbn_identifiers(monkeypatch, value, kind):
+    """Only a valid library ISBN may identify an owned edition by ISBN."""
+    from cps.services import goodreads_support
+    other = NS(isbn=value if kind == "isbn" else DUNE_13, gid=2,
+               _book_dict={"title_without_series": "Other"})
+    library = [NS(title="Dune", identifiers=[NS(type=kind, val=value)])]
+    monkeypatch.setattr(goodreads_support, "Levenshtein", None)
+    assert list(goodreads_support.get_other_books(NS(books=[other]), library)) == [other]
+
+
+def test_hardcover_standalone_scoring_uses_the_same_isbn_validation(monkeypatch):
+    """The standalone provider must not fall back to unchecked string equality."""
+    import builtins
+    import runpy
+    from pathlib import Path
+    original_import = builtins.__import__
+
+    def without_application(name, *args, **kwargs):
+        if name == "cps" or name.startswith("cps."):
+            raise ImportError("application unavailable in standalone mode")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_application)
+    standalone = runpy.run_path(str(Path(m.__file__).parent / "metadata_provider" / "hardcover.py"))
+    score = standalone["Hardcover"].calculate_confidence_score
+    record = NS(identifiers={"isbn": DUNE_13}, title="Dune", authors=["Frank Herbert"])
+    assert score(record, "Dune", query_isbn=DUNE_10) == (1.0, "ISBN exact match")
+    record.identifiers = {"isbn": "9780000000000"}
+    assert score(record, "Other", query_isbn="9780000000000")[1] != "ISBN exact match"

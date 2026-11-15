@@ -110,8 +110,14 @@ except Exception:  # pragma: no cover - CLI/testing path
     def get_language_name(locale: str, code3: str) -> str:  # type: ignore
         return code3 or ""
 
-    def isbn13(value):  # type: ignore
-        return str(value or "").replace("-", "").replace(" ", "") or None
+    # Load the same pure helper without starting the application in CLI mode.
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+
+    _isbn_spec = spec_from_file_location("cwng_isbn", Path(__file__).resolve().parents[1] / "services" / "isbn.py")
+    _isbn_module = module_from_spec(_isbn_spec)
+    _isbn_spec.loader.exec_module(_isbn_module)
+    isbn13 = _isbn_module.isbn13
 
     class _DummyUser:
         hardcover_token: Optional[str] = None

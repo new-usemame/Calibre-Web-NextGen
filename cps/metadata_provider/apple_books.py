@@ -24,7 +24,7 @@ import requests
 
 from cps import constants, logger
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
-from cps.services.isbn import is_valid as isbn_is_valid
+from cps.services.isbn import normalize as normalize_isbn
 
 
 log = logger.create()
@@ -46,7 +46,6 @@ class AppleBooks(Metadata):
     _ARTWORK_SIZE_RE = re.compile(r"/\d+x\d+bb\.(jpg|png)$")
     _ARTWORK_SIZE_REPL = r"/1500x1500bb.\1"
 
-    _ISBN_DIGITS_RE = re.compile(r"[^0-9Xx]")
 
     def search(
         self, query: str, generic_cover: str = "", locale: str = "en"
@@ -72,11 +71,12 @@ class AppleBooks(Metadata):
         return records
 
     def _looks_like_isbn(self, query: str) -> bool:
-        digits = self._ISBN_DIGITS_RE.sub("", query)
-        return len(digits) in (10, 13) and isbn_is_valid(digits)
+        return normalize_isbn(query) is not None
 
     def _lookup_isbn(self, query: str) -> List[Dict]:
-        isbn = self._ISBN_DIGITS_RE.sub("", query)
+        isbn = normalize_isbn(query)
+        if not isbn:
+            return []
         params = {"isbn": isbn, "country": "us", "media": "ebook"}
         return self._call(self.LOOKUP_URL, params)
 

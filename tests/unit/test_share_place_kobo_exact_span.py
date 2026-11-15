@@ -33,7 +33,9 @@ from datetime import timedelta
 
 import pytest
 
+from cps import kobo, ub
 from cps.services import kepub_alignment
+from tests.unit.kobo_state_world import _states
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
     BOOK, OTHER_DIGEST, _now, after_now, location_of, span_location, span_rows, sw,
 )
@@ -110,6 +112,58 @@ def test_a_backward_move_from_koreader_reaches_the_kobo_as_the_earlier_span(acco
     assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["early"]), abs=0.01)
     assert location_of(bookmark) == _expected(sw, rows["early"])
     assert sw.synced_location(sw.checked) == _expected(sw, rows["early"])
+
+
+@pytest.mark.parametrize("download_still_proven", [True, False])
+def test_retrying_an_exact_place_keeps_the_kobo_percentage_and_rechecks_download(
+        account, rows, download_still_proven):
+    """A lost sync reply is retried with its incoming token. Converting the
+    percentage must not make that page look superseded; losing download proof
+    must still turn its exact place into the Kobo's held place on replay."""
+    sw = account
+    header = kobo.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+    incoming = sw.sync(sw.checked).headers[header]
+    sw.push(rows["late"]["xpointer"], 40)
+    first = sw.sync(sw.checked)
+    assert _states(first).get(sw.book.uuid)
+    if not download_still_proven:
+        sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+            device_id=sw.checked.id, book_id=sw.book.id).delete()
+        sw.session.commit()
+
+    retry = sw.sync(sw.checked, token=incoming)
+
+    assert retry.headers[header] == first.headers[header]
+    replayed = _states(retry).get(sw.book.uuid)
+    assert replayed, retry.get_json()
+    bookmark = replayed[-1]["CurrentBookmark"]
+    if download_still_proven:
+        assert retry.get_json() == first.get_json()
+        assert bookmark["ProgressPercent"] == pytest.approx(_kobo_percent(sw, rows["late"]), abs=0.01)
+        assert location_of(bookmark) == _expected(sw, rows["late"])
+    else:
+        assert bookmark["ProgressPercent"] == pytest.approx(40)
+        own = rows["kobo-own"]
+        assert location_of(bookmark) == span_location(own["source"], own["span"])
+    assert sw.pull()[0] == pytest.approx(40)  # delivery never rewrites the shared row
+
+
+def test_retrying_a_page_with_a_converted_percentage_withholds_a_superseded_place(account, rows):
+    """Accepting Kobo percentage units must not replay a place the reader
+    has since replaced, including a backward move."""
+    sw = account
+    header = kobo.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+    incoming = sw.sync(sw.checked).headers[header]
+    sw.push(rows["late"]["xpointer"], 40, client_at=after_now(2))
+    first = sw.sync(sw.checked)
+    assert _states(first).get(sw.book.uuid)
+    sw.push(rows["early"]["xpointer"], 20, client_at=after_now(4))
+
+    retry = sw.sync(sw.checked, token=incoming)
+
+    assert retry.headers[header] == first.headers[header]
+    assert sw.book.uuid not in _states(retry)
+    assert sw.pull()[0] == pytest.approx(20)
 
 
 # == Today's fallback for a Kobo that does not hold the current KEPUB ========

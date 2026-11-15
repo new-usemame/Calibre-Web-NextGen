@@ -706,6 +706,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/147#issuecomment-4482187505",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#1495@2026-10-02T18:43:10Z": {
+  "hash": "10976962ad0fa3e2",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#1556@2026-08-13T14:50:50Z": {
   "hash": "3deff92f78a656a1",
   "verdict": "partial",
@@ -1287,6 +1294,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2479#issuecomment-6112419525",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2499@2026-10-07T08:18:28Z": {
+  "hash": "905f43b3ad340a2f",
+  "verdict": "content",
+  "quote": "I believe this is included now. Will close this off. Ta.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2499#issuecomment-6871343236",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2504@2026-10-08T12:08:31Z": {
   "hash": "501298cd390c169a",
   "verdict": "content",
@@ -1462,6 +1476,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6643117884",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2783@2026-11-12T11:18:06Z": {
+  "hash": "e2314eb411745e69",
+  "verdict": "partial",
+  "quote": "Thanks, this is nearly all working now. JustRead syncs both ways with the Kobo, and a Kobo that slept on the book no longer overwrites newer places. Web reader to Kobo is the one remaining problem.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6878347334",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2797@2026-11-04T02:37:03Z": {
   "hash": "c0d286009cc4beb9",
   "verdict": "partial",
@@ -1509,6 +1530,13 @@
   "verdict": "fixed",
   "quote": "The buttons and layout look good.",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/283#issuecomment-4517275960",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2862@2026-11-09T20:17:26Z": {
+  "hash": "bf51aa102dcfb9b7",
+  "verdict": "fixed",
+  "quote": "**Verification of #2862 — PASS on v4.1.68**",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2862#issuecomment-6859352597",
   "by": "deepseek-v4.1-flash"
  },
  "issue#303@2026-07-14T02:47:33Z": {
@@ -2597,11 +2625,11 @@
   "by": "deepseek-v4.1-flash"
  },
  "issue#980@2026-11-12T07:50:13Z": {
-  "hash": "4e382b304ab7174d",
-  "verdict": "content",
-  "quote": "Thanks for picking it up and for the fixes, especially the phone gap",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/980#issuecomment-6839463146",
-  "by": "deepseek-v4.1-flash"
+  "hash": "b49d8dd17670ad27",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "review"
  },
  "issue#984@2026-07-29T14:35:37Z": {
   "hash": "945f2cba8f6248d8",

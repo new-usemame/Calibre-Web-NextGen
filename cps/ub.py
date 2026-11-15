@@ -1645,6 +1645,9 @@ class DeviceReadingPosition(Base):
     # repeating the Kobo's own last place cannot replace a shared place it
     # was never sent. Delivery bookkeeping, never a reading observation.
     served_shared_received_at = deferred(Column(DateTime, nullable=True))
+    # When (server clock) that place was sent. Only a report the Kobo clocked
+    # after it can have seen it; an earlier-clocked one was queued before.
+    served_shared_at = deferred(Column(DateTime, nullable=True))
 
     __table_args__ = (
         UniqueConstraint(
@@ -4758,6 +4761,8 @@ def migrate_kobo_place_delivery(engine, _session):
     _add_column_if_missing(engine, "device_reading_position",
                            "served_shared_received_at",
                            "served_shared_received_at DATETIME")
+    _add_column_if_missing(engine, "device_reading_position",
+                           "served_shared_at", "served_shared_at DATETIME")
     _run_ddl_with_retry(engine, (
         "CREATE TABLE IF NOT EXISTS kobo_place_echo_guard ("
         "id INTEGER NOT NULL PRIMARY KEY, "

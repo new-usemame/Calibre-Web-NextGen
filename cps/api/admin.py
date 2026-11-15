@@ -361,6 +361,8 @@ def admin_update_mail():
             validate_mail_filename_template(template)
         except ValueError as error:
             return _err("invalid_request", str(error), 400)
+    if "mail_server_type" in data and type(data["mail_server_type"]) not in (int, str):
+        return _err("invalid_request", "mail_server_type must be 0 (SMTP) or 1 (Gmail OAuth)", 400)
     numeric = {}
     for key in ("mail_port", "mail_use_ssl", "mail_server_type"):
         if key in data:
@@ -368,6 +370,8 @@ def admin_update_mail():
                 numeric[key] = int(data[key])
             except (TypeError, ValueError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
+    if "mail_server_type" in numeric and numeric["mail_server_type"] not in (0, 1):
+        return _err("invalid_request", "mail_server_type must be 0 (SMTP) or 1 (Gmail OAuth)", 400)
     if "mail_size_mb" in data:
         try:
             numeric["mail_size"] = int(data["mail_size_mb"]) * 1024 * 1024

@@ -13,8 +13,15 @@ from unittest.mock import Mock
 from flask import Flask
 from flask_babel import Babel
 
+from cps import csrf
+from cps.api import api_v1
+from cps.config_sql import ConfigSQL
+
 app = Flask(__name__)
+app.config["SECRET_KEY"] = "mail-settings-test"
 Babel(app)
+csrf.init_app(app)
+app.register_blueprint(api_v1)
 
 
 def mail_config(**overrides):
@@ -27,7 +34,5 @@ def mail_config(**overrides):
     )
     values.update(overrides)
     config = SimpleNamespace(**values)
-    config.get_mail_server_configured = lambda: bool(
-        (config.mail_server != "mail.example.org" and config.mail_server_type == 0)
-        or (config.mail_gmail_token != {} and config.mail_server_type == 1))
+    config.get_mail_server_configured = lambda: ConfigSQL.get_mail_server_configured(config)
     return config

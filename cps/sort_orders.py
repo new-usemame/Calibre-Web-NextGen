@@ -262,21 +262,20 @@ def recent_sort_order(user_id):
 def read_date_order(user_id, descending=True):
     """"Date read": when this user finished each book.
 
-    The moment is ``book_read_link.read_status_choice_at`` -- stamped whenever a
-    book is marked finished, from the book page, the API or a device -- falling
-    back to the row's ``last_modified`` for a book finished before that clock
-    existed (the upgrade backfills it from ``last_modified`` anyway). Only a
+    The moment is ``book_read_link.read_finished_at`` -- stamped on transition
+    into finished, from the book page, the API or a device -- falling back to
+    the row's ``last_modified`` for an unknown historical finish. The upgrade
+    snapshots that fallback once so later activity cannot move it. Only a
     *finished* row counts, so on a list that mixes statuses the books this user
     has not finished sit together after the finished ones, in date-added order,
     rather than being ranked by an unrelated reading clock. Ends on ``Books.id``
     so the order is total and the pages line up (#1331).
 
-    When an admin keeps read status in a shared Calibre column there is no
-    per-user finish date to read, every book ties, and the list falls through to
-    date added.
+    A shared Calibre read column has per-user dates only for finishes recorded
+    through this app. Books without one follow in date-added order.
     """
     read = aliased(ub.ReadBook)
-    finished_at = (select(coalesce(read.read_status_choice_at, read.last_modified))
+    finished_at = (select(coalesce(read.read_finished_at, read.last_modified))
                    .where(read.user_id == int(user_id),
                           read.book_id == db.Books.id,
                           read.read_status == ub.ReadBook.STATUS_FINISHED)

@@ -31,7 +31,7 @@ except ImportError:
     except ImportError:
         OAuthConsumerMixin = BaseException
         oauth_support = False
-from sqlalchemy import create_engine, DDL, exc, exists, event, text
+from sqlalchemy import create_engine, DDL, exc, exists, event, inspect, text
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
 from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB, LargeBinary
 from sqlalchemy.orm.attributes import flag_modified
@@ -810,6 +810,9 @@ class ReadBook(Base):
     # Automatic-created rows have no choice; migration snapshots legacy clocks
     # once as an inferred historical baseline, never as a runtime fallback.
     read_status_choice_at = Column(DateTime, nullable=True)
+    # The last transition into FINISHED, independent of explicit intent and
+    # later device/progress updates. Legacy finishes are snapshotted at upgrade.
+    read_finished_at = Column(DateTime, nullable=True)
 
     # Audit 2026-05-11: enforce per-(user, book) uniqueness so concurrent
     # Kobo PUTs can't produce duplicate rows. The Kobo state handler reads
@@ -2539,6 +2542,19 @@ def receive_before_flush(session, flush_context, instances):
                 change.kobo_reading_state.priority_timestamp = ts
             if isinstance(change, KoboBookmark) and not change.created_at and (change.progress_percent or 0) > 0:
                 change.created_at = ts
+            if isinstance(change, ReadBook):
+                attrs = inspect(change).attrs
+                if attrs.read_status.history.has_changes():
+                    if change.read_status != ReadBook.STATUS_FINISHED:
+                        change.read_finished_at = None
+                    elif not attrs.read_finished_at.history.has_changes():
+                        clocks = [getattr(change, field) for field in
+                                  ("last_modified", "read_status_choice_at")
+                                  if getattr(attrs, field).history.has_changes()
+                                  and getattr(change, field) is not None]
+                        change.read_finished_at = max(
+                            clocks, key=lambda stamp: stamp.replace(tzinfo=None),
+                        ) if clocks else datetime.now(timezone.utc)
 
     # Maintain the last_modified_bit for the Shelf table.
     for change in itertools.chain(session.new, session.deleted):
@@ -3703,6 +3719,11 @@ def _dedupe_book_read_link(_session):
         )
         winner, losers = rows[0], rows[1:]
         chosen_clock = winner.last_modified
+        if winner.read_status == ReadBook.STATUS_FINISHED:
+            finishes = [r.read_finished_at for r in rows
+                        if r.read_status == ReadBook.STATUS_FINISHED and r.read_finished_at is not None]
+            if finishes:
+                winner.read_finished_at = max(finishes, key=lambda stamp: stamp.replace(tzinfo=None))
         if not has_paused:
             known_choices = [r.read_status_choice_at for r in rows if r.read_status_choice_at is not None]
             if known_choices:
@@ -5792,11 +5813,31 @@ def migrate_read_status_choice_at(engine, _session):
     log.info("[read-status-choice] added independent choice clock with historical baseline")
 
 
+def migrate_read_finished_at(engine, _session):
+    """Freeze the best available legacy finish date once, atomically."""
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(
+            text("PRAGMA table_info(book_read_link)"))}
+    if not columns or "read_finished_at" in columns:
+        return
+    try:
+        _run_ddl_with_retry(engine, [
+            "BEGIN IMMEDIATE",
+            "ALTER TABLE book_read_link ADD COLUMN read_finished_at DATETIME",
+            "UPDATE book_read_link SET read_finished_at = last_modified WHERE read_status = 1",
+        ])
+    except exc.OperationalError as error:
+        if "duplicate column" not in str(error).lower():
+            raise
+    log.info("[read-finished-at] preserved historical finish dates")
+
+
 def migrate_Database(_session):
     engine = _session.bind
     migrate_acquisition_schema(engine, Base.metadata)
     add_missing_tables(engine, _session)
     migrate_read_status_choice_at(engine, _session)
+    migrate_read_finished_at(engine, _session)
     migrate_kobo_entitlement_ledger_columns(engine, _session)
     migrate_thumbnail_lookup_index(engine, _session)
     migrate_reading_activity_indexes(engine, _session)

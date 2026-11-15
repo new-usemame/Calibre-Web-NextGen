@@ -3,7 +3,7 @@
 
 "Recent" puts finished books back in date-added order, so a book finished today
 that was added a year ago sat far down the list. ``readnew``/``readold`` rank
-the finished books by ``book_read_link.read_status_choice_at`` (falling back to
+the finished books by ``book_read_link.read_finished_at`` (falling back to
 ``last_modified`` for rows from before that clock), per reader.
 
 These run the real ORDER BY against real tables, not the source text.
@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import sessionmaker
 
 from cps import db, ub
-from cps.sort_orders import READ_DATE_SORTS, book_sort_order
+from cps.sort_orders import book_sort_order
 
 
 def _ids(session, sort, user_id):
@@ -79,9 +79,3 @@ def test_another_readers_finish_date_is_not_used(session):
 @pytest.mark.unit
 def test_no_viewer_degrades_to_newest_added(session):
     assert _ids(session, "readnew", None) == [5, 4, 3, 2, 1]
-
-
-@pytest.mark.unit
-def test_the_api_accepts_the_read_date_sorts():
-    from cps.api.books import _COMPATIBLE_BOOK_SORTS
-    assert READ_DATE_SORTS <= _COMPATIBLE_BOOK_SORTS

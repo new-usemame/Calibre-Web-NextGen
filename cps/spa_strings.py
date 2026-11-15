@@ -676,6 +676,12 @@ _("Account setting: {scope}")
 _("Could not save the book choice. Try again.")
 _("Saved.")
 
+# #2831: clear a book's saved reading position (More actions menu).
+_("Clear reading position")
+_("Clear your saved reading position for \"{title}\" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs.")
+_("Reading position cleared.")
+_("Could not clear the reading position.")
+
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
 # property in frontend/src that
@@ -1796,6 +1802,7 @@ _("There are no other accounts on this server yet.")
 _("These results could not be refreshed and may be out of date.")
 _("These settings could not be loaded, so nothing on this page can be trusted yet.")
 _("These settings could not be refreshed, so what is shown may be out of date.")
+_("This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account.")
 _("This account cannot use book sources, or the feature is switched off.")
 _("This account is no longer an administrator.")
 _("This book was already imported.")

@@ -287,6 +287,15 @@ def test_feed_search_passes_opds_filter_to_search_results(monkeypatch):
         def order_by(self, *_args, **_kwargs):
             return self
 
+        def count(self):
+            return 1
+
+        def limit(self, _value):
+            return self
+
+        def offset(self, _value):
+            return self
+
         def all(self):
             return [types.SimpleNamespace(Books=types.SimpleNamespace(id=1))]
 
@@ -299,8 +308,10 @@ def test_feed_search_passes_opds_filter_to_search_results(monkeypatch):
     monkeypatch.setattr(opds, "get_opds_restricted_common_filter", lambda user=None: "FILTER")
     monkeypatch.setattr(opds.auth, "current_user", lambda: basic_user)
     monkeypatch.setattr(opds, "render_xml_template", lambda *_args, **kwargs: kwargs)
+    monkeypatch.setattr(opds.config, "config_books_per_page", 60, raising=False)
 
-    result = opds.feed_search("space")
+    with app.test_request_context("/opds/search?query=space"):
+        result = opds.feed_search("space")
 
     assert captured == {"term": "space", "user": basic_user, "extra_filter": "FILTER"}
     assert result["searchterm"] == "space"

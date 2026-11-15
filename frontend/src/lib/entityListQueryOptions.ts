@@ -31,7 +31,7 @@ export function createPagedEntityListQueryOptions(
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage: EntityListPage) => lastPage.next_offset ?? undefined,
-    enabled: enabled && validMinimum && (plural === 'authors' || plural === 'series'),
+    enabled: enabled && validMinimum && (plural === 'authors' || plural === 'series' || plural === 'publishers'),
     staleTime: 60000,
   };
 }

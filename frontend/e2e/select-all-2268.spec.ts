@@ -458,6 +458,9 @@ test('late selection cannot overwrite Clear or Done, and failed selection keeps 
   });
   await page.getByRole('button', { name: /^Select all \d+ books$/ }).click();
   await expect(page.getByRole('region', { name: '1 selected', exact: true })).toBeVisible();
-  await expect(page.getByText(/Select all is limited to 100,?000 books/)).toBeVisible();
+  // The announcer repeats the message in its live region 60 ms later, so an
+  // unscoped text match finds one element or two depending on timing (#2940).
+  await expect(page.getByTestId('catalog-page').getByText(/Select all is limited to 100,?000 books/)).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: /Select all is limited to 100,?000 books/ })).toHaveCount(1);
   await page.screenshot({ path: test.info().outputPath('select-all-limit-error-desktop.png') });
 });

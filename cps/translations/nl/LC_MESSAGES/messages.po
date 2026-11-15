@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
-"me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
+"proton.me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -5073,6 +5073,105 @@ msgstr "Aangepaste velden op boekkaarten"
 msgid "Display name for {name}"
 msgstr "Weergavenaam voor {name}"
 
+# Share my place (Devices page)
+#: cps/spa_strings.py
+msgid "Share my place"
+msgstr "Mijn plek delen"
+
+#: cps/spa_strings.py
+msgid ""
+"Devices with this on open each book where you last stopped on any of them. "
+"Turn it off for a device someone else reads on."
+msgstr ""
+"Apparaten met deze optie aan openen elk boek waar je op een van hen het "
+"laatst gebleven was. Zet het uit voor een apparaat waarop iemand anders "
+"leest."
+
+#: cps/spa_strings.py
+msgid "Could not save Share my place. Try again."
+msgstr "Kan Mijn plek delen niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"Always shares its place. Install or update the NextGen Sync plugin on this "
+"device to choose."
+msgstr ""
+"Deelt altijd zijn plek. Installeer de NextGen Sync-plug-in op dit apparaat "
+"of werk deze bij om te kiezen."
+
+#: cps/spa_strings.py
+msgid "Books on this device"
+msgstr "Boeken op dit apparaat"
+
+#: cps/spa_strings.py
+msgid "Same as my account setting"
+msgstr "Hetzelfde als mijn accountinstelling"
+
+#: cps/spa_strings.py
+msgid "Everything in my library"
+msgstr "Alles in mijn bibliotheek"
+
+#: cps/spa_strings.py
+msgid "Only these shelves"
+msgstr "Alleen deze planken"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose which books this device keeps. Books you take off are removed from "
+"the device at its next sync; your place, highlights and notes stay saved."
+msgstr ""
+"Kies welke boeken dit apparaat bewaart. Boeken die u verwijdert, worden bij "
+"de volgende synchronisatie van het apparaat verwijderd; uw leespositie, "
+"markeringen en notities blijven bewaard."
+
+#: cps/spa_strings.py
+msgid ""
+"The shelf chosen for this device was deleted. It uses your account setting "
+"until you choose again."
+msgstr ""
+"De plank die voor dit apparaat is gekozen, is verwijderd. Het gebruikt uw "
+"accountinstelling totdat u opnieuw kiest."
+
+#: cps/spa_strings.py
+msgid ""
+"The shelf chosen for this device is no longer available. It uses your "
+"account setting until you choose again."
+msgstr ""
+"De plank die voor dit apparaat is gekozen, is niet meer beschikbaar. Het "
+"gebruikt uw accountinstelling totdat u opnieuw kiest."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Account setting: {scope}"
+msgstr "Accountinstelling: {scope}"
+
+#: cps/spa_strings.py
+msgid "Could not save the book choice. Try again."
+msgstr "De boekkeuze kon niet worden opgeslagen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr "Leespositie wissen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+"Je opgeslagen leespositie voor \"{title}\" wissen in de webreader, op je "
+"Kobo en in KOReader? Je leesstatus verandert niet. Een apparaat dat nog zijn "
+"eigen positie bewaart, kan die bij de volgende synchronisatie terugsturen."
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr "Leespositie gewist."
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr "Kan de leespositie niet wissen."
+
 #: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
@@ -6186,6 +6285,10 @@ msgstr "Kan volgorde niet opslaan."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "Kan lezersinstellingen niet opslaan."
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr "Kan die markering niet opslaan."
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
@@ -8682,6 +8785,10 @@ msgstr "Deze verwijderen"
 msgid "Remove {name}?"
 msgstr "{name} verwijderen?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Verwijderde apparaten"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Verwijderd uit Momenteel aan het lezen."
@@ -8803,6 +8910,11 @@ msgstr "Standaardwaarden herstellen"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Herstellen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr "{name} herstellen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10041,6 +10153,16 @@ msgstr ""
 "Deze instellingen konden niet worden vernieuwd, dus wat je ziet kan "
 "verouderd zijn."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+"Dit account kan geen boeken downloaden, dus de synchronisatie van de Kobo "
+"wordt geweigerd. Een beheerder kan dit oplossen door Downloads toestaan in "
+"te schakelen voor dit account."
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr "Dit account kan geen boekbronnen gebruiken, of de functie staat uit."
@@ -10149,8 +10271,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Dit is het eigen adres van deze computer, dat de e-reader niet kan bereiken. "
 "Kies ‘Wijzigen’ en voer het adres in dat de e-reader kan gebruiken, zoals "
@@ -11775,6 +11897,164 @@ msgstr ""
 "Kies een labelgroep om boeken uit die groep en de onderliggende labels te "
 "bekijken."
 
+#: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr "Slaapscherm"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr "Slaapscherm voor {name}"
+
+#: cps/spa_strings.py
+msgid "Set sleep screen"
+msgstr "Slaapscherm instellen"
+
+#: cps/spa_strings.py
+msgid "Replace image"
+msgstr "Afbeelding vervangen"
+
+#: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr "Slaapscherm verwijderen"
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr "Kies een afbeelding"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr "Voorbeeld van het slaapscherm voor {name}"
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr "Wordt getoond wanneer dit apparaat in KOReader in slaapstand gaat."
+
+#: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr "Het oorspronkelijke Kindle-vergrendelscherm blijft ongewijzigd."
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr "Wachten op de volgende synchronisatie"
+
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr "Toegepast op het apparaat"
+
+#: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr "Verwijdering wacht op synchronisatie"
+
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr "Vorige instellingen hersteld"
+
+#: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr "Wachten op apparaatgegevens"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr "Werk de CWNG-plugin bij"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr "Werk de CWNG-plugin op dit apparaat bij en synchroniseer daarna."
+
+#: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr "Verbind dit apparaat en gebruik Nu synchroniseren in KOReader."
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr "Dit apparaat kan geen aangepast KOReader-slaapscherm tonen."
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr "Gebruik een JPEG- of PNG-afbeelding van maximaal 10 MiB."
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr "Het slaapscherm kon niet worden opgeslagen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr "Het slaapscherm kon niet worden toegepast"
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr ""
+"Deze afbeelding verwijderen? Je vorige KOReader-slaapscherminstellingen "
+"worden na de volgende synchronisatie hersteld."
+
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr "Afbeeldingsweergave"
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr "Automatisch"
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr "Scherm vullen"
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr "Hele afbeelding tonen"
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+"Automatisch vult het scherm als er alleen een smalle rand zou wegvallen."
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "Dit exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "Dit exemplaar samenvoegen"
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "Samenvoegen in het behouden exemplaar"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+"Eén exemplaar samenvoegen in ‘{title}’? Formaten die het mist worden "
+"gekopieerd, daarna wordt dat exemplaar verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+"{n} exemplaren samenvoegen in ‘{title}’? Formaten die het mist worden "
+"gekopieerd, daarna worden die exemplaren verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr "Samengevoegd in ‘{title}’."
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "Kan deze boeken niet samenvoegen."
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Naamloos label"
@@ -12068,8 +12348,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
-"%(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
+"(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -15400,6 +15680,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr ""
 
@@ -15600,11 +15892,16 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
+"Als dit is ingeschakeld, vult opgehaalde metadata alleen aan wat een boek "
+"mist (bijvoorbeeld een lege beschrijving, of een ontbrekende reeks of "
+"omslag) en voegt nieuwe labels toe, maar vervangt nooit gegevens die het "
+"boek al heeft. Als dit is uitgeschakeld, vervangt opgehaalde metadata de "
+"bestaande gegevens ongewijzigd vanuit de voorkeursbron."
 
 #: cps/templates/cwa_settings.html
 #, fuzzy
@@ -19929,10 +20226,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
-#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
-#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
-#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
+#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
+#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
+#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
+#~ "bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

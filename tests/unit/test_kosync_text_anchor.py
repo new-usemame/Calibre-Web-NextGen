@@ -36,6 +36,14 @@ KINDS = "?position_kinds=locator,percentage,anchor"
 
 
 @pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
+@pytest.fixture(autouse=True)
 def _a_reader_who_may_open_the_book(request, monkeypatch):
     """The world's user can see book 221 and read it in the browser.
 

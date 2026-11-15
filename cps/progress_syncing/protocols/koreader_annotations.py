@@ -35,7 +35,8 @@ no-op off Kobo), so a second device could never receive the first device's highl
 still declared its empty set complete — silently destroying them, permanently,
 since ``apply_portable`` never un-hides a tombstone. Only the device can tell
 the two apart, because only it knows what it used to have, so the decision lives
-there and the server obeys. ``complete`` is still accepted and ignored.
+there and the server applies its source and device ownership checks.
+``complete`` is still accepted and ignored.
 
 The route handlers are thin; ``build_pull_payload`` + ``apply_push`` hold the
 testable logic. See notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md §4.
@@ -45,7 +46,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from flask import request
+from flask import has_request_context, request
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from ... import csrf, logger, ub
@@ -81,6 +83,39 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _device_annotations_predicate(device):
+    """Ownership shared by pull and push, including pre-provenance rows.
+
+    Both branches produce a boolean even for NULL provenance, so negating this
+    predicate also finds legacy rows outside the device's original sources.
+    """
+    legacy_sources = ("koreader", "textquote") if device.kind == "koreader" else ()
+    return or_(
+        and_(ub.Annotation.origin_device_id.isnot(None),
+             ub.Annotation.origin_device_id == device.id),
+        and_(ub.Annotation.origin_device_id.is_(None),
+             ub.Annotation.source.isnot(None),
+             ub.Annotation.source.in_(legacy_sources)),
+    )
+
+
+def _foreign_annotation_ids(annotation_ids, *, user, book, session, device):
+    """Existing, account/book-scoped ids this identified device cannot change."""
+    if device is None:
+        return set()
+    ids = sorted(set(annotation_ids))
+    query = session.query(ub.Annotation.annotation_id).filter(
+        ub.Annotation.user_id == user.id, ub.Annotation.book_id == book.id,
+        ~_device_annotations_predicate(device),
+    )
+    foreign = set()
+    for start in range(0, len(ids), _DELETE_ID_CHUNK_SIZE):
+        chunk = ids[start:start + _DELETE_ID_CHUNK_SIZE]
+        foreign.update(aid for (aid,) in query.filter(
+            ub.Annotation.annotation_id.in_(chunk)).all())
+    return foreign
+
+
 # ---------------------------------------------------------------------------
 # Testable core
 # ---------------------------------------------------------------------------
@@ -96,12 +131,26 @@ def build_pull_payload(user_id: int, book_id: int, session, *,
     the XPointers KOReader needs to place them (see ``_add_device_xpointers``).
     """
     from ...services.annotation_portable import to_portable
-    rows = (
-        session.query(ub.Annotation)
-        .filter(ub.Annotation.user_id == user_id, ub.Annotation.book_id == book_id)
-        .order_by(ub.Annotation.id.asc())
-        .all()
-    )
+    query = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.book_id == book_id)
+    device = None
+    foreign_ids = None
+    if has_request_context():
+        from ...services.device_registry import find_koreader_device
+        raw_id = request.headers.get("X-CWNG-Device-ID")
+        device = (find_koreader_device(user_id=user_id, device_id=raw_id,
+                                      session=session) if raw_id else None)
+        if device is not None:
+            # Only an attributed origin is proof. Include hidden rows; local
+            # cleanup does not delete or modify these authoritative records.
+            foreign_ids = [aid for (aid,) in session.query(ub.Annotation.annotation_id)
+                           .filter(ub.Annotation.user_id == user_id,
+                                   ub.Annotation.book_id == book_id,
+                                   ub.Annotation.origin_device_id.isnot(None),
+                                   ub.Annotation.origin_device_id != device.id)
+                           .order_by(ub.Annotation.id)]
+            query = query.filter(_device_annotations_predicate(device))
+    rows = query.order_by(ub.Annotation.id.asc()).all()
     annotations = [to_portable(r) for r in rows]
     if book is not None and book_format:
         _add_device_xpointers(rows, annotations, book, book_format)
@@ -109,7 +158,10 @@ def build_pull_payload(user_id: int, book_id: int, session, *,
         # Reading the book's text is file work; keep it off the request greenlet.
         from ...services.parallel import run_blocking
         run_blocking(lambda: _add_text_quotes(rows, annotations, book))
-    return {"annotations": annotations, "annotation_count": len(annotations)}
+    payload = {"annotations": annotations, "annotation_count": len(annotations)}
+    if foreign_ids is not None:
+        payload["foreign_annotation_ids"] = foreign_ids
+    return payload
 
 
 def _add_text_quotes(rows, annotations, book) -> None:
@@ -201,18 +253,21 @@ def apply_push(annotations, *, user, book, session, commit,
                deleted_ids=None, delete_source="koreader",
                origin_device_id=None, epub_path=None) -> dict:
     """Upsert each pushed portable annotation, fan out to enabled sync targets,
-    and return a counts summary keyed by action (created/updated/deleted/skipped).
+    and return counts by action (created/updated/deleted/unchanged/skipped).
 
     ``deleted_ids`` names the annotations the device knows it used to have and
     the user has since deleted; they are soft-deleted (see
     :func:`_apply_deletes`). Omission from ``annotations`` means nothing on its
     own — see the module docstring for why the server never infers a delete.
-    Inline ``hidden`` uses the same authority as those named deletes: the
-    pushing source (``delete_source``) alone.
+    An identified device cannot edit or hide another device's row, including
+    copies retained from an earlier pull. Its own and legacy rows retain the
+    pushing source's existing delete authority (``delete_source``).
 
     A pushed ``text_quote`` with no XPointer or KoboSpan is placed in
     ``epub_path`` (the library EPUB, when the user may read it); the summary's
-    ``resolved``/``unresolved`` list the quoted annotations by outcome.
+    ``resolved``/``unresolved`` list the quoted annotations by outcome. A
+    rejected foreign quote is resolved as terminal handling, not a content
+    write: retrying cannot grant ownership, and its action is ``unchanged``.
     """
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
@@ -221,10 +276,33 @@ def apply_push(annotations, *, user, book, session, commit,
     summary = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0}
     if not isinstance(annotations, list):
         return summary
+    device = (session.query(ub.Device).filter(
+        ub.Device.user_id == user.id, ub.Device.id == origin_device_id,
+    ).first() if origin_device_id is not None else None)
+    foreign = _foreign_annotation_ids(
+        (payload["annotation_id"].strip() for payload in annotations
+         if isinstance(payload, dict) and isinstance(payload.get("annotation_id"), str)),
+        user=user, book=book, session=session, device=device,
+    )
+    allowed, rejected_quotes = [], []
+    for payload in annotations:
+        aid = payload.get("annotation_id") if isinstance(payload, dict) else None
+        if isinstance(aid, str) and aid.strip() in foreign:
+            summary["unchanged"] += 1
+            if payload.get("text_quote") is not None:
+                rejected_quotes.append(aid)
+        else:
+            allowed.append(payload)
+    annotations = allowed
     placed = _place_quotes(annotations, epub_path,
                            _anchored_elsewhere(annotations, user=user, book=book, session=session))
     if placed is not None:
         annotations, summary["resolved"], summary["unresolved"] = placed
+    if rejected_quotes:
+        # Like _place_quotes retaining another reader's established anchor,
+        # this outcome needs no further placement attempt by the client.
+        summary.setdefault("resolved", []).extend(rejected_quotes)
+        summary.setdefault("unresolved", [])
     for payload in annotations:
         row, action = apply_portable(
             payload, user_id=user.id, book=book, session=session, commit=commit,
@@ -249,10 +327,12 @@ def apply_push(annotations, *, user, book, session, commit,
             log.exception("koreader annotation push fan-out failed for %s", row.annotation_id)
 
     if deleted_ids:
-        summary["deleted"] += _apply_deletes(
+        deleted, unchanged = _apply_deletes(
             deleted_ids, user=user, book=book, session=session, commit=commit,
-            source=delete_source,
+            source=delete_source, device=device,
         )
+        summary["deleted"] += deleted
+        summary["unchanged"] += unchanged
     return summary
 
 
@@ -351,7 +431,8 @@ def _place_quotes(annotations, epub_path, anchored=frozenset()):
     return out, resolved, unresolved
 
 
-def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
+def _apply_deletes(deleted_ids, *, user, book, session, commit, source,
+                   device=None) -> tuple[int, int]:
     """Soft-delete the rows the device reported as deleted.
 
     KOReader leaves no tombstone when a highlight is deleted — the entry just
@@ -361,13 +442,15 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
 
     Scoped hard, because deleting is destructive-in-effect:
       - only this ``(user, book)``;
+      - only this device's own and legacy rows when identified;
       - only rows of ``source`` (a KOReader sync must never delete a
         Kobo-native or web-reader highlight — those devices own their own);
       - only rows that are still live (an already-hidden row is left alone, so
         the delete fan-out fires once, not on every subsequent sync).
 
     Soft-deletes rather than deleting: pull deliberately includes hidden rows so
-    other devices can mirror the deletion locally.
+    other devices can mirror the deletion locally. Returns deleted and foreign
+    unchanged counts; already-hidden own rows retain their existing no-op.
     """
     from ...services import annotation_sync
 
@@ -376,7 +459,11 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         if isinstance(aid, str) and aid.strip()
     }
     if not wanted:
-        return 0
+        return 0, 0
+    foreign = _foreign_annotation_ids(
+        wanted, user=user, book=book, session=session, device=device,
+    )
+    wanted -= foreign
 
     base_query = session.query(ub.Annotation).filter(
         ub.Annotation.user_id == user.id,
@@ -394,7 +481,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
             base_query.filter(ub.Annotation.annotation_id.in_(chunk)).all()
         )
     if not stale:
-        return 0
+        return 0, len(foreign)
 
     for row in stale:
         row.hidden = True
@@ -413,7 +500,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         "koreader delete: soft-deleted %d reported %s row(s) for user=%s book=%s",
         len(stale), source, user.id, book.id,
     )
-    return len(stale)
+    return len(stale), len(foreign)
 
 
 # ---------------------------------------------------------------------------

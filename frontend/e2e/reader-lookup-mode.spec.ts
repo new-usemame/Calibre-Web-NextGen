@@ -267,6 +267,18 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   await expect(page).toHaveURL(/\/app(\/|$|\?)/, { timeout: 20_000 });
   await expect(page.getByRole('button', { name: `Account: ${secondaryUser.username}` })).toBeVisible();
   await page.setViewportSize(testInfo.project.name === 'mobile' ? { width: 375, height: 667 } : { width: 1280, height: 800 });
+  // This case observes account-wide Reading status. Devices start private,
+  // so explicitly opt this test's Browser into sharing through the real UI.
+  await page.goto('/app/account/devices');
+  const sharePlace = page.getByRole('checkbox', { name: 'Share my place Web reader', exact: true });
+  const [shared] = await Promise.all([
+    page.waitForResponse(response => response.request().method() === 'PATCH'
+      && /\/api\/annotations\/devices\/[^/?]+$/.test(response.url())),
+    sharePlace.click(),
+  ]);
+  expect(shared.ok(), await shared.text()).toBeTruthy();
+  await expect(sharePlace).toBeEnabled();
+  await expect(sharePlace).toBeChecked();
   const id = await readableEpub(page, adminPage, testInfo);
   // Establish a real saved position first, scoped to this test's owned account.
   await page.goto(`/app/read/${id}`);

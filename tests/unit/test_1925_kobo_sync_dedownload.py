@@ -27,6 +27,14 @@ from sqlalchemy.orm import sessionmaker
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 class _ProxiedTestWsgi:
     """Keep the harness proxy flag while allowing real Flask dispatch."""
 

@@ -249,7 +249,7 @@ window.addEventListener('locationchange',()=>{
     }
 });
 
-var epub=ePub(calibre.bookUrl)
+var epub=ePub(calibre.bookArchiveUrl || calibre.bookUrl)
 
 let progressDiv=document.getElementById("progress");
 

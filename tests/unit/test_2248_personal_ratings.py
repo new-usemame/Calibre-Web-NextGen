@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from cps import config, constants, db, ub
+from cps import config, constants, db, personal_ratings, ub
 
 
 @pytest.fixture
@@ -166,7 +166,7 @@ def test_rating_http_owns_account_validates_half_stars_and_preserves_calibre(rat
     def visible(book_id, read_column, **kwargs):
         visibility_calls.append(kwargs)
         return book if book_id == 1 else None
-    monkeypatch.setattr(book_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=visible))
+    monkeypatch.setattr(personal_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=visible))
     app = flask.Flask(__name__)
     app.add_url_rule('/books/<int:book_id>/rating', view_func=inspect.unwrap(book_ratings.book_rating),
                      methods=['GET', 'PUT', 'DELETE'])
@@ -207,7 +207,7 @@ def test_failed_rating_write_rolls_back_and_leaves_previous_score(ratings_db, mo
     session.add(ub.BookRating(user_id=users[0].id, book_id=1, rating=8))
     session.commit()
     monkeypatch.setattr(book_ratings, 'current_user', users[0])
-    monkeypatch.setattr(book_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=lambda *a, **kw: object()))
+    monkeypatch.setattr(personal_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=lambda *a, **kw: object()))
     monkeypatch.setattr(session, 'commit', lambda: (_ for _ in ()).throw(OperationalError('commit', {}, Exception('busy'))))
     app = flask.Flask(__name__)
     app.add_url_rule('/books/<int:book_id>/rating', view_func=inspect.unwrap(book_ratings.book_rating), methods=['PUT'])
@@ -267,7 +267,7 @@ def test_failed_rating_load_reports_error_and_rolls_back(ratings_db):
 
     session, users, stamp, engine, monkeypatch = ratings_db
     monkeypatch.setattr(book_ratings, 'current_user', users[0])
-    monkeypatch.setattr(book_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=lambda *a, **kw: object()))
+    monkeypatch.setattr(personal_ratings, 'calibre_db', SimpleNamespace(get_book_read_archived=lambda *a, **kw: object()))
     def fail_read(*_args):
         raise OperationalError('SELECT', {}, Exception('rating database busy'))
     monkeypatch.setattr(session, 'query', fail_read)

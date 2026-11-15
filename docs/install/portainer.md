@@ -4,7 +4,7 @@ For Portainer CE/BE on any host. The cleanest path is a **Stack** (Portainer's n
 docker-compose file you manage in the web UI).
 
 **Your books, users, settings and Read checkmarks live in the volumes you bind into the
-container — not in the image — so switching keeps everything and is reversible.**
+container, not in the image, so switching keeps everything and is reversible.**
 
 > **Needs hardware verification:** these Portainer labels and steps are docs-verified, but we do not
 > yet have a real Portainer walkthrough or screenshots. Please use the help links below if your screen differs.
@@ -53,7 +53,7 @@ container — not in the image — so switching keeps everything and is reversib
    **Pull and redeploy**). Portainer pulls the newest image and recreates the container with
    your data intact.
 
-   *(Just restarting the container does not pull a new image — you must re-pull.)*
+   *(Just restarting the container does not pull a new image; you must re-pull.)*
 
 ---
 

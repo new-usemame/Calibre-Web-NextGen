@@ -8,8 +8,9 @@ var reader;
     EPUBJS.filePath = calibre.filePath;
     EPUBJS.cssPath = calibre.cssPath;
 
-    window.reader = reader = ePubReader(calibre.bookUrl, {
-        restore: true,
+    window.reader = reader = ePubReader(calibre.bookArchiveUrl || calibre.bookUrl, {
+        // The bundled reader saves its own position on unload when restore is on.
+        restore: !calibre.lookupMode,
         bookmarks: calibre.bookmark ? [calibre.bookmark] : []
     });
 

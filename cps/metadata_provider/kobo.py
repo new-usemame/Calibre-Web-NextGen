@@ -39,6 +39,7 @@ class Kobo(Metadata):
 
     __name__ = "Kobo"
     __id__ = "kobo"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
 
     DESCRIPTION = "Kobo Books"
     META_URL = "https://www.kobo.com/"
@@ -683,7 +684,7 @@ class Kobo(Metadata):
             pass
         return ""
 
-    def _parse_series_from_dom(self, soup: BS) -> Tuple[str, int]:
+    def _parse_series_from_dom(self, soup: BS) -> Tuple[str, Union[int, float]]:
         # Parse the series name and index from dt/dd pairs
         # Example (from search page):
         #   <dt data-testid="series-product-type-and-number">Book 3 -</dt>
@@ -738,7 +739,7 @@ class Kobo(Metadata):
                 candidates.sort(key=lambda x: x[0])
                 _, series_name, series_idx = candidates[0]
                 if series_name and series_idx:
-                    return series_name, int(series_idx)
+                    return series_name, series_idx
 
             # 2) Fallback: any anchor to a series page, try to find an adjacent dt
             for a in scope.select(self.SERIES_LINK_SELECTOR):
@@ -758,7 +759,7 @@ class Kobo(Metadata):
                 if idx:
                     series_idx = idx
                 if series_name and series_idx:
-                    return series_name, int(series_idx)
+                    return series_name, series_idx
 
             # 3) Name-only fallback within scope
             if not series_name:
@@ -767,7 +768,7 @@ class Kobo(Metadata):
                     series_name = a.get_text(strip=True)
         except Exception:
             pass
-        return series_name, int(series_idx)
+        return series_name, series_idx
 
     def _parse_title_from_dom(self, soup: BS) -> str:
         el = soup.select_one("li.title")

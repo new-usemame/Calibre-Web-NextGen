@@ -45,6 +45,14 @@ BOOK_ID = 221
 OTHER_FILE = "0" * 32  # a device holding some other copy of the book
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 def _page(n):
     """(xpointer, text shown at the top of that page) from the Kindle."""
     sample = json.loads((FIXTURES / "metamorphosis-221.pages.json").read_text())["samples"][n]
@@ -322,13 +330,17 @@ def test_only_the_cfi_that_made_the_shared_position_is_converted(world):
     assert body["percentage"] == pytest.approx(0.217)
 
 
-def test_an_older_plugin_still_never_receives_a_web_reader_row(world):
-    _xpointer, cfi = _web_cfi(25)
+def test_an_older_plugin_receives_a_web_reader_row_only_as_an_exact_locator(world):
+    """#2783: a client that names no position kinds (an older plugin,
+    JustRead) gets the web reader's place when it converts exactly into the
+    file it holds, as a real XPointer; never the percentage-only sentinel."""
+    xpointer, cfi = _web_cfi(25)
     world.web_save(cfi, 21.7)
 
     body = world.koreader_pull(world.digest, advertise=False)
 
-    assert "progress" not in body and "percentage" not in body
+    assert (body["progress"], body["position_kind"]) == (xpointer, "locator")
+    assert body["percentage"] == pytest.approx(0.217)
 
 
 def test_furthest_position_still_wins_both_ways(world):

@@ -23,7 +23,25 @@ local SyncLogic = require("sync_logic")
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
 
+local Foreign = require("cwng_foreign_annotations")
 local AutoSync = {}
+
+local function bookSettings(plugin, file)
+    local reader
+    local ui = plugin.ui
+    if ui and ui.doc_settings and ui.document and ui.document.file == file then return ui.doc_settings end
+    local ReaderUI = package.loaded["apps/reader/readerui"]
+    reader = ReaderUI and ReaderUI.instance
+    if reader and reader.document and reader.document.file == file then return reader.doc_settings end
+    if type(file) == "string" and type(DocSettings.open) == "function" then
+        local ok, settings = pcall(DocSettings.open, DocSettings, file)
+        if ok then return settings end
+    end
+end
+
+function AutoSync:filterForeignAnnotations(file, payload)
+    return Foreign.filterPayload(payload, Foreign.proofs(bookSettings(self, file), self))
+end
 
 local PENDING_KEY = "cwngsync_pending"
 local PUSHED_STATUS_KEY = "cwngsync_pushed_status"
@@ -80,6 +98,9 @@ end
 -- is open there (its own flush would otherwise overwrite ours).
 function AutoSync:saveBookSetting(file, key, value)
     if type(file) ~= "string" then return end
+    if key == ANNOTATION_WATERMARK_KEY then
+        value = Foreign.filterIds(value, Foreign.proofs(bookSettings(self, file), self))
+    end
     local reader = readerInstance()
     if reader and reader.document and reader.document.file == file and reader.doc_settings then
         reader.doc_settings:saveSetting(key, value)
@@ -124,7 +145,7 @@ function AutoSync:captureOpenBook(with_annotations, explicit)
             -- stays behind, the highlight does not.
             if plan.known and (moved or #plan.deletions > 0
                     or Pending.annotationsFingerprint(plan.list) ~= self.opened_annotations) then
-                entry.annotations = { list = plan.list, deletions = plan.deletions }
+                entry.annotations = self:filterForeignAnnotations(entry.file, { list = plan.list, deletions = plan.deletions })
             end
         end
     end
@@ -243,7 +264,7 @@ function AutoSync:deliverPending(client, entry, done)
 
     if entry.percentage ~= nil and entry.progress ~= nil then
         steps[#steps + 1] = function(continue)
-            client:get_progress(s.username, s.password, entry.document, function(ok, body, reason)
+            client:get_progress(s.username, s.password, entry.document, Device.model, self.device_id, function(ok, body, reason)
                 if not ok and reason ~= "HTTP 404" then return done(false, reason) end
                 local remote = ok and decodeBody(body) or nil
                 if not Pending.shouldSendProgress(entry, remote, self.device_id) then
@@ -254,7 +275,7 @@ function AutoSync:deliverPending(client, entry, done)
                     entry.percentage, Device.model, self.device_id, function(sent, _body, send_reason)
                         if sent or isFinalRefusal(send_reason) then return continue() end
                         done(false, send_reason)
-                    end)
+                    end, entry.captured_at)
             end)
         end
     end
@@ -278,7 +299,8 @@ function AutoSync:deliverPending(client, entry, done)
 
     if entry.annotations and type(entry.annotations.list) == "table" then
         steps[#steps + 1] = function(continue)
-            local list, deletions = entry.annotations.list, entry.annotations.deletions or {}
+            local payload = self:filterForeignAnnotations(entry.file, entry.annotations)
+            local list, deletions = payload.list, payload.deletions
             if #list == 0 and #deletions == 0 then
                 self:saveBookSetting(entry.file, ANNOTATION_WATERMARK_KEY, {})
                 return continue()
@@ -370,6 +392,7 @@ function AutoSync:onDeviceOnline(force)
     local auto = self.settings.auto_sync
     local library = self:libraryEnabled()
     if not auto and not library then return end
+    self:syncSleepScreen()
     self:flushPending(function()
         if auto and self:hasCurrentDocument() then
             self:getProgress(false, false)
@@ -403,6 +426,7 @@ function AutoSync:syncEverythingNow()
         return
     end
     NetworkMgr:runWhenConnected(function()
+        self:syncSleepScreen()
         local InfoMessage = require("ui/widget/infomessage")
         local T = require("ffi/util").template
         local _ = require("gettext")

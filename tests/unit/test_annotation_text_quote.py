@@ -77,6 +77,17 @@ def _push(client, annotations, *, document=str(BOOK_ID), status=200, **extra):
     return response.get_json()
 
 
+def _push_unidentified(client, annotations, *, document=str(BOOK_ID), device=None):
+    """A push that names no device (an older plugin, or another client): the
+    server keeps today's shared-row behaviour for it (share-place spec section 8)."""
+    body = {"document": document, "annotations": annotations}
+    if device is not None:
+        body["device"] = device
+    response = client.put("/kosync/syncs/annotations", json=body)
+    assert response.status_code == 200, response.get_json()
+    return response.get_json()
+
+
 def _pull(client, document=str(BOOK_ID), quotes=True):
     url = f"/kosync/syncs/annotations/{document}" + ("?text_quote=1" if quotes else "")
     response = client.get(url)
@@ -218,12 +229,15 @@ def test_other_readers_highlights_reach_the_client_as_their_words(world, client)
     assert _pull(client, quotes=False)["web-1"]["text_quote"] is None
 
 
-def test_an_edit_from_another_device_keeps_the_highlights_creator(world, client):
+def test_an_edit_from_another_client_keeps_the_highlights_creator(world, client):
+    """An identified device may edit only its own rows (share-place spec
+    17b, pinned in test_share_place_koreader_push_ownership.py), so another
+    client's edit arrives unidentified."""
     _push(client, [_highlight("hl-1", _quote(60))])
 
-    _push(client, [_highlight("hl-1", _quote(60), note_text="from the tablet",
-                              device_origin_id="tablet-1")],
-          device="WordReader (Tablet)", device_id="tablet-1")
+    _push_unidentified(client, [_highlight("hl-1", _quote(60), note_text="from the tablet",
+                                           device_origin_id="tablet-1")],
+                       device="WordReader (Tablet)")
 
     pulled = _pull(client)["hl-1"]
     assert pulled["note_text"] == "from the tablet"
@@ -234,8 +248,9 @@ def test_a_highlight_another_reader_moved_comes_back_as_its_new_words(world, cli
     _push(client, [_highlight("hl-1", _quote(60))])
     moved = _koreader_highlight(world, "hl-1", 62)
 
-    _push(client, [moved], document=world.digest, device="KindleBasic5",
-          device_id="kindle-1")
+    # Moved by a reader that names no device (an identified one may move
+    # only its own rows, share-place spec 17b).
+    _push_unidentified(client, [moved], document=world.digest, device="KindleBasic5")
 
     quote = _pull(client)["hl-1"]["text_quote"]
     assert text_anchor.fold(quote["exact"]) == text_anchor.fold(moved["highlighted_text"])
@@ -248,9 +263,25 @@ def test_a_quote_sent_for_another_readers_highlight_never_moves_it(world, client
     row.position_type = position_type  # None: a row from before position types
     world.session.commit()
     before = (row.position_type, row.cfi_range, row.highlighted_text, row.start_xpointer)
+    quotes = (_quote(82), {"exact": "words no edition of this novel holds"})
 
-    for elsewhere in (_quote(82), {"exact": "words no edition of this novel holds"}):
+    # The identified phone's copy of a web-reader row is not its own (spec
+    # 17b): nothing changes, not even the note, and the row is counted
+    # unchanged. The response does not call it an unresolved gap; whether
+    # it is listed as resolved is not pinned (the current guard lists it in
+    # neither list).
+    for elsewhere in quotes:
         result = _push(client, [_highlight("web-1", elsewhere, note_text="noted")])
+        assert (result["unchanged"], result["updated"]) == (1, 0)
+        assert "web-1" not in result.get("unresolved", [])
+    row = _row(world, "web-1")
+    assert (row.position_type, row.cfi_range, row.highlighted_text, row.start_xpointer) == before
+    assert row.note_text is None
+
+    # A client that names no device keeps today's rule: the quote is dropped,
+    # the anchor and words kept, the note applied, and the id resolved.
+    for elsewhere in quotes:
+        result = _push_unidentified(client, [_highlight("web-1", elsewhere, note_text="noted")])
         assert result["resolved"] == ["web-1"] and result["unresolved"] == []
 
     row = _row(world, "web-1")
@@ -307,17 +338,18 @@ def test_a_deletion_koreader_names_reaches_the_client_as_a_newer_tombstone(world
     assert after["server_modified_at"] > before["server_modified_at"]
 
 
-def test_an_edit_from_any_device_advances_the_revision_and_a_resend_does_not(world, client):
+def test_an_edit_advances_the_revision_and_a_resend_does_not(world, client):
+    """The edit comes from the highlight's own device: an identified device
+    may edit only its own rows (share-place spec 17b)."""
     _push(client, [_highlight("hl-1", _quote(60))])
     first = _pull(client)["hl-1"]
 
     _push(client, [_highlight("hl-1", _quote(60))])
     assert _pull(client)["hl-1"]["content_revision"] == first["content_revision"]
 
-    _push(client, [{"annotation_id": "hl-1", "note_text": "edited in KOReader"}],
-          document=world.digest, device="KindleBasic5", device_id="kindle-1")
+    _push(client, [{"annotation_id": "hl-1", "note_text": "edited on the phone"}])
     edited = _pull(client)["hl-1"]
-    assert edited["note_text"] == "edited in KOReader"
+    assert edited["note_text"] == "edited on the phone"
     assert edited["content_revision"] > first["content_revision"]
 
 

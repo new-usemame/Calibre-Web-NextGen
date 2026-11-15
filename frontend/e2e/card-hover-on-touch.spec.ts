@@ -31,7 +31,6 @@ test('the cover lift never follows the pointer on a touch device', async ({ page
   const first = page.locator('a[aria-label^="Open details for"]').first();
   await expect(first).toBeVisible();
 
-  const box = (await first.boundingBox())!;
   const media = await page.evaluate(() => ({
     hoverNone: matchMedia('(hover: none)').matches,
     coarse: matchMedia('(pointer: coarse)').matches,
@@ -39,16 +38,29 @@ test('the cover lift never follows the pointer on a touch device', async ({ page
   await test.info().attach('media', { body: JSON.stringify(media), contentType: 'application/json' });
 
   // The pointer sitting over the cover is exactly what a synthetic hover is.
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
-  await page.waitForTimeout(300);
-  const hovered = await liftState(page);
+  // hover() measures the card at the moment it moves, so a grid that is still
+  // settling (covers loading, more cards arriving) cannot leave the pointer
+  // over a spot the card has already moved away from; Chromium only re-hits
+  // :hover on the next pointer event, which made the mouse case pass only on
+  // retry (#2940).
+  const hoverCover = async () => {
+    const box = (await first.boundingBox())!;
+    await first.hover({ position: { x: box.width / 2, y: box.height / 3 } });
+  };
 
   if (isTouchProject()) {
+    await hoverCover();
+    await page.waitForTimeout(300);
+    const hovered = await liftState(page);
     expect(hovered.transform, 'touch: a hovered cover must not be raised').toBe('none');
     expect(hovered.outline, 'touch: a hovered cover must not carry the ring').toMatch(RING_OFF);
   } else {
-    expect(hovered.transform, 'mouse: hover still lifts the cover').not.toBe('none');
-    expect(hovered.outline, 'mouse: hover still draws the ring').not.toMatch(RING_OFF);
+    await expect.poll(async () => {
+      await hoverCover();
+      return (await liftState(page)).transform;
+    }, { message: 'mouse: hover still lifts the cover' }).not.toBe('none');
+    await expect.poll(async () => (await liftState(page)).outline,
+      { message: 'mouse: hover still draws the ring' }).not.toMatch(RING_OFF);
 
     // Keyboard users keep the lift as their focus cue.
     await page.mouse.move(0, 0);

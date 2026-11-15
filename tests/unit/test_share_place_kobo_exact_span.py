@@ -19,7 +19,8 @@ backward, with no prompt).
   cover and PUTs 0% back (section 14, Clara probe 2).
 * Unchanged: an unchecked Kobo never receives it; a Kobo's own span report
   works as today; with the rollout switch off nothing changes (the merge
-  bar); an unidentified KOReader keeps today's percentage-only bridge.
+  bar). An unidentified KOSync app's accepted place also arrives as the
+  span since #2783 (``test_2783_headerless_kosync_exact_place.py``).
 
 Real book (``alice-pg11`` and its served KEPUB, the ``kepub_alignment``
 fixtures), real kosync HTTP, real Kobo handlers (``share_place_span_world``).
@@ -228,18 +229,15 @@ def test_a_kobos_own_later_span_report_wins_as_today(account, rows):
     assert location_of(bookmark) == span_location(later["source"], later["span"])
 
 
-@pytest.mark.parametrize("path", ["switch-off", "unidentified-koreader"])
-def test_unchanged_paths_keep_the_kobos_own_span_with_the_new_percentage(
-        account, rows, monkeypatch, path):
-    """Today the KOReader bridge moves only the percentage, forward only."""
+def test_with_the_switch_off_the_kobo_keeps_its_own_span_with_the_new_percentage(
+        account, rows, monkeypatch):
+    """With the rollout switch off the KOReader bridge moves only the
+    percentage, forward only."""
     sw = account
-    if path == "switch-off":
-        monkeypatch.setenv(SWITCH, "0")
+    monkeypatch.setenv(SWITCH, "0")
     own = rows["kobo-own"]
 
-    sw.push(rows["late"]["xpointer"], 40, identified=path != "unidentified-koreader",
-            raw_id="koreader-1" if path == "switch-off" else "stock-koreader",
-            name="KOReader" if path == "switch-off" else "Stock KOReader")
+    sw.push(rows["late"]["xpointer"], 40, raw_id="koreader-1", name="KOReader")
 
     bookmark = _bookmark(sw, sw.checked)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)

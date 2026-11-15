@@ -51,6 +51,10 @@ jobs:
     # Prereleases are not a delivery channel for devices, and the script only
     # accepts vX.Y.Z tags anyway.
     if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    # Set at job level so the failure step's `if` reads a value the docs
+    # guarantee is in scope there, rather than relying on the step's own env.
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
       # Constrain the tag to vX.Y.Z before it is ever used as a git ref. Only an
       # account that can publish a release can reach this workflow, but a ref
@@ -82,3 +86,25 @@ jobs:
           set -euo pipefail
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
           bash scripts/publish-cwngsync-plugin.sh --tag "$TAG" --auto
+
+      # fork #1688: a publish that fails used to be a red run on a workflow with no
+      # other consumer, so v4.1.34 through v4.1.36 failed one after another and
+      # nobody saw it. Every device stays on the old plugin until someone acts, so
+      # a failure here has to reach a person. This is the same Discord channel and
+      # action the test workflow already uses for release-blocking failures; it
+      # adds no new service or dependency, and it is skipped when the webhook
+      # secret is not configured (forks, local runs).
+      - name: Notify on failure
+        uses: sarisia/actions-status-discord@v1
+        # cancelled() covers the 10-minute job timeout (a hung clone or push).
+        if: (failure() || cancelled()) && env.DISCORD_WEBHOOK != ''
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          title: "⛔ KOReader plugin publish failed for ${{ steps.tag.outputs.tag || github.event.release.tag_name || inputs.tag }}"
+          description: |
+            Devices will not receive this release's plugin changes until it is published.
+            Most likely cause: `_meta.lua` / `main.lua` do not declare the release version.
+            After fixing, re-run with **Run workflow** and this tag.
+            [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          color: 0xFF0000
+          username: GitHub Actions

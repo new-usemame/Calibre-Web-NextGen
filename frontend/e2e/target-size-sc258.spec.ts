@@ -83,6 +83,12 @@ async function measureEffectiveHitExtent(control: Locator): Promise<HitExtent> {
 
 async function expectSc258Target(label: string, control: Locator) {
   await expect(control).toBeVisible();
+  // Visible is not hit-testable: a card or menu still settling, or a layer
+  // fading out over it, makes every probe miss and reports -1x-1 (#2940). A
+  // trial click waits until the control is stable and receives the pointer at
+  // its centre, which is the state a user's tap meets. It fails if the
+  // control never becomes reachable, so a real obstruction still fails here.
+  await control.click({ trial: true });
   const measured = await measureEffectiveHitExtent(control);
   console.log(
     `${label}: visual ${measured.visual[0]}x${measured.visual[1]}, `

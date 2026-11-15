@@ -144,9 +144,106 @@ def test_with_the_proxy_off_the_store_is_never_contacted(kobo_app, store, monkey
     assert store.calls == []
 
 
-def test_other_store_calls_still_redirect_to_the_store(kobo_app, store):
-    response = ask(kobo_app, "/v1/products/dailydeal")
+# With CWNG's answers for profile, subscriptions and deals, the reporter's Kobo
+# (firmware 6) got past them and stopped at the next call CWNG still redirected,
+# /v1/assets, and its Store and Libby pages stayed empty. Pointed at the store
+# directly the same Kobo loads both. So with the proxy on no store call is
+# redirected: CWNG asks the store and hands the answer back, as it already did
+# for every POST.
+@pytest.mark.parametrize("path", [
+    "/v1/assets",
+    "/v1/products/dailydeal",
+    "/v1/products/featured/",
+    "/v1/products/books/external/od_1,od_2",
+    "/v1/user/recommendations",
+    "/v1/user/loyalty/benefits",
+])
+def test_with_the_proxy_on_no_store_call_is_redirected(kobo_app, store, path):
+    store.reply = store_reply(200, b'{"from": "store"}')
 
-    assert response.status_code == 307
-    assert response.headers["Location"] == "https://storeapi.kobo.com/v1/products/dailydeal"
-    assert store.calls == []
+    response = ask(kobo_app, path)
+
+    assert response.status_code == 200, (response.status_code, response.headers.get("Location"))
+    assert response.get_json() == {"from": "store"}
+    assert store.calls[0].url == "https://storeapi.kobo.com" + path
+    assert store.calls[0].method == "GET"
+    assert store.calls[0].headers.get("Authorization") == "Bearer device-session"
+
+
+def test_a_store_query_string_reaches_the_store(kobo_app, store):
+    store.reply = store_reply(200, b'{"from": "store"}')
+
+    response = ask(kobo_app, "/v1/products/featured/?PageIndex=2&PageSize=10")
+
+    assert response.status_code == 200
+    assert store.calls[0].url == (
+        "https://storeapi.kobo.com/v1/products/featured/?PageIndex=2&PageSize=10")
+
+
+def test_a_refused_assets_call_gets_the_proxy_off_answer(kobo_app, store):
+    # /v1/assets comes between Init and the library sync, like profile and deals.
+    store.reply = store_reply(
+        401, b'{"ResponseStatus":{"ErrorCode":"UnauthorizedAccessException"}}')
+
+    response = ask(kobo_app, "/v1/assets")
+
+    assert response.status_code == 200
+    assert response.get_json() == {}
+
+
+def test_an_unreachable_store_answers_a_browsing_call_with_an_error_not_a_crash(kobo_app, store):
+    store.raises = requests.ConnectTimeout("slow")
+
+    response = ask(kobo_app, "/v1/products/featured/")
+
+    assert response.status_code == 504
+
+
+def test_a_proxied_store_answer_is_not_written_to_the_log(kobo_app, store):
+    # These answers were redirected before, so they never reached the log, and
+    # people paste DEBUG logs into public issues.
+    store.reply = store_reply(200, b'{"Wishlist": ["reader@private.invalid"]}')
+
+    response = ask(kobo_app, "/v1/user/wishlist")
+
+    assert response.get_json() == {"Wishlist": ["reader@private.invalid"]}
+    assert "reader@private.invalid" not in "\n".join(store.logged)
+
+
+@pytest.mark.parametrize("path", ["/v1/auth/device", "/v1/auth/refresh", "/v1/user/add-device"])
+def test_an_unreachable_store_during_sign_in_still_gets_cwngs_own_token(kobo_app, store, path):
+    # Pairing must not depend on the store being reachable (D#2781).
+    store.raises = requests.ConnectionError("down")
+
+    response = kobo_app.app.test_client().post(
+        "/kobo/reader-token" + path, headers=AUTH, json={"UserKey": "k"})
+
+    assert response.status_code == 200, response.status_code
+    assert response.get_json().get("AccessToken")
+
+
+def test_cwngs_own_cookies_are_not_sent_to_the_store(kobo_app, store):
+    store.reply = store_reply(200, b'{"from": "store"}')
+    client = kobo_app.app.test_client()
+    session_name = kobo_app.app.config.get("SESSION_COOKIE_NAME", "session")
+    remember_name = kobo_app.app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+    client.set_cookie(session_name, "cwng-session-secret")
+    client.set_cookie(remember_name, "cwng-remember-secret")
+    client.set_cookie("store_pref", "kept")
+
+    client.get("/kobo/reader-token/v1/products/dailydeal", headers=AUTH)
+
+    sent = store.calls[0].headers.get("Cookie") or ""
+    assert "cwng-session-secret" not in sent and "cwng-remember-secret" not in sent
+    assert "store_pref=kept" in sent
+
+
+def test_the_store_is_asked_only_for_encodings_cwng_can_decode(kobo_app, store):
+    # CWNG drops Content-Encoding from the store's answer, so the body must be
+    # one requests has already decoded.
+    store.reply = store_reply(200, b'{"from": "store"}')
+
+    kobo_app.app.test_client().get(
+        "/kobo/reader-token/v1/products/dailydeal", headers={**AUTH, "Accept-Encoding": "br, zstd"})
+
+    assert store.calls[0].headers.get("Accept-Encoding") == "gzip, deflate"

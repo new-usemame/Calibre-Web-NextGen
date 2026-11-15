@@ -19,6 +19,8 @@ import { apiGet, ApiError } from '../lib/api';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
 import { useCatalogDensity } from '../lib/catalogDensity';
+import { useCatalogRowsPerLoad } from '../lib/catalogRowsPerLoad';
+import { useMeasuredGridColumns } from '../lib/useMeasuredGridColumns';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
@@ -46,6 +48,9 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const fresh = next.filter((b) => !seen.has(b.id));
   return fresh.length ? [...prev, ...fresh] : prev;
 }
+
+/** Books per request before the grid has been measured (the old fixed size). */
+const MAGIC_SHELF_FALLBACK_PER_PAGE = 24;
 
 /** Native view of a saved smart shelf's matching books, with duplicate/delete. */
 export function MagicShelfView({ id }: { id: string }) {
@@ -93,8 +98,26 @@ export function MagicShelfView({ id }: { id: string }) {
   const [books, setBooks] = useState<Book[]>([]);
   const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const accKey = useRef('');
+  const [rowsChoice] = useCatalogRowsPerLoad();
+  const rowsPerLoad = Number(rowsChoice);
+  // Whole rows per request, as on regular shelves and the Library: rows x the
+  // columns the grid really renders. The first request waits for that
+  // measurement (fail-open after a moment) instead of fetching at a guess and
+  // refetching (#980, #1144).
+  const { gridRef, columns, measured: gridMeasured } = useMeasuredGridColumns({
+    fallbackColumns: Math.ceil(MAGIC_SHELF_FALLBACK_PER_PAGE / rowsPerLoad),
+    minWidthVar: '--shelf-grid-min',
+    layoutKey: density,
+  });
+  // Page N of an infinite scroll is only meaningful at the page size page 1 used,
+  // so follow the live measurement while on page 1 and hold that size once
+  // scrolling has started: a window resize mid-scroll then cannot skip or repeat
+  // books, and the next sort, bulk change or shelf starts afresh at page 1.
+  const pageSizeRef = useRef(rowsPerLoad * columns);
+  if (page === 1) pageSizeRef.current = rowsPerLoad * columns;
+  const perPage = pageSizeRef.current;
   const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(
-    id, page, sort, revision,
+    id, page, sort, revision, perPage, gridMeasured,
   );
   const del = useDeleteMagicShelf();
   const dup = useDuplicateMagicShelf();
@@ -189,7 +212,17 @@ export function MagicShelfView({ id }: { id: string }) {
     enabled: !!data && books.length < data.total && !isFetching,
   });
 
-  if (isLoading && !data) return <SpinnerCentered size={40} />;
+  // The loading state is itself a grid so there is something to measure before
+  // the first request is allowed to go out.
+  if ((isLoading || !gridMeasured) && !data) {
+    return (
+      <div className={styles.container}>
+        <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div className={styles.gridLoading}><SpinnerCentered size={40} /></div>
+        </div>
+      </div>
+    );
+  }
   if (error || !data) {
     return <div className={styles.container}>
       <Link href="/magic" className={styles.back}><ChevronLeft size={16} /> {t('Smart shelves')}</Link>
@@ -361,7 +394,7 @@ export function MagicShelfView({ id }: { id: string }) {
         <EmptyState message={t('No books match this smart shelf right now.')} />
       ) : (
         <>
-          <div className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="magic-shelf-grid">
+          <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="magic-shelf-grid">
             {books.map((b, i) => (
               <BookCard key={b.id} book={b}
                 selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}

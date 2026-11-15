@@ -61,6 +61,10 @@ def test_display_preferences_have_one_persistence_key_each():
     frontend = [p.read_text(encoding="utf-8") for p in (ROOT / "frontend/src").rglob("*.ts*")]
     assert sum(text.count("cwng:catalog-density-v1") for text in frontend) == 1
     assert "useCatalogDensity()" in catalog
+    # Rows per load is read by the Library and shelves (#980), so its key also
+    # lives once, in useCatalogRowsPerLoad().
+    assert sum(text.count("cwng:catalog-rows-v1") for text in frontend) == 1
+    assert "useCatalogRowsPerLoad()" in catalog
     assert catalog.count("cwng:series-presentation-v1") == 1
     assert "cwng:browse-list-compact" in source("frontend/src/pages/BrowseList.tsx")
 

@@ -184,6 +184,17 @@
   .grid.density_comfortable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.density_compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid.density_dense { --shelf-grid-gap: var(--sp-2); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* Fixed tracks have no auto-fill minimum; zero tells the column measurement so
+     (doubled class, later than the density steps, as in Catalog.module.css). */
+  .grid.grid { --shelf-grid-min: 0px; }
+}
+
+/* The first-load spinner is a grid child (it gives the column measurement an
+   element to read), so it spans every track to stay centred. */
+.gridLoading {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
 }
 
 .grid > * {

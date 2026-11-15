@@ -10,6 +10,8 @@ POST   /api/v1/admin/change-sets/<id>/apply      apply it, per-book results
 POST   /api/v1/admin/change-sets/<id>/undo       reverse an applied set
 """
 from datetime import datetime, timezone
+import hashlib
+import json
 
 from flask import jsonify, request
 
@@ -81,17 +83,25 @@ def _history(field):
     return out
 
 
+def _preview_token(rules, changes):
+    """Identify the exact rules and before/after values the admin reviewed."""
+    return hashlib.sha256(json.dumps([rules, changes], sort_keys=True,
+                                     ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def _state(field):
     value_map = vm.load_map(ub.session, field)
     values = vm.library_values(calibre_db.session, field)
     for item in values:
         item["covered"] = value_map.covers(item["name"])
+    rules, changes = _rules(field), _live_preview(field, value_map)
     return {
+        "preview_token": _preview_token(rules, changes),
         "field": field,
         "multi": FIELD_SPECS[field].multi,
-        "rules": _rules(field),
+        "rules": rules,
         "values": values,
-        "changes": _live_preview(field, value_map),
+        "changes": changes,
         "history": _history(field),
         "files_rewritten": _files_rewritten(),
     }
@@ -144,11 +154,20 @@ def value_map_preview(field):
     guard = _guard(field)
     if guard is not None:
         return guard
-    value_map = vm.load_map(ub.session, field)
-    changes = vm.plan(calibre_db.session, value_map, field)
-    if not changes:
-        return _err("nothing_to_change", "No book would change with the saved rules", 409)
-    change_set = cs.create(ub.session, "cleanup", current_user.id, changes)
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("preview_token"), str):
+        return _err("invalid_request", "preview_token must identify the displayed preview", 400)
+    with metadata_db_write_lock():
+        # A long-open page must not silently include new books or new edits.
+        value_map = vm.load_map(ub.session, field)
+        changes = _live_preview(field, value_map)
+        if payload["preview_token"] != _preview_token(_rules(field), changes):
+            return _err("conflict", "The preview has changed. Refresh and review it before applying.", 409)
+        if not changes:
+            return _err("nothing_to_change", "No book would change with the saved rules", 409)
+        change_set = cs.create(ub.session, "cleanup", current_user.id, [
+            {"book_id": c["book_id"], "field": field, "old": c["before"], "new": c["after"]}
+            for c in changes])
     return jsonify(cs.summary(ub.session, calibre_db.session, change_set))
 
 
@@ -178,14 +197,22 @@ def _run(set_id, action):
     change_set = _load_set(set_id)
     if change_set is None:
         return _err("not_found", "Change set not found", 404)
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if payload is None and not request.data:
+        payload = {}
+    if not isinstance(payload, dict):
+        return _err("invalid_request", "Expected a JSON object", 400)
     exclude = payload.get("exclude_book_ids", [])
-    if not isinstance(exclude, list) or not all(isinstance(i, int) for i in exclude):
+    if not isinstance(exclude, list) or not all(type(i) is int and i > 0 for i in exclude):
         return _err("invalid_request", "exclude_book_ids must be a list of book ids", 400)
     hooks = dict(mark_modified=lambda book: helper.mark_book_modified(book, set_dirty=True),
                  queue_embed=helper.log_metadata_change)
     try:
         with metadata_db_write_lock():
+            # The set was loaded before acquiring the cross-process lock.
+            # Another request may have applied it while this one waited.
+            ub.session.expire_all()
+            calibre_db.session.expire_all()
             if action == "apply":
                 result = cs.apply(ub.session, calibre_db.session, set_id, exclude=exclude, **hooks)
             else:

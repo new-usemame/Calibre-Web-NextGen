@@ -12,6 +12,7 @@ const values = [
 ];
 
 const emptyState = {
+  preview_token: 'reviewed-preview',
   field: 'tags', multi: true, rules: [], values, changes: [], history: [], files_rewritten: true,
 };
 
@@ -23,7 +24,7 @@ const change = {
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
 async function stubCleanup(page: Page) {
-  const sent: { saved?: unknown; applied?: unknown } = {};
+  const sent: { saved?: unknown; previewed?: unknown; applied?: unknown; undone?: unknown } = {};
   let state: Record<string, unknown> = { ...emptyState };
   const json = (route: Route, body: unknown) => route.fulfill({ json: body });
 
@@ -39,10 +40,13 @@ async function stubCleanup(page: Page) {
     }
     await json(route, state);
   });
-  await page.route(/\/api\/v1\/admin\/value-maps\/tags\/preview$/, (route) => json(route, {
-    id: 7, source: 'cleanup', status: 'proposed', created_at: '2026-10-19T16:00:00', applied_at: null,
-    counts: { proposed: 1 }, changes: [{ ...change, id: 1, status: 'proposed', error: null }],
-  }));
+  await page.route(/\/api\/v1\/admin\/value-maps\/tags\/preview$/, (route) => {
+    sent.previewed = route.request().postDataJSON();
+    return json(route, {
+      id: 7, source: 'cleanup', status: 'proposed', created_at: '2026-10-19T16:00:00', applied_at: null,
+      counts: { proposed: 1 }, changes: [{ ...change, id: 1, status: 'proposed', error: null }],
+    });
+  });
   await page.route(/\/api\/v1\/admin\/change-sets\/7\/apply$/, async (route) => {
     sent.applied = route.request().postDataJSON();
     state = {
@@ -59,6 +63,21 @@ async function stubCleanup(page: Page) {
       state,
     });
   });
+  await page.route(/\/api\/v1\/admin\/change-sets\/7\/undo$/, async (route) => {
+    sent.undone = route.request().postDataJSON();
+    state = {
+      ...state, changes: [change],
+      history: [{ id: 7, source: 'cleanup', status: 'undone', created_at: '2026-10-19T16:00:00',
+        applied_at: '2026-10-19T16:00:05', counts: { undone: 1 } }],
+    };
+    await json(route, {
+      written: 1, removed_values: [], files_rewritten: true,
+      set: { id: 7, source: 'cleanup', status: 'undone', created_at: '2026-10-19T16:00:00',
+        applied_at: '2026-10-19T16:00:05', counts: { undone: 1 },
+        changes: [{ ...change, id: 1, status: 'undone', error: null }] },
+      state,
+    });
+  });
   return sent;
 }
 
@@ -71,7 +90,7 @@ async function assertNoSeriousAxeViolations(page: Page) {
   ))).toEqual([]);
 }
 
-test('a rule is added, saved, previewed and applied, with undo offered after', async ({ page }) => {
+test('a rule is saved, previewed, applied and undone', async ({ page }) => {
   const sent = await stubCleanup(page);
   await page.goto('/app/admin/metadata-cleanup');
   await expect(page.getByRole('heading', { name: 'Metadata clean-up' })).toBeVisible();
@@ -84,7 +103,7 @@ test('a rule is added, saved, previewed and applied, with undo offered after', a
   expect(names.map((n) => n.trim())).toEqual(['Dragons', 'Fiction / Thrillers', 'General', 'thriller']);
 
   // "Add rule" on a value fills the editor; the unsaved bar sits above the list.
-  await page.locator('[class*="value"]').filter({ hasText: 'Fiction / Thrillers' })
+  await page.getByRole('listitem').filter({ has: page.getByText('Fiction / Thrillers', { exact: true }) })
     .getByRole('button', { name: 'Add rule' }).click();
   await expect(page.getByLabel('Incoming value')).toHaveValue('Fiction / Thrillers');
   await page.getByLabel(/Becomes/).fill('Thriller');
@@ -103,8 +122,12 @@ test('a rule is added, saved, previewed and applied, with undo offered after', a
   await page.getByRole('button', { name: 'Apply to 1 books' }).click();
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(page.getByText(/Changed 1 books\./)).toBeVisible();
+  expect(sent.previewed).toEqual({ preview_token: 'reviewed-preview' });
   expect(sent.applied).toEqual({ exclude_book_ids: [] });
-  await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText(/Restored 1 books\./)).toBeVisible();
+  expect(sent.undone).toBeNull();
+  await expect(page.getByText('Undone', { exact: true })).toBeVisible();
 
   for (const theme of ['light', 'dark'] as const) {
     await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);

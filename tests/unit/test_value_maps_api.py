@@ -58,12 +58,18 @@ def test_saving_rules_previews_without_writing(call, library):
 
 
 def test_preview_with_nothing_to_change_is_a_conflict(call):
-    assert call(routes.value_map_preview, "tags", method="POST")[0] == 409
+    assert call(routes.value_map_preview, "tags", method="POST",
+                    json={"preview_token": call(routes.value_map_state, "tags")[1]["preview_token"]})[0] == 409
 
 
 def test_apply_reports_each_book_and_undo_restores(call, library):
-    call(routes.value_map_replace, "tags", method="PUT", json=RULES)
-    status, proposed = call(routes.value_map_preview, "tags", method="POST")
+    call(routes.value_map_replace, "tags", method="PUT", json={"rules": [
+        {"incoming": "Fiction / Thrillers", "targets": ["Suspense"]},
+        {"incoming": "General", "targets": []},
+        {"incoming": "thriller", "targets": ["Mystery"]},
+    ]})
+    status, proposed = call(routes.value_map_preview, "tags", method="POST",
+                    json={"preview_token": call(routes.value_map_state, "tags")[1]["preview_token"]})
     assert status == 200 and proposed["status"] == "proposed"
 
     status, result = call(routes.change_set_apply, proposed["id"], method="POST",
@@ -73,7 +79,7 @@ def test_apply_reports_each_book_and_undo_restores(call, library):
     assert result["set"]["counts"] == {"applied": 1, "skipped": 1}
     assert [b for b, _ in call.queued] == [1]
     library.expire_all()
-    assert [t.name for t in library.get(routes.db.Books, 1).tags] == ["Thriller"]
+    assert [t.name for t in library.get(routes.db.Books, 1).tags] == ["Suspense"]
     assert [h["status"] for h in result["state"]["history"]] == ["applied"]
 
     # An applied set cannot be applied again.
@@ -87,10 +93,31 @@ def test_apply_reports_each_book_and_undo_restores(call, library):
 
 def test_apply_refuses_a_malformed_exclusion_list(call):
     call(routes.value_map_replace, "tags", method="PUT", json=RULES)
-    proposed = call(routes.value_map_preview, "tags", method="POST")[1]
+    proposed = call(routes.value_map_preview, "tags", method="POST",
+                    json={"preview_token": call(routes.value_map_state, "tags")[1]["preview_token"]})[1]
     assert call(routes.change_set_apply, proposed["id"], method="POST",
                 json={"exclude_book_ids": ["2"]})[0] == 400
 
 
 def test_an_unknown_change_set_is_not_found(call):
     assert call(routes.change_set_detail, 999)[0] == 404
+
+
+@pytest.mark.parametrize("payload", [[1], "bad", True, {"exclude_book_ids": [True]}])
+def test_apply_rejects_non_object_body_and_boolean_ids(call, payload):
+    """User-controlled JSON must produce a 400 without changing metadata."""
+    call(routes.value_map_replace, "tags", method="PUT", json=RULES)
+    proposed = call(routes.value_map_preview, "tags", method="POST",
+                    json={"preview_token": call(routes.value_map_state, "tags")[1]["preview_token"]})[1]
+    assert call(routes.change_set_apply, proposed["id"], method="POST", json=payload)[0] == 400
+
+
+def test_preview_refuses_changes_since_the_displayed_plan(call, library):
+    """Apply cannot silently add books or overwrite edits after the displayed preview."""
+    state = call(routes.value_map_replace, "tags", method="PUT", json=RULES)[1]
+    book = library.get(routes.db.Books, 3)
+    book.tags.append(library.get(routes.db.Tags, 3))
+    library.commit()
+    status, _ = call(routes.value_map_preview, "tags", method="POST",
+                     json={"preview_token": state.get("preview_token")})
+    assert status == 409

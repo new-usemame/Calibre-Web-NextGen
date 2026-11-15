@@ -21,7 +21,7 @@ interface SetSummary {
 }
 interface SetDetail extends SetSummary { changes: SetRow[] }
 interface MapState {
-  field: Field; multi: boolean; rules: Rule[]; values: LibraryValue[]; changes: Change[];
+  preview_token: string; field: Field; multi: boolean; rules: Rule[]; values: LibraryValue[]; changes: Change[];
   history: SetSummary[]; files_rewritten: boolean;
 }
 interface RunResponse {
@@ -218,6 +218,7 @@ function FieldPanel({ field }: { field: Field }) {
       report(await work(), verb);
     } catch (e) {
       setFailure(errorText(e));
+      void queryClient.invalidateQueries({ queryKey: ['value-map', field] });
     } finally {
       setBusy(false);
     }
@@ -226,7 +227,9 @@ function FieldPanel({ field }: { field: Field }) {
   const apply = () => run(async () => {
     // The preview becomes a stored change set, then that exact set is applied;
     // a book that changed in between is skipped and reported, not overwritten.
-    const proposed = await apiPost<SetDetail>(`${endpoint(field)}/preview`);
+    const proposed = await apiPost<SetDetail>(`${endpoint(field)}/preview`, {
+      preview_token: data.preview_token,
+    });
     return apiPost<RunResponse>(`/api/v1/admin/change-sets/${proposed.id}/apply`, {
       exclude_book_ids: changes.filter((c) => excluded.has(c.book_id)).map((c) => c.book_id),
     });

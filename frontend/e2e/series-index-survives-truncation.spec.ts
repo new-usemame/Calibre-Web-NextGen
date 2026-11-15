@@ -59,9 +59,12 @@ test('#2051 a truncated series name keeps its position visible on the card', asy
         index: { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
         line: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
         // Width overflow for an ellipsised span; height overflow for a
-        // line-clamped block that hides the wrapped remainder.
+        // line-clamped block that hides the wrapped remainder. The clamp sits on
+        // the name span since #2147, so the height check covers the spans too.
         truncated: el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight ||
-          Array.from(el.querySelectorAll('span')).some((s) => s.scrollWidth > s.clientWidth),
+          Array.from(el.querySelectorAll('span')).some(
+            (s) => s.scrollWidth > s.clientWidth || s.scrollHeight > s.clientHeight + 1,
+          ),
       };
     }
     return { found: false, inside: false, index: null, line: null, truncated: false };

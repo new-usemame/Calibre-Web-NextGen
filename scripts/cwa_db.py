@@ -338,18 +338,17 @@ class CWA_DB:
         # Fix for issue #903: Repair incorrectly parsed default values from older versions
         self.fix_malformed_setting_values()
         
-        # Delete any settings in the db but not in the schema file
-        for setting in cwa_setting_names:
-            if setting not in self.cwa_default_settings.keys():
-                try:
-                    print(f"[cwa-db] Deprecated setting found from previous version of CWA, removing setting '{setting}' from cwa.db...")
-                    self.cur.execute(f"ALTER TABLE cwa_settings DROP COLUMN {setting}")  
-                    self.con.commit()
-                    print(f"[cwa-db] Deprecated setting '{setting}' successfully removed from cwa.db!")
-                except Exception as e:
-                    print(f"[cwa-db] The following error occurred when trying to remove {setting} from cwa.db:\n{e}")
-    
-    
+        # Keep any settings in the db but not in the schema file (#2549). They
+        # belong to another version: a newer one wrote them before a downgrade,
+        # or an older one before a setting was retired. Dropping them destroyed
+        # that user's value on every version switch; an ignored column costs
+        # nothing, because nothing below reads, writes or normalises it.
+        unknown_settings = [s for s in cwa_setting_names if s not in self.cwa_default_settings]
+        if unknown_settings:
+            print(f"[cwa-db] Keeping {len(unknown_settings)} setting(s) this version does not use: "
+                  f"{', '.join(unknown_settings)}", flush=True)
+
+
     def sync_new_settings_with_defaults(self, newly_added_settings) -> None:
         """Sync newly added settings to match schema defaults
         
@@ -449,9 +448,12 @@ class CWA_DB:
 
                     self.cur.execute("PRAGMA table_info(cwa_settings)")
                     columns = self.cur.fetchall()
+                    # Only this version's own settings: an unknown column's
+                    # value is another version's to interpret (#2549).
                     text_columns = {
                         col[1] for col in columns
                         if isinstance(col[2], str) and col[2].upper().startswith("TEXT")
+                        and col[1] in self.cwa_default_settings
                     }
 
                     json_settings = {
@@ -693,10 +695,11 @@ class CWA_DB:
             return
 
         default_check = True
-        for setting in setting_names:
+        # Only this version's settings decide it; columns another version owns are ignored (#2549).
+        for setting in self.cwa_default_settings:
             if setting == "default_settings":
                 continue
-            elif current_settings[setting] != self.cwa_default_settings[setting]:
+            elif current_settings.get(setting) != self.cwa_default_settings[setting]:
                 default_check = False
                 self.cur.execute("UPDATE cwa_settings SET default_settings=0 WHERE default_settings=1;")
                 self.con.commit()
@@ -717,8 +720,11 @@ class CWA_DB:
             self.con.commit()
             
         self.cur.execute("SELECT * FROM cwa_settings")
-        headers = [header[0] for header in self.cur.description]
-        cwa_settings = [dict(zip(headers,row)) for row in self.cur.fetchall()][0]
+        # Columns another version owns stay in the table but out of the dict (#2549).
+        names = [header[0] for header in self.cur.description]
+        cwa_settings = {name: value for name, value in zip(names, self.cur.fetchone())
+                        if name in self.cwa_default_settings}
+        headers = list(cwa_settings)
 
         # Define default values for new columns (in case db doesn't have them yet)
         schema_defaults = {
@@ -1131,7 +1137,7 @@ class CWA_DB:
                     device_type = 'desktop'
                 
                 extra_data_dict['device_type'] = device_type
-            except:
+            except Exception:
                 # If flask context not available, skip device detection
                 pass
             
@@ -1158,110 +1164,6 @@ class CWA_DB:
             return self.cur.fetchall()
         except Exception as e:
             print(f"[cwa-db] Error fetching active users: {e}")
-            return []
-    def get_hourly_activity_heatmap(self, days=None, start_date=None, end_date=None, user_id=None):
-        """Returns activity count by hour of day and day of week for heatmap visualization.
-        
-        Returns list of tuples: (day_of_week, hour, count)
-        day_of_week: 0=Sunday, 1=Monday, ..., 6=Saturday
-        hour: 0-23
-        """
-        try:
-            # Build date filter
-            if start_date and end_date:
-                date_filter = f"timestamp BETWEEN date('{start_date}') AND date('{end_date}', '+1 day')"
-            else:
-                days = days or 30
-                date_filter = f"timestamp >= date('now', '-{days} days')"
-            
-            # Add user filter if provided
-            user_filter = self._build_user_filter(user_id)
-            combined_filter = date_filter + user_filter
-            
-            self.cur.execute(f"""
-                SELECT 
-                    CAST(strftime('%w', timestamp) AS INTEGER) as day_of_week,
-                    CAST(strftime('%H', timestamp) AS INTEGER) as hour,
-                    COUNT(*) as activity_count
-                FROM cwa_user_activity
-                WHERE {combined_filter}
-                GROUP BY day_of_week, hour
-                ORDER BY day_of_week, hour
-            """)
-            return self.cur.fetchall()
-        except Exception as e:
-            print(f"[cwa-db] Error getting hourly activity heatmap: {e}")
-            return []
-
-    def get_reading_velocity(self, days=None, start_date=None, end_date=None, user_id=None):
-        """Returns books read per week for velocity trend chart.
-        
-        Returns list of tuples: (week_start_date, books_read_count)
-        """
-        try:
-            # Build date filter
-            if start_date and end_date:
-                date_filter = f"timestamp BETWEEN date('{start_date}') AND date('{end_date}', '+1 day')"
-            else:
-                days = days or 90  # Default to 90 days for velocity trends
-                date_filter = f"timestamp >= date('now', '-{days} days')"
-            
-            # Add user filter if provided
-            user_filter = self._build_user_filter(user_id)
-            combined_filter = date_filter + user_filter
-            
-            self.cur.execute(f"""
-                SELECT 
-                    date(timestamp, 'weekday 0', '-6 days') as week_start,
-                    COUNT(DISTINCT item_id) as books_read
-                FROM cwa_user_activity
-                WHERE event_type = 'READ'
-                    AND {combined_filter}
-                GROUP BY week_start
-                ORDER BY week_start
-            """)
-            return self.cur.fetchall()
-        except Exception as e:
-            print(f"[cwa-db] Error getting reading velocity: {e}")
-            return []
-
-    def get_format_preferences(self, days=None, start_date=None, end_date=None, user_id=None):
-        """Returns format preferences by user for stacked bar chart.
-        
-        Returns list of tuples: (user_name, format, count)
-        """
-        try:
-            # Build date filter
-            if start_date and end_date:
-                date_filter = f"timestamp BETWEEN date('{start_date}') AND date('{end_date}', '+1 day')"
-            else:
-                days = days or 30
-                date_filter = f"timestamp >= date('now', '-{days} days')"
-            
-            # Add user filter if provided
-            user_filter = self._build_user_filter(user_id)
-            combined_filter = date_filter + user_filter
-            
-            self.cur.execute(f"""
-                SELECT 
-                    COALESCE(user_name, 'Unknown User') as user_name,
-                    UPPER(COALESCE(
-                        CASE WHEN json_valid(extra_data) 
-                            THEN json_extract(extra_data, '$.format')
-                            ELSE extra_data
-                        END,
-                        'UNKNOWN'
-                    )) as format,
-                    COUNT(*) as count
-                FROM cwa_user_activity
-                WHERE event_type IN ('DOWNLOAD', 'READ', 'EMAIL')
-                    AND {combined_filter}
-                GROUP BY user_name, format
-                ORDER BY user_name, count DESC
-            """)
-            return self.cur.fetchall()
-        except Exception as e:
-            print(f"[cwa-db] Error getting format preferences: {e}")
             return []
 
     def get_discovery_sources(self, days=None, start_date=None, end_date=None, user_id=None):

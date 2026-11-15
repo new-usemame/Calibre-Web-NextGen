@@ -6,7 +6,7 @@ Calibre-Web-NextGen ships as a single Docker image:
 ghcr.io/new-usemame/calibre-web-nextgen:latest
 ```
 
-It's a drop-in for the standard Calibre-Web-Automated (CWA) image. **Switching keeps everything** — your books, users, settings, shelves and the Read checkmarks you've set all live in the folders you mount into the container (`/config` and `/calibre-library`), not inside the image. Nothing is converted or deleted, and you can go back to your old image with the same one-line change in reverse.
+It's a drop-in for the standard Calibre-Web-Automated (CWA) image. **Switching keeps everything**: your books, users, settings, shelves and the Read checkmarks you've set all live in the folders you mount into the container (`/config` and `/calibre-library`), not inside the image. Nothing is converted or deleted, and you can go back to your old image with the same one-line change in reverse.
 
 For the shortest possible path, see **[[Quick Start]]**. Coming from another image? See **[[Migrating]]**.
 
@@ -14,7 +14,7 @@ For the shortest possible path, see **[[Quick Start]]**. Coming from another ima
 
 ## Not using a terminal? Pick your platform
 
-Every guide covers both a **fresh install** and **switching from stock CWA**, and tells you how to **update** later on that platform (on most NAS GUIs a "restart" does **not** pull a new image — you have to re-pull, and each guide shows exactly how).
+Every guide covers both a **fresh install** and **switching from stock CWA**, and tells you how to **update** later on that platform (on most NAS GUIs a "restart" does **not** pull a new image, so you have to re-pull; each guide shows exactly how).
 
 | You run Docker through… | Guide |
 |---|---|
@@ -30,6 +30,6 @@ Every guide covers both a **fresh install** and **switching from stock CWA**, an
 
 {{repo:README.md#full-docker-compose-setup|heading}}
 
-{{repo:README.md#runtime-path-overrides-for-packagers|heading}}
+{{repo:docs/runtime-paths.md#runtime-path-overrides-for-packagers|heading}}
 
 **Next:** **[[First Run]]** → **[[Updating]]**.

@@ -24,6 +24,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.fixtures.mock_hardcover_client import MockHardcoverClient
+from cps.services import hardcover_progress
 
 
 def _kosync_module():
@@ -169,9 +170,11 @@ class TestPushReadingStateToHardcoverNoActiveContext:
                 patch.object(kobo_mod, "ub", mock_ub), \
                 patch.object(kobo_mod, "hardcover", mock_hardcover):
             push_reading_state_to_hardcover(user, book, 42)
+            # The Hardcover calls run on a worker after the push returns (#2775).
+            assert hardcover_progress.wait_idle(5)
             mock_hardcover.HardcoverClient.assert_called_once_with("fake-token")
             mock_hardcover.HardcoverClient.return_value.update_reading_progress.\
-                assert_called_once_with(book.identifiers, 42)
+                assert_called_once_with({}, 42)
 
 
 @pytest.mark.unit
@@ -222,5 +225,8 @@ class TestPushReadingStateToHardcoverGuardsAndFailures:
             # The method intentionally returns normally: Kobo/KOReader must not
             # retry the protocol request merely because Hardcover is unavailable.
             assert push_reading_state_to_hardcover(user, book, 47) is None
+            assert hardcover_progress.wait_idle(5)
 
-        assert client.calls == [("progress", book.identifiers, 47)]
+        # The worker gets plain values read on the request thread, never the
+        # ORM relationship (#2775); the client accepts this mapping as is.
+        assert client.calls == [("progress", {"hardcover-id": "123", "hardcover-edition": "456"}, 47)]

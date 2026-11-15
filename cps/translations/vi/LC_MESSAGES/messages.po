@@ -4874,6 +4874,89 @@ msgid "Display name for {name}"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Share my place"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Devices with this on open each book where you last stopped on any of them. "
+"Turn it off for a device someone else reads on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save Share my place. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Always shares its place. Install or update the NextGen Sync plugin on this "
+"device to choose."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Books on this device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Same as my account setting"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Everything in my library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Only these shelves"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Choose which books this device keeps. Books you take off are removed from "
+"the device at its next sync; your place, highlights and notes stay saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The shelf chosen for this device was deleted. It uses your account setting "
+"until you choose again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The shelf chosen for this device is no longer available. It uses your "
+"account setting until you choose again."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Account setting: {scope}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the book choice. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr ""
 
@@ -5930,6 +6013,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8312,6 +8399,10 @@ msgstr ""
 msgid "Remove {name}?"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr ""
@@ -8428,6 +8519,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9567,6 +9663,13 @@ msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -9662,8 +9765,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11147,6 +11250,157 @@ msgstr ""
 msgid "Choose a tag group to browse books from it and its subtags."
 msgstr ""
 "Chọn một nhóm đánh dấu để duyệt sách trong nhóm và các đánh dấu con của nhóm."
+
+#: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Set sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Replace image"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr ""
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -14726,6 +14980,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr ""
 
@@ -14925,10 +15191,10 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
 
 #: cps/templates/cwa_settings.html

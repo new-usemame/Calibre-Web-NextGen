@@ -2,9 +2,9 @@ import { BookReview } from '../components/BookReview';
 import { PersonalRating } from '../components/PersonalRating';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Glasses, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, RotateCcw, Glasses, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
-  useBook, useToggleRead, useStopReading, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
+  useBook, useToggleRead, useStopReading, useClearReadingPosition, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
@@ -24,7 +24,7 @@ import { EmptyState } from '../components/EmptyState';
 import type { ReadingStatus, CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
 import { ApiError, resourceUrl, resourceSrcSet, TASK_FAILED, TASK_FINISHED, TASK_ENDED, TASK_CANCELLED } from '../lib/api';
 import { useT, useI18n } from '../lib/i18n';
-import { formatCustomColumnDate } from '../lib/customColumnDisplay';
+import { formatCustomColumnDate, formatPublishedDate } from '../lib/customColumnDisplay';
 import { getPrimaryReadTarget, withLookupMode } from '../lib/readerTarget';
 import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
 import {
@@ -57,17 +57,9 @@ function formatBytes(bytes: number): string {
   return mb >= 0.1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
 }
 
-function formatDate(date: string, alwaysReturnFullDate = false): string {
-  // Try to parse as ISO date — return just the year if it looks like a date
+function formatDate(date: string): string {
   const d = new Date(date);
   if (!isNaN(d.getTime())) {
-    if (!alwaysReturnFullDate) {
-      // If the time portion is midnight UTC it's likely just a year+date, show full date
-      const year = d.getFullYear();
-      const month = d.getMonth();
-      const day = d.getDate();
-      if (month === 0 && day === 1) return String(year);
-    }
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   }
   return date;
@@ -429,6 +421,7 @@ export function BookDetail() {
   const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
   const stopReading = useStopReading(id);
+  const clearPosition = useClearReadingPosition(id);
   const setReadingStatus = useSetReadingStatus(id);
   const resetReadingStatus = setReadingStatus.reset;
   useEffect(() => { resetReadingStatus(); }, [id, resetReadingStatus]);
@@ -585,6 +578,19 @@ export function BookDetail() {
         onSuccess: () => announce(t('Removed from Currently Reading.')),
         onError: () => announce(t('Could not remove this book from Currently Reading.'), { assertive: true }),
       }), testId: 'menu-stop-reading',
+    });
+  }
+  if (canAccessBook && !me?.role?.anonymous) {
+    menuItems.push({
+      id: 'clear-position', label: t('Clear reading position'),
+      icon: <RotateCcw size={15} />, disabled: clearPosition.isPending,
+      onSelect: () => {
+        if (!window.confirm(t('Clear your saved reading position for "{title}" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs.', { title: book.title }))) return;
+        clearPosition.mutate(undefined, {
+          onSuccess: () => announce(t('Reading position cleared.')),
+          onError: () => announce(t('Could not clear the reading position.'), { assertive: true }),
+        });
+      }, testId: 'menu-clear-position',
     });
   }
   if (inLibrary) {
@@ -1033,31 +1039,31 @@ export function BookDetail() {
                 <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
                   {t('Started reading')}
                 </dt>
-                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
+                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at)}</dd>
               </>
             )}
             {canAccessBook && book.kosync_progress_timestamp !== null && (
               <>
                 <dt className={styles.metaLabel}>{t('Last synced')}</dt>
-                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>
+                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp)}</dd>
               </>
             )}
             {book.pubdate && (
               <>
                 <dt className={styles.metaLabel}>{t('Published')}</dt>
-                <dd className={styles.metaValue}>{formatDate(book.pubdate)}</dd>
+                <dd className={styles.metaValue}>{formatPublishedDate(book.pubdate, locale)}</dd>
               </>
             )}
             {book.date_added && (
               <>
                 <dt className={styles.metaLabel}>{t('Date added')}</dt>
-                <dd className={styles.metaValue}><time dateTime={book.date_added}>{formatDate(book.date_added, true)}</time></dd>
+                <dd className={styles.metaValue}><time dateTime={book.date_added}>{formatDate(book.date_added)}</time></dd>
               </>
             )}
             {book.last_modified && (
               <>
                 <dt className={styles.metaLabel}>{t('Last modified')}</dt>
-                <dd className={styles.metaValue}><time dateTime={book.last_modified}>{formatDate(book.last_modified, true)}</time></dd>
+                <dd className={styles.metaValue}><time dateTime={book.last_modified}>{formatDate(book.last_modified)}</time></dd>
               </>
             )}
             {book.languages.length > 0 && (

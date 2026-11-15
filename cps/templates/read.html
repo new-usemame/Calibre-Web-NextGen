@@ -181,7 +181,9 @@
             bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=bookid, book_format=book_format|lower, lookup=1 if lookup_mode else None) }}",
             lookupMode: {{ lookup_mode|default(false)|tojson }},
             csrfToken: "{{ csrf_token() }}",
+            // Keep the local progress key stable; only archive requests carry lookup mode.
             bookUrl: "{{ url_for('web.serve_book', book_id=bookid, book_format=book_format, anyname='file.epub') }}",
+            bookArchiveUrl: "{{ url_for('web.serve_book', book_id=bookid, book_format=book_format, anyname='file.epub', lookup=1 if lookup_mode else None) }}",
             bookmark: "{{ bookmark.bookmark_key if bookmark != None }}",
             useBookmarks: "{{ current_user.is_authenticated | tojson }}",
             readerSettings: {{ reader_settings | default('{}') | safe }},

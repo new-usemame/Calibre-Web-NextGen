@@ -112,7 +112,7 @@ def _library_book_ids(session, user_id):
     return {row.book_id for row in rows}
 
 
-def membership(user, *, session=None, magic_shelf_book_ids=None,
+def membership(user, *, device=None, session=None, magic_shelf_book_ids=None,
                magic_shelf_membership_reliable=True):
     """Return the :class:`Membership` the user's e-reader choices admit.
 
@@ -123,6 +123,35 @@ def membership(user, *, session=None, magic_shelf_book_ids=None,
     ``user``.
     """
     session = session or ub.session
+    if device is not None:
+        from . import device_book_scope
+        choice = device_book_scope.resolve(user, device, session=session)
+        if choice.overrides_account:
+            personal = personal_library(user)
+            ids = None
+            reliable = True
+            if choice.mode == "shelves":
+                shelf_ids = [s.id for s in choice.shelves]
+                ids = {row.book_id for row in session.query(ub.BookShelf.book_id)
+                       .filter(ub.BookShelf.shelf.in_(shelf_ids))} if shelf_ids else set()
+                from .. import config, magic_shelf, logger
+                # Match account scope: disabled magic sync is reliably empty.
+                if getattr(config, "config_kobo_sync_magic_shelves", False):
+                    for shelf in choice.magic_shelves:
+                        try:
+                            books, _count = magic_shelf.get_book_ids_for_magic_shelf(
+                                shelf.id, raise_on_error=True)
+                            ids.update(books or ())
+                        except Exception:
+                            logger.create().warning("Device scope: smart shelf %s unavailable",
+                                                    shelf.id, exc_info=True)
+                            reliable = False
+            if personal or choice.mode == "my_library":
+                library = _library_book_ids(session, int(user.id))
+                ids = library if ids is None else ids & library
+            return Membership(mode=choice.mode,
+                              book_ids=None if ids is None else frozenset(ids),
+                              reliable=reliable, personal=personal)
     user_id = int(user.id)
     shelves = shelf_only(user)
     personal = personal_library(user)
@@ -152,7 +181,11 @@ def visible_book_ids(user, *, cdb=None):
     """Every book id the user can see, archived and hidden books excluded."""
     if cdb is None:
         from .. import calibre_db as cdb
-    cdb.ensure_session()
+    # Callers may supply an already-bound query facade (including isolated
+    # sync simulations). The application CalibreDB still refreshes its session.
+    ensure_session = getattr(cdb, 'ensure_session', None)
+    if ensure_session is not None:
+        ensure_session()
     rows = cdb.session.query(db.Books.id).filter(cdb.common_filters(user=user))
     return {row[0] for row in rows}
 

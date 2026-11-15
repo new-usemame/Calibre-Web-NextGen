@@ -22,6 +22,14 @@ BOOK_ID = 42
 _DEFAULT_LOCATION = object()
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 def _clock(hour):
     return datetime(2026, 8, 29, hour, 0, tzinfo=timezone.utc)
 

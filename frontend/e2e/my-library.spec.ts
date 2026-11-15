@@ -587,7 +587,7 @@ test.describe('My Library', () => {
       // The retained highlight's origin device is the real recovery route to
       // a removed book: device view -> book annotations -> browser downloads.
       await page.goto('/app/account/devices');
-      const browserSource = page.getByRole('link', { name: 'Browser', exact: true });
+      const browserSource = page.getByRole('link', { name: 'Web reader', exact: true });
       await expect(browserSource).toHaveCount(1);
       await browserSource.click();
       const deviceRow = page.getByRole('listitem').filter({ hasText: marker });

@@ -31,6 +31,14 @@ OPF_NS = {"opf": "http://www.idpf.org/2007/opf",
           "dc": "http://purl.org/dc/elements/1.1/"}
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     built = LibraryWorld(monkeypatch, tmp_path)
@@ -639,6 +647,53 @@ def test_a_new_placeholder_look_reaches_devices_that_already_hold_one(world, mon
     after = _books(world)[0][1]
     assert after["rev"] != before
     assert _placeholder(world, 1).headers["X-CWNG-Placeholder-Rev"] == after["rev"]
+
+
+def test_a_cloud_books_placeholder_carries_its_calibre_tags(world, tmp_path):
+    """#2792: the placeholder OPF carried title, authors, language and series
+    but no dc:subject, so KOReader's Book information and anything grouping
+    books by tag on the device saw every not-downloaded book as untagged."""
+    from cps.epub import get_epub_info
+    world.add_user("reader")
+    world.add_book(1, "Passing", tags=("Fiction", "Harlem Renaissance", "classic"))
+    world.add_book(2, "Untagged")
+
+    data = _placeholder(world, 1).get_data()
+    opf = etree.fromstring(zipfile.ZipFile(io.BytesIO(data)).read("OEBPS/content.opf"))
+    assert opf.xpath("//opf:metadata/dc:subject/text()", namespaces=OPF_NS) == [
+        "classic", "Fiction", "Harlem Renaissance"]
+    # The app's own EPUB reader reads them back as the book's tags.
+    path = tmp_path / "placeholder.epub"
+    path.write_bytes(data)
+    meta = get_epub_info(str(path), "placeholder", ".epub", False)
+    assert sorted(t.strip() for t in meta.tags.split(",")) == [
+        "Fiction", "Harlem Renaissance", "classic"]
+
+    untagged = zipfile.ZipFile(io.BytesIO(_placeholder(world, 2).get_data()))
+    assert etree.fromstring(untagged.read("OEBPS/content.opf")).xpath(
+        "//dc:subject", namespaces=OPF_NS) == []
+
+
+def test_a_tag_change_reaches_devices_that_already_hold_the_placeholder(world):
+    """A device replaces a placeholder only when its rev changes. A tag
+    edited without touching last_modified (a rename across the library, a
+    write from another tool) left every device on the old tags."""
+    from cps import db
+    world.add_user("reader")
+    world.add_book(1, "Retagged", tags=("old",))
+    before = _books(world)[0][1]["rev"]
+
+    book = world.session.get(db.Books, 1)
+    book.tags[0].name = "new"
+    world.session.commit()
+
+    after = _books(world)[0][1]["rev"]
+    assert after != before
+    response = _placeholder(world, 1)
+    assert response.headers["X-CWNG-Placeholder-Rev"] == after
+    opf = etree.fromstring(zipfile.ZipFile(io.BytesIO(response.get_data()))
+                           .read("OEBPS/content.opf"))
+    assert opf.xpath("//dc:subject/text()", namespaces=OPF_NS) == ["new"]
 
 
 def test_a_placeholder_is_built_once_per_revision(world, monkeypatch):

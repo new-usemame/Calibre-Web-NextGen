@@ -32,6 +32,17 @@ from cps.services.hardcover import HardcoverClient, STATUS_READ, STATUS_READING
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests call the writer outside a request, so no Browser device is
+    registered; with gates on (unset since PR 5) an unregistered Browser stays
+    private and nothing reaches Hardcover. They pin the pre share-my-place web
+    -> Hardcover rules (furthest-wins, preview not sent), so they run with the
+    emergency off switch. With a registered Browser and gates on, Hardcover
+    follows the Browser's own accepted reports (spec section 8 fan-out)."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 @pytest.fixture
 def web_reader(monkeypatch):
     """The real ``record_web_reader_progress`` on an in-memory app DB with

@@ -2,7 +2,7 @@
 # Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Regression test for v4.0.130 teenyverse deploy failure.
+"""Regression test for v4.0.130 the household host deploy failure.
 
 `migrate_annotation_polymorphic_position` failed in production with
 ``sqlite3.OperationalError: duplicate column name: position_type`` even
@@ -37,7 +37,7 @@ pytestmark = pytest.mark.unit
 
 def _create_annotation_with_position_type(engine):
     """Create an annotation table that already has the position_type
-    column (simulates the post-decouple-rename state on teenyverse where
+    column (simulates the post-decouple-rename state on the household host where
     the placeholder had been create_all'd with the full model)."""
     with engine.begin() as conn:
         conn.execute(text("""
@@ -68,7 +68,7 @@ def _create_bare_annotation_table(engine):
 
 
 def test_polymorphic_migration_idempotent_when_position_type_already_present(tmp_path):
-    """Simulates the exact teenyverse v4.0.130 failure: position_type
+    """Simulates the exact the household host v4.0.130 failure: position_type
     is already on the table when the polymorphic migration runs.
     Migration must complete cleanly, not raise duplicate-column."""
     db = tmp_path / "test.db"

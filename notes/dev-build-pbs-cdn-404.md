@@ -1,7 +1,7 @@
 # Dev/release image builds failing: python-build-standalone 404 from Actions
 
 **Status as of 2026-06-28 ~12:50 ET:** every GHCR image build (dev + release)
-fails. teenyverse is stuck on the 06-27 `:dev` image (no new UI banner) because
+fails. the household host is stuck on the 06-27 `:dev` image (no new UI banner) because
 no newer `:dev` ever published.
 
 ## Symptom
@@ -22,7 +22,7 @@ GitHub-hosted Actions runners get a hard **404 from the GitHub release-asset CDN
 ## Ruled out (with evidence)
 - ❌ Billing/quota — repo is **public → Actions free**; jobs run, only the
   download dies (quota failures block job start, not mid-build).
-- ❌ transcoder / self-hosted runner — builds run on GitHub-hosted
+- ❌ self-hosted runner host — builds run on GitHub-hosted
   `ubuntu-latest` + `ubuntu-24.04-arm`.
 - ❌ Stale/missing asset — bumped pin 20260414/3.13.13 → 20260623/3.13.14; both
   200 elsewhere.

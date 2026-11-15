@@ -38,7 +38,10 @@ The build:
 5. emits `sitemap.xml`, `robots.txt`, `_headers` (CSP etc.), and the search index as
    `assets/search-index.js` (a `<script>` tag, not `fetch`, so search works on file://);
 6. **self-checks every emitted page**: no unreplaced link tokens, no third-party
-   requests (script/img/stylesheet/icon), every in-page anchor resolves.
+   requests (script/img/srcset/stylesheet/icon), every in-page anchor resolves.
+   Raw `<img>`/`<source>` HTML from the README is localized too, and a light/dark
+   `<picture>` becomes two images that follow the site's theme toggle rather than
+   the OS setting.
 
 The home-page compose snippet is **extracted from the generated Quick-Start page** at
 build time — it is never hardcoded. If the generated content changes, the hero changes
@@ -80,6 +83,10 @@ the `.jpg` names with width/height/lazy/async wired up. Match these aspect ratio
 ```bash
 npx wrangler deploy   # from repo/wikisite — BY HAND; nothing auto-deploys this
 ```
+
+It is rebuilt from `main` right after each GitHub wiki sync and deployed whenever the
+build changed, so the two stay in step and every release is covered. `dist/` and
+`node_modules/` are build output and are not committed; a deploy always builds first.
 
 Do not touch the sibling `cwng-homepage` / `cwng-feedback` workers or their config.
 

@@ -10,9 +10,6 @@ import { useT } from '../lib/i18n';
 import { Button } from './Button';
 import styles from './DuplicateAutoResolve.module.css';
 
-/** Groups listed in the preview before collapsing to "and N more". */
-const PREVIEW_LIMIT = 50;
-
 /** "#12 (EPUB, PDF, Penguin Classics, 2003)" -- the publisher and year make
  *  it obvious when a group holds different editions rather than true copies. */
 function describeBook(id: number, formats: string[], publisher?: string | null, year?: number | null) {
@@ -52,6 +49,9 @@ export function DuplicateAutoResolve() {
   const [strategy, setStrategy] = useState<DuplicateStrategy>('newest');
   const [plan, setPlan] = useState<DuplicateResolutionResult | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Mutation observers render asynchronously; Escape or a second Enter can
+  // arrive before their pending state reaches the dialog's keyboard handler.
+  const executing = useRef(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
   const strategies: { value: DuplicateStrategy; label: string }[] = [
@@ -86,7 +86,9 @@ export function DuplicateAutoResolve() {
   };
 
   const runExecute = () => {
-    execute.mutate(strategy, {
+    if (!plan?.preview || executing.current) return;
+    executing.current = true;
+    execute.mutate({ strategy, expected_preview: plan.preview }, {
       onSuccess: (result) => {
         setConfirming(false);
         setPlan(null);
@@ -103,6 +105,7 @@ export function DuplicateAutoResolve() {
       },
       // Keep the dialog open on failure so the error shows beside Retry.
       onError: () => undefined,
+      onSettled: () => { executing.current = false; },
     });
   };
 
@@ -116,10 +119,11 @@ export function DuplicateAutoResolve() {
       <div className={styles.controls}>
         <label htmlFor="dup-strategy">{t('Strategy')}</label>
         <select id="dup-strategy" className={styles.select} value={strategy}
+          disabled={preview.isPending || confirming || execute.isPending}
           onChange={(e) => { setStrategy(e.target.value as DuplicateStrategy); setPlan(null); setMessage(null); }}>
           {strategies.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        <Button type="button" variant="ghost" onClick={runPreview} disabled={preview.isPending}>
+        <Button type="button" variant="ghost" onClick={runPreview} disabled={preview.isPending || confirming || execute.isPending}>
           {preview.isPending ? t('Previewing…') : t('Preview')}
         </Button>
       </div>
@@ -136,7 +140,7 @@ export function DuplicateAutoResolve() {
             })}
           </p>
           <ul className={styles.planList}>
-            {groups.slice(0, PREVIEW_LIMIT).map((g) => (
+            {groups.map((g) => (
               <li key={g.group_hash}>
                 <span className={styles.planTitle}>{g.title}</span>
                 <span className={styles.planAuthor}>{g.author}</span>
@@ -149,9 +153,6 @@ export function DuplicateAutoResolve() {
               </li>
             ))}
           </ul>
-          {groups.length > PREVIEW_LIMIT && (
-            <p className={styles.more}>{t('…and {count} more groups', { count: groups.length - PREVIEW_LIMIT })}</p>
-          )}
           <Button type="button" variant="danger" onClick={() => { execute.reset(); setConfirming(true); }}>
             {t('Delete duplicates')}
           </Button>
@@ -161,7 +162,7 @@ export function DuplicateAutoResolve() {
       {confirming && (
         <ConfirmDialog deleted={plan?.deleted_count ?? 0} busy={execute.isPending}
           error={execute.isError ? (execute.error.message || t('Could not resolve duplicates.')) : null}
-          onClose={() => setConfirming(false)} onConfirm={runExecute} />
+          onClose={() => { if (!executing.current) setConfirming(false); }} onConfirm={runExecute} />
       )}
     </section>
   );

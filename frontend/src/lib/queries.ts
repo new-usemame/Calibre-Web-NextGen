@@ -2157,15 +2157,20 @@ export function usePreviewDuplicateResolution() {
 /** Real run: keeps one book per group and deletes the rest. */
 export function useExecuteDuplicateResolution() {
   const qc = useQueryClient();
-  return useMutation<DuplicateResolutionResult, Error, DuplicateStrategy>({
-    mutationFn: (strategy) =>
-      apiPost<DuplicateResolutionResult>('/duplicates/execute-resolution', { strategy }),
+  return useMutation<DuplicateResolutionResult, Error, {
+    strategy: DuplicateStrategy; expected_preview: DuplicateResolutionPreviewGroup[];
+  }>({
+    mutationFn: (plan) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/execute-resolution', plan),
     // Books were deleted, so every list that can show them is stale -- not just
     // the duplicates view. Refresh on either outcome: a partial failure still
     // deletes some groups before it reports its errors.
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['duplicates'] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
+      invalidateBookVisibilityViews(qc);
+      void qc.invalidateQueries({ queryKey: ['book'] });
+      void qc.invalidateQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['discover-strip'] });
     },
   });
 }

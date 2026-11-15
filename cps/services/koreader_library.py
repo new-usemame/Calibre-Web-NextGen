@@ -144,6 +144,23 @@ def _series(cdb, ids):
     return names
 
 
+def _tags(cdb, ids):
+    names = {}
+    link = db.books_tags_link
+    for chunk in _chunks(ids):
+        for book_id, name in (cdb.session.query(link.c.book, db.Tags.name)
+                              .join(db.Tags, db.Tags.id == link.c.tag)
+                              .filter(link.c.book.in_(chunk))):
+            names.setdefault(book_id, []).append(name)
+    return {book_id: tag_order(found) for book_id, found in names.items()}
+
+
+def tag_order(names):
+    """A book's tag names in the order a placeholder lists them (Calibre's:
+    alphabetical, ignoring case)."""
+    return sorted(names, key=lambda name: (name.casefold(), name))
+
+
 def _formats(cdb, ids):
     formats = {}
     for chunk in _chunks(ids):
@@ -409,18 +426,20 @@ def file_facts(path):
 # The manifest
 # ---------------------------------------------------------------------------
 
-def book_rev(row, authors, series, fmt_row):
+def book_rev(row, authors, series, fmt_row, tags=()):
     """What a placeholder shows, plus which file stands behind it.
 
     Includes the placeholder layout, so a new look reaches devices that
     already hold placeholders: they replace one only when its rev changes.
+    The tags are here because a tag can change without the book's
+    last_modified (#2792).
     """
     return _digest([
         row.title, authors, series,
         row.series_index if series else None,
         bool(row.has_cover), iso_z(row.last_modified) if row.last_modified else None,
         fmt_row.format.upper(), fmt_row.name, fmt_row.uncompressed_size,
-        koreader_placeholder.LAYOUT,
+        koreader_placeholder.LAYOUT, list(tags),
     ], 16)
 
 
@@ -429,6 +448,7 @@ def _describe(ids, *, user, cdb, session, read_column, members):
     rows = _book_rows(cdb, ids)
     authors = _authors(cdb, ids)
     series = _series(cdb, ids)
+    tags = _tags(cdb, ids)
     formats = _formats(cdb, ids)
     present = [book_id for book_id in sorted(ids) if book_id in rows]
     statuses = read_statuses(user, present, session=session, cdb=cdb,
@@ -461,7 +481,8 @@ def _describe(ids, *, user, cdb, session, read_column, members):
             "format": chosen.format.upper(),
             "size": None,
             "checksum": None,
-            "rev": book_rev(row, book_authors, book_series, chosen),
+            "rev": book_rev(row, book_authors, book_series, chosen,
+                            tags.get(book_id, ())),
             "read_status": statuses.get(book_id, READ_UNREAD),
             "progress": position[0] if position else None,
             "shelves": list(members.get(book_id, ())),

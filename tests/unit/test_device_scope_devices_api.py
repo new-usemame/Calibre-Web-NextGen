@@ -223,3 +223,38 @@ def test_the_control_ships_translated(locale):
                if not catalog.get(msgid) or catalog[msgid] == msgid]
 
     assert missing == []
+
+
+# -- smart shelves while the admin's smart-shelf sync is off (#2953) ----------
+
+# The Devices page offers a device's smart shelves even when the admin's
+# "Sync smart shelves" switch is off, and the manifest then leaves
+# them out (#359 parity, test_device_scope_koreader_manifest). A reader picked
+# "Currently Reading" for their Kindle, saw it saved, and lost the book when it
+# came off their other shelf. The page has to be able to say the pick won't
+# count, the way the smart-shelf editor already disables its sync checkbox.
+SMART_SHELVES_OFF_NOTICE = (
+    "Smart shelves are not synced to e-readers on this server, so a smart "
+    "shelf ticked here adds no books. An administrator can turn on Sync "
+    "smart shelves in the settings.")
+
+
+@pytest.mark.parametrize("setting", [False, True], ids=["off", "on"])
+def test_the_page_is_told_whether_smart_shelves_count(world, monkeypatch, setting):
+    from cps import config
+    a = _account(world)
+    smart = ub.MagicShelf(name="Currently Reading", user_id=a.id, rules={})
+    world.session.add(smart)
+    world.session.commit()
+    monkeypatch.setattr(config, "config_kobo_sync_magic_shelves", setting, raising=False)
+
+    choices = _scope(world, world.koreader_device)["choices"]
+
+    assert [shelf["name"] for shelf in choices["magic_shelves"]] == ["Currently Reading"]
+    assert choices["magic_shelves_sync"] is setting
+
+
+@pytest.mark.parametrize("locale", ["fr", "nl"])
+def test_the_smart_shelves_off_notice_ships_translated(locale):
+    catalog = _catalog(locale)
+    assert catalog.get(SMART_SHELVES_OFF_NOTICE) not in (None, "", SMART_SHELVES_OFF_NOTICE)

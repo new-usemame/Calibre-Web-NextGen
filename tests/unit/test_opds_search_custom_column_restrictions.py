@@ -100,7 +100,7 @@ def test_opds_search_hides_boolean_denials_for_the_basic_auth_user(
     cdb.ensure_session = lambda: None
     cdb.config = SimpleNamespace(config_restricted_column=BOOL_COLUMN_ID)
     cdb.get_cc_columns = lambda *_args, **_kwargs: []
-    config = SimpleNamespace(config_read_column=0)
+    config = SimpleNamespace(config_read_column=0, config_books_per_page=60)
     app = Flask(__name__)
     Babel(app)
 

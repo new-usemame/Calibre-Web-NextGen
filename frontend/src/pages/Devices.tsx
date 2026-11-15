@@ -110,6 +110,10 @@ export function Devices() {
       `/api/annotations/devices?active=true&limit=${DEVICE_PAGE_SIZE}&offset=${deviceOffset}`,
     ),
   });
+  const removed = useQuery<DevicePage>({
+    queryKey: ['annotation-devices', 'removed'],
+    queryFn: () => apiGet(`/api/annotations/devices?active=false&limit=${DEVICE_PAGE_SIZE}`),
+  });
   const correctedDeviceOffset = data
     ? clampOffset(deviceOffset, data.total, DEVICE_PAGE_SIZE)
     : deviceOffset;
@@ -222,6 +226,8 @@ export function Devices() {
   };
 
   const devices = data?.devices ?? [];
+  // Browser rows come back by themselves; an active row never belongs here.
+  const removedDevices = (removed.data?.devices ?? []).filter(device => !device.active && device.type !== 'webreader');
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE));
   const currentPage = Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1;
   return (
@@ -231,7 +237,7 @@ export function Devices() {
       {isLoading || staleDevicePage ? <SpinnerCentered size={40} /> : error ? (
         <div className={styles.loadError}>
           <p role="alert">{t('Could not load devices and browsers.')}</p>
-          <button type="button" className={styles.primaryButton} onClick={() => void refetch()}>{t('Try again')}</button>
+          <button type="button" className={styles.primaryButton} onClick={() => { void refetch(); if (removed.isError) void removed.refetch(); }}>{t('Try again')}</button>
         </div>
       ) : devices.length === 0 ? (
         <section className={styles.empty}>
@@ -420,12 +426,41 @@ export function Devices() {
           )}
         </>
       )}
+      {removed.isError && !error && <div className={styles.loadError}>
+        <p role="alert">{t('Could not load devices and browsers.')}</p>
+        <button type="button" className={styles.primaryButton} onClick={() => void removed.refetch()}>{t('Try again')}</button>
+      </div>}
+      {removedDevices.length > 0 && <section aria-labelledby="removed-devices-title" className={styles.section}>
+        <h2 id="removed-devices-title" className={styles.sectionTitle}>{t('Removed devices')}</h2>
+        <ul className={styles.list} role="list">
+          {removedDevices.map(device => (
+            <li key={device.public_id} className={styles.card}>
+              <div className={styles.cardHead}>
+                <Smartphone size={20} aria-hidden="true" focusable={false} className={styles.cardIcon} />
+                <div className={styles.cardTitleWrap}>
+                  <h3 className={styles.cardName}>{displayName(device)}</h3>
+                  <p className={styles.deviceMeta}>{device.model}</p>
+                </div>
+                <button type="button" className={styles.primaryButton}
+                  aria-label={t('Restore {name}', { name: displayName(device) })}
+                  disabled={restore.isPending || remove.isPending || preflightPending}
+                  onClick={() => restore.mutate(device)}>{t('Restore')}</button>
+              </div>
+              <p role="alert" className={styles.renameError}>
+                {restore.isError && restore.variables?.public_id === device.public_id
+                  && undoDevice?.public_id !== device.public_id
+                  ? t('Could not restore this source. Try again.') : ''}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </section>}
       {!isLoading && !staleDevicePage && <KoboPairing devices={devices} enabled={!!me?.features?.kobo_sync}
         koreaderEnabled={!!me?.features?.koreader_sync} />}
       {undoDevice && <div className={styles.toast}>
         <span>{t('{name} removed.', { name: displayName(undoDevice) })}</span>
         <button ref={undoRef} type="button" disabled={restore.isPending || remove.isPending || preflightPending} onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>
-        <span role="alert" className={styles.undoError}>{restore.isError ? t('Could not restore this source. Try again.') : ''}</span>
+        <span role="alert" className={styles.undoError}>{restore.isError && restore.variables?.public_id === undoDevice.public_id ? t('Could not restore this source. Try again.') : ''}</span>
       </div>}
       {removing && <RemoveDialog device={removing.device} name={displayName(removing.device)} counts={removing.counts}
         onCancel={cancelRemoval} pending={remove.isPending} error={remove.isError}

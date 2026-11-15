@@ -56,6 +56,75 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.70',
+    date: '2026-11-15',
+    items: [
+      {
+        title: 'KOReader Library mode saves only what changed',
+        body: 'CWNGSync used to rewrite the record of every book in your library each time it saved, which could freeze a large library for a moment on the device. It now keeps records in small files and writes only the ones that changed. Update the plugin from KOReader\'s Updates Manager to get it.',
+        category: 'Sync',
+      },
+      {
+        title: 'A Kobo no longer undoes a newer place from another reader',
+        body: 'A Kobo that had been sent your newer place from the web reader or KOReader could send an older report it had queued, and the server took that as a move back. A report the Kobo made before it received the newer place now keeps the newer one.',
+        category: 'Sync',
+      },
+      {
+        title: 'Uploads work again with NETWORK_SHARE_MODE on',
+        body: 'With NETWORK_SHARE_MODE on and no ingest folder mounted, uploads failed with "Ingest directory not writable" after an update. The container now fixes that folder\'s owner on start when it is local and the app cannot write it. Folders on a network share are still left alone.',
+        category: 'Library',
+      },
+      {
+        title: 'Clearer sync logs',
+        body: '"No book found for checksum" now says which of three reasons caused the miss, and the "Session protection triggered" debug line is written once instead of on every request.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.69',
+    date: '2026-11-14',
+    items: [
+      {
+        title: 'Start a finished book over without marking it unread',
+        body: 'Choose "Clear reading position" in a book\'s More actions menu to remove your place in the web reader, on your Kobo and in KOReader at once. The book stays marked as read, so you can re-read it from the start.',
+        category: 'Reading',
+      },
+      {
+        title: 'Mark as unread now resets KOReader too',
+        body: 'A KOReader that had reported a place got that place handed straight back after you marked the book unread. Marking a book unread now also clears the place each KOReader and Kobo device saved for you.',
+        category: 'Sync',
+      },
+      {
+        title: 'Smart shelves load the rows you choose',
+        body: 'Smart shelves now ask for whole rows at a time, following the Library\'s "Rows per load" setting the same way the Library and regular shelves do.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Calibre\'s .fb2.zip exports upload again',
+        body: 'Uploading a .fb2.zip book from Calibre was refused as "File type not allowed". It is now accepted as FB2 in a zip (.fbz). In the Docker image, .docx, .odt and .flac uploads are also no longer refused when the file-content check is on.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Upload a book' },
+      },
+      {
+        title: 'Uploads without a built-in title get a sensible name',
+        body: 'A plain .txt, .docx, .rtf or untitled PDF you uploaded used to be titled with an internal name like "new 1 20261113 112627 Rig Doc". It is now titled from the file name you uploaded. Books already imported keep their titles, so edit them if needed.',
+        category: 'Library',
+      },
+      {
+        title: 'Libraries on NFSv4 shares can edit and import books',
+        body: 'Changing a book\'s author or title, or importing a book, failed with "[Errno 524]" on an NFSv4 share because the share refuses one of its own file attributes. Moves now rename the folder in place, and copies skip any attribute the destination refuses.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The translation banner counts the right strings',
+        body: 'The "strings still need translating" banner counted translated plural entries as missing and skipped fuzzy ones. It now matches what you actually see in English.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.68',
     date: '2026-11-13',
     items: [

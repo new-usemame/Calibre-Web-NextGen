@@ -34,8 +34,13 @@ test('#980 a shelf requests rows x columns books, in one first request', async (
       `/api/v1/shelves/${shelfId}/books/${books.items[0].id}`, { headers });
     expect(add.ok(), 'adding the book to the shelf should succeed').toBeTruthy();
 
-    await page.goto('/app');
     const openShelf = async (density: string, rows: string) => {
+      // Leave the previous shelf page before listening. A viewport change
+      // makes that page re-measure its grid and refetch for its own settings,
+      // and when the refetch lands after the listener is attached it was
+      // counted as a second first-page request (#2940: [12, 4] on the first
+      // phone pass, 12 = the previous dense 3-row request at 4 phone tracks).
+      await page.goto('/app');
       await page.evaluate(([d, r]) => {
         localStorage.setItem('cwng:catalog-density-v1', d);
         localStorage.setItem('cwng:catalog-rows-v1', r);

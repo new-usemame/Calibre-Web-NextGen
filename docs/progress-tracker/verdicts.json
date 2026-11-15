@@ -706,6 +706,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/147#issuecomment-4482187505",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#1495@2026-10-02T18:43:10Z": {
+  "hash": "10976962ad0fa3e2",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#1556@2026-08-13T14:50:50Z": {
   "hash": "3deff92f78a656a1",
   "verdict": "partial",
@@ -1467,6 +1474,13 @@
   "verdict": "partial",
   "quote": "JustRead and the web reader now sync with each other nicely. However, two things seem to be stopping places reaching the Kobo:",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6643117884",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2783@2026-11-12T11:18:06Z": {
+  "hash": "e2314eb411745e69",
+  "verdict": "partial",
+  "quote": "Thanks, this is nearly all working now. JustRead syncs both ways with the Kobo, and a Kobo that slept on the book no longer overwrites newer places. Web reader to Kobo is the one remaining problem.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6878347334",
   "by": "deepseek-v4.1-flash"
  },
  "issue#2797@2026-11-04T02:37:03Z": {

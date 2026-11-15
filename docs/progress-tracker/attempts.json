@@ -10493,14 +10493,15 @@
   "title": "Multi user book auto tagging based on filename or import folder",
   "person": "JamesHACS",
   "delivered_via": [
-   "PR #2420"
+   "PR #2420",
+   "closed"
   ],
   "outcome": "no_reply",
   "basis": "nothing heard",
   "quote": "",
   "evidence": "",
   "judged_by": "rule",
-  "id": "issue#1495@2026-10-02T18:43:10Z"
+  "id": "issue#1495@2026-11-14T11:21:49Z"
  },
  {
   "date": "2026-10-02",
@@ -12503,11 +12504,11 @@
    "PR #2911",
    "PR #2913"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
-  "quote": "",
-  "evidence": "",
-  "judged_by": "rule",
+  "outcome": "not_fixed",
+  "basis": "reply: partial",
+  "quote": "Thanks, this is nearly all working now. JustRead syncs both ways with the Kobo, and a Kobo that slept on the book no longer overwrites newer places. Web reader to Kobo is the one remaining problem.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783#issuecomment-6878347334",
+  "judged_by": "deepseek-v4.1-flash",
   "id": "issue#2783@2026-11-12T11:18:06Z"
  },
  {
@@ -12533,7 +12534,8 @@
   "person": "mstewart14",
   "delivered_via": [
    "PR #2901",
-   "PR #2930"
+   "PR #2930",
+   "closed"
   ],
   "outcome": "no_reply",
   "basis": "nothing heard",
@@ -12578,7 +12580,8 @@
   "title": "Uploading Calibre's .fb2.zip book exports fails: gate reads the name as \"zip\", .fbz has no registered MIME type",
   "person": "TovarischSuhov",
   "delivered_via": [
-   "PR #2919"
+   "PR #2919",
+   "closed"
   ],
   "outcome": "no_reply",
   "basis": "nothing heard",
@@ -12681,6 +12684,83 @@
  },
  {
   "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329",
+  "title": "[Bug report] CWNGSync koreader plugin Library mode locks device",
+  "person": "magdalar",
+  "delivered_via": [
+   "PR #2935"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2329@2026-11-14T14:10:47Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2783",
+  "title": "[bug] - CWNG no longer syncing with Justread",
+  "person": "lukerajah",
+  "delivered_via": [
+   "PR #2937"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2783@2026-11-14T16:20:49Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2882",
+  "title": "[bug] Session protection \"identifier mismatch\" DEBUG line is logged on every request after a browser update",
+  "person": "sgreadly",
+  "delivered_via": [
+   "PR #2932",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2882@2026-11-14T09:53:28Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2936",
+  "title": "[bug] Wrong user on /cwa-book-ingest",
+  "person": "zynexiz",
+  "delivered_via": [
+   "PR #2938",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2936@2026-11-14T17:58:00Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2883",
+  "title": "Log a session identifier mismatch once instead of on every request",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2883@2026-11-14T09:54:16Z"
+ },
+ {
+  "date": "2026-11-14",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2909",
   "title": "fix: translation banner no longer counts plural entries as missing",
   "person": "luochen1990",
@@ -12723,5 +12803,20 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2928@2026-11-14T05:31:59Z"
+ },
+ {
+  "date": "2026-11-14",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2933",
+  "title": "Fix/1190 checksum miss diagnostics",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2933@2026-11-14T12:22:12Z"
  }
 ]

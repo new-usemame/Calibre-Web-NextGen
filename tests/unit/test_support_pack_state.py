@@ -330,10 +330,69 @@ class TestInSupportPack:
                     assert SHARE_CANARY not in text and TITLE_CANARY not in text
             assert json.loads(zf.read("manifest.json"))["sanitized"] is sanitize
 
-    def test_resolver_failure_leaves_sections_unconfigured(self, built, monkeypatch):
-        monkeypatch.undo()  # drop the fixture's patches: real resolver, no app booted
-        paths = built._resolve_state_paths()
-        assert set(paths) == {"config", "library", "ingest", "app_db", "cwa_db", "metadata_db"}
+    @pytest.mark.parametrize("cwa_unavailable", [False, True])
+    def test_resolver_uses_current_paths_and_isolates_unavailable_roles(
+        self, built, monkeypatch, tmp_path, cwa_unavailable
+    ):
+        monkeypatch.undo()  # exercise the real resolver rather than the archive fixture's stub
+        from cps import constants, ub, cwa_db_loader
+
+        monkeypatch.setattr(ub, "app_DB_path", str(tmp_path / "config" / "app.db"))
+        monkeypatch.setattr(built, "config", SimpleNamespace(
+            config_calibre_dir=str(tmp_path / "metadata"), config_calibre_split=True,
+            config_calibre_split_dir=str(tmp_path / "network-books")))
+        monkeypatch.setattr(constants, "ingest_folder", lambda: str(tmp_path / "ingest"))
+        def cwa_module():
+            if cwa_unavailable:
+                raise RuntimeError("unavailable")
+            return SimpleNamespace(default_db_dir=lambda: str(tmp_path / "cwa"))
+        monkeypatch.setattr(cwa_db_loader, "load_cwa_db", cwa_module)
+        assert built._resolve_state_paths() == {
+            "config": str(tmp_path / "config"), "app_db": str(tmp_path / "config" / "app.db"),
+            "cwa_db": None if cwa_unavailable else str(tmp_path / "cwa" / "cwa.db"),
+            "library": str(tmp_path / "metadata"), "metadata_db": str(tmp_path / "metadata" / "metadata.db"),
+            "library_books": str(tmp_path / "network-books"), "ingest": str(tmp_path / "ingest"),
+        }
+        assert not (tmp_path / "cwa").exists()
+
+
+    def test_admin_http_download_is_private_and_preserves_access_control(self, built, metadata_db, monkeypatch):
+        from io import BytesIO
+        from cps import admin, usermanagement
+        from cps.cw_login import UserMixin
+        from tests.unit.api_basic_auth_world import build_api_app
+
+        class User(UserMixin):
+            def __init__(self, user_id):
+                self.id = user_id
+            def role_admin(self):
+                return self.id == "1"
+
+        users = SimpleNamespace(get=lambda model, user_id: User(str(user_id)))
+        app = build_api_app(users)
+        app.config["SESSION_PROTECTION"] = None
+        app.add_url_rule("/admin/debug/support-pack", view_func=admin.download_support_pack)
+        monkeypatch.setattr(built, "_known_usernames", lambda: [])
+        monkeypatch.setattr(usermanagement.config, "config_allow_reverse_proxy_header_login", False, raising=False)
+        monkeypatch.setenv("PUID", USER_CANARY)
+        with sqlite3.connect(metadata_db) as conn:
+            conn.execute("INSERT INTO data(book, format) VALUES (1, ?)", (TOKEN_CANARY,))
+        with app.test_client() as client:
+            assert client.get("/admin/debug/support-pack").status_code == 401
+            with client.session_transaction() as session:
+                session.update(_user_id="2", _random="test", _id="test-session")
+            assert client.get("/admin/debug/support-pack").status_code == 403
+            with client.session_transaction() as session:
+                session["_user_id"] = "1"
+            response = client.get("/admin/debug/support-pack")
+        assert response.status_code == 200
+        assert "attachment" in response.headers["Content-Disposition"]
+        with zipfile.ZipFile(BytesIO(response.data)) as archive:
+            assert json.loads(archive.read("manifest.json"))["sanitized"] is True
+            state = b"".join(archive.read(name) for name in archive.namelist() if name.startswith("state/"))
+            assert USER_CANARY.encode() not in state
+            assert TOKEN_CANARY.encode() not in state
+            assert json.loads(archive.read("state/databases.json"))["metadata_db"]["formats"]["other"] == 1
 
 
 @pytest.mark.unit
@@ -390,3 +449,42 @@ class TestStatePrivacy:
             "other": {"count": 2, "with_error": 1},
         }
         assert USER_CANARY not in json.dumps(out)
+
+
+@pytest.mark.unit
+class TestStateResilience:
+    def test_database_failure_does_not_drop_other_database_results(self, metadata_db, monkeypatch):
+        original = sps.collect_database
+        def collect(path, **kwargs):
+            if path == "unreadable.db":
+                raise PermissionError(f"/home/{USER_CANARY}/app.db")
+            return original(path, **kwargs)
+        monkeypatch.setattr(sps, "collect_database", collect)
+        out = sps.collect_databases({"app_db": "unreadable.db", "metadata_db": metadata_db})
+        assert out["app_db"] == {"error": "PermissionError"}
+        assert out["metadata_db"]["row_counts"]["books"] == 2
+        assert USER_CANARY not in json.dumps(out)
+
+    def test_scheduled_job_scan_has_a_time_budget(self, tmp_path):
+        path = tmp_path / "cwa.db"
+        with sqlite3.connect(path) as conn:
+            conn.execute("CREATE TABLE cwa_scheduled_jobs (state TEXT, last_error TEXT)")
+            conn.executemany("INSERT INTO cwa_scheduled_jobs VALUES ('scheduled', '')", [()] * 60_000)
+        assert sps._scheduled_send_state(str(path), budget_s=0) == {"timed_out": True}
+
+    def test_manifest_marks_nested_database_errors_as_unhealthy(self, tmp_path):
+        path = tmp_path / "corrupt.db"
+        path.write_text("not a database")
+        files = sps.collect_all({"app_db": str(path)}, sanitized=True,
+                                scheduler=SimpleNamespace(get_jobs=lambda: []), environ={})
+        sections = {item["file"]: item["ok"] for item in json.loads(files["manifest.json"])["sections"]}
+        assert sections["state/databases.json"] is False
+        assert sections["state/runtime.json"] is True
+
+
+    def test_hidden_ingest_entries_still_consume_the_scan_budget(self, tmp_path):
+        for i in range(8):
+            (tmp_path / f".hidden-{i}").write_text("x")
+        assert sps._count_ingest_entries(str(tmp_path), cap=5) == {
+            "exists": True, "entries": 0, "capped": True,
+        }

@@ -407,7 +407,7 @@ def _resolve_state_paths() -> dict:
     resolved is ``None`` and its section reports ``configured: false``
     rather than failing the whole pack.
     """
-    from . import constants, ub
+    from . import ub
 
     paths = {"config": None, "library": None, "ingest": None,
              "app_db": None, "cwa_db": None, "metadata_db": None}
@@ -473,8 +473,6 @@ def _build_debug_zip(sanitize: bool):
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
     state_files = support_pack_state.collect_all(_resolve_state_paths(), sanitized=sanitize)
-
-
     scrubber = None
     note = _SANITIZED_NOTE
     if sanitize:

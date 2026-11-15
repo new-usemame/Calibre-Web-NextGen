@@ -258,6 +258,21 @@ def _known_table_names() -> set:
     return names
 
 
+def _bounded_query(conn, budget_s):
+    """Bound scans and repeated short queries, including SQLite lock waits."""
+    deadline = time.monotonic() + budget_s
+    conn.set_progress_handler(lambda: int(time.monotonic() >= deadline), 10_000)
+
+    def execute(sql, parameters=()):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError
+        conn.execute(f"PRAGMA busy_timeout={min(2000, int(remaining * 1000))}")
+        return conn.execute(sql, parameters)
+
+    return execute
+
+
 def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bool = False) -> dict:
     """Health and size facts for one SQLite database, opened read-only.
 
@@ -276,18 +291,17 @@ def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bo
         entry.update(_error(ex))
         return entry
     try:
-        deadline = time.monotonic() + budget_s
-        conn.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 10_000)
-        entry["journal_mode"] = conn.execute("PRAGMA journal_mode").fetchone()[0]
-        entry["user_version"] = conn.execute("PRAGMA user_version").fetchone()[0]
-        entry["page_size"] = conn.execute("PRAGMA page_size").fetchone()[0]
-        entry["page_count"] = conn.execute("PRAGMA page_count").fetchone()[0]
+        query = _bounded_query(conn, budget_s)
+        entry["journal_mode"] = query("PRAGMA journal_mode").fetchone()[0]
+        entry["user_version"] = query("PRAGMA user_version").fetchone()[0]
+        entry["page_size"] = query("PRAGMA page_size").fetchone()[0]
+        entry["page_count"] = query("PRAGMA page_count").fetchone()[0]
         # quick_check, not integrity_check: it skips the index/content
         # cross-checks that make integrity_check slow on a large library.
-        result = conn.execute("PRAGMA quick_check(1)").fetchone()
+        result = query("PRAGMA quick_check(1)").fetchone()
         entry["quick_check"] = "ok" if result and result[0] == "ok" else "failed"
         tables = [
-            r[0] for r in conn.execute(
+            r[0] for r in query(
                 "SELECT name FROM sqlite_master WHERE type='table' "
                 "AND name NOT LIKE 'sqlite_%' ORDER BY name"
             )
@@ -303,7 +317,7 @@ def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bo
                 continue
             quoted = '"' + table.replace('"', '""') + '"'
             try:
-                counts[table] = conn.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()[0]
+                counts[table] = query(f"SELECT COUNT(*) FROM {quoted}").fetchone()[0]
             except sqlite3.OperationalError as ex:
                 if "interrupt" in str(ex).lower():
                     raise
@@ -313,15 +327,20 @@ def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bo
         entry["row_counts"] = counts
         if formats and "data" in counts:
             from . import constants
-            allowed = sorted({fmt.upper() for fmt in constants.EXTENSIONS_UPLOAD})
+            allowed = sorted({fmt.upper() for fmt in (
+                set(constants.EXTENSIONS_UPLOAD) | set(constants.EXTENSIONS_CONVERT_FROM)
+                | set(constants.EXTENSIONS_CONVERT_TO) | constants.EXTENSIONS_AUDIO
+            )})
             placeholders = ",".join("?" for _ in allowed)
-            rows = conn.execute(
+            rows = query(
                 f"SELECT CASE WHEN UPPER(format) IN ({placeholders}) "
                 "THEN UPPER(format) ELSE 'other' END AS safe_format, COUNT(*) "
                 "FROM data GROUP BY safe_format ORDER BY 2 DESC LIMIT ?",
                 (*allowed, MAX_FORMATS_LISTED),
             ).fetchall()
             entry["formats"] = dict(rows)
+    except TimeoutError:
+        entry["timed_out"] = True
     except sqlite3.OperationalError as ex:
         if "interrupt" in str(ex).lower():
             entry["timed_out"] = True
@@ -337,7 +356,10 @@ def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bo
 def collect_databases(paths: dict) -> dict:
     out = {}
     for name, path in paths.items():
-        out[name] = collect_database(path, formats=(name == "metadata_db"))
+        try:
+            out[name] = collect_database(path, formats=(name == "metadata_db"))
+        except Exception as ex:  # pylint: disable=broad-except
+            out[name] = _error(ex)
     return out
 
 
@@ -353,11 +375,10 @@ def _count_ingest_entries(path, cap: int) -> dict:
         return {"exists": False}
     count = 0
     with os.scandir(path) as it:
-        for entry in it:
-            if entry.name.startswith("."):
-                continue
-            count += 1
-            if count >= cap:
+        for inspected, entry in enumerate(it, 1):
+            if not entry.name.startswith("."):
+                count += 1
+            if inspected >= cap:
                 return {"exists": True, "entries": count, "capped": True}
     return {"exists": True, "entries": count, "capped": False}
 
@@ -392,7 +413,7 @@ def collect_background(cwa_db_path, ingest_path, scheduler=None, ingest_cap: int
     return out
 
 
-def _scheduled_send_state(cwa_db_path) -> dict:
+def _scheduled_send_state(cwa_db_path, budget_s=DB_TIME_BUDGET_SECONDS) -> dict:
     """Counts of ``cwa_scheduled_jobs`` by state, no users, titles or ids."""
     if not cwa_db_path or not os.path.isfile(cwa_db_path):
         return {"exists": False}
@@ -401,7 +422,8 @@ def _scheduled_send_state(cwa_db_path) -> dict:
     except Exception as ex:  # pylint: disable=broad-except
         return _error(ex)
     try:
-        rows = conn.execute(
+        query = _bounded_query(conn, budget_s)
+        rows = query(
             "SELECT CASE WHEN state IN ('scheduled', 'dispatched', 'cancelled') "
             "THEN state ELSE 'other' END AS safe_state, COUNT(*), "
             "SUM(CASE WHEN COALESCE(last_error, '') != '' THEN 1 ELSE 0 END) "
@@ -411,6 +433,10 @@ def _scheduled_send_state(cwa_db_path) -> dict:
             "exists": True,
             "by_state": {str(s): {"count": n, "with_error": int(e or 0)} for s, n, e in rows},
         }
+    except TimeoutError:
+        return {"timed_out": True}
+    except sqlite3.OperationalError as ex:
+        return {"timed_out": True} if "interrupt" in str(ex).lower() else _error(ex)
     except Exception as ex:  # pylint: disable=broad-except
         return _error(ex)
     finally:
@@ -427,6 +453,20 @@ def _encode(section: dict) -> tuple:
         marker = {"truncated": True, "original_bytes": len(data)}
         return json.dumps(marker, sort_keys=True, indent=2).encode("utf-8"), True
     return data, False
+
+
+def _section_ok(value) -> bool:
+    """Include nested failures in the manifest's per-section status."""
+    if isinstance(value, dict):
+        if ("error" in value or value.get("timed_out") or value.get("truncated")
+                or value.get("quick_check") == "failed"):
+            return False
+        if "row_counts" in value and any(count is None for count in value["row_counts"].values()):
+            return False
+        return all(_section_ok(item) for item in value.values())
+    if isinstance(value, list):
+        return all(_section_ok(item) for item in value)
+    return True
 
 
 def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, environ=None) -> dict:
@@ -465,7 +505,7 @@ def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, envir
         files[filename] = data
         manifest_sections.append({
             "file": filename,
-            "ok": "error" not in section and not truncated,
+            "ok": _section_ok(section) and not truncated,
             "bytes": len(data),
         })
 

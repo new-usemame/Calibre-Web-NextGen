@@ -14,7 +14,7 @@ of their existing transaction boundaries.
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, case, false, or_, select, update
+from sqlalchemy import and_, case, false, func, not_, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from .. import ub
@@ -27,7 +27,7 @@ def _now():
 def rehydrate_request_cutoff():
     """Return the server clock fence for one sync request.
 
-    A latch whose ``server_modified_at`` is at or beyond this fence was armed
+    A latch whose ``rehydrate_armed_at`` is at or beyond this fence was armed
     during the current request.  It cannot be consumed until a later request,
     after the device has had a chance to apply the entitlement/download that
     may reset its local position.
@@ -205,6 +205,8 @@ def advance_kobo_bookmark(
     location_type=None,
     location_value=None,
     location_supplied=False,
+    clear_location_proof=False,
+    converted_span_identity=None,
     incoming_clock=None,
     clock_accepts=False,
     equal_accepts=False,
@@ -235,6 +237,35 @@ def advance_kobo_bookmark(
             "location_type": location_type,
             "location_value": location_value,
         })
+        if clear_location_proof:
+            # A legacy native writer has no current-file sender proof. Drop
+            # the previous conversion's proof in the same accepted SQL write.
+            values.update(shared_from_koreader=False, span_kepub_identity=None)
+        elif converted_span_identity is not None:
+            # The Location is another reader's place converted into the
+            # library KEPUB (#2783, an unidentified KOSync app). Carry the
+            # same proof a checked writer's conversion does, so the place
+            # gate sends it only to a Kobo holding that KEPUB, and keep the
+            # Kobo's last native Location for a Kobo that has no own report
+            # (as ``kobo_place_gate.write_shared_bookmark`` does). The SET
+            # right-hand sides read the row as it was before this UPDATE.
+            mark = ub.KoboBookmark
+            native = not_(func.coalesce(mark.shared_from_koreader, False))
+            values.update(
+                shared_from_koreader=True,
+                span_kepub_identity=converted_span_identity,
+                native_location_value=case(
+                    (native, mark.location_value), else_=mark.native_location_value),
+                native_location_source=case(
+                    (native, mark.location_source), else_=mark.native_location_source),
+                native_location_type=case(
+                    (native, mark.location_type), else_=mark.native_location_type),
+                native_progress_percent=case(
+                    (native, mark.progress_percent), else_=mark.native_progress_percent),
+                native_content_source_progress_percent=case(
+                    (native, mark.content_source_progress_percent),
+                    else_=mark.native_content_source_progress_percent),
+            )
     if incoming_percentage is not None and incoming_percentage > 0:
         values["created_at"] = case(
             (ub.KoboBookmark.created_at.is_(None), write_clock or now),
@@ -370,6 +401,7 @@ def mark_rehydrate_needed(device_id, book_ids, *, session=None):
             "device_id": int(device_id),
             "book_id": book_id,
             "server_modified_at": now,
+            "rehydrate_armed_at": now,
             "rehydrate_needed": True,
         }
         for book_id in normalized
@@ -378,7 +410,7 @@ def mark_rehydrate_needed(device_id, book_ids, *, session=None):
     s.execute(statement.on_conflict_do_update(
         index_elements=["device_id", "book_id"],
         set_={
-            "server_modified_at": statement.excluded.server_modified_at,
+            "rehydrate_armed_at": statement.excluded.rehydrate_armed_at,
             "rehydrate_needed": True,
         },
     ))
@@ -395,7 +427,7 @@ def mark_existing_positions_for_rehydrate(device_id, *, session=None):
     ).update(
         {
             ub.DeviceReadingPosition.rehydrate_needed: True,
-            ub.DeviceReadingPosition.server_modified_at: _now(),
+            ub.DeviceReadingPosition.rehydrate_armed_at: _now(),
         },
         synchronize_session=False,
     )

@@ -137,6 +137,7 @@ def _install_common_web_stubs():
             "abort": lambda code: (_ for _ in ()).throw(RuntimeError(code)),
             "Response": lambda body=None, **kwargs: body,
             "jsonify": lambda *args, **kwargs: {"args": args, "kwargs": kwargs},
+            "copy_current_request_context": lambda func: func,
         },
     )
     _install_stub(
@@ -149,6 +150,27 @@ def _install_common_web_stubs():
     )
     _install_stub("werkzeug")
     _install_stub("werkzeug.utils", {"secure_filename": lambda value: value})
+
+
+# Calls into the duplicate index made while a book is deleted. A full rebuild
+# (get_duplicate_groups_from_index with no candidates) reloads every duplicate
+# group in the library inside the request; on a large library that blocked the
+# HTTP worker (#2751).
+_index_calls = []
+_merge_raises = []
+
+
+def _record_full_rebuild(settings, include_dismissed=False, **kwargs):
+    _index_calls.append(("full-rebuild", kwargs.get("candidate_book_ids")))
+    return []
+
+
+def _record_incremental_merge(candidate_book_ids, settings, preserve_pending=False):
+    assert preserve_pending is True, "a delete must not clear a pending full scan"
+    _index_calls.append(("merge", sorted(candidate_book_ids)))
+    if _merge_raises:
+        raise RuntimeError("merge failed")
+    return {"updated": True, "pending": False, "merged_count": 0}
 
 
 def _load_editbooks_module(delete_key_calls):
@@ -173,13 +195,13 @@ def _load_editbooks_module(delete_key_calls):
     calibre_db = _install_stub(
         "cps.calibre_db",
         {
-            "get_filtered_book": lambda book_id, **kwargs: SimpleNamespace(id=book_id),
+            "get_filtered_book": lambda book_id, **kwargs: SimpleNamespace(id=book_id, path="Author/Title (%s)" % book_id),
             "session": _Session(calls),
         },
     )
     data_cls = SimpleNamespace(book=_Field(), format=_Field())
     db = _install_stub("cps.db", {"Data": data_cls})
-    current_user = SimpleNamespace(role_delete_books=lambda: True)
+    current_user = SimpleNamespace(role_delete_books=lambda: True, role_edit=lambda: True, id=1)
 
     cps.logger = logger
     cps.helper = helper
@@ -215,6 +237,11 @@ def _load_editbooks_module(delete_key_calls):
         yield
 
     _install_stub("cps.services.calibre_db_lock", {"metadata_db_write_lock": _noop_lock})
+    _install_stub("cps.services.parallel")
+    _install_stub("cps.services.kepub_package_normalizer", {"normalize_kepub_package": lambda *a, **k: None})
+    _install_stub("cps.services.pubdate_parse", {"parse_partial_pubdate": lambda value: value})
+    _install_stub("cps.config_sql", {"uploads_enabled": lambda: True})
+    _install_stub("cps.sqlite_utils", {"network_share_mode_enabled": lambda: False})
     _install_stub("cps.tasks")
     _install_stub("cps.tasks.upload", {"TaskUpload": object})
     _install_stub("cps.render_template", {"render_title_template": lambda *args, **kwargs: ""})
@@ -232,7 +259,8 @@ def _load_editbooks_module(delete_key_calls):
         "cps.duplicate_index",
         {
             "delete_book_keys": lambda ids: delete_key_calls.append(list(ids)),
-            "get_duplicate_groups_from_index": lambda settings, include_dismissed=False: [],
+            "get_duplicate_groups_from_index": _record_full_rebuild,
+            "merge_affected_groups_into_cache": _record_incremental_merge,
             "_current_max_book_id": lambda: 1,
         },
     )
@@ -363,8 +391,9 @@ def _load_duplicates_module(delete_key_calls, *, user_data_commit_result=True):
     return module, calibre_books, calls
 
 
-def test_delete_book_from_table_whole_book_deletes_duplicate_keys_and_refreshes_cache():
+def test_delete_book_from_table_whole_book_refreshes_only_the_affected_groups():
     _CwaDB.instances = []
+    _index_calls[:] = []
     delete_key_calls = []
     module, calls = _load_editbooks_module(delete_key_calls)
 
@@ -373,13 +402,73 @@ def test_delete_book_from_table_whole_book_deletes_duplicate_keys_and_refreshes_
     assert result == "deleted"
     assert ("whole", 12) in calls
     assert "commit" in calls
-    assert delete_key_calls == [[12]]
-    assert _CwaDB.instances[-1].cache_updates == [([], 0, 1)]
-    assert _CwaDB.instances[-1].invalidated is False
+    # The incremental merge drops the book's keys itself, after it has read
+    # which groups the book belonged to; nothing reloads the whole library.
+    assert _index_calls == [("merge", [12])]
+    assert all(instance.cache_updates == [] for instance in _CwaDB.instances)
+    assert all(instance.invalidated is False for instance in _CwaDB.instances)
+
+
+def test_delete_book_from_table_marks_cache_stale_when_the_incremental_merge_fails():
+    _CwaDB.instances = []
+    _index_calls[:] = []
+    _merge_raises[:] = [True]
+    delete_key_calls = []
+    try:
+        module, calls = _load_editbooks_module(delete_key_calls)
+        result = module.delete_book_from_table(12, "", True)
+    finally:
+        _merge_raises[:] = []
+
+    assert result == "deleted"
+    assert ("whole", 12) in calls
+    assert [name for name, _ in _index_calls] == ["merge"]
+    assert any(instance.invalidated for instance in _CwaDB.instances)
+
+
+def test_batched_delete_leaves_the_duplicate_index_to_the_batch_refresh():
+    _CwaDB.instances = []
+    _index_calls[:] = []
+    delete_key_calls = []
+    module, calls = _load_editbooks_module(delete_key_calls)
+
+    result = module.delete_book_from_table(12, "", True, skip_cache_invalidation=True)
+
+    assert result == "deleted"
+    assert ("whole", 12) in calls
+    # Keys stay until the batch merge, which needs them to find the deleted
+    # book's surviving group members.
+    assert _index_calls == []
+    assert delete_key_calls == []
+    assert all(instance.cache_updates == [] for instance in _CwaDB.instances)
+    assert all(instance.invalidated is False for instance in _CwaDB.instances)
+
+
+def test_bulk_delete_refreshes_the_cache_once_for_the_whole_selection():
+    _CwaDB.instances = []
+    _index_calls[:] = []
+    delete_key_calls = []
+    module, calls = _load_editbooks_module(delete_key_calls)
+    queued = []
+    module.request = SimpleNamespace(get_json=lambda: {"selections": [3, 4, 5]})
+    module._queue_duplicate_scan_after_change = lambda book_ids=None: queued.append(list(book_ids))
+
+    module.delete_selected_books()
+
+    assert [call for call in calls if isinstance(call, tuple) and call[0] == "whole"] == [
+        ("whole", 3), ("whole", 4), ("whole", 5)
+    ]
+    # One incremental merge after all the deletes, never one per book. It runs
+    # here rather than only in the queued scan, which is skipped unless the
+    # scan frequency is after_import.
+    assert _index_calls == [("merge", [3, 4, 5])]
+    assert delete_key_calls == []
+    assert queued == [[3, 4, 5]]
 
 
 def test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates_cache():
     _CwaDB.instances = []
+    _index_calls[:] = []
     delete_key_calls = []
     module, calls = _load_editbooks_module(delete_key_calls)
 
@@ -389,6 +478,7 @@ def test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates
     assert "format-delete" in calls
     assert "commit" in calls
     assert delete_key_calls == []
+    assert _index_calls == []
     assert _CwaDB.instances[-1].invalidated is True
 
 

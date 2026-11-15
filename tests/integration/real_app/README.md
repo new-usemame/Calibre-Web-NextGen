@@ -23,7 +23,7 @@ the conditional Kobo blueprints exist (section 5).
    `real_app.test_client()`; cases that need the Kobo blueprints request
    `kobo_real_app` instead and live in their own module (section 5), because
    `cps` refuses a second boot in one interpreter. The `cases.py` child has
-   five tests; its outer process has two tests. Neither case module matches
+   six tests; its outer process has two tests. Neither case module matches
    automatic discovery: each is named explicitly by its outer module.
 
 2. **Blueprint requests — OBSERVED; parity — UNVERIFIED.** `cases.py:88`

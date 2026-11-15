@@ -121,18 +121,18 @@ local function pairingShown()
 end
 
 local function testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
-    reset({ "https://10.0.30.36:8083" })
+    reset({ "https://192.0.2.36:8083" })
     local plugin = newPlugin()
-    typed = "10.0.30.36:8083"
+    typed = "192.0.2.36:8083"
     plugin:startPairing()
     press(dialogs[#dialogs], "Continue")
-    assertEqual(table.concat(asked, ", "), "pair http://10.0.30.36:8083, pair https://10.0.30.36:8083",
+    assertEqual(table.concat(asked, ", "), "pair http://192.0.2.36:8083, pair https://192.0.2.36:8083",
         "http is tried first, then https")
     assert(pairingShown(), "the code is shown")
     assertEqual(pairingShown().code, "ABCD-1234", "the https server's code")
     -- A browser adds http:// to an address typed without one, and this server
     -- refuses http: the address to type must say https.
-    assertEqual(pairingShown().address, "https://10.0.30.36:8083/pair", "the address to open says https")
+    assertEqual(pairingShown().address, "https://192.0.2.36:8083/pair", "the address to open says https")
     pairingShown().on_cancel() -- one pairing at a time
 end
 
@@ -140,9 +140,9 @@ local function testAPlainHttpServerThatFailsSaysWhy()
     -- Seen on a Kindle: a slow http server timed out, the https attempt then
     -- met a port that speaks no TLS, and the reader was told "wantread".
     reset({})
-    failing["http://10.0.20.139:18086"] = "timeout"
-    failing["https://10.0.20.139:18086"] = "wantread"
-    typed = "10.0.20.139:18086"
+    failing["http://198.51.100.139:18086"] = "timeout"
+    failing["https://198.51.100.139:18086"] = "wantread"
+    typed = "198.51.100.139:18086"
     newPlugin():startPairing()
     press(dialogs[#dialogs], "Continue")
     assertEqual(#asked, 2, "http, then https")
@@ -182,7 +182,7 @@ end
 local function testASlowServerIsWaitedOutWhileTheCodeLives()
     -- Seen on a Kindle: a loaded server answered a dozen polls too slowly, the
     -- device gave up with "Lost contact", and the approval arrived for nobody.
-    reset({ "http://10.0.20.139:18086" })
+    reset({ "http://198.51.100.139:18086" })
     scheduled = {}
     polls = {}
     for _ = 1, 30 do polls[#polls + 1] = { false, nil, "timeout" } end
@@ -191,7 +191,7 @@ local function testASlowServerIsWaitedOutWhileTheCodeLives()
     local plugin = newPlugin()
     local connected
     function plugin:connectWith(credentials) connected = credentials end
-    typed = "10.0.20.139:18086"
+    typed = "198.51.100.139:18086"
     plugin:startPairing()
     press(dialogs[#dialogs], "Continue")
     local delays = runPolls()
@@ -200,12 +200,12 @@ local function testASlowServerIsWaitedOutWhileTheCodeLives()
 end
 
 local function testAServerThatNeverAnswersIsReportedWhenTheCodeRunsOut()
-    reset({ "http://10.0.20.139:18086" })
+    reset({ "http://198.51.100.139:18086" })
     scheduled = {}
     polls = {}
     local plugin = newPlugin()
     function plugin:connectWith() error("nothing was approved") end
-    typed = "10.0.20.139:18086"
+    typed = "198.51.100.139:18086"
     plugin:startPairing()
     press(dialogs[#dialogs], "Continue")
     local delays = runPolls()
@@ -230,25 +230,25 @@ testAServerThatNeverAnswersIsReportedWhenTheCodeRunsOut()
 end
 
 local function testAnAddressTypedWithASchemeIsTakenAtItsWord()
-    reset({ "https://10.0.30.36:8083" })
-    typed = "http://10.0.30.36:8083"
+    reset({ "https://192.0.2.36:8083" })
+    typed = "http://192.0.2.36:8083"
     newPlugin():startPairing()
     press(dialogs[#dialogs], "Continue")
-    assertEqual(table.concat(asked, ", "), "pair http://10.0.30.36:8083", "no other scheme is tried")
+    assertEqual(table.concat(asked, ", "), "pair http://192.0.2.36:8083", "no other scheme is tried")
     assertEqual(pairingShown(), nil, "no code")
 end
 
 local function testAFailedAddressIsOfferedAgainWithoutTheGuessedScheme()
     reset({})
     local plugin = newPlugin()
-    typed = "10.0.30.36:8083"
+    typed = "192.0.2.36:8083"
     plugin:startPairing()
     press(dialogs[#dialogs], "Continue")
     assertEqual(#asked, 2, "both schemes are tried")
-    assert(tostring(shown[#shown].text):find("10.0.30.36:8083", 1, true), "the failure names the address")
+    assert(tostring(shown[#shown].text):find("192.0.2.36:8083", 1, true), "the failure names the address")
     -- Offered back as typed, the next try still tries both.
     plugin:startPairing()
-    assertEqual(dialogs[#dialogs].input, "10.0.30.36:8083", "offered as it was typed")
+    assertEqual(dialogs[#dialogs].input, "192.0.2.36:8083", "offered as it was typed")
     reset({})
     plugin.settings.server = "https://books.example.com"
     plugin:startPairing()
@@ -256,15 +256,31 @@ local function testAFailedAddressIsOfferedAgainWithoutTheGuessedScheme()
 end
 
 local function testSigningInFindsAnHttpsOnlyServerToo()
-    reset({ "https://10.0.30.36:8083" })
+    reset({ "https://192.0.2.36:8083" })
     local plugin = newPlugin()
-    typed = "10.0.30.36:8083"
+    typed = "192.0.2.36:8083"
     plugin:showConnectChoices()
     press(dialogs[#dialogs], "Sign in with username and password")
     press(dialogs[#dialogs], "Continue")
-    assertEqual(table.concat(asked, ", "), "sign in http://10.0.30.36:8083, sign in https://10.0.30.36:8083",
+    assertEqual(table.concat(asked, ", "), "sign in http://192.0.2.36:8083, sign in https://192.0.2.36:8083",
         "http is tried first, then https")
-    assertEqual(plugin.settings.server, "https://10.0.30.36:8083", "and the address that worked is kept")
+    assertEqual(plugin.settings.server, "https://192.0.2.36:8083", "and the address that worked is kept")
+end
+
+local function testTheFirstLibraryFillWaitsLikeSyncNow()
+    -- #2329: automatic syncs give up after a few seconds a request. The fill
+    -- that starts right after connecting is the one the reader is watching,
+    -- so it must not be taken for one.
+    reset({ "https://192.0.2.36:8083" })
+    local plugin = newPlugin()
+    local opts
+    function plugin:syncLibrary(o) opts = o end
+    typed = "192.0.2.36:8083"
+    plugin:showConnectChoices()
+    press(dialogs[#dialogs], "Sign in with username and password")
+    press(dialogs[#dialogs], "Continue")
+    assert(opts, "connecting starts the library sync")
+    assertEqual(opts.after_setup, true, "as the first fill, with the long limits")
 end
 
 local function testAPasswordRefusedOverHttpIsNotSentAgain()
@@ -316,6 +332,7 @@ local function testTurningTheLibraryOffGivesTheReaderTheirHomeBack()
 end
 
 testTurningTheLibraryOffGivesTheReaderTheirHomeBack()
+testTheFirstLibraryFillWaitsLikeSyncNow()
 testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
 testAPlainHttpServerIsAskedOnce()
 testAPlainHttpServerThatFailsSaysWhy()

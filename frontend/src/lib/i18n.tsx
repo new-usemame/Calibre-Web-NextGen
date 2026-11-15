@@ -8,6 +8,7 @@
  *   - a string not yet in the catalog falls back to its English source key.
  * No missing-key placeholders, ever. See notes/FRONTEND-REBUILD-DESIGN.md §10.
  */
+import { browserLocale } from './locale.ts';
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
@@ -49,7 +50,7 @@ export function I18nProvider({ locale, children }: { locale: string; children: R
   // so screen readers use the right pronunciation rules. Normalize e.g. "de_DE"
   // (server form) to the BCP-47 "de-DE" the lang attribute expects.
   useEffect(() => {
-    document.documentElement.lang = (locale || 'en').replace('_', '-');
+    document.documentElement.lang = browserLocale(locale) || 'en';
   }, [locale]);
 
   const { data, isFetched } = useQuery({

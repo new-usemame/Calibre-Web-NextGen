@@ -1,0 +1,14 @@
+{
+  "area": "logging",
+  "body": "Source/native review of proposed #2451 b035 retains lower nonblocking contrivances: reused shared metadata or a stale in-flight stdout handler, combined with unusual descriptor reassignment, can repeat a record. Normal stdout-object/target changes, aliases, rollover and settings reload have separate passing evidence; arbitrary descriptor rebinding has no guarantee. No repository os.fork/dictConfig/fileConfig path was found by the review.\n\nInvestigate actual descriptor/object lifetime before changing sink reuse. Preserve rotating-writer identity and coherent handler-list replacement. The availability fallback also requires the original shared descriptor to stay usable; unlinking its inode or losing all writable sinks is outside the retention promise. These are proposed-source/native observations, not a reproduced household or installed application failure.",
+  "created": "2026-10-04",
+  "id": "F-4bd5cf",
+  "refs": [
+    "#2451",
+    "#1613"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Unusual stdout descriptor reassignment can evade shared-log sink provenance"
+}

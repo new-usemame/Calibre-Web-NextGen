@@ -53,7 +53,7 @@ merged hours ago. Corrected in the same commit as this file.
 
 The brief's done condition required evidence "on the dev container via CARE". CARE's deploy was
 confirmed by merge-base only (code is in the build); behaviour on the canary was never exercised.
-Now OBSERVED, read-only, over an SSH tunnel to teenyverse (`127.0.0.1:18083`, container
+Now OBSERVED, read-only, over an SSH tunnel to the household host (`127.0.0.1:18083`, container
 `calibre-web`).
 
 **Two instrument failures were caught before they became findings — both by controls:**

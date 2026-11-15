@@ -13,7 +13,7 @@ author/category/series *letter* endpoints were missing from the detail map
 entirely, so they fell back to the bare instance name.
 
 Now letter feeds render "Alphabetical Books (U)", by-id feeds render
-"Categories: Fantasy" / "Ratings: 4.5 Stars" / locale-aware
+"Tags: Fantasy" / "Ratings: 4.5 Stars" / locale-aware
 "Languages: German", and the three missing letter endpoints inherit their
 parents. The "00" pseudo-letter (the "All" listing) keeps the bare parent
 title, and an unknown entity id degrades to the parent title rather than
@@ -73,7 +73,7 @@ def _set_endpoint(endpoint):
     [
         ("opds.feed_letter_books", "U", "Alphabetical Books (U)"),
         ("opds.feed_letter_author", "V", "Authors (V)"),
-        ("opds.feed_letter_category", "F", "Categories (F)"),
+        ("opds.feed_letter_category", "F", "Tags (F)"),
         ("opds.feed_letter_series", "D", "Series (D)"),
         # the "00" pseudo-letter is the unfiltered "All" listing
         ("opds.feed_letter_books", "00", "Alphabetical Books"),
@@ -89,7 +89,7 @@ def test_letter_feeds_carry_their_letter(opds_module, babel_request_ctx, endpoin
     "endpoint,expected",
     [
         ("opds.feed_letter_author", "Authors"),
-        ("opds.feed_letter_category", "Categories"),
+        ("opds.feed_letter_category", "Tags"),
         ("opds.feed_letter_series", "Series"),
     ],
 )
@@ -105,11 +105,11 @@ def test_previously_unmapped_letter_endpoints_inherit_parent(opds_module, babel_
 @pytest.mark.parametrize(
     "endpoint,name,expected",
     [
-        ("opds.feed_category", "Fantasy", "Categories: Fantasy"),
+        ("opds.feed_category", "Fantasy", "Tags: Fantasy"),
         ("opds.feed_author", "Jane Austen", "Authors: Jane Austen"),
         ("opds.feed_format", "EPUB", "File formats: EPUB"),
         # unknown entity (deleted / foreign id) keeps the parent title
-        ("opds.feed_category", None, "Categories"),
+        ("opds.feed_category", None, "Tags"),
         ("opds.feed_series", "  ", "Series"),
     ],
 )

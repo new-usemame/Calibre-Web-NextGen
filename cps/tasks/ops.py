@@ -57,6 +57,10 @@ class TaskConvertLibraryRun(CalibreTask):
             try:
                 with open(self.log_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
+                if ("NextGen Convert Library Service - Run Failed:" in content
+                        or "NextGen Convert Library Service - Run Cancelled:" in content):
+                    self._handleError("Convert Library could not complete. Check its log and retry after maintenance.")
+                    return
                 # finished?
                 if self._finished_marker in content:
                     self._handleSuccess()

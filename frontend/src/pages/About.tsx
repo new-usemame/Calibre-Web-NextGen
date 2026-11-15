@@ -27,7 +27,7 @@ export function About() {
     { label: t('Books'), value: data.counts.books, icon: BookOpen },
     { label: t('Authors'), value: data.counts.authors, icon: Users },
     { label: t('Series'), value: data.counts.series, icon: Layers },
-    { label: t('Categories'), value: data.counts.categories, icon: Tag },
+    { label: t('Tags'), value: data.counts.categories, icon: Tag },
   ];
 
   return (

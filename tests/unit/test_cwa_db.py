@@ -76,6 +76,14 @@ class TestCWADBSettings:
         expected_keys = ['auto_backup_imports', 'auto_convert', 'auto_convert_target_format']
         for key in expected_keys:
             assert key in settings, f"Missing expected setting: {key}"
+
+    def test_folder_label_defaults_and_custom_lookup_remain_scalar(self, temp_cwa_db):
+        settings = temp_cwa_db.get_cwa_settings()
+        assert settings['auto_ingest_folder_label_target'] == 'disabled'
+        assert settings['auto_ingest_folder_label_nested'] is False
+
+        temp_cwa_db.update_cwa_settings({'auto_ingest_folder_label_target': '#owner,edition'})
+        assert temp_cwa_db.get_cwa_settings()['auto_ingest_folder_label_target'] == '#owner,edition'
     
     def test_can_update_setting(self, temp_cwa_db):
         """Test updating a setting"""

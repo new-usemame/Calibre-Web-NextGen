@@ -12,6 +12,14 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 @pytest.fixture
 def session():
     from cps import ub
@@ -398,7 +406,7 @@ def test_soft_delete_preserves_origin_clears_assignment_and_restore_round_trips(
     from cps import ub
     from cps.annotations import (device_annotation_counts, restore_annotation_device,
                                  soft_delete_annotation_device)
-    device = _device(session, label="Maggie's Libra")
+    device = _device(session, label="the household reader's device")
     annotation = _annotation(session, "a-1", origin=device.id, assigned=device.id)
     session.add(ub.AnnotationDeviceState(annotation_id=annotation.id, device_id=device.id,
                                          desired=True, delivery_status="acknowledged"))
@@ -412,10 +420,10 @@ def test_soft_delete_preserves_origin_clears_assignment_and_restore_round_trips(
     session.refresh(annotation)
     assert counts == preflight
     assert deleted.active is False
-    assert deleted.display_name == "Maggie's Libra"
+    assert deleted.display_name == "the household reader's device"
     assert annotation.origin_device_id == device.id
     assert annotation.assigned_device_id is None
-    assert session.query(ub.Device).filter_by(id=annotation.origin_device_id).one().display_name == "Maggie's Libra"
+    assert session.query(ub.Device).filter_by(id=annotation.origin_device_id).one().display_name == "the household reader's device"
 
     restored, restored_count, conflicts = restore_annotation_device(
         device.public_id, user_id=7, session=session, commit=session.commit,

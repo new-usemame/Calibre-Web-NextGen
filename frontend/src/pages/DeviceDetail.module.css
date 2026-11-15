@@ -150,3 +150,4 @@
   .positionActions a { width: 100%; justify-content: center; }
   .pagination { justify-content: space-between; }
 }
+.sleepScreenAction { min-height: 44px; padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); color: var(--accent-text); background: var(--accent-soft); border: 1px solid var(--border); border-radius: var(--r-md); }

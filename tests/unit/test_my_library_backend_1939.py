@@ -1273,7 +1273,6 @@ def test_successful_upload_is_added_only_to_personal_uploader(
 
     processor = object.__new__(ingest_processor.NewBookProcessor)
     processor.last_added_book_ids = [41]
-    processor.last_added_ids_are_fallback = False
     processor.original_filename = "uploaded.epub"
     processor.uploader_user_id = 1
     processor.uploader_was_personal_library = True
@@ -2254,6 +2253,24 @@ def test_user_specific_catalog_responses_are_private_and_vary(monkeypatch):
     assert response.headers["Cache-Control"] == "private, no-store"
     vary = {value.strip() for value in response.headers["Vary"].split(",")}
     assert vary == {"Cookie", "Authorization", "X-Remote-User"}
+
+
+@pytest.mark.parametrize("declared", [
+    "public, max-age=600",
+    "max-age=600",
+    "no-cache",
+    "private, public, max-age=600",
+])
+def test_user_specific_responses_never_keep_a_shareable_policy(declared):
+    """Only a policy that is already ``private`` survives the hook (#2386)."""
+    from flask import Response, g
+    import cps
+
+    with cps.app.test_request_context("/api/v1/books"):
+        g._common_filters_user_specific = True
+        response = cps.protect_user_specific_catalog_responses(
+            Response("ok", headers={"Cache-Control": declared}))
+    assert response.headers["Cache-Control"] == "private, no-store"
 
 
 def test_schema_rollback_is_idempotent_and_leaves_user_data_tables_intact():

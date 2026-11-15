@@ -1,56 +1,78 @@
-"""The classic UI must offer a way to support the project — in BOTH themes.
-
-The classic layout renders two different user-menu blocks: a profile dropdown
-that only exists when `g.current_theme == 1` (caliBlur), and a flat list of
-items for `g.current_theme == 0` (the default theme). A link added to only one
-of them is invisible to half the users — the recurring trap in this template,
-and the reason cwn-local (which forces caliBlur) can look fine while the
-default theme is missing the feature entirely.
-"""
-import re
+"""Classic navigation renders the configured support policy in both themes."""
+from html.parser import HTMLParser
 from pathlib import Path
+from types import SimpleNamespace
 
-LAYOUT = Path(__file__).resolve().parents[2] / "cps" / "templates" / "layout.html"
-KOFI = "https://ko-fi.com/calibrewebnextgen"
+import pytest
+from flask import Flask
+from jinja2 import ChainableUndefined
+
+from cps.services.support_policy import support_policy
 
 
-def _layout():
-    return LAYOUT.read_text(encoding="utf-8")
+class _Links(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.links = []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "a" and attrs.get("id") == "top_support":
+            self.links.append(attrs)
 
 
-def test_support_link_present_twice_once_per_theme():
-    src = _layout()
-    assert src.count('id="top_support"') == 2, (
-        "expected one support link in the caliBlur profile dropdown and one in "
-        "the default-theme user menu"
+def _render(theme, policy):
+    from cps import jinjia, ub
+    app = Flask(__name__, template_folder=str(
+        Path(__file__).resolve().parents[2] / "cps" / "templates"
+    ))
+    app.register_blueprint(jinjia.jinjia)
+    environment = app.jinja_env
+    environment.undefined = ChainableUndefined
+    environment.globals.update(
+        _=lambda value: "translated:" + value,
+        url_for=lambda endpoint, **_kwargs: "/" + endpoint,
+        get_flashed_messages=lambda **_kwargs: [],
+        csrf_token=lambda: "test-token",
+    )
+    return environment.get_template("layout.html").render(
+        g=SimpleNamespace(current_theme=theme, google_site_verification=""),
+        current_user=ub.User(name="Reader", locale="en", role=0, sidebar_view=0,
+                             view_settings={}, kindle_mail=""),
+        support_destinations=policy,
+        request=SimpleNamespace(path="/", query_string=b""),
+        sidebar=[], shelf=[], magic_shelves=[],
     )
 
 
-def test_support_link_points_at_the_project_kofi_page():
-    src = _layout()
-    for m in re.finditer(r'id="top_support"[^>]*href="([^"]+)"', src):
-        assert m.group(1) == KOFI, f"support link points at {m.group(1)}"
+@pytest.mark.parametrize("theme", [0, 1])
+def test_default_support_is_one_safe_translated_link_in_each_classic_theme(theme):
+    html = _render(theme, support_policy(SimpleNamespace()))
+    links = _Links(html).links
+    assert len(links) == 1
+    assert links[0]["href"] == "https://ko-fi.com/calibrewebnextgen"
+    assert links[0]["target"] == "_blank"
+    assert set(links[0]["rel"].split()) == {"noopener", "noreferrer"}
+    assert "translated:Support Calibre-Web NextGen" in html
 
 
-def test_support_link_opens_safely_in_a_new_tab():
-    # target=_blank without rel=noopener lets the opened page reach back via
-    # window.opener; this is an external link so both attributes are required.
-    for tag in re.findall(r'<a id="top_support".*?>', _layout()):
-        assert 'target="_blank"' in tag
-        assert "noopener" in tag and "noreferrer" in tag
+@pytest.mark.parametrize("theme", [0, 1])
+def test_host_support_replaces_project_destination_in_each_classic_theme(theme):
+    html = _render(theme, support_policy(SimpleNamespace(
+        config_show_project_support=False,
+        config_support_url="https://example.invalid/help?a=1&b=2",
+        config_support_label="Library <help>",
+    )))
+    links = _Links(html).links
+    assert len(links) == 1
+    assert links[0]["href"] == "https://example.invalid/help?a=1&b=2"
+    assert "Library &lt;help&gt;" in html
+    assert "ko-fi.com/calibrewebnextgen" not in html
 
 
-def test_support_label_is_translatable():
-    # Every user-visible string in this project goes through gettext, or the
-    # msgid never reaches the translators and non-English users see English.
-    for tag in re.findall(r'<a id="top_support".*?</a>', _layout(), re.S):
-        assert "_('Support Calibre-Web NextGen')" in tag
-
-
-def test_default_theme_block_contains_a_support_link():
-    src = _layout()
-    start = src.index("{% if g.current_theme == 0 %}")
-    end = src.index("{% endif %}", src.index('id="logout"', start))
-    assert 'id="top_support"' in src[start:end], (
-        "default-theme (g.current_theme == 0) user menu has no support link"
-    )
+@pytest.mark.parametrize("theme", [0, 1])
+def test_hidden_support_without_replacement_is_absent_in_each_classic_theme(theme):
+    html = _render(theme, support_policy(SimpleNamespace(config_show_project_support=False)))
+    assert _Links(html).links == []
+    assert "ko-fi.com/calibrewebnextgen" not in html

@@ -143,22 +143,13 @@ class TestCoverBadgeMacroRendersInProgress:
 
 @pytest.mark.unit
 class TestCoercionCarriesRawStatus:
-    def test_web_py_carries_raw_read_status(self):
-        """The detail page (``show_book``) must expose the raw integer
-        read_status, not only the ``== STATUS_FINISHED`` boolean — otherwise
-        detail.html can never tell in-progress from unread. (The grid/list
-        views read the raw tri-state straight off the query tuple as
-        ``entry[2]``, so they don't need a web.py field.)"""
-        src = WEB_PY.read_text(encoding="utf-8")
-        assert "read_status_raw" in src, (
-            "web.py show_book must set read_status_raw (the raw tri-state) so "
-            "detail.html can render the in-progress marker. fork #509."
-        )
-        # Pin it to the detail page's read_book source, not the boolean.
-        assert "read_status_raw = read_book" in src, (
-            "read_status_raw must derive from the detail page's read_book "
-            "value (the raw int), e.g. `read_book or STATUS_UNREAD`. fork #509."
-        )
+    def test_detail_read_status_derivation_preserves_in_progress(self):
+        """The shared detail derivation must distinguish reading from unread/read."""
+        from cps.helper import read_statuses_for_books, read_status_code
+        user = types.SimpleNamespace(id=7, is_authenticated=True, is_anonymous=False)
+        states = read_statuses_for_books([(1, None), (2, 1), (3, 2)], False, user)
+        assert states == {1: "unread", 2: "finished", 3: "in_progress"}
+        assert read_status_code(states[3]) == 2
 
     def test_detail_template_branches_on_in_progress(self):
         """detail.html must render a 'currently reading' marker when the raw

@@ -265,6 +265,8 @@ kbd {
 #theme-toggle .moon { display: none; }
 [data-theme="dark"] #theme-toggle .sun { display: none; }
 [data-theme="dark"] #theme-toggle .moon { display: block; }
+[data-theme="dark"] .theme-light-only,
+:root:not([data-theme="dark"]) .theme-dark-only { display: none; }
 
 /* ------------------------------ layout ------------------------------ */
 

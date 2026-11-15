@@ -6,5 +6,7 @@ echo "========== STARTING METADATA CHANGE DETECTOR ==========="
 # The service body lives in scripts/services so it can run outside s6 (#2094).
 # Only the container has the abc account, so the watch folder gets its owner here.
 install -d -o abc -g abc "${CWA_METADATA_CHANGE_LOGS_DIR:-/config/metadata_change_logs}"
+# Calibre children get the abc-owned, plugin-free runtime config cwa-init prepared (#2518).
+export CALIBRE_CONFIG_DIRECTORY="${CALIBRE_CONFIG_DIRECTORY:-/config/.config/calibre-runtime}"
 export CWA_RUN_AS=cwa-as-abc
 exec /app/calibre-web-automated/scripts/services/metadata-change-detector.sh

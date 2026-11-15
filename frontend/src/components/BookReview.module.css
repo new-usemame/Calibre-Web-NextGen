@@ -1,0 +1,15 @@
+.section { order: 11; margin-block: var(--sp-5); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); }
+.section h2 { font-family: var(--font-display); font-size: var(--fs-lg); margin-bottom: var(--sp-2); }
+.section h2:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.hint { color: var(--text-muted); font-size: var(--fs-sm); margin-block: var(--sp-2); }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; margin-block: var(--sp-3); }
+.section label { display: block; margin-bottom: var(--sp-2); }
+.section textarea { width: 100%; min-height: 150px; resize: vertical; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); font: inherit; }
+.section textarea:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: end; margin-top: var(--sp-3); }
+.actions button { min-height: 44px; }
+.error { color: var(--danger-text); margin-block: var(--sp-2); }
+.backdrop { position: fixed; inset: 0; z-index: var(--z-overlay); background: var(--overlay-backdrop); display: grid; place-items: center; padding: var(--sp-3); }
+.dialog { width: min(420px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); }
+.dialog h3 { font-size: var(--fs-lg); margin-bottom: var(--sp-2); }
+.dialog button:last-child { color: var(--danger-text); }

@@ -1,0 +1,60 @@
+.trigger {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  border: 1px solid var(--cover-control-border);
+  color: var(--cover-control-fg);
+  background: var(--cover-control-bg);
+  box-shadow: var(--elev-1);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.trigger:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 2px; }
+.backdrop { position: fixed; inset: 0; z-index: var(--z-overlay); background: var(--overlay-backdrop); }
+.panel {
+  position: fixed;
+  width: min(300px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--elev-3);
+}
+.heading { display: flex; align-items: center; gap: var(--sp-2); padding-inline-start: var(--sp-2); }
+.heading > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: var(--fw-semi); }
+.close { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: none; }
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  text-align: start;
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+.action svg { flex: none; }
+.action:hover { background: var(--surface-3); }
+.action:focus-visible, .close:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -2px; }
+.action:disabled { cursor: wait; opacity: .7; }
+.status { padding-inline: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); }
+.shelves { margin: var(--sp-1) var(--sp-2) var(--sp-2); }
+.shelves h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); font-weight: var(--fw-semi); }
+.shelves ul { margin: 0; padding-inline-start: 1.25rem; }
+.shelves li { padding-block: 2px; overflow-wrap: anywhere; }
+.error { color: var(--danger); padding-inline: var(--sp-2); }
+@media (hover: none), (pointer: coarse) {
+  .panel { left: 8px !important; top: auto !important; bottom: 8px; width: calc(100vw - 16px); max-height: 75dvh; }
+}

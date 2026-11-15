@@ -1,26 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
+import { BookListExport } from '../components/BookListExport';
+import { useShelfDragSelection } from '../components/ShelfDrag';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
   ChevronLeft, Globe, Lock, Pencil, Trash2, Check, X, ArrowUpDown, ArrowUp, ArrowDown, Smartphone,
-  Info, ListChecks,
+  Info, ListChecks, Plus,
 } from 'lucide-react';
 import {
   useShelf, useUpdateShelf, useDeleteShelf, useShelfMembership, useReorderShelfBooks, useMe,
   useUpdateProfile,
 } from '../lib/queries';
 import { BulkBar } from '../components/BulkBar';
+import { ShelfAddBooks } from '../components/ShelfAddBooks';
 import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { Book } from '../lib/api';
-import { ApiError } from '../lib/api';
+import { apiGet, ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useRangeSelection } from '../lib/useRangeSelection';
+import { useCatalogDensity } from '../lib/catalogDensity';
+import { useCatalogRowsPerLoad } from '../lib/catalogRowsPerLoad';
+import { useMeasuredGridColumns } from '../lib/useMeasuredGridColumns';
+import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
@@ -31,6 +39,8 @@ const SHELF_SORT_OPTIONS = [
 ] as const;
 const SHELF_SORT_VALUES = new Set<string>(SHELF_SORT_OPTIONS.map((option) => option.value));
 const SHELF_SORT_KEY_PREFIX = 'cwng:shelf-sort-v1:';
+/** Books per request before the grid has been measured (the old fixed size). */
+const SHELF_FALLBACK_PER_PAGE = 24;
 
 function readShelfSort(shelfId: string): string {
   try {
@@ -52,13 +62,23 @@ export function Shelf({ id }: { id: string }) {
   const [readingTagsHidden] = useReadingTagsHidden();
   const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
+  const announce = useAnnouncer();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [addingBooks, setAddingBooks] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectAllBusy, setSelectAllBusy] = useState(false);
+  const [selectAllError, setSelectAllError] = useState('');
+  const selectAllRequest = useRef(0);
+  useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
+    setSelected(new Set(ids)); setSelecting(true);
+  } });
   const clearSelection = () => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
     setSelected(new Set());
     setSelecting(false);
   };
@@ -74,14 +94,61 @@ export function Shelf({ id }: { id: string }) {
   const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
+  // The Library's density choice, read-only here, so a shelf is as dense as the Library (#980).
+  const [density] = useCatalogDensity();
+  const [rowsChoice] = useCatalogRowsPerLoad();
+  const rowsPerLoad = Number(rowsChoice);
+  // "Rows per load" means whole rows, so the request size is rows x the number of
+  // columns the grid really renders. The first request waits for that
+  // measurement (fail-open after a moment) rather than fetching at a guess and
+  // refetching, as the Library does (#1144).
+  const { gridRef, columns, measured: gridMeasured } = useMeasuredGridColumns({
+    fallbackColumns: Math.ceil(SHELF_FALLBACK_PER_PAGE / rowsPerLoad),
+    minWidthVar: '--shelf-grid-min',
+    layoutKey: density,
+  });
+  // Page N of an infinite scroll is only meaningful at the page size that page 1
+  // used, so follow the live measurement while on page 1 and hold that size once
+  // scrolling has started. Rotating a phone mid-scroll then cannot skip or
+  // repeat books; the next sort, bulk change or shelf starts afresh at page 1.
+  const pageSizeRef = useRef(rowsPerLoad * columns);
+  if (page === 1) pageSizeRef.current = rowsPerLoad * columns;
+  const perPage = pageSizeRef.current;
 
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort, revision);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort, revision, perPage, gridMeasured);
   const updateShelf = useUpdateShelf(id);
   const deleteShelf = useDeleteShelf();
   const reorder = useReorderShelfBooks(id);
   const { remove } = useShelfMembership();
   const me = useMe().data;
   const updateProfile = useUpdateProfile();
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
+
+  const selectAllBooks = async () => {
+    const requestId = ++selectAllRequest.current;
+    setSelectAllBusy(true);
+    setSelectAllError('');
+    announce(t('Selecting all books in this view…'));
+    try {
+      const params = new URLSearchParams({ select_all: '1', sort });
+      const result = await apiGet<{ ids: number[] }>(`/api/v1/shelves/${id}?${params.toString()}`);
+      if (requestId !== selectAllRequest.current) return;
+      setSelected(new Set(result.ids));
+      announce(t('Selected all {count} books in this view.', { count: result.ids.length }));
+    } catch (error) {
+      if (requestId !== selectAllRequest.current) return;
+      const apiError = error instanceof ApiError ? error : undefined;
+      const message = apiError?.detail?.code === 'selection_too_large'
+        ? t('Select all is limited to {max} books. Narrow the current view and try again.', {
+          max: typeof apiError.detail.max_items === 'number' ? apiError.detail.max_items : 100000,
+        })
+        : t('Could not select all books. Try again.');
+      setSelectAllError(message);
+      announce(message, { assertive: true });
+    } finally {
+      if (requestId === selectAllRequest.current) setSelectAllBusy(false);
+    }
+  };
 
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -90,7 +157,10 @@ export function Shelf({ id }: { id: string }) {
 
   // Route reuse (/shelf/A -> /shelf/B keeps this component mounted): reset
   // paging and per-shelf UI modes when the shelf changes (#612).
-  useEffect(() => {
+  useLayoutEffect(() => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
+    setSelectAllError('');
     setSelected(new Set());
     setSelecting(false);
     setSort(readShelfSort(id));
@@ -122,6 +192,8 @@ export function Shelf({ id }: { id: string }) {
   }, [data, id, isPlaceholderData, sort, revision]);
 
   const changeSort = (nextSort: string) => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
     const safeSort = SHELF_SORT_VALUES.has(nextSort) ? nextSort : 'stored';
     setReordering(false);
     setBooks([]);
@@ -141,15 +213,25 @@ export function Shelf({ id }: { id: string }) {
     enabled: !!data && books.length < data.total && !isFetching,
   });
 
-  if (isLoading && !data) return <SpinnerCentered size={40} />;
+  // The loading state is itself a grid so there is something to measure before
+  // the first request is allowed to go out.
+  if ((isLoading || !gridMeasured) && !data) {
+    return (
+      <div className={styles.container}>
+        <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div className={styles.gridLoading}><SpinnerCentered size={40} /></div>
+        </div>
+      </div>
+    );
+  }
   if (error || !data) {
     return (
-      <main className={styles.container}>
+      <div className={styles.container}>
         <Link href="/shelves" className={styles.back}>
           <ChevronLeft size={16} /> {t('All shelves')}
         </Link>
         <EmptyState message={error instanceof Error ? error.message : t('Shelf not found.')} />
-      </main>
+      </div>
     );
   }
 
@@ -158,7 +240,7 @@ export function Shelf({ id }: { id: string }) {
   const canEdit = data.can_edit;
   const visibilityAction = getShelfVisibilityAction({
     canEdit,
-    canMakePublic: !!me?.role?.edit_shelfs,
+    canMakePublic: data.is_owner ? !!me?.role?.share_shelfs : !!me?.role?.edit_shelfs,
     isPublic: data.is_public,
   });
 
@@ -248,7 +330,7 @@ export function Shelf({ id }: { id: string }) {
   };
 
   return (
-    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
+    <div className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
       <Link href="/shelves" className={styles.back}>
         <ChevronLeft size={16} /> {t('All shelves')}
       </Link>
@@ -283,7 +365,7 @@ export function Shelf({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              <h1 className={styles.title}>{data.name}</h1>
+              <h1 data-testid="shelf-heading" tabIndex={-1} className={styles.title}>{data.name}</h1>
               <span
                 className={styles.visibility}
                 title={data.is_public ? t('Public shelf') : t('Private shelf')}
@@ -295,6 +377,8 @@ export function Shelf({ id }: { id: string }) {
         </div>
 
         <div className={styles.subRow}>
+          <BookListExport disabled={bulkBusy || isFetching || isPlaceholderData || !!error} source={{ source: 'shelf', id: Number(id), params: { sort } }} />
+
           <span className={styles.count}>
             {total === 1
               ? t('{count} book', { count: total })
@@ -304,12 +388,22 @@ export function Shelf({ id }: { id: string }) {
             className={selecting ? styles.manageBtnActive : styles.manageBtn}
             aria-pressed={selecting} disabled={bulkBusy} title={t('Select multiple')}
             onClick={() => {
+              selectAllRequest.current += 1;
+              setSelectAllBusy(false);
               setSelecting((value) => !value);
               setSelected(new Set());
               setReordering(false);
             }}>
             <ListChecks size={15} aria-hidden="true" /> {selecting ? t('Done') : t('Select')}
           </button>
+          {selecting && (
+            <button type="button" className={styles.manageBtn}
+              onClick={() => { void selectAllBooks(); }}
+              disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
+              aria-busy={selectAllBusy}>
+              {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
+            </button>
+          )}
           <select
             className={styles.sortSelect}
             value={sort}
@@ -322,8 +416,12 @@ export function Shelf({ id }: { id: string }) {
               </option>
             ))}
           </select>
+          {canEdit && <Link href={`/shelf/${id}/edit`} className={styles.manageBtn}>{t('Settings')}</Link>}
           {canEdit && !editing && (
             <div className={styles.manage}>
+              <button className={styles.manageBtn} onClick={() => setAddingBooks(true)} disabled={bulkBusy}>
+                <Plus size={14} /> {t('Add books')}
+              </button>
               <button className={styles.manageBtn} onClick={startRename}>
                 <Pencil size={14} /> {t('Rename')}
               </button>
@@ -335,7 +433,7 @@ export function Shelf({ id }: { id: string }) {
                   {visibilityAction === 'make-private' ? t('Make private') : t('Make public')}
                 </button>
               )}
-              {shelfMarksReachDevices(me?.features) && (
+              {data.is_owner && shelfMarksReachDevices(me?.features) && (
                 <button className={data.kobo_sync ? styles.manageBtnActive : styles.manageBtn}
                   onClick={toggleKoboSync} disabled={updateShelf.isPending}>
                   <Smartphone size={14} /> {ereaderWording
@@ -357,6 +455,7 @@ export function Shelf({ id }: { id: string }) {
           )}
         </div>
         {actionError && <p className={styles.actionError}>{actionError}</p>}
+        {selectAllError && <p className={styles.actionError}>{selectAllError}</p>}
 
         {koboMarkInert && (
           <div className={styles.koboNotice} role="status">
@@ -414,12 +513,12 @@ export function Shelf({ id }: { id: string }) {
         </ol>
       ) : (
         <>
-          <div className={styles.grid}>
+          <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="shelf-grid">
             {books.map((book, i) => (
               <BookCard
                 key={book.id}
                 book={book}
-                selectable={selecting} selectionDisabled={bulkBusy}
+                selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy}
                 selected={selected.has(book.id)}
                 onToggleSelect={toggleSelect}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }}
@@ -430,6 +529,7 @@ export function Shelf({ id }: { id: string }) {
                 hideReadingTags={readingTagsHidden}
                 hideShelfTags={shelfBadgesHidden}
                 excludeShelfId={Number(id)}
+                customColumnDefinitions={customColumns}
               />
             ))}
           </div>
@@ -450,8 +550,13 @@ export function Shelf({ id }: { id: string }) {
           personalLibrary={me?.library_mode === 'personal_library'}
           onClear={clearSelection}
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
-          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
+          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy} />
       )}
-    </main>
+      {addingBooks && (
+        <ShelfAddBooks shelfId={Number(id)} onClose={() => setAddingBooks(false)}
+          onAdded={() => refreshAfterBulk([])} />
+      )}
+    </div>
   );
 }

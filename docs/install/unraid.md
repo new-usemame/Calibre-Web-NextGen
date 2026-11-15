@@ -4,7 +4,7 @@ For Unraid's **Docker** tab. Works whether you're installing fresh or switching 
 standard Calibre-Web-Automated (CWA) image.
 
 **Your books, users, settings and Read checkmarks live in the appdata + library shares you
-map into the container — not in the image — so switching keeps everything and is reversible.**
+map into the container, not in the image, so switching keeps everything and is reversible.**
 
 > **Needs hardware verification:** these Unraid labels and steps are docs-verified, but we do not
 > yet have a real Unraid walkthrough or screenshots. Please use the help links below if your screen differs.
@@ -18,11 +18,11 @@ If you already run CWA on Unraid, you only need to change the image it uses:
    ```
    ghcr.io/new-usemame/calibre-web-nextgen:latest
    ```
-3. Leave every **Path** mapping as-is — `/config`, `/calibre-library`, `/cwa-book-ingest`
+3. Leave every **Path** mapping as-is: `/config`, `/calibre-library`, `/cwa-book-ingest`
    should keep pointing at the same `/mnt/user/...` shares you already use. Leave `PUID`/`PGID`
    (Unraid's default is `99`/`100`) and your port mapping unchanged.
 4. **Apply.** Unraid pulls the NextGen image and recreates the container with all your data
-   mounted. Open the WebUI and log in — everything's there.
+   mounted. Open the WebUI and log in. Everything's there.
 
 > Keeping the same container name and paths means it's a true in-place swap. If you'd rather
 > keep CWA around as a fallback, instead follow "Fresh install" below with a **different**
@@ -35,7 +35,7 @@ If you already run CWA on Unraid, you only need to change the image it uses:
    - **Name:** `calibre-web-nextgen`
    - **Repository:** `ghcr.io/new-usemame/calibre-web-nextgen:latest`
    - **Network Type:** `bridge`
-   - **Port:** add a Port mapping — Container Port `8083` → a Host Port of your choice (e.g. `8083`).
+   - **Port:** add a Port mapping: Container Port `8083` → a Host Port of your choice (e.g. `8083`).
    - **Path** mappings (add three):
      - Container `/config` → Host `/mnt/user/appdata/calibre-web-nextgen`
      - Container `/calibre-library` → Host `/mnt/user/books` (wherever your Calibre library lives)
@@ -47,7 +47,7 @@ If you already run CWA on Unraid, you only need to change the image it uses:
 
 1. **Docker** tab → toggle **Advanced View** (top-right) so the "version" column shows.
 2. NextGen will show **update ready** when a newer image is published. Click it (or
-   **force update** from the container's context menu) — Unraid re-pulls and recreates the
+   **force update** from the container's context menu). Unraid re-pulls and recreates the
    container with your data intact.
 
    *(If you don't see "update ready", click **Check for Updates** at the bottom of the Docker tab.)*

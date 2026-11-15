@@ -733,7 +733,7 @@ def test_user_gate_real_save_paths_preserve_hidden_and_apply_visible(monkeypatch
     monkeypatch.setattr(web, "current_user", profile_user)
     monkeypatch.setattr(web.ub, "session", session)
     monkeypatch.setattr(web, "valid_email", lambda value: value)
-    monkeypatch.setattr(web, "check_email", lambda value: value)
+    monkeypatch.setattr(web, "check_email", lambda value, _user_id=None: value)
     monkeypatch.setattr(web, "flag_modified", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(web, "flash", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(web, "redirect", lambda location: location)
@@ -763,7 +763,7 @@ def test_user_gate_real_save_paths_preserve_hidden_and_apply_visible(monkeypatch
     monkeypatch.setattr(admin, "get_sidebar_config", lambda: ([], None))
     monkeypatch.setattr(admin.constants, "selected_roles", lambda _form: 0)
     monkeypatch.setattr(admin, "valid_email", lambda value: value)
-    monkeypatch.setattr(admin, "check_email", lambda value: value)
+    monkeypatch.setattr(admin, "check_email", lambda value, _user_id=None: value)
     monkeypatch.setattr(admin, "flag_modified", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(admin, "flash", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(admin, "_", lambda value, **kwargs: value % kwargs if kwargs else value)
@@ -914,3 +914,120 @@ def test_backup_schema3_records_empty_set_and_stage0_metadata(tmp_path, monkeypa
     assert set(payload["annotation_columns"]) == {c.name for c in ub.Annotation.__table__.columns}
     session.close()
     annotation_backup.reset_for_tests()
+
+
+def _stage0_engine():
+    from cps import config_sql, ub
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    ub.Base.metadata.create_all(engine)
+    config_sql._Settings.__table__.create(engine, checkfirst=True)
+    ub.migrate_kobo_two_way_annotation_sync(engine, None)
+    return engine
+
+
+def _count_inspections(monkeypatch):
+    from cps.services import kobo_annotation_stage0
+
+    calls = []
+    real_inspect = kobo_annotation_stage0.inspect
+
+    def counting_inspect(target):
+        calls.append(target)
+        return real_inspect(target)
+
+    monkeypatch.setattr(kobo_annotation_stage0, "inspect", counting_inspect)
+    return calls
+
+
+@pytest.mark.unit
+def test_schema_capable_inspects_once_across_many_calls(monkeypatch):
+    from cps.services import kobo_annotation_stage0
+
+    engine = _stage0_engine()
+    inspections = _count_inspections(monkeypatch)
+    for _ in range(50):
+        assert kobo_annotation_stage0.schema_capable(engine) is True
+    assert len(inspections) == 1
+
+
+@pytest.mark.unit
+def test_schema_capable_invalidation_hook_forces_reinspection(monkeypatch):
+    from cps.services import kobo_annotation_stage0
+
+    engine = _stage0_engine()
+    inspections = _count_inspections(monkeypatch)
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+    assert len(inspections) == 1
+
+    kobo_annotation_stage0.invalidate_schema_capable_cache(engine)
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+    assert len(inspections) == 2
+
+    kobo_annotation_stage0.invalidate_schema_capable_cache()  # all engines
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+    assert len(inspections) == 3
+
+
+@pytest.mark.unit
+def test_schema_capable_notices_schema_change_without_hook(monkeypatch):
+    """A dropped or restored schema object is seen even if nobody invalidates."""
+    from cps.services import kobo_annotation_stage0
+
+    engine = _stage0_engine()
+    inspections = _count_inspections(monkeypatch)
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+    with engine.begin() as conn:
+        trigger_sql = conn.execute(text(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' "
+            "AND name = 'trg_kabs_opaque_present_sticky'"
+        )).scalar_one()
+        conn.execute(text("DROP TRIGGER trg_kabs_opaque_present_sticky"))
+    assert kobo_annotation_stage0.schema_capable(engine) is False
+    assert kobo_annotation_stage0.schema_capable(engine) is False
+    assert len(inspections) == 2  # one per distinct schema, not per call
+
+    # Raw DDL rather than the migration, so the cached False must be dropped
+    # by the schema_version check alone (the migration also calls the hook).
+    with engine.begin() as conn:
+        conn.execute(text(trigger_sql))
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+
+
+@pytest.mark.unit
+def test_schema_capable_does_not_cache_inspection_errors(monkeypatch):
+    from cps.services import kobo_annotation_stage0
+
+    engine = _stage0_engine()
+    real_inspect = kobo_annotation_stage0.inspect
+    state = {"fail": True, "calls": 0}
+
+    def flaky_inspect(target):
+        state["calls"] += 1
+        if state["fail"]:
+            raise RuntimeError("transient")
+        return real_inspect(target)
+
+    monkeypatch.setattr(kobo_annotation_stage0, "inspect", flaky_inspect)
+    assert kobo_annotation_stage0.schema_capable(engine) is False
+    assert kobo_annotation_stage0.schema_capable(engine) is False
+    assert state["calls"] == 2  # failure is retried, never memoised
+
+    state["fail"] = False
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+
+
+@pytest.mark.unit
+def test_schema_capable_cache_does_not_keep_engines_alive():
+    import gc
+    import weakref
+
+    from cps.services import kobo_annotation_stage0
+
+    engine = _stage0_engine()
+    assert kobo_annotation_stage0.schema_capable(engine) is True
+    ref = weakref.ref(engine)
+    del engine
+    gc.collect()
+    assert ref() is None

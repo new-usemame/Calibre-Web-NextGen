@@ -61,7 +61,7 @@ from .services.annotation_colors import (
     to_display_name,
     to_storage_color,
 )
-from .services import device_capabilities
+from .services import device_capabilities, device_registry
 from .services.kobo_import import (
     KoboUploadError,
     MAX_KOBO_DATABASE_UPLOAD_BYTES,
@@ -213,12 +213,26 @@ def _empty_authority_rollup():
     return {**{status: 0 for status in AUTHORITY_STATUSES}, "books_partially_seeded": 0}
 
 
+_UNSET_SCOPE_PAYLOAD = object()
+
+
 def _device_json(device, annotation_count=0, inventory_report=None, storage_snapshot=None,
                  annotation_counts=None, authority_rollup=None, seeded_books=0,
                  unseeded_books=0, inventory_count=None, books_with_position=0,
                  last_position_at=None, origin_annotation_count=None,
-                 browser_identity=None):
+                 browser_identity=None, scope_payload=_UNSET_SCOPE_PAYLOAD):
     annotation_counts = annotation_counts or {}
+    if scope_payload is _UNSET_SCOPE_PAYLOAD:
+        scope_payload = None
+        if device.kind in ("kobo", "koreader"):
+            from sqlalchemy import inspect
+            from sqlalchemy.orm import object_session
+            from .services import device_book_scope
+            mapped = inspect(device, raiseerr=False)
+            session = (object_session(device) or ub.session) if mapped is not None else None
+            owner = _device_owner(device, session) if session is not None else None
+            if owner is not None:
+                scope_payload = device_book_scope.payload(owner, device, session=session)
     return {
         "public_id": device.public_id,
         "label": device.display_name or _device_kind_label(device.kind),
@@ -254,6 +268,9 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "authority": authority_rollup or _empty_authority_rollup(),
         "can_receive_books": device.kind in ("kobo", "koreader"),
         "active": bool(device.active),
+        "share_place": bool(device.share_place),
+        "place_control": device_registry.place_control(device),
+        "book_scope": scope_payload,
     }
 
 
@@ -725,6 +742,9 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
     }
 
     rows = []
+    from .services import device_book_scope
+    scope_choices = {owner_id: device_book_scope.choices(owner, session)
+                     for owner_id, owner in owners_by_id.items()}
     for device in devices:
         owner_id = int(device.user_id)
         seeded = (
@@ -738,9 +758,12 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
         books_with_position, last_position = position_counts.get(device.id, (0, None))
         rows.append(_device_json(
             device,
-            assigned_counts.get(device.id, 0),
-            reports.get(device.id),
-            storage.get(device.id),
+            scope_payload=device_book_scope.payload(
+                owners_by_id[owner_id], device, session=session,
+                offered=scope_choices[owner_id]),
+            annotation_count=assigned_counts.get(device.id, 0),
+            inventory_report=reports.get(device.id),
+            storage_snapshot=storage.get(device.id),
             annotation_counts=origin_counts.get(device.id),
             authority_rollup=authority_by_owner.get(owner_id),
             seeded_books=seeded,
@@ -754,7 +777,7 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
     return rows
 
 
-def list_annotation_devices(*, user_id, session, active_only=False,
+def list_annotation_devices(*, user_id, session, active_only=False, inactive_only=False,
                             limit=DEFAULT_DEVICE_LIST_LIMIT, offset=0,
                             return_total=False):
     """List one bounded page with SQL-aggregated, owner-filtered counts."""
@@ -763,6 +786,8 @@ def list_annotation_devices(*, user_id, session, active_only=False,
     )
     if active_only:
         query = query.filter(ub.Device.active.is_(True))
+    elif inactive_only:
+        query = query.filter(ub.Device.active.is_(False))
     total = query.count()
     devices = query.order_by(ub.Device.display_name, ub.Device.id).offset(
         offset,
@@ -779,15 +804,62 @@ def list_annotation_devices(*, user_id, session, active_only=False,
     return (rows, total) if return_total else rows
 
 
-def rename_annotation_device(public_id, *, user_id, label, session, commit):
-    if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
-        raise ValueError("device label must be 1-60 characters without surrounding whitespace")
-    if any(ord(char) < 32 or ord(char) == 127 for char in label):
-        raise ValueError("device label contains control characters")
+_DEVICE_SETTING_UNSET = object()
+
+
+class InvalidSharePlace(ValueError):
+    """The sharing setting must be a JSON boolean, not a truthy value."""
+
+
+def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
+                             share_place=_DEVICE_SETTING_UNSET,
+                             book_scope=_DEVICE_SETTING_UNSET, session, commit):
+    """Update the owner's label and/or sharing choice in a single commit.
+
+    Resolve ownership before validation and validate every field before any
+    mutation. Retain the enable clock on disable and repeated enable requests;
+    later protocol gates use it to recognize a new opt-in.
+    """
     device = _owned_device(public_id, user_id, session)
     if device is None:
         return None
-    device.display_name = label
+    if share_place is not _DEVICE_SETTING_UNSET and not isinstance(share_place, bool):
+        raise InvalidSharePlace("share_place must be a boolean")
+    from .services import device_book_scope
+    if book_scope is not _DEVICE_SETTING_UNSET:
+        book_scope = device_book_scope.validate(
+            book_scope, _device_owner(device, session), device, session)
+    if (label is _DEVICE_SETTING_UNSET and share_place is _DEVICE_SETTING_UNSET
+            and book_scope is _DEVICE_SETTING_UNSET):
+        raise ValueError("device label or share_place is required")
+    if label is not _DEVICE_SETTING_UNSET:
+        if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
+            raise ValueError("device label must be 1-60 characters without surrounding whitespace")
+        if any(ord(char) < 32 or ord(char) == 127 for char in label):
+            raise ValueError("device label contains control characters")
+    # Validate all fields before mutating any, including a combined PATCH.
+    if label is not _DEVICE_SETTING_UNSET:
+        device.display_name = label
+    if book_scope is not _DEVICE_SETTING_UNSET:
+        device.book_scope = (None if book_scope["mode"] == "unset"
+                             else json.dumps(book_scope, sort_keys=True))
+    if share_place is not _DEVICE_SETTING_UNSET:
+        turned_on = share_place and not device.share_place
+        turned_off = not share_place and device.share_place
+        if turned_on:
+            device.share_place_enabled_at = datetime.now(timezone.utc)
+        device.share_place = share_place
+        from .services import kobo_place_gate
+        from .services.share_place import gates_enforced
+        if gates_enforced(device.user_id):
+            # Turn-on: the device's next sync is sent the shared place for
+            # books where it wins the arbiter against the device's own row.
+            # Turn-off rewinds nothing; it only withdraws unsent nudges.
+            if turned_on:
+                kobo_place_gate.refresh_share_place_nudges(device, session=session)
+            elif turned_off:
+                kobo_place_gate.clear_share_place_nudges(device.id, session=session)
+                kobo_place_gate.clear_echo_guard(device.id, session=session)
     _commit_required(commit)
     return device
 
@@ -837,6 +909,9 @@ def soft_delete_annotation_device(public_id, *, user_id, session, commit):
     session.query(ub.AnnotationDeviceState).filter_by(device_id=device.id).update(
         {ub.AnnotationDeviceState.desired: False}, synchronize_session=False,
     )
+    if device.kind == "koreader":
+        from .services import device_sleep_screen
+        device_sleep_screen.remove(device, session=session)
     device.active = False
     _commit_required(commit)
     return device, counts
@@ -893,7 +968,7 @@ def restore_annotation_device(public_id, *, user_id, session, commit):
 @annotations_bp.route("/api/annotations/devices", methods=["GET"])
 @user_login_required
 def annotation_devices_list():
-    active_only = request.args.get("active", "").lower() == "true"
+    active_filter = request.args.get("active", "").lower()
     try:
         pagination, error_response, error_status = _offset_pagination(
             default_limit=DEFAULT_DEVICE_LIST_LIMIT,
@@ -902,8 +977,16 @@ def annotation_devices_list():
         if error_response is not None:
             return error_response, error_status
         limit, offset = pagination
+        from .services.device_registry import ensure_webreader_device_best_effort
+        from .services.share_place import gates_enforced
+        gates = gates_enforced(int(current_user.id))
+        if gates:
+            # The web reader's Share my place row only matters once the
+            # gates read it; until then a list stays read-only.
+            ensure_webreader_device_best_effort(user_id=current_user.id)
         devices, total = list_annotation_devices(
-            user_id=current_user.id, session=ub.session, active_only=active_only,
+            user_id=current_user.id, session=ub.session,
+            active_only=active_filter == "true", inactive_only=active_filter == "false",
             limit=limit, offset=offset, return_total=True,
         )
     except FilteredBookVisibilityUnavailable as error:
@@ -912,6 +995,7 @@ def annotation_devices_list():
         return _database_error_response("device list")
     return jsonify({
         "devices": devices,
+        "share_place_gates": gates,
         "limit": limit,
         "offset": offset,
         "total": total,
@@ -1364,16 +1448,26 @@ def annotation_device_inventory_delete(public_id, item_id):
 @annotations_bp.route("/api/annotations/devices/<public_id>", methods=["PATCH"])
 @user_login_required
 def annotation_device_rename(public_id):
+    from .services import device_book_scope
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
     try:
         device = rename_annotation_device(
-            public_id, user_id=current_user.id, label=data.get("label"),
+            public_id, user_id=current_user.id,
+            label=data.get("label", _DEVICE_SETTING_UNSET),
+            share_place=data.get("share_place", _DEVICE_SETTING_UNSET),
+            book_scope=data.get("book_scope", _DEVICE_SETTING_UNSET),
             session=ub.session, commit=ub.session_commit,
         )
+    except device_book_scope.InvalidBookScope:
+        return jsonify({"error": "invalid_book_scope"}), 400
+    except InvalidSharePlace:
+        return jsonify({"error": "invalid_share_place"}), 400
     except ValueError as error:
         return jsonify({"error": "invalid_label", "message": str(error)}), 400
     except (RuntimeError, SQLAlchemyError):
-        return _database_error_response("device rename")
+        return _database_error_response("device settings update")
     if device is None:
         abort(404)
     return jsonify(_device_json(device))

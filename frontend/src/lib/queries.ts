@@ -1,32 +1,40 @@
 import type { ReaderBookmark } from "./readerResume";
-import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ReaderFontCatalog } from './readerFonts';
+import { keepPreviousData, useQuery, useInfiniteQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { refreshBookCoverViews } from './bookCoverCache';
 import {
   apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, apiPostDownload, ApiError,
-  navigateToLogout, noteSessionIdentity,
+  navigateToLogout, noteSessionIdentity, TASK_FINISHED,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
+import type { PickerBook } from './shelfPicker';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
+import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
-import { createEntityListQueryOptions } from './entityListQueryOptions';
+import { addShelfBooks } from './shelfAdd';
+import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
+import type { EntityListPage } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
-  Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
+  Me, Book, BooksPage, BookDetail, ReadingStatus, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
   NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken, KoreaderPairRequest,
+  CcColumnsPage, CcTree, CcBooksPage,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
  *  endpoints/routes use the plural (author -> authors). */
 export type EntityKind = 'author' | 'series' | 'tag' | 'publisher' | 'language' | 'rating' | 'format';
-export type ReadFilter = 'all' | 'read' | 'unread';
+export type ReadFilter = 'all' | 'read' | 'unread' | 'in_progress' | 'did_not_finish' | 'on_hold';
 /** Discovery "views" — server-side ?filter= categories beyond read/unread. */
 export type DiscoveryView = 'hot' | 'discover' | 'rated' | 'favorites' | 'archived';
 
@@ -42,6 +50,7 @@ export const ENTITY_PLURAL: Record<EntityKind, string> = {
 };
 
 export interface BooksQuery {
+  tagPath?: string;
   page: number;
   perPage?: number;
   search?: string;
@@ -101,31 +110,59 @@ export function useUpdateSidebar() {
  * the server with an older request winning the race. */
 export function useUpdateNamedPreferences() {
   const queryClient = useQueryClient();
+  const owner = captureNamedPreferencesOwner(queryClient);
+  const mutation = useMutation(namedPreferencesMutationOptions(queryClient, update =>
+    apiPost<{ preferences: Record<string, boolean | null> }>(
+      '/api/v1/account/preferences', { preferences: update.preferences, expected_user_id: update.ownerId })));
+  return {
+    ...mutation,
+    mutate: (preferences: Record<string, boolean>, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ preferences, ...owner }, options),
+    mutateAsync: (preferences: Record<string, boolean>, options?: Parameters<typeof mutation.mutateAsync>[1]) =>
+      mutation.mutateAsync({ preferences, ...owner }, options),
+  };
+}
+
+export interface CatalogCustomFieldsUpdate {
+  expected_user_id: number;
+  known_custom_column_ids: number[];
+  custom_column_ids: number[];
+  custom_column_labels: Record<string, string>;
+}
+
+/** Persist the selected scalar Calibre fields and their display labels. */
+export function useUpdateCatalogCustomFields() {
+  const queryClient = useQueryClient();
   return useMutation({
-    scope: { id: 'named-user-preferences' },
-    mutationFn: (preferences: Record<string, boolean>) =>
-      apiPost<{ preferences: Record<string, boolean | null> }>(
-        '/api/v1/account/preferences', { preferences }),
-    onMutate: async (preferences) => {
-      await queryClient.cancelQueries({ queryKey: ['me'] });
-      const previous = queryClient.getQueryData<Me | null>(['me']);
-      queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
+    // Each request writes the complete selection, so concurrent clicks must be
+    // serialized; otherwise an older snapshot may arrive last and erase a
+    // newer checkbox choice.
+    scope: { id: 'catalog-custom-fields' },
+    mutationFn: (update: CatalogCustomFieldsUpdate) => {
+      const currentId = queryClient.getQueryData<Me | null>(['me'])?.id;
+      if (currentId !== update.expected_user_id) {
+        throw new Error('Account changed before custom fields could be saved');
+      }
+      return apiPost<{
+        custom_field_ids: number[]; custom_field_labels: Record<string, string>;
+      }>('/api/v1/account/catalog-custom-fields', update);
+    },
+    onError: (error, update) => {
+      const ownerChanged = queryClient.getQueryData<Me | null>(['me'])?.id !== update.expected_user_id;
+      if (ownerChanged || (error instanceof ApiError && (error.status === 400 || error.status === 409))) {
+        void queryClient.invalidateQueries({ queryKey: ['me'] });
+        void queryClient.invalidateQueries({ queryKey: ['books'] });
+        void queryClient.invalidateQueries({ queryKey: ['adv-search'] });
+      }
+    },
+    onMutate: (update: CatalogCustomFieldsUpdate) => ({ userId: update.expected_user_id }),
+    onSuccess: (data, _update, savedFor) => {
+      queryClient.setQueryData<Me | null>(['me'], (current) => current && current.id === savedFor?.userId ? {
         ...current,
-        preferences: { ...(current.preferences ?? {}), ...preferences },
+        catalog: { ...current.catalog, default_filter: current.catalog?.default_filter ?? null,
+          custom_field_ids: data.custom_field_ids,
+          custom_field_labels: data.custom_field_labels },
       } : current);
-      return { previous };
-    },
-    onError: (_error, _preferences, context) => {
-      if (context) queryClient.setQueryData(['me'], context.previous);
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData<Me | null>(['me'], (current) => current ? {
-        ...current,
-        preferences: { ...(current.preferences ?? {}), ...data.preferences },
-      } : current);
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
@@ -192,14 +229,66 @@ export function useMagicLinkPoll() {
 /** A short strip of random books for the library "Discover" section. `nonce`
  *  lets the caller reshuffle (bump it to refetch a fresh random set). Reuses the
  *  same server-side discover filter as the full /discover view. */
-export function useDiscover(count: number, nonce: number) {
-  return useQuery<BooksPage>({
-    queryKey: ['discover-strip', count, nonce],
-    queryFn: () => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`),
+export interface DiscoverSourceSettings {
+  source: string;
+  available: boolean;
+  sources: { value: string; name: string; kind: 'library' | 'shelf' | 'smart' }[];
+}
+
+export function useDiscoverSource(enabled = true) {
+  const me = useMe().data;
+  return useQuery<DiscoverSourceSettings>({
+    queryKey: ['account', 'discover-source', me?.id],
+    queryFn: ({ signal }) => apiGet<DiscoverSourceSettings>('/api/v1/account/discover-source', { signal }),
+    enabled: enabled && !!me && !me.role.anonymous,
     staleTime: 0,
     refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
   });
+}
+
+export function useSaveDiscoverSource() {
+  const qc = useQueryClient();
+  const me = useMe().data;
+  return useMutation({
+    mutationKey: ['discover-source-save'],
+    mutationFn: (source: string) => apiPut<DiscoverSourceSettings>('/api/v1/account/discover-source', { source }),
+    onMutate: async () => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ['discover-strip'] }),
+        qc.cancelQueries({ queryKey: ['books'] }),
+        qc.cancelQueries({ queryKey: ['account', 'discover-source', me?.id] }),
+      ]);
+    },
+    onSuccess: (settings) => {
+      qc.setQueryData(['account', 'discover-source', me?.id], settings);
+    },
+    onSettled: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['discover-strip'] }),
+        qc.invalidateQueries({ queryKey: ['books'] }),
+      ]);
+    },
+  });
+}
+
+export function useDiscover(count: number, nonce: number) {
+  const me = useMe().data;
+  const source = useDiscoverSource();
+  const saving = useIsMutating({ mutationKey: ['discover-source-save'] }) > 0;
+  const query = useQuery<BooksPage>({
+    queryKey: ['discover-strip', me?.id, source.data?.source, source.data?.available, count, nonce],
+    queryFn: ({ signal }) => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`, { signal }),
+    enabled: !!me && (me.role.anonymous || !!source.data) && !saving,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && previousQuery.queryKey[1] === me?.id && previousQuery.queryKey[2] === source.data?.source
+        && previousQuery.queryKey[3] === source.data?.available ? previous : undefined,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  return { ...query,
+    isLoading: query.isLoading || !me || (!me.role.anonymous && source.isPending),
+    error: query.error ?? source.error,
+  };
 }
 
 export function useAuthConfig() {
@@ -233,14 +322,17 @@ export function useLogout() {
 export function useBooks(q: BooksQuery) {
   const revision = useLibraryRevision();
   const me = useMe().data;
+  const discoverSource = useDiscoverSource(q.view === 'discover');
+  const savingSource = useIsMutating({ mutationKey: ['discover-source-save'] }) > 0;
   const {
     page, perPage = 24, search = '', sort = 'new', readFilter = 'all',
-    entityKind, entityId, view, showHidden = false, enabled = true,
+    entityKind, entityId, tagPath, view, showHidden = false, enabled = true,
   } = q;
   const params = new URLSearchParams();
   params.set('page', String(page));
   params.set('per_page', String(perPage));
   params.set('sort', sort);
+  if (tagPath !== undefined) params.set('tag_path', tagPath);
   // The API's search path is separate from entity/read filtering, so `search`
   // is only sent in the unfiltered library view.
   //
@@ -262,15 +354,21 @@ export function useBooks(q: BooksQuery) {
   else if (readFilter !== 'all') params.set('filter', readFilter);
   if (showHidden && !entityKind && !view) params.set('show_hidden', '1');
   if (entityKind && entityId !== undefined && entityId !== '') {
-    params.set(entityKind, String(entityId));
+    params.set(entityKind === 'rating' && me && !me.role.anonymous ? 'personal_rating' : entityKind, String(entityId));
   }
-  return useQuery<BooksPage>({
+  const query = useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
-      entityKind ?? '', entityId ?? '', view ?? '', showHidden, me?.id, me?.library_mode, revision],
-    queryFn: () => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`),
-    placeholderData: (prev) => prev,
-    enabled,
+      entityKind ?? '', entityId ?? '', view ?? '', tagPath ?? '', showHidden, me?.id, me?.library_mode, revision,
+      view === 'discover' ? discoverSource.data?.source : '',
+      view === 'discover' ? discoverSource.data?.available : true],
+    queryFn: ({ signal }) => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`, { signal }),
+    placeholderData: view === 'discover' ? undefined : (prev) => prev,
+    enabled: enabled && (view !== 'discover' || (!!me && (me.role.anonymous || !!discoverSource.data) && !savingSource)),
   });
+  return { ...query,
+    isLoading: query.isLoading || (view === 'discover' && (!me || (!me.role.anonymous && discoverSource.isPending))),
+    error: query.error ?? (view === 'discover' ? discoverSource.error : null),
+  };
 }
 
 export interface GlobalLibraryQuery {
@@ -298,10 +396,10 @@ export function useGlobalLibrary(q: GlobalLibraryQuery) {
 const LIBRARY_VIEW_QUERIES = new Set([
   'books', 'adv-search', 'global-library', 'book', 'book-shelves',
   'shelf', 'shelves', 'magicshelf', 'magicshelves', 'entities',
-  'discover-strip', 'account', 'me', 'about',
+  'discover-strip', 'account', 'me', 'about', 'tag-tree',
 ]);
 
-async function refreshLibraryViews(qc: QueryClient): Promise<void> {
+export async function refreshLibraryViews(qc: QueryClient): Promise<void> {
   const catalogQuery = (query: { queryKey: readonly unknown[] }) =>
     query.queryKey[0] === 'books' || query.queryKey[0] === 'adv-search';
   // Cancel before changing revision: an old request must not land beside the
@@ -333,7 +431,7 @@ function setBookMembership(qc: QueryClient, bookId: number, owned: boolean) {
  *  delete, merge, My Library membership) calls this, so no badge keeps
  *  counting a book its shelf no longer shows (#2235). */
 function invalidateBookVisibilityViews(qc: QueryClient) {
-  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves']) {
+  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves', 'tag-tree']) {
     void qc.invalidateQueries({ queryKey: [key] });
   }
 }
@@ -407,12 +505,7 @@ export function useClearMyCover(bookId: string | number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiDelete(`/api/v1/books/${bookId}/my-cover`),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['book', String(bookId)] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
-      void qc.invalidateQueries({ queryKey: ['global-library'] });
-      void qc.invalidateQueries({ queryKey: ['cover-state', String(bookId)] });
-    },
+    onSuccess: () => refreshBookCoverViews(qc, bookId),
   });
 }
 
@@ -441,13 +534,69 @@ export function useDismissMyLibraryIntro() {
   });
 }
 
+// ── Custom columns (browse by tag-like column) ───────────────────────────────
+
+/** Browsable custom columns (tag-like text/enumeration), with their hierarchy
+ *  status. Empty items = the library has no browsable columns (or the caller
+ *  hid every one on their profile page). */
+export function useColumns(enabled = true) {
+  return useQuery<CcColumnsPage>({
+    queryKey: ['cc-columns'],
+    queryFn: () => apiGet<CcColumnsPage>('/api/v1/columns'),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** The nodes of one custom column. For a hierarchical column that is the
+ *  nested tree; for a flat one a one-level list of whole values. The response's
+ *  `column.hierarchical` tells the caller which, so one renderer covers both. */
+export function useCcTree(colId: string | number, enabled = true) {
+  return useQuery<CcTree>({
+    queryKey: ['cc-tree', String(colId)],
+    queryFn: () => apiGet<CcTree>(`/api/v1/columns/${colId}/tree`),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** One page of books under a node of a custom column. An empty `path` lists
+ *  every book carrying any value in the column. */
+export function useCcBooks(
+  colId: string | number, path: string, page: number, enabled = true,
+) {
+  return useQuery<CcBooksPage>({
+    queryKey: ['cc-books', String(colId), path, page],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page) });
+      if (path) params.set('path', path);
+      return apiGet<CcBooksPage>(`/api/v1/columns/${colId}/books?${params.toString()}`);
+    },
+    enabled,
+    staleTime: 60000,
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** Fetch an entity-browse list (authors/series/tags/publishers/languages).
  *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
-  return useQuery<EntityList>(createEntityListQueryOptions(
-    plural,
-    () => apiGet<EntityList>(`/api/v1/${plural}`),
-  ));
+  const me = useMe().data;
+  const endpoint = plural === 'ratings' && me && !me.role.anonymous ? 'personal-ratings' : plural;
+  const options = createEntityListQueryOptions(endpoint,
+    () => apiGet<EntityList>(`/api/v1/${endpoint}`));
+  return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
+}
+
+/** Authors, series and publishers browse in pages; other useEntityList callers stay full-list. */
+export function usePagedEntityList(plural: string, q: string, minimum: number | null, enabled: boolean) {
+  const me = useMe().data;
+  return useInfiniteQuery({
+    ...createPagedEntityListQueryOptions(plural, q, minimum, me?.id,
+      (url, signal) => apiGet<EntityListPage>(url, { signal }), enabled),
+    // Keep the filter controls mounted while a new filter's first page loads.
+    placeholderData: keepPreviousData,
+  });
 }
 
 /** The tag a rename collided with, carried on the 409 so the caller can offer
@@ -472,6 +621,7 @@ export function tagConflictOf(error: unknown): TagConflict | null {
 }
 
 function invalidateTagViews(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['tag-tree'] });
   // 'entities' un-suffixed: a merge or delete REMOVES a row from the all-tags
   // browse list, so that list must refetch too — not just the tag's own page.
   void qc.invalidateQueries({ queryKey: ['entities'] });
@@ -506,14 +656,80 @@ export function useBook(id: string | number) {
   });
 }
 
+function invalidateBookCardViews(qc: QueryClient) {
+  // Read/favorite changes can remove a row from a filtered result and shift
+  // every subsequent page. Rebuild the accumulated catalog from page 1 instead
+  // of appending a refreshed single page onto stale membership. This also
+  // refreshes advanced-search/default-filter cards through the shared seam.
+  return refreshLibraryViews(qc);
+}
+
+export function useSetReadingStatus(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (status: ReadingStatus) =>
+      apiPost<{ status: ReadingStatus }>(`/api/v1/books/${id}/read-status`, { status }),
+    onSuccess: () => {
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(qc),
+      ]);
+    },
+  });
+}
+
 export function useToggleRead(id: string | number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (read: boolean) =>
       apiPost<{ read: boolean }>(`/api/v1/books/${id}/read`, { read }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['book', String(id)] });
-      void queryClient.invalidateQueries({ queryKey: ['books'] });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(queryClient),
+      ]);
+    },
+  });
+}
+
+/** Remove the local Reading marker while retaining every saved position. */
+export function useStopReading(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
+/** Clear this user's saved reading position for a book on the web reader, Kobo
+ *  and KOReader together (#2831). The read status is left as it is. */
+export function useClearReadingPosition(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; cleared: number }>(`/api/v1/books/${id}/clear-position`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
+/** Record a new-UI reader open, as the classic /read route does (#2750): the
+ *  server moves the book onto Currently Reading (a finished book stays
+ *  finished) and counts a session only on that transition. */
+export function useRecordReaderOpen(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean }>(`/api/v1/books/${id}/reader-open`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
     },
   });
 }
@@ -524,7 +740,12 @@ export function useToggleFavorite(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiPost<{ favorited: boolean }>(`/api/v1/books/${id}/favorite`),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+    onSuccess: () => {
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(qc),
+      ]);
+    },
   });
 }
 
@@ -607,18 +828,28 @@ export function useShelves(options?: { enabled?: boolean }) {
 
 // A new revision starts a fresh result set after bulk changes. Do not reuse
 // pre-mutation pages in the local accumulator; pages already skip placeholders.
-export function useShelf(id: string | number | undefined, page = 1, sort = 'stored', revision = 0) {
+export function useShelf(
+  id: string | number | undefined,
+  page = 1,
+  sort = 'stored',
+  revision = 0,
+  perPage = 24,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<ShelfDetail>({
-    queryKey: ['shelf', String(id), sort, page, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 2, and the
+    // invalidations elsewhere match on the ['shelf', id] prefix.
+    queryKey: ['shelf', String(id), sort, page, revision, perPage],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
-        per_page: '24',
+        per_page: String(perPage),
         sort,
       });
       return apiGet<ShelfDetail>(`/api/v1/shelves/${id}?${params.toString()}`);
     },
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== '' && ready,
     // Keep the previous page's rows only while paging within the SAME shelf and
     // sort. Never carry rows across either identity change (#612/#2059).
     placeholderData: (prev, prevQuery) =>
@@ -627,6 +858,32 @@ export function useShelf(id: string | number | undefined, page = 1, sort = 'stor
       && prevQuery.queryKey[2] === sort
         ? prev
         : undefined,
+  });
+}
+
+interface ShelfAvailableBooksPage {
+  items: PickerBook[];
+  page: number;
+  total: number;
+  has_more: boolean;
+}
+
+/** Paged, searchable library list for the shelf "Add books" picker. */
+export function useShelfAvailableBooks(shelfId: string | number, query: string, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['shelf-available-books', String(shelfId), query],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }): Promise<ShelfAvailableBooksPage> => {
+      const params = new URLSearchParams({ page: String(pageParam) });
+      if (query) params.set('query', query);
+      return apiGet<ShelfAvailableBooksPage>(
+        `/api/v1/shelves/${shelfId}/available-books?${params.toString()}`, { signal });
+    },
+    getNextPageParam: (last) => (last.has_more ? last.page + 1 : undefined),
+    enabled,
+    // Always re-check shelf membership when the picker is reopened.
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -642,7 +899,7 @@ export function useBookShelves(bookId: string | number, options?: { enabled?: bo
 export function useCreateShelf() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { name: string; is_public?: boolean }) =>
+    mutationFn: (vars: { name: string; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<Shelf>('/api/v1/shelves', vars),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['shelves'] }),
   });
@@ -651,7 +908,7 @@ export function useCreateShelf() {
 export function useUpdateShelf(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { name?: string; is_public?: boolean; kobo_sync?: boolean }) =>
+    mutationFn: (vars: { name?: string; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<Shelf>(`/api/v1/shelves/${id}`, vars),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['shelves'] });
@@ -733,7 +990,10 @@ export interface AdminConfig {
   config_theme: string;
   config_default_language: string;
   config_default_locale: string;
+  config_default_ui_font_body: string;
+  config_default_ui_font_display: string;
   config_server_announcement: string;
+  config_opds_filename_template: string;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
 }
@@ -763,6 +1023,7 @@ export interface MailConfig {
   mail_login: string;
   mail_from: string;
   mail_size_mb: number;
+  mail_filename_template: string;
   mail_server_type: number;
   has_password: boolean;
 }
@@ -972,11 +1233,7 @@ export function useBulkActions() {
   });
   const addToShelf = useMutation({
     mutationFn: (v: { ids: number[]; shelfId: number }) =>
-      // tolerate 409 (already on shelf) per book
-      settleById(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch((err) => {
-        if (err instanceof ApiError && err.status === 409) return null;
-        throw err;
-      })),
+      addShelfBooks(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`)),
     onSuccess: refresh,
   });
   const deleteBooks = useMutation({
@@ -1056,7 +1313,12 @@ export function useMergeBooks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => apiPost('/ajax/mergebooks', { Merge_books: ids }),
-    onSuccess: () => invalidateBookVisibilityViews(qc),
+    onSuccess: () => {
+      invalidateBookVisibilityViews(qc);
+      // The merged-away copies are deleted, so their duplicate group shrinks or
+      // goes; the list reads live book rows and is right on the next fetch.
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+    },
   });
 }
 
@@ -1133,6 +1395,7 @@ export function useUpdateMetadata(id: string | number) {
       // page, whose membership an edit can equally change.
       qc.removeQueries({ queryKey: ['books'] });
       qc.removeQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['tag-tree'] });
     },
   });
 }
@@ -1210,12 +1473,36 @@ export function useAddFormat(id: string | number) {
   });
 }
 
-/** Queue a format conversion (from -> to). */
+/** Queue a format conversion (from -> to). `task_id` names the queued task
+ *  in /api/v1/tasks (#1110). */
 export function useConvertFormat(id: string | number) {
   return useMutation({
     mutationFn: (v: { from: string; to: string }) =>
-      apiPost<{ ok: boolean; message: string }>(`/api/v1/books/${id}/convert`, v),
+      apiPost<{ ok: boolean; message: string; task_id?: string | null }>(`/api/v1/books/${id}/convert`, v),
   });
+}
+
+/** Follow one queued conversion until it ends (#1110: a finished conversion
+ *  used to look stalled until the reader refreshed the page). Returns the
+ *  task's row while it is listed; when it finishes, the book is refetched so
+ *  the new format appears in the file list. */
+export function useConversionTask(bookId: string | number, taskId: string | null, queuedAt = 0) {
+  const qc = useQueryClient();
+  const query = useQuery<{ items: TaskItem[] }>({
+    queryKey: ['tasks'],
+    queryFn: () => apiGet<{ items: TaskItem[] }>('/api/v1/tasks'),
+    enabled: !!taskId,
+    refetchInterval: 3000,
+  });
+  const task = taskId ? query.data?.items.find((it) => String(it.task_id) === taskId) : undefined;
+  // A list fetched after the task was queued that no longer holds it means the
+  // worker already pruned it; stop following it rather than polling forever.
+  const gone = !!taskId && !task && query.isSuccess && query.dataUpdatedAt > queuedAt;
+  const finished = task?.stat === TASK_FINISHED || gone;
+  useEffect(() => {
+    if (finished) void qc.invalidateQueries({ queryKey: ['book', String(bookId)] });
+  }, [finished, bookId, qc]);
+  return { task, gone };
 }
 
 /** Search online metadata providers (reuses the legacy /metadata/search).
@@ -1273,10 +1560,7 @@ export function useSetCover(id: string | number) {
       }
       return apiPost<{ ok: boolean; cover_url: string }>(`/api/v1/books/${id}/cover`, { url: v.url });
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['book', String(id)] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
-    },
+    onSuccess: () => refreshBookCoverViews(qc, id),
   });
 }
 
@@ -1284,7 +1568,8 @@ export function useSetCover(id: string | number) {
 
 export interface ReaderSettings {
   theme: 'lightTheme' | 'sepiaTheme' | 'darkTheme' | 'blackTheme';
-  font: 'default' | 'Yahei' | 'SimSun' | 'KaiTi' | 'Arial';
+  /** Built-in IDs and server-validated custom:<uuid> catalog entries. */
+  font: string;
   fontSize: number;
   margin: number;
   lineHeight: number;
@@ -1314,6 +1599,15 @@ export function useReaderSettings() {
     queryKey: ['reader-settings'],
     queryFn: () => apiGet<{ reader: ReaderSettings }>('/api/v1/reader/settings'),
     staleTime: 60_000,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
+export function useReaderFonts() {
+  return useQuery<ReaderFontCatalog>({
+    queryKey: ['reader-fonts'],
+    queryFn: () => apiGet<ReaderFontCatalog>('/api/v1/reader/fonts'),
+    staleTime: 0,
     retry: retryUnlessUnauthorized,
   });
 }
@@ -1625,7 +1919,8 @@ export function useShelfMembership() {
 
 // ── Magic shelves (smart collections) ────────────────────────────────────────
 
-export interface MagicRule { id: string; operator: string; value: string | string[] }
+export type MagicRuleValue = string | number | boolean | null | MagicRuleValue[] | { [key: string]: MagicRuleValue };
+export interface MagicRule { id: string; operator: string; value: MagicRuleValue }
 export interface MagicRuleSet { condition: 'AND' | 'OR'; rules: MagicRuleNode[] }
 /** A rule set may nest groups: the classic builder's "Add group" writes them. */
 export type MagicRuleNode = MagicRule | MagicRuleSet;
@@ -1664,16 +1959,18 @@ export function useMagicShelfPreview() {
 }
 
 export function useCreateMagicShelf() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet }) =>
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<{ success: boolean; shelf_id?: number; message?: string }>('/magicshelf', v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
   });
 }
 
 export function useEditMagicShelf(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet }) =>
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<{ success: boolean; message?: string }>(`/magicshelf/${id}/edit`, v),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['magicshelves'] });
@@ -1705,6 +2002,7 @@ export function useToggleMagicShelfKoboSync(id: string | number) {
 }
 
 export interface MagicShelfItem {
+  rules?: MagicRuleSet;
   id: number;
   name: string;
   icon: string;
@@ -1716,12 +2014,15 @@ export interface MagicShelfItem {
   can_delete: boolean;
   can_duplicate: boolean;
   can_kobo_sync: boolean;
+  opds_expose?: boolean;
+  can_hide?: boolean;
+  is_hidden?: boolean;
 }
 
-export function useMagicShelves() {
+export function useMagicShelves(manage = false) {
   return useQuery<{ items: MagicShelfItem[] }>({
-    queryKey: ['magicshelves'],
-    queryFn: () => apiGet<{ items: MagicShelfItem[] }>('/api/v1/magicshelves'),
+    queryKey: ['magicshelves', { manage }],
+    queryFn: () => apiGet<{ items: MagicShelfItem[] }>(`/api/v1/magicshelves${manage ? '?manage=1' : ''}`),
     staleTime: 30000,
   });
 }
@@ -1731,17 +2032,29 @@ export interface MagicShelfSortOption {
   label: string;
 }
 
-export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new', revision = 0) {
+export function useMagicShelfBooks(
+  id: string | number,
+  page = 1,
+  sort = 'new',
+  revision = 0,
+  /** Books per request; leave out to use the server's configured page size. */
+  perPage?: number,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<MagicShelfItem & BooksPage & {
     sort: string;
     sort_persistable?: boolean;
     custom_sort_options?: MagicShelfSortOption[];
   }>({
-    queryKey: ['magicshelf', String(id), page, sort, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 3, and the
+    // invalidations elsewhere match on the ['magicshelf', id] prefix.
+    queryKey: ['magicshelf', String(id), page, sort, revision, perPage],
     queryFn: () => apiGet(
-      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`,
+      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`
+        + (perPage ? `&per_page=${perPage}` : ''),
     ),
-    enabled: String(id).length > 0,
+    enabled: String(id).length > 0 && ready,
     // Same-shelf, same-order paging only — see useShelf (#612).
     placeholderData: (prev, prevQuery) =>
       prevQuery
@@ -1869,5 +2182,15 @@ export function useCancelTask() {
     mutationFn: (taskId: number | string) =>
       apiPost(`/api/v1/tasks/${encodeURIComponent(String(taskId))}/cancel`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+}
+
+
+export function useMagicShelfVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; visible: boolean }) =>
+      apiPost(`/api/v1/magicshelves/${v.id}/visibility`, { visible: v.visible }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
   });
 }

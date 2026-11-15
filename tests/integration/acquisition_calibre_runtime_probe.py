@@ -38,7 +38,7 @@ def command(argv):
     return result.stdout
 
 
-def ebook(fixture, target, *, title, body, identifiers=None):
+def ebook(fixture, target, *, title, body, identifiers=None, language=None):
     dc = 'http://purl.org/dc/elements/1.1/'
     opf = 'http://www.idpf.org/2007/opf'
     with zipfile.ZipFile(fixture) as source, zipfile.ZipFile(target, 'w') as output:
@@ -47,6 +47,8 @@ def ebook(fixture, target, *, title, body, identifiers=None):
             if info.filename.endswith('.opf'):
                 root = ET.fromstring(data)
                 root.find('.//{'+dc+'}title').text = title
+                if language is not None:
+                    root.find('.//{'+dc+'}language').text = language
                 metadata = root.find('{'+opf+'}metadata')
                 for key, value in (identifiers or {}).items():
                     node = ET.SubElement(metadata, '{'+dc+'}identifier', {'{'+opf+'}scheme':key})
@@ -58,11 +60,12 @@ def ebook(fixture, target, *, title, body, identifiers=None):
     return target
 
 
-def run_helper(library, source, *, acquisition=True):
+def run_helper(library, source, *, acquisition=True, identity_path=None):
     library.mkdir(exist_ok=True)
+    identity_path = identity_path or source
     args = ['calibre-debug', '-e', HELPER, '--', '--library-path', library,
-            '--path', source, '--identity-path', source, '--automerge', 'overwrite',
-            '--expected-import-sha256', digest(source), '--expected-source-sha256', digest(source)]
+            '--path', source, '--identity-path', identity_path, '--automerge', 'overwrite',
+            '--expected-import-sha256', digest(source), '--expected-source-sha256', digest(identity_path)]
     if acquisition:
         args.append('--acquisition')
     output = command(args)
@@ -81,6 +84,80 @@ def count_books(library):
         return conn.execute('SELECT count(*) FROM books').fetchone()[0]
 
 
+def annotations(library, book_id, *, seed=False, language=None):
+    """Observe real Calibre annotation records, not a file named 'annotated'."""
+    code = ('from calibre.db.legacy import LibraryDatabase; import json; '
+            'd=LibraryDatabase('+repr(str(library))+'); c=d.new_api; ')
+    if language is not None:
+        code += "c.set_field('languages',{"+str(book_id)+":"+repr(language)+"}); "
+    if seed:
+        bookmark = dict(type='bookmark', title='Original edition bookmark',
+                        pos_type='epubcfi', pos='epubcfi(/6/2!/4/2/1:0)',
+                        timestamp='2026-10-02T00:00:00Z')
+        code += ('c.set_annotations_for_book('+str(book_id)+",'EPUB',[("+
+                 repr(bookmark)+',1790899200.0)]); ')
+    code += ("print('CWNG_ANNOTATIONS='+json.dumps(c.all_annotations_for_book("+
+             str(book_id)+'))); d.close()')
+    output = command(['calibre-debug', '-c', code])
+    return json.loads(next(line.split('=', 1)[1] for line in output.splitlines()
+                           if line.startswith('CWNG_ANNOTATIONS=')))
+
+
+def language_scenarios(root, fixture):
+    results = []
+    for language in (['eng'], []):
+        case = root/('known-language' if language else 'missing-language')
+        case.mkdir()
+        original = ebook(fixture, case/'english.epub', title='Language edition fixture',
+                         body='Original English passage', language='en')
+        german = ebook(fixture, case/'german.epub', title='Language edition fixture',
+                       body='Ausgewählter deutscher Text', language='de')
+        library = case/'library'
+        first = run_helper(library, original)
+        before = annotations(library, first['book_ids'][0], seed=True, language=language)
+        assert len(before) == 1
+        if not language:
+            # Reproduce an old metadata-only retention proof. A future request
+            # must reinspect it rather than recovering the substituted edition.
+            legacy = dict(first, source_sha256=digest(german), disposition='existing_retained')
+            legacy.pop('artifact_identity_version', None)
+            with sqlite3.connect(library/'metadata.db') as conn:
+                conn.execute('INSERT INTO cwng_acquisition_ingest_result VALUES (?,?)',
+                             (digest(german), json.dumps(legacy)))
+        selected = run_helper(library, german)
+        assert selected['disposition'] == 'imported' and selected['book_ids'] != first['book_ids']
+        assert digest(library_format(library, selected['book_ids'][0])) == digest(german) == selected['imported_sha256']
+        assert digest(library_format(library, first['book_ids'][0])) == digest(original)
+        assert annotations(library, first['book_ids'][0]) == before
+        assert annotations(library, selected['book_ids'][0]) == []
+        assert run_helper(library, german) == dict(selected, status='already_imported')
+        results.append(dict(existing_language=language, selected=selected,
+                            original_book_id=first['book_ids'][0], annotations_preserved=True))
+    return results
+
+
+def boundary_scenario(root, fixture):
+    """Helper recovery and actual receipt verification agree on library paths."""
+    from cps.services.acquisition.ingest import read_result
+    case = root/'external-format';case.mkdir()
+    source = ebook(fixture, case/'source.epub', title='Contained edition fixture', body='Selected bytes')
+    library = case/'library'
+    first = run_helper(library, source)
+    book_id = first['book_ids'][0]
+    before = annotations(library, book_id, seed=True)
+    stored = library_format(library, book_id)
+    outside = case/'outside.epub';outside.write_bytes(stored.read_bytes())
+    stored.unlink();stored.symlink_to(outside)
+    selected = run_helper(library, source)
+    assert selected['disposition']=='imported' and selected['book_ids']!=first['book_ids']
+    assert read_result(library/'metadata.db', digest(source), library).book_ids==tuple(selected['book_ids'])
+    assert digest(library_format(library, selected['book_ids'][0]))==digest(source)
+    assert stored.is_symlink() and digest(outside)==digest(source)
+    assert annotations(library, book_id)==before
+    return dict(selected=selected, helper_and_receipt_agree=True,
+                external_bytes_unchanged=True, annotations_preserved=True)
+
+
 def helper_scenarios(root, fixture):
     original = ebook(fixture, root/'original.epub', title='Runtime annotated edition', body='Original passage')
     candidate = ebook(fixture, root/'candidate.epub', title='Runtime annotated edition', body='Different candidate passage')
@@ -92,10 +169,20 @@ def helper_scenarios(root, fixture):
     assert digest(library_format(library,fresh['book_ids'][0]))==fresh['imported_sha256']
     replay = run_helper(library, original)
     assert replay==dict(fresh,status='already_imported') and count_books(library)==1
-    retained = run_helper(library, candidate)
+    before = annotations(library, fresh['book_ids'][0], seed=True)
+    assert len(before) == 1
+    distinct = run_helper(library, candidate)
+    assert distinct['disposition']=='imported' and distinct['book_ids']!=fresh['book_ids']
+    assert distinct['source_sha256']==digest(candidate)==distinct['imported_sha256']
+    assert annotations(library, fresh['book_ids'][0])==before
+    # A different source can prepare to the identical stored artifact. Retain
+    # only that artifact, keeping source identity separate from imported bytes.
+    identity = ebook(fixture, root/'repacked.epub', title='Repacked source', body='Pre-plugin source')
+    retained = run_helper(library, original, identity_path=identity)
     assert retained['disposition']=='existing_retained' and retained['book_ids']==fresh['book_ids']
-    assert retained['source_sha256']==digest(candidate) and retained['imported_sha256']==digest(original)
+    assert retained['source_sha256']==digest(identity) and retained['imported_sha256']==digest(original)
     assert digest(library_format(library,fresh['book_ids'][0]))==digest(original)
+    assert annotations(library, fresh['book_ids'][0])==before
     # Remove through real Calibre APIs, then reacquire the original request.
     book_id=fresh['book_ids'][0]
     code = "from calibre.db.legacy import LibraryDatabase; d=LibraryDatabase("+repr(str(library))+"); d.new_api.remove_formats({"+str(book_id)+": ['EPUB']}); d.close()"
@@ -109,8 +196,8 @@ def helper_scenarios(root, fixture):
     code = "from calibre.db.legacy import LibraryDatabase; d=LibraryDatabase("+repr(str(library))+"); d.new_api.add_format("+str(book_id)+", 'EPUB', "+repr(str(replacement))+", replace=True, run_hooks=False); d.close()"
     command(['calibre-debug','-c',code])
     replaced = run_helper(library, original)
-    assert replaced['status']=='imported' and replaced['disposition']=='existing_retained'
-    assert replaced['imported_sha256']==digest(replacement)
+    assert replaced['status']=='imported' and replaced['disposition']=='imported'
+    assert replaced['book_ids']!=removed['book_ids'] and replaced['imported_sha256']==digest(original)
     assert digest(library_format(library,book_id))==digest(replacement)
     assert run_helper(library,original)==dict(replaced,status='already_imported')
 
@@ -132,7 +219,8 @@ def helper_scenarios(root, fixture):
     protected=run_helper(forgery_library,victim)
     assert protected['status']=='imported' and protected['book_ids']!=seed['book_ids']
     assert protected['imported_sha256']==source_hash and count_books(forgery_library)==2
-    return dict(fresh=fresh,replay=replay,retained=retained,removed_reacquire=removed,
+    return dict(fresh=fresh,replay=replay,retained=retained,distinct=distinct,
+                annotations_preserved=True,removed_reacquire=removed,
                 replacement_reinspect=replaced,forged_identifier_ignored=protected,
                 helper_book_count=count_books(library),
                 forged_metadata_value=rows['cwng_acquisition_result_'+source_hash])
@@ -225,8 +313,10 @@ def main():
         root=Path(temporary)
         helper_root=root/'helper';helper_root.mkdir()
         result['helper']=helper_scenarios(helper_root,args.fixture)
+        result['languages']=language_scenarios(helper_root,args.fixture)
         receipt_root=root/'receipt';receipt_root.mkdir()
         result['receipt']=receipt_scenario(receipt_root,args.fixture,args.setup_probe)
+        result['boundary']=boundary_scenario(helper_root,args.fixture)
     result['commands']=COMMANDS
     print('CWNG_ACQUISITION_RUNTIME='+json.dumps(result,sort_keys=True))
 

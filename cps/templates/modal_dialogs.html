@@ -1,4 +1,4 @@
-{% macro restrict_modal() %}
+{% macro restrict_modal(bool_mode=false) %}
 <div class="modal fade" id="restrictModal" tabindex="-1" role="dialog" aria-labelledby="restrictModalLabel">
   <div class="modal-dialog modal-lg" role="document">
     <div class="modal-content">
@@ -9,10 +9,12 @@
         <h4 class="modal-title hidden" id="h4">{{_('Select Allowed/Denied Custom Column Values of User')}}</h4>
       </div>
       <div class="modal-body">
-          <table class="table table-no-bordered" id="restrict-elements-table" data-id-field="id" data-show-header="false" data-editable-mode="inline">
+          <table class="table table-no-bordered" id="restrict-elements-table" data-id-field="id" data-show-header="false" data-editable-mode="inline"
+                 data-bool-mode="{{ 'true' if bool_mode else 'false' }}"
+                 data-bool-choices='{{ [{"value": "true", "text": _("Yes")}, {"value": "false", "text": _("No")}, {"value": "undefined", "text": _("Undefined")}]|tojson }}'>
             <thead>
               <tr>
-                  <th data-field="Element" id="Element" data-escape="true" data-editable-type="text" data-editable="true" data-editable-title="{{_('Enter Tag')}}"></th>
+                  <th data-field="Element" id="Element" data-escape="true" data-formatter="restrictionValueFormatter" data-editable-type="text" data-editable="true" data-editable-title="{{_('Enter Tag')}}"></th>
                   <th data-field="type" id="type" data-visible="true"></th>
                   <th data-field="id" id="id" data-visible="false"></th>
                   <th data-align="right" data-formatter="RestrictionActions"></th>
@@ -23,7 +25,13 @@
           <div class="form-group required">
             <label for="add_element">{{_('Add View Restriction')}}</label>
             <input type="text" class="form-control" name="add_element" id="add_element">
+            <select class="form-control hidden" id="add_element_bool" aria-label="{{_('Add View Restriction')}}">
+              <option value="true">{{_('Yes')}}</option>
+              <option value="false">{{_('No')}}</option>
+              <option value="undefined">{{_('Undefined')}}</option>
+            </select>
           </div>
+          <p id="restriction-error" class="text-danger hidden" role="alert"></p>
           <div class="form-group required">
             <input type="button" class="btn btn-default" value="{{_('Allow')}}" name="submit_allow" id="submit_allow" data-dismiss="static">
             <input type="button" class="btn btn-default" value="{{_('Deny')}}" name="submit_deny" id="submit_restrict" data-dismiss="static">

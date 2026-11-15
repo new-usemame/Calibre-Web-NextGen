@@ -843,6 +843,7 @@ function currentImageOffset(imageIndex) {
 }
 
 function setBookmark() {
+  if (calibre.lookupMode) return;
   // get csrf_token
     let csrf_token = $("input[name='csrf_token']").val();
     //This sends a bookmark update to calibreweb.

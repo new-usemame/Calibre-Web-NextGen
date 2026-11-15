@@ -6,6 +6,7 @@ import { clampOffset } from '../lib/pagination';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useT } from '../lib/i18n';
 import styles from '../pages/Devices.module.css';
+import type { BookScope } from './DeviceBookScope';
 
 export interface AuthorityRollup {
   unseeded: number;
@@ -17,6 +18,7 @@ export interface AuthorityRollup {
 }
 
 export interface Device {
+  book_scope?: BookScope | null;
   public_id: string;
   label: string;
   type: string;
@@ -41,6 +43,10 @@ export interface Device {
   unseeded_books?: number;
   authority?: AuthorityRollup;
   active: boolean;
+  /** Opt-in place sharing between devices (spec 2026-10-11); off by default. */
+  share_place?: boolean;
+  /** per_device: the device's own requests can honor the checkbox; always_shared: an old KOReader plugin or stock KOReader. */
+  place_control?: 'per_device' | 'always_shared';
 }
 
 interface InventoryBook {

@@ -30,7 +30,7 @@ from sqlalchemy.orm import sessionmaker
 # --- Helpers ---------------------------------------------------------------
 
 # The exact schema kobo_annotation_sync had BEFORE the H1 migration ran.
-# Matches the production app.db on teenyverse pre-v4.0.78 (verified via
+# Matches the production app.db on the household host pre-v4.0.78 (verified via
 # `sqlite3 .schema kobo_annotation_sync` on 2026-05-18).
 PRE_H1_SCHEMA = """
 CREATE TABLE kobo_annotation_sync (
@@ -578,6 +578,7 @@ class TestMigrationPreservesAllUserData:
         ub.migrate_device_management_slice(engine, session)
         ub.migrate_kobo_annotation_seed_pipeline(engine, session)
         ub.migrate_kobo_two_way_annotation_sync(engine, session)
+        ub.migrate_annotation_text_quote(engine, session)
 
         # Fresh session: ORM read must work on every row.
         s2 = session_maker()

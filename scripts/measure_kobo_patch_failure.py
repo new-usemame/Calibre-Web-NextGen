@@ -644,7 +644,7 @@ def _parse_args(argv=None):
     )
     parser.add_argument("--app-db", required=True, help="CWNG app.db")
     parser.add_argument("--metadata-db", required=True, help="Calibre metadata.db")
-    parser.add_argument("--device-host", default="10.0.20.250")
+    parser.add_argument("--device-host", default="192.0.2.250")
     parser.add_argument("--device-db", default="/mnt/onboard/.kobo/KoboReader.sqlite")
     parser.add_argument(
         "--backup-dir", required=True, help="persistent local directory for DB backups"

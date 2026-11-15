@@ -293,44 +293,53 @@ class HardcoverClient:
         if not book_id:
             return None
         preferred = ids.get("hardcover-edition")
-        candidates = self._editions_with_pages(int(book_id))
-        if not candidates:
-            return None
-        by_id = {str(e.get("id")): e for e in candidates}
-        chosen = by_id.get(str(preferred)) if preferred else None
+        candidates = self._editions_with_pages(int(book_id), edition_ids=[int(preferred)]) if preferred else []
+        chosen = next(iter(candidates), None)
         if chosen is None:
             defaults = self._default_edition_ids(int(book_id))
+            candidates = self._editions_with_pages(int(book_id), edition_ids=defaults) if defaults else []
+            by_id = {str(e.get("id")): e for e in candidates}
             chosen = next((by_id[str(d)] for d in defaults if str(d) in by_id), None)
         if chosen is None:
-            chosen = sorted(
-                candidates,
-                key=lambda e: (e.get("reading_format_id") == self.EBOOK_READING_FORMAT,
-                               e.get("users_count") or 0),
-                reverse=True,
-            )[0]
+            candidates = (self._editions_with_pages(int(book_id), ebooks_only=True)
+                          or self._editions_with_pages(int(book_id)))
+            chosen = next(iter(candidates), None)
+        if chosen is None:
+            return None
         edition = {"id": int(chosen["id"]), "pages": int(chosen["pages"])}
         log.info("Hardcover user_book %s had no edition with pages; using edition %s (%s pages)",
                  user_book.get("id"), edition["id"], edition["pages"])
         self._set_user_book_edition(user_book, edition["id"])
         return edition
 
-    def _editions_with_pages(self, book_id):
+    def _editions_with_pages(self, book_id, edition_ids=None, ebooks_only=False):
         """The book's editions that have a page count.
 
         ``users_count`` only orders the fallback choice; if the schema refuses
         it, the query is retried with the fields the client already relies on.
         """
+        # Filter and order before limiting: popular books can have thousands
+        # of editions, and their own/default e-book may be beyond the first 100.
+        where = {"book_id": {"_eq": book_id}, "pages": {"_gt": 0}}
+        if edition_ids is not None:
+            where["id"] = {"_in": edition_ids}
+        if ebooks_only:
+            where["reading_format_id"] = {"_eq": self.EBOOK_READING_FORMAT}
         query = """
-            query ($id: Int!) {
-                editions(where: {book_id: {_eq: $id}, pages: {_gt: 0}}, limit: 100) {
+            query ($where: editions_bool_exp!, $order: [editions_order_by!], $limit: Int!) {
+                editions(where: $where, order_by: $order, limit: $limit) {
                     id
                     pages
                     reading_format_id%s
                 }
             }"""
         for extra in ("\n                    users_count", ""):
+            order = ([{"users_count": "desc_nulls_last"}] if extra else []) + [{"id": "asc"}]
             try:
-                response = self.execute(query % extra, {"id": book_id})
+                response = self.execute(query % extra, {
+                    "where": where, "order": order,
+                    "limit": len(edition_ids) if edition_ids is not None else 1,
+                })
             except Exception as e:
                 log.debug(f"Hardcover editions query failed for book {book_id}: {e}")
                 continue

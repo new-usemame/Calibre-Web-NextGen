@@ -33,7 +33,16 @@ class FakeApi:
         if "editions(where" in query:
             if self.refuse_users_count and "users_count" in query:
                 raise Exception("GraphQL error: field 'users_count' not found")
-            return {"editions": self.editions}
+            editions = list(self.editions)
+            where = (variables or {}).get("where", {})
+            if "id" in where:
+                editions = [e for e in editions if e["id"] in where["id"]["_in"]]
+            if "reading_format_id" in where:
+                editions = [e for e in editions if e["reading_format_id"] == where["reading_format_id"]["_eq"]]
+            for order in reversed((variables or {}).get("order", [])):
+                field, direction = next(iter(order.items()))
+                editions.sort(key=lambda e: e.get(field) or 0, reverse=direction.startswith("desc"))
+            return {"editions": editions[:(variables or {}).get("limit", 100)]}
         if "default_ebook_edition_id" in query:
             if self.defaults_error:
                 raise Exception("GraphQL error: field not found")
@@ -116,3 +125,20 @@ def test_no_read_in_progress_writes_nothing():
     _client(api, reads=()).update_reading_progress({"hardcover-id": "9"}, 50)
 
     assert not any("update_user_book_read" in q for q, _ in api.calls)
+
+
+@pytest.mark.parametrize("preferred", ["own", "default", "popular"])
+def test_preferred_edition_is_found_beyond_the_first_hundred(preferred):
+    """A popular work's large edition list cannot hide the requested edition."""
+    editions = [{"id": i, "pages": 200, "reading_format_id": 1, "users_count": 1}
+                for i in range(1, 151)]
+    editions.append({"id": 999, "pages": 400, "reading_format_id": 4, "users_count": 500})
+    api = FakeApi(editions, defaults={"default_ebook_edition_id": 999} if preferred == "default" else {})
+    ids = {"hardcover-id": "9"}
+    if preferred == "own":
+        ids["hardcover-edition"] = "999"
+
+    _client(api).update_reading_progress(ids, 50)
+
+    assert api.read_update()["editionId"] == 999
+    assert api.read_update()["pages"] == 200

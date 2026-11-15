@@ -58,8 +58,4 @@ test('reader derives the viewer-gated content route when an older API omits cont
   expect(strippedCurrentPayload, 'the test must exercise an API payload without content_url').toBe(true);
   expect((await contentResponse).status()).toBe(200);
   expect(downloadRequests, 'compatibility must never fall back to the download-gated route').toEqual([]);
-  // The reader can fetch the book detail again after the iframe attaches. A
-  // handler still running when the context closes reads a disposed response,
-  // so let any in-flight handler finish before teardown (#2940).
-  await page.unrouteAll({ behavior: 'wait' });
 });

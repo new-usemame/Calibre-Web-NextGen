@@ -141,6 +141,43 @@ def test_plain_scores_are_unchanged():
     assert score == pytest.approx(0.95)
 
 
+@pytest.mark.parametrize("isbn", ["2070368220", "207036822Z", "9782070368220", "1234567890123"])
+def test_invalid_isbn_cannot_override_unrelated_title_and_author(isbn):
+    """A malformed identifier must not auto-link an unrelated Hardcover work."""
+    hit = _hit("Unrelated", ["Someone Else"], isbns=[isbn])
+    score, _ = Hardcover.calculate_confidence_score(
+        hit, "Dune", query_authors=["Frank Herbert"], query_isbn=isbn,
+    )
+    assert normalize_isbn(isbn) == ""
+    assert score < 0.85
+
+
+@pytest.mark.parametrize("title, subtitle", [
+    ("Chronicles: The Lost Kingdom", ""),
+    ("Chronicles", "The Lost Kingdom"),
+])
+def test_different_subtitles_are_not_discarded_on_both_sides(title, subtitle):
+    """A shared series-like prefix and author cannot erase conflicting titles."""
+    hit = _hit(title, ["An Author"], subtitle=subtitle)
+    score, _ = Hardcover.calculate_confidence_score(
+        hit, "Chronicles: An Ocean Voyage", query_authors=["An Author"],
+    )
+    assert score < 0.85
+
+
+def test_cli_uses_the_same_isbn_validation_and_title_matching(monkeypatch):
+    """A direct provider import must not fall back to a weaker ISBN validator."""
+    import runpy
+    import sys
+    from cps.metadata_provider import hardcover
+
+    monkeypatch.setitem(sys.modules, "cps.utils.text_similarity", None)
+    namespace = runpy.run_path(hardcover.__file__, run_name="hardcover_cli_test")
+    assert namespace["normalize_isbn"]("207036822X") == "9782070368228"
+    assert namespace["normalize_isbn"]("2070368220") == ""
+    assert namespace["normalized_levenshtein_similarity"]("étoffes", "etoffes") == 1.0
+
+
 # --- provider parsing --------------------------------------------------------
 
 def test_search_hits_carry_match_hints_but_not_as_identifiers(monkeypatch):
@@ -284,31 +321,25 @@ def test_equal_scores_prefer_the_most_shelved_record(monkeypatch):
     assert outcome["applied"] == "12"
 
 
-def test_include_pending_only_excludes_rejected_books(monkeypatch):
-    seen = {}
+@pytest.mark.parametrize("include_pending, expected", [(False, {1, 2}), (True, {2})])
+def test_include_pending_only_excludes_rejected_books(monkeypatch, include_pending, expected):
+    """Manual rematching includes pending books but preserves durable rejections."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
 
-    class FakeQuery:
-        def filter(self, condition):
-            seen["sql"] = str(condition.compile(compile_kwargs={"literal_binds": True}))
-            return self
-
-        def distinct(self):
-            return self
-
-        def all(self):
-            return []
-
-    class FakeSession:
-        def query(self, *args):
-            return FakeQuery()
-
-        def close(self):
-            pass
-
-    monkeypatch.setattr(mod.ub, "init_db_thread", lambda: FakeSession())
-
-    _bare_task(include_pending=False)._get_review_excluded_book_ids()
-    assert "reviewed = 0" in seen["sql"]
-    _bare_task(include_pending=True)._get_review_excluded_book_ids()
-    assert "reviewed = 0" not in seen["sql"]
-    assert "'reject'" in seen["sql"]
+    engine = create_engine("sqlite://")
+    mod.ub.HardcoverMatchQueue.__table__.create(engine)
+    factory = sessionmaker(bind=engine)
+    with factory() as session:
+        for book_id, reviewed, action in [(1, 0, None), (2, 1, "reject"),
+                                          (3, 1, "skip"), (4, 1, "retry")]:
+            session.add(mod.ub.HardcoverMatchQueue(
+                book_id=book_id, book_title="t", book_authors="a", search_query="q",
+                reviewed=reviewed, review_action=action, created_at="2026-10-07",
+                hardcover_results="[]", confidence_scores="[]"))
+        session.commit()
+    monkeypatch.setattr(mod.ub, "init_db_thread", factory)
+    try:
+        assert _bare_task(include_pending=include_pending)._get_review_excluded_book_ids() == expected
+    finally:
+        engine.dispose()

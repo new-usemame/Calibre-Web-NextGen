@@ -191,13 +191,20 @@ def normalize_isbn(value) -> str:
     Hardcover lists both forms per edition. Comparing the ISBN-13 form
     makes "2-07-036822-X" and "9782070368228" the same book.
     """
-    digits = re.sub(r"[^0-9Xx]", "", str(value or "")).upper()
-    if len(digits) == 10 and digits[:9].isdigit():
+    raw = re.sub(r"^isbn(?:-1[03])?:?\s*", "", str(value or "").strip(), flags=re.I)
+    digits = re.sub(r"[\s-]", "", raw).upper()
+    if re.fullmatch(r"[0-9]{9}[0-9X]", digits):
+        checksum = sum((10 - i) * (10 if d == 'X' else int(d))
+                       for i, d in enumerate(digits))
+        if checksum % 11:
+            return ""
         core = "978" + digits[:9]
         total = sum((1 if i % 2 == 0 else 3) * int(d) for i, d in enumerate(core))
         return core + str((10 - total % 10) % 10)
-    if len(digits) == 13 and digits.isdigit():
-        return digits
+    if re.fullmatch(r"97[89][0-9]{10}", digits):
+        checksum = sum((1 if i % 2 == 0 else 3) * int(d) for i, d in enumerate(digits))
+        if checksum % 10 == 0:
+            return digits
     return ""
 
 

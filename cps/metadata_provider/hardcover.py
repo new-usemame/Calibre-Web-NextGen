@@ -27,19 +27,22 @@ try:
         main_title,
     )
 except ImportError:
-    # Fallback for CLI usage
-    def normalized_levenshtein_similarity(s1: str, s2: str) -> float:
-        return 1.0 if s1.lower() == s2.lower() else 0.5
-    def author_list_similarity(a1: List[str], a2: List[str]) -> tuple[float, bool]:
-        return (0.5, False)
-    def normalize_string(s: str) -> str:
-        return s.lower()
-    def calculate_year_similarity(y1: str, y2: str) -> float:
-        return 1.0 if y1 == y2 else 0.0
-    def normalize_isbn(value) -> str:
-        return re.sub(r"[^0-9Xx]", "", str(value or "")).upper()
-    def main_title(title: str) -> str:
-        return (title or "").split(":")[0].strip()
+    # Direct CLI usage cannot always import the Flask package. Load the same
+    # dependency-free helpers by path so matching and ISBN validation agree.
+    import importlib.util
+    from pathlib import Path
+
+    _similarity_spec = importlib.util.spec_from_file_location(
+        "hardcover_text_similarity", Path(__file__).resolve().parents[1] / "utils" / "text_similarity.py",
+    )
+    _similarity = importlib.util.module_from_spec(_similarity_spec)
+    _similarity_spec.loader.exec_module(_similarity)
+    normalized_levenshtein_similarity = _similarity.normalized_levenshtein_similarity
+    author_list_similarity = _similarity.author_list_similarity
+    normalize_string = _similarity.normalize_string
+    calculate_year_similarity = _similarity.calculate_year_similarity
+    normalize_isbn = _similarity.normalize_isbn
+    main_title = _similarity.main_title
 
 # Try importing from full app; if unavailable (CLI), use light fallbacks
 try:  # pragma: no cover - normal app path
@@ -486,19 +489,25 @@ class Hardcover(Metadata):
         hints = getattr(result, "match_hints", None) or {}
         result_title = result.title or ""
         subtitle = hints.get("subtitle") or ""
+        query_main = main_title(query_title)
+        query_has_subtitle = bool(query_main and query_main != query_title)
+        stripped = main_title(result_title)
+        result_has_subtitle = bool(subtitle or (stripped and stripped != result_title))
 
-        candidates = [(result_title, 1.0, "")]
+        # If both records carry a subtitle, compare those subtitles too. A
+        # shared prefix can be a series name followed by different book names.
+        # The canonical title alone is incomplete when the API splits off its
+        # subtitle and the query also supplies one.
+        candidates = [] if subtitle and query_has_subtitle else [(result_title, 1.0, "")]
         if subtitle:
             candidates.append((f"{result_title}: {subtitle}", 1.0, "with subtitle"))
         for alt in hints.get("alternative_titles", []) or []:
             candidates.append((alt, 1.0, "alternative title"))
-        stripped = main_title(result_title)
-        if stripped and stripped != result_title:
+        if stripped and stripped != result_title and not query_has_subtitle:
             candidates.append((stripped, Hardcover.SUBTITLE_STRIPPED_WEIGHT, "subtitle ignored"))
 
         queries = [(query_title, 1.0)]
-        query_main = main_title(query_title)
-        if query_main and query_main != query_title:
+        if query_has_subtitle and not result_has_subtitle:
             queries.append((query_main, Hardcover.SUBTITLE_STRIPPED_WEIGHT))
 
         best, best_note = 0.0, ""

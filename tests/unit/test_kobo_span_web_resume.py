@@ -126,6 +126,43 @@ def test_a_kepub_only_span_from_a_proven_kobo_opens_the_browser_exactly(library,
     assert served.get("epub_sha256")
 
 
+def test_raising_the_archive_cap_resumes_a_large_proven_book_through_the_api(
+        library, rows, monkeypatch):
+    """The same >16 MiB book changes from a percentage offer to an exact place.
+
+    Drive the real authenticated bookmark GET and KEPUB bridge, preserving
+    the Browser's own bookmark and the Kobo download proof.
+    """
+    import hashlib
+    from pathlib import Path
+    import zipfile
+    from cps.services import kobo_position, kobo_resume
+
+    w = library
+    with zipfile.ZipFile(w.epub, 'a', zipfile.ZIP_STORED) as archive:
+        archive.writestr('images/plate.jpg', b'\0' * (17 * 1024 * 1024))
+    # Exercise size admission independently of the machine's storage speed.
+    monkeypatch.setattr(kobo_resume, 'KEPUB_RESUME_TIMEOUT_SECONDS', 5.0)
+    monkeypatch.delenv('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', raising=False)
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES',
+                        kobo_position._resume_archive_limit())
+    _newer_kobo_place(w, rows, proof='proven')
+    offered = resume(w)
+    assert offered['bookmark']
+    assert offered['resume']['mode'] == 'offer'
+    assert 'cfi' not in offered['resume']
+
+    monkeypatch.setenv('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', '32')
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES',
+                        kobo_position._resume_archive_limit())
+    served = resume(w)
+    assert served['bookmark'] == offered['bookmark']
+    assert served['resume']['mode'] == 'automatic'
+    assert served['resume']['percentage'] == pytest.approx(60)
+    assert served['resume']['cfi'] == cfi_of(w, rows['late'])
+    assert served['resume']['epub_sha256'] == hashlib.sha256(Path(w.epub).read_bytes()).hexdigest()
+
+
 # == (b) No proof, or a proof of another file: the offer ======================
 
 @pytest.mark.parametrize("proof", ["none", "mismatch"])

@@ -351,6 +351,7 @@ def test_chapter_snapshot_over_cap_is_explained(epub, monkeypatch, caplog):
 
 def test_large_illustrated_archive_resolves_once_the_cap_allows_it(epub, monkeypatch):
     """A >16 MiB archive (stored images) is refused by default and exact when admitted."""
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', 16 * 1024 * 1024)
     with zipfile.ZipFile(epub, 'a', zipfile.ZIP_STORED) as archive:
         archive.writestr('OEBPS/images/plate.jpg', b'\0' * (17 * 1024 * 1024))
     assert epub.stat().st_size > kobo_position.MAX_RESUME_ARCHIVE_BYTES
@@ -360,6 +361,53 @@ def test_large_illustrated_archive_resolves_once_the_cap_allows_it(epub, monkeyp
     point, digest = kobo_position._resume_snapshot(*args)
     assert point == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
     assert len(digest) == 64
+
+
+@pytest.mark.parametrize('configured, admitted', [(None, False), ('32', True), ('257', False)])
+def test_startup_archive_limit_reaches_both_snapshot_readers(epub, tmp_path, configured, admitted):
+    """A real startup setting must admit the same large EPUB for exact and chapter resume.
+
+    A child process imports both readers afresh, so patching the parser without
+    wiring its result into either reader cannot pass this check.
+    """
+    import hashlib
+    import json
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    with zipfile.ZipFile(epub, 'a', zipfile.ZIP_STORED) as archive:
+        archive.writestr('OEBPS/images/plate.jpg', b'\0' * (17 * 1024 * 1024))
+    config_dir = tmp_path / 'config'
+    config_dir.mkdir()
+    env = {**os.environ, 'CALIBRE_DBPATH': str(config_dir)}
+    env.pop('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', None)
+    if configured is not None:
+        env['CWA_KOBO_RESUME_MAX_ARCHIVE_MIB'] = configured
+    script = '''
+import json
+import sys
+from cps.services import kobo_position, kobo_resume
+exact = kobo_position._resume_snapshot(sys.argv[1], 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+chapter = kobo_resume._chapter_snapshot(sys.argv[1], 'OEBPS/chapter.xhtml', 50)
+print(json.dumps({'exact': exact, 'chapter': chapter}))
+'''
+    child = subprocess.run(
+        [sys.executable, '-c', script, str(epub)], env=env,
+        cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True, timeout=30,
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+    result = json.loads(child.stdout.splitlines()[-1])
+    if admitted:
+        fingerprint = hashlib.sha256(epub.read_bytes()).hexdigest()
+        assert result == {
+            'exact': ['epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)', fingerprint],
+            'chapter': {'chapter_href': 'OEBPS/chapter.xhtml',
+                        'chapter_progression': 0.5, 'epub_sha256': fingerprint},
+        }
+    else:
+        assert result == {'exact': None, 'chapter': None}
 
 
 def _set_flag_on_every_member(path, flag):

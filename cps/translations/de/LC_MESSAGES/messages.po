@@ -2096,7 +2096,7 @@ msgstr "Hoch bewertet"
 #: cps/magic_shelf.py cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/web.py
 msgid "Currently Reading"
-msgstr "Derzeit gelesen"
+msgstr "Wird gerade gelesen"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Yet to Read"
@@ -7826,7 +7826,7 @@ msgstr "Mehr laden"
 #: cps/templates/config_edit.html cps/templates/cwa_settings.html
 #: cps/templates/read.html
 msgid "Loading"
-msgstr "Wird geladen"
+msgstr "Wird geladen…"
 
 #: cps/spa_strings.py
 msgid "Loading device annotations…"

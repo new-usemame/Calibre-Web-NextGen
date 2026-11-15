@@ -147,6 +147,8 @@ def test_opt_in_and_default_plugin_environments_are_distinct_probe_keys(tmp_path
     monkeypatch.setenv("HOME", str(tmp_path / "ambient-home"))
     monkeypatch.delenv("CALIBRE_CONFIG_DIRECTORY", raising=False)
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    # The container layout, where the plugin opt-in's HOME is /config.
+    monkeypatch.delenv("CALIBRE_DBPATH", raising=False)
     calls = []
 
     def run(_debug_path, env):

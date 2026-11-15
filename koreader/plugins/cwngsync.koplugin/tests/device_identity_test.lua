@@ -303,6 +303,15 @@ local function testACopyTakenBeforeKOReaderExitsCarriesTheFingerprint()
         "the copy must carry the fingerprint, so the second Kindle gets its own ID")
 end
 
+-- A platform that reports no model name says nothing about its hardware.
+local function testAReaderWithNoModelNameKeepsItsId()
+    local nameless = { isKindle = function() return false end, isKobo = function() return false end }
+    local settings = newSettings({ device_id = "kept", cwngsync_hardware_fingerprint = "from-a-kindle" })
+    local plugin, shown = loadPlugin(settings, nameless, {})
+    assertEqual(plugin.device_id, "kept", "no model name: the ID is left alone")
+    assertEqual(#shown, 0, "and nothing is shown")
+end
+
 testACopiedKindleGetsItsOwnId()
 testTheSerialIsNotWrittenToSettings()
 testAKoboIsToldApartByItsSerial()
@@ -314,4 +323,5 @@ testAnAndroidSetupCopiedOntoAKindleGetsItsOwnId()
 testAnAndroidReaderKeepsItsIdOnUpdate()
 testAKindleWithAnUnreadableSerialKeepsItsRecordedId()
 testACopyTakenBeforeKOReaderExitsCarriesTheFingerprint()
+testAReaderWithNoModelNameKeepsItsId()
 print("device identity: all tests passed")

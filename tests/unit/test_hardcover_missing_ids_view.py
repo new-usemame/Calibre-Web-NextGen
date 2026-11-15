@@ -80,7 +80,11 @@ def env(monkeypatch):
                            ("/admin/hardcover/review-matches", "admin.hardcover_review_matches"),
                            ("/admin", "admin.admin")]:
         app.add_url_rule(rule, endpoint=endpoint, view_func=lambda: "")
-    return SimpleNamespace(app=app, cal=cal, us=us, rendered=rendered)
+    yield SimpleNamespace(app=app, cal=cal, us=us, rendered=rendered)
+    cal.close()
+    us.close()
+    cal_engine.dispose()
+    ub_engine.dispose()
 
 
 def test_lists_only_books_without_any_hardcover_identifier(env):
@@ -149,3 +153,95 @@ def test_review_page_hides_books_matched_since_they_were_queued(env):
     r = env.rendered
     assert [m["book_id"] for m in r["matches"]] == [1]
     assert r["missing_count"] == 3
+
+
+def test_pagination_reaches_every_missing_book_and_keeps_status_filter(env, monkeypatch):
+    """The display limit must not make later books impossible to inspect."""
+    monkeypatch.setattr(admin, "HARDCOVER_MISSING_PAGE_LIMIT", 1)
+    seen = []
+    for page in range(1, 4):
+        with env.app.test_request_context(f"/admin/hardcover/missing?page={page}"):
+            _unwrap(admin.hardcover_missing_ids)()
+        seen.extend(row["id"] for row in env.rendered["rows"])
+    assert sorted(seen) == [1, 2, 5]
+    with env.app.test_request_context("/admin/hardcover/missing?status=rejected&page=99"):
+        _unwrap(admin.hardcover_missing_ids)()
+    assert [row["id"] for row in env.rendered["rows"]] == [2]
+    assert env.rendered["status_filter"] == "rejected"
+
+
+@pytest.mark.parametrize("actor, expected", [(None, 401), ("reader", 403), ("admin", 200)])
+def test_new_routes_enforce_login_admin_and_csrf(env, monkeypatch, actor, expected):
+    """Drive the decorated handlers: denied requests cannot enqueue or lift a rejection."""
+    from cps import cw_login, usermanagement
+    from flask_wtf.csrf import CSRFProtect, generate_csrf
+
+    manager = cw_login.LoginManager(env.app)
+
+    class User(cw_login.UserMixin):
+        def __init__(self, name):
+            self.id = self.name = name
+            self.locale = "fr"
+
+        def role_admin(self):
+            return self.name == "admin"
+
+    manager.user_loader(lambda user_id, user_random, session_key: User(user_id))
+    from pathlib import Path
+    env.app.config["BABEL_TRANSLATION_DIRECTORIES"] = str(Path(admin.__file__).parent / "translations")
+    Babel(env.app, locale_selector=lambda: cw_login.current_user.locale if cw_login.current_user.is_authenticated else "en")
+    monkeypatch.setattr(admin, "current_user", cw_login.current_user)
+    monkeypatch.setattr(admin, "render_title_template", lambda template, **kwargs: kwargs["title"])
+    monkeypatch.setattr(usermanagement.config, "config_allow_reverse_proxy_header_login", False, raising=False)
+    CSRFProtect(env.app)
+    env.app.add_url_rule("/csrf", view_func=lambda: generate_csrf())
+    env.app.view_functions["admin.hardcover_missing_ids"] = admin.hardcover_missing_ids
+    env.app.add_url_rule("/admin/hardcover/rematch", view_func=admin.hardcover_rematch, methods=["POST"])
+    env.app.add_url_rule("/admin/hardcover/allow-retry/<int:book_id>",
+                         view_func=admin.hardcover_allow_retry, methods=["POST"])
+    queued = []
+    monkeypatch.setattr(admin, "_enqueue_hardcover_auto_fetch", lambda include_pending: queued.append(include_pending))
+    client = env.app.test_client()
+    if actor:
+        with client.session_transaction() as session:
+            session["_user_id"] = actor
+            session["_random"] = "test-random"
+            session["_id"] = "test-session"
+    response = client.get("/admin/hardcover/missing")
+    assert response.status_code == expected
+    if actor == "admin":
+        assert response.get_data(as_text=True) == "Livres sans identifiant Hardcover"
+    token = client.get("/csrf").get_data(as_text=True)
+    for path in ["/admin/hardcover/rematch", "/admin/hardcover/allow-retry/2"]:
+        assert client.post(path).status_code == 400
+        assert client.post(path, data={"csrf_token": token}).status_code == (302 if actor == "admin" else expected)
+    assert queued == ([True] if actor == "admin" else [])
+    action = env.us.query(ub.HardcoverMatchQueue).filter_by(book_id=2).one().review_action
+    assert action == ("retry" if actor == "admin" else "reject")
+
+
+def test_rendered_page_keeps_filter_in_pagination_and_escapes_book_titles(env, monkeypatch):
+    """Users can reach later filtered pages; library metadata stays plain text."""
+    from pathlib import Path
+    from flask import render_template
+    from jinja2 import ChoiceLoader, DictLoader, FileSystemLoader
+
+    monkeypatch.setattr(admin, "HARDCOVER_MISSING_PAGE_LIMIT", 1)
+    env.cal.query(db.Books).filter_by(id=1).update({"title": "<script>alert(1)</script>"})
+    env.cal.commit()
+    env.app.jinja_loader = ChoiceLoader([
+        DictLoader({"layout.html": "{% block body %}{% endblock %}"}),
+        FileSystemLoader(Path(admin.__file__).parent / "templates"),
+    ])
+    env.app.jinja_env.globals["csrf_token"] = lambda: "token"
+    for endpoint in ["admin.hardcover_rematch", "admin.hardcover_allow_retry",
+                     "web.show_book", "edit-book.show_edit_book"]:
+        env.app.add_url_rule("/" + endpoint + "/<int:book_id>" if endpoint != "admin.hardcover_rematch"
+                             else "/rematch", endpoint=endpoint, view_func=lambda **kw: "")
+    with env.app.test_request_context("/admin/hardcover/missing?status=all&page=3"):
+        _unwrap(admin.hardcover_missing_ids)()
+        context = {key: value for key, value in env.rendered.items() if key != "template"}
+        html = render_template(env.rendered["template"], **context)
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "<script>alert(1)</script>" not in html
+    assert "status=all&amp;page=2" in html

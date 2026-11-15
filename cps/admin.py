@@ -27,10 +27,11 @@ from flask import Blueprint, current_app, flash, redirect, url_for, abort, reque
 from markupsafe import Markup
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from .cw_login import current_user
-from flask_babel import gettext as _
+from flask_babel import gettext as _, lazy_gettext as N_
 from flask_babel import get_locale, format_time, format_timedelta, LazyString
 from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
@@ -511,9 +512,14 @@ def hardcover_review_reject_all():
         return json.dumps({'success': False, 'error': str(e)}), 500
 
 
-# Rows rendered on the "books without a Hardcover ID" page; counts cover all.
+# Rows per page on "books without a Hardcover ID"; counts cover all pages.
 HARDCOVER_MISSING_PAGE_LIMIT = 500
-HARDCOVER_MISSING_STATUSES = ('pending', 'rejected', 'skipped', 'unmatched')
+HARDCOVER_MISSING_STATUSES = {
+    'pending': N_('Waiting for review'),
+    'rejected': N_('Rejected'),
+    'skipped': N_('Skipped'),
+    'unmatched': N_('Not matched yet'),
+}
 
 
 def _chunks(values, size=500):
@@ -586,16 +592,27 @@ def hardcover_missing_ids():
 
         selected = [book_id for book_id, status in status_of.items()
                     if status_filter == 'all' or status == status_filter]
-        books = []
+        # Sort lightweight rows across both databases, then load only this
+        # page's Books and authors. Keep IN clauses below SQLite's bind limit.
+        sort_rows = []
         for chunk in _chunks(selected):
-            books.extend(calibre_db.session.query(db.Books).filter(db.Books.id.in_(chunk)).all())
-        books.sort(key=lambda book: (book.sort or book.title or '').lower())
+            sort_rows.extend(calibre_db.session.query(
+                db.Books.id, db.Books.sort, db.Books.title,
+            ).filter(db.Books.id.in_(chunk)).all())
+        sort_rows.sort(key=lambda row: ((row.sort or row.title or '').lower(), row.id))
+        pages = max(1, (len(sort_rows) + HARDCOVER_MISSING_PAGE_LIMIT - 1) // HARDCOVER_MISSING_PAGE_LIMIT)
+        page_number = min(pages, max(1, request.args.get('page', 1, type=int)))
+        start = (page_number - 1) * HARDCOVER_MISSING_PAGE_LIMIT
+        page_ids = [row.id for row in sort_rows[start:start + HARDCOVER_MISSING_PAGE_LIMIT]]
+        books_by_id = {book.id: book for book in calibre_db.session.query(db.Books).options(
+            selectinload(db.Books.authors),
+        ).filter(db.Books.id.in_(page_ids)).all()} if page_ids else {}
         rows = [{
             'id': book.id,
             'title': book.title,
             'authors': ', '.join(author.name for author in book.authors),
             'status': status_of[book.id],
-        } for book in books[:HARDCOVER_MISSING_PAGE_LIMIT]]
+        } for book in (books_by_id[book_id] for book_id in page_ids if book_id in books_by_id)]
 
         return render_title_template(
             "hardcover_missing_ids.html",
@@ -606,6 +623,9 @@ def hardcover_missing_ids():
             shown_of=len(selected),
             counts=counts,
             status_filter=status_filter,
+            status_labels={'all': _('All'), **HARDCOVER_MISSING_STATUSES},
+            page_number=page_number,
+            pages=pages,
             sync_enabled=config.hardcover_sync_enabled(),
             token_available=bool(config.resolved_hardcover_token()),
         )

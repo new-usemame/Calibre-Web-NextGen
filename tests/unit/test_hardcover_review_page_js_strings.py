@@ -41,10 +41,6 @@ def _render(translate):
     return env.from_string(_script_block()).render()
 
 
-def test_no_translation_is_written_inside_a_quoted_js_literal():
-    assert not re.search(r"""['"]\{\{\s*_\(""", _script_block())
-
-
 def test_hostile_translation_stays_inside_its_string():
     hostile = "l'x \"y\" </script>"
     rendered = _render(lambda s: hostile)

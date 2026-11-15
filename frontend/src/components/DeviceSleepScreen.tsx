@@ -144,6 +144,8 @@ function SleepScreenDialog({ device, onClose }: { device: Device; onClose: () =>
   const cancelRemove = useCallback(() => { if (!busyRef.current) setConfirmRemove(false); }, []);
   const data = metadata.data;
   const unsupported = data?.support === 'unsupported';
+  // Show the choice being sent at once; a failure falls back to the server's.
+  const shownFit = (fitChange.isPending && fitChange.variables) || data?.fit;
   const dimensionsKnown = !!data?.screen_width && !!data.screen_height;
   const preview = localPreview || (data?.preview_url ? resourceUrl(data.preview_url) : null);
   // A white preview frame remains visible before the first choice; no stock
@@ -189,7 +191,7 @@ function SleepScreenDialog({ device, onClose }: { device: Device; onClose: () =>
             ['fill', t('Fill the screen')],
             ['whole', t('Show the whole image')],
           ] as const).map(([value, label]) => <label key={value} className={styles.fitOption}>
-            <input type="radio" name={fitId} value={value} checked={data.fit === value}
+            <input type="radio" name={fitId} value={value} checked={shownFit === value}
               onChange={() => { if (!busyRef.current && !unsupported) fitChange.mutate(value); }} />
             {label}
           </label>)}

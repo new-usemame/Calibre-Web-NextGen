@@ -74,6 +74,7 @@ async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
   let removals = 0;
   let uploadError = false;
   let fitError = false;
+  let fitHold: Promise<void> | null = null;
   const fitBodies: unknown[] = [];
 
   await page.route('**/api/**', async (route) => {
@@ -117,6 +118,11 @@ async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
       }
       if (method === 'PATCH') {
         fitBodies.push(request.postDataJSON());
+        if (fitHold) {
+          const hold = fitHold;
+          fitHold = null;
+          await hold;
+        }
         if (fitError) {
           fitError = false;
           return route.fulfill({ status: 503, json: {
@@ -180,6 +186,11 @@ async function mockDeviceAndSleepScreenApi(page: Page, locale = 'en') {
     removedCount: () => removals,
     failNextUpload: () => { uploadError = true; },
     failNextFit: () => { fitError = true; },
+    holdNextFit: () => {
+      let release = () => {};
+      fitHold = new Promise<void>((resolve) => { release = resolve; });
+      return () => release();
+    },
     fitBodies: () => fitBodies,
     acknowledgeCurrentImage: () => {
       current = {
@@ -303,6 +314,13 @@ test('a reader can choose how the image fits the screen, by pointer and by keybo
   await expect(fit.getByRole('radio', { name: 'Show the whole image' }), 'a keyboard change keeps focus in the group').toBeFocused();
   await expect(editor.getByText('Could not change image fit. Try again.')).toHaveCount(0);
   await expect.poll(api.savedCount).toBe(1);
+
+  const release = api.holdNextFit();
+  await fit.getByRole('radio', { name: 'Automatic' }).click();
+  await expect(fit.getByRole('radio', { name: 'Automatic' }), 'a slow change shows the new choice at once').toBeChecked();
+  release();
+  await expect.poll(api.fitBodies).toEqual([{ fit: 'fill' }, { fit: 'whole' }, { fit: 'whole' }, { fit: 'auto' }]);
+  await expect(fit.getByRole('radio', { name: 'Automatic' })).toBeChecked();
 
   const scan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
   expect(scan.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);

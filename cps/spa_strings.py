@@ -257,13 +257,11 @@ _("Default UI display font for new users")
 _("Applies to accounts created from now on. Each user can change these fonts under Account settings.")
 
 
-# ============================================================================
-# Accessibility remediation (WCAG 2.2 AA sweep) — SPA-only strings introduced by
+# =====================================================================# Accessibility remediation (WCAG 2.2 AA sweep) — SPA-only strings introduced by
 # the a11y pass: skip link, live-region announcements, ARIA labels for icon-only
 # controls, reader/annotation color names, form/error messages. Anchored so the
 # auto-translation job keeps them (babel does not scan .tsx).
-# ============================================================================
-_('Add a format')
+# =====================================================================_('Add a format')
 _('Add rule')
 _('Add to shelf')
 _('Add your own')
@@ -669,12 +667,19 @@ _("Books on this device")
 _("Same as my account setting")
 _("Everything in my library")
 _("Only these shelves")
+_("Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync smart shelves in the settings.")
 _("Choose which books this device keeps. Books you take off are removed from the device at its next sync; your place, highlights and notes stay saved.")
 _("The shelf chosen for this device was deleted. It uses your account setting until you choose again.")
 _("The shelf chosen for this device is no longer available. It uses your account setting until you choose again.")
 _("Account setting: {scope}")
 _("Could not save the book choice. Try again.")
 _("Saved.")
+
+# #2831: clear a book's saved reading position (More actions menu).
+_("Clear reading position")
+_("Clear your saved reading position for \"{title}\" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs.")
+_("Reading position cleared.")
+_("Could not clear the reading position.")
 
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
@@ -938,6 +943,7 @@ _("Could not reset password.")
 _("Could not restore this source. Try again.")
 _("Could not save order.")
 _("Could not save reader settings.")
+_("Could not save that highlight.")
 _("Could not save that note.")
 _("Could not save the default library filter.")
 _("Could not save the preset. Try again.")
@@ -1501,6 +1507,7 @@ _("Remove rule")
 _("Remove tag \"{tag}\"")
 _("Remove these")
 _("Remove {name}?")
+_("Removed devices")
 _("Removed from Currently Reading.")
 _("Rename")
 _("Rename {name}")
@@ -1528,6 +1535,7 @@ _("Reset password for {name}")
 _("Reset password for {name}? Their current password will stop working and a replacement will be emailed.")
 _("Reset to defaults")
 _("Restore")
+_("Restore {name}")
 _("Restored the previous library mode for {accounts} accounts.")
 _("Restoring…")
 _("Results stay separate by catalog so you can choose the edition and format.")
@@ -1789,6 +1797,7 @@ _("There are no other accounts on this server yet.")
 _("These results could not be refreshed and may be out of date.")
 _("These settings could not be loaded, so nothing on this page can be trusted yet.")
 _("These settings could not be refreshed, so what is shown may be out of date.")
+_("This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account.")
 _("This account cannot use book sources, or the feature is switched off.")
 _("This account is no longer an administrator.")
 _("This book was already imported.")
@@ -2228,3 +2237,12 @@ _("Applies when you choose My Library. The user adds books from the global libra
 _("Give {name} an empty My Library? They start with no books and add what they want from the global library.")
 _("Needs the global-browse role: without it the user could not add any books.")
 _("Start My Library empty")
+
+# #2747 — merge copies from the new UI's Duplicates page.
+_("Keep this copy")
+_("Merge this copy")
+_("Merge into the kept copy")
+_("Merge one copy into “{title}”? Formats it lacks are copied over, then that copy is deleted.")
+_("Merge {n} copies into “{title}”? Formats it lacks are copied over, then those copies are deleted.")
+_("Merged into “{title}”.")
+_("Could not merge these books.")

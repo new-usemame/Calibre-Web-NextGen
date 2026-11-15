@@ -328,6 +328,9 @@
       {% if kobo_support and not new_user %}
       <div style="margin-top: 25px;">
         <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('Kobo Sync Token')}}</label>
+        {% if not content.role_download() %}
+        <p class="alert alert-warning" role="alert" id="kobo_download_role_notice">{{ _("This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account.") }}</p>
+        {% endif %}
         <div style="margin-bottom: 10px;">
           <a class="btn btn-default" id="config_create_kobo_token" data-toggle="modal" data-target="#modal_kobo_token" data-remote="false" href="{{ url_for('kobo_auth.generate_auth_token', user_id=content.id) }}">{{_('Create/View')}}</a>
           <div class="btn btn-danger" id="config_delete_kobo_token" data-value="{{ content.id }}" data-remote="false" {% if not content.remote_auth_token.first() %} style="display: none;" {% endif %}>{{_('Delete')}}</div>

@@ -58,7 +58,8 @@ def test_kobo_store_request_prepares_flask_values_before_offload(monkeypatch):
     assert observed["kwargs"] == {
         "method": "POST",
         "url": "https://storeapi.kobo.com/v1/library/book?foo=bar",
-        "headers": Headers([("X-Kobo-Test", "prepared"), ("Content-Length", "13")]),
+        "headers": Headers([("X-Kobo-Test", "prepared"), ("Content-Length", "13"),
+                           ("Accept-Encoding", "gzip, deflate")]),
         "data": b"reading-state",
         "allow_redirects": False,
         "timeout": (2, 10),

@@ -5,12 +5,12 @@ import os
 import traceback
 from urllib.parse import urlsplit
 
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, current_app, jsonify, request, g
 from werkzeug.exceptions import HTTPException
 
-from .. import logger, config
+from .. import logger, config, csrf
 from ..cw_login import current_user
-from ..usermanagement import load_user_from_reverse_proxy_header
+from ..usermanagement import auth as basic_auth, load_user_from_reverse_proxy_header
 
 log = logger.create()
 
@@ -92,7 +92,24 @@ def _require_api_auth():
     expiry). The per-route @login_required_if_no_ano decorators remain as
     defence-in-depth and per-route documentation."""
     if request.endpoint in _PUBLIC_ENDPOINTS:
+        if request.endpoint in _BASIC_AUTH_READ_ENDPOINTS and _native_basic_read():
+            return _authenticate_basic_read()
         return None
+    if request.endpoint in _BASIC_AUTH_WRITE_ENDPOINTS:
+        if _sent_basic_credentials():
+            return _authenticate_basic_write()
+        denied = _session_auth_gate()
+        if denied is None:
+            _protect_session_write()
+        return denied
+    if request.endpoint in _BASIC_AUTH_READ_ENDPOINTS and _native_basic_read():
+        return _authenticate_basic_read()
+    return _session_auth_gate()
+
+
+def _session_auth_gate():
+    """None when the caller may proceed by session, proxy header or anonymous
+    browsing; otherwise the JSON 401."""
     if config.config_allow_reverse_proxy_header_login:
         user = load_user_from_reverse_proxy_header(request)
         if user:
@@ -105,6 +122,121 @@ def _require_api_auth():
         return None
     return jsonify({"error": {"code": "unauthorized",
                               "message": "Authentication required"}}), 401
+
+
+# #2842: a native client that holds an app password (the credential OPDS and
+# KOSync already take over HTTP Basic) may make these writes without a browser
+# session. They are exempt from the global CSRFProtect hook below; the token is
+# checked again in _protect_session_write for every request that did not send
+# Basic credentials, so a cookie session still needs it. A Basic request has no
+# token to carry, and needs none: a cross-site page cannot set an Authorization
+# header without a CORS preflight this app never answers, and a browser that
+# replays cached Basic credentials on a cross-site form post also sends Origin,
+# which _reject_cross_site_mutation refuses for another host. That check ignores
+# the port, so a page on another port of this same hostname is not refused by it;
+# it would also need the browser to hold this user's own credentials for this
+# host. Filled in after the route imports.
+_BASIC_AUTH_WRITE_ENDPOINTS = frozenset()
+
+# #2844: the header the new UI sends on its own /api/v1 fetches, so a browser
+# replaying a proxy's Basic login is told apart from a native client over plain
+# HTTP too. Mirrored in frontend/src/lib/api.ts.
+WEB_CLIENT_HEADER = "X-CWNG-Client"
+
+# #2844: the library reads a native client makes with the same app password,
+# plus /auth/me so its connection test learns who it signed in as. An allow-list,
+# not every read: an app password is a credential for a reader app, and must not
+# open account settings, app-password or device-token listings, or admin pages.
+# Filled in after the route imports.
+_BASIC_AUTH_READ_ENDPOINTS = frozenset()
+
+
+def _sent_basic_credentials():
+    """True for a native client's Basic request: Basic credentials and no CSRF token.
+
+    A request that carries a token is a browser session's write, even when the
+    browser also replays Basic credentials for a proxy's own auth layer in front
+    of this app; that credential is the proxy's, not an app password, so it goes
+    the session way and keeps needing the token."""
+    authorization = request.authorization
+    if authorization is None or (authorization.type or "").lower() != "basic":
+        return False
+    header_names = current_app.config.get("WTF_CSRF_HEADERS", ["X-CSRFToken", "X-CSRF-Token"])
+    if any(request.headers.get(name) for name in header_names):
+        return False
+    return not request.form.get(current_app.config.get("WTF_CSRF_FIELD_NAME", "csrf_token"))
+
+
+def _native_basic_read():
+    """True for a native client's read that sent HTTP Basic credentials (#2844).
+
+    Only reads, and only on _BASIC_AUTH_READ_ENDPOINTS: writes go through _sent_basic_credentials and the allow-list.
+    A browser's fetch is left on the session path, so nothing changes for the
+    new UI: behind a reverse proxy with its own Basic login a browser replays the
+    proxy's credentials on each request, which are usually no CWNG account.
+    Refusing those would sign out every anonymous visitor on that setup, and
+    honouring a match would keep a browser signed in after it logs out. The new
+    UI marks its own fetches with X-CWNG-Client (a browser sends Sec-Fetch-Site
+    only to a secure origin, so plain HTTP behind such a proxy has no Fetch
+    Metadata); Sec-Fetch-Site still counts for any other browser fetch. A request
+    that already has a signed-in session keeps it for the same reason."""
+    if request.method not in _SAFE_METHODS:
+        return False
+    authorization = request.authorization
+    if authorization is None or (authorization.type or "").lower() != "basic":
+        return False
+    if request.headers.get(WEB_CLIENT_HEADER) or request.headers.get("Sec-Fetch-Site"):
+        return False
+    return not current_user.is_authenticated
+
+
+def _authenticate_basic_read():
+    """Read as the Basic user, or answer the JSON 401 when the credentials are wrong.
+
+    Credentials that name no account (an empty username, or Guest) are a probe,
+    as on OPDS: they get whatever the session path gives an anonymous caller, the
+    guest view under anonymous browsing and the 401 otherwise. Credentials that
+    name an account and are wrong get the 401 even under anonymous browsing, so
+    a client's connection test fails instead of browsing as the guest."""
+    username = ((request.authorization or {}).get("username") or "").strip()
+    if not username or username.lower() == "guest":
+        return _session_auth_gate()
+    return _authenticate_basic_write()
+
+
+def _authenticate_basic_write():
+    """Run the request as the Basic user, or refuse it with a JSON 401.
+
+    Credentials that were sent and are wrong are refused outright: never answered
+    as the guest under anonymous browsing, and never replaced by a session cookie
+    the same client also holds, so a client learns its app password is wrong
+    instead of seeing a write land on another account or nowhere. Guest
+    credentials cannot write either. verify_password applies the usual sign-in
+    pacing, so guessing here costs the same as guessing on OPDS."""
+    user = basic_auth.authenticate(request.authorization, "")
+    if not user or user is True or (user.name or "").lower() == "guest":
+        response = jsonify({"error": {"code": "unauthorized",
+                                      "message": "Authentication required"}})
+        response.headers["WWW-Authenticate"] = 'Basic realm="Authentication Required"'
+        return response, 401
+    g.flask_httpauth_user = user
+    g.api_basic_auth_user = user
+    return None
+
+
+def _protect_session_write():
+    """Apply the CSRF check the global hook skipped for an allow-listed endpoint
+    reached without Basic credentials, with the same switches it obeys."""
+    if csrf is None or current_app.extensions.get("csrf") is not csrf:
+        return      # no CSRFProtect, or another instance that never exempted these
+    app_config = current_app.config
+    if not app_config.get("WTF_CSRF_ENABLED", True) \
+            or not app_config.get("WTF_CSRF_CHECK_DEFAULT", True):
+        return
+    if request.method not in app_config.get("WTF_CSRF_METHODS",
+                                            {"POST", "PUT", "PATCH", "DELETE"}):
+        return
+    csrf.protect()
 
 
 @api_v1.before_request
@@ -236,3 +368,24 @@ from . import acquisition  # noqa: E402,F401
 from . import discover_source  # noqa: E402,F401
 
 from . import device_sleep_screen  # noqa: E402,F401
+
+# #2842 part 2: convert_format lets a reader app ask for a format the book lacks
+# (an EPUB of an AZW3-only book); it keeps its own edit-role check, so an app
+# password can do no more than its owner's session. tasks_list lets the app
+# follow the task_id it gets back; render_task_status scopes rows to the caller.
+_BASIC_AUTH_WRITE_VIEWS = (books.set_book_read_status, books.toggle_book_read,
+                           actions.toggle_book_archived, edit.convert_format)
+_BASIC_AUTH_WRITE_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
+                                        for view in _BASIC_AUTH_WRITE_VIEWS)
+_BASIC_AUTH_READ_VIEWS = (auth.auth_me, books.list_books, books.book_detail,
+                          books.list_global_library, browse.list_authors,
+                          browse.list_series, browse.list_tags, browse.tag_tree,
+                          browse.list_publishers, browse.list_languages,
+                          browse.list_ratings, browse.list_formats,
+                          shelves.list_shelves, shelves.shelf_detail,
+                          shelves.book_shelf_membership, info.tasks_list)
+_BASIC_AUTH_READ_ENDPOINTS = frozenset(api_v1.name + "." + view.__name__
+                                       for view in _BASIC_AUTH_READ_VIEWS)
+if csrf is not None:
+    for _view in _BASIC_AUTH_WRITE_VIEWS:
+        csrf.exempt(_view)

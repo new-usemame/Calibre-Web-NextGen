@@ -117,6 +117,26 @@ def own_position(device_id, book_id):
         device_id=device_id, book_id=book_id).populate_existing().first()
 
 
+def places_not_shared(user_id, book_id, *, exclude_device_id=None):
+    """How many of the account's active devices keep a place for the book private.
+
+    A count only (#2841): the caller may say a private place exists, never
+    where it is or whose it is. Another account's devices never count.
+    """
+    if not book_id:
+        return 0
+    query = (ub.session.query(ub.DeviceReadingPosition.device_id)
+             .join(ub.Device, ub.Device.id == ub.DeviceReadingPosition.device_id)
+             .filter(ub.Device.user_id == user_id,
+                     ub.Device.active.is_(True),
+                     ub.Device.share_place.is_(False),
+                     ub.DeviceReadingPosition.book_id == book_id,
+                     ub.DeviceReadingPosition.progress_percent.isnot(None)))
+    if exclude_device_id is not None:
+        query = query.filter(ub.Device.id != exclude_device_id)
+    return query.distinct().count()
+
+
 def journal(device_id, book_id, document, progress, percentage, report):
     from .koreader_position import KOREADER_LOCATION_TYPE, is_xpointer
     from ..progress_syncing.protocols.kosync import read_status_for_percentage

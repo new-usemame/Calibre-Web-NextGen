@@ -17,7 +17,8 @@ in the EPUB and in the normalized, split KEPUB.
 
 A span therefore crosses to the EPUB as its offset in that concatenation, and
 back the same way -- only when the two concatenations are identical, the
-proof that each offset names the same character on both sides. Anything else
+proof that each offset names the same character on both sides (kepubify's
+blank title page, which only the KEPUB has, is left out). Anything else
 (a changed or re-edited book, a spine document that cannot be read, a span
 the KEPUB does not hold, a position outside every span) gives ``None``.
 
@@ -45,6 +46,11 @@ log = logger.create()
 
 _SPAN_ID = re.compile(r"kobo\.[0-9]{1,9}\.[0-9]{1,9}")
 _BODY = f"{{{kx._XHTML_NS}}}body"
+# kepubify adds this blank page (text: "Page intentionally left blank by
+# kepubify.") to the spine of a KEPUB whose first page is not a bare title
+# page. It has no counterpart in the EPUB, so its text is left out of both
+# sides' concatenations; it holds no place a reader could be at (#2804).
+_KEPUBIFY_DUMMY = "kepubify-titlepage-dummy.xhtml"
 
 
 @dataclass(frozen=True)
@@ -149,6 +155,7 @@ def _aligned_epub(epub_path, kepub: _Kepub):
     spine = kx.spine_solid_texts(epub_path)
     if spine is None:
         return None
+    spine = [(m, t) for m, t in spine if posixpath.basename(m) != _KEPUBIFY_DUMMY]
     members = [m for m, _t in spine]
     texts = [t for _m, t in spine]
     if "".join(texts) != kepub.text:
@@ -212,6 +219,8 @@ def _load_kepub(path: str, _mtime_ns: int, _size: int,
             member = manifest.get(ref.get("idref"))
             if member not in names or archive.getinfo(member).file_size > kx.MAX_CHAPTER_BYTES:
                 return None
+            if posixpath.basename(member) == _KEPUBIFY_DUMMY:
+                continue
             text, spans = _read_document(archive.read(member))
             ordered = sorted((s, i) for i, (s, e) in spans.items() if e > s)
             documents.append(_Document(member, offset, spans,

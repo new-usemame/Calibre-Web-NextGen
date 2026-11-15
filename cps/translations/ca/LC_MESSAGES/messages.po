@@ -5256,6 +5256,26 @@ msgid "Could not save the book choice. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(no s'ha capturat cap text)"
 
@@ -8878,6 +8898,10 @@ msgstr "Elimina aquests"
 msgid "Remove {name}?"
 msgstr "Voleu treure {name}?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "S'ha tret d'«En curs de lectura»."
@@ -8999,6 +9023,11 @@ msgstr "Restableix els valors predeterminats"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Restaura"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10245,6 +10274,13 @@ msgstr ""
 "Aquesta configuració no s'ha pogut actualitzar, de manera que el que es "
 "mostra pot estar obsolet."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -10355,8 +10391,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Aquesta és l'adreça de l'ordinador mateix, a la qual el lector electrònic no "
 "pot accedir. Trieu «Canvia» i introduïu una adreça accessible des del "
@@ -10544,9 +10580,9 @@ msgid ""
 "are never allowed."
 msgstr ""
 "Activeu aquesta opció si la connexió funciona a la vostra xarxa, com ara un "
-"catàleg, un indexador o un client de descàrrega amb una adreça 192.168 o 10."
-"x. Només s'aplica a aquesta connexió. Les adreces de bucle local, d'enllaç "
-"local i de metadades dels serveis al núvol no es permeten mai."
+"catàleg, un indexador o un client de descàrrega amb una adreça 192.168 o "
+"10.x. Només s'aplica a aquesta connexió. Les adreces de bucle local, "
+"d'enllaç local i de metadades dels serveis al núvol no es permeten mai."
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -14031,8 +14067,8 @@ msgid ""
 msgstr ""
 "Aquestes rutes només són internes a NextGen. Podeu canviar lliurement les "
 "vinculacions de l’esquerra, però no cal\n"
-"        canviar les rutes de la dreta.<br><br>Si voleu desar <code>metadata."
-"db</code> en una ubicació diferent de la resta de la\n"
+"        canviar les rutes de la dreta.<br><br>Si voleu desar "
+"<code>metadata.db</code> en una ubicació diferent de la resta de la\n"
 "        biblioteca, activeu l’opció <b>Separa els fitxers dels llibres de la "
 "biblioteca i introduïu-hi la ruta de la resta de la biblioteca</b>."
 
@@ -15960,6 +15996,18 @@ msgstr ""
 "        i AZW3."
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr "Activa el corrector d'EPUB per a Kindle de NextGen"
 
@@ -16051,8 +16099,8 @@ msgstr ""
 "detecten el títol, la sèrie, l'autor ni l'editorial. Si activeu aquesta "
 "opció, abans d'importar un arxiu amb ComicInfo.xml fora de lloc se'n crearà "
 "una còpia amb el fitxer traslladat a l'arrel. No es modificaran els arxius "
-"que ja siguin correctes. Només s'admeten els arxius ZIP (.cbz); els formats ."
-"cbr, .cb7 i .cbt no es modifiquen. La baixada original tampoc no es "
+"que ja siguin correctes. Només s'admeten els arxius ZIP (.cbz); els "
+"formats .cbr, .cb7 i .cbt no es modifiquen. La baixada original tampoc no es "
 "modifica, només la còpia importada."
 
 #: cps/templates/cwa_settings.html

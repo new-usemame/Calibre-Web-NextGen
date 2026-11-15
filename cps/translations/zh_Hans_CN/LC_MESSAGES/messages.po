@@ -2575,7 +2575,7 @@ msgstr "已将丛书“%(name)s”的 %(count)d 本书添加到书架“%(sname)
 #: cps/shelf.py
 #, python-format
 msgid "Book has been removed from shelf: %(sname)s"
-msgstr "此书已从书架 %(sname)s 中删除"
+msgstr "此书已从书架 %(sname)s 中移除"
 
 #: cps/shelf.py
 msgid "Sorry you are not allowed to remove a book from this shelf"
@@ -4973,6 +4973,26 @@ msgid "Could not save the book choice. Try again."
 msgstr "无法保存书籍选择。请重试。"
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "（未截取文本）"
 
@@ -6044,7 +6064,7 @@ msgstr "无法保存阅读器设置。"
 
 #: cps/spa_strings.py
 msgid "Could not save that highlight."
-msgstr ""
+msgstr "无法保存该高亮。"
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
@@ -8464,6 +8484,10 @@ msgstr "移除这些项目"
 msgid "Remove {name}?"
 msgstr "移除 {name}？"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "已从“正在阅读”中移除。"
@@ -8540,7 +8564,7 @@ msgstr "请求 {format}"
 
 #: cps/spa_strings.py
 msgid "Requested by a removed account"
-msgstr "请求者账户已删除"
+msgstr "请求者账户已移除"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8582,6 +8606,11 @@ msgstr "恢复默认设置"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "恢复"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9747,6 +9776,13 @@ msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr "无法刷新这些设置，显示内容可能已过期。"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr "此账户无法使用书源，或该功能已关闭。"
@@ -9846,8 +9882,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "这是此计算机自身的地址，电子阅读器无法访问。请选择“更改”，输入阅读器可访问的"
 "地址，例如 http://192.168.1.20:8083。"
@@ -11479,27 +11515,27 @@ msgstr "移除此图片吗？下次同步后将恢复您之前的 KOReader 休�
 
 #: cps/spa_strings.py
 msgid "Image fit"
-msgstr ""
+msgstr "图像适配"
 
 #: cps/spa_strings.py
 msgid "Automatic"
-msgstr ""
+msgstr "自动"
 
 #: cps/spa_strings.py
 msgid "Fill the screen"
-msgstr ""
+msgstr "填满屏幕"
 
 #: cps/spa_strings.py
 msgid "Show the whole image"
-msgstr ""
+msgstr "显示完整图像"
 
 #: cps/spa_strings.py
 msgid "Automatic fills the screen when only a thin edge would be cut off."
-msgstr ""
+msgstr "只会裁掉细边时，自动模式将填满屏幕。"
 
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
-msgstr ""
+msgstr "无法更改图像适配。请重试。"
 
 #: cps/spa_strings.py
 msgid "Keep this copy"
@@ -12243,8 +12279,8 @@ msgid ""
 "%(clean)d clean, %(repaired)d repaired, %(unsupported)d unsupported, "
 "%(failed)d failed"
 msgstr ""
-"%(clean)d 本无需修复，%(repaired)d 本已修复，%(unsupported)d 本不支"
-"持，%(failed)d 本失败"
+"%(clean)d 本无需修复，%(repaired)d 本已修复，%(unsupported)d 本不支持，"
+"%(failed)d 本失败"
 
 #: cps/tasks/kepub_package_repair.py
 #, python-format
@@ -14438,8 +14474,8 @@ msgid ""
 "Restrict book visibility based on values in a Calibre text, enumeration, or "
 "Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
 msgstr ""
-"根据 Calibre 文本、枚举或布尔类型自定义列的值限制书籍可见性。布尔列区"
-"分“是”“否”和“未定义”。"
+"根据 Calibre 文本、枚举或布尔类型自定义列的值限制书籍可见性。布尔列区分"
+"“是”“否”和“未定义”。"
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -15124,6 +15160,18 @@ msgstr ""
 "        或 AZW3 格式文件。"
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr "启用 NextGen Kindle EPUB 修复"
 
@@ -15149,8 +15197,8 @@ msgid ""
 "innocenat\">innocenat</a>."
 msgstr ""
 "此工具改编自 <a href=\"https://github.com/innocenat\">innocenat</a> 制作的 "
-"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-fix.netlify."
-"app</a> 工具。"
+"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-"
+"fix.netlify.app</a> 工具。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -15171,8 +15219,8 @@ msgid ""
 "temporarily lock metadata.db. To stop a running backfill, restart the "
 "container after disabling."
 msgstr ""
-"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 metadata."
-"db。要停止正在运行的回填，请在禁用后重新启动容器。"
+"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 "
+"metadata.db。要停止正在运行的回填，请在禁用后重新启动容器。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -15352,6 +15400,9 @@ msgid ""
 "but never replaces data the book already has. When disabled, fetched "
 "metadata will replace existing data as-is from the preferred provider."
 msgstr ""
+"启用时，抓取的元数据只补全书籍缺失的内容（如空描述、缺失的丛书或封面）并添加"
+"新标签，绝不替换书籍已有的数据。禁用时，抓取的元数据将按首选提供商的原样替换"
+"现有数据。"
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -16055,8 +16106,8 @@ msgid ""
 "users with edit rights will see a badge on the Duplicates sidebar button and "
 "a notification popup when they login."
 msgstr ""
-"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将"
-"在“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
+"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将在"
+"“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Automatic Duplicate Resolution"

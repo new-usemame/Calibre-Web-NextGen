@@ -12215,7 +12215,7 @@ msgstr "Suppression en attente de synchronisation"
 
 #: cps/spa_strings.py
 msgid "Previous settings restored"
-msgstr "Paramètres précédents restaurés"
+msgstr "Réglages précédents restaurés"
 
 #: cps/spa_strings.py
 msgid "Waiting for device details"
@@ -12223,21 +12223,19 @@ msgstr "En attente des informations de l’appareil"
 
 #: cps/spa_strings.py
 msgid "Update the CWNG plugin"
-msgstr "Mettre à jour le module CWNG"
+msgstr "Mettre à jour le plugin CWNG"
 
 #: cps/spa_strings.py
 msgid "Update the CWNG plugin on this device, then sync."
-msgstr "Mettez à jour le module CWNG sur cet appareil, puis synchronisez."
+msgstr "Mettez à jour le plugin CWNG sur cet appareil, puis synchronisez."
 
 #: cps/spa_strings.py
 msgid "Connect this device and use Sync now in KOReader."
-msgstr ""
-"Connectez cet appareil, puis utilisez Synchroniser maintenant dans KOReader."
+msgstr "Connectez cet appareil, puis utilisez Synchroniser maintenant dans KOReader."
 
 #: cps/spa_strings.py
 msgid "This device cannot show a custom KOReader sleep screen."
-msgstr ""
-"Cet appareil ne peut pas afficher d’écran de veille KOReader personnalisé."
+msgstr "Cet appareil ne peut pas afficher d’écran de veille KOReader personnalisé."
 
 #: cps/spa_strings.py
 msgid "Use a JPEG or PNG image up to 10 MiB."
@@ -12256,7 +12254,7 @@ msgid ""
 "Remove this image? Your previous KOReader sleep-screen settings will return "
 "after the next sync."
 msgstr ""
-"Supprimer cette image ? Vos paramètres précédents d’écran de veille "
+"Supprimer cette image ? Vos réglages précédents d’écran de veille "
 "KOReader seront restaurés après la prochaine synchronisation."
 
 #: cps/spa_strings.py
@@ -12277,8 +12275,7 @@ msgstr "Afficher l’image entière"
 
 #: cps/spa_strings.py
 msgid "Automatic fills the screen when only a thin edge would be cut off."
-msgstr ""
-"Automatique remplit l’écran quand seule une fine bordure serait rognée."
+msgstr "Automatique remplit l’écran quand seule une fine bordure serait rognée."
 
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
@@ -14226,8 +14223,8 @@ msgstr ""
 "        S’il n’en trouve aucune, il en crée et en monte automatiquement "
 "une nouvelle. Pour plus de détails,\n"
 "        <a "
-"href=\"https://github.com/crocodilestick/Calibre-Web-Automated/wiki/Config"
-"uration#database-configuration\">consultez cette page</a> !"
+"href=\"https://github.com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-configuration\">"
+"consultez cette page</a> !"
 
 #: cps/templates/config_db.html
 msgid ""

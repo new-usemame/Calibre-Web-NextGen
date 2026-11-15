@@ -75,9 +75,9 @@ class TestRuntime:
             assert canary not in text
 
     def test_literal_env_reads_match_the_allow_list(self):
-        # _safe_env_values spells each key out literally for the env SSOT
-        # test; this keeps that list and _SAFE_ENV_VALUES from drifting.
-        env = {name: "1" for name in sps._SAFE_ENV_VALUES}
+        env = {"TZ": "Etc/UTC", "PUID": "1000", "PGID": "1000",
+               "CWA_PORT_OVERRIDE": "8083", "NETWORK_SHARE_MODE": "true",
+               "CWA_CALIBRE_USER_PLUGINS": "false"}
         assert sps.collect_runtime(environ=env)["env_values"] == env
         assert set(sps._safe_env_values({"UNLISTED": "1"})) == set()
 
@@ -334,3 +334,59 @@ class TestInSupportPack:
         monkeypatch.undo()  # drop the fixture's patches: real resolver, no app booted
         paths = built._resolve_state_paths()
         assert set(paths) == {"config", "library", "ingest", "app_db", "cwa_db", "metadata_db"}
+
+
+@pytest.mark.unit
+class TestStatePrivacy:
+    @pytest.mark.parametrize("name", ["PUID", "PGID", "CWA_PORT_OVERRIDE",
+                                     "NETWORK_SHARE_MODE", "CWA_CALIBRE_USER_PLUGINS", "TZ"])
+    @pytest.mark.parametrize("value", [USER_CANARY, f"home/{USER_CANARY}", "UTC\n"])
+    def test_unexpected_environment_values_are_not_exported(self, name, value):
+        out = sps.collect_runtime(environ={name: value})
+        assert out["env_values"][name] == "set"
+        assert USER_CANARY not in json.dumps(out)
+
+    def test_database_schema_and_format_values_cannot_leak_identifiers(self, tmp_path):
+        path = tmp_path / "metadata.db"
+        _make_db(str(path), [
+            "CREATE TABLE books (id INTEGER)",
+            "CREATE TABLE data (format TEXT)",
+            f'CREATE TABLE "{USER_CANARY}" (secret TEXT)',
+            "CREATE TABLE custom_column_42 (value TEXT)",
+            f"INSERT INTO data VALUES ('EPUB'), ('epub'), ('{TITLE_CANARY}'), (NULL)",
+        ])
+        out = sps.collect_database(str(path), formats=True)
+        assert out["row_counts"] == {"books": 0, "data": 4, "custom_column_42": 0}
+        assert out["unlisted_tables"] == 1
+        assert out["formats"] == {"EPUB": 2, "other": 2}
+        assert USER_CANARY not in json.dumps(out)
+        assert TITLE_CANARY not in json.dumps(out)
+
+    def test_quick_check_failure_does_not_export_constraint_or_table_names(self, tmp_path):
+        path = tmp_path / "bad-check.db"
+        _make_db(str(path), [
+            f'CREATE TABLE "{USER_CANARY}" (v INTEGER NOT NULL)',
+            f'INSERT INTO "{USER_CANARY}" VALUES (1)',
+        ])
+        # One row with integer 1 has no payload bytes, just serial type 9.
+        # Replace that type with NULL to create a genuine NOT NULL violation.
+        raw = bytearray(path.read_bytes())
+        assert raw[-4:] == bytes([2, 1, 2, 9])
+        raw[-1] = 0
+        path.write_bytes(raw)
+        out = sps.collect_database(str(path))
+        assert out["quick_check"] == "failed"
+        assert USER_CANARY not in json.dumps(out)
+
+    def test_unknown_job_states_are_aggregated_without_exporting_contents(self, tmp_path):
+        path = tmp_path / "cwa.db"
+        _make_db(str(path), [
+            "CREATE TABLE cwa_scheduled_jobs (state TEXT, last_error TEXT)",
+            f"INSERT INTO cwa_scheduled_jobs VALUES ('scheduled', ''), ('{USER_CANARY}', 'oops'), (NULL, '')",
+        ])
+        out = sps.collect_background(str(path), None, scheduler=SimpleNamespace(get_jobs=lambda: []))
+        assert out["scheduled_send_jobs"]["by_state"] == {
+            "scheduled": {"count": 1, "with_error": 0},
+            "other": {"count": 2, "with_error": 1},
+        }
+        assert USER_CANARY not in json.dumps(out)

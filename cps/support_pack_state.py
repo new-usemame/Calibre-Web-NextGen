@@ -40,6 +40,7 @@ import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 SCHEMA_VERSION = 1
 MAX_SECTION_BYTES = 64 * 1024
@@ -48,21 +49,8 @@ INGEST_COUNT_CAP = 10_000
 MAX_JOBS_LISTED = 100
 MAX_FORMATS_LISTED = 50
 
-# Environment variables whose *values* are safe to show (they are settings,
-# not secrets or paths). Everything else matching ``_ENV_NAME_PATTERN`` is
-# reported by name only, so HARDCOVER_TOKEN and any path-valued CWA_* variable
-# never leak a value.
-_SAFE_ENV_VALUES = (
-    "TZ",
-    "PUID",
-    "PGID",
-    "NETWORK_SHARE_MODE",
-    "CWA_PORT_OVERRIDE",
-    "CWA_CALIBRE_USER_PLUGINS",
-)
+# Other integration settings are reported by name only, never by value.
 _ENV_NAME_PATTERN = re.compile(r"^(CWA_|CALIBRE_|HARDCOVER_|FLASK_)")
-# A safe value is short and path-free, so a surprising value degrades to "set".
-_SAFE_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9_+.:-]+(?:/[A-Za-z0-9_+.-]+){0,2}$")
 
 # Filesystem types where SQLite locking and latency problems are common.
 _NETWORK_FS_TYPES = frozenset(
@@ -129,13 +117,7 @@ def _mem_total_bytes():
 
 
 def _safe_env_values(env) -> dict:
-    """Values of the allow-listed settings that are set in ``env``.
-
-    Every key is written out literally, not looped over, so the environment
-    SSOT test can resolve each read statically and check it against
-    ``examples/.env.example``. Keep this in step with ``_SAFE_ENV_VALUES``
-    (a test asserts they match).
-    """
+    """Validate each setting's value, keeping literal reads for the env SSOT."""
     raw = {
         "TZ": env.get("TZ"),
         "PUID": env.get("PUID"),
@@ -149,7 +131,21 @@ def _safe_env_values(env) -> dict:
         if value is None:
             continue
         text = str(value)
-        values[name] = text if len(text) <= 64 and _SAFE_VALUE_PATTERN.match(text) else "set"
+        valid = False
+        if name == "TZ":
+            if len(text) <= 64 and re.fullmatch(r"[A-Za-z0-9_+/-]+", text):
+                try:
+                    ZoneInfo(text)
+                    valid = True
+                except (ValueError, ZoneInfoNotFoundError):
+                    pass
+        elif name in {"PUID", "PGID", "CWA_PORT_OVERRIDE"}:
+            if re.fullmatch(r"[0-9]{1,10}", text):
+                valid = (0 <= int(text) < 2**32 if name != "CWA_PORT_OVERRIDE"
+                         else 1 <= int(text) <= 65535)
+        else:
+            valid = text.lower() in {"true", "false", "yes", "no", "on", "off", "1", "0"}
+        values[name] = text if valid else "set"
     return values
 
 
@@ -161,7 +157,7 @@ def collect_runtime(environ=None) -> dict:
     env = os.environ if environ is None else environ
     values = _safe_env_values(env)
     names_only = sorted(
-        n for n in env if _ENV_NAME_PATTERN.match(n) and n not in _SAFE_ENV_VALUES
+        n for n in env if _ENV_NAME_PATTERN.match(n) and n not in values
     )
     process = {}
     if hasattr(os, "getuid"):
@@ -252,6 +248,16 @@ def _open_readonly(path: str) -> sqlite3.Connection:
     return conn
 
 
+def _known_table_names() -> set:
+    """Read code-owned schema names; arbitrary imported table names stay private."""
+    from . import constants, db, ub
+
+    names = {table.name for base in (db.Base, ub.Base) for table in base.metadata.tables.values()}
+    schema = Path(constants.SCRIPTS_DIR, "cwa_schema.sql").read_text(encoding="utf-8")
+    names.update(re.findall(r"CREATE TABLE IF NOT EXISTS ([A-Za-z0-9_]+)\s*\(", schema))
+    return names
+
+
 def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bool = False) -> dict:
     """Health and size facts for one SQLite database, opened read-only.
 
@@ -279,15 +285,22 @@ def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bo
         # quick_check, not integrity_check: it skips the index/content
         # cross-checks that make integrity_check slow on a large library.
         result = conn.execute("PRAGMA quick_check(1)").fetchone()
-        entry["quick_check"] = str(result[0])[:200] if result else "no result"
+        entry["quick_check"] = "ok" if result and result[0] == "ok" else "failed"
         tables = [
             r[0] for r in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' "
                 "AND name NOT LIKE 'sqlite_%' ORDER BY name"
             )
         ]
+        known_tables = _known_table_names()
         counts = {}
+        entry["unlisted_tables"] = 0
         for table in tables:
+            if table not in known_tables and not re.fullmatch(
+                r"(?:custom_column_[0-9]+|books_custom_column_[0-9]+_link)", table
+            ):
+                entry["unlisted_tables"] += 1
+                continue
             quoted = '"' + table.replace('"', '""') + '"'
             try:
                 counts[table] = conn.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()[0]
@@ -299,11 +312,16 @@ def collect_database(path, budget_s: float = DB_TIME_BUDGET_SECONDS, formats: bo
                 counts[table] = None
         entry["row_counts"] = counts
         if formats and "data" in counts:
+            from . import constants
+            allowed = sorted({fmt.upper() for fmt in constants.EXTENSIONS_UPLOAD})
+            placeholders = ",".join("?" for _ in allowed)
             rows = conn.execute(
-                "SELECT format, COUNT(*) FROM data GROUP BY format ORDER BY 2 DESC LIMIT ?",
-                (MAX_FORMATS_LISTED,),
+                f"SELECT CASE WHEN UPPER(format) IN ({placeholders}) "
+                "THEN UPPER(format) ELSE 'other' END AS safe_format, COUNT(*) "
+                "FROM data GROUP BY safe_format ORDER BY 2 DESC LIMIT ?",
+                (*allowed, MAX_FORMATS_LISTED),
             ).fetchall()
-            entry["formats"] = {str(fmt).upper(): n for fmt, n in rows}
+            entry["formats"] = dict(rows)
     except sqlite3.OperationalError as ex:
         if "interrupt" in str(ex).lower():
             entry["timed_out"] = True
@@ -384,8 +402,10 @@ def _scheduled_send_state(cwa_db_path) -> dict:
         return _error(ex)
     try:
         rows = conn.execute(
-            "SELECT state, COUNT(*), SUM(CASE WHEN COALESCE(last_error, '') != '' THEN 1 ELSE 0 END) "
-            "FROM cwa_scheduled_jobs GROUP BY state"
+            "SELECT CASE WHEN state IN ('scheduled', 'dispatched', 'cancelled') "
+            "THEN state ELSE 'other' END AS safe_state, COUNT(*), "
+            "SUM(CASE WHEN COALESCE(last_error, '') != '' THEN 1 ELSE 0 END) "
+            "FROM cwa_scheduled_jobs GROUP BY safe_state"
         ).fetchall()
         return {
             "exists": True,

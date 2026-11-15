@@ -40,10 +40,21 @@ def _dir(base, name, *, age_seconds=0):
     return path
 
 
-def test_a_dead_owner_with_an_old_directory_is_reaped(tmp_path):
+def test_a_dead_owner_with_an_old_directory_is_reaped(tmp_path, monkeypatch):
     """The only case that should actually free disk."""
     base = str(tmp_path)
     victim = _dir(base, "999999", age_seconds=STALE)
+
+    from tests import conftest
+    from types import SimpleNamespace
+
+    def gone(*args):
+        raise ProcessLookupError
+
+    monkeypatch.setattr(conftest, "os", SimpleNamespace(
+        name="posix", listdir=os.listdir, path=os.path, getpid=os.getpid,
+        kill=gone,
+    ))
 
     _reap_stale_pytest_tempdirs(base)
 
@@ -114,3 +125,33 @@ def test_an_unreadable_entry_never_fails_the_run(tmp_path, monkeypatch):
     monkeypatch.setattr(os.path, "getmtime", boom)
 
     _reap_stale_pytest_tempdirs(base)
+
+
+def test_an_uncertain_owner_is_not_reaped(tmp_path, monkeypatch):
+    """A failed liveness probe cannot establish that a directory is abandoned."""
+    victim = _dir(str(tmp_path), "999996", age_seconds=STALE)
+
+    def uncertain(*args):
+        raise SystemError("process check failed")
+
+    monkeypatch.setattr(os, "kill", uncertain)
+    _reap_stale_pytest_tempdirs(str(tmp_path))
+    assert os.path.exists(victim)
+
+
+def test_windows_cleanup_never_signals_another_process(tmp_path, monkeypatch):
+    """On Windows kill(pid, 0) terminates a live process instead of probing it."""
+    from tests import conftest
+    from types import SimpleNamespace
+
+    victim = _dir(str(tmp_path), "999995", age_seconds=STALE)
+    calls = []
+    # Replace only this module's os reference; changing os.name globally makes
+    # pathlib and pytest choose a filesystem implementation the host cannot use.
+    monkeypatch.setattr(conftest, "os", SimpleNamespace(
+        name="nt", listdir=os.listdir, path=os.path, getpid=os.getpid,
+        kill=lambda *args: calls.append(args),
+    ))
+    _reap_stale_pytest_tempdirs(str(tmp_path))
+    assert calls == []
+    assert os.path.exists(victim)

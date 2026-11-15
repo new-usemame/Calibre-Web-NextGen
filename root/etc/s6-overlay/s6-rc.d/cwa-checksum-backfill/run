@@ -10,57 +10,7 @@
 
 echo "[cwa-checksum-backfill] Waiting for CWA service to be ready..."
 
-CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
-if ! library_path="$(python3 "${CWA_APP_PATHS}" calibre_library_dir)"; then
-  echo "[cwa-checksum-backfill] ERROR: runtime library path resolver failed; refusing to inspect an unknown database"
-  exit 1
-fi
-case "$library_path" in
-  ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..)
-    echo "[cwa-checksum-backfill] ERROR: runtime library path resolver returned an unsafe path; refusing to continue"
-    exit 1 ;;
-  /*) ;;
-  *)
-    echo "[cwa-checksum-backfill] ERROR: runtime library path resolver returned a non-absolute path; refusing to continue"
-    exit 1 ;;
-esac
-metadata_db="${library_path%/}/metadata.db"
-metadata_uri="$(python3 - "$metadata_db" <<'PY'
-import sys
-from pathlib import Path
-
-print(Path(sys.argv[1]).as_uri() + "?mode=ro")
-PY
-)"
-
-# Poll for database schema to be initialized (up to 30 seconds)
-max_attempts=30
-attempt=0
-db_ready=false
-
-while [ $attempt -lt $max_attempts ]; do
-  if [ -f "$metadata_db" ] && sqlite3 "$metadata_uri" "SELECT name FROM sqlite_master WHERE type='table' AND name='book_format_checksums';" 2>/dev/null | grep -q "book_format_checksums"; then
-    echo "[cwa-checksum-backfill] Database schema ready (attempt $((attempt + 1)))"
-    db_ready=true
-    break
-  fi
-
-  attempt=$((attempt + 1))
-  sleep 1
-done
-
-if [ "$db_ready" = false ]; then
-  echo "[cwa-checksum-backfill] WARNING: Database schema not ready after ${max_attempts}s, proceeding anyway..."
-fi
-
-echo "[cwa-checksum-backfill] Checking for missing KOReader sync checksums..."
-
-# Run the checksum generation script (fills in missing checksums)
-if cwa-as-abc python3 /app/calibre-web-automated/scripts/generate_book_checksums.py --library-path "$library_path" --batch-size 50; then
-  echo "[cwa-checksum-backfill] Checksum generation/backfill completed successfully"
-else
-  echo "[cwa-checksum-backfill] WARNING: Checksum generation encountered errors but continuing..."
-  echo "[cwa-checksum-backfill] You can manually run: python3 /app/calibre-web-automated/scripts/generate_book_checksums.py"
-fi
-
-echo "[cwa-checksum-backfill] Service complete"
+# The service body lives in scripts/services so it can run outside s6 (#2094).
+# Checksum generation drops to abc.
+export CWA_RUN_AS=cwa-as-abc
+exec /app/calibre-web-automated/scripts/services/cwa-checksum-backfill.sh

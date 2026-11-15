@@ -181,6 +181,33 @@ local function testFailuresReadAsPlainWordsOnScreen()
     assertEqual(CWNGSyncClient.statusOf("common/Spore/Protocols.lua:85: timeout"), nil, "no status")
 end
 
+local function testTheLibraryListWaitsAsLongAsItIsTold()
+    -- #2329: an automatic library sync gives each page a short limit so a weak
+    -- network cannot hold KOReader's screen for half a minute per page.
+    local socketutil = require("socketutil")
+    local set = {}
+    local original = socketutil.set_timeout
+    socketutil.set_timeout = function(_, block, total) set[#set + 1] = { block, total } end
+    local spore = {
+        reset_middlewares = function() end,
+        enable = function() end,
+        get_library = function() return { status = 200, body = { books = {} } } end,
+    }
+    local answered
+    local function list(timeouts)
+        set, answered = {}, nil
+        CWNGSyncClient.get_library({ client = spore }, "reader", "secret", "Kindle", "device",
+            nil, nil, 50, timeouts, function(ok) answered = ok end)
+    end
+    list({ 3, 6 })
+    assertEqual(answered, true, "the list still arrives")
+    assertEqual(set[1] and set[1][1], 3, "the connect limit it was given is used")
+    assertEqual(set[1] and set[1][2], 6, "and the total limit")
+    list(nil)
+    assertEqual(set[1] and set[1][2], 30, "without one, the list keeps its long limit")
+    socketutil.set_timeout = original
+end
+
 testDescribeFailureNamesEveryShape()
 testADownloadSaysWhetherTheServerAnswered()
 testNoSyncFailureIsWrittenAtDbg()
@@ -188,5 +215,6 @@ testRaisedCallReportsAReasonAndWarns()
 testNon200ReportsItsStatus()
 testSuccessCarriesNoReason()
 testFailuresReadAsPlainWordsOnScreen()
+testTheLibraryListWaitsAsLongAsItIsTold()
 
 print("sync_client outcome-reporting tests passed")

@@ -185,16 +185,16 @@ def test_ingest_setting_defaults_off():
 
 def test_ingest_only_flattens_staged_copy_not_the_original():
     """Source-pin: the flatten call must happen after staging (the
-    shutil.copy2 that isolates the working copy from the original,
+    _copy_file that isolates the working copy from the original,
     possibly-hardlinked-elsewhere file), not before."""
     import inspect
 
     src = inspect.getsource(ingest_processor.NewBookProcessor.add_book_to_library)
-    stage_idx = src.index("shutil.copy2(source_path, staged_path)")
+    stage_idx = src.index("_copy_file(source_path, staged_path)")
     flatten_idx = src.index("comic.flatten_comicinfo_to_root(str(staged_path))")
     assert flatten_idx > stage_idx, (
         "flatten_comicinfo_to_root must run on the staged copy, after "
-        "shutil.copy2 - never on the original source file"
+        "_copy_file - never on the original source file"
     )
     # And it must be gated on the setting, not unconditional.
     window = src[max(0, flatten_idx - 200):flatten_idx]

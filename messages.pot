@@ -4849,7 +4849,7 @@ msgid "Only these shelves"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync Magic Shelves to Kobo in the settings."
+msgid "Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync smart shelves in the settings."
 msgstr ""
 
 #: cps/spa_strings.py

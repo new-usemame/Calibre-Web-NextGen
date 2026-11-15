@@ -228,7 +228,7 @@ def test_the_control_ships_translated(locale):
 # -- smart shelves while the admin's smart-shelf sync is off (#2953) ----------
 
 # The Devices page offers a device's smart shelves even when the admin's
-# "Sync Magic Shelves to Kobo" switch is off, and the manifest then leaves
+# "Sync smart shelves" switch is off, and the manifest then leaves
 # them out (#359 parity, test_device_scope_koreader_manifest). A reader picked
 # "Currently Reading" for their Kindle, saw it saved, and lost the book when it
 # came off their other shelf. The page has to be able to say the pick won't
@@ -236,7 +236,7 @@ def test_the_control_ships_translated(locale):
 SMART_SHELVES_OFF_NOTICE = (
     "Smart shelves are not synced to e-readers on this server, so a smart "
     "shelf ticked here adds no books. An administrator can turn on Sync "
-    "Magic Shelves to Kobo in the settings.")
+    "smart shelves in the settings.")
 
 
 @pytest.mark.parametrize("setting", [False, True], ids=["off", "on"])

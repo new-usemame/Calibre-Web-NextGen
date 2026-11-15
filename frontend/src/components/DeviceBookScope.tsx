@@ -77,7 +77,7 @@ export function DeviceBookScope({ id, scope, onSaved }: {
         </label>)}
         {!magicShelvesSync && scope.choices.magic_shelves.length > 0 &&
           <p id={`${prefix}-magic-help`} className={styles.bookScopeHelp}>
-            {t('Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync Magic Shelves to Kobo in the settings.')}
+            {t('Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync smart shelves in the settings.')}
           </p>}
         {scope.choices.magic_shelves.map(shelf => <label key={`magic-${shelf.id}`} className={styles.bookScopeOption}>
           <input type="checkbox" checked={magic.includes(shelf.id)} disabled={pending || !magicShelvesSync}

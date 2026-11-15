@@ -47,7 +47,7 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_SCRIPT = (
-    REPO_ROOT / "root" / "etc" / "s6-overlay" / "s6-rc.d" / "cwa-ingest-service" / "run"
+    REPO_ROOT / "scripts" / "services" / "cwa-ingest-service.sh"
 )
 
 
@@ -85,6 +85,9 @@ def harness(tmp_path):
         **os.environ,
         "WATCH_FOLDER": str(watch),
         "CWA_INGEST_SERVICE_TEST_MODE": "1",
+        # As the image sets it: the watcher runs through cwa-as-abc, which
+        # these tests replace with a shell function that emits fake events.
+        "CWA_RUN_AS": "cwa-as-abc",
         "CWA_INGEST_PROCESSING_DIR": str(processing),
         "CWA_INGEST_RECENT_DIR": str(recent),
         "CWA_INGEST_RETRY_QUEUE": str(retry_queue),
@@ -115,7 +118,7 @@ def harness(tmp_path):
             run_env.pop("CWA_INGEST_STABLE_CHECKS")
             run_env.pop("CWA_INGEST_STABLE_CONSEC_MATCH")
             run_env.pop("CWA_INGEST_STABLE_INTERVAL")
-        subprocess.run(["bash", "-c", script], env=run_env, check=False)
+        subprocess.run(["bash", "-c", script], env=run_env, check=False, timeout=120)
         return processor_log.read_text().splitlines()
 
     run.watch = watch

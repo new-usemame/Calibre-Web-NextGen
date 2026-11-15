@@ -244,3 +244,70 @@ def test_valid_ingest_owner_ids_are_used_unchanged(tmp_path, monkeypatch):
 
     chown.assert_called_once_with(str(tmp_path), 2001, 2002)
     warning.assert_not_called()
+
+
+@pytest.mark.unit
+def test_network_share_ingest_is_not_chowned_wherever_it_is_mounted(tmp_path, monkeypatch):
+    # A relocated ingest share (not /cwa-book-ingest) is still a share: the
+    # upload path must not re-own it, which is what NETWORK_SHARE_MODE is for.
+    monkeypatch.setattr(editbooks, "get_ingest_dir", lambda: str(tmp_path))
+    monkeypatch.setenv("NETWORK_SHARE_MODE", "true")
+    uploaded = SimpleNamespace(filename="book.epub")
+
+    with patch.object(editbooks.os, "chown") as chown:
+        final_path = editbooks._get_ingest_path(uploaded)
+
+    chown.assert_not_called()
+    assert final_path.startswith(str(tmp_path))
+
+
+@pytest.mark.unit
+def test_updater_leaves_relocated_network_share_dirs_alone(tmp_path, monkeypatch):
+    # In network-share mode the updater must not chown files it moves into this
+    # install's configured config/library dirs, not only the container mounts.
+    from cps import updater
+
+    library = tmp_path / "library"
+    plain = tmp_path / "app"
+    src = tmp_path / "src"
+    for root in (library, plain):
+        root.mkdir()
+    (src / "lib").mkdir(parents=True)
+    (src / "app").mkdir()
+    (src / "lib" / "a.txt").write_text("a")
+    (src / "app" / "b.txt").write_text("b")
+
+    monkeypatch.setattr(updater, "network_share_mode_enabled", lambda: True)
+    monkeypatch.setattr(updater.sys, "platform", "linux")
+    monkeypatch.setattr(constants, "calibre_library_dir", lambda: str(library))
+    monkeypatch.setattr(constants, "ingest_folder", lambda: "/cwa-book-ingest")
+
+    chowned = []
+    monkeypatch.setattr(updater.os, "chown", lambda path, *a: chowned.append(path))
+
+    updater.Updater.move_all_files(str(src / "lib"), str(library))
+    updater.Updater.move_all_files(str(src / "app"), str(plain))
+
+    assert not [p for p in chowned if p.startswith(str(library))]
+    assert any(p.startswith(str(plain)) for p in chowned)
+
+
+@pytest.mark.unit
+def test_library_autodetect_finds_a_relocated_library(tmp_path, monkeypatch):
+    # Bare metal: the library lives at CWA_CALIBRE_LIBRARY_DIR, not /calibre-library.
+    (tmp_path / "metadata.db").write_bytes(b"")
+    monkeypatch.setenv("CWA_CALIBRE_LIBRARY_DIR", str(tmp_path))
+    assert constants.detected_calibre_library_dir() == str(tmp_path)
+
+
+@pytest.mark.unit
+def test_library_autodetect_without_metadata_db_finds_nothing(tmp_path, monkeypatch):
+    monkeypatch.setenv("CWA_CALIBRE_LIBRARY_DIR", str(tmp_path))
+    assert constants.detected_calibre_library_dir() is None
+
+
+@pytest.mark.unit
+def test_library_autodetect_survives_an_unsafe_override(monkeypatch):
+    # Startup and the admin database page call this; a bad value must not raise.
+    monkeypatch.setenv("CWA_CALIBRE_LIBRARY_DIR", "relative/library")
+    assert constants.detected_calibre_library_dir() is None

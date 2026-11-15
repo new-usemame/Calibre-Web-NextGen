@@ -25,6 +25,8 @@ CWA_CALIBRE_LIBRARY_DIR=/srv/calibre/library
 CWA_TMP_CONVERSION_DIR=/var/cache/calibre-web-nextgen/conversion
 ```
 
+`CWA_PROCESSED_BOOKS_DIR` moves the retained originals, failed imports and backup archives (default: `processed_books` in the config dir) somewhere else, such as a larger disk. It follows the same path rules and has no `dirs.json` key.
+
 When `CWA_CALIBRE_LIBRARY_DIR` is set, it is authoritative. Automatic library discovery leaves `dirs.json` unchanged, and if discovery finds a different library, startup stops and reports both paths so you can correct the environment file.
 
 In Docker, the same three variables appear, commented out, in the [full Docker Compose setup](../README.md#full-docker-compose-setup). The volume targets must use the same paths.

@@ -29,6 +29,7 @@ ingest folder        ``CWA_INGEST_FOLDER``                  ``/cwa-book-ingest``
 library directory    ``CWA_CALIBRE_LIBRARY_DIR``            ``/calibre-library``
 conversion temp      ``CWA_TMP_CONVERSION_DIR``             ``/config/.cwa_conversion_tmp``
 ``app.db``           ``CWA_APP_DB_PATH``, ``CALIBRE_DBPATH`` ``<config dir>/app.db``
+processed books      ``CWA_PROCESSED_BOOKS_DIR``            ``<config dir>/processed_books``
 ===================  ====================================  =========================
 
 The three runtime directories use their matching key in ``dirs.json`` between
@@ -222,7 +223,15 @@ def config_path(*parts):
 
 
 def processed_books_dir():
-    """Root for retained originals, failed conversions and backup archives."""
+    """Root for retained originals, failed conversions and backup archives.
+
+    ``CWA_PROCESSED_BOOKS_DIR`` places it apart from the config dir (#1883).
+    """
+    override = os.environ.get("CWA_PROCESSED_BOOKS_DIR")
+    if override is not None and override.strip():
+        return Path(
+            _validated_runtime_dir(override, "CWA_PROCESSED_BOOKS_DIR")
+        )
     return config_path("processed_books")
 
 
@@ -390,10 +399,12 @@ def _main(argv=None):
         "calibre_library_dir": calibre_library_dir,
         "tmp_conversion_dir": tmp_conversion_dir,
     }
-    if len(args) != 1 or args[0] not in {*commands, "all"}:
+    # Kept out of "all", whose callers read exactly three lines.
+    single_commands = {**commands, "processed_books_dir": processed_books_dir}
+    if len(args) != 1 or args[0] not in {*single_commands, "all"}:
         print(
-            "usage: app_paths.py "
-            "{ingest_folder|calibre_library_dir|tmp_conversion_dir|all}",
+            "usage: app_paths.py {ingest_folder|calibre_library_dir|"
+            "tmp_conversion_dir|processed_books_dir|all}",
             file=sys.stderr,
         )
         return 2
@@ -406,7 +417,7 @@ def _main(argv=None):
             for value in resolved:
                 print(value)
         else:
-            print(commands[args[0]]())
+            print(single_commands[args[0]]())
     except RuntimePathError as error:
         print(f"[cwa-paths] ERROR: {error}", file=sys.stderr)
         return 1

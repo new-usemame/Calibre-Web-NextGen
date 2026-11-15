@@ -19,7 +19,7 @@ from io import BytesIO
 from flask import send_file
 from flask_babel.speaklater import LazyString
 
-from . import logger, config
+from . import logger, config, constants
 from .about import collect_stats
 
 log = logger.create()
@@ -236,10 +236,31 @@ def _maybe_redact_ipv4_mapped(match):
     return "<ip>"
 
 
-def _sanitize_log_line(line: str) -> str:
+def _install_path_patterns():
+    """Patterns for this install's own config and library dirs, longest first."""
+    candidates = (
+        (getattr(constants, "CONFIG_DIR", None), "<config>"),
+        (getattr(config, "config_calibre_dir", None), "<library>"),
+    )
+    patterns = []
+    for path, token in candidates:
+        if not isinstance(path, str) or not path.strip():
+            continue
+        path = os.path.normpath(path.strip())
+        if not os.path.isabs(path) or path == "/":
+            continue
+        patterns.append(
+            (re.compile(re.escape(path) + r"(?![\w.-])"), token, len(path))
+        )
+    patterns.sort(key=lambda entry: entry[2], reverse=True)
+    return tuple((pattern, token) for pattern, token, _length in patterns)
+
+
+def _sanitize_log_line(line: str, install_paths=()) -> str:
     """Apply PII/credential scrubbing to a single log line.
 
-    Idempotent: running on already-sanitized text is a no-op.
+    ``install_paths`` comes from ``_install_path_patterns()``. Idempotent:
+    running on already-sanitized text is a no-op.
     """
     if not line:
         return line
@@ -251,7 +272,9 @@ def _sanitize_log_line(line: str) -> str:
     line = _IPV4_PATTERN.sub("<ip>", line)
     line = _IPV6_PATTERN.sub("<ip>", line)
     line = line.replace(_LOOPBACK_V4M_MARKER, "::ffff:127.0.0.1")
-    # Paths.
+    # Paths, this install's own before the container defaults.
+    for pattern, token in install_paths:
+        line = pattern.sub(token, line)
     line = _CONFIG_PATH_PATTERN.sub("<config>/", line)
     line = _LIBRARY_PATH_PATTERN.sub("<library>/", line)
     # Auth headers.
@@ -281,6 +304,7 @@ class _LogScrubber:
     """
 
     def __init__(self, known_names=()):
+        self._install_paths = _install_path_patterns()
         self._emails = {}
         self._users = {}
         names = {n.strip() for n in known_names
@@ -305,7 +329,7 @@ class _LogScrubber:
         return self._users.setdefault(key, "<user_%d>" % (len(self._users) + 1))
 
     def __call__(self, line: str) -> str:
-        line = _sanitize_log_line(line)
+        line = _sanitize_log_line(line, self._install_paths)
         if not line:
             return line
         line = _EMAIL_PATTERN.sub(self._email_label, line)
@@ -335,10 +359,14 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
         return raw
-    scrub = scrubber if scrubber is not None else _sanitize_log_line
+    if scrubber is None:
+        install_paths = _install_path_patterns()
+
+        def scrubber(line):
+            return _sanitize_log_line(line, install_paths)
     sanitized_lines = []
     for line in text.splitlines(keepends=True):
-        sanitized_lines.append(scrub(line))
+        sanitized_lines.append(scrubber(line))
     return "".join(sanitized_lines).encode("utf-8")
 
 

@@ -308,7 +308,7 @@ function transformCallouts(html) {
 // ourselves. If a referenced file is missing from the checkout, fall back to a
 // linked placeholder figure — never an external <img>.
 function transformContentImages(html, register, warn) {
-  return html.replace(
+  const out = html.replace(
     /<p><img src="(https:\/\/github\.com\/new-usemame\/Calibre-Web-NextGen\/raw\/main\/([^"]+))" alt="([^"]*)"(?:\s+title="[^"]*")?\s*>\s*<\/p>/g,
     (m, full, repoRel, alt) => {
       const local = register(repoRel);
@@ -320,6 +320,22 @@ function transformContentImages(html, register, warn) {
       return `<figure class="remote-shot">${ICONS.camera}<figcaption>${alt} `
         + `— <a href="${full}" class="ext">view the full screenshot on GitHub</a>.</figcaption></figure>`;
     },
+  );
+  // Raw HTML from the README (the progress charts' <picture> blocks) keeps its own
+  // attributes, which the paragraph pattern above never sees. A file missing from
+  // the checkout stays external and the third-party self-check reports it.
+  return out.replace(
+    /\s(src|srcset)="https:\/\/github\.com\/new-usemame\/Calibre-Web-NextGen\/raw\/main\/([^"\s]+)"/g,
+    (m, attr, repoRel) => {
+      const local = register(repoRel);
+      return local ? ` ${attr}="~ROOT~/${local.rel}"` : m;
+    },
+  // A <picture> that switches on prefers-color-scheme follows the OS, but this
+  // site has its own theme toggle: emit both variants and let data-theme pick.
+  ).replace(
+    /<picture>\s*<source media="\(prefers-color-scheme: dark\)" srcset="([^"]+)">\s*<img([^>]*?) src="([^"]+)"([^>]*)>\s*<\/picture>/g,
+    (m, dark, pre, light, post) => `<img${pre} src="${light}"${post} class="theme-light-only">`
+      + `<img${pre} src="${dark}"${post} class="theme-dark-only">`,
   );
 }
 
@@ -914,6 +930,7 @@ ${sitemapUrls.map((u) => `  <url><loc>${u.loc}</loc><lastmod>${BUILD_DATE}</last
   // ----- self-checks on emitted pages -----
   const thirdParty = new RegExp(
     '<(?:script|img)[^>]+src="https?://'
+    + '|<(?:img|source)[^>]+srcset="[^"]*https?://'
     + '|<link[^>]+rel="(?:stylesheet|icon|apple-touch-icon|preconnect|dns-prefetch|preload)"[^>]*href="https?://'
     + '|url\\(\\s*[\'"]?https?://',
   );

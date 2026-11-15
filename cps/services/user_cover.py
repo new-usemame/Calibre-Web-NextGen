@@ -337,16 +337,12 @@ def materialize_delivery_copy(user_id, book_id, source_path: str, book_format: s
         os.makedirs(destination_dir, exist_ok=True)
         stem = str(uuid.uuid4())
         destination = os.path.join(destination_dir, stem + "." + book_format.lower())
-        with zipfile.ZipFile(source_path, "r") as source, zipfile.ZipFile(destination, "w") as target:
-            target.comment = source.comment
-            for info in source.infolist():
-                target.writestr(
-                    info,
-                    replacement if info.filename == member_name else source.read(info.filename),
-                )
+        from ..epub_helper import rewrite_zip_members
+        rewrite_zip_members(source_path, destination, {member_name: replacement})
         with zipfile.ZipFile(destination, "r") as check:
-            if check.testzip() is not None:
-                raise ValueError("personal-cover delivery copy failed CRC validation")
+            # Validate what changed, without inflating every unchanged image.
+            if check.read(member_name) != replacement:
+                raise ValueError("personal-cover delivery copy failed cover validation")
         return destination_dir, stem
     except Exception as error:
         log.warning("Could not embed personal cover for book %s: %s", book_id, error)

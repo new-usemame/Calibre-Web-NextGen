@@ -5082,6 +5082,26 @@ msgid "Could not save the book choice. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr ""
 
@@ -6146,6 +6166,10 @@ msgstr "Nie udało się zapisać kolejności."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "Nie udało się zapisać ustawień czytnika."
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
@@ -8548,6 +8572,10 @@ msgstr ""
 msgid "Remove {name}?"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr ""
@@ -8666,6 +8694,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9810,6 +9843,13 @@ msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -9905,8 +9945,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11491,6 +11531,65 @@ msgstr ""
 msgid ""
 "Remove this image? Your previous KOReader sleep-screen settings will return "
 "after the next sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -15175,6 +15274,18 @@ msgstr ""
 "        lub AZW3."
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr "Włącz naprawę EPUB dla Kindle w NextGen"
 
@@ -15400,15 +15511,11 @@ msgstr "Włącz inteligentne stosowanie metadanych"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Gdy włączone, pobrane metadane zastąpią istniejące dane tylko wtedy, gdy "
-"wydają się lepszej jakości (np. dłuższe opisy, okładki o wyższej "
-"rozdzielczości). Gdy wyłączone, pobrane metadane zastąpią istniejące dane "
-"bezpośrednio danymi z preferowanego dostawcy."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -15754,8 +15861,8 @@ msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
 msgstr ""
-"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up -"
-"d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
+"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up "
+"-d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
 "żadnego przycisku."
 
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html
@@ -19061,6 +19168,17 @@ msgstr "Udostępniaj wybrane półki przez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
+
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "Gdy włączone, pobrane metadane zastąpią istniejące dane tylko wtedy, gdy "
+#~ "wydają się lepszej jakości (np. dłuższe opisy, okładki o wyższej "
+#~ "rozdzielczości). Gdy wyłączone, pobrane metadane zastąpią istniejące dane "
+#~ "bezpośrednio danymi z preferowanego dostawcy."
 
 #~ msgid "Rating updated"
 #~ msgstr "Ocena zaktualizowana"

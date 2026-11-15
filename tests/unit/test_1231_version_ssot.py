@@ -258,10 +258,12 @@ def test_no_calibre_release_stamp_file_is_written_or_read_anywhere():
     thought to list — a helper under ``scripts/``, a workflow, an entrypoint,
     a packaging file.
 
-    Two categories are deliberately exempt because naming the retired path is
-    their job: ``tests/`` (this module has to name it to assert on it) and
+    Three categories are deliberately exempt because naming the retired path is
+    their job: ``tests/`` (this module has to name it to assert on it),
     Markdown (``CHANGELOG.md`` and ``CHANGES-vs-upstream.md`` are the historical
-    record of the removal). Neither is executed, so neither can resurrect the
+    record of the removal) and ``docs/progress-tracker/`` (the README tracker's
+    ledger quotes GitHub thread titles, one of them "Remove
+    `/app/CALIBRE_RELEASE`"). None is executed, so none can resurrect the
     dependency.
 
     Matches the *path* form only. ``ARG CALIBRE_RELEASE`` and ``$CALIBRE_RELEASE``
@@ -277,7 +279,7 @@ def test_no_calibre_release_stamp_file_is_written_or_read_anywhere():
     for relative_path in tracked:
         if not relative_path:
             continue
-        if relative_path.startswith("tests/") or relative_path.endswith(".md"):
+        if relative_path.startswith(("tests/", "docs/progress-tracker/")) or relative_path.endswith(".md"):
             continue
         path = _REPO_ROOT / relative_path
         try:

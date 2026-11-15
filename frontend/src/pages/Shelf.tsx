@@ -20,6 +20,9 @@ import type { Book } from '../lib/api';
 import { apiGet, ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useRangeSelection } from '../lib/useRangeSelection';
+import { useCatalogDensity } from '../lib/catalogDensity';
+import { useCatalogRowsPerLoad } from '../lib/catalogRowsPerLoad';
+import { useMeasuredGridColumns } from '../lib/useMeasuredGridColumns';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
@@ -36,6 +39,8 @@ const SHELF_SORT_OPTIONS = [
 ] as const;
 const SHELF_SORT_VALUES = new Set<string>(SHELF_SORT_OPTIONS.map((option) => option.value));
 const SHELF_SORT_KEY_PREFIX = 'cwng:shelf-sort-v1:';
+/** Books per request before the grid has been measured (the old fixed size). */
+const SHELF_FALLBACK_PER_PAGE = 24;
 
 function readShelfSort(shelfId: string): string {
   try {
@@ -89,8 +94,28 @@ export function Shelf({ id }: { id: string }) {
   const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
+  // The Library's density choice, read-only here, so a shelf is as dense as the Library (#980).
+  const [density] = useCatalogDensity();
+  const [rowsChoice] = useCatalogRowsPerLoad();
+  const rowsPerLoad = Number(rowsChoice);
+  // "Rows per load" means whole rows, so the request size is rows x the number of
+  // columns the grid really renders. The first request waits for that
+  // measurement (fail-open after a moment) rather than fetching at a guess and
+  // refetching, as the Library does (#1144).
+  const { gridRef, columns, measured: gridMeasured } = useMeasuredGridColumns({
+    fallbackColumns: Math.ceil(SHELF_FALLBACK_PER_PAGE / rowsPerLoad),
+    minWidthVar: '--shelf-grid-min',
+    layoutKey: density,
+  });
+  // Page N of an infinite scroll is only meaningful at the page size that page 1
+  // used, so follow the live measurement while on page 1 and hold that size once
+  // scrolling has started. Rotating a phone mid-scroll then cannot skip or
+  // repeat books; the next sort, bulk change or shelf starts afresh at page 1.
+  const pageSizeRef = useRef(rowsPerLoad * columns);
+  if (page === 1) pageSizeRef.current = rowsPerLoad * columns;
+  const perPage = pageSizeRef.current;
 
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort, revision);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort, revision, perPage, gridMeasured);
   const updateShelf = useUpdateShelf(id);
   const deleteShelf = useDeleteShelf();
   const reorder = useReorderShelfBooks(id);
@@ -188,7 +213,17 @@ export function Shelf({ id }: { id: string }) {
     enabled: !!data && books.length < data.total && !isFetching,
   });
 
-  if (isLoading && !data) return <SpinnerCentered size={40} />;
+  // The loading state is itself a grid so there is something to measure before
+  // the first request is allowed to go out.
+  if ((isLoading || !gridMeasured) && !data) {
+    return (
+      <div className={styles.container}>
+        <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div className={styles.gridLoading}><SpinnerCentered size={40} /></div>
+        </div>
+      </div>
+    );
+  }
   if (error || !data) {
     return (
       <div className={styles.container}>
@@ -478,7 +513,7 @@ export function Shelf({ id }: { id: string }) {
         </ol>
       ) : (
         <>
-          <div className={styles.grid}>
+          <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="shelf-grid">
             {books.map((book, i) => (
               <BookCard
                 key={book.id}

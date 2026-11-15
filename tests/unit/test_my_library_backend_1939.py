@@ -1273,7 +1273,6 @@ def test_successful_upload_is_added_only_to_personal_uploader(
 
     processor = object.__new__(ingest_processor.NewBookProcessor)
     processor.last_added_book_ids = [41]
-    processor.last_added_ids_are_fallback = False
     processor.original_filename = "uploaded.epub"
     processor.uploader_user_id = 1
     processor.uploader_was_personal_library = True

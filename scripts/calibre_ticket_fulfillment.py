@@ -18,6 +18,9 @@ import zipfile
 from xml.etree import ElementTree
 
 RESULT_PREFIX = "CWNG_FULFILLMENT_RESULT="
+# Ingest looks for this text to tell a hook that handed the ticket back from
+# a plugin that ran and failed (#1228).
+TICKET_RETURNED = "ACSM import hooks must return an EPUB or PDF, not the ticket"
 
 
 def validate_book(path):
@@ -50,7 +53,7 @@ def validate_book(path):
             if b"%%EOF" not in stream.read():
                 raise ValueError("Fulfillment returned an incomplete PDF document")
     else:
-        raise ValueError("ACSM import hooks must return an EPUB or PDF, not the ticket")
+        raise ValueError(TICKET_RETURNED)
     return extension.lstrip(".")
 
 

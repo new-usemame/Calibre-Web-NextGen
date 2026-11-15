@@ -87,11 +87,11 @@ def collect_stats():
 
 def render_readme_table(stats):
     """Compact table for the repo README. Pure markdown, no images, no
-    external services — renders the same on github.com and on a clone."""
+    external services; renders the same on github.com and on a clone."""
     lines = [
         "| Language | Completion | Strings | Fuzzy |",
         "|---|---|---:|---:|",
-        "| English (source) | 100% | source | — |",
+        "| English (source) | 100% | source | n/a |",
     ]
     for lang, name, total, translated, fuzzy, percent in stats:
         bar_filled = int(round(percent / 5))

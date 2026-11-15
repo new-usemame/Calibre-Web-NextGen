@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 from cps import ub
 
+from .annotation_content_id import ContentIdError, normalize_content_id
 from .kobo_annotation_reanchor import KepubIndex, _kepub_path, normalize
 
 ANCHOR_CHARS = 200
@@ -25,10 +26,26 @@ _SHRINK = (200, 120, 60, 30)
 LOOKAHEAD_SPANS = 40  # a v3 page-foot note block ran 14 spans before body prose resumed
 
 
+def _zip_name(source, book_uuid=None):
+    """The KEPUB zip path a location source names.
+
+    Nickel reports a place inside a book as ``<uuid>!OEBPS!chap.xhtml`` (or
+    ``<uuid>!!OEBPS/chap.xhtml``); the store API form is ``OEBPS/chap.xhtml``.
+    A source in neither content-id form, or naming another book, is returned
+    as given."""
+    name = (source or "").split("#", 1)[0]
+    try:
+        content_id = normalize_content_id(
+            name, book_uuid=book_uuid, allow_kobo_device_content_id=True)
+    except ContentIdError:
+        return name
+    return content_id.split("!!", 1)[1]
+
+
 def _chapter(index, name):
+    name = _zip_name(name)
     if not name:
         return None
-    name = name.split("#", 1)[0]
     chapter = index.chapters.get(name)
     if chapter is None:
         full = index.basenames.get(posixpath.basename(name))
@@ -247,7 +264,8 @@ def reanchor_missing_position(book, bookmark, *, log):
         return False
     if (getattr(bookmark, "location_type", None) or "").lower() != "kobospan":
         return False
-    source = (getattr(bookmark, "location_source", None) or "").split("#", 1)[0]
+    source = _zip_name(getattr(bookmark, "location_source", None),
+                       getattr(book, "uuid", None))
     if not source:
         return False
     path = _kepub_path(book)

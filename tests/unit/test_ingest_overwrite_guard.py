@@ -31,7 +31,6 @@ def _processor(ingest_processor, tmp_path):
     processor.library_dir = str(tmp_path / "library")
     processor.last_added_book_id = None
     processor.last_added_book_ids = []
-    processor.last_added_ids_are_fallback = False
     processor.db = _ImportDb()
     processor.filepath = str(tmp_path / "incoming.epub")
     processor.original_filename = "incoming.epub"

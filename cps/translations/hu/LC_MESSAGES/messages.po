@@ -5023,6 +5023,26 @@ msgid "Could not save the book choice. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr ""
 
@@ -6089,6 +6109,10 @@ msgstr "Nem sikerült menteni a sorrendet."
 
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8491,6 +8515,10 @@ msgstr ""
 msgid "Remove {name}?"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr ""
@@ -8607,6 +8635,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9771,6 +9804,13 @@ msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -9872,8 +9912,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11472,6 +11512,65 @@ msgstr ""
 msgid ""
 "Remove this image? Your previous KOReader sleep-screen settings will return "
 "after the next sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -15087,6 +15186,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr ""
 
@@ -15298,15 +15409,11 @@ msgstr "Okos metaadat hozzárendelés engedélyezése"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Ha engedélyezve van, a letöltött metaadatok csak akkor írják felül a "
-"meglévőket, ha azok jobb minőségűnek tűnnek (pl. részletesebb leírás, "
-"nagyobb felbontású borító). Ha ki van kapcsolva, a preferált szolgáltatótól "
-"érkező metaadatok változtatás nélkül felülírják a meglévő adatokat."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -18918,6 +19025,18 @@ msgstr "Kiválasztott polcok szinkronizációja Kobo eszközzel"
 msgid "Show Read/Unread Section"
 msgstr "Olvasott/olvasatlan mutatása"
 
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "Ha engedélyezve van, a letöltött metaadatok csak akkor írják felül a "
+#~ "meglévőket, ha azok jobb minőségűnek tűnnek (pl. részletesebb leírás, "
+#~ "nagyobb felbontású borító). Ha ki van kapcsolva, a preferált "
+#~ "szolgáltatótól érkező metaadatok változtatás nélkül felülírják a meglévő "
+#~ "adatokat."
+
 #~ msgid "Rating updated"
 #~ msgstr "Értékelés frissítve"
 
@@ -19379,9 +19498,9 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 #~ "wiki/Configuration#database-configuration\">see here</a>!"
 #~ msgstr ""
-#~ "A CWA úgy van konfigurálva, hogy a Calibre adatbázisa (a <code>metadata."
-#~ "db</code> fájl) mindig a <code>/calibre-library</code> könyvtáron belül "
-#~ "helyezkedjen el. \n"
+#~ "A CWA úgy van konfigurálva, hogy a Calibre adatbázisa (a "
+#~ "<code>metadata.db</code> fájl) mindig a <code>/calibre-library</code> "
+#~ "könyvtáron belül helyezkedjen el. \n"
 #~ "Induláskor a CWA automatikusan átvizsgálja azt a könyvtárat, amelyet a "
 #~ "docker-compose fájlban a <code>/calibre-library</code> útvonalhoz "
 #~ "rendelt, és meglévő Calibre \n"

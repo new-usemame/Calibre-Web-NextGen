@@ -144,6 +144,17 @@ test('Classic advanced-search date controls share named canonical fields', async
 });
 
 
+// The iframe body is editable before TinyMCE finishes init; init then loads
+// the textarea's value into it, wiping anything typed in between (#2940: the
+// probe text read back as "" and passed only on retry). Type after init.
+async function waitForCommentsEditor(page: import('@playwright/test').Page) {
+  await expect(page.locator('#comments_ifr')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as {
+    tinymce?: { get(id: string): { initialized?: boolean } | null };
+  }).tinymce?.get('comments')?.initialized === true),
+  { message: 'TinyMCE finished initializing the comments editor' }).toBe(true);
+}
+
 // Use the real authenticated HTML/backend, with a deliberately restrictive
 // response header. No policy opt-in or console filtering can mask the failure.
 test('Chromium Classic editor works with unload denied', async ({ page, browserName }) => {
@@ -160,7 +171,7 @@ test('Chromium Classic editor works with unload denied', async ({ page, browserN
   expect(await page.evaluate(() => (document as Document & {
     featurePolicy?: { allowsFeature(feature: string): boolean };
   }).featurePolicy?.allowsFeature('unload'))).toBe(false);
-  await expect(page.locator('#comments_ifr')).toBeVisible();
+  await waitForCommentsEditor(page);
   const firstBody = page.frameLocator('#comments_ifr').locator('body');
   await firstBody.fill('Unsubmitted policy probe');
   await expect(firstBody).toContainText('Unsubmitted policy probe');
@@ -169,7 +180,7 @@ test('Chromium Classic editor works with unload denied', async ({ page, browserN
   await page.goto('/table');
   await expect(page.locator('#books-table')).toBeVisible();
   await page.goto(editorPath);
-  await expect(page.locator('#comments_ifr')).toBeVisible();
+  await waitForCommentsEditor(page);
   const nextBody = page.frameLocator('#comments_ifr').locator('body');
   await nextBody.fill('Second unsubmitted policy probe');
   await expect(nextBody).toContainText('Second unsubmitted policy probe');

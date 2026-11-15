@@ -8,7 +8,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   wrapClassName?: string;
 };
 
-/** Password input with a show/hide toggle. Drop-in for <input type="password">. */
+/** Password input with a show/hide toggle. Use an explicit label outside the
+ * wrapper: a wrapping label would also name the input after the toggle. */
 export function PasswordInput({ wrapClassName, className, ...rest }: Props) {
   const t = useT();
   const [shown, setShown] = useState(false);

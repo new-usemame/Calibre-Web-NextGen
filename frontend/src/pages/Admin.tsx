@@ -212,15 +212,16 @@ export function Admin() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </label>
-            <label className={styles.field}>
-              <span>{t('Password')}</span>
+            <div className={styles.field}>
+              <label htmlFor="new-user-password">{t('Password')}</label>
               <PasswordInput
+                id="new-user-password"
                 value={form.password} required autoComplete="new-password"
                 aria-describedby={passwordRequirementsText(passwordPolicy, t) ? 'new-user-password-rules' : undefined}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
               <PasswordPolicyHint policy={passwordPolicy} id="new-user-password-rules" />
-            </label>
+            </div>
             <label className={styles.field}>
               <span>{t('Email (optional)')}</span>
               <input
@@ -602,10 +603,10 @@ function MailConfigForm() {
           <span>{t('Login')}</span>
           <input value={String(form.mail_login ?? '')} onChange={(e) => set('mail_login', e.target.value)} />
         </label>
-        <label className={styles.field}>
-          <span>{cfg.has_password ? t('Password (leave blank to keep)') : t('Password')}</span>
-          <PasswordInput value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
-        </label>
+        <div className={styles.field}>
+          <label htmlFor="smtp-password">{cfg.has_password ? t('Password (leave blank to keep)') : t('Password')}</label>
+          <PasswordInput id="smtp-password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+        </div>
         <label className={styles.field}>
           <span>{t('From address')}</span>
           <input value={String(form.mail_from ?? '')} onChange={(e) => set('mail_from', e.target.value)} />
@@ -748,9 +749,9 @@ function SecurityConfigForm() {
           <div className={styles.newRow}>
             <label className={styles.field}><span>{t('Service account (DN)')}</span>
               <input value={f.ldap.serv_username} onChange={(e) => setLdap('serv_username', e.target.value)} /></label>
-            <label className={styles.field}>
-              <span>{f.ldap.has_password ? t('Service password (leave blank to keep)') : t('Service password')}</span>
-              <PasswordInput value={ldapPw} autoComplete="new-password" onChange={(e) => setLdapPw(e.target.value)} /></label>
+            <div className={styles.field}>
+              <label htmlFor="ldap-password">{f.ldap.has_password ? t('Service password (leave blank to keep)') : t('Service password')}</label>
+              <PasswordInput id="ldap-password" value={ldapPw} autoComplete="new-password" onChange={(e) => setLdapPw(e.target.value)} /></div>
             <label className={styles.field}><span>{t('Base DN')}</span>
               <input value={f.ldap.dn} onChange={(e) => setLdap('dn', e.target.value)} /></label>
           </div>
@@ -797,9 +798,9 @@ function SecurityConfigForm() {
           <div className={styles.newRow}>
             <label className={styles.field}><span>{t('Client ID')}</span>
               <input value={f.oauth.generic.client_id} onChange={(e) => setGen('client_id', e.target.value)} /></label>
-            <label className={styles.field}>
-              <span>{f.oauth.generic.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</span>
-              <PasswordInput value={oauthSecret} autoComplete="new-password" onChange={(e) => setOauthSecret(e.target.value)} /></label>
+            <div className={styles.field}>
+              <label htmlFor="oauth-secret">{f.oauth.generic.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</label>
+              <PasswordInput id="oauth-secret" value={oauthSecret} autoComplete="new-password" onChange={(e) => setOauthSecret(e.target.value)} /></div>
           </div>
           <div className={styles.newRow}>
             <label className={styles.field}><span>{t('Metadata URL (OIDC auto-discovery)')}</span>
@@ -867,10 +868,10 @@ function SecurityConfigForm() {
                 <div className={styles.newRow} key={p.name}>
                   <label className={styles.field}><span>{p.name[0].toUpperCase() + p.name.slice(1)} {t('Client ID')}</span>
                     <input value={p.client_id} onChange={(e) => setProviderClientId(p.name, e.target.value)} /></label>
-                  <label className={styles.field}>
-                    <span>{p.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</span>
-                    <PasswordInput autoComplete="new-password" value={providerSecrets[p.name] || ''}
-                      onChange={(e) => setProviderSecrets((s) => ({ ...s, [p.name]: e.target.value }))} /></label>
+                  <div className={styles.field}>
+                    <label htmlFor={`oauth-${p.name}-secret`}>{p.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</label>
+                    <PasswordInput id={`oauth-${p.name}-secret`} autoComplete="new-password" value={providerSecrets[p.name] || ''}
+                      onChange={(e) => setProviderSecrets((s) => ({ ...s, [p.name]: e.target.value }))} /></div>
                 </div>
               ))}
             </>

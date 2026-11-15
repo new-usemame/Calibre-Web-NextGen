@@ -624,16 +624,17 @@ export function AdminAcquisition() {
               </label>
             )}
             {((adapter !== 'opds' && !passwordClient) || draft.auth_kind !== 'none') && (
-              <label className={styles.field}>
-                <span>{adapter !== 'opds' && !passwordClient ? t('API key') : draft.auth_kind === 'basic' ? t('Password') : t('Token')}</span>
+              <div className={styles.field}>
+                <label htmlFor={`${formId}-secret`}>{adapter !== 'opds' && !passwordClient ? t('API key') : draft.auth_kind === 'basic' ? t('Password') : t('Token')}</label>
                 <PasswordInput
-                aria-invalid={formError ? true : undefined}
-                aria-describedby={formError ? `${formId}-error` : undefined}
+                  id={`${formId}-secret`}
+                  aria-invalid={formError ? true : undefined}
+                  aria-describedby={formError ? `${formId}-error` : undefined}
                   value={draft.secret}
                   autoComplete="new-password"
                   onChange={(event) => setDraft({ ...draft, secret: event.target.value })}
                 />
-              </label>
+              </div>
             )}
           </div>
           <label className={styles.switchRow}>

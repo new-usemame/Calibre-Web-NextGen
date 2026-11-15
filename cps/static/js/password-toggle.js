@@ -1,6 +1,6 @@
 /* Adds a show/hide button to every password input (issue #2632).
  * Opt out per field with data-pw-toggle="off". Disabled/readonly fields are
- * skipped. Fields added to the DOM later are picked up via MutationObserver. */
+ * skipped. Fields added or enabled later are picked up via MutationObserver. */
 (function () {
     "use strict";
 
@@ -56,6 +56,11 @@
         if (window.MutationObserver) {
             new MutationObserver(function (muts) {
                 for (var i = 0; i < muts.length; i++) {
+                    if (muts[i].type === "attributes") {
+                        var input = muts[i].target;
+                        if (input.matches('input[type="password"]')) { enhance(input); }
+                        continue;
+                    }
                     var added = muts[i].addedNodes;
                     for (var j = 0; j < added.length; j++) {
                         var n = added[j];
@@ -64,7 +69,10 @@
                         else if (n.querySelectorAll) { scan(n); }
                     }
                 }
-            }).observe(document.body, { childList: true, subtree: true });
+            }).observe(document.body, {
+                childList: true, subtree: true, attributes: true,
+                attributeFilter: ["type", "disabled", "readonly", "data-pw-toggle"]
+            });
         }
     }
 

@@ -8,10 +8,11 @@
 
 When ``CWA_CALIBRE_USER_PLUGINS`` is set to a truthy value (``1`` /
 ``true`` / ``yes`` / ``on``), Calibre subprocess invocations launched by
-the ingest pipeline run with ``HOME=/config`` and
-``CALIBRE_CONFIG_DIRECTORY=/config/.config/calibre`` so that the
+the ingest pipeline run with ``HOME`` set to the config dir (``/config``
+in the container, ``CALIBRE_DBPATH`` elsewhere) and
+``CALIBRE_CONFIG_DIRECTORY=<config dir>/.config/calibre`` so that the
 embedded Calibre process loads any plugins the operator has placed under
-``/config/.config/calibre/plugins/``. The plugins directory is created
+``<config dir>/.config/calibre/plugins/``. The plugins directory is created
 on first use if missing.
 
 ``CALIBRE_CONFIG_DIRECTORY`` is Calibre's documented configuration
@@ -53,6 +54,14 @@ _PLUGINS_SUBPATH = ".config/calibre/plugins"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 
+def _home() -> str:
+    """The config dir from ``CALIBRE_DBPATH``, or ``/config`` when it is unset."""
+    configured = os.environ.get("CALIBRE_DBPATH", "").strip()
+    if not configured:
+        return _HOME
+    return os.path.dirname(configured) if configured.endswith(".db") else configured
+
+
 def is_enabled() -> bool:
     """True iff the operator has opted into Calibre user-plugin loading.
 
@@ -84,7 +93,7 @@ def apply_to_env(env: dict[str, str]) -> dict[str, str]:
     the intended off-state.
     """
     if is_enabled():
-        env["HOME"] = _HOME
+        env["HOME"] = _home()
         env["CALIBRE_CONFIG_DIRECTORY"] = str(config_dir())
     return env
 
@@ -93,13 +102,13 @@ def config_dir() -> Path:
     """Absolute path to the Calibre configuration directory the opt-in
     points subprocesses at (``/config/.config/calibre``). The plugins
     directory lives directly beneath it."""
-    return Path(_HOME) / _PLUGINS_SUBPATH.rsplit("/", 1)[0]
+    return Path(_home()) / _PLUGINS_SUBPATH.rsplit("/", 1)[0]
 
 
 def plugins_dir() -> Path:
     """Absolute path to where Calibre will look for user plugins when
     HOME=/config. Always returns a path; doesn't check existence."""
-    return Path(_HOME) / _PLUGINS_SUBPATH
+    return Path(_home()) / _PLUGINS_SUBPATH
 
 
 def ensure_plugins_dir() -> Path | None:
@@ -255,4 +264,4 @@ def env_var_name() -> str:
 
 def home_path() -> str:
     """Public accessor for the HOME value injected when enabled."""
-    return _HOME
+    return _home()

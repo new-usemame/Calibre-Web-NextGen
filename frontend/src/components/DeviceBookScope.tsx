@@ -13,7 +13,10 @@ export interface BookScope {
   account_mode: Exclude<Mode, 'unset'>;
   effective_mode: Exclude<Mode, 'unset'>;
   fallback: null | { reason: 'shelf_deleted' | 'shelf_unavailable' };
-  choices: { shelves: ShelfChoice[]; magic_shelves: ShelfChoice[]; my_library: boolean };
+  choices: {
+    shelves: ShelfChoice[]; magic_shelves: ShelfChoice[]; my_library: boolean;
+    magic_shelves_sync: boolean;
+  };
 }
 
 export function DeviceBookScope({ id, scope, onSaved }: {
@@ -33,7 +36,9 @@ export function DeviceBookScope({ id, scope, onSaved }: {
     unset: t('Same as my account setting'), library: t('Everything in my library'),
     my_library: t('My Library'), shelves: t('Only these shelves'),
   };
-  const canSave = mode !== 'shelves' || shelves.length + magic.length > 0;
+  // Older servers omit this field; keep their smart-shelf choices enabled.
+  const magicShelvesSync = scope.choices.magic_shelves_sync !== false;
+  const canSave = mode !== 'shelves' || shelves.length > 0 || (magicShelvesSync && magic.length > 0);
   const save = async () => {
     if (pending || !canSave) return;
     setPending(true); setError(false);
@@ -70,8 +75,13 @@ export function DeviceBookScope({ id, scope, onSaved }: {
             onChange={event => setShelves(toggle(shelves, shelf.id, event.currentTarget.checked))} />
           <span>{shelf.name}</span>
         </label>)}
+        {!magicShelvesSync && scope.choices.magic_shelves.length > 0 &&
+          <p id={`${prefix}-magic-help`} className={styles.bookScopeHelp}>
+            {t('Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync Magic Shelves to Kobo in the settings.')}
+          </p>}
         {scope.choices.magic_shelves.map(shelf => <label key={`magic-${shelf.id}`} className={styles.bookScopeOption}>
-          <input type="checkbox" checked={magic.includes(shelf.id)} disabled={pending}
+          <input type="checkbox" checked={magic.includes(shelf.id)} disabled={pending || !magicShelvesSync}
+            aria-describedby={!magicShelvesSync ? `${prefix}-magic-help` : undefined}
             onChange={event => setMagic(toggle(magic, shelf.id, event.currentTarget.checked))} />
           <span>{shelf.name}</span>
         </label>)}

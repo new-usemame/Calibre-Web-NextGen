@@ -787,6 +787,7 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | n/a |
+| German (`de`) | `████████████████████` 100% | 4145/4150 | 0 |
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 100% | 4143/4150 | 0 |
 | ca (`ca`) | `████████████████████` 99% | 4090/4150 | 0 |
 | Slovak (`sk`) | `████████████████████` 98% | 4085/4150 | 0 |
@@ -798,7 +799,6 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Spanish (`es`) | `███████████████░░░░░` 74% | 3093/4150 | 0 |
 | Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 64% | 2672/4150 | 172 |
 | Polish (`pl`) | `████████████░░░░░░░░` 62% | 2574/4150 | 0 |
-| German (`de`) | `████████████░░░░░░░░` 58% | 2404/4150 | 11 |
 | Hungarian (`hu`) | `████████░░░░░░░░░░░░` 42% | 1758/4150 | 118 |
 | Arabic (`ar`) | `███████░░░░░░░░░░░░░` 35% | 1464/4150 | 0 |
 | Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 34% | 1426/4150 | 296 |

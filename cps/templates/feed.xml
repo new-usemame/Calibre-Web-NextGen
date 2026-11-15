@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata">
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata" xmlns:cwng="urn:cwng:opds:1">
   <icon>{{ url_for('static', filename='favicon.ico') }}</icon>
   <id>urn:uuid:2853dacf-ed79-42f5-8e8a-a7bb3d1ae6a2</id>
   <updated>{{ current_time }}</updated>
@@ -40,7 +40,7 @@
     <link rel="search"
       href="{{url_for('opds.feed_osd')}}"
       type="application/opensearchdescription+xml"/>
-  <link type="application/atom+xml" rel="search" title="{{_('Search')}}" href="{{ opds_search_url_path() }}" />
+  <link type="application/atom+xml" rel="search" title="{{_('Search')}}" href="{{ opds_search_url_template() }}" />
   <title>{% if feed_title %}{{ instance }} - {{ feed_title }}{% else %}{{ instance }}{% endif %}</title>
   <author>
     <name>{{instance}}</name>
@@ -52,6 +52,13 @@
   <entry>
     <title>{{entry.Books.title}}</title>
     <id>urn:uuid:{{entry.Books.uuid}}</id>
+    <calibre:id>{{entry.Books.id}}</calibre:id>
+    {% if read_statuses and entry.Books.id in read_statuses %}
+    <cwng:read_status>{{ read_statuses[entry.Books.id] }}</cwng:read_status>
+    {% endif %}
+    {% if shared_places and entry.Books.id in shared_places %}
+    <cwng:progress>{{ shared_places[entry.Books.id] }}</cwng:progress>
+    {% endif %}
     <updated>{{entry.Books.atom_timestamp}}</updated>
     {% for author in entry.Books.authors %}
       <author>
@@ -91,12 +98,13 @@
     <content type="text">{{entry.Books.comments[0].text|striptags}}</content>
     {% endif %}
     {% if entry.Books.has_cover %}
-    <link type="image/jpeg" href="{{url_for('opds.feed_get_cover', book_id=entry.Books.id)}}" rel="http://opds-spec.org/image"/>
-    <link type="image/jpeg" href="{{url_for('opds.feed_get_cover', book_id=entry.Books.id)}}" rel="http://opds-spec.org/image/thumbnail"/>
+    {% set cover_version = entry.Books|last_modified %}
+    <link type="image/jpeg" href="{{url_for('opds.feed_get_cover', book_id=entry.Books.id, c=cover_version)}}" rel="http://opds-spec.org/image"/>
+    <link type="image/jpeg" href="{{url_for('opds.feed_get_cover_thumbnail', book_id=entry.Books.id, c=cover_version)}}" rel="http://opds-spec.org/image/thumbnail"/>
     {% endif %}
     {% for format in entry.Books.data %}
     <link rel="http://opds-spec.org/acquisition" href="{{ url_for('opds.opds_download_link', book_id=entry.Books.id, book_format=format.format|lower)}}"
-          length="{{format.uncompressed_size}}" mtime="{{entry.Books.atom_timestamp}}" type="{{format.format|lower|mimetype}}"/>
+          title="{{ format.format|upper }}" length="{{format.uncompressed_size}}" mtime="{{entry.Books.atom_timestamp}}" type="{{format.format|lower|mimetype}}"/>
     {% endfor %}
   </entry>
   {% endfor %}

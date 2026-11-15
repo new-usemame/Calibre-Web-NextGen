@@ -22,7 +22,7 @@ msgstr "Estatísticas"
 
 #: cps/admin.py
 msgid "Calibre database unavailable. Please reconfigure the library path."
-msgstr ""
+msgstr "Banco de dados do Calibre indisponível. Reconfigure o caminho da biblioteca."
 
 #: cps/admin.py
 #, fuzzy
@@ -2417,11 +2417,11 @@ msgstr ""
 #: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
 #: cps/templates/user_table.html
 msgid "My Library"
-msgstr ""
+msgstr "Minha biblioteca"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Library"
-msgstr ""
+msgstr "Biblioteca"
 
 #: cps/render_template.py
 msgid "Show recent books"
@@ -3015,63 +3015,63 @@ msgstr "Adicionar"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Add to my library"
-msgstr ""
+msgstr "Adicionar à minha biblioteca"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Add {title} to my library"
-msgstr ""
+msgstr "Adicionar {title} à minha biblioteca"
 
 #: cps/spa_strings.py
 msgid "Added to your library"
-msgstr ""
+msgstr "Adicionado à sua biblioteca"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added to your library and to {shelf}"
-msgstr ""
+msgstr "Adicionado à sua biblioteca e a {shelf}"
 
 #: cps/spa_strings.py
 msgid "Adding this book to a shelf also adds it to your library."
-msgstr ""
+msgstr "Adicionar este livro a uma estante também o inclui na sua biblioteca."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Adding…"
-msgstr ""
+msgstr "Adicionando…"
 
 #: cps/spa_strings.py
 msgid "Add book to this library"
-msgstr ""
+msgstr "Adicionar livro a esta biblioteca"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added book {book} to {name}."
-msgstr ""
+msgstr "Livro {book} adicionado a {name}."
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Browse global library"
-msgstr ""
+msgstr "Explorar biblioteca global"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Browse the global library"
-msgstr ""
+msgstr "Explore a biblioteca global"
 
 #: cps/spa_strings.py
 msgid "Could not add the book."
-msgstr ""
+msgstr "Não foi possível adicionar o livro."
 
 #: cps/spa_strings.py
 msgid "Could not add this book to the shelf."
-msgstr ""
+msgstr "Não foi possível adicionar este livro à estante."
 
 #: cps/spa_strings.py
 msgid "Could not add the book. Please try again."
-msgstr ""
+msgstr "Não foi possível adicionar o livro. Tente novamente."
 
 #: cps/spa_strings.py
 msgid "Could not remove the book. Please try again."
-msgstr ""
+msgstr "Não foi possível remover o livro. Tente novamente."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4991,6 +4991,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
+"Smart shelves are not synced to e-readers on this server, so a smart shelf "
+"ticked here adds no books. An administrator can turn on Sync smart shelves "
+"in the settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Choose which books this device keeps. Books you take off are removed from "
 "the device at its next sync; your place, highlights and notes stay saved."
 msgstr ""
@@ -5014,6 +5021,26 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save the book choice. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6073,6 +6100,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8006,39 +8037,39 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open administration"
-msgstr ""
+msgstr "Abrir Administração"
 
 #: cps/spa_strings.py cps/templates/annotations_view.html
 msgid "Open book"
-msgstr ""
+msgstr "Abrir Livro"
 
 #: cps/spa_strings.py
 msgid "Open classic reader"
-msgstr ""
+msgstr "Abrir leitor clássico"
 
 #: cps/spa_strings.py
 msgid "Open cover editor"
-msgstr ""
+msgstr "Abrir editor de capa"
 
 #: cps/spa_strings.py
 msgid "Open navigation"
-msgstr ""
+msgstr "Abrir navegação"
 
 #: cps/spa_strings.py
 msgid "Open reader"
-msgstr ""
+msgstr "Abrir leitor"
 
 #: cps/spa_strings.py
 msgid "Open the classic interface"
-msgstr ""
+msgstr "Abra a interface clássica"
 
 #: cps/spa_strings.py
 msgid "Open the link below on your signed-in device."
-msgstr ""
+msgstr "Abra o link abaixo no dispositivo em que está conectado."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Open without saving progress"
-msgstr ""
+msgstr "Abrir sem salvar o progresso"
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
@@ -8051,7 +8082,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Opening…"
-msgstr ""
+msgstr "Aberindo…"
 
 #: cps/spa_strings.py
 msgid ""
@@ -8095,33 +8126,33 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Other users' eReaders:"
-msgstr ""
+msgstr "eReaders de outros utilizadores"
 
 #: cps/spa_strings.py
 msgid "PDF reader"
-msgstr ""
+msgstr "Leitor de PDF"
 
 #: cps/spa_strings.py
 msgid "Page margins"
-msgstr ""
+msgstr "Margens da página"
 
 #: cps/spa_strings.py
 msgid "Page theme"
-msgstr ""
+msgstr "Tema da página"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Page {number}"
-msgstr ""
+msgstr "Página {number}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Page {page} of {pages}"
-msgstr ""
+msgstr "Página {page} de {pages}"
 
 #: cps/spa_strings.py
 msgid "Pagination"
-msgstr ""
+msgstr "Paginação"
 
 #: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
@@ -8455,6 +8486,10 @@ msgstr ""
 msgid "Remove {name}?"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr ""
@@ -8571,6 +8606,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9710,6 +9750,13 @@ msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -9805,8 +9852,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11408,6 +11455,41 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr ""
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Etiqueta sem nome"
@@ -12303,21 +12385,21 @@ msgstr "Ordenar de acordo com a data do livro, o mais antigo primeiro"
 
 #: cps/templates/_book_organizer.html
 msgid "Title A → Z"
-msgstr ""
+msgstr "Título A → Z"
 
 #: cps/templates/_book_organizer.html
 msgid "Title Z → A"
-msgstr ""
+msgstr "Título Z → A"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
 msgid "Author A → Z"
-msgstr "Autor"
+msgstr "Autor A → Z"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
 msgid "Author Z → A"
-msgstr "Autor"
+msgstr "Autor Z → A"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
@@ -12331,11 +12413,11 @@ msgstr "Publicado antes de "
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, ascending"
-msgstr ""
+msgstr "Número de série, ordem crescente"
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, descending"
-msgstr ""
+msgstr "Número de série, ordem decrescente"
 
 #: cps/templates/_book_organizer.html
 #, fuzzy
@@ -12370,7 +12452,7 @@ msgstr "Estante pública"
 
 #: cps/templates/admin.html
 msgid "Manage Profile Pictures"
-msgstr ""
+msgstr "Gerir fotos de perfil"
 
 #: cps/templates/admin.html
 msgid "Import LDAP Users"
@@ -12452,7 +12534,7 @@ msgstr "Nome do cabeçalho do Proxy reverso"
 
 #: cps/templates/admin.html
 msgid "NextGen Settings"
-msgstr ""
+msgstr "Configurações NextGen"
 
 #: cps/templates/admin.html
 msgid "Edit Basic Configuration"
@@ -12468,7 +12550,7 @@ msgstr "Editar configuração da base de dados do Calibre"
 
 #: cps/templates/admin.html
 msgid "Manage reader fonts"
-msgstr ""
+msgstr "Gerir fontes de leitura"
 
 #: cps/templates/admin.html
 #, fuzzy
@@ -12486,7 +12568,7 @@ msgstr "Duração máxima"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Scheduled Thumbnail Refresh"
-msgstr ""
+msgstr "Atualização agendada de miniatura"
 
 #: cps/templates/admin.html
 msgid "Generate series cover thumbnails"
@@ -12510,7 +12592,7 @@ msgstr ""
 
 #: cps/templates/admin.html
 msgid "Show NextGen Stats"
-msgstr ""
+msgstr "Mostrar estado NextGen"
 
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
@@ -15030,6 +15112,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr ""
 
@@ -15229,10 +15323,10 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
 
 #: cps/templates/cwa_settings.html

@@ -1,2 +1,0 @@
-### Fixed
-- **Metadata filled in by automatic fetch is now written into the book file.** When fetch on ingest changed only text fields (description, publisher, published date, rating and the others it can set), the change was saved to the library but never queued for the file, so with enforcement on the file kept its old metadata, and the book was not marked as changed for a Kobo that had already synced it. A fetched cover already did both. Text changes now do the same.

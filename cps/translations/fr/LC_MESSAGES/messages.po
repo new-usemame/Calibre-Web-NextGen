@@ -5250,6 +5250,10 @@ msgid "Only these shelves"
 msgstr "Uniquement ces étagères"
 
 #: cps/spa_strings.py
+msgid "Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync smart shelves in the settings."
+msgstr "Les étagères intelligentes ne sont pas synchronisées avec les liseuses sur ce serveur : une étagère intelligente cochée ici n'ajoute aucun livre. Un administrateur peut activer « Synchroniser les étagères intelligentes » dans les paramètres."
+
+#: cps/spa_strings.py
 msgid ""
 "Choose which books this device keeps. Books you take off are removed from "
 "the device at its next sync; your place, highlights and notes stay saved."
@@ -5282,6 +5286,30 @@ msgstr "Paramètre du compte : {scope}"
 #: cps/spa_strings.py
 msgid "Could not save the book choice. Try again."
 msgstr "Impossible d’enregistrer le choix des livres. Réessayez."
+
+#: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr "Effacer la position de lecture"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+"Effacer votre position de lecture enregistrée pour « {title} » dans le "
+"lecteur web, sur votre Kobo et dans KOReader ? Votre statut de lecture n'est "
+"pas modifié. Un appareil qui conserve sa propre position peut la renvoyer à "
+"sa prochaine synchronisation."
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr "Position de lecture effacée."
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
+msgstr "Impossible d'effacer la position de lecture."
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -6397,6 +6425,10 @@ msgstr "Impossible d’enregistrer l’ordre."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "Impossible d’enregistrer les paramètres de lecture."
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr "Impossible d'enregistrer ce surlignage."
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
@@ -8914,6 +8946,10 @@ msgstr "Retirer ceux-ci"
 msgid "Remove {name}?"
 msgstr "Supprimer {name} ?"
 
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr "Appareils supprimés"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Retiré de « Lecture en cours »."
@@ -9035,6 +9071,11 @@ msgstr "Réinitialiser les valeurs par défaut"
 #: cps/spa_strings.py
 msgid "Restore"
 msgstr "Restaurer"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr "Restaurer {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10283,6 +10324,16 @@ msgstr ""
 "Ces réglages n'ont pas pu être actualisés ; ce qui est affiché peut être "
 "obsolète."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+"Ce compte ne peut pas télécharger de livres, donc la synchronisation de sa "
+"Kobo sera refusée. Un administrateur peut corriger cela en activant "
+"Permettre les téléchargements pour ce compte."
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -10394,8 +10445,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Il s’agit de l’adresse propre à cet ordinateur, que la liseuse ne peut pas "
 "joindre. Choisissez « Modifier » et saisissez l’adresse que la liseuse peut "
@@ -10457,8 +10508,8 @@ msgid ""
 "you did not just ask for a code on your own e-reader, choose Deny."
 msgstr ""
 "Cette demande provient d’un autre réseau que celui que vous utilisez. Si "
-"vous ne venez pas de demander un code sur votre propre liseuse, choisissez « "
-"Refuser »."
+"vous ne venez pas de demander un code sur votre propre liseuse, choisissez "
+"« Refuser »."
 
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
@@ -12156,6 +12207,45 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
 msgstr "Impossible de modifier le cadrage de l’image. Réessayez."
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "Garder cet exemplaire"
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "Fusionner cet exemplaire"
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "Fusionner dans l’exemplaire gardé"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+"Fusionner un exemplaire dans « {title} » ? Les formats qui lui manquent sont "
+"copiés, puis cet exemplaire est supprimé."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+"Fusionner {n} exemplaires dans « {title} » ? Les formats qui lui manquent "
+"sont copiés, puis ces exemplaires sont supprimés."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr "Fusionné dans « {title} »."
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "Impossible de fusionner ces livres."
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -15851,6 +15941,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr ""
 
@@ -15870,9 +15972,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -16063,16 +16165,17 @@ msgstr "Activer l'application Smart Metadata"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Lorsque cette option est activée, les métadonnées récupérées ne remplacent "
-"les données existantes que si elles semblent être de meilleure qualité (par "
-"exemple, descriptions plus longues, couvertures en plus haute résolution). "
-"Lorsque cette option est désactivée, les métadonnées récupérées remplacent "
-"les données existantes telles quelles à partir du fournisseur préféré."
+"Lorsque cette option est activée, les métadonnées récupérées complètent "
+"seulement ce qui manque au livre (par exemple une description vide, une "
+"série ou une couverture absente) et ajoutent les nouvelles étiquettes, sans "
+"jamais remplacer les données que le livre possède déjà. Lorsqu'elle est "
+"désactivée, les métadonnées récupérées remplacent telles quelles les données "
+"existantes à partir du fournisseur préféré."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"

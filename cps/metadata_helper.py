@@ -7,6 +7,7 @@
 
 import json
 import re
+import copy
 import unicodedata
 from difflib import SequenceMatcher
 
@@ -79,6 +80,7 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
             
         # Try each provider in order
         metadata_found = False
+        series_fill = _NOT_ASKED
         for provider_id in provider_hierarchy:
             # Check if explicitly disabled (default is enabled if not specified)
             from cps.metadata_constants import metadata_provider_enabled
@@ -122,6 +124,16 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 # book.title, so logging it afterwards named the book we fetched
                 # rather than the book we changed (fork #1164).
                 searched_title = book.title
+
+                # A matched record without a series takes one from a provider
+                # that carries series, applied with the rest of the record.
+                if not (getattr(metadata, "series", None) or "").strip():
+                    if series_fill is _NOT_ASKED:
+                        series_fill = _find_missing_series(book, search_query, provider_id,
+                                                           provider_hierarchy, enabled_map)
+                    if series_fill:
+                        metadata = copy.copy(metadata)
+                        metadata.series, metadata.series_index = series_fill
 
                 # Apply metadata to book
                 if _apply_metadata_to_book(book, metadata, calibre_db_instance):
@@ -173,11 +185,13 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         
         updated = False
         
-        # Update title - only if enabled in settings
+        # Update title - only if enabled in settings. Smart mode only fills a
+        # missing title. It used to take the longer one, and a summary or study
+        # guide's title is nearly always longer than the book's.
         if (cwa_settings.get('auto_metadata_update_title', True) and 
             metadata.title and metadata.title.strip()):
             if use_smart_application:
-                if len(metadata.title.strip()) > len(book.title.strip()):
+                if not _has_meaningful_title(book):
                     book.title = metadata.title.strip()
                     updated = True
             else:
@@ -205,8 +219,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         if (cwa_settings.get('auto_metadata_update_description', True) and 
             metadata.description and metadata.description.strip()):
             current_description = book.comments[0].text if book.comments else ""
+            # Smart mode only fills a missing description, for the same reason as
+            # the title: the longer text is often a summary's disclaimer.
             if use_smart_application:
-                if len(metadata.description.strip()) > len(current_description):
+                if not _has_meaningful_description(current_description):
                     if book.comments:
                         book.comments[0].text = metadata.description.strip()
                     else:
@@ -262,7 +278,8 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         if (cwa_settings.get('auto_metadata_update_series', True) and
             hasattr(metadata, 'series') and metadata.series and metadata.series.strip() and
             not (use_smart_application and book.series)):
-            series = calibre_db_instance.get_series_by_name(metadata.series.strip())
+            series = (calibre_db_instance.get_series_by_name(metadata.series.strip())
+                      or _library_series_like(calibre_db_instance, metadata.series.strip(), book))
             if not series:
                 series = db.Series(metadata.series.strip(), metadata.series.strip())
                 calibre_db_instance.session.add(series)
@@ -492,6 +509,160 @@ def _apply_cover_from_metadata(book, metadata):
 def _normalize_isbn(value):
     """Strip separators and upper-case so ISBNs compare regardless of formatting."""
     return "".join(ch for ch in str(value) if ch.isalnum()).upper()
+
+
+# Trailing words that name the kind of series rather than the series itself:
+# "Dune Chronicles" is the library's "Dune", "Red Rising Saga" its "Red Rising".
+_SERIES_KIND_WORDS = frozenset({
+    "series", "saga", "trilogy", "chronicles", "cycle", "sequence", "novels",
+    "duology", "dilogy", "dylogy", "quartet", "quintet",
+})
+
+# How many series-capable providers the fill step may ask per book.
+_SERIES_FILL_LIMIT = 3
+
+# Series-capable providers the fill asks even when the configured order leaves
+# them out: both carry series data of their own. Any other provider (Amazon,
+# Goodreads and the rest scrape pages that throttle bots) is asked only when
+# the administrator put it in the order.
+_SERIES_FILL_EXTRAS = ("hardcover", "kobo")
+
+# The fill has not run yet for this book (None means it ran and found nothing).
+_NOT_ASKED = object()
+
+# A trailing note in brackets: "(Publication Order)", "[Legends]".
+_SERIES_NOTE = re.compile(r"\s*[(\[][^()\[\]]*[)\]]\s*$")
+
+
+def _series_key(name):
+    """A series name folded for comparison: case, Latin accents, punctuation, a
+    leading "The", trailing kind words (``_SERIES_KIND_WORDS``) and a trailing
+    note in brackets ("(Publication Order)") ignored. Letters of every script
+    are kept, so two Japanese titles never fold to the same bare number."""
+    text = _SERIES_NOTE.sub("", name or "")
+    folded = []
+    for ch in unicodedata.normalize("NFC", text):
+        base = unicodedata.normalize("NFD", ch)[0]
+        folded.append(base if base.isascii() else ch)
+    words = re.findall(r"[^\W_]+", "".join(folded).casefold())
+    if words[:1] == ["the"] and len(words) > 1:
+        words = words[1:]
+    while len(words) > 1 and words[-1] in _SERIES_KIND_WORDS:
+        words = words[:-1]
+    return " ".join(words)
+
+
+def _series_note(name):
+    """The trailing bracketed note of a series name, folded, or ""."""
+    found = _SERIES_NOTE.search(name or "")
+    return found.group(0).strip(" ()[]").casefold() if found else ""
+
+
+def _library_series_like(calibre_db_instance, name, book=None):
+    """The library's existing series that ``name`` is another spelling of, or None.
+
+    Sources disagree on what to call a series (Open Library's "Dune Chronicles",
+    Hardcover's "The Chronicles of Narnia (Publication Order)"), and every new
+    spelling became a second series beside the first. Only an exact key match counts, and only when it is unique.
+    """
+    wanted = _series_key(name)
+    if not wanted:
+        return None
+    try:
+        rows = calibre_db_instance.session.query(db.Series).all()
+    except Exception:
+        return None
+    note = _series_note(name)
+
+    def same_series(row):
+        # Two different notes name two different series: "Star Wars (Legends)"
+        # is not "Star Wars (Canon)", and a publication-order position is
+        # wrong inside a chronological-order series.
+        row_name = getattr(row, "name", "")
+        row_note = _series_note(row_name)
+        return (_series_key(row_name) == wanted
+                and not (note and row_note and note != row_note)
+                and _shares_an_author(row, book))
+
+    matches = [row for row in rows if same_series(row)]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _shares_an_author(series_row, book):
+    """False when the library series holds books and none is by one of the
+    book's authors: a stem shared across authors ("Inheritance Cycle",
+    "Inheritance Trilogy") is two series, not two spellings of one."""
+    if book is None:
+        return True
+    shelved = list(getattr(series_row, "books", None) or [])
+    if not shelved:
+        return True
+    wanted = {getattr(a, "name", "").casefold() for a in getattr(book, "authors", None) or []}
+    wanted.discard("")
+    return any(getattr(a, "name", "").casefold() in wanted
+               for other in shelved for a in (getattr(other, "authors", None) or []))
+
+
+def _find_missing_series(book, search_query, applied_provider_id, provider_hierarchy,
+                         enabled_map):
+    """Ask series-capable providers for the series a matched record left empty.
+
+    Auto-fetch applies the first provider whose result passes the match gate
+    and stops. When that provider carries no series (Google Books, Open Library
+    and IBDb never do), a provider further down that has one was never asked.
+    This asks the providers marked ``FILLS_SERIES``: those in the configured
+    order first, then ``_SERIES_FILL_EXTRAS`` if the order leaves them out, at
+    most ``_SERIES_FILL_LIMIT`` of them, and returns ``(series, position)``
+    from the first result that passes the same gate, or None.
+
+    The caller folds the answer into the record it is about to apply, so the
+    book gets one commit and one file-embed record. Never raises: the caller
+    is inside its provider loop, and an exception there would send the loop on
+    to the next provider's whole record.
+    """
+    try:
+        return _find_missing_series_unguarded(book, search_query, applied_provider_id,
+                                              provider_hierarchy, enabled_map)
+    except Exception as e:
+        log.warning(f"Series fill failed for book {getattr(book, 'id', 'unknown')}: {e}")
+        return None
+
+
+def _find_missing_series_unguarded(book, search_query, applied_provider_id, provider_hierarchy,
+                                   enabled_map):
+    try:
+        cwa_settings = CWA_DB().get_cwa_settings()
+    except Exception:
+        return None
+    if not cwa_settings.get('auto_metadata_update_series', True) or getattr(book, "series", None):
+        return None
+    from cps.metadata_constants import metadata_provider_enabled
+    by_id = {p.__id__: p for p in metadata_providers}
+    ordered = [pid for pid in provider_hierarchy if pid in by_id]
+    ordered += [pid for pid in _SERIES_FILL_EXTRAS if pid in by_id and pid not in ordered]
+    asked = 0
+    for provider_id in ordered:
+        provider = by_id[provider_id]
+        if (provider_id == applied_provider_id or not getattr(provider, "FILLS_SERIES", False)
+                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map)):
+            continue
+        if asked >= _SERIES_FILL_LIMIT:
+            break
+        asked += 1
+        try:
+            results = provider.search(search_query, "", "en") or []
+        except Exception as e:
+            log.info(f"Series fill: {provider.__name__} failed for book {book.id}: {e}")
+            continue
+        chosen = _select_metadata_result(results, _book_isbn(book),
+                                         book_title=book.title, book_authors=book.authors) if results else None
+        series = (getattr(chosen, "series", None) or "") if chosen is not None else ""
+        if not isinstance(series, str) or not series.strip():
+            continue
+        position = getattr(chosen, "series_index", None)
+        log.info(f"Series fill: {series.strip()} #{position or ''} from {provider.__name__} for book {book.id}")
+        return series.strip(), position
+    return None
 
 
 def _book_isbn(book):
@@ -767,6 +938,20 @@ def _select_metadata_result(results, book_isbn, book_title=None, book_authors=No
         return None
 
     return best
+
+
+def _has_meaningful_title(book):
+    """True if the book has a title other than empty or Calibre's 'Unknown'."""
+    title = (getattr(book, "title", "") or "").strip().lower()
+    return title not in ("", "unknown")
+
+
+def _has_meaningful_description(text):
+    """True if the description has visible text. Markup with no text in it
+    (``<p></p>``, ``&nbsp;``) counts as missing, so smart mode can fill it."""
+    visible = re.sub(r"<[^>]*>", " ", text or "")
+    visible = re.sub(r"&nbsp;|&#160;|\u00a0", " ", visible)
+    return bool(visible.strip())
 
 
 def _has_meaningful_authors(book):

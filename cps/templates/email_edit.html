@@ -73,6 +73,14 @@
    {% if feature_support['gmail'] %}
     </div>
    {% endif %}
+      <div class="form-group">
+        <label for="mail_filename_template">{{_('eReader attachment filename template')}}</label>
+        <input type="text" class="form-control" name="mail_filename_template" id="mail_filename_template"
+               maxlength="1024" value="{{ content.mail_filename_template or '' }}"
+               aria-describedby="mail-filename-help mail-filename-conditional">
+        <small id="mail-filename-help" class="help-block">{{_('Leave blank to keep the existing filename. Example: {series} #{series_index} - {title}. Fields include {title}, {authors}, {series} and {series_index}; the file extension is added automatically.')}}</small>
+        <small id="mail-filename-conditional" class="help-block">{{_('Use {series:|(|) }{title} to omit the series prefix when no series is set.')}}</small>
+      </div>
       <a href="{{ url_for('admin.admin') }}" id="email_back" class="btn btn-default">{{_('Back')}}</a>
   </form>
     {% if g.allow_registration and not simple%}

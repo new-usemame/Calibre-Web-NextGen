@@ -71,8 +71,11 @@ def test_term_passes_text_and_ids():
 
 
 @pytest.mark.unit
-def test_read_status_constants():
-    assert _READ_STATUS == {"all": "Any", "read": "True", "unread": "False"}
+@pytest.mark.parametrize("status", ["in_progress", "did_not_finish", "on_hold"])
+def test_exact_personal_status_survives_the_advanced_search_adapter(status):
+    # The shared builder understands canonical statuses; the JSON adapter must
+    # not silently broaden a selected pause filter to its Any fallback.
+    assert _json_to_term({"read_status": status})["read_status"] == status
 
 
 @pytest.mark.unit

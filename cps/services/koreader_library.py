@@ -70,6 +70,7 @@ class Manifest:
     entries: list
     unsupported: int
     paths: dict = field(default_factory=dict)
+    device_scope: Optional[list] = None
 
 
 def _utc(value):
@@ -143,6 +144,23 @@ def _series(cdb, ids):
     return names
 
 
+def _tags(cdb, ids):
+    names = {}
+    link = db.books_tags_link
+    for chunk in _chunks(ids):
+        for book_id, name in (cdb.session.query(link.c.book, db.Tags.name)
+                              .join(db.Tags, db.Tags.id == link.c.tag)
+                              .filter(link.c.book.in_(chunk))):
+            names.setdefault(book_id, []).append(name)
+    return {book_id: tag_order(found) for book_id, found in names.items()}
+
+
+def tag_order(names):
+    """A book's tag names in the order a placeholder lists them (Calibre's:
+    alphabetical, ignoring case)."""
+    return sorted(names, key=lambda name: (name.casefold(), name))
+
+
 def _formats(cdb, ids):
     formats = {}
     for chunk in _chunks(ids):
@@ -197,7 +215,14 @@ def read_statuses(user, ids, *, session=None, cdb=None, read_column=None):
                    if status == ub.ReadBook.STATUS_IN_PROGRESS}
     statuses = {}
     for book_id in ids:
-        if book_id in finished:
+        exact = tri_state.get(book_id)
+        if exact in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                     ub.ReadBook.STATUS_ON_HOLD):
+            # KOReader's wire contract has only unread/reading/finished. Keep
+            # the projection conservative; the richer state remains private
+            # to the server and is not copied into the device protocol.
+            statuses[book_id] = READ_UNREAD
+        elif book_id in finished:
             statuses[book_id] = READ_FINISHED
         elif book_id in reading:
             statuses[book_id] = READ_READING
@@ -273,7 +298,7 @@ def _magic_shelves_for_collections(user_id, session):
             .all())
 
 
-def shelf_catalogue(user, *, session=None):
+def shelf_catalogue(user, *, session=None, choice=None):
     """Return ``(shelves, members, scope_shelves)``.
 
     ``shelves`` lists every regular shelf the user owns plus the magic shelves
@@ -290,6 +315,10 @@ def shelf_catalogue(user, *, session=None):
     members = {}
     scope_shelves = []
     shelf_only = ereader_scope.shelf_only(user)
+    override = choice is not None and choice.overrides_account
+    if override:
+        shelf_only = choice.mode == "shelves"
+    selected_ids = {s.id for s in choice.shelves} if override else set()
 
     regular = (session.query(ub.Shelf)
                .filter(ub.Shelf.user_id == user_id)
@@ -299,7 +328,7 @@ def shelf_catalogue(user, *, session=None):
         shelf_id = shelf.uuid or str(shelf.id)
         ids_by_row[shelf.id] = shelf_id
         shelves.append({"id": shelf_id, "name": shelf.name or ""})
-        if shelf_only and shelf.kobo_sync:
+        if shelf_only and (shelf.id in selected_ids if override else shelf.kobo_sync):
             scope_shelves.append({"id": shelf_id, "name": shelf.name or "",
                                   "kind": "shelf"})
     if ids_by_row:
@@ -309,9 +338,17 @@ def shelf_catalogue(user, *, session=None):
                 .order_by(ub.BookShelf.shelf, ub.BookShelf.order, ub.BookShelf.id)):
             members.setdefault(book_id, []).append(ids_by_row[shelf_row_id])
 
-    for shelf in _magic_shelves_for_collections(user_id, session):
+    magic_rows = _magic_shelves_for_collections(user_id, session)
+    if override:
+        from .. import config
+        if getattr(config, "config_kobo_sync_magic_shelves", False):
+            by_id = {s.id: s for s in magic_rows}
+            by_id.update({s.id: s for s in choice.magic_shelves})
+            magic_rows = sorted(by_id.values(), key=lambda s: (s.name or "", s.id))
+    selected_magic_ids = {s.id for s in choice.magic_shelves} if override else set()
+    for shelf in magic_rows:
         shelf_id = shelf.uuid or "magic-%d" % shelf.id
-        if shelf_only:
+        if shelf_only and (not override or shelf.id in selected_magic_ids):
             scope_shelves.append({"id": shelf_id, "name": shelf.name or "",
                                   "kind": "magic"})
         try:
@@ -389,18 +426,20 @@ def file_facts(path):
 # The manifest
 # ---------------------------------------------------------------------------
 
-def book_rev(row, authors, series, fmt_row):
+def book_rev(row, authors, series, fmt_row, tags=()):
     """What a placeholder shows, plus which file stands behind it.
 
     Includes the placeholder layout, so a new look reaches devices that
     already hold placeholders: they replace one only when its rev changes.
+    The tags are here because a tag can change without the book's
+    last_modified (#2792).
     """
     return _digest([
         row.title, authors, series,
         row.series_index if series else None,
         bool(row.has_cover), iso_z(row.last_modified) if row.last_modified else None,
         fmt_row.format.upper(), fmt_row.name, fmt_row.uncompressed_size,
-        koreader_placeholder.LAYOUT,
+        koreader_placeholder.LAYOUT, list(tags),
     ], 16)
 
 
@@ -409,6 +448,7 @@ def _describe(ids, *, user, cdb, session, read_column, members):
     rows = _book_rows(cdb, ids)
     authors = _authors(cdb, ids)
     series = _series(cdb, ids)
+    tags = _tags(cdb, ids)
     formats = _formats(cdb, ids)
     present = [book_id for book_id in sorted(ids) if book_id in rows]
     statuses = read_statuses(user, present, session=session, cdb=cdb,
@@ -436,11 +476,13 @@ def _describe(ids, *, user, cdb, session, read_column, members):
             "series_index": (float(row.series_index)
                              if book_series and row.series_index is not None
                              else None),
-            "filename": device_delivery._delivery_filename(book_id, chosen),
+            "filename": device_delivery._delivery_filename(
+                book_id, chosen, row.title),
             "format": chosen.format.upper(),
             "size": None,
             "checksum": None,
-            "rev": book_rev(row, book_authors, book_series, chosen),
+            "rev": book_rev(row, book_authors, book_series, chosen,
+                            tags.get(book_id, ())),
             "read_status": statuses.get(book_id, READ_UNREAD),
             "progress": position[0] if position else None,
             "shelves": list(members.get(book_id, ())),
@@ -455,8 +497,8 @@ def _describe(ids, *, user, cdb, session, read_column, members):
     return entries, paths, unsupported
 
 
-def _revision(scope, scope_shelves, shelves, entries):
-    return _digest({
+def _revision(scope, scope_shelves, shelves, entries, *, device_scope=None):
+    value = {
         "scope": scope,
         "scope_shelves": scope_shelves,
         "shelves": shelves,
@@ -464,10 +506,13 @@ def _revision(scope, scope_shelves, shelves, entries):
                    entry["read_status"], entry["progress"], entry["shelves"],
                    entry.get("author_sort"), entry.get("last_read")]
                   for entry in entries],
-    }, 24)
+    }
+    if device_scope is not None:
+        value["device_scope"] = device_scope
+    return _digest(value, 24)
 
 
-def build_manifest(user, *, cdb=None, session=None, read_column=None):
+def build_manifest(user, *, device=None, cdb=None, session=None, read_column=None):
     """Describe every book an e-reader of ``user`` should hold.
 
     The request must be acting as ``user`` (``current_user``): magic shelves
@@ -480,24 +525,28 @@ def build_manifest(user, *, cdb=None, session=None, read_column=None):
         read_column = getattr(config, "config_read_column", 0)
     session = session or ub.session
     cdb.ensure_session()
-    scope = ereader_scope.membership(user, session=session)
+    from . import device_book_scope
+    choice = device_book_scope.resolve(user, device, session=session)
+    scope = ereader_scope.membership(user, device=device, session=session)
     if not scope.reliable:
         raise ScopeUnavailable(
-            "One of the magic shelves that choose this device's books could "
+            "One of the smart shelves that choose this device's books could "
             "not be read")
     ids = ereader_scope.held_book_ids(user, cdb=cdb, session=session, scope=scope)
-    shelves, members, scope_shelves = shelf_catalogue(user, session=session)
+    shelves, members, scope_shelves = shelf_catalogue(user, session=session, choice=choice)
     entries, paths, unsupported = _describe(
         ids, user=user, cdb=cdb, session=session, read_column=read_column,
         members=members)
     return Manifest(
-        revision=_revision(scope.mode, scope_shelves, shelves, entries),
+        revision=_revision(scope.mode, scope_shelves, shelves, entries,
+                           device_scope=choice.revision_key),
         scope=scope.mode,
         scope_shelves=scope_shelves,
         shelves=shelves,
         entries=entries,
         unsupported=unsupported,
         paths=paths,
+        device_scope=choice.revision_key,
     )
 
 
@@ -640,6 +689,7 @@ def set_read_status(user, book_id, status):
                           times_started_reading=0)
         ub.session.add(row)
     now = datetime.now(timezone.utc)
+    row.read_status_choice_at = now
     if row.read_status != ub.ReadBook.STATUS_IN_PROGRESS:
         row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
         row.times_started_reading = (row.times_started_reading or 0) + 1

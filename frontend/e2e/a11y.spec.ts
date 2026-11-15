@@ -99,7 +99,7 @@ test('edit book: no critical/serious a11y violations', async ({ page }) => {
 });
 
 test('smart shelf builder: no critical/serious a11y violations', async ({ page }) => {
-  await page.goto('/app/magic');
+  await page.goto('/app/magic/new');
   // The signed-in test user may use any supported locale. Identify the route by
   // structure rather than an English accessible name, and pin its one-landmark
   // invariant so a nested page-level <main> cannot return.
@@ -332,11 +332,21 @@ test('skip link is the first tab stop and moves focus to <main>', async ({ page 
   expect(onMain).toBeTruthy();
 });
 
-test('book cards are a single tab stop (no nested tabindex)', async ({ page }) => {
+test('book-card destinations are sibling tab stops; selection remains one toggle', async ({ page }) => {
   await page.goto('/app');
   await page.locator('a[href*="/book/"]').first().waitFor({ state: 'visible' });
   // The old BookCard put tabIndex=0 on an inner <article>, a second tab stop.
   await expect(page.locator('article[tabindex]')).toHaveCount(0);
+
+  const bookLink = page.locator('a[aria-label^="Open details for"]').first();
+  await expect(bookLink.locator('a, button, [tabindex]:not([tabindex="-1"])')).toHaveCount(0);
+  const card = bookLink.locator('xpath=..');
+  const seriesLink = card.locator('a[data-testid="book-card-series"]');
+  if (await seriesLink.count()) {
+    await bookLink.focus();
+    await page.keyboard.press('Tab');
+    await expect(seriesLink).toBeFocused();
+  }
 });
 
 test('clickable announcement is a link with a sibling dismiss button', async ({ page }) => {

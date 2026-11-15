@@ -459,3 +459,115 @@ def test_a_render_failure_never_hands_the_reader_the_server_s_stderr():
     assert "Could not design a cover for this book." in body
     for secret in ("/srv/calibre-library", "/usr/lib/x86_64-linux-gnu", "qt.qpa.plugin", "RuntimeError"):
         assert secret not in body, f"the response leaked {secret!r}: {body}"
+
+@pytest.mark.parametrize("arrival", ["regular", "symlink"])
+def test_reader_cover_published_during_render_is_not_replaced(tmp_path, monkeypatch, arrival):
+    destination = tmp_path / "cover.jpg"
+    reader_cover = tmp_path / "reader.jpg"
+    reader_cover.write_bytes(b"reader chosen cover")
+    real_render = cg.render
+
+    def render_then_reader_publishes(*args, **kwargs):
+        rendered = real_render(*args, **kwargs)
+        if arrival == "regular":
+            destination.write_bytes(reader_cover.read_bytes())
+        else:
+            destination.symlink_to(reader_cover)
+        return rendered
+
+    monkeypatch.setattr(cg, "render", render_then_reader_publishes)
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append) is False
+    assert destination.read_bytes() == b"reader chosen cover"
+    assert destination.is_symlink() is (arrival == "symlink")
+    assert created == []
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["cover.jpg", "reader.jpg"]
+
+
+def test_generated_cover_flag_does_not_report_success_for_a_deleted_book(tmp_path):
+    import sqlite3
+    metadata = tmp_path / "metadata.db"
+    with sqlite3.connect(metadata) as connection:
+        connection.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, has_cover INTEGER)")
+    destination = tmp_path / "cover.jpg"
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append)
+    with pytest.raises(sqlite3.IntegrityError):
+        cg.commit_generated_cover_flag(str(metadata), 7, str(destination), created[0])
+    # Unknown metadata state is never treated as proof that file cleanup is safe.
+    assert destination.read_bytes()[:2] == b"\xff\xd8"
+
+def test_cover_flag_commit_honors_the_real_calibre_books_update_trigger(tmp_path):
+    import sqlite3
+    metadata = tmp_path / "metadata.db"
+    with sqlite3.connect(metadata) as connection:
+        connection.executescript("""
+            CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, sort TEXT, has_cover INTEGER);
+            INSERT INTO books VALUES (7, 'The Reader Book', 'Reader Book, The', 0);
+            CREATE TRIGGER books_update_trg AFTER UPDATE ON books BEGIN
+                UPDATE books SET sort=title_sort(NEW.title) WHERE id=NEW.id AND OLD.title <> NEW.title;
+            END;
+        """)
+    destination = tmp_path / "cover.jpg"
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append)
+    cg.commit_generated_cover_flag(str(metadata), 7, str(destination), created[0])
+    with sqlite3.connect(metadata) as connection:
+        assert connection.execute("SELECT title,sort,has_cover FROM books WHERE id=7").fetchone() == ('The Reader Book', 'Reader Book, The', 1)
+    assert destination.read_bytes()[:2] == b"\xff\xd8"
+
+
+def test_optional_cover_survives_staging_cleanup_failure_after_publication(tmp_path, monkeypatch):
+    import sqlite3
+    destination = tmp_path / "cover.jpg"
+    metadata = tmp_path / "metadata.db"
+    with sqlite3.connect(metadata) as connection:
+        connection.execute('CREATE TABLE books (id INTEGER PRIMARY KEY, has_cover INTEGER)')
+        connection.execute('INSERT INTO books VALUES (7,0)')
+    real_unlink = cg.os.unlink
+
+    def cleanup_refused(path, *args, **kwargs):
+        if '.cwng-generating-' in str(path):
+            raise PermissionError('owned staging cleanup failure')
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(cg.os, 'unlink', cleanup_refused)
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append)
+    cg.commit_generated_cover_flag(str(metadata), 7, str(destination), created[0])
+    with sqlite3.connect(metadata) as connection:
+        assert connection.execute('SELECT has_cover FROM books WHERE id=7').fetchone()[0] == 1
+    assert destination.read_bytes()[:2] == b"\xff\xd8"
+
+
+@pytest.mark.parametrize('reader_arrives', [False, True])
+@pytest.mark.parametrize('unsupported_errno', ['EOPNOTSUPP', 'EINVAL'])
+def test_unsupported_hard_links_use_atomic_no_replace_publication(tmp_path, monkeypatch, reader_arrives, unsupported_errno):
+    import errno
+    destination = tmp_path / 'cover.jpg'
+
+    def unsupported_link(*_args, **_kwargs):
+        if reader_arrives:
+            destination.write_bytes(b'reader cover during publication')
+        raise OSError(getattr(errno, unsupported_errno), 'owned no hard-link fixture')
+
+    monkeypatch.setattr(cg.os, 'link', unsupported_link)
+    created = []
+    assert cg.generate_cover_file(str(destination), META, on_created=created.append) is (not reader_arrives)
+    if reader_arrives:
+        assert destination.read_bytes() == b'reader cover during publication'
+        assert created == []
+    else:
+        assert destination.read_bytes()[:2] == b"\xff\xd8"
+        assert len(created) == 1
+    assert sorted(path.name for path in tmp_path.iterdir()) == ['cover.jpg']
+
+
+def test_dangling_reader_cover_entry_is_skipped_before_render(tmp_path, monkeypatch):
+    destination = tmp_path / 'cover.jpg'
+    destination.symlink_to(tmp_path / 'missing-reader-cover.jpg')
+    def unexpected_render(*args, **kwargs):
+        raise AssertionError('existing reader entry must not trigger automatic rendering')
+    monkeypatch.setattr(cg, 'render', unexpected_render)
+    assert cg.generate_cover_file(str(destination), META) is False
+    assert destination.is_symlink()

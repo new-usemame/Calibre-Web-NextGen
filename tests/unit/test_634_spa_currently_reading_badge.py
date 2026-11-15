@@ -22,7 +22,6 @@ guarding the read-state drift class of fork #579/#637), the detail serializer
 emits ``in_progress``, and the endpoint wires the helper into the payload.
 """
 
-import ast
 import pathlib
 
 import pytest
@@ -129,15 +128,5 @@ def test_serialize_book_detail_emits_in_progress():
     assert serialize_book_detail(book)["in_progress"] is False
 
 
-# ── Endpoint wiring (source-pin — the pure tests can't reach the Flask view) ──
-
-@pytest.mark.unit
-def test_book_detail_endpoint_wires_helper_into_serializer():
-    """book_detail must derive in_progress via the shared helper and pass it to
-    serialize_book_detail — guards the wiring the unit tests can't exercise."""
-    tree = ast.parse(BOOKS_PY.read_text())
-    fn = next(n for n in ast.walk(tree)
-              if isinstance(n, ast.FunctionDef) and n.name == "book_detail")
-    src = ast.get_source_segment(BOOKS_PY.read_text(), fn)
-    assert "book_is_in_progress(" in src, "book_detail must call the shared helper"
-    assert "in_progress=in_progress" in src, "helper result must reach the serializer"
+# Actual detail/list status outputs, including in-progress and both pauses,
+# are exercised by test_paused_reading_states.py and test_api_v1_detail.py.

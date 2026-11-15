@@ -78,8 +78,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border: 1px solid transparent;
   border-radius: var(--r-md);
   background: transparent;
@@ -151,3 +151,6 @@
   .box { padding: var(--sp-3) var(--sp-3) var(--sp-2); }
   .item { flex-basis: 116px; width: 116px; }
 }
+
+.message { color: var(--text-muted); margin: var(--sp-4) 0; }
+.message button { min-height: 44px; padding: 0 var(--sp-3); }

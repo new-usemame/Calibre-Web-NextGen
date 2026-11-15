@@ -129,7 +129,12 @@ def world(monkeypatch):
     def records():
         return sorted((row.user_id, row.book_id) for row in app_session.query(ub.Downloads))
 
-    yield SimpleNamespace(users=users, listed=listed, records=records)
+    def selected_ids(name):
+        as_viewer(name)
+        with app.test_request_context("/api/v1/books?filter=hot&select_all=1"):
+            return books_api.list_books.__wrapped__().get_json()
+
+    yield SimpleNamespace(users=users, listed=listed, records=records, selected_ids=selected_ids)
 
     metadata_session.close()
     app_session.close()
@@ -167,6 +172,18 @@ def test_hot_books_pages_through_the_books_its_viewer_can_see(world, view):
     assert pagination.total_count == 2
     if view != "spa":
         assert pagination.has_next
+
+
+@pytest.mark.parametrize("viewer, expected", [
+    ("kid", [3, 1]),
+    ("reader2", [3, 2, 4]),
+])
+def test_hot_select_all_returns_full_hot_order_and_only_cleans_deleted_book_records(
+        world, viewer, expected):
+    body = world.selected_ids(viewer)
+
+    assert body == {"ids": expected, "total": len(expected)}
+    assert world.records() == _without_deleted_book(world)
 
 
 @pytest.mark.parametrize("viewer", ["kid", "reader2"])

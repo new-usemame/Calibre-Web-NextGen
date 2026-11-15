@@ -17,13 +17,15 @@ pytestmark = pytest.mark.unit
 
 OWN = shelf(1, "Own", owner=7)
 PUBLIC = shelf(2, "Everyone's", owner=1, public=True)
+OWNER_PUBLIC = shelf(4, "Owner's Public Shelf", owner=7, public=True)
 OTHER_READERS_PRIVATE = 3  # holds the book; never in the reader's shelves_access
 EDITOR = reader(role_edit_shelfs=lambda: True)
 
 
 def removal_offers(**kwargs):
     """(toolbar menu shown, its removal targets, shelves whose pill has a remove button)."""
-    page = BeautifulSoup(render_detail(shelves_access=[OWN, PUBLIC], **kwargs), "html.parser")
+    shelves_access = kwargs.pop("shelves_access", [OWN, PUBLIC])
+    page = BeautifulSoup(render_detail(shelves_access=shelves_access, **kwargs), "html.parser")
     toolbar = [link["data-href"].rsplit("shelf_id=", 1)[1]
                for link in page.select('#remove-from-shelves a[data-shelf-action="remove"]')]
     pills = [pill["data-shelf-id"] for pill in page.select("#detail-shelves .shelf-pill")
@@ -41,3 +43,16 @@ def test_no_removal_control_when_no_shelf_holding_the_book_is_editable():
     assert removal_offers(books_shelfs=[2, OTHER_READERS_PRIVATE]) == (False, [], [])
     assert removal_offers(books_shelfs=[OTHER_READERS_PRIVATE]) == (False, [], [])
     assert removal_offers(user=EDITOR, books_shelfs=[OTHER_READERS_PRIVATE]) == (False, [], [])
+
+
+def test_public_shelf_owner_can_remove_and_guest_never_can():
+    guest = reader(is_anonymous=True, role_edit_shelfs=lambda: True)
+
+    assert removal_offers(
+        shelves_access=[OWNER_PUBLIC], books_shelfs=[OWNER_PUBLIC.id],
+    ) == (True, [str(OWNER_PUBLIC.id)], [str(OWNER_PUBLIC.id)])
+    assert removal_offers(
+        user=guest,
+        shelves_access=[OWNER_PUBLIC],
+        books_shelfs=[OWNER_PUBLIC.id],
+    ) == (False, [], [])

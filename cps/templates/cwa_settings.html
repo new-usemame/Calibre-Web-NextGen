@@ -7,6 +7,17 @@
 
 {% block header %}
 <style>
+  /* Settings explanations belong in their section; caliBlur's global .alert
+     toast positioning otherwise covers unrelated controls on narrow screens. */
+  .settings-container .alert {
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    max-width: none;
+    transform: none;
+    animation: none;
+    z-index: auto;
+  }
   .metadata-provider-item {
     display: flex;
     align-items: center;
@@ -157,6 +168,16 @@
         will then apply those changes the ebook files themselves. Normally in Stock CW or when this setting is disabled, the changes made 
         are only applied to what you see in the Web UI, not the ebook files themselves. This feature currently only supports files in EPUB 
         or AZW3 format.')}}
+      </p>
+
+      {% if cwa_settings.get('cover_keep_aspect_ratio') %}
+      <input type="checkbox" id="cover_keep_aspect_ratio" name="cover_keep_aspect_ratio" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% else %}
+      <input type="checkbox" id="cover_keep_aspect_ratio" name="cover_keep_aspect_ratio" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% endif %}
+      <label for="cover_keep_aspect_ratio" style="padding-left: 10px;">{{_('Preserve cover aspect ratio in EPUBs')}}</label><br>
+      <p class="cwa-settings-tooltip">
+        {{_("When the enforcement service writes a new cover into an EPUB, its cover page keeps the image's proportions instead of stretching it to fill the screen. This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to covers written from now on; KEPUB files are not changed.")}}
       </p>
 
       {% if cwa_settings['kindle_epub_fixer'] %}
@@ -315,13 +336,13 @@
       </p>
 
       {% if cwa_settings['auto_metadata_smart_application'] %}
-      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Apply intelligent criteria when replacing existing metadata">
+      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Only fill metadata the book is missing">
       {% else %}
-      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Apply intelligent criteria when replacing existing metadata">
+      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Only fill metadata the book is missing">
       {% endif %}
       <label for="auto_metadata_smart_application" style="padding-left: 10px;">{{_('Enable Smart Metadata Application')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When enabled, fetched metadata will only replace existing data if it appears to be better quality (e.g., longer descriptions, higher resolution covers). When disabled, fetched metadata will replace existing data as-is from the preferred provider.')}}
+        {{_('When enabled, fetched metadata only fills in what a book is missing (for example an empty description, a missing series or cover) and adds new tags, but never replaces data the book already has. When disabled, fetched metadata will replace existing data as-is from the preferred provider.')}}
       </p>
 
       <!-- Metadata Field Selection -->
@@ -815,14 +836,15 @@
       <input type="checkbox" id="config_kobo_sync_magic_shelves" name="config_kobo_sync_magic_shelves" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="{{ magic_shelf_sync_hint }}">
       {% endif %}
       {% if koreader_sync %}
-      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync Magic Shelves to e-readers (Kobo and KOReader)')}}</label><br>
+      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync smart shelves to e-readers (Kobo and KOReader)')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, Magic Shelves marked for e-reader sync reach your Kobo as collections and your KOReader library as shelves. Kobo also needs Kobo Sync in Basic Configuration.')}}
+        {{_('When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too.')}}
+        {{_('KOReader also receives marked smart shelves in its library.')}}
       </p>
       {% else %}
-      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync Magic Shelves to Kobo')}}</label><br>
+      <label for="config_kobo_sync_magic_shelves" style="padding-left: 10px;">{{_('Sync smart shelves to Kobo')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, your Magic Shelves will be synced to your Kobo device as collections. Note: You must also enable Kobo Sync in Basic Configuration.')}}
+        {{_('When enabled, marked smart shelves reach your Kobo as collections. Enable Kobo Sync in Basic Configuration too.')}}
       </p>
       {% endif %}
 
@@ -996,6 +1018,29 @@
             <td>{{_('Creates a duplicate record, keeping both copies')}}</td>
         </tr>
       </tbody></table>
+    </div>
+
+    <div class="settings-container" id="ingest-folder-labels">
+      <h4 class="settings-section-header">{{ _('Ingest folder labels') }}</h4>
+      <p class="cwa-settings-explanation settings-explanation">{{ _('Add ingest subfolder names to book tags or an existing custom column. Existing values are kept; files in the ingest root add no labels.') }}</p>
+      <p class="cwa-settings-explanation settings-explanation">{{ _('For example, ingest/James/scifi adds James by default. Include nested folders to add scifi too.') }}</p>
+      <label for="auto_ingest_folder_label_target">{{ _('Write subfolder names to') }}</label>
+      <select class="cwa-settings-select" style="min-height:44px;max-width:100%" id="auto_ingest_folder_label_target" name="auto_ingest_folder_label_target" aria-describedby="ingest-folder-column-help">
+        {% set current_target = cwa_settings.get('auto_ingest_folder_label_target', 'disabled') %}
+        <option value="disabled" {% if current_target == 'disabled' %}selected{% endif %}>{{ _('Disabled') }}</option>
+        <option value="tags" {% if current_target == 'tags' %}selected{% endif %}>{{ _('Tags') }}</option>
+        {% for column in ingest_folder_label_columns %}
+        <option value="{{ column.lookup }}" {% if current_target == column.lookup %}selected{% endif %}>{{ column.name }} ({{ column.lookup }})</option>
+        {% endfor %}
+        {% if current_target not in ['disabled', 'tags'] and current_target not in ingest_folder_label_columns|map(attribute='lookup')|list %}
+        <option value="{{ current_target }}" selected>{{ _('Unavailable column: {name}').replace('{name}', current_target) }}</option>
+        {% endif %}
+      </select>
+      <p id="ingest-folder-column-help" class="cwa-settings-explanation settings-explanation">{{ _('Custom columns must already exist and use comma-separated text, like tags. Create them in Calibre desktop first.') }}</p>
+      <label style="min-height:44px;display:flex;align-items:center;gap:8px" for="auto_ingest_folder_label_nested">
+        <input type="checkbox" id="auto_ingest_folder_label_nested" name="auto_ingest_folder_label_nested" {% if cwa_settings.get('auto_ingest_folder_label_nested', 0) %}checked{% endif %}>
+        {{ _('Include nested folders') }}
+      </label>
     </div>
 
     <div class="settings-container">

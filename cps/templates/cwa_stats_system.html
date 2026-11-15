@@ -1,27 +1,27 @@
 <!-- System Logs Content (formerly cwa_stats.html) -->
 
 <div class="stats-hero">
-    <h1>⚙️ Server Activity Dashboard</h1>
-    <p>Track server activity, file conversions, automatic fixes ect.</p>
+    <h1>⚙️ {{ _('Server Activity Dashboard') }}</h1>
+    <p>{{ _('Track server activity, file conversions, and automatic fixes.') }}</p>
 </div>
 
 <div>
-    <h3>Calibre-Web NextGen - Server Stats</h3>
+    <h3>{{ _('Calibre-Web NextGen - Server Stats') }}</h3>
     <div class="cwa_stats_container">
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Total Books</div>
+        <div class="cwa_stats_header">{{ _('Total Books') }}</div>
         <div class="cwa_stats_value">{{cwa_stats["total_books"]}}</div>
       </div>
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Books Enforced</div>
+        <div class="cwa_stats_header">{{ _('Books Enforced') }}</div>
         <div class="cwa_stats_value">{{cwa_stats["cwa_enforcement"]}}</div>
       </div>
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Books Converted</div>
+        <div class="cwa_stats_header">{{ _('Books Converted') }}</div>
         <div class="cwa_stats_value">{{cwa_stats["cwa_conversions"]}}</div>
       </div>
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Books Fixed</div>
+        <div class="cwa_stats_header">{{ _('Books Fixed') }}</div>
         <div class="cwa_stats_value">{{cwa_stats["epub_fixes"]}}</div>
       </div>
     </div>
@@ -32,22 +32,22 @@
   <hr style="width: 85%;text-align: center;margin-bottom: 36px;border-width: medium;border-color: #96a2a9;border-radius: 8px;">
   
   <div>
-    <h3>🔖 Hardcover Auto-Fetch Statistics</h3>
+    <h3>🔖 {{ _('Hardcover Auto-Fetch Statistics') }}</h3>
     <div class="cwa_stats_container">
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Total Processed</div>
+        <div class="cwa_stats_header">{{ _('Total Processed') }}</div>
         <div class="cwa_stats_value">{{hardcover_stats.total_processed}}</div>
       </div>
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Auto-Matched</div>
+        <div class="cwa_stats_header">{{ _('Auto-Matched') }}</div>
         <div class="cwa_stats_value" style="color: #5cb85c;">{{hardcover_stats.total_auto_matched}}</div>
       </div>
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Pending Review</div>
+        <div class="cwa_stats_header">{{ _('Pending Review') }}</div>
         <div class="cwa_stats_value" style="color: #f0ad4e;">{{hardcover_stats.pending_review}}</div>
       </div>
       <div class="cwa_stats_section">
-        <div class="cwa_stats_header">Manually Reviewed</div>
+        <div class="cwa_stats_header">{{ _('Manually Reviewed') }}</div>
         <div class="cwa_stats_value" style="color: #5bc0de;">{{hardcover_stats.manually_reviewed}}</div>
       </div>
     </div>
@@ -66,7 +66,7 @@
 
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0;">Calibre-Web NextGen Conversion History</h3>
+        <h3 style="margin: 0;">{{ _('Calibre-Web NextGen Conversion History') }}</h3>
         <a class="btn btn-default stats_see_more_btn" href="{{ url_for('cwa_stats.show_full_conversions') }}">{{_('Click to See More')}}</a>
       </div>
       <br>
@@ -88,7 +88,7 @@
 
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0;">Calibre-Web NextGen Import History</h3>
+        <h3 style="margin: 0;">{{ _('Calibre-Web NextGen Import History') }}</h3>
         <a class="btn btn-default stats_see_more_btn" href="{{ url_for('cwa_stats.show_full_imports') }}">{{_('Click to See More')}}</a>
       </div>
       <br>
@@ -110,7 +110,7 @@
 
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0;">Calibre-Web NextGen EPUB Fixer History</h3>
+        <h3 style="margin: 0;">{{ _('Calibre-Web NextGen EPUB Fixer History') }}</h3>
         <a class="btn btn-default stats_see_more_btn" href="{{ url_for('cwa_stats.show_full_epub_fixer') }}">{{_('Click to See More')}}</a>
       </div>
       <br>
@@ -129,7 +129,7 @@
         {% endfor %}
       </table>
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h4 style="margin: 0;"><i>EPUB Fixer History with Paths & Fixes</i></h4>
+        <h4 style="margin: 0;"><i>{{ _('EPUB Fixer History with Paths & Fixes') }}</i></h4>
         <a class="btn btn-default stats_see_more_btn" href="{{ url_for('cwa_stats.show_full_epub_fixer_with_paths_fixes') }}">{{_('Click to See More')}}</a>
       </div>
       <br>
@@ -143,7 +143,7 @@
         <tr>
           {% for cell in row %}
           <td>
-            <div style="max-height: 20rem; overflow-y: auto;">{{ cell | replace("\n", "<br>") | safe }}</div>
+            <div style="max-height: 20rem; overflow-y: auto; white-space: pre-line;">{{ cell }}</div>
           </td>
           {% endfor %}
         </tr>
@@ -153,7 +153,7 @@
 
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0;">Calibre-Web NextGen Enforcement History</h3>
+        <h3 style="margin: 0;">{{ _('Calibre-Web NextGen Enforcement History') }}</h3>
         <a class="btn btn-default stats_see_more_btn" href="{{url_for('cwa_stats.show_full_enforcement')}}">{{_('Click to See More')}}</a>
       </div>
       <br>
@@ -172,7 +172,7 @@
         {% endfor %}
       </table>
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h4 style="margin: 0;"><i>Enforcement History with Paths</i></h4>
+        <h4 style="margin: 0;"><i>{{ _('Enforcement History with Paths') }}</i></h4>
         <a class="btn btn-default stats_see_more_btn" href="{{ url_for('cwa_stats.show_full_enforcement_path') }}">{{_('Click to See More')}}</a>
       </div>
       <br>

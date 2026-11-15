@@ -68,8 +68,7 @@ DeviceIdentity
 ```
 
 `Device.public_id`, not the database integer or hardware identifier, is exposed to APIs and dropdown
-clients. `display_name` is ordinary mutable user data; changing “Kobo Libra Colour” to “Maggie's
-Libra” changes no foreign key and no sync identity. Auto-registration chooses a collision-resistant
+clients. `display_name` is ordinary mutable user data; changing “Kobo Libra Colour” to “the household reader's device” changes no foreign key and no sync identity. Auto-registration chooses a collision-resistant
 label such as `Kobo Libra Colour`, then `Kobo Libra Colour (2)`. List responses return a derived
 `annotation_count` rather than maintaining a drift-prone counter column.
 
@@ -356,7 +355,7 @@ current. With identity:
 - explicit device deletions can be scoped to IDs that device previously acknowledged;
 - different content fingerprints prevent replaying stale KoboSpan/xpointer metadata across a
   regenerated artifact;
-- diagnostics can say “Maggie's Libra is at generation 12; Clara is at 9.”
+- diagnostics can say “the household reader's device is at generation 12; Clara is at 9.”
 
 This is a real correction to the old model. KOReader's existing deletion code already explains why
 omission cannot distinguish “deleted here” from “never present here” and requires named deletes

@@ -473,6 +473,11 @@ def _record_user_book_deletions(session, user_id, book_deletions, deleted_at):
             ))
             added += 1
         if book_id is not None:
+            # The following book purge intentionally deletes reading content.
+            # Keep only the requesting device's UUID-bound G7 receipt evidence
+            # so permanent deletion observes the same bounded capture hold.
+            from .services import kobo_removal
+            kobo_removal.preserve_deletion_capture(session, user_id, book_id, book_uuid)
             session.query(ub.KoboSyncedBooks).filter(
                 ub.KoboSyncedBooks.user_id == user_id,
                 ub.KoboSyncedBooks.book_id == book_id,

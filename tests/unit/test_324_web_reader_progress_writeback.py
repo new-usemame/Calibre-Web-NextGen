@@ -51,6 +51,14 @@ REPO = Path(__file__).resolve().parents[2]
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 def _session():
     engine = create_engine("sqlite:///:memory:")
     ub.Base.metadata.create_all(engine)
@@ -536,11 +544,12 @@ def test_spa_percentage_is_not_sticky_across_relocations():
         r"lastCfiRef\.current\s*=\s*cfi;.*?lastPercentRef\.current\s*=\s*valid;",
         persist, re.S), \
         "cfi and its percentage must be written as a pair, so any reader of both matches"
-    writers = re.findall(r"lastCfiRef\.current\s*=", tsx)
+    # An assignment, not a comparison: `== null` reads the ref (#2783).
+    writers = re.findall(r"lastCfiRef\.current\s*=(?!=)", tsx)
     assert len(writers) == 1, \
         "a second writer of lastCfiRef could desynchronise it from lastPercentRef"
-    assert re.search(r"lastPercentRef\.current\s*=", tsx) and \
-        len(re.findall(r"lastPercentRef\.current\s*=", tsx)) == 1, \
+    assert re.search(r"lastPercentRef\.current\s*=(?!=)", tsx) and \
+        len(re.findall(r"lastPercentRef\.current\s*=(?!=)", tsx)) == 1, \
         "likewise for lastPercentRef"
 
     # And the send path must take BOTH from the refs — never one ref plus one

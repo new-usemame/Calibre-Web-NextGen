@@ -86,6 +86,38 @@ local function testContinueReadingPutsThisDeviceFirstAndDropsFinished()
     assertEqual(titles(finished_here), "The Colour of Magic", "finishing it here takes it off the row")
 end
 
+-- #2732: opening a book once puts it in KOReader's history, and neither
+-- Reset nor Delete takes it out again. A history entry with no progress on
+-- this device only stays in Reading when the server says it is being read.
+local function testHistoryWithoutProgressHereFollowsTheServer()
+    local omens, mort, colour = ROOT .. "/Omens [3].epub", ROOT .. "/Mort [5].epub", ROOT .. "/Colour [2].epub"
+    local history = { omens, mort, colour }
+    local reset_here = Catalog.continueReading(entries(), history, 5, function() return nil end)
+    assertEqual(titles(reset_here), "The Colour of Magic|Coraline",
+        "reset (Omens) and deleted (Mort) unread books leave Reading; Colour is read elsewhere")
+
+    local read_here = Catalog.continueReading(entries(), history, 5, function(path)
+        if path == omens then return "reading" end
+    end)
+    assertEqual(titles(read_here), "Good Omens|The Colour of Magic|Coraline",
+        "progress on this device keeps a book in Reading whatever the server says")
+end
+
+local function testResetOrDeletedHereMeansNoProgressHere()
+    assertEqual(Catalog.deviceStatus({ been_opened = false }), nil, "deleted: no sidecar")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", has_summary = false, reset = true }),
+        nil, "Reset keeps the sidecar without its summary, and KOReader then says reading")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", has_summary = false }), nil,
+        "no summary and no position saved")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", has_summary = true }), "reading",
+        "read here with the status bar off: a summary but no percent_finished")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "reading", percent_finished = 0.02 }),
+        "reading", "a page turned here is progress")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "complete" }), "complete",
+        "marked finished here, with or without a position")
+    assertEqual(Catalog.deviceStatus({ been_opened = true, status = "abandoned" }), "abandoned", "on hold")
+end
+
 local function testGroupsAndTheirMembersInReadingOrder()
     local authors = Catalog.groups(entries(), "author")
     assertEqual(#authors, 2, "two authors")
@@ -178,6 +210,8 @@ end
 testEntriesKnowWhatIsOnTheDevice()
 testRecentlyAddedNewestFirst()
 testContinueReadingPutsThisDeviceFirstAndDropsFinished()
+testHistoryWithoutProgressHereFollowsTheServer()
+testResetOrDeletedHereMeansNoProgressHere()
 testGroupsAndTheirMembersInReadingOrder()
 testAuthorsAreFiledBySurname()
 testSearchFindsEveryWordAnywhereAndRanksTitles()

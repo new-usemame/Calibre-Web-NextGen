@@ -4,7 +4,7 @@ import type { MagicRule, MagicRuleNode, MagicRuleSet } from './queries';
  *  depth — the classic builder's "Add group" writes `{condition, rules}` nodes —
  *  and the server evaluates them recursively (`build_query_from_rules`), so the
  *  editor must load, edit and save the same shape or it corrupts the shelf. */
-export type RuleLeaf = { kind: 'rule'; key: number; id: string; operator: string; value: string | string[] };
+export type RuleLeaf = { kind: 'rule'; key: number; id: string; operator: string; value: MagicRule['value'] };
 export type RuleGroup = { kind: 'group'; key: number; condition: 'AND' | 'OR'; rules: RuleNode[] };
 export type RuleNode = RuleLeaf | RuleGroup;
 
@@ -24,7 +24,7 @@ export function groupFromStored(stored: Partial<MagicRuleSet> | null | undefined
       key: nextKey(),
       id: String(rule.id ?? ''),
       operator: String(rule.operator ?? ''),
-      value: Array.isArray(rule.value) ? rule.value.map(String) : String(rule.value ?? ''),
+      value: rule.value === undefined ? '' : rule.value,
     };
   });
   return { kind: 'group', key: nextKey(), condition: conditionOf(stored?.condition), rules };
@@ -68,3 +68,8 @@ export function removeNode(group: RuleGroup, key: number): RuleGroup {
       .filter((node) => node.kind === 'rule' || node.rules.length > 0),
   };
 }
+
+/** Format JSON values for controls and inert rows without invoking an object's
+ *  coercion hooks. Stored values themselves stay unchanged until edited. */
+export const ruleValueText = (value: MagicRule['value']): string =>
+  typeof value === 'string' ? value : JSON.stringify(value);

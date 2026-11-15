@@ -5,6 +5,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+import os
+import threading
+import time
+
 from . import db, ub, logger
 from .cw_login import current_user
 from flask_babel import lazy_gettext as N_
@@ -100,9 +104,9 @@ _NATIVE_RULE_FIELDS = (
     {'id': 'language', 'label': 'Language', 'type': 'string', 'input': 'select',
      'description': 'Book language', 'operators': _SELECT_OPERATORS,
      '_binding': (db.Languages, 'lang_code')},
-    {'id': 'rating', 'label': 'Rating', 'type': 'integer', 'input': 'select',
+    {'id': 'rating', 'label': 'Library rating', 'type': 'integer', 'input': 'select',
      'values': {value: value for value in range(1, 11)},
-     'description': 'Book rating (1-10)', 'operators': _NUMBER_OPERATORS,
+     'description': 'Calibre library rating (1-10)', 'operators': _NUMBER_OPERATORS,
      '_binding': (db.Ratings, 'rating')},
     {'id': 'pubdate', 'label': 'Publication Date', 'type': 'datetime',
      'validation': {'format': 'YYYY-MM-DD'}, 'description': 'Original publication date',
@@ -123,7 +127,8 @@ _NATIVE_RULE_FIELDS = (
      'description': 'Book description/comments', 'operators': _TEXT_OPERATORS,
      '_binding': (db.Comments, 'text')},
     {'id': 'read_status', 'label': 'Read Status', 'type': 'integer', 'input': 'radio',
-     'values': {0: 'Unread', 2: 'Currently Reading', 1: 'Read'},
+     'values': {0: 'Unread', 2: 'Currently Reading', 1: 'Read',
+                3: 'Did not finish', 4: 'On hold'},
      'description': 'Book reading status', 'operators': _SELECT_OPERATORS,
      '_binding': ('custom_column', 'read_status')},
     {'id': 'hardcover_id', 'label': 'Has Hardcover ID', 'type': 'integer', 'input': 'radio',
@@ -224,6 +229,7 @@ def get_rule_custom_columns():
 def build_rule_schema_for_locale(locale):
     """Build the request-ready schema, including library-specific choices."""
     from . import calibre_db, isoLanguages
+    from flask_babel import gettext
 
     language_map = {}
     for language in calibre_db.session.query(db.Languages).all():
@@ -232,7 +238,11 @@ def build_rule_schema_for_locale(locale):
                 locale, language.lang_code)
         except Exception:
             language_map[language.lang_code] = language.lang_code
-    return build_rule_schema(language_map, get_rule_custom_columns())
+    schema = build_rule_schema(language_map, get_rule_custom_columns())
+    for field in schema['fields']:
+        if field['id'] == 'read_status':
+            field['values'] = {key: gettext(label) for key, label in field['values'].items()}
+    return schema
 
 
 def normalize_magic_shelf_order(order_list, available_ids):
@@ -373,10 +383,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'timestamp',
                     'field': 'timestamp',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=30)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '30'
                 }
             ]
         }
@@ -452,6 +462,40 @@ SYSTEM_SHELF_TEMPLATES = {
             }]
         }
     },
+    'did_not_finish': {
+        'name': 'Did not finish',
+        'display_name': N_('Did not finish'),
+        'icon': '⏭️',
+        'description': 'Books you chose not to finish',
+        'rules': {
+            'condition': 'AND',
+            'rules': [{
+                'id': 'read_status',
+                'field': 'read_status',
+                'type': 'integer',
+                'input': 'radio',
+                'operator': 'equal',
+                'value': ub.ReadBook.STATUS_DID_NOT_FINISH,
+            }]
+        }
+    },
+    'on_hold': {
+        'name': 'On hold',
+        'display_name': N_('On hold'),
+        'icon': '⏸️',
+        'description': 'Books you have paused for later',
+        'rules': {
+            'condition': 'AND',
+            'rules': [{
+                'id': 'read_status',
+                'field': 'read_status',
+                'type': 'integer',
+                'input': 'radio',
+                'operator': 'equal',
+                'value': ub.ReadBook.STATUS_ON_HOLD,
+            }]
+        }
+    },
     'recent_publications': {
         'name': 'Recent Publications',
         'display_name': N_('Recent Publications'),
@@ -463,10 +507,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'pubdate',
                     'field': 'pubdate',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=730)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '730'
                 }
             ]
         }
@@ -745,40 +789,40 @@ def build_filter_from_rule(rule, user_id=None):
                 try:
                     status_value = int(value)
                 except (ValueError, TypeError):
-                    status_value = 0
+                    return None
+                if status_value not in (ub.ReadBook.STATUS_UNREAD,
+                                        ub.ReadBook.STATUS_FINISHED,
+                                        ub.ReadBook.STATUS_IN_PROGRESS,
+                                        ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                        ub.ReadBook.STATUS_ON_HOLD):
+                    return None
 
-                if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
-                    # Currently reading: match STATUS_IN_PROGRESS
-                    matching_books = ub.session.query(ub.ReadBook).filter(
+                if status_value == ub.ReadBook.STATUS_UNREAD:
+                    # Preserve the historical unread meaning (including
+                    # in-progress) while excluding the two explicit paused
+                    # states so they do not fall into Yet to Read.
+                    matching_books = ub.session.query(ub.ReadBook.book_id).filter(
                         ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
+                        ub.ReadBook.read_status.in_((
+                            ub.ReadBook.STATUS_FINISHED,
+                            ub.ReadBook.STATUS_DID_NOT_FINISH,
+                            ub.ReadBook.STATUS_ON_HOLD,
+                        )),
                     ).all()
-                elif status_value == ub.ReadBook.STATUS_FINISHED:
-                    # Finished reading
-                    matching_books = ub.session.query(ub.ReadBook).filter(
-                        ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED
-                    ).all()
+                    matching_book_ids = [rb[0] for rb in matching_books]
+                    condition = ~db.Books.id.in_(matching_book_ids)
                 else:
-                    # Unread: books with no ReadBook entry or STATUS_UNREAD
-                    matching_books = ub.session.query(ub.ReadBook).filter(
+                    matching_books = ub.session.query(ub.ReadBook.book_id).filter(
                         ub.ReadBook.user_id == user_id,
-                        ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED
+                        ub.ReadBook.read_status == status_value
                     ).all()
-
-                matching_book_ids = [rb.book_id for rb in matching_books]
+                    matching_book_ids = [rb[0] for rb in matching_books]
+                    condition = db.Books.id.in_(matching_book_ids)
 
                 if operator_name == 'equal':
-                    if status_value == ub.ReadBook.STATUS_UNREAD:
-                        # Unread = NOT in finished list
-                        return ~db.Books.id.in_(matching_book_ids)
-                    else:
-                        return db.Books.id.in_(matching_book_ids)
+                    return condition
                 elif operator_name == 'not_equal':
-                    if status_value == ub.ReadBook.STATUS_UNREAD:
-                        return db.Books.id.in_(matching_book_ids)
-                    else:
-                        return ~db.Books.id.in_(matching_book_ids)
+                    return ~condition
                 else:
                     return None
             else:
@@ -797,11 +841,24 @@ def build_filter_from_rule(rule, user_id=None):
         try:
             status_value = int(value)
         except (ValueError, TypeError):
-            status_value = 0
+            return None
+        if status_value not in (ub.ReadBook.STATUS_UNREAD,
+                                ub.ReadBook.STATUS_FINISHED,
+                                ub.ReadBook.STATUS_IN_PROGRESS,
+                                ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                ub.ReadBook.STATUS_ON_HOLD):
+            return None
 
         # "Marked read" in custom-column mode means a truthy column row exists.
         cc_read = getattr(db.Books, cc_relationship).any(column == True)  # noqa: E712
 
+        paused_ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+            ub.ReadBook.user_id == user_id,
+            ub.ReadBook.read_status.in_((
+                ub.ReadBook.STATUS_DID_NOT_FINISH,
+                ub.ReadBook.STATUS_ON_HOLD,
+            )),
+        ).all()] if user_id is not None else []
         if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
             # The in-progress tri-state exists only in ub.ReadBook — KOReader/
             # Kobo sync writes it there regardless of the configured read
@@ -818,13 +875,25 @@ def build_filter_from_rule(rule, user_id=None):
                 ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
             ).all()]
             condition = and_(db.Books.id.in_(in_progress_ids), ~cc_read)
+        elif status_value == ub.ReadBook.STATUS_DID_NOT_FINISH:
+            ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_DID_NOT_FINISH,
+            ).all()] if user_id is not None else []
+            condition = db.Books.id.in_(ids)
+        elif status_value == ub.ReadBook.STATUS_ON_HOLD:
+            ids = [row[0] for row in ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_ON_HOLD,
+            ).all()] if user_id is not None else []
+            condition = db.Books.id.in_(ids)
         elif status_value == ub.ReadBook.STATUS_FINISHED:
-            condition = cc_read
+            condition = and_(cc_read, ~db.Books.id.in_(paused_ids))
         else:
             # Unread: no truthy column row. Books never touched have no row
             # at all, so match on absence-of-read rather than value == False
             # (the old shape hid every never-marked book from "Yet to Read").
-            condition = ~cc_read
+            condition = and_(~cc_read, ~db.Books.id.in_(paused_ids))
 
         if operator_name == 'equal':
             return condition
@@ -1149,6 +1218,86 @@ def get_books_for_magic_shelf(shelf_id, page=1, page_size=None, sort_order=None,
         if raise_on_error:
             raise
         return [], 0
+
+
+# Sidebar counts for the classic layout, cached per (user, shelf) on the server.
+# They used to live in the session cookie, which changed the cookie whenever a
+# count expired; covers are cached with ``Vary: Cookie``, so every library visit
+# more than a few minutes after the last one downloaded every cover again (#2386).
+BOOK_COUNT_CACHE_SECONDS = 300
+_book_count_cache = {}
+_book_count_cache_lock = threading.Lock()
+# Bumped by every full forget, so a count that was being worked out while the
+# library changed is not stored over the forget.
+_book_count_generation = 0
+_library_signature = None
+
+
+def cached_book_count_for_magic_shelf(user_id, shelf_id, now=None):
+    """``get_book_count_for_magic_shelf`` for ``user_id``, reused for a few minutes."""
+    now = time.time() if now is None else now
+    key = (user_id, shelf_id)
+    with _book_count_cache_lock:
+        cached = _book_count_cache.get(key)
+        generation = _book_count_generation
+    if cached and now - cached[1] < BOOK_COUNT_CACHE_SECONDS:
+        return cached[0]
+    count = get_book_count_for_magic_shelf(shelf_id)
+    with _book_count_cache_lock:
+        if generation == _book_count_generation:
+            _book_count_cache[key] = (count, now)
+    return count
+
+
+def forget_book_counts(shelf_id=None):
+    """Drop cached counts for one shelf (every user), or all of them."""
+    global _book_count_generation
+    with _book_count_cache_lock:
+        if shelf_id is None:
+            _book_count_cache.clear()
+            _book_count_generation += 1
+        else:
+            for key in [k for k in _book_count_cache if k[1] == shelf_id]:
+                del _book_count_cache[key]
+
+
+def _file_signature(path):
+    """What changes when SQLite writes ``path``: its identity, size and mtime,
+    plus those of its WAL. None when ``path`` cannot be read."""
+    if not path:
+        return None
+    parts = []
+    for candidate in (path, path + "-wal"):
+        try:
+            st = os.stat(candidate)
+        except FileNotFoundError:
+            if candidate == path:
+                return None
+            parts.append(None)
+            continue
+        except OSError:
+            return None
+        parts.append((st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns))
+    return tuple(parts)
+
+
+def forget_book_counts_if_library_changed(metadata_db_path):
+    """Drop every cached count when ``metadata_db_path`` changed on disk since
+    the last call (DESKTOP_COMPAT_MODE, where Calibre desktop writes the
+    library between requests). Returns True when the counts were dropped.
+
+    Dropping them on every request instead re-ran every shelf's COUNT query on
+    every page, cover and API call (#2862). When the file cannot be read there
+    is no way to tell, so the counts are dropped as before.
+    """
+    global _library_signature
+    signature = _file_signature(metadata_db_path)
+    with _book_count_cache_lock:
+        if signature is not None and signature == _library_signature:
+            return False
+        _library_signature = signature
+    forget_book_counts()
+    return True
 
 
 def get_book_count_for_magic_shelf(shelf_id):

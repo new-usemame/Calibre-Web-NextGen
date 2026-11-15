@@ -63,6 +63,28 @@ export interface BulkFailurePresentation {
 export type BulkFailureReasonFor = (failure: BulkFailureDetail) => string;
 
 const TERMINAL_PUNCTUATION = /([.!?…;:]+)([)\]}'"»”’]*)$/u;
+const MAX_CONCURRENT_BULK_REQUESTS = 8;
+
+async function settleBounded<T, R>(
+  items: readonly T[],
+  run: (item: T, index: number) => Promise<R>,
+  concurrency: number,
+) {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      try {
+        results[index] = { status: 'fulfilled', value: await run(items[index], index) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
 
 /** Collapse a reason to a sentence fragment so a translated outer sentence can
  * add exactly one terminator. Closing quotes/brackets remain in place. */
@@ -138,7 +160,9 @@ export async function settleById<T>(
   run: (id: number) => Promise<T>,
   options: SettleByIdOptions<T> = {},
 ): Promise<BulkActionResult<T>> {
-  const results = await Promise.allSettled(ids.map(run));
+  // Select-all can include a very large result set. Keep accounting per ID,
+  // but do not open one simultaneous HTTP request for every selected book.
+  const results = await settleBounded(ids, (id) => run(id), MAX_CONCURRENT_BULK_REQUESTS);
   return results.reduce<BulkActionResult<T>>((accounting, result, index) => {
     const id = ids[index];
     if (result.status === 'rejected') {
@@ -186,7 +210,7 @@ export async function settleByBatch(
   for (let start = 0; start < ids.length; start += batchSize) {
     chunks.push(ids.slice(start, start + batchSize));
   }
-  const settled = await Promise.allSettled(chunks.map(run));
+  const settled = await settleBounded(chunks, run, MAX_CONCURRENT_BULK_REQUESTS);
 
   return settled.reduce<BulkBatchResult>((accounting, result, index) => {
     const chunk = chunks[index];

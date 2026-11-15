@@ -64,6 +64,7 @@ SSOT_EXCEPTIONS = {
     "LISTEN_FDS": "provided by systemd's socket-activation protocol",
     "NODE_ENV": "provided and interpreted by the Node and Vite runtimes",
     "SECRET": "injected transiently by the operator's secret broker into measurement tools",
+
 }
 
 EXAMPLE_ASSIGNMENT = re.compile(r"^\s*#?\s*([A-Z][A-Z0-9_]*)\s*=", re.MULTILINE)
@@ -302,18 +303,35 @@ def _python_env_reads() -> tuple[dict[str, set[str]], list[str]]:
             unresolved.extend(source_unresolved)
             for key, locations in found.items():
                 reads.setdefault(key, set()).update(locations)
+    # The Generic OIDC resolver accepts an injected environment mapping.
+    # Its explicit field registry is the reviewed static seam for that parser;
+    # derive the population so a new field still requires .env documentation.
+    declaration_path = ROOT / "cps" / "oauth_config.py"
+    tree = ast.parse(declaration_path.read_text(encoding="utf-8"))
+    declaration = next(node for node in tree.body if isinstance(node, ast.Assign)
+                       and any(isinstance(target, ast.Name) and target.id == "ENVIRONMENT_FIELDS"
+                               for target in node.targets))
+    fields = ast.literal_eval(declaration.value.args[0])
+    for field in fields:
+        reads.setdefault("GENERIC_OAUTH_" + field, set()).add(
+            f"{_relative(declaration_path)}:{declaration.lineno}:ENVIRONMENT_FIELDS")
     return reads, unresolved
 
 
 def _shell_env_reads_from_source(path: Path, source: str) -> dict[str, set[str]]:
     reads: dict[str, set[str]] = {}
     assigned: set[str] = set()
+    first_line = source.splitlines()[0] if source.splitlines() else ""
+    # Bash owns its elapsed-seconds variable; this is not an inherited setting.
+    # Keep explicit printcontenv queries visible and do not exempt other shells.
+    runtime_names = {"SECONDS"} if first_line.startswith("#!") and re.search(r"\bbash\b", first_line) else set()
     for lineno, line in enumerate(source.splitlines(), 1):
         if line.lstrip().startswith("#"):
             continue
         names = {
             match.group(1) or match.group(2) for match in SHELL_REFERENCE.finditer(line)
         }
+        names.difference_update(runtime_names)
         names.update(match.group(1) for match in PRINTCONTENV.finditer(line))
         for name in names - assigned:
             reads.setdefault(name, set()).add(f"{_relative(path)}:{lineno}")
@@ -696,6 +714,22 @@ CWA_SELF=${CWA_SELF:-default}
     )
 
     assert set(reads) == {"CWA_BEFORE", "CWA_SELF"}
+
+
+def test_shell_clock_is_runtime_owned_but_named_environment_reads_remain_visible() -> None:
+    reads = _shell_env_reads_from_source(
+        ROOT / "root" / "etc" / "s6-overlay" / "ssot_shell_runtime",
+        '#!/bin/bash\necho "$SECONDS ${CWA_UNDECLARED:-5}"\nprintcontenv SECONDS\n',
+    )
+    # Bash expands SECONDS itself, while an explicit environment query is still
+    # configuration, even when its name happens to match a shell builtin.
+    assert set(reads) == {"CWA_UNDECLARED", "SECONDS"}
+    assert all(location.endswith(":3") for location in reads["SECONDS"])
+    plain_shell = _shell_env_reads_from_source(
+        ROOT / "root" / "etc" / "s6-overlay" / "ssot_shell_runtime",
+        '#!/bin/sh\necho "$SECONDS"\n',
+    )
+    assert set(plain_shell) == {"SECONDS"}
 
 
 def test_env_example_is_the_single_source_of_truth() -> None:

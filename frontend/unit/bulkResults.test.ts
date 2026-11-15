@@ -43,6 +43,24 @@ test('settleById retains every item value, warning, and failure for truthful cal
   ]);
 });
 
+test('large select-all actions run with bounded concurrency and retain every result', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  const ids = Array.from({ length: 73 }, (_, index) => index + 1);
+  const result = await settleById(ids, async (id) => {
+    inFlight += 1;
+    peak = Math.max(peak, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    inFlight -= 1;
+    return id;
+  });
+
+  assert.equal(peak, 8);
+  assert.deepEqual(result.succeededIds, ids);
+  assert.deepEqual(result.failedIds, []);
+  assert.equal(result.outcomes.length, ids.length);
+});
+
 test('shared failure reasons are stated once and omitted from per-book items', () => {
   const canonical = 'The last book cannot be removed unless you can browse the global library.';
   const presentation = presentBulkFailures([

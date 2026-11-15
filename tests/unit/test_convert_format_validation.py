@@ -44,8 +44,8 @@ def test_convert_rejects_invalid_target():
 
 
 @pytest.mark.unit
-def test_convert_accepts_valid_source_and_target():
-    """A src/dst pair inside the allowed lists queues the conversion."""
+def test_convert_accepts_a_plugin_format_reported_by_the_shared_capability_list():
+    """A plugin-reported KFX pair reaches the queue through shared validation."""
     from cps.api import edit as edit_mod
 
     app = flask.Flask(__name__)
@@ -56,7 +56,7 @@ def test_convert_accepts_valid_source_and_target():
     with app.test_request_context(
         "/api/v1/books/42/convert",
         method="POST",
-        json={"from": "EPUB", "to": "MOBI"},
+        json={"from": "KFX", "to": "EPUB"},
         content_type="application/json",
     ):
         with patch.object(edit_mod, "current_user",
@@ -64,7 +64,7 @@ def test_convert_accepts_valid_source_and_target():
                                           role_edit=lambda: True, name="admin")), \
              patch.object(edit_mod.calibre_db, "get_filtered_book", return_value=fake_book), \
              patch.object(edit_mod, "get_convert_options",
-                          return_value=(["epub"], ["mobi", "pdf"])), \
+                          return_value=(["kfx"], ["epub", "pdf"])), \
              patch.object(edit_mod.config, "get_book_path", return_value="/books"), \
              patch.object(edit_mod, "convert_book_format", return_value=None) as mock_convert:
             view = inspect.unwrap(edit_mod.convert_format)
@@ -74,6 +74,7 @@ def test_convert_accepts_valid_source_and_target():
     data = json.loads(resp.get_data(as_text=True))
     assert data["ok"] is True
     mock_convert.assert_called_once()
+    assert mock_convert.call_args.args[2:4] == ("KFX", "EPUB")
 
 
 @pytest.mark.unit

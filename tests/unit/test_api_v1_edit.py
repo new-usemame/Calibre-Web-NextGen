@@ -4,6 +4,7 @@
 per-field dispatch to the shared edit_book_param core (mocked)."""
 import inspect
 import json
+import uuid
 import flask
 import pytest
 from pathlib import Path
@@ -322,6 +323,27 @@ def test_convert_success_calls_core():
     assert body["ok"] is True
     core.assert_called_once()
     assert core.call_args.args[2] == "EPUB" and core.call_args.args[3] == "MOBI"
+
+
+@pytest.mark.unit
+def test_convert_returns_the_queued_task_id():
+    """#1110: the book page watches this id in /api/v1/tasks to say when the
+    new format is ready, so it must be the queued task's own id."""
+    from cps.api import edit as mod
+    task = SimpleNamespace(id=uuid.UUID("12345678-1234-5678-1234-567812345678"))
+
+    def queue(*_args, queued_tasks=None, **_kwargs):
+        queued_tasks.append(task)
+        return None
+
+    with _ctx("/api/v1/books/5/convert", body={"from": "pdf", "to": "epub"}):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod, "config", SimpleNamespace(get_book_path=lambda: "/books")), \
+             patch.object(mod, "get_convert_options", return_value=(["pdf"], ["epub"])), \
+             patch.object(mod, "convert_book_format", side_effect=queue):
+            resp = inspect.unwrap(mod.convert_format)(5)
+    assert json.loads(resp.get_data())["task_id"] == "12345678-1234-5678-1234-567812345678"
 
 
 @pytest.mark.unit

@@ -1,0 +1,21 @@
+.section { margin-top: var(--sp-6); }
+.heading { font-family: var(--font-display); font-size: var(--fs-lg); margin-bottom: var(--sp-2); }
+.heading:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.hint { color: var(--text-muted); margin-bottom: var(--sp-3); }
+.form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); }
+.field { display: flex; flex: 1 1 220px; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.field input { min-height: 44px; width: 100%; min-width: 0; padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); }
+.field input:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.list { list-style: none; padding: 0; margin-top: var(--sp-3); display: grid; gap: var(--sp-2); }
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.message { margin-top: var(--sp-3); }
+.error { color: var(--danger-text); }
+.backdrop { position: fixed; inset: 0; z-index: var(--z-overlay); background: var(--overlay-backdrop); display: grid; place-items: center; padding: var(--sp-3); }
+.dialog { width: min(420px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); }
+.dialog h3 { overflow-wrap: anywhere; }
+.buttons { display: flex; justify-content: end; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); }
+.form button, .row button, .buttons button { min-height: 44px; }
+
+/* Danger tokens are too dim for text on the dialog surface in dark themes. */
+.buttons button:last-child { color: var(--danger-text); }

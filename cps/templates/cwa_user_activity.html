@@ -359,51 +359,51 @@
 
 <!-- Hero Section -->
 <div class="stats-hero">
-    <h1>📊 User Activity Dashboard</h1>
-    <p>Track library usage, downloads, and user engagement</p>
+    <h1>📊 {{ _('User Activity Dashboard') }}</h1>
+    <p>{{ _('Track library usage, downloads, and user engagement') }}</p>
 </div>
     
     <!-- Date Range & Demo Controls -->
     <div class="date-range-controls">
         <div class="date-range-picker">
-            <label>🕵️ Filter by User:</label>
+            <label>🕵️ {{ _('Filter by User:') }}</label>
             <select id="user-filter" onchange="handleUserChange()">
-                <option value="" {{ 'selected' if not selected_user_id else '' }}>All Users</option>
+                <option value="" {{ 'selected' if not selected_user_id else '' }}>{{ _('All Users') }}</option>
                 {% for user_id, user_name in active_users %}
                 <option value="{{ user_id }}" {{ 'selected' if selected_user_id == user_id else '' }}>{{ user_name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="date-range-picker">
-            <label>📅 Time Period:</label>
+            <label>📅 {{ _('Time Period:') }}</label>
             <select id="date-preset" onchange="handlePresetChange()">
-                <option value="7" {{ 'selected' if days == 7 else '' }}>Last 7 Days</option>
-                <option value="30" {{ 'selected' if days == 30 or not days else '' }}>Last 30 Days</option>
-                <option value="90" {{ 'selected' if days == 90 else '' }}>Last 90 Days</option>
-                <option value="180" {{ 'selected' if days == 180 else '' }}>Last 6 Months</option>
-                <option value="365" {{ 'selected' if days == 365 else '' }}>Last Year</option>
-                <option value="custom" {{ 'selected' if start_date and end_date else '' }}>Custom Range</option>
+                <option value="7" {{ 'selected' if days == 7 else '' }}>{{ _('Last 7 Days') }}</option>
+                <option value="30" {{ 'selected' if days == 30 or not days else '' }}>{{ _('Last 30 Days') }}</option>
+                <option value="90" {{ 'selected' if days == 90 else '' }}>{{ _('Last 90 Days') }}</option>
+                <option value="180" {{ 'selected' if days == 180 else '' }}>{{ _('Last 6 Months') }}</option>
+                <option value="365" {{ 'selected' if days == 365 else '' }}>{{ _('Last Year') }}</option>
+                <option value="custom" {{ 'selected' if start_date and end_date else '' }}>{{ _('Custom Range') }}</option>
             </select>
             <div id="custom-dates" style="display: {{ 'flex' if start_date and end_date else 'none' }}; gap: 10px; align-items: center;">
-                <label>From:</label>
+                <label>{{ _('From:') }}</label>
                 <input type="date" id="start-date" value="{{ start_date or '' }}" onchange="handleCustomDateChange()">
-                <label>To:</label>
+                <label>{{ _('To:') }}</label>
                 <input type="date" id="end-date" value="{{ end_date or '' }}" max="{{ today }}" onchange="handleCustomDateChange()">
             </div>
         </div>
         <button class="demo-toggle" onclick="resetDateRange()" id="reset-button">
-            🔄 Reset
+            🔄 {{ _('Reset') }}
         </button>
         <button class="demo-toggle" onclick="exportActivityCSV()" style="margin-left: 10px; background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);">
-            📥 Export CSV
+            📥 {{ _('Export CSV') }}
         </button>
         <button class="demo-toggle" onclick="toggleDemoMode()" id="demo-button" style="margin-left: 10px;">
-            🎨 Show Demo Data
+            🎨 {{ _('Show Demo Data') }}
         </button>
-        <span class="demo-badge" id="demo-badge" style="display: none;">DEMO MODE</span>
+        <span class="demo-badge" id="demo-badge" style="display: none;">{{ _('DEMO MODE') }}</span>
     </div>
     <div class="date-warning" id="date-warning">
-        ⚠️ Large date ranges may take longer to load
+        ⚠️ {{ _('Large date ranges may take longer to load') }}
     </div>
     
     <!-- Top Metrics Cards -->
@@ -411,30 +411,30 @@
         <div class="metric-card">
             {% if selected_user_id %}
                 <div class="metric-icon">🔑</div>
-                <div class="metric-label">No of Logins</div>
+                <div class="metric-label">{{ _('Logins') }}</div>
                 <div class="metric-value" id="metric-users">{{ dashboard_stats.totals.total_logins }}</div>
             {% else %}
                 <div class="metric-icon">👥</div>
-                <div class="metric-label">Active Users</div>
+                <div class="metric-label">{{ _('Active Users') }}</div>
                 <div class="metric-value" id="metric-users">{{ dashboard_stats.totals.active_users }}</div>
             {% endif %}
                 <small style="color: #999;" class="date-range-label">{{ date_range_label }}</small>
         </div>
         <div class="metric-card">
             <div class="metric-icon">📥</div>
-            <div class="metric-label">Total Downloads</div>
+            <div class="metric-label">{{ _('Total Downloads') }}</div>
             <div class="metric-value" id="metric-downloads">{{ dashboard_stats.totals.total_downloads }}</div>
             <small style="color: #999;" class="date-range-label">{{ date_range_label }}</small>
         </div>
         <div class="metric-card">
             <div class="metric-icon">📖</div>
-            <div class="metric-label">Books Read</div>
+            <div class="metric-label">{{ _('Books Read') }}</div>
             <div class="metric-value" id="metric-reads">{{ dashboard_stats.totals.total_reads }}</div>
             <small style="color: #999;" class="date-range-label">{{ date_range_label }}</small>
         </div>
         <div class="metric-card">
             <div class="metric-icon">🔍</div>
-            <div class="metric-label">Searches</div>
+            <div class="metric-label">{{ _('Searches') }}</div>
             <div class="metric-value" id="metric-searches">{{ dashboard_stats.totals.total_searches }}</div>
             <small style="color: #999;" class="date-range-label">{{ date_range_label }}</small>
         </div>
@@ -442,13 +442,13 @@
     
     <!-- Activity Timeline Chart -->
     <div class="chart-container">
-        <div class="chart-title">📈 Activity Timeline</div>
+        <div class="chart-title">📈 {{ _('Activity Timeline') }}</div>
         <div id="timeline-chart" style="width: 100%; height: 400px;"></div>
     </div>
     
     <!-- Peak Usage Hours Heatmap -->
     <div class="chart-container">
-        <div class="chart-title">🔥 Peak Usage Hours</div>
+        <div class="chart-title">🔥 {{ _('Peak Usage Hours') }}</div>
         <div id="heatmap-chart" style="width: 100%; height: 350px;"></div>
     </div>
     
@@ -456,13 +456,13 @@
     <div class="row cwa-stats-row">
         <div class="col-md-6">
             <div class="chart-container">
-                <div class="chart-title">🎯 Event Types</div>
+                <div class="chart-title">🎯 {{ _('Event Types') }}</div>
                 <div id="events-chart" style="width: 100%; height: 350px;"></div>
             </div>
         </div>
         <div class="col-md-6">
             <div class="chart-container">
-                <div class="chart-title">📊 Format Preferences by User</div>
+                <div class="chart-title">📊 {{ _('Format Preferences by User') }}</div>
                 <div id="format-preferences-chart" style="width: 100%; height: 350px;"></div>
             </div>
         </div>
@@ -472,22 +472,22 @@
     <div class="row cwa-stats-row">
         <div class="col-md-4">
             <div class="chart-container">
-                <div class="chart-title">📍 Discovery Sources</div>
+                <div class="chart-title">📍 {{ _('Discovery Sources') }}</div>
                 <div id="discovery-chart" style="width: 100%; height: 350px;"></div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="chart-container">
-                <div class="chart-title">📱 Device Breakdown</div>
+                <div class="chart-title">📱 {{ _('Device Breakdown') }}</div>
                 <div id="device-chart" style="width: 100%; height: 350px;"></div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="chart-container">
-                <div class="chart-title">🔒 Security</div>
+                <div class="chart-title">🔒 {{ _('Security') }}</div>
                 <div class="metric-card" style="margin-bottom: 15px;">
                     <div class="metric-icon">🛡️</div>
-                    <div class="metric-label">Failed Login Attempts</div>
+                    <div class="metric-label">{{ _('Failed Login Attempts') }}</div>
                     <div class="metric-value" id="failed-logins-count">0</div>
                 </div>
                 <div id="failed-logins-list" style="max-height: 200px; overflow-y: auto;"></div>
@@ -500,23 +500,23 @@
         <div class="col-md-4">
             <div class="chart-container">
                 {% if selected_user_id %}
-                <div class="chart-title">📅 Most Active Days</div>
+                <div class="chart-title">📅 {{ _('Most Active Days') }}</div>
                 <div id="most-active-days-list"></div>
                 {% else %}
-                <div class="chart-title">🏆 Top Users</div>
+                <div class="chart-title">🏆 {{ _('Top Users') }}</div>
                 <div id="top-users-list"></div>
                 {% endif %}
             </div>
         </div>
         <div class="col-md-4">
             <div class="chart-container">
-                <div class="chart-title">⭐ Popular Books</div>
+                <div class="chart-title">⭐ {{ _('Popular Books') }}</div>
                 <div id="top-books-list"></div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="chart-container">
-                <div class="chart-title">🔎 Recent Searches</div>
+                <div class="chart-title">🔎 {{ _('Recent Searches') }}</div>
                 <div id="recent-searches-list"></div>
             </div>
         </div>
@@ -526,24 +526,24 @@
     <div class="row cwa-stats-row">
         <div class="col-md-4">
             <div class="chart-container" style="min-height: 520px;">
-                <div class="chart-title">⏱️ Average Session Duration</div>
+                <div class="chart-title">⏱️ {{ _('Average Session Duration') }}</div>
                 <div class="metric-card" style="margin-bottom: 15px;">
                     <div class="metric-icon">⏰</div>
-                    <div class="metric-label">Avg Session Length</div>
-                    <div class="metric-value" id="avg-session-duration">0 min</div>
+                    <div class="metric-label">{{ _('Avg Session Length') }}</div>
+                    <div class="metric-value" id="avg-session-duration">{{ _('%(minutes)s min', minutes=0) }}</div>
                 </div>
                 <div id="session-duration-chart" style="width: 100%; height: 250px;"></div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="chart-container" style="min-height: 520px;">
-                <div class="chart-title">🎯 Search Success Rate</div>
+                <div class="chart-title">🎯 {{ _('Search Success Rate') }}</div>
                 <div class="metric-card" style="margin-bottom: 15px;">
                     <div class="metric-icon">🔍</div>
-                    <div class="metric-label">Searches Leading to Actions</div>
+                    <div class="metric-label">{{ _('Searches Leading to Actions') }}</div>
                     <div class="metric-value" id="search-success-rate">0%</div>
                     <div style="font-size: 0.9em; color: #aaa; margin-top: 5px;">
-                        <span id="search-success-count">0</span> of <span id="total-searches">0</span> searches
+                        <span id="search-success-summary">{{ _('Successful searches: %(successful)s / %(total)s', successful=0, total=0) }}</span>
                     </div>
                 </div>
                 <div id="search-success-chart" style="width: 100%; height: 250px;"></div>
@@ -551,7 +551,7 @@
         </div>
         <div class="col-md-4">
             <div class="chart-container" style="min-height: 520px;">
-                <div class="chart-title">📚 Shelf Activity</div>
+                <div class="chart-title">📚 {{ _('Shelf Activity') }}</div>
                 <div id="shelf-activity-list" style="max-height: 420px; overflow-y: auto;"></div>
             </div>
         </div>
@@ -560,16 +560,16 @@
     <!-- Empty State (hidden by default) -->
     <div class="empty-state" id="empty-state" style="display: none;">
         <div class="empty-state-icon">📊</div>
-        <h3>No Activity Data Yet</h3>
-        <p>Start using your library to see beautiful visualizations and insights!</p>
-        <p style="color: #bbb; font-size: 0.9em;">Downloads, reading sessions, and searches will be tracked here.</p>
+        <h3>{{ _('No Activity Data Yet') }}</h3>
+        <p>{{ _('Start using your library to see beautiful visualizations and insights!') }}</p>
+        <p style="color: #bbb; font-size: 0.9em;">{{ _('Downloads, reading sessions, and searches will be tracked here.') }}</p>
     </div>
 
     <!-- Download Formats Pie Chart -->
     <div class="row cwa-stats-row">
         <div class="col-md-12">
             <div class="chart-container">
-                <div class="chart-title">📦 Download Formats Distribution</div>
+                <div class="chart-title">📦 {{ _('Download Formats Distribution') }}</div>
                 <div id="formats-chart" style="width: 100%; height: 350px;"></div>
             </div>
         </div>
@@ -577,7 +577,7 @@
 
     <!-- Reading Velocity Trend -->
     <div class="chart-container">
-        <div class="chart-title">📚 Reading Velocity (Books per Week)</div>
+        <div class="chart-title">📚 {{ _('Reading Velocity (Books per Week)') }}</div>
         <div id="velocity-chart" style="width: 100%; height: 350px;"></div>
     </div>
 
@@ -637,6 +637,11 @@ function generateDemoData() {
     
     // Check if we're in single user mode
     const selectedUserId = urlParams.get('user_id');
+
+    // Derive every display from one sample instead of independently generating
+    // totals, successful counts and a percentage that can contradict each other.
+    const demoSearchTotal = 150 + Math.floor(Math.random() * 100);
+    const demoSearchSuccessful = Math.floor(demoSearchTotal * (0.55 + Math.random() * 0.3));
     
     // Generate appropriate topUsers data based on mode
     let topUsersData;
@@ -717,14 +722,14 @@ function generateDemoData() {
             total_logins: 47,
             total_downloads: 1356,
             total_reads: 432,
-            total_searches: 234,
+            total_searches: demoSearchTotal,
             total_events: 2178
         } : {
             // All users mode: show active_users
             active_users: 24,
             total_downloads: 1356,
             total_reads: 432,
-            total_searches: 234,
+            total_searches: demoSearchTotal,
             total_events: 2178
         },
         // Generate heatmap data (day of week, hour, count)
@@ -819,9 +824,9 @@ function generateDemoData() {
         },
         // Generate search success rate
         searchSuccess: {
-            total_searches: 150 + Math.floor(Math.random() * 100),
-            successful_searches: 100 + Math.floor(Math.random() * 80),
-            success_rate: 55 + Math.floor(Math.random() * 30), // 55-85%
+            total_searches: demoSearchTotal,
+            successful_searches: demoSearchSuccessful,
+            success_rate: Math.round(1000 * demoSearchSuccessful / demoSearchTotal) / 10,
             trend: Math.floor(Math.random() * 20) - 5 // -5 to +15
         },
         // Generate shelf activity (shelf_name, add_count, remove_count, net_change)
@@ -957,10 +962,13 @@ function updateTimelineChart() {
             trigger: 'axis',
             axisPointer: {
                 type: 'cross'
-            }
+            },
+            formatter: params => statsEscape(statsDate(params[0]?.axisValue ?? '')) +
+                params.map(item => `<br/>${statsEscape(statsLabel(item.seriesName))}: ${statsEscape(item.value)}`).join('')
         },
         legend: {
             data: eventTypes,
+            formatter: statsLabel,
             bottom: 0,
             textStyle: {
                 color: '#fff'
@@ -981,7 +989,7 @@ function updateTimelineChart() {
                 rotate: 45,
                 color: '#fff',
                 formatter: function(value) {
-                    return value.split('-').slice(1).join('/');
+                    return statsDate(value);
                 }
             },
             axisLine: {
@@ -1018,12 +1026,13 @@ function updateEventsChart() {
             trigger: 'item',
             backgroundColor: 'rgba(0,0,0,0.8)',
             textStyle: { color: '#fff' },
-            formatter: '{b}: {c} ({d}%)'
+            formatter: statsPieTooltip
         },
         legend: {
             orient: 'horizontal',
             bottom: '5%',
-            textStyle: { color: '#fff' }
+            textStyle: { color: '#fff' },
+            formatter: statsLabel
         },
         series: [{
             type: 'pie',
@@ -1036,7 +1045,7 @@ function updateEventsChart() {
             },
             label: {
                 color: '#fff',
-                formatter: '{b}\n{d}%'
+                formatter: statsPieLabel
             },
             emphasis: {
                 itemStyle: {
@@ -1059,7 +1068,7 @@ function updateFormatsChart() {
     if (data.length === 0) {
         formatsChart.setOption({
             title: {
-                text: 'No format data yet',
+                text: {{ _('No format data yet') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -1076,7 +1085,8 @@ function updateFormatsChart() {
             trigger: 'axis',
             axisPointer: {
                 type: 'shadow'
-            }
+            },
+            formatter: params => params.map(item => `${statsEscape(statsFormatLabel(item.name))}: ${statsEscape(item.value)}`).join('<br/>')
         },
         grid: {
             left: '3%',
@@ -1101,6 +1111,7 @@ function updateFormatsChart() {
             type: 'category',
             data: data.map(d => d[0]),
             axisLabel: {
+                formatter: statsFormatLabel,
                 color: '#fff'
             },
             axisLine: {
@@ -1137,7 +1148,7 @@ function updateHeatmapChart() {
     if (data.length === 0) {
         heatmapChart.setOption({
             title: {
-                text: 'No activity data yet',
+                text: {{ _('No activity data yet') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -1149,7 +1160,7 @@ function updateHeatmapChart() {
         return;
     }
     
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = statsWeekdays;
     const hours = Array.from({length: 24}, (_, i) => i + ':00');
     
     // Transform data to [hour, day, value] format
@@ -1162,7 +1173,7 @@ function updateHeatmapChart() {
                 const hour = params.data[0];
                 const day = days[params.data[1]];
                 const count = params.data[2];
-                return `${day} ${hour}:00<br/>Activity: ${count}`;
+                return statsEscape(`${day} ${hour}:00`) + "<br/>" + statsEscape(statsFormat({{ _('Activity: %(count)s', count='%(count)s') | tojson }}, {count}));
             }
         },
         grid: {
@@ -1208,10 +1219,11 @@ function updateHeatmapChart() {
             inRange: {
                 color: ['#2c3e50', '#ff9800', '#ff5722']
             },
-            textStyle: { color: '#fff' }
+            textStyle: { color: '#fff' },
+            formatter: statsLabel
         },
         series: [{
-            name: 'Activity',
+            name: {{ _('Activity') | tojson }},
             type: 'heatmap',
             data: heatmapData,
             label: {
@@ -1235,7 +1247,7 @@ function updateVelocityChart() {
     if (data.length === 0) {
         velocityChart.setOption({
             title: {
-                text: 'No reading data yet',
+                text: {{ _('No reading data yet') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -1265,7 +1277,7 @@ function updateVelocityChart() {
             }
         },
         legend: {
-            data: ['Books Read', '4-Week Avg'],
+            data: [{{ _('Books Read') | tojson }}, {{ _('4-Week Avg') | tojson }}],
             textStyle: {
                 color: '#fff'
             },
@@ -1291,7 +1303,7 @@ function updateVelocityChart() {
         },
         yAxis: {
             type: 'value',
-            name: 'Books',
+            name: {{ _('Books') | tojson }},
             nameTextStyle: {
                 color: '#fff'
             },
@@ -1307,7 +1319,7 @@ function updateVelocityChart() {
         },
         series: [
             {
-                name: 'Books Read',
+                name: {{ _('Books Read') | tojson }},
                 type: 'bar',
                 data: data.map(d => d[1]),
                 itemStyle: {
@@ -1319,7 +1331,7 @@ function updateVelocityChart() {
                 }
             },
             {
-                name: '4-Week Avg',
+                name: {{ _('4-Week Avg') | tojson }},
                 type: 'line',
                 data: movingAvg,
                 smooth: true,
@@ -1343,7 +1355,7 @@ function updateFormatPreferencesChart() {
     if (data.length === 0) {
         formatPreferencesChart.setOption({
             title: {
-                text: 'No format preference data yet',
+                text: {{ _('No format preference data yet') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -1396,10 +1408,12 @@ function updateFormatPreferencesChart() {
             trigger: 'axis',
             axisPointer: {
                 type: 'shadow'
-            }
+            },
+            formatter: params => statsEscape(params[0]?.axisValue ?? '') + params.map(item => `<br/>${statsEscape(statsFormatLabel(item.seriesName))}: ${statsEscape(item.value)}`).join('')
         },
         legend: {
             data: formats,
+            formatter: statsFormatLabel,
             textStyle: {
                 color: '#fff'
             },
@@ -1446,7 +1460,7 @@ function updateDiscoveryChart() {
     if (data.length === 0) {
         discoveryChart.setOption({
             title: {
-                text: 'No discovery data yet',
+                text: {{ _('No discovery data yet') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -1458,35 +1472,25 @@ function updateDiscoveryChart() {
         return;
     }
     
-    const sourceLabels = {
-        'search': 'Search',
-        'book_detail': 'Book Detail',
-        'series': 'Series Page',
-        'author': 'Author Page',
-        'browse': 'Browse',
-        'shelf': 'Shelf',
-        'category': 'Category',
-        'direct': 'Direct Link'
-    };
-    
     const option = {
         tooltip: {
             trigger: 'item',
             backgroundColor: 'rgba(0,0,0,0.8)',
             textStyle: { color: '#fff' },
-            formatter: '{b}: {c} ({d}%)'
+            formatter: statsPieTooltip
         },
         legend: {
             orient: 'horizontal',
             bottom: '5%',
-            textStyle: { color: '#fff' }
+            textStyle: { color: '#fff' },
+            formatter: statsLabel
         },
         series: [{
             type: 'pie',
             radius: ['40%', '70%'],
             center: ['50%', '40%'],
             data: data.map(([source, count]) => ({
-                name: sourceLabels[source] || source,
+                name: source,
                 value: count
             })),
             emphasis: {
@@ -1503,7 +1507,7 @@ function updateDiscoveryChart() {
             },
             label: {
                 color: '#fff',
-                formatter: '{b}\n{d}%'
+                formatter: statsPieLabel
             }
         }]
     };
@@ -1517,7 +1521,7 @@ function updateDeviceChart() {
     if (data.length === 0) {
         deviceChart.setOption({
             title: {
-                text: 'No device data yet',
+                text: {{ _('No device data yet') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -1550,7 +1554,7 @@ function updateDeviceChart() {
             textStyle: { color: '#fff' },
             formatter: (params) => {
                 const icon = deviceIcons[params.name] || '❓';
-                return `${icon} ${params.name.charAt(0).toUpperCase() + params.name.slice(1)}: ${params.value} (${params.percent}%)`;
+                return `${icon} ${statsEscape(statsLabel(params.name))}: ${params.value} (${params.percent}%)`;
             }
         },
         legend: {
@@ -1559,7 +1563,7 @@ function updateDeviceChart() {
             textStyle: { color: '#fff' },
             formatter: (name) => {
                 const icon = deviceIcons[name] || '❓';
-                return `${icon} ${name.charAt(0).toUpperCase() + name.slice(1)}`;
+                return `${icon} ${statsLabel(name)}`;
             }
         },
         series: [{
@@ -1582,7 +1586,7 @@ function updateDeviceChart() {
             },
             label: {
                 color: '#fff',
-                formatter: '{b}\n{d}%'
+                formatter: statsPieLabel
             }
         }]
     };
@@ -1597,13 +1601,13 @@ function updateFailedLogins() {
     document.getElementById('failed-logins-count').textContent = count;
     
     if (data.length === 0) {
-        document.getElementById('failed-logins-list').innerHTML = '<p style="text-align: center; color: #4caf50; padding: 20px;">✓ No failed attempts</p>';
+        document.getElementById('failed-logins-list').innerHTML = `<p style="text-align: center; color: #4caf50; padding: 20px;">✓ ${statsEscape({{ _('No failed attempts') | tojson }})}</p>`;
         return;
     }
     
     const listHtml = data.map(([ip, username, timestamp, attempts]) => {
         const date = new Date(timestamp);
-        const formattedDate = date.toLocaleString('en-US', { 
+        const formattedDate = date.toLocaleString(statsLocale, {
             month: 'short', 
             day: 'numeric',
             hour: '2-digit',
@@ -1614,11 +1618,11 @@ function updateFailedLogins() {
         return `
             <div style="padding: 8px; border-bottom: 1px solid #3a4451; font-size: 0.85em;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #fff; font-weight: 500;">${ip}</span>
+                    <span style="color: #fff; font-weight: 500;">${statsEscape(ip)}</span>
                     <span style="background: ${badgeColor}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.9em;">${attempts}×</span>
                 </div>
                 <div style="color: #999; font-size: 0.9em; margin-top: 4px;">
-                    ${username} • ${formattedDate}
+                    ${statsEscape(username)} • ${statsEscape(formattedDate)}
                 </div>
             </div>
         `;
@@ -1638,7 +1642,7 @@ function updateTopLists() {
             ? currentData.topUsers.map(([date, count]) => {
                 // Format date nicely
                 const dateObj = new Date(date + 'T00:00:00');
-                const formattedDate = dateObj.toLocaleDateString('en-US', { 
+                const formattedDate = dateObj.toLocaleDateString(statsLocale, {
                     month: 'short', 
                     day: 'numeric',
                     year: 'numeric'
@@ -1646,26 +1650,27 @@ function updateTopLists() {
                 
                 return `
                     <div class="top-item">
-                        <span class="top-item-name">📆 ${formattedDate}</span>
+                        <span class="top-item-name">📆 ${statsEscape(formattedDate)}</span>
                         <span class="top-item-value">${count}</span>
                     </div>
                 `;
             }).join('')
-            : '<p style="text-align: center; color: #999; padding: 20px;">No activity data yet</p>';
+            : `<p style="text-align: center; color: #999; padding: 20px;">${statsEscape({{ _('No activity data yet') | tojson }})}</p>`;
         document.getElementById('most-active-days-list').innerHTML = daysHtml;
     } else {
         // Show Top Users
         const usersHtml = currentData.topUsers.length > 0 
             ? currentData.topUsers.map(([userId, name, count]) => {
+                if (userId == null && name === "Unknown User") name = {{ _("Unknown User") | tojson }};
                 const profileImage = userProfiles[name];
                 const avatar = profileImage 
-                    ? `<img src="${profileImage}" class="user-avatar" alt="${name}">` 
+                    ? `<img src="${statsEscape(profileImage)}" class="user-avatar" alt="${statsEscape(name)}">`
                     : '👤';
                 
                 // Make username clickable for admins
                 const nameDisplay = isAdmin 
-                    ? `<a href="/admin/user/${userId}">${name}</a>` 
-                    : name;
+                    ? `<a href="/admin/user/${encodeURIComponent(userId)}">${statsEscape(name)}</a>`
+                    : statsEscape(name);
                 
                 return `
                     <div class="top-item">
@@ -1674,7 +1679,7 @@ function updateTopLists() {
                     </div>
                 `;
             }).join('')
-            : '<p style="text-align: center; color: #999; padding: 20px;">No user activity yet</p>';
+            : `<p style="text-align: center; color: #999; padding: 20px;">${statsEscape({{ _('No user activity yet') | tojson }})}</p>`;
         document.getElementById('top-users-list').innerHTML = usersHtml;
     }
     
@@ -1682,22 +1687,22 @@ function updateTopLists() {
     const booksHtml = currentData.topBooks.length > 0
         ? currentData.topBooks.map(([title, id, count]) => `
             <div class="top-item">
-                <span class="top-item-name">📚 <a href="/book/${id}">${title}</a></span>
+                <span class="top-item-name">📚 <a href="/book/${encodeURIComponent(id)}">${statsEscape(title)}</a></span>
                 <span class="top-item-value">${count}</span>
             </div>
         `).join('')
-        : '<p style="text-align: center; color: #999; padding: 20px;">No popular books yet</p>';
+        : `<p style="text-align: center; color: #999; padding: 20px;">${statsEscape({{ _('No popular books yet') | tojson }})}</p>`;
     document.getElementById('top-books-list').innerHTML = booksHtml;
     
     // Recent Searches
     const searchesHtml = currentData.recentSearches.length > 0
         ? currentData.recentSearches.map(([term, timestamp, user]) => `
             <div class="search-term">
-                "${term}"
-                <span class="timestamp">${timestamp.split('T')[0]}</span>
+                "${statsEscape(term)}"
+                <span class="timestamp">${statsEscape(statsDate(timestamp.split('T')[0]))}</span>
             </div>
         `).join('')
-        : '<p style="text-align: center; color: #999; padding: 20px;">No searches yet</p>';
+        : `<p style="text-align: center; color: #999; padding: 20px;">${statsEscape({{ _('No searches yet') | tojson }})}</p>`;
     document.getElementById('recent-searches-list').innerHTML = searchesHtml;
 }
 
@@ -1706,7 +1711,7 @@ function updateSessionDuration() {
     
     // Update metric card
     const avgMin = data.average_minutes || 0;
-    document.getElementById('avg-session-duration').textContent = avgMin > 0 ? `${avgMin} min` : '0 min';
+    document.getElementById('avg-session-duration').textContent = statsFormat({{ _('%(minutes)s min', minutes='%(minutes)s') | tojson }}, {minutes: avgMin});
     
     // Update histogram chart
     if (data.distribution && data.distribution.length > 0) {
@@ -1720,7 +1725,8 @@ function updateSessionDuration() {
                 textStyle: { color: '#fff' },
                 formatter: (params) => {
                     const p = params[0];
-                    return `${p.name}-${p.name + 5} min: ${p.value} sessions`;
+                    const start = Number(buckets[p.dataIndex]);
+                    return statsEscape(statsFormat({{ _('Minutes: %(start)s–%(end)s; sessions: %(count)s', start='%(start)s', end='%(end)s', count='%(count)s') | tojson }}, {start, end: start + 5, count: p.value}));
                 }
             },
             grid: {
@@ -1732,7 +1738,7 @@ function updateSessionDuration() {
             xAxis: {
                 type: 'category',
                 data: buckets,
-                name: 'Minutes',
+                name: {{ _('Minutes') | tojson }},
                 nameLocation: 'middle',
                 nameGap: 30,
                 axisLabel: {
@@ -1743,7 +1749,7 @@ function updateSessionDuration() {
             },
             yAxis: {
                 type: 'value',
-                name: 'Sessions',
+                name: {{ _('Sessions') | tojson }},
                 axisLabel: { color: '#fff' },
                 splitLine: { lineStyle: { color: '#3a4451' } }
             },
@@ -1761,7 +1767,7 @@ function updateSessionDuration() {
     } else {
         sessionDurationChart.setOption({
             title: {
-                text: 'No session data available',
+                text: {{ _('No session data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: { color: '#999', fontSize: 14 }
@@ -1780,8 +1786,7 @@ function updateSearchSuccess() {
     
     // Update metric card
     document.getElementById('search-success-rate').textContent = `${data.success_rate}%`;
-    document.getElementById('search-success-count').textContent = data.successful_searches;
-    document.getElementById('total-searches').textContent = data.total_searches;
+    document.getElementById('search-success-summary').textContent = statsFormat({{ _('Successful searches: %(successful)s / %(total)s', successful='%(successful)s', total='%(total)s') | tojson }}, {successful: data.successful_searches, total: data.total_searches});
     
     // Determine color based on success rate
     let color = '#f44336'; // Red for low
@@ -1836,7 +1841,7 @@ function updateSearchSuccess() {
                 fontSize: 24,
                 offsetCenter: [0, '80%']
             },
-            data: [{ value: data.success_rate, name: 'Success Rate' }]
+            data: [{ value: data.success_rate, name: {{ _('Success Rate') | tojson }} }]
         }]
     }, true);
 }
@@ -1854,18 +1859,18 @@ function updateShelfActivity() {
             
             const statsHtml = isMagic 
                 ? `
-                    <span style="color: #2196f3; display: flex; align-items: center; gap: 4px;" title="Views">
+                    <span style="color: #2196f3; display: flex; align-items: center; gap: 4px;" title="${statsEscape({{ _('Views') | tojson }})}">
                         <span style="font-size: 1.1em;">👁️</span> ${views}
                     </span>
                   `
                 : `
-                    <span style="color: #4caf50; display: flex; align-items: center; gap: 4px;" title="Added">
+                    <span style="color: #4caf50; display: flex; align-items: center; gap: 4px;" title="${statsEscape({{ _('Added') | tojson }})}">
                         <span style="font-size: 1.1em;">▲</span> ${addCount}
                     </span>
-                    <span style="color: #f44336; display: flex; align-items: center; gap: 4px;" title="Removed">
+                    <span style="color: #f44336; display: flex; align-items: center; gap: 4px;" title="${statsEscape({{ _('Removed') | tojson }})}">
                         <span style="font-size: 1.1em;">▼</span> ${removeCount}
                     </span>
-                    <span style="color: #2196f3; display: flex; align-items: center; gap: 4px;" title="Views">
+                    <span style="color: #2196f3; display: flex; align-items: center; gap: 4px;" title="${statsEscape({{ _('Views') | tojson }})}">
                         <span style="font-size: 1.1em;">👁️</span> ${views}
                     </span>
                   `;
@@ -1881,7 +1886,7 @@ function updateShelfActivity() {
                     onmouseover="this.style.background='rgba(255,255,255,0.05)'"
                     onmouseout="this.style.background='rgba(255,255,255,0.03)'">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: #fff; font-size: 0.95em;">${icon} ${shelfName}</span>
+                        <span style="font-weight: 600; color: #fff; font-size: 0.95em;">${icon} ${statsEscape(shelfName)}</span>
                         <span style="
                             color: ${netColor};
                             font-weight: 700;
@@ -1899,7 +1904,7 @@ function updateShelfActivity() {
                 </div>
             `;
         }).join('')
-        : '<p style="text-align: center; color: #999; padding: 40px 20px;">No shelf activity yet</p>';
+        : `<p style="text-align: center; color: #999; padding: 40px 20px;">${statsEscape({{ _('No shelf activity yet') | tojson }})}</p>`;
     
     document.getElementById('shelf-activity-list').innerHTML = html;
 }
@@ -1911,12 +1916,12 @@ function toggleDemoMode() {
     
     if (demoMode) {
         currentData = generateDemoData();
-        button.textContent = '📊 Show Real Data';
+        button.textContent = '📊 ' + {{ _('Show Real Data') | tojson }};
         button.classList.add('active');
         badge.style.display = 'inline-block';
     } else {
         currentData = hasRealData ? realData : generateDemoData();
-        button.textContent = '🎨 Show Demo Data';
+        button.textContent = '🎨 ' + {{ _('Show Demo Data') | tojson }};
         button.classList.remove('active');
         badge.style.display = 'none';
     }

@@ -17,12 +17,13 @@ Sources tried, in order, per record:
 
   1. Amazon image CDN by ASIN - public CloudFront-fronted host with
      CORS open, no auth, no scraping. Edition-keyed, so we get the
-     correct-edition cover at up to ~2000px tall. An ISBN-10 is simply
-     the ASIN a print edition happens to have, and is tried first; a
-     Kindle edition's own ASIN is tried after it, and is often the only
-     key such a book has (fork #304). Validated via HEAD against an
-     image/jpeg content-type and a minimum byte count (Amazon serves a
-     43-byte GIF placeholder for unknown keys).
+     correct-edition cover from its original MAIN image, falling back to
+     the bounded SL2000 image only when MAIN is unavailable. An ISBN-10 is
+     simply the ASIN a print edition happens to have, and is tried first; a
+     Kindle edition's own ASIN is tried after it, and is often the only key
+     such a book has (fork #304). Both variants are validated via HEAD
+     against an image/jpeg content-type and a minimum byte count (Amazon
+     serves a 43-byte GIF placeholder for unknown keys).
   2. iTunes lookup by ISBN - exact-edition match against Apple Books.
   3. iTunes search by title+author - fuzzy match. Only run when the
      record has no ISBN, or as a secondary signal that's gated to within
@@ -66,7 +67,7 @@ _AMAZON_CDN_ENABLED = os.environ.get("CWA_COVER_BOOST_AMAZON_CDN", "1").lower() 
 
 # Patterns that indicate the cover URL is already high-res - skip work.
 _HIGHRES_HINTS = (
-    "_SL1500_", "_SL2000_", "1500x1500bb", "2400x2400bb", "fife=w1600",
+    "_SL1500_", "_SL2000_", ".MAIN._SCRM_", "1500x1500bb", "2400x2400bb", "fife=w1600",
     "fife=w2000", "fife=w2400",
 )
 
@@ -75,7 +76,10 @@ _AMAZON_SIZE_TOKEN = re.compile(r"\._(?:S[XLY]|UL|UY|UX|CR|AC|FM)\d+(?:_,\d+,\d+
 
 # Amazon image CDN: public CloudFront-fronted host, CORS open, ASIN keyed
 # (an ISBN-10 is the ASIN of a print edition, so both go in the same slot).
-_AMAZON_CDN_URL = "https://m.media-amazon.com/images/P/{key}.01._SCRM_SL2000_.jpg"
+# MAIN is the source image used by the Kindle High-res Covers plugin. The
+# bounded SL2000 URL stays as a fallback for keys whose CDN record lacks MAIN.
+_AMAZON_CDN_URL = "https://m.media-amazon.com/images/P/{key}.01.MAIN._SCRM_.jpg"
+_AMAZON_CDN_FALLBACK_URL = "https://m.media-amazon.com/images/P/{key}.01._SCRM_SL2000_.jpg"
 # For unknown keys Amazon serves a 43-byte image/gif placeholder; real covers
 # are JPEGs measured in tens-to-hundreds of kilobytes. Anything below this
 # threshold is almost certainly the placeholder, not a cover.
@@ -325,33 +329,36 @@ def _year_from(published_date: object) -> Optional[int]:
 
 def _amazon_cdn_cover_for_key(key: str) -> Optional[str]:
     """HEAD-probe Amazon's image CDN for ``key`` (an ISBN-10 or an ASIN).
-    Returns the URL when Amazon serves a real cover (image/jpeg above the
-    placeholder threshold); None for the 43-byte image/gif Amazon serves for
-    unknown keys.
+    Prefer its uncapped MAIN artwork, which matches the Kindle High-res Covers
+    plugin's same-host URL. Keep the existing bounded SL2000 URL as a fallback
+    for records without a usable MAIN image. Returns None for the tiny GIF
+    placeholder Amazon serves for unknown keys.
     """
-    url = _AMAZON_CDN_URL.format(key=key)
-    try:
-        resp = requests.head(
-            url,
-            headers={"User-Agent": getattr(constants, "USER_AGENT", "Calibre-Web")},
-            timeout=_DEFAULT_TIMEOUT,
-            allow_redirects=True,
-        )
-    except requests.RequestException as exc:
-        log.debug("amazon CDN HEAD %s failed: %s", url, exc)
-        return None
-    if resp.status_code != 200:
-        return None
-    ctype = (resp.headers.get("content-type") or "").lower()
-    if not ctype.startswith("image/jpeg"):
-        return None
-    try:
-        clen = int(resp.headers.get("content-length") or 0)
-    except (TypeError, ValueError):
-        clen = 0
-    if clen and clen < _AMAZON_CDN_MIN_BYTES:
-        return None
-    return url
+    for template in (_AMAZON_CDN_URL, _AMAZON_CDN_FALLBACK_URL):
+        url = template.format(key=key)
+        try:
+            resp = requests.head(
+                url,
+                headers={"User-Agent": getattr(constants, "USER_AGENT", "Calibre-Web")},
+                timeout=_DEFAULT_TIMEOUT,
+                allow_redirects=True,
+            )
+        except requests.RequestException as exc:
+            log.debug("amazon CDN HEAD %s failed: %s", url, exc)
+            continue
+        if resp.status_code != 200:
+            continue
+        ctype = (resp.headers.get("content-type") or "").lower()
+        if not ctype.startswith("image/jpeg"):
+            continue
+        try:
+            clen = int(resp.headers.get("content-length") or 0)
+        except (TypeError, ValueError):
+            clen = 0
+        if clen and clen < _AMAZON_CDN_MIN_BYTES:
+            continue
+        return url
+    return None
 
 
 def _itunes_lookup_isbn(isbn: str) -> Optional[Dict]:

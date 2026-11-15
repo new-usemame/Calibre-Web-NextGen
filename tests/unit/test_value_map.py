@@ -126,3 +126,13 @@ def test_allow_list_rejects_unmatched_values_but_not_drops(monkeypatch):
 def test_without_an_allow_list_nothing_is_rejected(monkeypatch):
     monkeypatch.setattr(vm, "load_map", lambda session, field: vm.ValueMap())
     assert vm.apply_value_map("tags", ["Anything"], app_session=object()) == (["Anything"], [])
+
+
+@pytest.mark.parametrize("raw", [
+    {"A": ["Thriller"], "B": ["thriller"]},
+    {"A": [" "]},
+])
+def test_rules_reject_ambiguous_spelling_and_accidental_blank_drops(raw):
+    """Imports must neither disagree on canonical spelling nor turn blanks into drops."""
+    _, errors = vm.clean_rules("tags", raw)
+    assert errors

@@ -112,7 +112,7 @@ def test_excluded_and_stale_books_are_skipped(library, app_db):
 
 
 def test_a_failing_book_is_reported_and_the_rest_apply(library, app_db):
-    change_set = _propose(library, app_db, "tags", {"Fiction / Thrillers": ["Thriller"], "General": []})
+    change_set = _propose(library, app_db, "tags", {"Fiction / Thrillers": ["Suspense"], "General": [], "thriller": ["Mystery"]})
 
     result = cs.apply(app_db, library, change_set.id, **Hooks(fail_on=1).kw())
 
@@ -146,3 +146,56 @@ def test_only_a_proposed_set_applies(library, app_db):
     cs.apply(app_db, library, change_set.id, **Hooks().kw())
     with pytest.raises(ValueError):
         cs.apply(app_db, library, change_set.id, **Hooks().kw())
+
+
+def test_excluded_shared_tag_owner_is_never_recased(library, app_db):
+    """A target's spelling is global; leaving its owner out must leave it intact."""
+    change_set = _propose(library, app_db, "tags", {"Fiction / Thrillers": ["Thriller"]})
+    hooks = Hooks()
+    cs.apply(app_db, library, change_set.id, exclude=[2], **hooks.kw())
+    assert _tags(library)[2] == ["thriller"]
+    assert _tags(library)[1] == ["Fiction / Thrillers", "General"]
+    assert hooks.marked == [] and hooks.queued == []
+
+
+def test_shared_case_change_rolls_back_all_owners_on_failure(library, app_db):
+    """All owners of a shared spelling must succeed together, with no silent writes."""
+    library.get(db.Books, 3).tags = [library.get(db.Tags, 2)]
+    library.commit()
+    change_set = _propose(library, app_db, "tags", {"thriller": ["Thriller"]})
+    hooks = Hooks(fail_on=3)
+    result = cs.apply(app_db, library, change_set.id, **hooks.kw())
+    assert _tags(library)[2] == ["thriller"]
+    assert _tags(library)[3] == ["thriller"]
+    assert result["written"] == 0 and hooks.queued == []
+    assert _statuses(app_db, change_set) == {2: "failed", 3: "failed"}
+
+
+def test_accent_only_edit_since_preview_is_not_overwritten(library, app_db):
+    """Matching rules fold accents; concurrency checks must preserve exact edits."""
+    change_set = _propose(library, app_db, "tags", {"Dragons": ["Fantasy"]})
+    library.get(db.Tags, 4).name = "Drágons"
+    library.commit()
+    cs.apply(app_db, library, change_set.id, **Hooks().kw())
+    assert _tags(library)[3] == ["Drágons"]
+    assert _statuses(app_db, change_set) == {3: "skipped"}
+
+
+def test_undo_ignores_tag_relationship_order(library, app_db):
+    """Tags are a set; reloading by row id must not make undo appear stale."""
+    change_set = _propose(library, app_db, "tags", {"Fiction / Thrillers": ["Zebra", "Alpha"]})
+    cs.apply(app_db, library, change_set.id, **Hooks().kw())
+    library.expire_all()
+    cs.undo(app_db, library, change_set.id, **Hooks().kw())
+    assert sorted(_tags(library)[1]) == ["Fiction / Thrillers", "General"]
+    assert _statuses(app_db, change_set) == {1: "undone"}
+
+
+def test_apply_reuses_an_existing_non_ascii_target(library, app_db):
+    """SQLite lower() is ASCII-only; exact accented targets still reuse their row."""
+    library.get(db.Tags, 4).name = "Épopée"
+    library.commit()
+    change_set = _propose(library, app_db, "tags", {"General": ["Épopée"]})
+    cs.apply(app_db, library, change_set.id, **Hooks().kw())
+    assert sorted(_tags(library)[1]) == ["Fiction / Thrillers", "Épopée"]
+    assert _statuses(app_db, change_set) == {1: "applied"}

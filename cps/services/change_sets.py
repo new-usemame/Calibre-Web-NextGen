@@ -14,11 +14,8 @@ testable against a plain SQLite session.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import func
-
 from .. import db, ub
 from .fields import FIELD_SPECS
-from .value_map import fold
 
 
 def current_values(book, field):
@@ -29,7 +26,7 @@ def _row_for(calibre_session, field, name):
     """The row for ``name``. calibre's names are unique case-insensitively
     (NOCASE), so an existing row that differs only in case is renamed."""
     spec = FIELD_SPECS[field]
-    row = calibre_session.query(spec.model).filter(func.lower(spec.model.name) == name.lower()).first()
+    row = calibre_session.query(spec.model).filter(spec.model.name == name).first()
     if row is None:
         row = spec.new_row(name)
         calibre_session.add(row)
@@ -65,45 +62,80 @@ def rows(app_session, set_id):
 
 def _walk(app_session, calibre_session, set_id, *, eligible, expect, target, done_status,
           exclude, mark_modified, queue_embed):
-    """Shared walk for apply and undo: one calibre commit per book."""
+    """Commit independent books separately, shared spelling changes atomically."""
     by_book = {}
     for row in rows(app_session, set_id):
         if row.status == eligible:
             by_book.setdefault(row.book_id, []).append(row)
-    written, touched = [], {}
+
+    # A case-only rename changes a shared calibre row. Its owners and any
+    # books acquiring that spelling must be reviewed and committed together.
+    # Ordinary independent changes retain one commit per book.
+    parents = {book_id: book_id for book_id in by_book}
+
+    def root(book_id):
+        while parents[book_id] != book_id:
+            book_id = parents[book_id]
+        return book_id
+
+    books, blocked = {}, {}
     for book_id, book_rows in by_book.items():
-        if book_id in exclude:
-            for row in book_rows:
-                row.status, row.error = "skipped", "left out at apply"
-            continue
         book = calibre_session.get(db.Books, book_id)
-        if book is None:
-            for row in book_rows:
-                row.status, row.error = "skipped", "book no longer in the library"
+        books[book_id] = book
+        if book_id in exclude:
+            blocked[book_id] = "left out at apply"
+        elif book is None:
+            blocked[book_id] = "book no longer in the library"
+        elif any(sorted(current_values(book, r.field)) != sorted(expect(r)) for r in book_rows):
+            blocked[book_id] = "changed since the preview"
+        if book_id in blocked:
             continue
-        # Compared folded: calibre treats names that differ only in case as one
-        # value, and an earlier book in this same set may have re-cased a row
-        # this book shares.
-        stale = [r for r in book_rows
-                 if [fold(v) for v in current_values(book, r.field)] != [fold(v) for v in expect(r)]]
-        if stale:
-            for row in book_rows:
-                row.status, row.error = "skipped", "changed since the preview"
+        for change in book_rows:
+            spec = FIELD_SPECS[change.field]
+            for name in target(change):
+                existing = (calibre_session.query(spec.model)
+                            .filter(spec.model.name == name).first())
+                if existing is None or existing.name == name:
+                    continue
+                for owner in existing.books:
+                    if owner.id not in by_book:
+                        blocked[book_id] = "shared tag spelling affects a book outside this run"
+                    else:
+                        parents[root(owner.id)] = root(book_id)
+
+    groups = {}
+    for book_id in by_book:
+        groups.setdefault(root(book_id), []).append(book_id)
+    written, touched = [], {}
+    for group in groups.values():
+        if any(book_id in blocked for book_id in group):
+            for book_id in group:
+                for row in by_book[book_id]:
+                    row.status = "skipped"
+                    row.error = blocked.get(book_id, "shared tag spelling depends on a skipped book")
+            app_session.commit()
             continue
         try:
+            for book_id in group:
+                book = books[book_id]
+                for row in by_book[book_id]:
+                    _write(calibre_session, book, row.field, target(row))
+                mark_modified(book)
+            calibre_session.commit()
+        except Exception as error:  # reported per book; independent groups continue
+            calibre_session.rollback()
+            for book_id in group:
+                for row in by_book[book_id]:
+                    row.status, row.error = "failed", str(error)
+            app_session.commit()
+            continue
+        for book_id in group:
+            book_rows = by_book[book_id]
             for row in book_rows:
                 touched.setdefault(row.field, set()).update(expect(row))
-                _write(calibre_session, book, row.field, target(row))
-            mark_modified(book)
-            calibre_session.commit()
-        except Exception as error:  # reported per book; the walk goes on
-            calibre_session.rollback()
-            for row in book_rows:
-                row.status, row.error = "failed", str(error)
-            continue
-        for row in book_rows:
-            row.status, row.error = done_status, None
-        written.append((book, {r.field: ", ".join(target(r)) for r in book_rows}))
+                row.status, row.error = done_status, None
+            written.append((books[book_id], {r.field: ", ".join(target(r)) for r in book_rows}))
+        app_session.commit()
 
     removed = []
     for field, names in touched.items():

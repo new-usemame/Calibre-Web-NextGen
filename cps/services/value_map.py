@@ -43,7 +43,7 @@ def clean_rules(field, raw):
         raw = [{"incoming": k, "targets": v} for k, v in raw.items()]
     if not isinstance(raw, list):
         return [], ["rules must be a list or an object"]
-    rules, errors, seen = [], [], {}
+    rules, errors, seen, canonical = [], [], {}, {}
     for index, item in enumerate(raw):
         incoming = item.get("incoming") if isinstance(item, dict) else None
         targets = item.get("targets") if isinstance(item, dict) else None
@@ -54,6 +54,9 @@ def clean_rules(field, raw):
             continue
         if not isinstance(targets, list) or not all(isinstance(t, str) for t in targets):
             errors.append(f"rule {index + 1}: targets must be a list of text values")
+            continue
+        if any(not t.strip() for t in targets):
+            errors.append(f"rule {index + 1}: use an empty target list to drop a value")
             continue
         incoming = " ".join(incoming.split())
         targets = [" ".join(t.split()) for t in targets if t.strip()]
@@ -73,6 +76,10 @@ def clean_rules(field, raw):
             errors.append(f"rule {index + 1}: a single-valued field maps to one value or none")
             del seen[key]
             continue
+        if any(fold(t) in canonical and canonical[fold(t)] != t for t in deduped):
+            errors.append(f"rule {index + 1}: targets must use the same canonical spelling")
+            continue
+        canonical.update({fold(t): t for t in deduped})
         rules.append({"incoming": incoming, "incoming_key": key, "targets": deduped})
     return rules, errors
 

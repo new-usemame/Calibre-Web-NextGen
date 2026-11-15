@@ -1,0 +1,4 @@
+### Fixed
+
+- **A KOReader setup restored onto a different kind of e-reader shows up as its own device.** Copying the `koreader` folder from a Kindle onto a Tolino (or another reader running KOReader's Android build) also copied the Kindle's sync ID, so the website listed both as one device and only one of them was updated. The CWNG Sync plugin now also recognises a settings file that arrives on a different model of e-reader and gives that reader its own ID, with a short message saying why. Two readers of the same Android model set up from one copy still share an ID; deleting the `["device_id"]` line in `settings.reader.lua` on one of them separates them. (#2952)
+- **The plugin saves its copy check straight away.** It used to be written only when KOReader exited, so a settings file copied while KOReader was running carried the sync ID without the check, and the second Kindle quietly kept the first one's ID. (#2351)

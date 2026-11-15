@@ -7,11 +7,12 @@ all missing the proxy prefix, so they 404'd.
 Server side (this file): the shell is now served through Flask, which rewrites
 the asset URLs to <prefix>/static/app/… and injects window.__CWNG_PREFIX__ from
 request.script_root (the same value url_for uses for the classic UI, set by
-ReverseProxied / ProxyFix upstream). Client side is source-pinned below.
+ReverseProxied / ProxyFix upstream). Client side:
+frontend/tests/unit/mountPrefix.test.ts drives api.ts under a /cwa prefix;
+the remaining source pins below say what would replace them.
 """
 import html
 import pathlib
-import re
 
 import flask
 import pytest
@@ -176,23 +177,13 @@ def test_safe_prefix_regex(value, ok):
 
 
 # ---- client-side source pins (guard the runtime prefix wiring) ---------------
+# The api.ts request and resourceUrl pins became behaviour in
+# frontend/tests/unit/mountPrefix.test.ts, and classicFallback.test.ts runs
+# through tests/unit/test_frontend_unit_suites_run.py. The router base, cover
+# consumption and vite runtime-base pins below still need a real prefixed page
+# (a Playwright run behind a /cwa mount) to replace them.
 
 _FE = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
-
-
-@pytest.mark.unit
-def test_api_ts_wraps_fetches_with_prefix():
-    """api.ts must derive BASE_PREFIX and prefix every fetch via apiUrl(), else
-    API calls 404 behind a subpath. resourceUrl() must exist for cover/download."""
-    src = (_FE / "lib" / "api.ts").read_text()
-    assert "__CWNG_PREFIX__" in src
-    assert "export const BASE_PREFIX" in src
-    assert "export function apiUrl" in src
-    assert "export function resourceUrl" in src
-    # Every fetch( in api.ts must go through apiUrl(...) — no bare fetch(path.
-    for m in re.finditer(r"fetch\(([^)]*)", src):
-        arg = m.group(1)
-        assert "apiUrl(" in arg, f"un-prefixed fetch in api.ts: fetch({arg}"
 
 
 @pytest.mark.unit
@@ -200,28 +191,6 @@ def test_app_router_base_uses_prefix():
     src = (_FE / "App.tsx").read_text()
     assert "BASE_PREFIX + '/app'" in src
     assert 'base="/app"' not in src  # the old hardcoded base must be gone
-
-
-@pytest.mark.unit
-def test_resource_url_is_idempotent():
-    """resourceUrl must not double-prefix a value that already carries the mount
-    prefix (e.g. a Flask url_for path from an apply endpoint) → /cwa/cwa/…."""
-    src = (_FE / "lib" / "api.ts").read_text()
-    assert "u.startsWith(BASE_PREFIX + '/')" in src, "resourceUrl missing double-prefix guard"
-
-
-@pytest.mark.unit
-def test_notfound_prefix_matched_literally():
-    """The NotFound legacy-link must strip the <prefix>/app base with a literal
-    string compare, not an unescaped RegExp (a dotted prefix like /app.v2 would
-    otherwise match loosely)."""
-    import subprocess
-    result = subprocess.run(
-        ["node", "--experimental-strip-types", "--test", str(_FE.parent / "unit" / "classicFallback.test.ts")],
-        capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "pass 2" in result.stdout
-
 
 
 @pytest.mark.unit

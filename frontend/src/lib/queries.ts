@@ -17,7 +17,8 @@ import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { beginImportWatch } from './uploadImportStore';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
-import { createEntityListQueryOptions } from './entityListQueryOptions';
+import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
+import type { EntityListPage } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
@@ -588,6 +589,17 @@ export function useEntityList(plural: string) {
   return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
 }
 
+/** Authors, series and publishers browse in pages; other useEntityList callers stay full-list. */
+export function usePagedEntityList(plural: string, q: string, minimum: number | null, enabled: boolean) {
+  const me = useMe().data;
+  return useInfiniteQuery({
+    ...createPagedEntityListQueryOptions(plural, q, minimum, me?.id,
+      (url, signal) => apiGet<EntityListPage>(url, { signal }), enabled),
+    // Keep the filter controls mounted while a new filter's first page loads.
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** The tag a rename collided with, carried on the 409 so the caller can offer
  *  to merge into it rather than showing a dead end (#973). */
 export interface TagConflict { id: number; name: string; count: number }
@@ -687,7 +699,21 @@ export function useStopReading(id: string | number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
     onSuccess: () => {
-      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
+/** Clear this user's saved reading position for a book on the web reader, Kobo
+ *  and KOReader together (#2831). The read status is left as it is. */
+export function useClearReadingPosition(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; cleared: number }>(`/api/v1/books/${id}/clear-position`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
       }
     },
@@ -702,7 +728,7 @@ export function useRecordReaderOpen(id: string | number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean }>(`/api/v1/books/${id}/reader-open`),
     onSuccess: () => {
-      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
       }
     },
@@ -803,18 +829,28 @@ export function useShelves(options?: { enabled?: boolean }) {
 
 // A new revision starts a fresh result set after bulk changes. Do not reuse
 // pre-mutation pages in the local accumulator; pages already skip placeholders.
-export function useShelf(id: string | number | undefined, page = 1, sort = 'stored', revision = 0) {
+export function useShelf(
+  id: string | number | undefined,
+  page = 1,
+  sort = 'stored',
+  revision = 0,
+  perPage = 24,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<ShelfDetail>({
-    queryKey: ['shelf', String(id), sort, page, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 2, and the
+    // invalidations elsewhere match on the ['shelf', id] prefix.
+    queryKey: ['shelf', String(id), sort, page, revision, perPage],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
-        per_page: '24',
+        per_page: String(perPage),
         sort,
       });
       return apiGet<ShelfDetail>(`/api/v1/shelves/${id}?${params.toString()}`);
     },
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== '' && ready,
     // Keep the previous page's rows only while paging within the SAME shelf and
     // sort. Never carry rows across either identity change (#612/#2059).
     placeholderData: (prev, prevQuery) =>
@@ -2012,17 +2048,29 @@ export interface MagicShelfSortOption {
   label: string;
 }
 
-export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new', revision = 0) {
+export function useMagicShelfBooks(
+  id: string | number,
+  page = 1,
+  sort = 'new',
+  revision = 0,
+  /** Books per request; leave out to use the server's configured page size. */
+  perPage?: number,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<MagicShelfItem & BooksPage & {
     sort: string;
     sort_persistable?: boolean;
     custom_sort_options?: MagicShelfSortOption[];
   }>({
-    queryKey: ['magicshelf', String(id), page, sort, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 3, and the
+    // invalidations elsewhere match on the ['magicshelf', id] prefix.
+    queryKey: ['magicshelf', String(id), page, sort, revision, perPage],
     queryFn: () => apiGet(
-      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`,
+      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`
+        + (perPage ? `&per_page=${perPage}` : ''),
     ),
-    enabled: String(id).length > 0,
+    enabled: String(id).length > 0 && ready,
     // Same-shelf, same-order paging only — see useShelf (#612).
     placeholderData: (prev, prevQuery) =>
       prevQuery

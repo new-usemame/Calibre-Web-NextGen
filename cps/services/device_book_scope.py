@@ -100,6 +100,7 @@ def resolve(user, device, *, session=None):
 
 
 def choices(user, session):
+    from .. import config
     from . import ereader_scope
     return {
         "shelves": [{"id": row.id, "name": row.name} for row in session.query(ub.Shelf)
@@ -108,6 +109,7 @@ def choices(user, session):
                           .filter(ub.MagicShelf.user_id == user.id)
                           .order_by(ub.MagicShelf.name, ub.MagicShelf.id)],
         "my_library": ereader_scope.personal_library(user),
+        "magic_shelves_sync": bool(getattr(config, "config_kobo_sync_magic_shelves", False)),
     }
 
 

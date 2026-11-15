@@ -114,7 +114,9 @@ def _put_progress(protocol, document, *, device_id=..., device="PocketBook Era")
 
 
 def _expected_body(document):
-    return {"document": document, "timestamp": int(FROZEN_NOW.timestamp())}
+    # accepted/shared: the #2843 additive fields; a first push is kept and shared.
+    return {"document": document, "timestamp": int(FROZEN_NOW.timestamp()),
+            "accepted": True, "shared": True}
 
 
 def _utc(value):

@@ -463,7 +463,11 @@ function Home:onSwipe(arg, ges_ev)
         end
         return true
     end
-    return BookList.onSwipe(self, arg, ges_ev)
+    -- KOReader's Menu:onSwipe returns nothing. Report the swipe as handled, or a
+    -- plugin that wraps full-screen widgets (Simple UI) dispatches it a second
+    -- time and every swipe turns two pages (#2730).
+    BookList.onSwipe(self, arg, ges_ev)
+    return true
 end
 
 function Home:refresh()

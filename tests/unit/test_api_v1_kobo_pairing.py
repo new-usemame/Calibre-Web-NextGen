@@ -22,7 +22,7 @@ def _user(*, user_id=1, authenticated=True, anonymous=False, admin=False):
 
 
 def _ub(*, target_exists=True):
-    value = SimpleNamespace(id=1) if target_exists else None
+    value = SimpleNamespace(id=1, role_download=lambda: True) if target_exists else None
     session = MagicMock()
     session.query.return_value.filter.return_value.first.return_value = value
     return SimpleNamespace(
@@ -144,6 +144,7 @@ def test_get_views_existing_state_without_creating():
         response = inspect.unwrap(mod.get_kobo_sync_token)()
     assert _json(response) == {
         "configured": False,
+        "download_allowed": True,
         "is_localhost": False,
         "server_url": "https://books.example.test",
         "sync_url": None,

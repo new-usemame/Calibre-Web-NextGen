@@ -56,6 +56,32 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.70',
+    date: '2026-11-15',
+    items: [
+      {
+        title: 'KOReader Library mode saves only what changed',
+        body: 'CWNGSync used to rewrite the record of every book in your library each time it saved, which could freeze a large library for a moment on the device. It now keeps records in small files and writes only the ones that changed. Update the plugin from KOReader\'s Updates Manager to get it.',
+        category: 'Sync',
+      },
+      {
+        title: 'A Kobo no longer undoes a newer place from another reader',
+        body: 'A Kobo that had been sent your newer place from the web reader or KOReader could send an older report it had queued, and the server took that as a move back. A report the Kobo made before it received the newer place now keeps the newer one.',
+        category: 'Sync',
+      },
+      {
+        title: 'Uploads work again with NETWORK_SHARE_MODE on',
+        body: 'With NETWORK_SHARE_MODE on and no ingest folder mounted, uploads failed with "Ingest directory not writable" after an update. The container now fixes that folder\'s owner on start when it is local and the app cannot write it. Folders on a network share are still left alone.',
+        category: 'Library',
+      },
+      {
+        title: 'Clearer sync logs',
+        body: '"No book found for checksum" now says which of three reasons caused the miss, and the "Session protection triggered" debug line is written once instead of on every request.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.69',
     date: '2026-11-14',
     items: [

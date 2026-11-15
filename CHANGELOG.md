@@ -16,6 +16,22 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.70] - 2026-11-15
+
+### Changed
+
+- **"No book found for checksum" now says why it missed.** The same log line used to cover a checksum row whose book no longer exists (for example after a Calibre database rebuild), a library with no checksums registered at all, and a checksum the server never registered. The line now names which of the three it is. Each checksum gets that detail at most once every five minutes, and at most 256 checksums get it in that time, so a device that keeps retrying, or reports thousands of unmatched files at once, neither floods the log nor slows the sync. Sync behaviour is unchanged. (#1190)
+
+### Fixed
+
+- **KOReader Library mode no longer rewrites every book's record on each save.** CWNGSync kept one record per library book in `cwngsync_library.lua` and wrote the whole file, on KOReader's main thread, every 10 steps of a sync, at its end, and each time a book was opened or sent. For 2000 books that was about 800 KB per save, even when nothing had changed. The records now live in small files under `koreader/settings/cwngsync_library/`, and a save rewrites only the files holding a record that changed: about 20 KB when one book changes, nothing when none did. Records saved by an earlier version are kept and move on the first save. (#2329)
+
+- **A Kobo's queued report no longer undoes a newer place from the web reader or KOReader.** A Kobo that had been sent another reader's newer place could then send a report it had queued before that, repeating its old place, and the server took it as a deliberate move back. The Kobo then stayed behind, and the web reader reopened at the Kobo's old place. A report the Kobo clocked before it was sent the newer place now keeps that place; going back to an old place after receiving the new one still counts as a move. (#2783)
+
+- **The "Session protection triggered" debug line is logged once instead of on every request.** After a browser update changed the User-Agent, a "Remember me" session kept its old identifier, so each request logged the same mismatch and one page load could print dozens of lines. Each distinct mismatch is now reported once; sign-in and session-protection behaviour are unchanged. (#2882)
+
+- **Uploads no longer fail with "Ingest directory not writable" after an update when `NETWORK_SHARE_MODE` is on and the ingest folder is not mounted.** That switch skipped every ownership fix on `/cwa-book-ingest`, even when the folder was the image's own local volume, which is created owned by uid 911 and comes back that way on each update. With `PUID` set, the app user could not write it until someone ran `chown` by hand. On start, the container now sets that folder's owner to `PUID`/`PGID` when it is on a local filesystem and the app user cannot write it. A folder on a network share is still left alone. (#2936)
+
 ## [v4.1.69] - 2026-11-14
 
 ### Added

@@ -131,6 +131,24 @@ def calibre_library_dir():
     )
 
 
+def detected_calibre_library_dir(_isfile=os.path.isfile):
+    """The configured library dir when it already holds ``metadata.db``.
+
+    This is the auto-detect fallback for an install whose Calibre database
+    location is not set yet. An unsafe configured value is logged and treated
+    as nothing detected, so a bad override cannot stop startup or the admin
+    database page; the user can still type a path there.
+    """
+    try:
+        library_dir = calibre_library_dir()
+    except RuntimePathError as exc:
+        _dirs_logger.warning("Not auto-detecting the Calibre library: %s", exc)
+        return None
+    if _isfile(posixpath.join(library_dir, 'metadata.db')):
+        return library_dir
+    return None
+
+
 AUTO_LIBRARY_UNIT_DIR = '/etc/s6-overlay/s6-rc.d/cwa-auto-library'
 
 

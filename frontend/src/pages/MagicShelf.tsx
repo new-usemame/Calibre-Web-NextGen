@@ -3,13 +3,14 @@ import { useLocation } from 'wouter';
 import { Wand2, Plus, Trash2 } from 'lucide-react';
 import {
   useMagicShelfPreview, useCreateMagicShelf, useEditMagicShelf,
-  useMagicShelfBooks, useMagicShelfRuleSchema,
+  useMagicShelfBooks, useMagicShelfRuleSchema, useMe,
 } from '../lib/queries';
 import type { MagicRule, MagicRuleField, MagicRuleOperator } from '../lib/queries';
 import {
-  groupFromStored, groupToStored, leafCount, removeNode, someLeaf, updateNode,
+  groupFromStored, groupToStored, leafCount, removeNode, ruleValueText, someLeaf, updateNode,
 } from '../lib/magicRuleTree';
 import type { RuleGroup, RuleLeaf } from '../lib/magicRuleTree';
+import { ShelfOptions } from '../components/ShelfOptions';
 import { Button } from '../components/Button';
 import { useT } from '../lib/i18n';
 import { ApiError } from '../lib/api';
@@ -21,7 +22,7 @@ const newRule = (): RuleLeaf => ({ kind: 'rule', key: nextKey(), id: 'title', op
 const newGroup = (): RuleGroup => ({ kind: 'group', key: nextKey(), condition: 'AND', rules: [newRule()] });
 
 const hasRuleValue = (value: MagicRule['value']) =>
-  Array.isArray(value) ? value.some((item) => item.trim()) : value.trim().length > 0;
+  Array.isArray(value) ? value.some((item) => ruleValueText(item ?? '').trim()) : ruleValueText(value ?? '').trim().length > 0;
 
 const blankValueFor = (operator?: MagicRuleOperator): MagicRule['value'] =>
   operator?.nb_inputs === 2 ? ['', ''] : '';
@@ -32,6 +33,7 @@ const blankValueFor = (operator?: MagicRuleOperator): MagicRule['value'] =>
  *  stays server-side). */
 export function MagicShelf({ editId }: { editId?: string }) {
   const t = useT();
+  const me = useMe().data;
   const [, navigate] = useLocation();
   const preview = useMagicShelfPreview();
   const create = useCreateMagicShelf();
@@ -43,15 +45,21 @@ export function MagicShelf({ editId }: { editId?: string }) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('🪄');
   const [isSystem, setIsSystem] = useState(false);
+  const [isPublic, setPublic] = useState(false);
+  const [koboSync, setKobo] = useState(false);
+  const [opdsExpose, setOpds] = useState(false);
   const [tree, setTree] = useState<RuleGroup>(() => ({ kind: 'group', key: nextKey(), condition: 'AND', rules: [newRule()] }));
   const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
     if (!editId || seeded || !existing.data) return;
-    const d = existing.data as unknown as { name: string; icon: string; is_system?: boolean; rules?: Parameters<typeof groupFromStored>[0] };
+    const d = existing.data;
     setName(d.name || '');
     setIcon(d.icon || '🪄');
     setIsSystem(Boolean(d.is_system));
+    setPublic(d.is_public);
+    setKobo(!!d.kobo_sync);
+    setOpds(!!d.opds_expose);
     const loaded = groupFromStored(d.rules, nextKey);
     setTree(loaded.rules.length ? loaded : { ...loaded, rules: [newRule()] });
     setSeeded(true);
@@ -95,12 +103,27 @@ export function MagicShelf({ editId }: { editId?: string }) {
   const appendTo = (k: number, node: RuleLeaf | RuleGroup) =>
     setTree((current) => updateNode(current, k, (group) => ({ ...group, rules: [...(group as RuleGroup).rules, node] }) as RuleGroup));
   const totalRules = leafCount(tree);
+  const rootAddRule = useRef<HTMLButtonElement>(null);
+  const focusAfterRemoval = useRef(false);
+  useEffect(() => {
+    if (!focusAfterRemoval.current) return;
+    focusAfterRemoval.current = false;
+    rootAddRule.current?.focus();
+  }, [tree]);
+
+  const removeUnsupportedRule = (key: number) => {
+    focusAfterRemoval.current = true;
+    setTree((current) => {
+      const next = removeNode(current, key);
+      return leafCount(next) ? next : { ...next, rules: [newRule()] };
+    });
+  };
 
   const renderRuleValue = (rule: RuleLeaf, field: MagicRuleField, operator: MagicRuleOperator) => {
     if (operator.nb_inputs === 0) return <span className={styles.noValue} aria-hidden="true" />;
     if (field.input === 'select' || field.input === 'radio') {
       return (
-        <select aria-label={`${t(field.label)} ${t('value')}`} value={String(rule.value ?? '')}
+        <select aria-label={`${t(field.label)} ${t('value')}`} value={ruleValueText(rule.value ?? '')}
           onChange={(event) => setRule(rule.key, { value: event.target.value })}>
           {Object.entries(field.values ?? {}).map(([value, label]) => (
             <option key={value} value={value}>{t(String(label))}</option>
@@ -113,7 +136,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
       return (
         <span className={styles.rangeInputs} role="group" aria-label={`${t(field.label)} ${t(operator.label)}`}>
           {[0, 1].map((index) => (
-            <input key={index} value={values[index] ?? ''}
+            <input key={index} value={ruleValueText(values[index] ?? '')}
               aria-label={`${t(field.label)} ${index + 1}`}
               onChange={(event) => {
                 const next = [...values];
@@ -126,7 +149,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
       );
     }
     return (
-      <input value={String(rule.value ?? '')}
+      <input value={ruleValueText(rule.value ?? '')}
         onChange={(event) => setRule(rule.key, { value: event.target.value })}
         aria-label={`${t(field.label)} ${t('value')}`} placeholder={t('value')}
         type={inputType(field, operator)}
@@ -137,8 +160,25 @@ export function MagicShelf({ editId }: { editId?: string }) {
   const renderRule = (r: RuleLeaf) => {
     const ops = operatorsFor(r.id);
     const field = fieldFor(r.id);
-    const operator = operatorMap.get(r.operator) ?? ops[0];
-    if (!field || !operator) return null;
+    const operator = ops.find((candidate) => candidate.type === r.operator);
+    if (!field || !operator) {
+      return (
+        <div key={r.key} className={styles.unsupportedRule} role="group" aria-label={t('Unsupported rule')}>
+          <div className={styles.unsupportedDetails}>
+            <strong>{field ? t(field.label) : r.id}</strong>
+            <p>{t('This rule cannot be edited here. It will be kept unless you remove it.')}</p>
+            <dl>
+              <dt>{t('Rule field')}</dt><dd>{r.id}</dd>
+              <dt>{t('Rule operator')}</dt><dd>{r.operator}</dd>
+              <dt>{t('value')}</dt><dd>{ruleValueText(r.value)}</dd>
+            </dl>
+          </div>
+          <button className={styles.removeRule} onClick={() => removeUnsupportedRule(r.key)} aria-label={t('Remove rule')}>
+            <Trash2 size={15} aria-hidden="true" focusable={false} />
+          </button>
+        </div>
+      );
+    }
     return (
       <div key={r.key} className={styles.ruleRow}>
         <select aria-label={t('Rule field')} value={r.id} onChange={(e) => {
@@ -185,7 +225,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
       )}
       {group.rules.map((node) => (node.kind === 'group' ? renderGroup(node, true) : renderRule(node)))}
       <div className={styles.addRow}>
-        <button className={styles.addRule} onClick={() => appendTo(group.key, newRule())}>
+        <button ref={nested ? undefined : rootAddRule} className={styles.addRule} onClick={() => appendTo(group.key, newRule())}>
           <Plus size={15} aria-hidden="true" focusable={false} /> {t('Add rule')}
         </button>
         <button className={styles.addRule} onClick={() => appendTo(group.key, newGroup())}>
@@ -199,13 +239,15 @@ export function MagicShelf({ editId }: { editId?: string }) {
     // Discard edits and go back where the user came from; fall back to the shelf
     // view (editing) or the shelves list (creating) on a direct/bookmarked load.
     if (window.history.length > 1) window.history.back();
-    else navigate(editId ? `/magic/${editId}` : '/shelves');
+    else navigate(editId ? `/magic/${editId}` : '/magic');
   };
 
   const onSave = () => {
     setErr(null);
     if (!name.trim()) { setErr(t('Give your smart shelf a name.')); return; }
-    const payload = { name: name.trim(), icon: icon || '🪄', rules: ruleSet() };
+    const owner = !editId || existing.data?.is_owner;
+    const payload = { name: name.trim(), icon: icon || '🪄', rules: ruleSet(), is_public: isPublic,
+      ...(owner ? { kobo_sync: koboSync } : {}), opds_expose: opdsExpose };
     if (editId) {
       edit.mutate(payload, {
         onSuccess: (d) => d.success ? navigate(`/magic/${editId}`) : setErr(d.message || t('Could not save the shelf.')),
@@ -220,7 +262,10 @@ export function MagicShelf({ editId }: { editId?: string }) {
   };
   const saving = create.isPending || edit.isPending;
 
-  if (schemaQuery.isLoading) {
+  if (editId && !existing.isLoading && (existing.error || !existing.data?.can_edit)) {
+    return <div className={styles.container}><p role="alert">{t('You are not allowed to edit this shelf')}</p></div>;
+  }
+  if (schemaQuery.isLoading || (editId && !seeded)) {
     return <div className={styles.container}><h1 className={styles.title}>{t('Loading…')}</h1></div>;
   }
   if (schemaQuery.isError || fields.length === 0) {
@@ -246,6 +291,11 @@ export function MagicShelf({ editId }: { editId?: string }) {
             aria-describedby={err ? 'magic-shelf-error' : undefined} />
         </label>
       </div>
+
+      <ShelfOptions me={me} smart showSharing={!isSystem} owner={!editId || !!existing.data?.is_owner}
+        canShare={!editId || existing.data?.is_owner ? !!me?.role.share_shelfs : !!me?.role.edit_shelfs}
+        isPublic={isPublic} koboSync={koboSync} opdsExpose={opdsExpose}
+        onPublic={setPublic} onKobo={setKobo} onOpds={setOpds} />
 
       <div className={styles.matchRow}>
         {t('Match')}

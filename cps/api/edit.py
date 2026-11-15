@@ -25,6 +25,7 @@ from ..editbooks import edit_book_param, delete_book_from_table, modify_identifi
 from ..helper import (convert_book_format, save_cover, save_cover_from_url, tags_filters,
                      get_convert_options, mark_book_modified, log_metadata_change,
                      replace_cover_thumbnail_cache, book_cover_is_locked)
+from ..services import isbn_extract
 
 # Fields the SPA edit form can change, applied in this order. Title/authors come
 # first because they may restructure the book's directory; the rest follow.
@@ -578,6 +579,40 @@ def update_metadata(book_id):
     return jsonify(body)
 
 
+@api_v1.route("/books/<int:book_id>/isbn-candidates", methods=["POST"])
+@login_required_if_no_ano
+def extract_isbn_candidates(book_id):
+    """Offer valid ISBN-13s found in this book's stored text formats.
+
+    This action is deliberately read-only. The editor may copy one suggestion
+    into its unsaved identifier draft; only the existing metadata-save route
+    persists that explicit choice.
+    """
+    guard = _require_edit()
+    if guard:
+        return guard
+    book = _editable_book(book_id)
+    if not book:
+        return _err("not_found", "Book not found", 404)
+    try:
+        return jsonify(isbn_extract.extract_candidates(book))
+    except isbn_extract.ISBNExtractionError as exc:
+        messages = {
+            "unsupported_storage": ("ISBN extraction is unavailable for Google Drive books", 409),
+            "unsupported_platform": ("ISBN extraction is unavailable on this platform", 409),
+            "sandbox_unavailable": ("ISBN extraction isolation is unavailable", 503),
+            "unsafe_book_path": ("The stored book file is unavailable", 404),
+            "file_unavailable": ("The stored book file is unavailable", 404),
+            "scan_timeout": ("The file could not be scanned within the time limit", 422),
+            "scan_failed": ("The file could not be scanned", 422),
+            "scan_unavailable": ("ISBN extraction is temporarily unavailable", 503),
+        }
+        message, status = messages.get(
+            exc.code, ("ISBN extraction is temporarily unavailable", 503)
+        )
+        return _err(exc.code, message, status)
+
+
 @api_v1.route("/books/<int:book_id>/delete", methods=["POST"])
 @login_required_if_no_ano
 def delete_book(book_id):
@@ -634,9 +669,15 @@ def convert_format(book_id):
         return _err("invalid_request", "Source format is not valid for conversion", 400)
     if dst not in allowed_targets:
         return _err("invalid_request", "Target format is not valid for conversion", 400)
-    rtn = convert_book_format(book_id, config.get_book_path(), src, dst, current_user.name)
+    queued = []
+    rtn = convert_book_format(book_id, config.get_book_path(), src, dst, current_user.name,
+                              queued_tasks=queued)
     if rtn is None:
-        return jsonify({"ok": True, "message": "Queued for conversion to %s" % dst})
+        # task_id matches /api/v1/tasks rows, so the book page can tell the
+        # reader when the new format is ready or why it failed (#1110).
+        task_id = str(queued[0].id) if queued else None
+        return jsonify({"ok": True, "message": "Queued for conversion to %s" % dst,
+                        "task_id": task_id})
     return _err("convert_failed", "There was an error converting this book: %s" % rtn, 400)
 
 

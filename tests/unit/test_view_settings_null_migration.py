@@ -24,7 +24,7 @@ Effectively a per-user lockout from the web UI.
 
 PR #281 proposed `vs = self.view_settings or {}` guards inside
 get_view_property / set_view_property. That was closed because no
-production user (teenyverse) currently has NULL view_settings — the
+production user (the household host) currently has NULL view_settings — the
 fix looked speculative. During fork #276 work I reproduced the exact
 crash by manually setting `view_settings=NULL` on a test user.
 

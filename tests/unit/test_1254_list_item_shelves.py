@@ -50,7 +50,7 @@ def env(monkeypatch):
 
     monkeypatch.setattr(ub, "session", session)
     monkeypatch.setattr(mod, "config", SimpleNamespace(config_read_column=0))
-    monkeypatch.setattr(mod, "book_in_progress_ids", lambda *a, **k: set())
+    monkeypatch.setattr(mod, "read_statuses_for_books", lambda *a, **k: {})
     monkeypatch.setattr(mod.user_cover, "overrides_for_user", lambda *a, **k: {})
 
     def as_viewer(user_id):
@@ -97,4 +97,7 @@ def test_unreadable_app_db_costs_the_tags_not_the_page(env, monkeypatch):
     monkeypatch.setattr(ub, "session", broken)
     shelves = env(READER)
     assert shelves == {10: [], 11: [], 12: []}
-    broken.rollback.assert_called_once_with()
+    # Shelf and supplemental-rating queries each recover their failed read.
+    assert broken.rollback.call_count == 2
+    assert all(call.args == () and call.kwargs == {}
+               for call in broken.rollback.call_args_list)

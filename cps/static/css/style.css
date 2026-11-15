@@ -861,3 +861,13 @@ select.cwa-settings-select {
 .hierarchy-sublist li a {
   display: inline-block;
 }
+
+/* Keep OPDS field errors readable on both Classic theme backgrounds. */
+.settings-container .opds-filename-error {
+  color: #8c2020;
+  background-color: #fce8e8;
+  border: 1px solid #b14040;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}

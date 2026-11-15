@@ -146,6 +146,7 @@ def test_serialize_user_roles_from_bitmask():
     assert out["roles"]["upload"] is True
     assert out["roles"]["edit"] is False
     assert out["roles"]["delete_books"] is False
+    assert out["roles"]["share_shelfs"] is True
 
 
 # ── role update + lockout guard ──────────────────────────────────────────────
@@ -180,6 +181,22 @@ def test_update_user_toggles_roles():
     assert resp.status_code == 200
     assert target.role & constants.ROLE_UPLOAD
     assert not (target.role & constants.ROLE_DOWNLOAD)
+
+
+@pytest.mark.unit
+def test_update_user_can_disable_own_shelf_sharing_without_changing_role_bits():
+    from cps.api import admin as mod
+    target = _user(uid=2, name="alice", role=constants.ROLE_DOWNLOAD)
+    target.share_shelfs = True
+    mock_ub = MagicMock()
+    mock_ub.session.query.return_value.filter.return_value.first.return_value = target
+    with _ctx("/api/v1/admin/users/2", body={"roles": {"share_shelfs": False}}):
+        with patch.object(mod, "current_user", _admin()), \
+             patch.object(mod, "ub", mock_ub):
+            response = inspect.unwrap(mod.admin_update_user)(2)
+    assert response.status_code == 200
+    assert target.share_shelfs is False
+    assert target.role == constants.ROLE_DOWNLOAD
 
 
 @pytest.mark.unit
@@ -400,6 +417,7 @@ def _ui_config():
         config_books_per_page=20, config_random_books=4, config_authors_max=0,
         config_calibre_web_title="t", config_default_language="all",
         config_default_locale="en", config_server_announcement="",
+        config_default_ui_font_body="", config_default_ui_font_display="",
         save=lambda: None,
     )
 

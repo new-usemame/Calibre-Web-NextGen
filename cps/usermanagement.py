@@ -18,6 +18,7 @@ from werkzeug.security import check_password_hash
 from . import lm, ub, config, logger, limiter, constants, services, rate_limits
 from .services import app_passwords
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 
 
 log = logger.create()
@@ -143,9 +144,10 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         # This used to hardcode dark, from when light was deprecated; #845
         # brought six themes back, so honour whatever the admin configured.
         user.theme = config_theme_code(getattr(config, 'config_theme', None))
+        seed_new_user_ui_font_defaults(user, config)
             
-        # Kobo sync setting defaults to 0 (disabled) for new users
-        user.kobo_only_shelves_sync = 0
+        # Match every other new account: send only selected shelves.
+        user.kobo_only_shelves_sync = 1
         user.opds_only_shelves_sync = 0
         
         ub.session.add(user)
@@ -270,6 +272,12 @@ def verify_password(username, password):
     return None
 
 
+def _names_an_account(authorisation):
+    """True when Basic credentials name an account other than Guest."""
+    username = ((authorisation or {}).get("username") or "").strip()
+    return bool(username) and username.lower() != "guest"
+
+
 def requires_basic_auth_if_no_ano(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -290,11 +298,15 @@ def requires_basic_auth_if_no_ano(f):
                 b"Basic", {'username': "Guest", 'password': ""})
         if not user:
             user = auth.authenticate(authorisation, "")
-        # Issue #121 part 2: graceful fallback to Guest when auth was
-        # attempted but failed and anonymous browsing is on. Without this
-        # the OPDS client never sees the anon catalog whenever it has a
-        # bad/empty credential cached.
-        if user in (False, None) and config.config_anonbrowse == 1:
+        # Issue #121 part 2: with anonymous browsing on, a request that named
+        # no account (an empty-username probe such as Readest's) still gets
+        # the Guest catalog. #2844: credentials that name an account and are
+        # wrong get 401 instead, as KOSync answers and as the web sign-in
+        # form does, so a client learns its password is wrong rather than
+        # silently browsing as the guest. Unknown and known names get the
+        # same 401, so the status reveals nothing about which accounts exist.
+        if (user in (False, None) and config.config_anonbrowse == 1
+                and not _names_an_account(authorisation)):
             guest_auth = Authorization(
                 b"Basic", {'username': "Guest", 'password': ""})
             user = auth.authenticate(guest_auth, "")
@@ -314,6 +326,11 @@ def requires_basic_auth_if_no_ano(f):
 def login_required_if_no_ano(func):
     @wraps(func)
     def decorated_view(*args, **kwargs):
+        # An /api/v1 write the API already authenticated by Basic (#2842) runs
+        # as that user. Explicit credentials win over a proxy header, as they
+        # do on OPDS (requires_basic_auth_if_no_ano).
+        if g.get("api_basic_auth_user") is not None:
+            return func(*args, **kwargs)
         if config.config_allow_reverse_proxy_header_login:
             user = load_user_from_reverse_proxy_header(request)
             if user:

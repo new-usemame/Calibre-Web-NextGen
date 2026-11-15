@@ -471,7 +471,7 @@ def _serialize_group_for_cache(group):
     }
 
 
-def _write_duplicate_cache_groups(cwa_db, duplicate_groups, max_book_id):
+def _write_duplicate_cache_groups(cwa_db, duplicate_groups, max_book_id, scan_pending=False):
     serialized_groups = [_serialize_group_for_cache(group) for group in duplicate_groups]
     cwa_db.cur.execute(
         """
@@ -479,16 +479,22 @@ def _write_duplicate_cache_groups(cwa_db, duplicate_groups, max_book_id):
         SET scan_timestamp = CURRENT_TIMESTAMP,
             duplicate_groups_json = ?,
             total_count = ?,
-            scan_pending = 0,
+            scan_pending = ?,
             last_scanned_book_id = ?
         WHERE id = 1
         """,
-        (json.dumps(serialized_groups), len(serialized_groups), max_book_id),
+        (json.dumps(serialized_groups), len(serialized_groups), 1 if scan_pending else 0, max_book_id),
     )
     cwa_db.con.commit()
 
 
-def merge_affected_groups_into_cache(candidate_book_ids, settings):
+def merge_affected_groups_into_cache(candidate_book_ids, settings, preserve_pending=False):
+    """Recompute only the cached duplicate groups the candidate books touch.
+
+    ``preserve_pending`` keeps an already pending cache pending: a delete
+    refreshes the groups it changed but does not stand in for the full scan a
+    criteria change asked for.
+    """
     candidate_book_ids = {int(book_id) for book_id in candidate_book_ids if book_id is not None}
     if len(candidate_book_ids) > MAX_INCREMENTAL_BOOK_IDS:
         mark_duplicate_index_pending("incremental candidate set too large")
@@ -510,11 +516,19 @@ def merge_affected_groups_into_cache(candidate_book_ids, settings):
     cwa_db = CWA_DB()
     cache_data = cwa_db.get_duplicate_cache() or {}
     cached_groups = cache_data.get("duplicate_groups", []) or []
+    # A cached group that names a candidate is dropped below, so look its other
+    # members up too: a candidate with no key row (index lag) would otherwise
+    # take surviving copies out of the cache until the next full scan.
+    for group in cached_groups:
+        group_ids = _cached_group_book_ids(group)
+        if group_ids & candidate_book_ids:
+            affected_ids.update(group_ids)
     retained_groups = [group for group in cached_groups if not (_cached_group_book_ids(group) & affected_ids)]
     fresh_groups = get_duplicate_groups_from_index(settings, include_dismissed=True, candidate_book_ids=affected_ids)
     merged_groups = retained_groups + fresh_groups
     merged_groups.sort(key=lambda group: (group["title"].lower(), group["author"].lower()))
-    _write_duplicate_cache_groups(cwa_db, merged_groups, _current_max_book_id())
+    keep_pending = bool(preserve_pending and cache_data.get("scan_pending"))
+    _write_duplicate_cache_groups(cwa_db, merged_groups, _current_max_book_id(), scan_pending=keep_pending)
     return {"updated": True, "pending": False, "merged_count": len(merged_groups)}
 
 

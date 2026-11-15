@@ -167,7 +167,7 @@ local function newHarness(options)
         return 1024 * 1024, 2 * 1024 * 1024
     end
     function self_stub:getDeliveryReceipt() return nil end
-    function self_stub:getDocumentDigest() return "checksum" end
+    function self_stub:getDocumentContentDigest() return "checksum" end
     function self_stub:persistDeliveryReceipt() return true end
     function self_stub:clearDeliveryReceipt() end
     function self_stub:refreshLibraryViews() end

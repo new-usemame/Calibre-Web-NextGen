@@ -588,3 +588,36 @@ def test_new_client_admin_setup_encrypts_credentials_and_fences_edits(api,adapte
     assert client.patch(endpoint,json={'config':{'category':'ebooks'},'expected_revision':1}).status_code==200
     assert repo.connection_config(row['id'],include_disabled=True).config['secret']=='CLIENT_PASSWORD'
     assert client.patch(endpoint,json={'config':{'endpoint':'https://other.example/'},'expected_revision':2}).get_json()['error']['code']=='credential_required_for_new_origin'
+
+
+def test_account_locale_is_captured_for_localized_catalog_before_private_io(api, monkeypatch):
+    """The account's saved locale must survive the request-to-worker seam."""
+    import json
+    from concurrent.futures import ThreadPoolExecutor
+    from flask import has_request_context
+    from werkzeug.local import LocalProxy
+    from cps.services.acquisition.catalog import CatalogService
+    from cps.services.acquisition.http import FetchedDocument
+    client, repo, actor, module, connection, offer, database = api
+    actor.locale = 'fr_CA'
+    def request_actor():
+        if not has_request_context(): raise RuntimeError('account read outside request')
+        return actor
+    monkeypatch.setattr(module, 'current_user', LocalProxy(request_actor))
+    feed = {'metadata': {'title': {'fr': 'Livres', 'en': 'Books'}}, 'publications': [
+        {'metadata': {'title': {'fr': 'Édition originale', 'en': 'Original edition'},
+                      'author': {'name': {'fr': 'Une autrice', 'en': 'A Writer'}}},
+         'links': [{'rel': 'download', 'href': '/original.epub?token=PRIVATE', 'type': 'application/epub+zip'}]}]}
+    def transfer(url, policy, **kwargs):
+        assert not has_request_context()
+        return FetchedDocument(json.dumps(feed).encode(), url, 'application/opds+json')
+    monkeypatch.setattr(module, 'CatalogService', lambda repo, **kw: CatalogService(repo, transfer=transfer, **kw))
+    def blocking(fn):
+        with ThreadPoolExecutor(max_workers=1) as executor: return executor.submit(fn).result(timeout=10)
+    monkeypatch.setattr(module, '_run_private_blocking', blocking)
+    response = client.get('/api/v1/acquisition/catalog', query_string={'connection': connection.id})
+    assert response.status_code == 200, response.get_data(as_text=True)
+    page = response.get_json(); book, = page['publications']
+    assert (page['title'], book['title'], book['authors']) == ('Livres', 'Édition originale', ['Une autrice'])
+    assert 'PRIVATE' not in response.get_data(as_text=True) and 'https://' not in response.get_data(as_text=True)
+    assert not repo.list_jobs(actor.id)

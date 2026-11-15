@@ -17,7 +17,8 @@ in the EPUB and in the normalized, split KEPUB.
 
 A span therefore crosses to the EPUB as its offset in that concatenation, and
 back the same way -- only when the two concatenations are identical, the
-proof that each offset names the same character on both sides. Anything else
+proof that each offset names the same character on both sides (kepubify's
+blank title page, which only the KEPUB has, is left out). Anything else
 (a changed or re-edited book, a spine document that cannot be read, a span
 the KEPUB does not hold, a position outside every span) gives ``None``.
 
@@ -45,6 +46,11 @@ log = logger.create()
 
 _SPAN_ID = re.compile(r"kobo\.[0-9]{1,9}\.[0-9]{1,9}")
 _BODY = f"{{{kx._XHTML_NS}}}body"
+# kepubify adds this blank page (text: "Page intentionally left blank by
+# kepubify.") to the spine of a KEPUB whose first page is not a bare title
+# page. It has no counterpart in the EPUB, so its text is left out of both
+# sides' concatenations; it holds no place a reader could be at (#2804).
+_KEPUBIFY_DUMMY = "kepubify-titlepage-dummy.xhtml"
 
 
 @dataclass(frozen=True)
@@ -89,6 +95,27 @@ def span_to_xpointer(epub_path, kepub_path, source: str, span_id: str) -> Option
     return kx.xpointer_at_solid_index(epub_path, members[k], index - offsets[k], texts[k])
 
 
+def span_text_range(epub_path, kepub_path, source: str, span_id: str) -> Optional[tuple[int, int]]:
+    """``(start, end)``: where a Kobo span's text lies in the library EPUB.
+
+    Indexes count non-whitespace characters across the EPUB's spine laid end
+    to end (``spine_solid_texts``), the coordinates both books share; None
+    unless the EPUB holds exactly the KEPUB's text and the span holds some.
+    """
+    if not isinstance(span_id, str) or not _SPAN_ID.fullmatch(span_id):
+        return None
+    kepub = _kepub(kepub_path)
+    if kepub is None:
+        return None
+    document = _document(kepub, source)
+    if document is None or span_id not in document.spans:
+        return None
+    start, end = document.spans[span_id]
+    if start == end or _aligned_epub(epub_path, kepub) is None:
+        return None
+    return document.offset + start, document.offset + end
+
+
 def xpointer_to_span(epub_path, kepub_path, xpointer: str) -> Optional[tuple[str, str]]:
     """``(document, span id)``: the Kobo span of ``kepub_path`` holding an XPointer.
 
@@ -128,6 +155,7 @@ def _aligned_epub(epub_path, kepub: _Kepub):
     spine = kx.spine_solid_texts(epub_path)
     if spine is None:
         return None
+    spine = [(m, t) for m, t in spine if posixpath.basename(m) != _KEPUBIFY_DUMMY]
     members = [m for m, _t in spine]
     texts = [t for _m, t in spine]
     if "".join(texts) != kepub.text:
@@ -159,14 +187,16 @@ def _kepub(kepub_path) -> Optional[_Kepub]:
     if stat.st_size > kx.MAX_ARCHIVE_BYTES:
         return None
     try:
-        return _load_kepub(path, stat.st_mtime_ns, stat.st_size)
+        return _load_kepub(path, stat.st_mtime_ns, stat.st_size,
+                           (stat.st_dev, stat.st_ino, stat.st_ctime_ns))
     except Exception:
         log.debug("kepub_alignment: cannot read %s", path, exc_info=True)
         return None
 
 
 @lru_cache(maxsize=8)
-def _load_kepub(path: str, _mtime_ns: int, _size: int) -> Optional[_Kepub]:
+def _load_kepub(path: str, _mtime_ns: int, _size: int,
+                 _identity=None) -> Optional[_Kepub]:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         container = kx._xml(archive.read("META-INF/container.xml"))
@@ -189,6 +219,8 @@ def _load_kepub(path: str, _mtime_ns: int, _size: int) -> Optional[_Kepub]:
             member = manifest.get(ref.get("idref"))
             if member not in names or archive.getinfo(member).file_size > kx.MAX_CHAPTER_BYTES:
                 return None
+            if posixpath.basename(member) == _KEPUBIFY_DUMMY:
+                continue
             text, spans = _read_document(archive.read(member))
             ordered = sorted((s, i) for i, (s, e) in spans.items() if e > s)
             documents.append(_Document(member, offset, spans,

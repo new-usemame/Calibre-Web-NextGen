@@ -1,71 +1,31 @@
 import { test, expect } from '@playwright/test';
 
-const isTouchProject = () => test.info().project.use.hasTouch === true;
+test('a Discover rail action opens outside the horizontally clipped rail', async ({ page }) => {
+  test.skip(test.info().project.use.hasTouch === true, 'desktop keyboard/focus interaction');
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/app/');
 
-/*
- * #1112 — the Edit pencil overlapped the "Read now" label on a book card.
- *
- * Reported by @Andrew-H2O after the vertical-alignment fix on #863, with a
- * 335px-wide screenshot: the label read "Read no…" because the pencil sat on
- * top of its tail. At the time this shipped, the coarse-pointer block made both
- * controls permanently visible. The operator reversed that ruling on
- * 2026-08-29; coarse pointers no longer have this side-by-side row, while
- * fine pointers retain it. This probe therefore runs only where the overlap
- * contract exists and still focuses each pencil before measuring.
- *
- * Measured on a real library before the fix: 52px of the label ran under the
- * button at 360px and at 768px. After: 0px.
- *
- * Geometry rather than a screenshot, because the failure is positional and a
- * pixel diff would also fire on every unrelated restyle.
- */
+  const discover = page.getByTestId('discover-section');
+  await expect(discover).toBeVisible();
+  const trigger = discover.getByRole('button', { name: /^Actions for / }).first();
+  await expect(trigger).toBeVisible();
+  await trigger.focus();
+  await trigger.press('Enter');
 
-// IIFE, not a bare arrow function. page.evaluate() given a STRING evaluates it
-// as an expression, so `() => {...}` returns the function itself — which is not
-// serializable, so it arrives as undefined and every assertion dies on
-// "Cannot read properties of undefined". Shipped that way in #1112 and caught
-// by the e2e gate the first time it ran (#953), which is the gate earning its
-// keep on its first outing.
-const OVERLAP = `(() => {
-  const labels = [...document.querySelectorAll('*')].filter(
-    (e) => typeof e.className === 'string' && /readNow/.test(e.className));
-  let checked = 0, worst = 0, unrevealed = 0;
-  for (const label of labels) {
-    const card = label.closest('[class*="wrap"]');
-    if (!card) continue;
-    const pencil = card.querySelector('[class*="quickEditBtn"]');
-    if (!pencil) continue;
-    pencil.style.transition = 'none';
-    label.style.transition = 'none';
-    pencil.focus();
-    checked++;
-    if (getComputedStyle(pencil).opacity === '0' || getComputedStyle(label).opacity === '0') {
-      unrevealed++;
-      continue;
-    }
-    const lb = label.getBoundingClientRect();
-    const pb = pencil.getBoundingClientRect();
-    // Content box: padding is the reserved corner, so exclude it.
-    const contentRight = lb.right - parseFloat(getComputedStyle(label).paddingRight);
-    worst = Math.max(worst, Math.round(contentRight - pb.left));
-  }
-  return { checked, worst, unrevealed };
-})()`;
-
-for (const [name, width, height] of [['phone', 360, 760], ['tablet', 768, 1024]] as const) {
-  test(`the Edit control never covers the "Read now" label (${name}, #1112)`, async ({ page }) => {
-    test.skip(isTouchProject(), 'fine-pointer action-row geometry');
-    await page.setViewportSize({ width, height });
-    await page.goto('/app/');
-    await page.waitForLoadState('networkidle');
-
-    const result = await page.evaluate(OVERLAP) as { checked: number; worst: number; unrevealed: number };
-    test.skip(result.checked === 0, 'no card in this seed shows both a read link and an edit control');
-
-    expect(result.unrevealed, 'keyboard focus must reveal both card actions before geometry is measured').toBe(0);
-
-    expect(result.worst,
-      `the "Read now" label runs ${result.worst}px under the Edit control, clipping its tail (#1112)`
-    ).toBeLessThanOrEqual(0);
+  const dialog = page.getByRole('dialog', { name: /^Actions for / });
+  await expect(dialog).toBeVisible();
+  const isPortaledOutsideRail = await dialog.evaluate((node) => {
+    const rail = document.querySelector('[data-testid="discover-section"]');
+    return document.body.contains(node) && !rail?.contains(node);
   });
-}
+  expect(isPortaledOutsideRail, 'the action panel must escape the rail clipping container').toBe(true);
+
+  const panel = await dialog.boundingBox();
+  expect(panel).not.toBeNull();
+  const viewport = page.viewportSize()!;
+  expect(panel!.x).toBeGreaterThanOrEqual(0);
+  expect(panel!.y).toBeGreaterThanOrEqual(0);
+  expect(panel!.x + panel!.width).toBeLessThanOrEqual(viewport.width);
+  expect(panel!.y + panel!.height).toBeLessThanOrEqual(viewport.height);
+  await expect(dialog.getByRole('link', { name: 'Read now', exact: true })).toBeVisible();
+});

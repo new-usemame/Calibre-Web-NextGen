@@ -188,7 +188,7 @@
 
           if (this.progressBuffer <= this.position) {
 
-            $.ajax(calibre.bookmarkUrl, {
+            if (!calibre.lookupMode) $.ajax(calibre.bookmarkUrl, {
               method: "post",
               data: {
                 csrf_token: csrf_token,
@@ -239,7 +239,7 @@
 
         onpause: function () {
 
-          $.ajax(calibre.bookmarkUrl, {
+          if (!calibre.lookupMode) $.ajax(calibre.bookmarkUrl, {
             method: "post",
             data: { bookmark: this.position }
           }).fail(function (xhr, status, error) {
@@ -320,7 +320,7 @@
 
         onstop: function () {
 
-          $.ajax(calibre.bookmarkUrl, {
+          if (!calibre.lookupMode) $.ajax(calibre.bookmarkUrl, {
             method: "post",
             data: { bookmark: this.position }
           }).fail(function (xhr, status, error) {
@@ -333,7 +333,7 @@
 
         onfinish: function () {
 
-          $.ajax(calibre.bookmarkUrl, {
+          if (!calibre.lookupMode) $.ajax(calibre.bookmarkUrl, {
             method: "post",
             data: { bookmark: this.position }
           }).fail(function (xhr, status, error) {

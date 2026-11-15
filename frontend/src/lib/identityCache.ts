@@ -2,6 +2,12 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import { clearCatalogCache } from './scrollCache.ts';
 
+const identityGenerations = new WeakMap<QueryClient, number>();
+
+export function cachedIdentityGeneration(client: QueryClient): number {
+  return identityGenerations.get(client) ?? 0;
+}
+
 /**
  * Replace the cached session identity without ever pairing the incoming user
  * with data fetched for the outgoing user.
@@ -17,6 +23,7 @@ export async function replaceCachedIdentity<T>(
   queryClient: QueryClient,
   nextIdentity: T,
 ): Promise<void> {
+  identityGenerations.set(queryClient, cachedIdentityGeneration(queryClient) + 1);
   queryClient.setQueryData(['me'], null);
 
   const isIdentityData = (query: { queryKey: readonly unknown[] }) =>

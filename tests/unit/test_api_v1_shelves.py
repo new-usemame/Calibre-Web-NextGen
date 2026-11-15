@@ -65,7 +65,8 @@ def test_create_public_without_role_403():
     from cps.api import shelves as mod
     with _ctx("/api/v1/shelves", body={"name": "Shared", "is_public": True}):
         with patch.object(mod, "current_user",
-                          SimpleNamespace(role_edit_shelfs=lambda: False, id=7)):
+                          SimpleNamespace(role_edit_shelfs=lambda: False,
+                                           role_share_shelfs=lambda: False, id=7)):
             resp = inspect.unwrap(mod.create_shelf_api)()
     assert resp[1] == 403
     assert json.loads(resp[0].get_data())["error"]["code"] == "forbidden"
@@ -227,6 +228,16 @@ def test_detail_sort_query_is_view_only_and_preserves_manual_order(real_shelf_so
         for row in env.session.query(env.ub.BookShelf).order_by(env.ub.BookShelf.order).all()
     ]
     assert stored_after == stored_before == [(2, 1), (1, 2), (3, 3)]
+
+
+@pytest.mark.unit
+def test_select_all_shelf_returns_ordered_ids_from_real_filtered_query(real_shelf_sort_env):
+    env = real_shelf_sort_env
+    with _ctx("/api/v1/shelves/1?select_all=1&sort=authaz", method="GET"):
+        response = inspect.unwrap(env.module.shelf_detail)(1)
+
+    payload = json.loads(response.get_data())
+    assert payload == {"ids": [3, 1, 2], "total": 3}
 
 
 # ── add book — status mapping ────────────────────────────────────────────────

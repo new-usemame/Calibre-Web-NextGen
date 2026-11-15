@@ -157,40 +157,36 @@ class TestSourcePins:
             ("scripts/convert_library.py", "_acquire_lock_or_exit"),
         ],
     )
-    def test_main_calls_lock_acquire_helper(self, filename, helper_name):
-        """If the lock-acquire helper exists at module level but main() never
-        calls it, the script silently loses its single-instance guard while
-        all the import-side-effect tests still pass. This pins the wire-up.
+    def test_main_calls_lock_acquire_helper(self, filename, helper_name, monkeypatch, tmp_path):
+        """Starting a script must honor denial by its single-instance guard,
+        including when main delegates execution through a maintenance scope.
         """
-        import ast
+        import importlib
+        from contextlib import contextmanager
 
-        source = (REPO_ROOT / filename).read_text(encoding="utf-8")
-        tree = ast.parse(source)
+        monkeypatch.syspath_prepend(str(SCRIPTS_DIR))
+        module = importlib.import_module(Path(filename).stem)
 
-        helper_defined = any(
-            isinstance(n, ast.FunctionDef) and n.name == helper_name
-            for n in tree.body
-        )
-        assert helper_defined, f"{filename} is missing module-level def {helper_name}()"
+        class GuardDenied(Exception):
+            pass
 
-        main_func = next(
-            (n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main"),
-            None,
-        )
-        assert main_func is not None, f"{filename} has no module-level main() function"
+        def deny():
+            raise GuardDenied("another script owns the process lock")
 
-        calls_helper = any(
-            isinstance(sub, ast.Call)
-            and isinstance(sub.func, ast.Name)
-            and sub.func.id == helper_name
-            for sub in ast.walk(main_func)
-        )
-        assert calls_helper, (
-            f"{filename}::main() never calls {helper_name}(). The helper "
-            f"is defined but not wired up — running the script as __main__ "
-            f"would skip single-instance protection and let two concurrent "
-            f"invocations both proceed."
-        )
+        monkeypatch.setattr(module, helper_name, deny)
+        monkeypatch.setattr(sys, "argv", [filename])
+        if Path(filename).stem == "convert_library":
+            @contextmanager
+            def available(*_args, **_kwargs):
+                yield 17
+            monkeypatch.setattr(module.ownership, "maintenance", available)
+        with pytest.raises(GuardDenied, match="another script owns"):
+            if Path(filename).stem == "ingest_processor":
+                source = tmp_path / "guarded.epub"
+                source.write_bytes(b"guard fixture")
+                module.main(str(source))
+            else:
+                module.main()
 
     @pytest.mark.parametrize(
         "filename",

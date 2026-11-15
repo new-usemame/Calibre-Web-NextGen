@@ -67,6 +67,8 @@ class _Settings(_Base):
     # shipped default. Named with the mail_ prefix so it auto-migrates and
     # flows through get_mail_settings() into the settings page.
     mail_body_text = Column(String, default="")
+    # Empty keeps the stored Calibre basename for emailed book attachments.
+    mail_filename_template = Column(String(1024), default="")
 
     config_calibre_dir = Column(String)
     config_calibre_uuid = Column(String)
@@ -139,15 +141,27 @@ class _Settings(_Base):
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")
     config_default_locale = Column(String(2), default="en")
+    # Seed only newly created accounts; an account's own Account-page choice
+    # remains independent after creation.
+    config_default_ui_font_body = Column(String, default="")
+    config_default_ui_font_display = Column(String, default="")
     # Fork issue #160: locale fallback for anonymous OPDS clients (Readest,
     # KOReader, Aldiko) that don't send Accept-Language. Empty string keeps
     # the existing 'en' fallback; setting a value pins anon OPDS responses
     # to that locale unless the client overrides via ?lang= or Accept-Language.
     config_opds_default_locale = Column(String(8), default="")
+    # Empty preserves legacy title/first-author naming. Only OPDS uses this.
+    config_opds_filename_template = Column(String(1024), default="")
     config_columns_to_ignore = Column(String)
     # Comma-separated Calibre custom-column IDs selected by an administrator.
     # Request-time use is revalidated against the live Calibre schema.
     config_sortable_custom_columns = Column(String, default="")
+    # One-time compatibility upgrade preserves previously visible hierarchical
+    # custom columns without freezing hidden defaults for empty/flat columns.
+    config_cc_visibility_seeded = Column(Boolean, default=False)
+    # Freeze the pre-upgrade account boundary before the service can create
+    # users. A delayed library read must not stamp newly created profiles.
+    config_cc_visibility_legacy_user_id = Column(Integer, default=None)
 
     config_denied_tags = Column(String, default="")
     config_allowed_tags = Column(String, default="")
@@ -213,6 +227,15 @@ class _Settings(_Base):
     # neutralizing </style> breakout at render time (see render_template.py).
     config_custom_css = Column(String, default="")
 
+    # Issue #1402: let hosted instances hide project-specific support links and
+    # point readers to their own support destination. Defaults preserve today's
+    # links for every existing installation.
+    config_show_project_support = Column(
+        Boolean, nullable=False, default=True, server_default=text("1"),
+    )
+    config_support_url = Column(String, default="")
+    config_support_label = Column(String, default="")
+
     config_ldap_provider_url = Column(String, default='example.org')
     config_ldap_port = Column(SmallInteger, default=389)
     config_ldap_authentication = Column(SmallInteger, default=constants.LDAP_AUTH_SIMPLE)
@@ -240,6 +263,11 @@ class _Settings(_Base):
     # One-time append of the fork #1608 LCPL default to existing rows. A
     # dedicated marker preserves any later user removal of lcpl.
     config_upload_formats_lcpl_migrated = Column(Boolean, default=False)
+    # One-time append of FBZ to existing rows: FBZ is FB2 in a Zip container —
+    # the form Calibre itself writes on export ("Title.fb2.zip") — so an FB2
+    # entry demonstrates the administrator wants those books. A dedicated
+    # marker preserves any later user removal of fbz.
+    config_upload_formats_fbz_migrated = Column(Boolean, default=False)
     config_unicode_filename = Column(Boolean, default=False)
     config_embed_metadata = Column(Boolean, default=True)
 
@@ -274,6 +302,14 @@ class _Settings(_Base):
     config_limiter_uri = Column(String, default="")
     config_limiter_options = Column(String, default="")
     config_check_extensions = Column(Boolean, default=True)
+
+    config_calibre_server_enabled = Column(Boolean, default=False)
+    config_calibre_server_port = Column(Integer, default=8080)
+    config_calibre_server_listen = Column(String, default="127.0.0.1")
+    config_calibre_server_anonymous_writes = Column(Boolean, default=False)
+    config_calibre_server_trusted_ips = Column(String, default="")
+    config_calibre_server_username = Column(String, default="")
+    config_calibre_server_password_e = Column(String)
 
     def __repr__(self):
         return self.__class__.__name__
@@ -352,6 +388,7 @@ class ConfigSQL(object):
         self.cli = cli
         self.load()
         self.reconcile_lcpl_upload_format()
+        self.reconcile_fbz_upload_format()
 
         change = False
 
@@ -665,6 +702,31 @@ class ConfigSQL(object):
             self.save()
         return self.config_upload_formats
 
+    def reconcile_fbz_upload_format(self):
+        """Inherit FBZ once when an existing allowlist accepts FB2."""
+        if not bool(getattr(
+                self, "config_upload_formats_fbz_migrated", False)):
+            raw_formats = getattr(self, "config_upload_formats", "") or ""
+            normalized = []
+            for raw_format in str(raw_formats).split(','):
+                upload_format = raw_format.strip().lower()
+                if upload_format not in normalized:
+                    normalized.append(upload_format)
+
+            # FBZ is FB2 in a Zip container — the form Calibre itself writes
+            # on export ("Title.fb2.zip") — so an existing FB2 entry shows the
+            # administrator wants FB2 books. If FB2 was removed or never
+            # allowed, preserve the list byte-for-byte; FBZ can still be added
+            # in Basic Configuration. The empty allow-all sentinel also stays
+            # unchanged.
+            if "fb2" in normalized and "fbz" not in normalized:
+                normalized.append("fbz")
+                self.config_upload_formats = ','.join(normalized)
+
+            self.config_upload_formats_fbz_migrated = True
+            self.save()
+        return self.config_upload_formats
+
     def resolved_comicvine_api_key(self):
         """The install's OWN ComicVine API key, or "" when none is set.
 
@@ -746,6 +808,19 @@ class ConfigSQL(object):
                 else:
                     setattr(self, k, v)
 
+        env_port = os.environ.get("CALIBRE_SERVER_PORT")
+        env_username = os.environ.get("CALIBRE_SERVER_USERNAME")
+        env_password = os.environ.get("CALIBRE_SERVER_PASSWORD")
+        if env_port and env_port.isdigit() and 1 <= int(env_port) <= 65535:
+            self.config_calibre_server_port = int(env_port)
+        if env_username:
+            self.config_calibre_server_username = env_username
+        if env_password:
+            self.config_calibre_server_password_e = env_password
+        self.config_calibre_server_env = {"port": bool(env_port),
+                                          "username": bool(env_username),
+                                          "password": bool(env_password)}
+
         # Fork issue #312: the prior force-reset-to-/dev/stdout block
         # silently broke admin → View Logs for every install — the on-disk
         # file was never written. cps.logger.setup() now dual-writes to
@@ -788,6 +863,13 @@ class ConfigSQL(object):
             except OperationalError as e:
                 log.error('Database error: %s', e)
                 self._session.rollback()
+        runtime_login_type = self.__dict__.get("_runtime_login_type_override")
+        if runtime_login_type is not None:
+            # Environment-managed OIDC selects OAuth for this process without
+            # changing the stored login type. Preserve that startup decision
+            # across admin saves/reloads; the value is private runtime state,
+            # so bypass ConfigSQL.__setattr__ and never add it to app.db.
+            self.__dict__["config_login_type"] = runtime_login_type
         self.__dict__["dirty"] = list()
 
     def save(self):
@@ -1059,7 +1141,15 @@ def _migrate_database(session, secret_key):
 def load_configuration(session, secret_key):
     _migrate_database(session, secret_key)
     if not session.query(_Settings).count():
-        session.add(_Settings())
+        session.add(_Settings(config_cc_visibility_seeded=True, config_cc_visibility_legacy_user_id=0))
+        session.commit()
+    settings = session.query(_Settings).first()
+    if not settings.config_cc_visibility_seeded and settings.config_cc_visibility_legacy_user_id is None:
+        tables = sa_inspect(session.get_bind()).get_table_names()
+        settings.config_cc_visibility_legacy_user_id = (session.execute(text(
+            "SELECT coalesce(max(id), 0) FROM user")).scalar() if "user" in tables else 0)
+        # Raise on failure: startup must not serve account creation before the
+        # compatibility boundary is durably captured.
         session.commit()
 
 

@@ -25,6 +25,7 @@ local function stableId(annotation)
     -- A highlight this device received from the server keeps the server's id,
     -- so pushing it back updates that row rather than making a second one.
     if annotation.cwng_id then return annotation.cwng_id end
+    if annotation.cwng_native_id then return annotation.cwng_native_id end
     local identity = {
         Provider.document_digest or "",
         annotation.datetime or "",
@@ -33,6 +34,46 @@ local function stableId(annotation)
         annotation.pos1,
     }
     return "koreader-" .. md5(Json.encode(identity))
+end
+
+-- Ownership reconciliation is local cleanup, never a user deletion. Only a
+-- cwng_id proves that this item was imported; a coinciding native id is kept.
+-- Return the proven ids to forget from the deletion watermark even when the
+-- copy is already absent, so an interrupted earlier cleanup cannot reap it.
+function Provider.removeForeign(ids, device_id)
+    if not Provider.available() or type(ids) ~= "table" then return {} end
+    local foreign, count = {}, 0
+    for key, id in pairs(ids) do
+        if type(key) ~= "number" or key < 1 or key % 1 ~= 0
+                or type(id) ~= "string" or id == "" then return {} end
+        foreign[id] = true
+        count = count + 1
+    end
+    if count ~= #ids then return {} end
+    local ui, removed, renamed = Provider.ui, 0, false
+    local annotations = ui.annotation.annotations
+    for _, item in ipairs(annotations) do
+        if not item.cwng_id and foreign[stableId(item)] then
+            -- Two devices can create the same span in the same second. Keep
+            -- the native highlight under a persistent device-specific id;
+            -- its old id belongs to the foreign server row and cannot be used.
+            item.cwng_native_id = "koreader-" .. md5(stableId(item) .. ":" .. (device_id or "local"))
+            ui:handleEvent(require("ui/event"):new("AnnotationsModified", { item }))
+            renamed = true
+        end
+    end
+    for index = #annotations, 1, -1 do
+        local item = annotations[index]
+        if item.cwng_id and foreign[item.cwng_id] then
+            ui.bookmark:removeItemByIndex(index)
+            ui:handleEvent(require("ui/event"):new("AnnotationsModified", { item }))
+            removed = removed + 1
+        end
+    end
+    if removed > 0 or renamed then require("ui/uimanager"):setDirty(ui.dialog, "ui") end
+    local forgotten = {}
+    for id in pairs(foreign) do forgotten[#forgotten + 1] = id end
+    return forgotten, removed
 end
 
 -- Colours KOReader draws, keyed by the names the server speaks: Kobo's five,

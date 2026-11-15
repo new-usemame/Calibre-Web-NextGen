@@ -1,0 +1,14 @@
+{
+  "area": "ci",
+  "body": "Observed in the original automatic #2460 run: full current image build was skipped, while SPA/templates were overlaid onto an older digest-pinned image. Changed Classic caliBlur CSS and TinyMCE Silver JavaScript were not copied; six owning cases failed against the incomplete subject. Source review also found template deletions could leave stale files in the copy overlay. This is an artifact-routing gap, not proof that the current feature implementation fails.\n\nProposed #2461 routes every Classic template and non-SPA static change, including deletions, to frontend and full-stack build gates. Five routing and two deletion regressions were seen red; 99 adjacent checks and 18 real-diff checks pass after correction. Its current full CI passes; that branch is not merged at capture. Keep this finding open until the trusted-main policy is delivered and #2460 obtains fresh ordinary automatic current-head CI. Publisher policy and SPA-only overlays remain deliberate choices.",
+  "created": "2026-10-04",
+  "id": "F-1dbc31",
+  "refs": [
+    "#2460",
+    "#2461"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Classic static changes can run E2E against stale non-overlaid assets"
+}

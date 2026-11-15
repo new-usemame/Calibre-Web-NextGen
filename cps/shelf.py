@@ -10,8 +10,10 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, request, url_for, abort, jsonify
 from flask_babel import gettext as _
+from markupsafe import Markup
 from .cw_login import current_user
 from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func, true
 
 from . import calibre_db, config, constants, db, logger, ub, user_library
@@ -760,20 +762,25 @@ def order_shelf(shelf_id):
                 .join(ub.BookShelf, ub.BookShelf.book_id == db.Books.id, isouter=True) \
                 .filter(ub.BookShelf.shelf == shelf_id).order_by(ub.BookShelf.order.asc()).all()
         return render_title_template('shelf_order.html', entries=result,
-                                     title=_("Change order of Shelf: '%(name)s'", name=shelf.name),
+                                     title=Markup(_("Change order of Shelf: '%(name)s'")) % {"name": shelf.name},
                                      shelf=shelf, page="shelfreorder")
     else:
         abort(404)
 
 
 def check_shelf_edit_permissions(cur_shelf):
-    if not cur_shelf.is_public and not cur_shelf.user_id == int(current_user.id):
+    if getattr(current_user, "is_anonymous", False):
+        return False
+    if cur_shelf.user_id == int(current_user.id):
+        return True
+    if cur_shelf.is_public and current_user.role_edit_shelfs():
+        return True
+    if not cur_shelf.is_public:
         log.error("User {} not allowed to edit shelf: {}".format(current_user.id, cur_shelf.name))
         return False
-    if cur_shelf.is_public and not current_user.role_edit_shelfs():
+    if cur_shelf.is_public:
         log.info("User {} not allowed to edit public shelves".format(current_user.id))
-        return False
-    return True
+    return False
 
 
 def check_shelf_view_permissions(cur_shelf):
@@ -796,11 +803,24 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
     # calibre_db.session.query(ub.Shelf).filter(ub.Shelf.user_id == current_user.id).filter(ub.Shelf.kobo_sync).count()
     if request.method == "POST":
         to_save = request.form.to_dict()
-        if not current_user.role_edit_shelfs() and to_save.get("is_public") == "on":
+        can_share_own = current_user.role_share_shelfs()
+        can_edit_public = current_user.role_edit_shelfs()
+        requested_public = to_save.get("is_public") == "on"
+        if shelf_id and not can_share_own and shelf.user_id == int(current_user.id) and not to_save.get('_visibility_present'):
+            # A hidden checkbox must not turn an existing public shelf private
+            # during an unrelated edit. Keep its current state when sharing is
+            # disabled for this account.
+            is_public = bool(shelf.is_public)
+        else:
+            is_public = requested_public
+        if requested_public and not (can_share_own if not shelf_id or shelf.user_id == int(current_user.id) else can_edit_public) and not (shelf_id and shelf.is_public):
             flash(_("Sorry you are not allowed to create a public shelf"), category="error")
             return redirect(url_for('web.index'))
-        is_public = 1 if to_save.get("is_public") == "on" else 0
-        if ereader_scope.shelf_marks_enabled(config):
+        is_public = 1 if is_public else 0
+        is_owner = not shelf_id or shelf.user_id == int(current_user.id)
+        if not is_owner and 'kobo_sync' in to_save:
+            abort(403)
+        if is_owner and ereader_scope.shelf_marks_enabled(config):
             shelf.kobo_sync = True if to_save.get("kobo_sync") else False
             if shelf.kobo_sync:
                 ub.session.query(ub.ShelfArchive).filter(ub.ShelfArchive.user_id == current_user.id).filter(
@@ -838,6 +858,7 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
                 flash(_("There was an error"), category="error")
     return render_title_template('shelf_edit.html',
                                  shelf=shelf,
+                                 shelf_id=bool(shelf_id),
                                  title=page_title,
                                  page=page,
                                  kobo_sync_enabled=ereader_scope.shelf_marks_enabled(config),
@@ -965,7 +986,7 @@ def render_show_shelf(shelf_type, shelf_id, page_no, sort_param):
         return render_title_template(page,
                                      entries=result,
                                      pagination=pagination,
-                                     title=_("Shelf: '%(name)s'", name=shelf.name),
+                                     title=Markup(_("Shelf: '%(name)s'")) % {"name": shelf.name},
                                      shelf=shelf,
                                      page="shelf",
                                      status=status,
@@ -1065,6 +1086,38 @@ def add_selected_to_shelf():
         }), 200
 
 
+SHELF_PICKER_PAGE_SIZE = 30
+
+
+def shelf_picker_books(shelf_id, query, offset, limit):
+    """Books for a shelf's "Add books" picker, shared by the classic modal and
+    ``GET /api/v1/shelves/<id>/available-books``.
+
+    A non-empty ``query`` matches like the library search (sorted by title) and
+    an empty one lists the most recently added books; both orders end in the
+    book id so offset paging is stable. Both apply the plain
+    ``common_filters()``: unlike browsing search results, the picker leaves out
+    archived books, because the add path refuses them. Paging happens in SQL,
+    and the user's stored search results are left alone. Returns ``(books,
+    total, in_shelf_ids)`` where ``books`` are ``db.Books`` rows for this page.
+    """
+    if query:
+        base = (calibre_db.search_query(query, config, eager_data=False)
+                .filter(calibre_db.common_filters()))
+        order = [db.Books.sort, db.Books.id]
+    else:
+        base = calibre_db.session.query(db.Books).filter(calibre_db.common_filters())
+        order = BOOK_SORT_ORDERS["new"]
+    total = base.count()
+    # Search rows wrap the book in `.Books`; the plain query yields it directly.
+    page = (base.options(selectinload(db.Books.authors))
+            .order_by(*order).offset(offset).limit(limit).all())
+    books = [getattr(entry, 'Books', entry) for entry in page]
+    in_shelf = {row.book_id for row in
+                ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()}
+    return books, total, in_shelf
+
+
 @shelf.route("/shelf/<int:shelf_id>/available_books", methods=["GET"])
 @user_login_required
 def shelf_available_books(shelf_id):
@@ -1084,28 +1137,11 @@ def shelf_available_books(shelf_id):
         return jsonify({'status': 'error',
                         'message': 'You are not allowed to add books to this shelf'}), 403
 
-    query = (request.args.get('query') or '').strip()
-    limit = 30
-    in_shelf = {row.book_id for row in
-                ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()}
-
-    if query:
-        # get_search_results returns author-ordered rows that wrap the book in a
-        # `.Books` attribute (the shape the list/search templates consume).
-        entries, __, ___ = calibre_db.get_search_results(query, config, 0, None, limit)
-    else:
-        # A plain Books query returns Books instances directly (no `.Books`).
-        entries = (calibre_db.session.query(db.Books)
-                   .filter(calibre_db.common_filters())
-                   .order_by(*BOOK_SORT_ORDERS["new"])
-                   .limit(limit).all())
-
-    # Normalise the two shapes: search rows expose the book at `.Books`; the plain
-    # query yields the book itself.
-    books = []
-    for entry in entries:
-        book = getattr(entry, 'Books', entry)
-        books.append({
+    books, __, in_shelf = shelf_picker_books(
+        shelf_id, (request.args.get('query') or '').strip(), 0, SHELF_PICKER_PAGE_SIZE)
+    rows = []
+    for book in books:
+        rows.append({
             'id': book.id,
             'title': book.title,
             'authors': ' & '.join(author.name for author in book.authors) if book.authors else '',
@@ -1114,7 +1150,7 @@ def shelf_available_books(shelf_id):
         })
 
     return jsonify({'status': 'ok', 'shelf_id': shelf_id,
-                    'shelf_name': shelf.name, 'books': books})
+                    'shelf_name': shelf.name, 'books': rows})
 
 
 # ---------------------------------------------------------------------------

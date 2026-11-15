@@ -109,8 +109,15 @@ export interface Me {
    *  because the mark does nothing until it is on. Absent on older servers →
    *  stay quiet rather than warn wrongly. */
   kobo_only_shelves_sync?: boolean;
+  opds_only_shelves_sync?: boolean;
   features?: ServerFeatures;
   instance_name?: string;
+  /** Instance support links, resolved by the server for this account. */
+  support?: {
+    show_project_links: boolean;
+    url: string | null;
+    label: string | null;
+  };
   display?: {
     books_per_page: number;
     random_books: number;
@@ -118,6 +125,10 @@ export interface Me {
   /** Per-user catalog landing preferences (#498), persisted server-side. */
   catalog?: {
     default_filter: AdvancedSearchParams | null;
+    /** Selected administrator-enabled Calibre fields for card/table display. */
+    custom_field_ids?: number[] | null;
+    /** Per-user display-label overrides keyed by Calibre custom-column id. */
+    custom_field_labels?: Record<string, string> | null;
   };
   /** Named My Library mode. Older servers omit it and therefore behave as the
    * whole-library mode that predates per-user selections. */
@@ -133,11 +144,17 @@ export interface Me {
   acquisition_access?: boolean;
 }
 
+export type ReadingStatus = 'unread' | 'finished' | 'in_progress' | 'did_not_finish' | 'on_hold';
+
 export interface Book {
+  personal_rating?: number | null;
+  household_rating?: number | null;
   id: number;
   title: string;
   authors: string[];
   series: string | null;
+  /** First associated series ID, for direct navigation from book cards. */
+  series_id?: number | null;
   series_index: number | null;
   cover_url: string | null;
   formats: string[];
@@ -147,6 +164,9 @@ export interface Book {
   date_added?: string | null;
   last_modified?: string | null;
   read?: boolean;
+  /** Caller-owned favorite state, resolved in bulk for every list page. */
+  favorited?: boolean | null;
+  read_status?: ReadingStatus;
   /** Sync-driven tri-state marker for library cards; absent on older servers. */
   in_progress?: boolean;
   archived?: boolean;
@@ -158,6 +178,15 @@ export interface Book {
   /** Global-library lists only. Absent means the server predates My Library and
    * the book is treated as part of the whole library. */
   in_my_library?: boolean;
+  /** Compact list-field values keyed by Calibre custom-column id. Definitions
+   * arrive once on the surrounding page response. */
+  custom_columns?: Record<string, CustomColumnValue[]>;
+}
+
+export interface ListCustomColumnDefinition {
+  id: number;
+  name: string;
+  datatype: 'int' | 'float' | 'datetime' | string;
 }
 
 export interface UserNotice {
@@ -240,6 +269,8 @@ export interface BookDetail {
   /** Calibre rating on a 0–10 scale (half-star granularity: 9 → 4.5 stars),
    *  or null when the book is unrated. Divide by 2 for a 0–5 star display. */
   rating: number | null;
+  personal_rating?: number | null;
+  household_rating?: number | null;
   cover_url: string | null;
   /** Density candidates for the detail cover (`sm` 1x, `md` 2x). Absent on
    *  older servers — fall back to `cover_url` alone. */
@@ -262,6 +293,7 @@ export interface BookDetail {
   custom_columns?: CustomColumn[];
   formats: BookFormat[];
   read: boolean;
+  read_status?: ReadingStatus;
   archived: boolean;
   favorited: boolean;
   hidden: boolean;
@@ -299,6 +331,53 @@ export interface BooksPage {
   page: number;
   per_page: number;
   total: number;
+  /** Effective server-validated sort and enabled scalar custom-column choices. */
+  sort?: string;
+  sort_persistable?: boolean;
+  custom_sort_options?: { value: string; label: string }[];
+  custom_column_definitions?: ListCustomColumnDefinition[];
+}
+
+/** One browsable custom column (tag-like: text/enumeration datatype).
+ *  `hierarchical` marks columns whose stored values form a Calibre-style
+ *  dotted hierarchy (e.g. `Computers.DB.Oracle`) — those render as a tree.
+ *  When false the values are atomic strings (Dewey `778.3` is ONE
+ *  classification, not a `778` parent with a `3` child) and the tree
+ *  endpoint returns them as a one-level list of whole values. */
+export interface CcColumn {
+  id: number;
+  name: string;
+  datatype: string;
+  hierarchical: boolean;
+}
+
+export interface CcColumnsPage {
+  items: CcColumn[];
+}
+
+/** One node of a custom column's browse tree. `path` is the canonical dotted
+ *  path from the root (e.g. `Computers.DB`) for a hierarchical column, and the
+ *  whole stored value for a flat one. `count` is direct hits on the exact
+ *  value, `total_count` includes every descendant — always equal for a flat
+ *  node, which has none. */
+export interface CcNode {
+  name: string;
+  path: string;
+  count: number;
+  total_count: number;
+  children: CcNode[];
+}
+
+export interface CcTree {
+  column: CcColumn;
+  nodes: CcNode[];
+}
+
+/** Books under one node of a custom column (or all books carrying any value
+ *  in the column when no path was requested). */
+export interface CcBooksPage extends BooksPage {
+  path: string;
+  column: { id: number; name: string };
 }
 
 /** One row in an entity-browse list, with how many books reference it. */
@@ -317,6 +396,8 @@ export interface Shelf {
   is_owner: boolean;
   kobo_sync: boolean;
   count: number;
+  can_edit?: boolean;
+  opds_expose?: boolean;
 }
 
 export interface ShelfDetail extends Shelf {
@@ -325,6 +406,7 @@ export interface ShelfDetail extends Shelf {
   per_page: number;
   total: number;
   can_edit: boolean;
+  custom_column_definitions?: ListCustomColumnDefinition[];
 }
 
 /** A custom column the advanced search can filter on (#2365). */
@@ -348,7 +430,7 @@ export interface AdvancedSearchParams {
   authors?: string;
   publisher?: string;
   comments?: string;
-  read_status?: 'all' | 'read' | 'unread';
+  read_status?: 'all' | 'read' | 'unread' | 'in_progress' | 'did_not_finish' | 'on_hold';
   publishstart?: string;
   publishend?: string;
   rating_high?: string;
@@ -374,6 +456,10 @@ export interface AdvSearchResult {
   per_page: number;
   total: number;
   criteria: string;
+  sort?: string;
+  sort_persistable?: boolean;
+  custom_sort_options?: { value: string; label: string }[];
+  custom_column_definitions?: ListCustomColumnDefinition[];
 }
 
 export interface AppPassword {
@@ -415,6 +501,8 @@ export interface KoboSyncToken {
   sync_url: string | null;
   server_url: string;
   is_localhost: boolean;
+  /** False when the account lacks download permission: the Kobo's library sync is refused (#2807). */
+  download_allowed?: boolean;
 }
 
 /** A KOReader device waiting for its pairing code to be answered. The name is
@@ -611,7 +699,15 @@ export interface TaskItem {
   user: string;
   is_cancellable: boolean;
   stat: number;
+  /** Converter output for a failed task, HTML-escaped by the server. */
+  error?: string | null;
 }
+
+/** TaskItem.stat values (cps/services/worker.py STAT_*). */
+export const TASK_FAILED = 1;
+export const TASK_FINISHED = 3;
+export const TASK_ENDED = 4;
+export const TASK_CANCELLED = 5;
 
 export class ApiError extends Error {
   status: number;
@@ -664,6 +760,7 @@ export function navigateToLogout(): void {
 
 export interface ApiRequestOptions {
   auth?: 'protected' | 'public';
+  signal?: AbortSignal;
 }
 
 function isProtected(options?: ApiRequestOptions): boolean {
@@ -729,6 +826,19 @@ function sessionIsGone(): Promise<boolean> {
  * which is a worse version of the symptom being fixed. */
 const SESSION_PROBE_TIMEOUT_MS = 5000;
 
+/** #2844: marks a fetch as the new UI's own. Behind a reverse proxy with its own
+ * Basic login the browser replays the proxy's credentials on every request; the
+ * server reads /api/v1 as a native client's app password only when this header
+ * is absent, so the proxy's login never signs a visitor in, out, or into a 401.
+ * Mirrored by WEB_CLIENT_HEADER in cps/api/__init__.py. */
+export const WEB_CLIENT_HEADERS = { 'X-CWNG-Client': 'web' } as const;
+
+function asWebClient(init: RequestInit): RequestInit {
+  const headers = new Headers(init.headers);
+  for (const [name, value] of Object.entries(WEB_CLIENT_HEADERS)) headers.set(name, value);
+  return { ...init, headers };
+}
+
 async function probeSession(): Promise<boolean> {
   let probe: Response;
   // AbortController rather than AbortSignal.timeout(): this ships to whatever
@@ -736,11 +846,11 @@ async function probeSession(): Promise<boolean> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), SESSION_PROBE_TIMEOUT_MS);
   try {
-    probe = await fetch(apiUrl('/api/v1/auth/me'), {
+    probe = await fetch(apiUrl('/api/v1/auth/me'), asWebClient({
       credentials: 'include',
       redirect: 'manual',
       signal: abort.signal,
-    });
+    }));
   } catch {
     // The probe could not reach the server, or ran out of time. That is evidence
     // about the network, not about the session — fail safe and keep the session.
@@ -784,7 +894,7 @@ async function classifiedFetch(
 ): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), init);
+    response = await fetch(apiUrl(path), asWebClient(init));
   } catch (error) {
     // A rejected fetch is a TRANSPORT failure — connection reset, read timeout,
     // DNS, offline, or a CORS-blocked redirect. None of those are proof that the
@@ -832,7 +942,7 @@ function clearCsrf() {
 }
 
 export async function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
-  const res = await classifiedFetch(path, { credentials: 'include' }, options);
+  const res = await classifiedFetch(path, { credentials: 'include', signal: options?.signal }, options);
   if (!res.ok) {
     const parsed = await readApiError(res);
     throw new ApiError(res.status, parsed.message, parsed.detail);
@@ -1067,6 +1177,7 @@ export async function apiPostDownload(
     classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
+      signal: options?.signal,
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }, options);
@@ -1089,12 +1200,12 @@ export async function apiPostDownload(
   return { blob: await res.blob(), filename: named ? named[1] : null };
 }
 
-/** Multipart POST (file upload). Mirrors apiPost's CSRF handling, but lets the
+/** Multipart upload. Mirrors apiPost's CSRF handling, but lets the
  *  browser set the multipart Content-Type + boundary (so we must NOT set it). */
-export async function apiUpload<T>(path: string, formData: FormData, options?: ApiRequestOptions): Promise<T> {
+export async function apiUpload<T>(path: string, formData: FormData, options?: ApiRequestOptions, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> =>
     classifiedFetch(path, {
-      method: 'POST',
+      method,
       credentials: 'include',
       headers: { 'X-CSRFToken': csrf },
       body: formData,

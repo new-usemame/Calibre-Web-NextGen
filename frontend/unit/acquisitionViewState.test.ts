@@ -115,8 +115,8 @@ test('a requester is not called removed when the name directory failed', () => {
 
 test('a resolved directory names the requester', () => {
   assert.deepEqual(
-    acquisitionRequesterLabel({ ownerId: 7, names: new Map([[7, 'maggie']]), resolved: true }),
-    { kind: 'named', name: 'maggie' },
+    acquisitionRequesterLabel({ ownerId: 7, names: new Map([[7, 'user A']]), resolved: true }),
+    { kind: 'named', name: 'user A' },
   );
 });
 

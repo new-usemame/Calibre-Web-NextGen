@@ -1,0 +1,13 @@
+{
+  "area": "classic-ui",
+  "body": "Observed in two finite actual Chromium desktop app runs: restored original TinyMCE Silver renderer and proposed #2460 renderer both focus the paragraph breadcrumb with Alt+F11. Enter keydown selects P; Enter keyup returns selection.getNode() to STRONG while the path still displays P. The restored renderer differs only by the original 17-byte aria-level attribute, with all other tracked mode/blob identities preserved. This establishes inherited final-node behavior, not its range/key-up cause, formatting loss or a keyboard trap. Earlier BODY-focus loss has no established cause. Pointer paragraph selection and actual formatting/save/reload remain separate passing evidence.\n\nPreserve the widget and its selection/keying code while delivering label/date/ARIA repairs. Diagnose actual range and event order before changing the vendor keyboard lifecycle. Verify equivalent original/current selection and visible formatting, then save/reload; no blanket WCAG or keyboard-breadcrumb claim is supported. No private reporter content or new user promise is involved.",
+  "created": "2026-10-04",
+  "id": "F-cbb027",
+  "refs": [
+    "#2460"
+  ],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "Classic rich-text breadcrumb keyboard selection returns to the prior strong node after Enter keyup"
+}

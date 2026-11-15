@@ -86,6 +86,15 @@ def test_real_bootstrap(real_app):
     assert b"csrf_token" in response.data
 
 
+def test_dashboard_icon_is_served_without_signing_in(real_app):
+    # #2616: dashboards (Homepage, Heimdall) fetch this icon with no session,
+    # so the real app must hand it to an anonymous client as SVG.
+    response = real_app.test_client().get("/static/CalibreWebNextgen-square.svg")
+    assert response.status_code == 200
+    assert response.mimetype == "image/svg+xml"
+    assert b"<svg" in response.data
+
+
 def blueprint_probes(app):
     """Choose a real rule per blueprint; fail closed on unsupported converters."""
     from uuid import UUID

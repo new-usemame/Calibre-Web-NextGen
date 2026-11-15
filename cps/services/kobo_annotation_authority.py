@@ -293,6 +293,21 @@ def _simple_annotation_rows(user_id, book_id, page_limit):
     ]
 
 
+def _device_pull_rows(rows, device_id):
+    """Own-origin rows and legacy Kobo rows at the device render boundary.
+
+    The caller has already read/proved a complete set. Filter afterwards so
+    foreign rows cannot hide later own rows behind a SQL page limit, and seed
+    membership still proves the whole local store before the first serve.
+    An unresolved request retains the existing all-origin set.
+    """
+    if device_id is None:
+        return rows
+    return [(row, materialization) for row, materialization in rows
+            if row.origin_device_id == device_id
+            or (row.origin_device_id is None and row.source == "kobo")]
+
+
 def _normalized_entitlement_id(entitlement_id):
     """Mirror ``resolve_entitlement_ownership``'s safe lookup spelling."""
     if not isinstance(entitlement_id, str):
@@ -777,6 +792,44 @@ def local_get_is_eligible(*, settings, user, book_id, entitlement_id,
     return True
 
 
+def _unresolved_snapshot_membership_is_safe(*, state, user_id, book_id, visible_ids):
+    """Prove a union rebuild against the latest private snapshot's members.
+
+    A scoped cache cannot be replayed to an unresolved requester. Rebuilding
+    the union is safe only when its prior members remain live, or have newer
+    local deletion tombstones, and the accepted capture evidence still holds.
+    """
+    try:
+        body = gzip.decompress(_blob(state.last_served_body_gzip))
+        if hashlib.sha256(body).hexdigest() != state.last_served_body_sha256:
+            return False
+        payload = json.loads(body)
+        annotations = payload["annotations"]
+        if not isinstance(annotations, list):
+            return False
+        ids = {row["id"] for row in annotations}
+        if ((not annotations and not visible_ids) or len(ids) != len(annotations)
+                or len(annotations) != state.last_served_annotation_count
+                or payload.get("nextPageOffsetToken") is not None
+                or not all(isinstance(identity, str) and identity for identity in ids)):
+            return False
+        received_at = state.last_served_at
+        if received_at is None:
+            return False
+        if received_at.tzinfo is None:
+            received_at = received_at.replace(tzinfo=timezone.utc)
+        return _requirements_membership_is_safe(
+            requirements={identity: received_at for identity in ids},
+            user_id=user_id, book_id=book_id, visible_ids=visible_ids,
+        ) and _captured_membership_is_safe(
+            state=state, user_id=user_id, book_id=book_id,
+            device_id=None, visible_ids=visible_ids,
+        )
+    except Exception:
+        _safe_rollback()
+        return False
+
+
 def _render_count_is_safe(
     *, user_id, book_id, device_id, row_count, row_ids=None,
 ):
@@ -786,6 +839,12 @@ def _render_count_is_safe(
         state.authority_status != "authoritative"
         and not state.ever_authoritative
     ):
+        return False
+    if (device_id is None
+            and getattr(state, "last_served_device_id", None) is not None
+            and not _unresolved_snapshot_membership_is_safe(
+                state=state, user_id=user_id, book_id=book_id,
+                visible_ids=row_ids or set())):
         return False
     if state.ever_authoritative:
         # Historical capture bytes are no longer the live-set authority. The
@@ -967,12 +1026,19 @@ def _log_degraded(log, *, user_id, book_id, visible_count, reasons):
         pass
 
 
-def _snapshot_payload(state, *, log, user_id, book_id):
+def _snapshot_payload(state, *, log, user_id, book_id, device_id=None):
     """Return last exact bytes only when bound to the current authority set."""
     compressed = _blob(getattr(state, "last_served_body_gzip", None))
     expected_digest = getattr(state, "last_served_body_sha256", None)
     etag = getattr(state, "last_served_etag", None)
+    # NULL marks historical/unresolved account-wide snapshots. A scope is
+    # stored with the bytes; never infer ownership from wire annotation ids.
+    if getattr(state, "last_served_device_id", None) != device_id:
+        return None
     expected_count = getattr(state, "last_served_annotation_count", None)
+    if expected_count == 0:
+        # An error has not proved the device's current set is empty.
+        return None
     snapshot_revision = getattr(state, "last_served_authority_revision", None)
     snapshot_set_digest = getattr(state, "last_served_set_digest", None)
     current_revision = getattr(state, "authority_revision", None)
@@ -1020,14 +1086,19 @@ def _snapshot_payload(state, *, log, user_id, book_id):
     return body, etag
 
 
-def load_last_served_complete_set(*, user_id, book_id, log):
-    """Load CWNG's durable complete replacement set without inventing rows."""
+def load_last_served_complete_set(*, user_id, book_id, log, device_id=None):
+    """Replay only exact bytes recorded for this request's device scope.
+
+    Identified requests reject account-wide and other-device snapshots;
+    unresolved requests reject device-scoped snapshots. All retain the
+    existing revision/digest validity checks.
+    """
     try:
         state = _state_for_book(user_id, book_id)
         if state is None or not state.ever_authoritative:
             return None
         return _snapshot_payload(
-            state, log=log, user_id=user_id, book_id=book_id,
+            state, log=log, user_id=user_id, book_id=book_id, device_id=device_id,
         )
     except Exception:
         _safe_rollback()
@@ -1042,8 +1113,12 @@ def load_last_served_complete_set(*, user_id, book_id, log):
         return None
 
 
-def _commit_complete_render(*, state, body, digest, annotation_count):
-    """Advance CWNG revision and atomically persist the exact served bytes."""
+def _commit_complete_render(*, state, body, digest, annotation_count, device_id=None):
+    """Atomically bind complete fallback bytes to their device scope.
+
+    The book keeps a single latest snapshot. Another device must rebuild
+    its live set or receive 503; it can never replay these scoped bytes.
+    """
     if state.set_digest != digest:
         state.authority_revision = (state.authority_revision or 0) + 1
         state.set_digest = digest
@@ -1055,6 +1130,7 @@ def _commit_complete_render(*, state, body, digest, annotation_count):
     )
     state.current_etag = etag
     state.etag_kind = "cwng_revision"
+    state.last_served_device_id = device_id
     state.last_served_body_gzip = gzip.compress(body, mtime=0)
     state.last_served_body_sha256 = digest
     state.last_served_etag = etag
@@ -1079,16 +1155,17 @@ def _emergency_render(*, user_id, book_id, entitlement_id, page_limit,
             reasons=[reason, query_reason, "last_served_snapshot_required"],
         )
         return load_last_served_complete_set(
-            user_id=user_id, book_id=book_id, log=log,
+            user_id=user_id, book_id=book_id, log=log, device_id=device_id,
         )
     if len(rows) > page_limit:
         return None
-    if not force_authoritative and not _render_count_is_safe(
+    if (not force_authoritative or device_id is None) and not _render_count_is_safe(
         user_id=user_id, book_id=book_id, device_id=device_id,
         row_count=len(rows),
         row_ids={annotation.annotation_id for annotation, _ in rows},
     ):
         return None
+    rows = _device_pull_rows(rows, device_id)
     reasons = [reason]
     if query_reason is not None:
         reasons.append(query_reason)
@@ -1127,7 +1204,7 @@ def _emergency_render(*, user_id, book_id, entitlement_id, page_limit,
         try:
             etag = _commit_complete_render(
                 state=state, body=body, digest=digest,
-                annotation_count=len(rows),
+                annotation_count=len(rows), device_id=device_id,
             )
         except Exception as error:
             _safe_rollback()
@@ -1157,6 +1234,7 @@ def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
         row_ids={annotation.annotation_id for annotation, _ in rows},
     ):
         return None
+    rows = _device_pull_rows(rows, device_id)
     # A single malformed row or serializer bug cannot abort a
     # replacement-set GET.  Preserve at least its id and user text.
     objects = _render_rows(rows, entitlement_id, reasons)
@@ -1178,7 +1256,7 @@ def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
         try:
             etag = _commit_complete_render(
                 state=state, body=body, digest=digest,
-                annotation_count=len(rows),
+                annotation_count=len(rows), device_id=device_id,
             )
         except Exception as error:
             _safe_rollback()
@@ -1239,7 +1317,8 @@ def reanchor_after_download(*, user_id, book_id, device_id, log, reanchor):
         return None
     try:
         rows = _simple_annotation_rows(user_id, book_id, 2 ** 31 - 2)
-        annotations = [row[0] if isinstance(row, tuple) else row for row in rows]
+        rows = _device_pull_rows(rows, device_id)
+        annotations = [row[0] for row in rows]
         if annotations:
             reanchor(annotations)
         ledger.settle_pending_download(
@@ -1267,8 +1346,10 @@ def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
                                  log, reanchor=None):
     """Answer the first annotation GET after a device download from CWNG rows.
 
-    Returns ``(body, etag)`` or ``None`` (nothing pending, or nothing to
-    restore: the caller then proxies exactly as before).
+    Returns ``(body, etag)`` or ``None`` (nothing pending, or the account
+    has no local rows: the caller then proxies exactly as before). An
+    identified device is restored only its own rows, which may be an empty
+    set when the account's rows all came from other devices.
 
     The seeding gates exist so that a partial local set never replaces a
     fuller one on the device. Right after a download the device set is
@@ -1298,6 +1379,8 @@ def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
         _safe_rollback()
         rows = _simple_annotation_rows(user_id, book_id, 2 ** 31 - 2)
     if not rows:
+        # The account's local set is itself empty: nothing proves Kobo's
+        # cloud copy incomplete, so the caller proxies exactly as before.
         ledger.settle_pending_download(pending, state=ledger.RESTORE_EMPTY, count=0)
         ub.session.commit()
         log.info(
@@ -1306,8 +1389,13 @@ def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
             user_id, book_id, device_id,
         )
         return None
+    # Spec 17a.3: the account's set is non-empty and the device's set is
+    # empty by construction, so this device's own rows are the complete
+    # answer. With none of its own, that answer is a valid empty set; the
+    # upstream body would carry another Kobo's highlights.
+    rows = _device_pull_rows(rows, device_id)
 
-    if reanchor is not None:
+    if reanchor is not None and rows:
         try:
             reanchor([annotation for annotation, _ in rows])
         except Exception as error:
@@ -1336,6 +1424,7 @@ def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
         try:
             etag = _commit_complete_render(
                 state=state, body=body, digest=digest, annotation_count=len(rows),
+                device_id=device_id,
             )
         except Exception as error:
             _safe_rollback()
@@ -1343,6 +1432,8 @@ def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
             etag = _transient_etag(user_id, book_id, normalized_content_id, digest)
 
     try:
+        # A served empty own set is still the device's complete answer:
+        # ``served`` keeps an armed row armed for the real download's GET.
         ledger.settle_pending_download(
             pending, state=ledger.RESTORE_SERVED, count=len(rows),
         )

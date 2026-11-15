@@ -1,0 +1,7 @@
+.section { display: grid; gap: var(--sp-2); margin-block: var(--sp-4); }
+.section h2 { font-size: var(--fs-lg); margin: 0; }
+.section p { margin: 0; }
+.form { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.form select { min-height: 44px; max-width: 100%; color: var(--text); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2); font: inherit; }
+.form select:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.average { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }

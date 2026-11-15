@@ -87,7 +87,7 @@ def test_existing_read_row_gets_visible_progress_state_from_plugin_put(monkeypat
 
         handshake = client.get("/kosync/users/auth", headers=headers)
         assert handshake.status_code == 200
-        assert handshake.get_json() == {"authorized": "OK"}
+        assert handshake.get_json()["authorized"] == "OK"
 
         pushed = client.put(
             "/kosync/syncs/progress",

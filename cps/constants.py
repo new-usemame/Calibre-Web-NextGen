@@ -157,10 +157,6 @@ def tmp_conversion_dir():
         DEFAULT_TMP_CONVERSION_DIR,
     )
 
-# Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
-DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
-CACHE_DIR           = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
-
 OAUTH_SSL_STRICT = os.environ.get('OAUTH_SSL_STRICT', "1").lower() in ("true", "1")
 
 if HOME_CONFIG:
@@ -172,6 +168,13 @@ else:
     CONFIG_DIR = os.environ.get('CALIBRE_DBPATH', BASE_DIR)
     if getattr(sys, 'frozen', False):
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
+
+
+# Derived cache belongs with writable per-install state, not image-owned code.
+# Existing explicit CACHE_DIR deployments keep their chosen location. Thumbnail
+# cache already uses CONFIG_DIR/thumbnails and is deliberately unchanged.
+DEFAULT_CACHE_DIR = os.path.join(CONFIG_DIR, 'cache')
+CACHE_DIR = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
 
 
 def config_path(*parts, _join=os.path.join):
@@ -338,7 +341,7 @@ EXTENSIONS_CONVERT_FROM = ['pdf', 'epub', 'mobi', 'azw3', 'docx', 'rtf', 'fb2', 
 EXTENSIONS_CONVERT_TO = ['pdf', 'epub', 'mobi', 'azw3', 'docx', 'rtf', 'fb2',
                          'lit', 'lrf', 'txt', 'htmlz', 'rtf', 'odt']
 EXTENSIONS_UPLOAD = {'txt', 'pdf', 'epub', 'kepub', 'mobi', 'azw', 'azw3', 'cbr', 'cbz', 'cbt', 'cb7', 'djvu', 'djv',
-                     'prc', 'doc', 'docx', 'fb2', 'html', 'rtf', 'lit', 'odt', 'mp3', 'mp4', 'ogg',
+                     'prc', 'doc', 'docx', 'fb2', 'fbz', 'html', 'rtf', 'lit', 'odt', 'mp3', 'mp4', 'ogg',
                      'opus', 'wav', 'flac', 'm4a', 'm4b', 'acsm', 'lcpl', 'kfx', 'kfx-zip'}
 
 _extension = ""

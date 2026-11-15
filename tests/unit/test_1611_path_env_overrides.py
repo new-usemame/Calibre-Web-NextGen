@@ -433,13 +433,30 @@ def test_cwa_init_ingest_block_reports_missing_sentinel(
         _cwa_init_ingest_block(tmp_path, script_copy)
 
 
-def test_cwa_init_skips_custom_ingest_chown_in_network_share_mode(tmp_path):
+def _run_network_share_ingest_block(tmp_path, fs_type, abc_can_write):
+    """Run the cwa-init ingest block with NETWORK_SHARE_MODE on.
+
+    `stat -f -c %T` (the filesystem type) and `cwa-as-abc` (the writability
+    probe as the app user) are faked on PATH so the block's decision can be
+    driven from the outside; chown is faked so nothing is really re-owned.
+    `fs_type=None` makes the fake stat fail, as an unreadable mount would.
+    """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     chown_log = tmp_path / "chown.log"
     _write_executable(
         bin_dir / "chown",
         '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CWA_TEST_CHOWN_LOG"\n',
+    )
+    if fs_type is None:
+        _write_executable(bin_dir / "stat", "#!/bin/sh\nexit 1\n")
+    else:
+        _write_executable(
+            bin_dir / "stat", f'#!/bin/sh\nprintf "%s\\n" "{fs_type}"\n'
+        )
+    _write_executable(
+        bin_dir / "cwa-as-abc",
+        "#!/bin/sh\nexit 0\n" if abc_can_write else "#!/bin/sh\nexit 1\n",
     )
     custom_ingest = tmp_path / "custom-ingest"
     env = _isolated_path_env(tmp_path)
@@ -460,11 +477,46 @@ def test_cwa_init_skips_custom_ingest_chown_in_network_share_mode(tmp_path):
         text=True,
         timeout=10,
     )
-
     assert result.returncode == 0, result.stderr
     assert custom_ingest.is_dir()
-    assert not chown_log.exists()
-    assert f"skipping chown of {custom_ingest}" in result.stdout
+    chowned = chown_log.read_text().splitlines() if chown_log.exists() else []
+    return custom_ingest, chowned, result.stdout
+
+
+@pytest.mark.parametrize("fs_type", ("nfs", "cifs", "smb2", "fuseblk", None))
+def test_cwa_init_skips_ingest_chown_on_a_network_share(tmp_path, fs_type):
+    custom_ingest, chowned, stdout = _run_network_share_ingest_block(
+        tmp_path, fs_type, abc_can_write=False
+    )
+
+    assert chowned == []
+    assert f"skipping chown of {custom_ingest}" in stdout
+
+
+@pytest.mark.parametrize("fs_type", ("ext2/ext3", "xfs", "btrfs", "zfs"))
+def test_cwa_init_reowns_a_local_ingest_dir_the_app_user_cannot_write(
+    tmp_path, fs_type
+):
+    # #2936: NETWORK_SHARE_MODE is often on for the library's sake while the
+    # ingest folder is the image's own local volume, created 911-owned at build
+    # time. Skipping it left uploads failing with "Ingest directory not
+    # writable" after every update.
+    custom_ingest, chowned, stdout = _run_network_share_ingest_block(
+        tmp_path, fs_type, abc_can_write=False
+    )
+
+    assert chowned == [f"abc:abc {custom_ingest}"]
+    assert "skipping chown" not in stdout
+
+
+def test_cwa_init_leaves_a_writable_local_ingest_dir_alone_in_network_share_mode(
+    tmp_path,
+):
+    _custom_ingest, chowned, _stdout = _run_network_share_ingest_block(
+        tmp_path, "ext2/ext3", abc_can_write=True
+    )
+
+    assert chowned == []
 
 
 @pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)

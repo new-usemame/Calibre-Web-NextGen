@@ -20,7 +20,12 @@ from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
                       generate_password_hash, reset_password)
 from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slug, theme_code
+from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
+                                   validate_default_font_updates)
 from ..admin import _delete_user
+from ..string_helper import strip_whitespaces
+from ..services.opds_filename import validate_template as validate_opds_filename_template
+from ..services.mail_filename import validate_mail_filename_template
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
 # the safe, high-traffic display settings — the deep security config (LDAP,
@@ -33,7 +38,8 @@ from ..admin import _delete_user
 _UI_CONFIG_INT = ("config_books_per_page", "config_random_books",
                   "config_authors_max")
 _UI_CONFIG_STR = ("config_calibre_web_title", "config_default_language",
-                  "config_default_locale", "config_server_announcement")
+                  "config_default_locale", "config_server_announcement",
+                  "config_opds_filename_template")
 
 # SPA role key -> the User.role bitmask bit. ROLE_ANONYMOUS is intentionally
 # excluded — it's not an admin-assignable permission.
@@ -54,6 +60,16 @@ def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
 
 
+def _conflict_message(exc):
+    """Name the field that actually collided (SQLite reports it as ``user.<column>``)."""
+    detail = str(getattr(exc, "orig", exc)).lower()
+    if "user.email" in detail:
+        return "An account already exists for this email address"
+    if "user.name" in detail:
+        return "That username is already taken"
+    return "An account already exists for this email or username"
+
+
 def _require_admin():
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
@@ -71,7 +87,10 @@ def _serialize_user(u):
         "locale": u.locale,
         "default_language": u.default_language,
         "is_guest": u.name == "Guest",
-        "roles": {key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+        "roles": {
+            **{key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+            "share_shelfs": bool(getattr(u, "share_shelfs", True)),
+        },
     }
     payload.update(user_library.mode_payload(u))
     return payload
@@ -276,7 +295,10 @@ def _ui_config_payload():
         "config_theme": config_theme_slug(config.config_theme),
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
+        "config_default_ui_font_body": getattr(config, "config_default_ui_font_body", ""),
+        "config_default_ui_font_display": getattr(config, "config_default_ui_font_display", ""),
         "config_server_announcement": config.config_server_announcement or "",
+        "config_opds_filename_template": getattr(config, "config_opds_filename_template", "") or "",
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
         "locales": locale_options(),
@@ -294,6 +316,7 @@ def _mail_payload():
         "mail_login": config.mail_login or "",
         "mail_from": config.mail_from or "",
         "mail_size_mb": int((config.mail_size or 0) / 1024 / 1024),
+        "mail_filename_template": getattr(config, "mail_filename_template", "") or "",
         "mail_server_type": config.mail_server_type,
         "has_password": bool(getattr(config, "mail_password_e", None)),
     }
@@ -319,20 +342,30 @@ def admin_update_mail():
     if guard:
         return guard
     data = request.get_json(silent=True) or {}
-    for key in ("mail_server", "mail_from", "mail_login"):
-        if key in data:
-            setattr(config, key, str(data[key] or "").strip())
+    if "mail_filename_template" in data:
+        template = data["mail_filename_template"] if data["mail_filename_template"] is not None else ""
+        try:
+            validate_mail_filename_template(template)
+        except ValueError as error:
+            return _err("invalid_request", str(error), 400)
+    numeric = {}
     for key in ("mail_port", "mail_use_ssl", "mail_server_type"):
         if key in data:
             try:
-                setattr(config, key, int(data[key]))
+                numeric[key] = int(data[key])
             except (TypeError, ValueError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
     if "mail_size_mb" in data:
         try:
-            config.mail_size = int(data["mail_size_mb"]) * 1024 * 1024
+            numeric["mail_size"] = int(data["mail_size_mb"]) * 1024 * 1024
         except (TypeError, ValueError):
             return _err("invalid_request", "mail_size_mb must be a number", 400)
+    # Complete validation before changing the process's shared settings row.
+    for key in ("mail_server", "mail_from", "mail_login", "mail_filename_template"):
+        if key in data:
+            setattr(config, key, str(data[key] or "").strip())
+    for key, value in numeric.items():
+        setattr(config, key, value)
     # Write-only password: only overwrite when the admin actually typed a new one.
     if data.get("mail_password"):
         config.mail_password_e = str(data["mail_password"])
@@ -362,11 +395,24 @@ def admin_update_config():
     if guard:
         return guard
     data = request.get_json(silent=True) or {}
+    try:
+        font_updates = validate_default_font_updates(data)
+    except ValueError as ex:
+        return _err("invalid_request", str(ex), 400)
+    if "config_opds_filename_template" in data:
+        try:
+            validate_opds_filename_template(data["config_opds_filename_template"] if data["config_opds_filename_template"] is not None else "")
+        except ValueError as error:
+            return _err("invalid_opds_filename_template", str(error), 400)
+    integer_updates = {}
     for key in _UI_CONFIG_INT:
         if key in data:
             try:
-                setattr(config, key, int(data[key]))
-            except (TypeError, ValueError):
+                value = int(data[key])
+                if not -(2 ** 63) <= value < 2 ** 63:
+                    raise ValueError('Number exceeds the settings database range')
+                integer_updates[key] = value
+            except (TypeError, ValueError, OverflowError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
     if "config_theme" in data:
         # Validated against the SSOT slug set, exactly like the per-account
@@ -374,10 +420,15 @@ def admin_update_config():
         # instead of being stored and silently falling back to dark on read.
         if data["config_theme"] not in ALLOWED_THEME_SLUGS:
             return _err("invalid_request", "Invalid theme option", 400)
-        config.config_theme = theme_code(data["config_theme"])
+        integer_updates['config_theme'] = theme_code(data["config_theme"])
+    for key, value in integer_updates.items():
+        setattr(config, key, value)
     for key in _UI_CONFIG_STR:
         if key in data:
-            setattr(config, key, str(data[key] or ""))
+            value = str(data[key] or "")
+            setattr(config, key, strip_whitespaces(value) if key == "config_opds_filename_template" else value)
+    for key, value in font_updates.items():
+        setattr(config, key, value)
     try:
         config.save()
     except Exception as ex:
@@ -422,6 +473,7 @@ def admin_create_user():
             if roles.get(key):
                 role |= bit
         new_user.role = role
+        new_user.share_shelfs = bool(roles.get("share_shelfs", True))
     else:
         new_user.role = config.config_default_role
 
@@ -442,13 +494,14 @@ def admin_create_user():
     # Inherit the instance default theme, matching _handle_new_user. The account
     # keeps its own copy from here on — Account -> Theme edits User.theme only.
     new_user.theme = config_theme_code(config.config_theme)
+    seed_new_user_ui_font_defaults(new_user, config)
 
     try:
         ub.session.add(new_user)
         ub.session.commit()
-    except IntegrityError:
+    except IntegrityError as ex:
         ub.session.rollback()
-        return _err("conflict", "An account already exists for this email or name", 409)
+        return _err("conflict", _conflict_message(ex), 409)
     except Exception as ex:
         ub.session.rollback()
         return _err("db_error", "Could not create user: %s" % ex, 500)
@@ -502,12 +555,14 @@ def admin_update_user(user_id):
         if losing_admin and _other_admin_count(user.id) == 0:
             return _err("conflict", "Can't remove admin from the last administrator", 400)
         user.role = new_role
+        if "share_shelfs" in data["roles"]:
+            user.share_shelfs = bool(data["roles"]["share_shelfs"])
 
     try:
         if "email" in data:
             new_email = valid_email(data.get("email") or "")
             if new_email and new_email != user.email:
-                user.email = check_email(new_email)  # raises if taken
+                user.email = check_email(new_email, user.id)  # raises if taken
         if "kindle_mail" in data:
             user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "locale" in data and data["locale"]:

@@ -35,7 +35,8 @@ no-op off Kobo), so a second device could never receive the first device's highl
 still declared its empty set complete — silently destroying them, permanently,
 since ``apply_portable`` never un-hides a tombstone. Only the device can tell
 the two apart, because only it knows what it used to have, so the decision lives
-there and the server obeys. ``complete`` is still accepted and ignored.
+there and the server applies its source and device ownership checks.
+``complete`` is still accepted and ignored.
 
 The route handlers are thin; ``build_pull_payload`` + ``apply_push`` hold the
 testable logic. See notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md §4.
@@ -45,7 +46,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from flask import request
+from flask import has_request_context, request
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from ... import csrf, logger, ub
@@ -66,8 +68,11 @@ log = logger.create()
 
 # Sources a push may delete from. A device may only delete rows of the source it
 # actually owns, so a KOReader sync can never touch a Kobo-native or web-reader
-# highlight.
-_DELETABLE_SOURCES = {"koreader"}
+# highlight. A push names its own source in ``delete_source`` (KOReader's plugin
+# never sends it, so a push without one is KOReader's), and only that one
+# source's rows are deletable by that push -- a word-based client and KOReader
+# cannot delete each other's highlights either.
+_DELETABLE_SOURCES = {"koreader", "textquote"}
 
 # Keep ``annotation_id IN (...)`` below SQLite's historical 999-variable
 # ceiling after the user/book/source predicates take their own bind slots.
@@ -78,13 +83,46 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _device_annotations_predicate(device):
+    """Ownership shared by pull and push, including pre-provenance rows.
+
+    Both branches produce a boolean even for NULL provenance, so negating this
+    predicate also finds legacy rows outside the device's original sources.
+    """
+    legacy_sources = ("koreader", "textquote") if device.kind == "koreader" else ()
+    return or_(
+        and_(ub.Annotation.origin_device_id.isnot(None),
+             ub.Annotation.origin_device_id == device.id),
+        and_(ub.Annotation.origin_device_id.is_(None),
+             ub.Annotation.source.isnot(None),
+             ub.Annotation.source.in_(legacy_sources)),
+    )
+
+
+def _foreign_annotation_ids(annotation_ids, *, user, book, session, device):
+    """Existing, account/book-scoped ids this identified device cannot change."""
+    if device is None:
+        return set()
+    ids = sorted(set(annotation_ids))
+    query = session.query(ub.Annotation.annotation_id).filter(
+        ub.Annotation.user_id == user.id, ub.Annotation.book_id == book.id,
+        ~_device_annotations_predicate(device),
+    )
+    foreign = set()
+    for start in range(0, len(ids), _DELETE_ID_CHUNK_SIZE):
+        chunk = ids[start:start + _DELETE_ID_CHUNK_SIZE]
+        foreign.update(aid for (aid,) in query.filter(
+            ub.Annotation.annotation_id.in_(chunk)).all())
+    return foreign
+
+
 # ---------------------------------------------------------------------------
 # Testable core
 # ---------------------------------------------------------------------------
 
 
 def build_pull_payload(user_id: int, book_id: int, session, *,
-                       book=None, book_format=None) -> dict:
+                       book=None, book_format=None, quotes=False) -> dict:
     """Portable annotations for one user + book, INCLUDING hidden rows so the
     device can mirror deletions locally.
 
@@ -93,16 +131,84 @@ def build_pull_payload(user_id: int, book_id: int, session, *,
     the XPointers KOReader needs to place them (see ``_add_device_xpointers``).
     """
     from ...services.annotation_portable import to_portable
-    rows = (
-        session.query(ub.Annotation)
-        .filter(ub.Annotation.user_id == user_id, ub.Annotation.book_id == book_id)
-        .order_by(ub.Annotation.id.asc())
-        .all()
-    )
+    query = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.book_id == book_id)
+    device = None
+    foreign_ids = None
+    if has_request_context():
+        from ...services.device_registry import find_koreader_device
+        raw_id = request.headers.get("X-CWNG-Device-ID")
+        device = (find_koreader_device(user_id=user_id, device_id=raw_id,
+                                      session=session) if raw_id else None)
+        if device is not None:
+            # Only an attributed origin is proof. Include hidden rows; local
+            # cleanup does not delete or modify these authoritative records.
+            foreign_ids = [aid for (aid,) in session.query(ub.Annotation.annotation_id)
+                           .filter(ub.Annotation.user_id == user_id,
+                                   ub.Annotation.book_id == book_id,
+                                   ub.Annotation.origin_device_id.isnot(None),
+                                   ub.Annotation.origin_device_id != device.id)
+                           .order_by(ub.Annotation.id)]
+            query = query.filter(_device_annotations_predicate(device))
+    rows = query.order_by(ub.Annotation.id.asc()).all()
     annotations = [to_portable(r) for r in rows]
     if book is not None and book_format:
         _add_device_xpointers(rows, annotations, book, book_format)
-    return {"annotations": annotations, "annotation_count": len(annotations)}
+    if book is not None and quotes:
+        # Reading the book's text is file work; keep it off the request greenlet.
+        from ...services.parallel import run_blocking
+        run_blocking(lambda: _add_text_quotes(rows, annotations, book))
+    payload = {"annotations": annotations, "annotation_count": len(annotations)}
+    if foreign_ids is not None:
+        payload["foreign_annotation_ids"] = foreign_ids
+    return payload
+
+
+def _add_text_quotes(rows, annotations, book) -> None:
+    """Name each pulled highlight by its words, for clients that hold no DOM.
+
+    A row keeps the quote its own client sent. Any other row is named from
+    its anchor in the library EPUB -- a Kobo highlight through the KEPUB's
+    text, which is the EPUB's (``kepub_alignment``) -- and only when the words
+    found there are the row's ``highlighted_text``: an anchor from another
+    copy of the book gives no quote, never other words.
+    """
+    from ...annotations import _book_format_path, _cfi_source_path
+    from ...services import kepub_alignment
+    from ...services import koreader_xpointer as kx
+    from ...services import text_anchor
+    from ...services.kobo_position import _extract_kobospan_id
+
+    epub = _book_format_path(book, "EPUB")
+    if not epub:
+        return
+    kepub = _book_format_path(book, "KEPUB")
+    for row, wire in zip(rows, annotations):
+        if row.hidden or wire.get("text_quote") or not row.highlighted_text:
+            continue
+        try:
+            pair = None
+            span = _extract_kobospan_id(row.start_container_path or "")
+            if row.position_type == "koreader_xpointer" and row.start_xpointer and row.end_xpointer:
+                pair = (row.start_xpointer, row.end_xpointer)
+            elif span and kepub and "!!" in (row.content_id or ""):
+                # The Kobo's offset counts characters of a DOM this server does
+                # not rebuild, so the words place the highlight inside the span.
+                text_range = kepub_alignment.span_text_range(
+                    epub, kepub, row.content_id.split("!!", 1)[1], span)
+                placed = text_anchor.place_in_text_range(epub, text_range, row.highlighted_text)
+                pair = placed[:2] if placed else None
+            elif row.cfi_range and _cfi_source_path(row, book) == epub:
+                pair = kx.cfi_range_to_xpointers(epub, row.cfi_range)
+            if not pair:
+                continue
+            quote = text_anchor.quote_at(epub, *pair)
+        except Exception:  # pragma: no cover - a derived quote is optional
+            log.warning("Annotation pull: could not name %s by its words",
+                        row.annotation_id, exc_info=True)
+            continue
+        if quote and text_anchor.fold(quote["exact"]) == text_anchor.fold(row.highlighted_text):
+            wire["text_quote"] = quote
 
 
 def _add_device_xpointers(rows, annotations, book, book_format) -> None:
@@ -145,23 +251,58 @@ def _add_device_xpointers(rows, annotations, book, book_format) -> None:
 
 def apply_push(annotations, *, user, book, session, commit,
                deleted_ids=None, delete_source="koreader",
-               origin_device_id=None) -> dict:
+               origin_device_id=None, epub_path=None) -> dict:
     """Upsert each pushed portable annotation, fan out to enabled sync targets,
-    and return a counts summary keyed by action (created/updated/deleted/skipped).
+    and return counts by action (created/updated/deleted/unchanged/skipped).
 
     ``deleted_ids`` names the annotations the device knows it used to have and
     the user has since deleted; they are soft-deleted (see
     :func:`_apply_deletes`). Omission from ``annotations`` means nothing on its
     own — see the module docstring for why the server never infers a delete.
-    Inline ``hidden`` uses the same ``_DELETABLE_SOURCES`` authority as those
-    named deletes.
+    An identified device cannot edit or hide another device's row, including
+    copies retained from an earlier pull. Its own and legacy rows retain the
+    pushing source's existing delete authority (``delete_source``).
+
+    A pushed ``text_quote`` with no XPointer or KoboSpan is placed in
+    ``epub_path`` (the library EPUB, when the user may read it); the summary's
+    ``resolved``/``unresolved`` list the quoted annotations by outcome. A
+    rejected foreign quote is resolved as terminal handling, not a content
+    write: retrying cannot grant ownership, and its action is ``unchanged``.
     """
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
 
+    authority = {delete_source}
     summary = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0}
     if not isinstance(annotations, list):
         return summary
+    device = (session.query(ub.Device).filter(
+        ub.Device.user_id == user.id, ub.Device.id == origin_device_id,
+    ).first() if origin_device_id is not None else None)
+    foreign = _foreign_annotation_ids(
+        (payload["annotation_id"].strip() for payload in annotations
+         if isinstance(payload, dict) and isinstance(payload.get("annotation_id"), str)),
+        user=user, book=book, session=session, device=device,
+    )
+    allowed, rejected_quotes = [], []
+    for payload in annotations:
+        aid = payload.get("annotation_id") if isinstance(payload, dict) else None
+        if isinstance(aid, str) and aid.strip() in foreign:
+            summary["unchanged"] += 1
+            if payload.get("text_quote") is not None:
+                rejected_quotes.append(aid)
+        else:
+            allowed.append(payload)
+    annotations = allowed
+    placed = _place_quotes(annotations, epub_path,
+                           _anchored_elsewhere(annotations, user=user, book=book, session=session))
+    if placed is not None:
+        annotations, summary["resolved"], summary["unresolved"] = placed
+    if rejected_quotes:
+        # Like _place_quotes retaining another reader's established anchor,
+        # this outcome needs no further placement attempt by the client.
+        summary.setdefault("resolved", []).extend(rejected_quotes)
+        summary.setdefault("unresolved", [])
     for payload in annotations:
         row, action = apply_portable(
             payload, user_id=user.id, book=book, session=session, commit=commit,
@@ -169,7 +310,7 @@ def apply_push(annotations, *, user, book, session, commit,
             # This protocol owns the single authority decision. The portable
             # helper receives the decision; it does not grow a second source
             # list that could drift from named-delete enforcement.
-            deletable_sources=_DELETABLE_SOURCES,
+            deletable_sources=authority,
         )
         summary[action] = summary.get(action, 0) + 1
         if row is None or action in ("skipped", "unchanged"):
@@ -178,7 +319,7 @@ def apply_push(annotations, *, user, book, session, commit,
             if action == "deleted":
                 annotation_sync.dispatch_annotation_deletes(
                     [row.annotation_id], user, book_id=book.id,
-                    deletable_sources=_DELETABLE_SOURCES,
+                    deletable_sources=authority,
                 )
             else:
                 annotation_sync.dispatch_existing_annotation_sync(row, book, user)
@@ -186,14 +327,112 @@ def apply_push(annotations, *, user, book, session, commit,
             log.exception("koreader annotation push fan-out failed for %s", row.annotation_id)
 
     if deleted_ids:
-        summary["deleted"] += _apply_deletes(
+        deleted, unchanged = _apply_deletes(
             deleted_ids, user=user, book=book, session=session, commit=commit,
-            source=delete_source,
+            source=delete_source, device=device,
         )
+        summary["deleted"] += deleted
+        summary["unchanged"] += unchanged
     return summary
 
 
-def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
+def _has_native_anchor(payload) -> bool:
+    return bool(payload.get("start_xpointer") or payload.get("start_kobospan"))
+
+
+def _anchored_elsewhere(annotations, *, user, book, session) -> set:
+    """Ids of quoted rows another reader already anchors: never re-placed.
+
+    A client may send back a quote for another reader's highlight (an edited
+    note). Placing it would replace that reader's own anchor -- a web CFI, a
+    KoboSpan -- with the client's idea of the words.
+    """
+    ids = {
+        payload.get("annotation_id") for payload in annotations
+        if isinstance(payload, dict) and payload.get("text_quote") is not None
+        and isinstance(payload.get("annotation_id"), str)
+    }
+    if not ids:
+        return set()
+    rows = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user.id, ub.Annotation.book_id == book.id,
+        ub.Annotation.annotation_id.in_(sorted(ids)),
+        ub.Annotation.source != "textquote",
+    ).all()
+    return {
+        row.annotation_id for row in rows
+        if row.start_xpointer or row.start_container_path or row.cfi_range
+    }
+
+
+def _place_quotes(annotations, epub_path, anchored=frozenset()):
+    """Pushed annotations with each text quote placed, or None if none quote.
+
+    Returns ``(annotations, resolved_ids, unresolved_ids)``. A quote found in
+    the library EPUB becomes the KOReader XPointer pair every reader already
+    consumes, with the book's own words as ``highlighted_text`` (what KOReader
+    compares before drawing); one not found is kept as the row's only anchor
+    (``position_type`` 'text_quote') rather than guessed at or dropped. A
+    payload that already carries a native anchor is left as sent, and a quote
+    for a row another reader anchors (``anchored``) is dropped, the row kept.
+    """
+    from ...services import text_anchor
+    from ...services.parallel import run_blocking
+
+    quoted = [
+        i for i, payload in enumerate(annotations)
+        if isinstance(payload, dict) and not _has_native_anchor(payload)
+        and text_anchor.parse_quote(payload.get("text_quote")) is not None
+    ]
+    if not quoted:
+        return None
+    out, resolved, unresolved = list(annotations), [], []
+    for i in [i for i in quoted if annotations[i].get("annotation_id") in anchored]:
+        out[i] = {k: v for k, v in annotations[i].items()
+                  if k not in ("text_quote", "percentage", "position_type",
+                               "highlighted_text")}
+        resolved.append(out[i].get("annotation_id"))
+        quoted.remove(i)
+
+    def place_all():
+        found = {}
+        for i in quoted:
+            payload = annotations[i]
+            quote = text_anchor.parse_quote(payload["text_quote"])
+            percentage = payload.get("percentage")
+            try:
+                found[i] = text_anchor.place_quote(
+                    epub_path, quote,
+                    None if percentage is None else percentage * 100.0,
+                ) if epub_path and quote else None
+            except Exception:
+                log.warning("Could not place a text quote in %s", epub_path, exc_info=True)
+                found[i] = None
+        return found
+
+    found = run_blocking(place_all) if quoted else {}
+    for i in quoted:
+        payload = dict(annotations[i])
+        quote = text_anchor.parse_quote(payload["text_quote"])
+        point = payload.get("type") == "dogear"
+        if found.get(i):
+            start, end, passage, _percent = found[i]
+            payload.update(position_type="koreader_xpointer",
+                           start_xpointer=start, end_xpointer=end)
+            if not point:
+                payload["highlighted_text"] = passage
+            resolved.append(payload.get("annotation_id"))
+        else:
+            payload["position_type"] = "text_quote"
+            if not point and not payload.get("highlighted_text"):
+                payload["highlighted_text"] = quote["exact"]
+            unresolved.append(payload.get("annotation_id"))
+        out[i] = payload
+    return out, resolved, unresolved
+
+
+def _apply_deletes(deleted_ids, *, user, book, session, commit, source,
+                   device=None) -> tuple[int, int]:
     """Soft-delete the rows the device reported as deleted.
 
     KOReader leaves no tombstone when a highlight is deleted — the entry just
@@ -203,13 +442,15 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
 
     Scoped hard, because deleting is destructive-in-effect:
       - only this ``(user, book)``;
+      - only this device's own and legacy rows when identified;
       - only rows of ``source`` (a KOReader sync must never delete a
         Kobo-native or web-reader highlight — those devices own their own);
       - only rows that are still live (an already-hidden row is left alone, so
         the delete fan-out fires once, not on every subsequent sync).
 
     Soft-deletes rather than deleting: pull deliberately includes hidden rows so
-    other devices can mirror the deletion locally.
+    other devices can mirror the deletion locally. Returns deleted and foreign
+    unchanged counts; already-hidden own rows retain their existing no-op.
     """
     from ...services import annotation_sync
 
@@ -218,7 +459,11 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         if isinstance(aid, str) and aid.strip()
     }
     if not wanted:
-        return 0
+        return 0, 0
+    foreign = _foreign_annotation_ids(
+        wanted, user=user, book=book, session=session, device=device,
+    )
+    wanted -= foreign
 
     base_query = session.query(ub.Annotation).filter(
         ub.Annotation.user_id == user.id,
@@ -236,7 +481,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
             base_query.filter(ub.Annotation.annotation_id.in_(chunk)).all()
         )
     if not stale:
-        return 0
+        return 0, len(foreign)
 
     for row in stale:
         row.hidden = True
@@ -247,7 +492,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         try:
             annotation_sync.dispatch_annotation_deletes(
                 [row.annotation_id], user, book_id=book.id,
-                deletable_sources=_DELETABLE_SOURCES,
+                deletable_sources={source},
             )
         except Exception:  # pragma: no cover - fan-out must never fail the push
             log.exception("koreader annotation delete fan-out failed for %s", row.annotation_id)
@@ -255,7 +500,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         "koreader delete: soft-deleted %d reported %s row(s) for user=%s book=%s",
         len(stale), source, user.id, book.id,
     )
-    return len(stale)
+    return len(stale), len(foreign)
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +561,29 @@ def _reject(user, document, error, message, status=400):
     return create_sync_response({"error": error, "message": message}, status)
 
 
+def _book_for_document(document, user):
+    """``(book_id, book_format)`` a ``document`` names for ``user``.
+
+    ``document`` is a KOReader digest of a file the library holds, or -- for
+    a client that read the book from OPDS and kept no copy of the library's
+    file to digest -- a decimal Calibre book id, which resolves only to a book
+    this user may see (as for progress, ``book_id_document``). A book id
+    names no particular file, so its format is None.
+    """
+    from .kosync import _is_ascii_book_id
+    if _is_ascii_book_id(document):
+        from ... import calibre_db
+        book = calibre_db.get_filtered_book(int(document), allow_show_archived=True,
+                                            allow_show_hidden=True, user=user)
+        return (book.id, None) if book is not None else (None, None)
+    book_id, book_format, _title, _path, _ver = get_book_by_checksum(document)
+    return book_id, book_format
+
+
+def _wants_quotes() -> bool:
+    return request.args.get("text_quote", "").lower() in ("1", "true")
+
+
 @csrf.exempt
 @kosync.route("/kosync/syncs/annotations/<document>", methods=["GET"])
 def pull_annotations(document: str):
@@ -329,7 +597,7 @@ def pull_annotations(document: str):
     if not is_valid_key_field(document):
         return _reject(user, document, ERROR_DOCUMENT_FIELD_MISSING, "Invalid document field")
 
-    book_id, book_format, _title, _path, _ver = get_book_by_checksum(document)
+    book_id, book_format = _book_for_document(document, user)
     if not book_id:
         # Unknown book: empty set, not an error (the device may have a book the
         # server doesn't know yet). Logged because from the device's side this
@@ -365,8 +633,14 @@ def pull_annotations(document: str):
     except Exception:  # pragma: no cover - XPointer derivation is optional
         log.warning("KOReader annotation pull: book %s lookup failed", book_id, exc_info=True)
         book = None
+    # Naming highlights by their words reads the book's text, so it needs the
+    # same right to read the book as anchors do (kosync._readable_epub).
+    quotes = False
+    if _wants_quotes() and book is not None:
+        from .kosync import _readable_epub
+        quotes = bool(_readable_epub(book_id, user))
     payload = build_pull_payload(user.id, book_id, ub.session,
-                                 book=book, book_format=book_format)
+                                 book=book, book_format=book_format, quotes=quotes)
     payload["document"] = document
     payload["calibre_book_id"] = book_id
     # See the unmatched branch above: present-and-true is what lets a client
@@ -413,7 +687,7 @@ def push_annotations():
         return create_sync_response({"document": document, "matched": False,
                                      "created": 0, "updated": 0, "deleted": 0, "skipped": 0})
 
-    book_id, _fmt, _title, _path, _ver = get_book_by_checksum(document)
+    book_id, _fmt = _book_for_document(document, user)
     if not book_id:
         return _unmatched()
 
@@ -452,13 +726,15 @@ def push_annotations():
     # that deletes nothing would throw away the annotations that push carries
     # over a field with no effect.
     delete_source = data.get("delete_source", "koreader")
-    if deleted_ids and (
-        not isinstance(delete_source, str) or delete_source not in _DELETABLE_SOURCES
-    ):
-        return _reject(
-            user, document, "invalid_delete_source",
-            "delete_source must be one of: %s" % ", ".join(sorted(_DELETABLE_SOURCES)),
-        )
+    if not isinstance(delete_source, str) or delete_source not in _DELETABLE_SOURCES:
+        if deleted_ids:
+            return _reject(
+                user, document, "invalid_delete_source",
+                "delete_source must be one of: %s" % ", ".join(sorted(_DELETABLE_SOURCES)),
+            )
+        # Nothing named for deletion: the push still carries its annotations,
+        # and it may delete only through the unchanged default authority.
+        delete_source = "koreader"
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
         error = validate_portable_payload(
@@ -486,12 +762,17 @@ def push_annotations():
     except Exception:
         log.warning("KOReader annotation attribution failed", exc_info=True)
 
+    epub_path = None
+    if any(isinstance(p, dict) and p.get("text_quote") is not None for p in annotations):
+        # Placing a quote reads the book's text (see the pull route).
+        from .kosync import _readable_epub
+        epub_path = _readable_epub(book_id, user)
     try:
         summary = apply_push(
             annotations, user=user, book=book,
             session=ub.session, commit=ub.session_commit,
             deleted_ids=deleted_ids, delete_source=delete_source,
-            origin_device_id=origin_device_id,
+            origin_device_id=origin_device_id, epub_path=epub_path,
         )
     except (RuntimeError, SQLAlchemyError):
         ub.session.rollback()

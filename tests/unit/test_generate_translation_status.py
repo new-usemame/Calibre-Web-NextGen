@@ -153,5 +153,22 @@ def test_published_counts_match_msgfmt_for_every_shipped_locale():
     )
 
 
+def test_complete_plural_messages_count_once_and_fuzzy_or_empty_forms_do_not(tmp_path, monkeypatch):
+    _write_po(
+        tmp_path,
+        'msgid "one day"\nmsgid_plural "many days"\n'
+        'msgstr[0] "un jour"\nmsgstr[1] "plusieurs jours"\n\n'
+        '#, fuzzy\nmsgid "one guess"\nmsgid_plural "many guesses"\n'
+        'msgstr[0] "guess"\nmsgstr[1] "guesses"\n\n'
+        'msgid "one empty"\nmsgid_plural "many empty"\n'
+        'msgstr[0] "one"\nmsgstr[1] ""\n\n'
+        'msgid "singular"\nmsgstr "translated"\n',
+    )
+    monkeypatch.setattr(mod, "ROOT_DIR", tmp_path)
+    lang, _name, total, translated, fuzzy, percent = mod.collect_stats()[0]
+    assert (lang, total, translated, fuzzy) == ("xx", 4, 2, 1)
+    assert percent == 50.0
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

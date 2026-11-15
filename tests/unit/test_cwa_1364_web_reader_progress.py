@@ -100,66 +100,11 @@ def test_cwa_1364_anchor_comment_present_in_js():
 # --- Fix #2 source-pins -------------------------------------------------------
 
 
-def test_read_book_route_updates_book_read_link():
-    """The /read/<book_id>/<book_format> route must UPSERT
-    ``book_read_link`` for authenticated users — Kobo + KOSync already
-    do this; the web reader was the only book-opening surface that
-    never recorded a read event."""
-    src = _web_source()
-    # Locate the read_book function body.
-    match = re.search(
-        r"def read_book\(book_id, book_format\):.*?(?=\n(?:@web\.route|def \w))",
-        src,
-        re.DOTALL,
-    )
-    assert match, "Could not locate read_book function body"
-    body = match.group(0)
-    assert "ub.ReadBook" in body, (
-        "read_book must query `ub.ReadBook` to UPSERT the user's "
-        "read state. See CWA #1364."
-    )
-    assert "last_time_started_reading" in body, (
-        "read_book must set `last_time_started_reading` on the book_read_link "
-        "row so /read and /unread filters reflect web-reader activity."
-    )
-    assert "times_started_reading" in body, (
-        "read_book must bump `times_started_reading` on the IN_PROGRESS "
-        "transition (debounced — only when transitioning FROM a "
-        "non-in-progress state, so refreshes don't inflate the count)."
-    )
-    assert "STATUS_IN_PROGRESS" in body, (
-        "read_book must set `read_status = STATUS_IN_PROGRESS` when "
-        "opening a not-yet-finished book."
-    )
-
-
-def test_read_book_debounces_times_started_reading_increment():
-    """`times_started_reading` should only bump on transition INTO
-    IN_PROGRESS — refresh / Back / Forward must not inflate the count.
-    Source-pin the guard so a future refactor doesn't remove it."""
-    src = _web_source()
-    match = re.search(
-        r"def read_book\(book_id, book_format\):.*?(?=\n(?:@web\.route|def \w))",
-        src,
-        re.DOTALL,
-    )
-    body = match.group(0)
-    # The increment must be inside a conditional that excludes
-    # IN_PROGRESS (so refresh doesn't bump) and FINISHED (so re-opening
-    # a finished book doesn't reset to in-progress and bump).
-    assert re.search(
-        r"prev_status\s*!=\s*ub\.ReadBook\.STATUS_IN_PROGRESS",
-        body,
-    ), (
-        "read_book must guard the times_started_reading bump on "
-        "`prev_status != STATUS_IN_PROGRESS` — refresh shouldn't count "
-        "as a new reading session."
-    )
-    assert "STATUS_FINISHED" in body, (
-        "read_book must also exclude STATUS_FINISHED from the bump path "
-        "— re-opening a finished book shouldn't silently reset its "
-        "status to in-progress."
-    )
+# The upsert and its debounce (refresh is not a new session, a finished book
+# stays finished) moved into ``cps.services.read_status.record_reader_open``,
+# shared with the new UI reader (#2750). They are exercised as behaviour, not
+# source text, in tests/unit/test_2750_new_reader_open_marks_reading.py, and
+# the classic route's write in test_reader_lookup_and_stop_reading_2223.py.
 
 
 def test_read_book_handles_db_failure_gracefully():

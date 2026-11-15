@@ -76,11 +76,9 @@ def collect_stats():
         # pointed contributors at the wrong languages. `translated` must mean
         # "reaches the user", i.e. exactly what `msgfmt --statistics` reports
         # as translated. Same failure class as #879 and #1086.
-        translated = sum(
-            1
-            for e in po
-            if not e.obsolete and e.msgstr.strip() and "fuzzy" not in e.flags
-        )
+        # Plural translations live in msgstr_plural, not msgstr. Polib's
+        # predicate also excludes fuzzy/obsolete and incomplete plural entries.
+        translated = sum(1 for e in po if e.translated())
         percent = round(100 * translated / total, 1) if total else 0.0
         stats.append((lang, LANGUAGE_NAMES.get(lang, lang), total, translated, fuzzy, percent))
     stats.sort(key=lambda r: (-r[5], r[1]))
@@ -89,11 +87,11 @@ def collect_stats():
 
 def render_readme_table(stats):
     """Compact table for the repo README. Pure markdown, no images, no
-    external services — renders the same on github.com and on a clone."""
+    external services; renders the same on github.com and on a clone."""
     lines = [
         "| Language | Completion | Strings | Fuzzy |",
         "|---|---|---:|---:|",
-        "| English (source) | 100% | source | — |",
+        "| English (source) | 100% | source | n/a |",
     ]
     for lang, name, total, translated, fuzzy, percent in stats:
         bar_filled = int(round(percent / 5))

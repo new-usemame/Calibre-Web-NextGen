@@ -48,6 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 def clean_env(monkeypatch):
     """Each test starts from a known-empty CWA_CALIBRE_USER_PLUGINS state."""
     monkeypatch.delenv("CWA_CALIBRE_USER_PLUGINS", raising=False)
+    monkeypatch.delenv("CALIBRE_DBPATH", raising=False)
     yield monkeypatch
 
 
@@ -171,8 +172,20 @@ class TestCalibreUserPluginsHelper:
     def test_env_var_name_constant(self):
         assert calibre_user_plugins.env_var_name() == "CWA_CALIBRE_USER_PLUGINS"
 
-    def test_home_path_constant(self):
+    def test_home_path_constant(self, clean_env):
         assert calibre_user_plugins.home_path() == "/config"
+
+    @pytest.mark.parametrize("dbpath", ("/srv/cwng", "/srv/cwng/app.db"))
+    def test_home_path_follows_calibre_dbpath(self, clean_env, dbpath):
+        clean_env.setenv("CALIBRE_DBPATH", dbpath)
+        clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "1")
+        assert calibre_user_plugins.home_path() == "/srv/cwng"
+        assert calibre_user_plugins.plugins_dir() == Path(
+            "/srv/cwng/.config/calibre/plugins"
+        )
+        env = calibre_user_plugins.apply_to_env({})
+        assert env["HOME"] == "/srv/cwng"
+        assert env["CALIBRE_CONFIG_DIRECTORY"] == "/srv/cwng/.config/calibre"
 
 
 @pytest.mark.unit
